@@ -27,8 +27,38 @@ const SHELF_KEY = "openchapter:shelf";
 const BODY_PREFIX = "openchapter:chapter:";
 const NOTES_PREFIX = "openchapter:notes:";
 
-/** A book's three regions. "body" is the default and is stored as absent. */
-export type ChapterPart = "front" | "body" | "back";
+/**
+ * Which section a chapter sits in. A plain id rather than a union: the three
+ * below are what every book starts with, not what it is limited to.
+ *
+ * "body" is the default and is stored as absent, so a chapter that has never
+ * been moved carries no part at all.
+ */
+export type ChapterPart = string;
+
+export interface BookPart {
+  id: string;
+  label: string;
+}
+
+export const DEFAULT_PARTS: readonly BookPart[] = Object.freeze([
+  Object.freeze({ id: "front", label: "Front matter" }),
+  Object.freeze({ id: "body", label: "Body" }),
+  Object.freeze({ id: "back", label: "Back matter" }),
+]);
+
+const BUILTIN_PART_IDS: ReadonlySet<string> = new Set(
+  DEFAULT_PARTS.map((p) => p.id),
+);
+
+/**
+ * The three a book is born with cannot be removed. Body is where a deleted
+ * section's chapters land, and front and back are the shape of a book rather
+ * than one writer's idea about one manuscript.
+ */
+export function isBuiltinPart(id: ChapterPart): boolean {
+  return BUILTIN_PART_IDS.has(id);
+}
 
 export interface ChapterMeta {
   id: string;
@@ -51,6 +81,8 @@ export interface Book {
   genre?: string;
   /** Words aimed at. Absent means no goal, and no progress is shown. */
   targetWords?: number;
+  /** Sections, in list order. Absent means the three defaults — see partsOf. */
+  parts?: readonly BookPart[];
   /** Page geometry. Absent means the default — see pageSetupOf. */
   page?: PageSetup;
   /** Set aside but kept. Epoch ms. */
@@ -842,6 +874,61 @@ export function bookmarks(shelf: Shelf): Bookmark[] {
 
 export function chaptersInPart(book: Book, part: ChapterPart): ChapterMeta[] {
   return book.chapters.filter((c) => (c.part ?? "body") === part);
+}
+
+/** Absent means a book made before sections were editable. */
+export function partsOf(book: Book): readonly BookPart[] {
+  return book.parts ?? DEFAULT_PARTS;
+}
+
+/** Returns the new section's id, or null if the label was blank. */
+export function addPart(bookId: string, label: string): string | null {
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+
+  const id = newId();
+  // Appended, not slotted in before the back matter. Section order is a
+  // grouping in the panel and nothing else — export walks the chapter list —
+  // so a new section appearing anywhere but the end would just be surprising.
+  commitBook(bookId, (book) => ({
+    ...book,
+    parts: [...partsOf(book), { id, label: trimmed }],
+  }));
+  return id;
+}
+
+export function renamePart(bookId: string, partId: ChapterPart, label: string) {
+  const trimmed = label.trim();
+  if (!trimmed) return;
+
+  commitBook(bookId, (book) => ({
+    ...book,
+    parts: partsOf(book).map((p) =>
+      p.id === partId ? { ...p, label: trimmed } : p,
+    ),
+  }));
+}
+
+/**
+ * Removes a section and returns its chapters to the body.
+ *
+ * A section is a label on a group of chapters, so deleting one must not delete
+ * what it labelled. Built-ins are refused outright — losing "Body" would leave
+ * every untagged chapter with nowhere to appear.
+ */
+export function removePart(bookId: string, partId: ChapterPart) {
+  if (isBuiltinPart(partId)) return;
+
+  commitBook(bookId, (book) => ({
+    ...book,
+    parts: partsOf(book).filter((p) => p.id !== partId),
+    chapters: book.chapters.map((c) => {
+      if (c.part !== partId) return c;
+      const next = { ...c };
+      delete next.part;
+      return next;
+    }),
+  }));
 }
 
 export function setChapterPart(

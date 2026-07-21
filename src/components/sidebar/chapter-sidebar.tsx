@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -9,7 +9,11 @@ import {
   createChapter,
   deleteChapter,
   findBook,
+  addPart,
   moveChapter,
+  isBuiltinPart,
+  partsOf,
+  removePart,
   renameBook,
   setChapterPart,
   toggleBookmark,
@@ -35,11 +39,18 @@ import { useShelf } from "@/lib/use-library";
  * chapter is being dragged — the only moment they are wanted.
  */
 
-const PARTS: { key: ChapterPart; label: string; empty: string }[] = [
-  { key: "front", label: "Front matter", empty: "Copyright, dedication…" },
-  { key: "body", label: "Body", empty: "Drag chapters here" },
-  { key: "back", label: "Back matter", empty: "Acknowledgements, notes…" },
-];
+/**
+ * What each built-in section is for, shown when it is empty. Sections a writer
+ * adds get the generic line — we know what a book's front matter holds, but not
+ * what they meant by "Interludes".
+ */
+const PART_HINTS: Record<string, string> = {
+  front: "Copyright, dedication…",
+  body: "Drag chapters here",
+  back: "Acknowledgements, notes…",
+};
+
+const EMPTY_HINT = "No chapters here yet";
 
 export function ChapterSidebar({ bookId }: { bookId: string }) {
   const shelf = useShelf();
@@ -49,6 +60,14 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overPart, setOverPart] = useState<ChapterPart | null>(null);
+  // A blank string means the new-section row is open and still empty, which is
+  // different from null: null is "not naming anything".
+  const [naming, setNaming] = useState<string | null>(null);
+  // Enter, Escape and blur can all fire for a single naming session: committing
+  // unmounts the row, and a browser that then fires blur would run the handler
+  // again with the name still in its closure and add the section twice. First
+  // one through wins.
+  const namingSettled = useRef(false);
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -115,6 +134,47 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     setOverPart(null);
   };
 
+  const parts = partsOf(book);
+  const current = browsing ? parts.find((p) => p.id === browsing) : null;
+
+  // A section deleted in another tab leaves this one pointing at nothing. Fall
+  // back to the list rather than rendering a header with no name in it.
+  if (browsing !== null && !current) {
+    setBrowsing(null);
+  }
+
+  const startNaming = () => {
+    namingSettled.current = false;
+    setNaming("");
+  };
+
+  const cancelNaming = () => {
+    namingSettled.current = true;
+    setNaming(null);
+  };
+
+  const handleAddPart = () => {
+    if (namingSettled.current) return;
+    namingSettled.current = true;
+
+    const id = addPart(bookId, naming ?? "");
+    setNaming(null);
+    // Step into what was just made: naming a section and then having to find it
+    // in the list is a click nobody needs.
+    if (id) setBrowsing(id);
+  };
+
+  const handleRemovePart = (partId: ChapterPart, label: string) => {
+    const held = chaptersInPart(book, partId).length;
+    const warning = held
+      ? `Delete “${label}”? Its ${held} ${held === 1 ? "chapter moves" : "chapters move"} to Body.`
+      : `Delete “${label}”?`;
+    if (!window.confirm(warning)) return;
+
+    removePart(bookId, partId);
+    setBrowsing(null);
+  };
+
   const written = bookWordCount(book);
 
   return (
@@ -135,30 +195,32 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                      text-lg font-semibold text-fg outline-none
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         />
-        {/* Full width and solid, matching New book on the shelf. Creating a
-            chapter is this panel's primary action and now looks like one. */}
+        {/* One primary-action slot whose meaning follows the level you are
+            standing on: from the list it adds a section, inside a section it
+            adds a chapter to that section. Two buttons here would both have
+            claimed to be the main thing to do. */}
         <button
           type="button"
-          onClick={() => handleCreate(browsing ?? "body")}
+          onClick={() => (current ? handleCreate(current.id) : startNaming())}
           className="mt-3 w-full rounded-md bg-accent py-2.5 font-sans text-sm
                      font-semibold text-white outline-none transition-colors
                      hover:bg-accent-strong focus-visible:ring-2
                      focus-visible:ring-accent/60"
         >
-          New chapter
+          {current ? `Add to ${current.label}` : "New section"}
         </button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
         {browsing === null ? (
           <ul>
-            {PARTS.map(({ key, label }) => {
-              const count = chaptersInPart(book, key).length;
+            {parts.map(({ id, label }) => {
+              const count = chaptersInPart(book, id).length;
               return (
-                <li key={key}>
+                <li key={id}>
                   <button
                     type="button"
-                    onClick={() => setBrowsing(key)}
+                    onClick={() => setBrowsing(id)}
                     className="flex w-full items-center gap-2 border-b
                                border-line px-4 py-3.5 text-left font-sans
                                text-sm font-semibold text-fg outline-none
@@ -177,6 +239,33 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 </li>
               );
             })}
+
+            {naming !== null && (
+              <li className="border-b border-line px-4 py-2.5">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleAddPart();
+                  }}
+                >
+                  <input
+                    value={naming}
+                    onChange={(e) => setNaming(e.target.value)}
+                    onBlur={handleAddPart}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") cancelNaming();
+                    }}
+                    placeholder="Section name…"
+                    aria-label="New section name"
+                    autoFocus
+                    className="w-full rounded-md border border-accent bg-surface
+                               px-2.5 py-1.5 font-sans text-sm text-fg
+                               placeholder:text-muted placeholder:font-normal
+                               outline-none"
+                  />
+                </form>
+              </li>
+            )}
           </ul>
         ) : (
           <>
@@ -184,14 +273,32 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
               <button
                 type="button"
                 onClick={() => setBrowsing(null)}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5
-                           font-sans text-sm font-semibold text-fg outline-none
-                           transition-colors hover:bg-raised
-                           focus-visible:ring-2 focus-visible:ring-accent/60"
+                className="flex flex-1 items-center gap-1.5 truncate rounded-md
+                           px-2 py-1.5 text-left font-sans text-sm font-semibold
+                           text-fg outline-none transition-colors
+                           hover:bg-raised focus-visible:ring-2
+                           focus-visible:ring-accent/60"
               >
                 <span aria-hidden="true">‹</span>
-                {PARTS.find((p) => p.key === browsing)?.label}
+                <span className="truncate">{current?.label}</span>
               </button>
+
+              {/* Only sections the writer added. Front matter, Body and Back
+                  matter are the shape of a book, not a preference. */}
+              {current && !isBuiltinPart(current.id) && (
+                <button
+                  type="button"
+                  onClick={() => handleRemovePart(current.id, current.label)}
+                  aria-label={`Delete section ${current.label}`}
+                  title="Delete section"
+                  className="shrink-0 rounded-md px-2 py-1.5 font-sans text-sm
+                             leading-none text-muted outline-none
+                             transition-colors hover:text-red-400
+                             focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  ×
+                </button>
+              )}
             </div>
 
             <SectionChapters
@@ -205,20 +312,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
               onDelete={handleDelete}
             />
 
-            <div className="px-3 pt-3">
-              <button
-                type="button"
-                onClick={() => handleCreate(browsing)}
-                className="w-full rounded-md border border-dashed border-line
-                           py-2.5 font-sans text-sm text-muted outline-none
-                           transition-colors hover:border-accent
-                           hover:text-accent-strong focus-visible:ring-2
-                           focus-visible:ring-accent/60"
-              >
-                + Add to {PARTS.find((p) => p.key === browsing)?.label}
-              </button>
-            </div>
-
             {/* The other two sections, shown only while something is being
                 dragged. Stepping into a section took them off screen, and a
                 chapter you can pick up but cannot put anywhere is worse than
@@ -226,33 +319,33 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             {dragId && (
               <div className="sticky bottom-0 z-10 mt-4 border-t border-line bg-panel px-3 pt-3 pb-1">
                 <p className="pb-2 font-sans text-xs text-muted">Move to</p>
-                {PARTS.filter((p) => p.key !== browsing).map(
-                  ({ key, label }) => (
+                {parts
+                  .filter((p) => p.id !== browsing)
+                  .map(({ id, label }) => (
                     <div
-                      key={key}
+                      key={id}
                       onDragOver={(e) => {
                         // Without preventDefault the browser refuses the drop.
                         e.preventDefault();
-                        setOverPart(key);
+                        setOverPart(id);
                       }}
                       onDragLeave={() => setOverPart(null)}
                       onDrop={(e) => {
                         e.preventDefault();
-                        handleDropOn(key);
-                        setBrowsing(key);
+                        handleDropOn(id);
+                        setBrowsing(id);
                       }}
                       className={`mb-1.5 rounded-md border border-dashed py-3
                                   text-center font-sans text-sm
                                   transition-colors ${
-                                    overPart === key
+                                    overPart === id
                                       ? "border-accent bg-accent-deep/40 text-fg"
                                       : "border-line text-muted"
                                   }`}
                     >
                       {label}
                     </div>
-                  ),
-                )}
+                  ))}
               </div>
             )}
           </>
@@ -312,7 +405,7 @@ function SectionChapters({
   onDelete: (chapter: ChapterMeta) => void;
 }) {
   const chapters = chaptersInPart(book, part);
-  const empty = PARTS.find((p) => p.key === part)?.empty ?? "";
+  const empty = PART_HINTS[part] ?? EMPTY_HINT;
 
   if (chapters.length === 0) {
     return (
