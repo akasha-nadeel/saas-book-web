@@ -26,6 +26,11 @@ import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 const SHELF_KEY = "openchapter:shelf";
 const BODY_PREFIX = "openchapter:chapter:";
 const NOTES_PREFIX = "openchapter:notes:";
+// Covers live at their own key rather than in the shelf. The shelf is
+// parsed on every read and shared by every screen; folding a few hundred
+// kilobytes of base64 per book into it would make opening the library the
+// most expensive thing the app does.
+const COVER_PREFIX = "openchapter:cover:";
 
 export interface ChapterMeta {
   id: string;
@@ -38,6 +43,8 @@ export interface ChapterMeta {
 export interface Book {
   id: string;
   title: string;
+  /** Shown under the title on the cover. */
+  subtitle?: string;
   /** Optional. Used for the DOCX byline and EPUB's dc:creator. */
   author?: string;
   /** What the writer set out to make. Absent on books made before setup. */
@@ -76,6 +83,7 @@ const EMPTY_SHELF: Shelf = Object.freeze({
 
 const bodyKey = (id: string) => `${BODY_PREFIX}${id}`;
 const notesKey = (id: string) => `${NOTES_PREFIX}${id}`;
+const coverKey = (id: string) => `${COVER_PREFIX}${id}`;
 
 function newId(): string {
   // randomUUID needs a secure context; plain http://<lan-ip>:3000 isn't one.
@@ -189,6 +197,50 @@ export function getServerBody(): string | null {
   return null;
 }
 
+/** A data URL, or null when the book has no cover art. */
+export function getCover(bookId: string): string | null {
+  return readRaw(coverKey(bookId));
+}
+
+export function getServerCover(): string | null {
+  return null;
+}
+
+export function subscribeToCover(bookId: string, onStoreChange: () => void) {
+  // Local writes arrive on the shelf channel, which is what setCover emits on;
+  // the storage event covers the other tabs.
+  shelfListeners.add(onStoreChange);
+
+  const key = coverKey(bookId);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    shelfListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+/**
+ * Pass null to clear. Returns false when the write failed, which for a cover
+ * means the browser is out of room — worth saying rather than swallowing,
+ * because the book itself saved and only the picture did not.
+ */
+export function setCover(bookId: string, dataUrl: string | null): boolean {
+  try {
+    if (dataUrl === null) window.localStorage.removeItem(coverKey(bookId));
+    else window.localStorage.setItem(coverKey(bookId), dataUrl);
+  } catch (err) {
+    console.error("[store] could not write cover", err);
+    return false;
+  }
+  // The shelf did not change, but what the shelf *renders* did.
+  emitShelf();
+  return true;
+}
+
 /**
  * Pure lookup. The result is a reference into the cached shelf, so it is
  * stable for as long as the shelf is.
@@ -238,6 +290,10 @@ export interface BookSetup {
   kind?: BookKind;
   genre?: string;
   targetWords?: number;
+  subtitle?: string;
+  author?: string;
+  /** A data URL. Stored at its own key, not in the shelf — see COVER_PREFIX. */
+  cover?: string;
 }
 
 /**
@@ -262,6 +318,8 @@ export function createBook(
     // Spread conditionally rather than assigning undefined: an explicit
     // `targetWords: undefined` survives JSON.stringify as a missing key but
     // shows up in object comparisons, and the store's tests check exact shape.
+    ...(setup?.subtitle ? { subtitle: setup.subtitle } : {}),
+    ...(setup?.author ? { author: setup.author } : {}),
     ...(setup?.kind ? { kind: setup.kind } : {}),
     ...(setup?.genre ? { genre: setup.genre } : {}),
     ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
@@ -269,6 +327,8 @@ export function createBook(
     lastOpenedId: chapterId,
     lastOpenedAt: Date.now(),
   };
+
+  if (setup?.cover) setCover(bookId, setup.cover);
 
   commit({
     ...shelf,
@@ -301,6 +361,12 @@ export function deleteBook(bookId: string) {
   // Shelf first, bodies second. The shelf entry is what makes the book visible,
   // so if this half fails the writer sees a consistent app with some dead bytes
   // in storage — the reverse order would show a book whose chapters are gone.
+  try {
+    window.localStorage.removeItem(coverKey(bookId));
+  } catch {
+    // Unreachable bytes, not a broken app.
+  }
+
   for (const chapter of doomed.chapters) {
     try {
       window.localStorage.removeItem(bodyKey(chapter.id));

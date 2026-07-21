@@ -74,7 +74,21 @@ function loadImage(file: File): Promise<HTMLImageElement> {
   });
 }
 
-export async function importImage(file: File): Promise<ImportResult> {
+/**
+ * A cover is rendered about 150px wide on the shelf, so it needs a fraction of
+ * what an inline illustration does. Every book carries one, and they all share
+ * the same few megabytes of origin storage.
+ */
+export const COVER_MAX_EDGE = 700;
+export const COVER_MAX_BYTES = 250_000;
+
+export async function importImage(
+  file: File,
+  limits: { maxEdge?: number; maxBytes?: number } = {},
+): Promise<ImportResult> {
+  const maxEdge = limits.maxEdge ?? MAX_EDGE;
+  const maxBytes = limits.maxBytes ?? MAX_BYTES;
+
   if (!file.type.startsWith("image/")) {
     return { ok: false, error: "That file isn’t an image." };
   }
@@ -86,7 +100,7 @@ export async function importImage(file: File): Promise<ImportResult> {
     return { ok: false, error: "That image couldn’t be read." };
   }
 
-  const size = targetSize(img.naturalWidth, img.naturalHeight);
+  const size = targetSize(img.naturalWidth, img.naturalHeight, maxEdge);
   const canvas = document.createElement("canvas");
   canvas.width = size.width;
   canvas.height = size.height;
@@ -104,7 +118,7 @@ export async function importImage(file: File): Promise<ImportResult> {
   }
 
   const bytes = dataUrlBytes(src);
-  if (bytes > MAX_BYTES) {
+  if (bytes > maxBytes) {
     return {
       ok: false,
       error: `Still ${describeBytes(bytes)} after resizing — too large to store in the browser. Try a smaller crop.`,

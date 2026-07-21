@@ -3,6 +3,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 import {
   getBody,
+  getCover,
+  getServerCover,
   getServerBody,
   getNotes,
   getPrefs,
@@ -11,6 +13,7 @@ import {
   getServerShelf,
   getShelf,
   subscribeToBody,
+  subscribeToCover,
   subscribeToNotes,
   subscribeToPrefs,
   subscribeToShelf,
@@ -57,6 +60,16 @@ export function useChapterBody(id: string): string | null {
   // with Object.is, and equal strings are Object.is-equal, so no caching layer
   // is needed here the way it is for the parsed shelf.
   return useSyncExternalStore(subscribe, snapshot, getServerBody);
+}
+
+/** A book's cover art as a data URL, or null. */
+export function useCover(bookId: string): string | null {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToCover(bookId, onStoreChange),
+    [bookId],
+  );
+  const snapshot = useCallback(() => getCover(bookId), [bookId]);
+  return useSyncExternalStore(subscribe, snapshot, getServerCover);
 }
 
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */

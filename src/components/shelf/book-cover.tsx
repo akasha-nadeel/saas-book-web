@@ -17,13 +17,18 @@
  */
 export function BookCover({
   title,
+  subtitle,
   author,
   words,
+  image,
 }: {
   title: string;
+  subtitle?: string;
   author?: string;
   /** Drives how thick the page block looks. A long book is a fat book. */
   words: number;
+  /** Cover art as a data URL. Replaces the typeset face when present. */
+  image?: string | null;
 }) {
   // Eight leaves at 40k words, which is where a novel starts. Capped, because
   // past a point more lines just turn into a grey smear.
@@ -38,6 +43,19 @@ export function BookCover({
                  group-hover:-translate-y-1.5
                  group-hover:shadow-[0_18px_34px_-12px_rgba(0,0,0,0.85)]"
     >
+      {/* Artwork sits under the spine and page-block shading, so a cover with
+          a picture on it still reads as an object rather than a flat image. A
+          plain <img>: these are data URLs already resized on import, so
+          next/image has nothing left to optimise. */}
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={image}
+          alt=""
+          className="absolute inset-0 h-full w-full rounded-l-[3px] rounded-r-md object-cover"
+        />
+      ) : null}
+
       {/* The spine: a hard fold line with the shading falling away from it. */}
       <div
         aria-hidden="true"
@@ -61,21 +79,29 @@ export function BookCover({
         }}
       />
 
-      <div className="relative flex h-full flex-col px-5 py-5 pl-7">
-        <h3
-          // Three lines then ellipsis: a long title should wrap like a title,
-          // not be cut off after four words.
-          className="line-clamp-3 font-serif text-lg leading-snug text-[#16191f]"
-          title={title}
-        >
-          {title}
-        </h3>
-        {author ? (
-          <p className="mt-2 truncate font-sans text-[0.7rem] tracking-wide text-[#6b7280] uppercase">
-            {author}
-          </p>
-        ) : null}
-      </div>
+      {image ? null : (
+        <div className="relative flex h-full flex-col px-5 py-5 pl-7">
+          <h3
+            // Three lines then ellipsis: a long title should wrap like a title,
+            // not be cut off after four words.
+            className="line-clamp-3 font-serif text-lg leading-snug text-[#16191f]"
+            title={title}
+          >
+            {title}
+          </h3>
+          {subtitle ? (
+            <p className="mt-1.5 line-clamp-2 font-serif text-xs leading-snug text-[#4b5563] italic">
+              {subtitle}
+            </p>
+          ) : null}
+          {author ? (
+            /* Pushed to the foot of the cover, where a byline sits. */
+            <p className="mt-auto truncate font-sans text-[0.7rem] tracking-wide text-[#6b7280] uppercase">
+              {author}
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

@@ -12,6 +12,8 @@ import {
   deleteChapter,
   ensureChapter,
   findBook,
+  getCover,
+  setCover,
   getNotes,
   getPrefs,
   getShelf,
@@ -100,6 +102,54 @@ it("writes setup through to storage, not just the in-memory cache", () => {
   expect(book?.kind).toBe("novel");
   expect(book?.genre).toBe("Fantasy");
   expect(book?.targetWords).toBe(110_000);
+});
+
+it("stores subtitle, author and cover from setup", () => {
+  const { bookId } = createBook("The Salt Road", {
+    subtitle: "A novel",
+    author: "A. Writer",
+    cover: "data:image/webp;base64,AAAA",
+  });
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.subtitle).toBe("A novel");
+  expect(book.author).toBe("A. Writer");
+  // The cover is deliberately not on the book: the shelf is parsed on every
+  // read and must not carry image payloads.
+  expect("cover" in book).toBe(false);
+  expect(getCover(bookId)).toBe("data:image/webp;base64,AAAA");
+});
+
+it("keeps cover art out of the shelf document", () => {
+  const { bookId } = createBook("A", { cover: "data:image/webp;base64,BBBB" });
+  const shelfRaw = localStorage.getItem("openchapter:shelf")!;
+  expect(shelfRaw).not.toContain("BBBB");
+  expect(localStorage.getItem(`openchapter:cover:${bookId}`)).toContain("BBBB");
+});
+
+it("clears a cover when set to null", () => {
+  const { bookId } = createBook("A", { cover: "data:image/webp;base64,CCCC" });
+  expect(setCover(bookId, null)).toBe(true);
+  expect(getCover(bookId)).toBeNull();
+});
+
+it("removes a deleted book's cover", () => {
+  const { bookId } = createBook("A", { cover: "data:image/webp;base64,DDDD" });
+  deleteBook(bookId);
+
+  // The largest orphan the app can leave behind.
+  expect(localStorage.getItem(`openchapter:cover:${bookId}`)).toBeNull();
+});
+
+it("reports a failed cover write rather than swallowing it", () => {
+  const { bookId } = createBook("A");
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new DOMException("quota", "QuotaExceededError");
+  });
+
+  // The book saved; only the picture did not, and the caller can say so.
+  expect(setCover(bookId, "data:image/webp;base64,EEEE")).toBe(false);
+  vi.restoreAllMocks();
 });
 
 it("finds a book by id and reports null for an unknown one", () => {

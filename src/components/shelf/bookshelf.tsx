@@ -19,7 +19,7 @@ import {
   type BookView,
 } from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
-import { useHydrated, useShelf } from "@/lib/use-library";
+import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 const VIEW_LABEL: Record<BookView, string> = {
   active: "All books",
@@ -360,6 +360,27 @@ function Empty() {
 }
 
 /**
+ * A cover that follows its book's art.
+ *
+ * Its own component so the subscription is per book: covers live at their own
+ * storage keys, and reading them all through one hook would repaint every book
+ * on the shelf whenever any one of them changed.
+ */
+function ShelfCover({ book }: { book: Book }) {
+  const image = useCover(book.id);
+
+  return (
+    <BookCover
+      title={book.title}
+      subtitle={book.subtitle}
+      author={book.author}
+      words={bookWordCount(book)}
+      image={image}
+    />
+  );
+}
+
+/**
  * The shelf itself.
  *
  * A grid of covers rather than a table of rows. A table is the better shape for
@@ -407,11 +428,7 @@ function BookGrid({
                        focus-visible:ring-accent/60 focus-visible:ring-offset-4
                        focus-visible:ring-offset-panel"
           >
-            <BookCover
-              title={book.title}
-              author={book.author}
-              words={bookWordCount(book)}
-            />
+            <ShelfCover book={book} />
           </Link>
 
           {/* Over the cover's top corner, revealed on hover. Actions on a shelf

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,7 +12,9 @@ import {
   targetHint,
   type BookKind,
 } from "@/lib/book-kinds";
+import { COVER_MAX_BYTES, COVER_MAX_EDGE, importImage } from "@/lib/image-import";
 import { createBook } from "@/lib/library-store";
+import { BookCover } from "@/components/shelf/book-cover";
 
 /**
  * The step between "New book" and the blank page.
@@ -28,6 +30,11 @@ export function NewBookForm() {
   const router = useRouter();
 
   const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [author, setAuthor] = useState("");
+  const [cover, setCover] = useState<string | null>(null);
+  const [coverError, setCoverError] = useState<string | null>(null);
+  const coverInput = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<BookKind>(DEFAULT_KIND);
   const [genre, setGenre] = useState<string>(DEFAULT_GENRE);
 
@@ -44,6 +51,9 @@ export function NewBookForm() {
 
     const words = Number.parseInt(target.replace(/[^0-9]/g, ""), 10);
     const { bookId, chapterId } = createBook(title.trim() || "Untitled Book", {
+      subtitle: subtitle.trim() || undefined,
+      author: author.trim() || undefined,
+      cover: cover ?? undefined,
       kind,
       genre,
       // A cleared or nonsense field means no goal rather than a goal of zero.
@@ -76,6 +86,122 @@ export function NewBookForm() {
                          focus-visible:border-accent focus-visible:outline-none"
             />
           </label>
+
+          <label className="mt-6 block font-sans text-sm">
+            <span className="font-medium text-fg">Subtitle</span>
+            <span className="ml-2 text-xs text-muted">optional</span>
+            <input
+              value={subtitle}
+              onChange={(e) => setSubtitle(e.target.value)}
+              placeholder="A novel"
+              className="mt-1.5 w-full rounded-md border border-line bg-panel
+                         px-3 py-2.5 text-fg placeholder:text-muted
+                         focus-visible:border-accent focus-visible:outline-none"
+            />
+          </label>
+
+          <label className="mt-6 block font-sans text-sm">
+            <span className="font-medium text-fg">Author</span>
+            <span className="ml-2 text-xs text-muted">optional</span>
+            <input
+              value={author}
+              onChange={(e) => setAuthor(e.target.value)}
+              placeholder="Your name"
+              autoComplete="name"
+              className="mt-1.5 w-full rounded-md border border-line bg-panel
+                         px-3 py-2.5 text-fg placeholder:text-muted
+                         focus-visible:border-accent focus-visible:outline-none"
+            />
+          </label>
+
+          {/* The cover, beside a live preview of it. A cover is the one field
+              here whose result cannot be imagined from the input, so the form
+              shows the thing being made rather than describing it. */}
+          <div className="mt-6">
+            <p className="font-sans text-sm font-medium text-fg">
+              Cover
+              <span className="ml-2 text-xs font-normal text-muted">
+                optional
+              </span>
+            </p>
+
+            <div className="mt-1.5 flex items-start gap-4">
+              <div className="w-24 shrink-0">
+                <BookCover
+                  title={title.trim() || "Untitled Book"}
+                  subtitle={subtitle.trim() || undefined}
+                  author={author.trim() || undefined}
+                  words={0}
+                  image={cover}
+                />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => coverInput.current?.click()}
+                    className="rounded-md border border-line px-3 py-2 font-sans
+                               text-sm text-fg outline-none transition-colors
+                               hover:border-accent/60 hover:bg-raised
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    {cover ? "Replace image" : "Choose image"}
+                  </button>
+                  {cover && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCover(null);
+                        setCoverError(null);
+                      }}
+                      className="rounded-md px-3 py-2 font-sans text-sm
+                                 text-muted outline-none transition-colors
+                                 hover:bg-raised hover:text-fg
+                                 focus-visible:ring-2 focus-visible:ring-accent/60"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <p className="mt-2 font-sans text-xs text-muted">
+                  Resized and stored in this browser. Without one, the cover is
+                  typeset from the title.
+                </p>
+
+                {coverError && (
+                  <p
+                    role="alert"
+                    className="mt-2 font-sans text-xs text-red-400"
+                  >
+                    {coverError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <input
+              ref={coverInput}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                // Reset, or choosing the same file twice fires nothing.
+                e.target.value = "";
+                if (!file) return;
+
+                setCoverError(null);
+                const result = await importImage(file, {
+                  maxEdge: COVER_MAX_EDGE,
+                  maxBytes: COVER_MAX_BYTES,
+                });
+                if (result.ok) setCover(result.src);
+                else setCoverError(result.error);
+              }}
+            />
+          </div>
 
           <fieldset className="mt-6">
             <legend className="font-sans text-sm font-medium text-fg">
