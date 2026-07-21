@@ -60,6 +60,49 @@ it("degrades to an empty shelf when storage is corrupt", () => {
   expect(getShelf().books).toEqual([]);
 });
 
+it("stores the setup a new book was created with", () => {
+  const { bookId } = createBook("The Salt Road", {
+    kind: "novella",
+    genre: "Historical fiction",
+    targetWords: 30_000,
+  });
+
+  const book = findBook(getShelf(), bookId);
+  expect(book?.kind).toBe("novella");
+  expect(book?.genre).toBe("Historical fiction");
+  expect(book?.targetWords).toBe(30_000);
+});
+
+it("leaves setup fields off a book created without them", () => {
+  // Absent rather than undefined: the sidebar treats a missing target as "no
+  // goal" and must not render a progress bar against one.
+  const { bookId } = createBook("The Salt Road");
+  const book = findBook(getShelf(), bookId)!;
+
+  expect("kind" in book).toBe(false);
+  expect("genre" in book).toBe(false);
+  expect("targetWords" in book).toBe(false);
+});
+
+it("writes setup through to storage, not just the in-memory cache", () => {
+  const { bookId } = createBook("The Salt Road", {
+    kind: "novel",
+    genre: "Fantasy",
+    targetWords: 110_000,
+  });
+
+  // Read the serialized form directly. Going back through getShelf would hit
+  // the raw-string cache and prove nothing about what was persisted.
+  const stored = JSON.parse(localStorage.getItem("openchapter:shelf")!) as {
+    books: Book[];
+  };
+  const book = stored.books.find((b) => b.id === bookId);
+
+  expect(book?.kind).toBe("novel");
+  expect(book?.genre).toBe("Fantasy");
+  expect(book?.targetWords).toBe(110_000);
+});
+
 it("finds a book by id and reports null for an unknown one", () => {
   const { bookId } = createBook("The Salt Road");
   expect(findBook(getShelf(), bookId)?.title).toBe("The Salt Road");

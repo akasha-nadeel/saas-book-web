@@ -2,15 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ExportDialog } from "@/components/export/export-dialog";
+import { NewBookDialog } from "@/components/shelf/new-book-dialog";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
 import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
 import {
   archiveBook,
   bookWordCount,
   booksIn,
-  createBook,
   deleteBook,
   migrateLegacy,
   restoreBook,
@@ -30,11 +29,12 @@ const VIEW_LABEL: Record<BookView, string> = {
 export function Bookshelf() {
   const hydrated = useHydrated();
   const shelf = useShelf();
-  const router = useRouter();
 
   const [exporting, setExporting] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
-  const [dialog, setDialog] = useState<"templates" | "upgrade" | null>(null);
+  const [dialog, setDialog] = useState<
+    "new" | "templates" | "upgrade" | null
+  >(null);
   const [view, setView] = useState<BookView>("active");
 
   // migrateLegacy is idempotent, but running it twice is still wasted work and
@@ -76,10 +76,9 @@ export function Bookshelf() {
     [shelf],
   );
 
-  const handleCreate = () => {
-    const { bookId, chapterId } = createBook();
-    router.push(`/book/${bookId}/chapter/${chapterId}`);
-  };
+  // Setup comes first now. The dialog does the creating and the navigating,
+  // so there is one path into a new book rather than two that can drift.
+  const handleCreate = () => setDialog("new");
 
   // From the active or archived shelf, deleting means the trash — recoverable,
   // so no dialog. Only the permanent one asks.
@@ -201,6 +200,8 @@ export function Bookshelf() {
       {exporting && (
         <ExportDialog book={exporting} onClose={() => setExporting(null)} />
       )}
+      {dialog === "new" && <NewBookDialog onClose={() => setDialog(null)} />}
+
       {dialog === "templates" && (
         <TemplatesDialog onClose={() => setDialog(null)} />
       )}

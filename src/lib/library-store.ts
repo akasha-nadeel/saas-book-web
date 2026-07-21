@@ -20,6 +20,7 @@
  * the chapters they describe.
  */
 
+import type { BookKind } from "./book-kinds";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 
 const SHELF_KEY = "openchapter:shelf";
@@ -44,6 +45,12 @@ export interface Book {
   title: string;
   /** Optional. Used for the DOCX byline and EPUB's dc:creator. */
   author?: string;
+  /** What the writer set out to make. Absent on books made before setup. */
+  kind?: BookKind;
+  /** A plain string, not a union: the list can grow without a migration. */
+  genre?: string;
+  /** Words aimed at. Absent means no goal, and no progress is shown. */
+  targetWords?: number;
   /** Page geometry. Absent means the default — see pageSetupOf. */
   page?: PageSetup;
   /** Set aside but kept. Epoch ms. */
@@ -231,7 +238,22 @@ function commitBook(bookId: string, update: (book: Book) => Book) {
  * Creates a book and its opening chapter together — a book with no chapters is
  * a dead end, with nowhere for the route to send the writer.
  */
-export function createBook(title?: string): {
+/** What the setup dialog collects. Every field is optional — see createBook. */
+export interface BookSetup {
+  kind?: BookKind;
+  genre?: string;
+  targetWords?: number;
+}
+
+/**
+ * Setup is optional throughout. A book made without it is a complete book with
+ * no goal attached, which is what every book made before this existed is, and
+ * what "skip" has to keep producing.
+ */
+export function createBook(
+  title?: string,
+  setup?: BookSetup,
+): {
   bookId: string;
   chapterId: string;
 } {
@@ -242,6 +264,12 @@ export function createBook(title?: string): {
   const book: Book = {
     id: bookId,
     title: title ?? "Untitled Book",
+    // Spread conditionally rather than assigning undefined: an explicit
+    // `targetWords: undefined` survives JSON.stringify as a missing key but
+    // shows up in object comparisons, and the store's tests check exact shape.
+    ...(setup?.kind ? { kind: setup.kind } : {}),
+    ...(setup?.genre ? { genre: setup.genre } : {}),
+    ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
     chapters: [{ id: chapterId, title: "Chapter One", words: 0 }],
     lastOpenedId: chapterId,
     lastOpenedAt: Date.now(),

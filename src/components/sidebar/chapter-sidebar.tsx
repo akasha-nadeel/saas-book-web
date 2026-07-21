@@ -89,6 +89,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     setOverPart(null);
   };
 
+  const written = bookWordCount(book);
+
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
       <div className="shrink-0 px-4 pt-3 pb-3">
@@ -297,14 +299,57 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       {/* The reference closes the panel with a running total and its wordmark;
           both belong to the manuscript rather than to any one chapter. */}
       <div className="shrink-0 border-t border-line">
-        <div className="flex items-baseline justify-between gap-2 px-4 py-3 font-sans text-sm text-muted">
-          <span>{bookWordCount(book).toLocaleString()} words</span>
-          <SaveIndicator />
+        <div className="px-4 py-3">
+          <div className="flex items-baseline justify-between gap-2 font-sans text-sm text-muted">
+            <span>
+              {written.toLocaleString()}
+              {book.targetWords
+                ? ` of ${book.targetWords.toLocaleString()}`
+                : ""}{" "}
+              words
+            </span>
+            <SaveIndicator />
+          </div>
+          {book.targetWords ? (
+            <Progress written={written} target={book.targetWords} />
+          ) : null}
         </div>
         <p className="border-t border-line px-4 py-3 font-display text-base font-medium text-fg">
           OpenChapter
         </p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Progress toward the target set when the book was created.
+ *
+ * The bar fills to 100% and stops, but the count above it keeps climbing —
+ * passing your target is not an error, and a bar that overflowed its track or
+ * a number that froze would both read as one.
+ */
+function Progress({ written, target }: { written: number; target: number }) {
+  const pct = Math.min(100, Math.round((written / target) * 100));
+
+  return (
+    <div className="mt-2">
+      <div
+        role="progressbar"
+        aria-valuenow={written}
+        aria-valuemin={0}
+        aria-valuemax={target}
+        aria-label="Words written toward your target"
+        className="h-1 w-full overflow-hidden rounded-full bg-raised"
+      >
+        <div
+          className="h-full rounded-full bg-accent transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="mt-1 font-sans text-xs text-muted tabular-nums">
+        {pct}%{written >= target ? " · target reached" : ""}
+      </p>
     </div>
   );
 }
