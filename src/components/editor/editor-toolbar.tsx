@@ -384,9 +384,9 @@ export function ToolRail({
         onClick={() => fileRef.current?.click()}
       >
         <Icon>
-          <rect x="2.5" y="4" width="15" height="12" rx="2" />
-          <circle cx="7" cy="8.5" r="1.2" />
-          <path d="m3.5 14 4-4 3.5 3.5 2.5-2 3 3" />
+          <rect x="2.6" y="3.8" width="14.8" height="12.4" rx="2" />
+          <circle cx="7.1" cy="8.2" r="1.4" />
+          <path d="m2.9 14.4 3.9-3.9a1.2 1.2 0 0 1 1.7 0l2.6 2.6 1.7-1.7a1.2 1.2 0 0 1 1.7 0l2.6 2.6" />
         </Icon>
       </ToolButton>
       <input
@@ -422,8 +422,8 @@ export function ToolRail({
         onClick={() => editor.chain().focus().undo().run()}
       >
         <Icon>
-          <path d="M7 7H4V4" />
-          <path d="M4.5 7.5a6 6 0 1 1-.8 5" />
+          <path d="M3.2 4.4v3.9h3.9" />
+          <path d="M3.9 8.3a6.4 6.4 0 1 1-.5 5.3" />
         </Icon>
       </ToolButton>
       <ToolButton
@@ -433,8 +433,8 @@ export function ToolRail({
         onClick={() => editor.chain().focus().redo().run()}
       >
         <Icon>
-          <path d="M13 7h3V4" />
-          <path d="M15.5 7.5a6 6 0 1 0 .8 5" />
+          <path d="M16.8 4.4v3.9h-3.9" />
+          <path d="M16.1 8.3a6.4 6.4 0 1 0 .5 5.3" />
         </Icon>
       </ToolButton>
 

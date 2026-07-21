@@ -4,19 +4,15 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  bookWordCount,
   createChapter,
   deleteChapter,
   findBook,
   moveChapter,
-  renameBook,
   renameChapter,
   toggleBookmark,
   type ChapterMeta,
 } from "@/lib/library-store";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
-import { useSaveState } from "@/lib/save-status";
-import type { SaveStatus } from "@/lib/use-autosave";
 import { useShelf } from "@/lib/use-library";
 
 /**
@@ -98,8 +94,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     setRenamingId(null);
   };
 
-  const written = bookWordCount(book);
-
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
       {/* The wordmark opens the panel rather than closing it. At the foot it
@@ -118,20 +112,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="shrink-0 px-4 pt-3 pb-3">
-        {/* The book's title, not the word "Manuscript". A book you cannot
-            rename is worse than a panel without a label. */}
-        <input
-          value={book.title}
-          onChange={(e) => renameBook(bookId, e.target.value)}
-          onBlur={(e) => {
-            if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
-          }}
-          aria-label="Book title"
-          spellCheck={false}
-          className="w-full truncate rounded-sm bg-transparent font-sans
-                     text-lg font-semibold text-fg outline-none
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
-        />
         <button
           type="button"
           onClick={handleCreate}
@@ -144,7 +124,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+      <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-3">
         {book.chapters.length === 0 ? (
           <p className="px-4 py-6 text-center font-sans text-sm text-muted italic">
             No chapters yet
@@ -284,92 +264,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           </ol>
         )}
       </div>
-
-      {/* The reference closes the panel with a running total and its wordmark;
-          both belong to the manuscript rather than to any one chapter. */}
-      <div className="shrink-0 border-t border-line">
-        <div className="px-4 py-3">
-          <div className="flex items-baseline justify-between gap-2 font-sans text-sm text-muted">
-            <span>
-              {written.toLocaleString()}
-              {book.targetWords
-                ? ` of ${book.targetWords.toLocaleString()}`
-                : ""}{" "}
-              words
-            </span>
-            <SaveIndicator />
-          </div>
-          {book.targetWords ? (
-            <Progress written={written} target={book.targetWords} />
-          ) : null}
-        </div>
-      </div>
     </div>
-  );
-}
-
-/**
- * Progress toward the target set when the book was created.
- *
- * The bar fills to 100% and stops, but the count above it keeps climbing —
- * passing your target is not an error, and a bar that overflowed its track or
- * a number that froze would both read as one.
- */
-function Progress({ written, target }: { written: number; target: number }) {
-  const pct = Math.min(100, Math.round((written / target) * 100));
-
-  return (
-    <div className="mt-2">
-      <div
-        role="progressbar"
-        aria-valuenow={written}
-        aria-valuemin={0}
-        aria-valuemax={target}
-        aria-label="Words written toward your target"
-        className="h-1 w-full overflow-hidden rounded-full bg-raised"
-      >
-        <div
-          className="h-full rounded-full bg-accent transition-[width] duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className="mt-1 font-sans text-xs tabular-nums text-muted">
-        {pct}%{written >= target ? " · target reached" : ""}
-      </p>
-    </div>
-  );
-}
-
-const STATUS_LABEL: Record<SaveStatus, string> = {
-  saved: "Saved",
-  unsaved: "Unsaved",
-  saving: "Saving…",
-  error: "Save failed",
-};
-
-/**
- * Reads from the save store rather than a prop: the editor that knows the
- * status is a cousin of this panel, not a parent.
- *
- * `aria-live="polite"` so a screen reader hears a failed save without having to
- * go looking for it — silent data loss is the one thing this indicator exists
- * to prevent.
- */
-function SaveIndicator() {
-  const { status, lastSavedAt } = useSaveState();
-
-  return (
-    <span
-      aria-live="polite"
-      className={status === "error" ? "text-accent" : undefined}
-    >
-      {STATUS_LABEL[status]}
-      {status === "saved" && lastSavedAt
-        ? ` · ${lastSavedAt.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-          })}`
-        : null}
-    </span>
   );
 }

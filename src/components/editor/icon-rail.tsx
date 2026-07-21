@@ -91,8 +91,8 @@ export function Rail({
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
       data-paper={paper}
-      className={`flex w-(--rail-width) shrink-0 flex-col items-center gap-2
-                  overflow-y-auto py-4 ${
+      className={`scroll-slim flex w-(--rail-width) shrink-0 flex-col
+                  items-center gap-2 overflow-y-auto py-4 ${
                     paper ? "rail-paper" : "bg-surface"
                   } ${side === "left" ? "border-r" : "border-l"} border-line`}
     >
@@ -102,45 +102,65 @@ export function Rail({
   );
 }
 
-/* Icon paths, kept here so the rails read as a list of actions. */
+/*
+ * Icon paths, kept here so the rails read as a list of actions.
+ *
+ * Drawn to one system: a 20-unit box with the shape living between 2.5 and
+ * 17.5, so every glyph carries the same optical weight and the column of them
+ * lines up. Stroke width, caps and joins come from the wrapper — a path that
+ * sets its own would break step with the rest.
+ */
 export const icons = {
-  home: <path d="M3 8.5 10 3l7 5.5V16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z" />,
+  home: (
+    <>
+      <path d="M2.8 8.4 10 2.8l7.2 5.6v7.1a1.4 1.4 0 0 1-1.4 1.4H4.2a1.4 1.4 0 0 1-1.4-1.4z" />
+      <path d="M7.9 16.9v-4.4h4.2v4.4" />
+    </>
+  ),
   chapters: (
     <>
-      <path d="M3 4.5h5.5A1.5 1.5 0 0 1 10 6v10a1.2 1.2 0 0 0-1.2-1.2H3z" />
-      <path d="M17 4.5h-5.5A1.5 1.5 0 0 0 10 6v10a1.2 1.2 0 0 1 1.2-1.2H17z" />
+      <path d="M10 6.4c0-1.1-1.4-1.9-3.8-1.9h-3v9.6h3c2.4 0 3.8.9 3.8 2" />
+      <path d="M10 6.4c0-1.1 1.4-1.9 3.8-1.9h3v9.6h-3c-2.4 0-3.8.9-3.8 2" />
     </>
   ),
   notes: (
     <>
-      <rect x="4.5" y="3" width="11" height="14" rx="1.5" />
-      <path d="M7.5 7h5M7.5 10h5M7.5 13h3" />
+      <path d="M11.6 2.8H6.2a1.5 1.5 0 0 0-1.5 1.5v11.4a1.5 1.5 0 0 0 1.5 1.5h7.6a1.5 1.5 0 0 0 1.5-1.5V6.4z" />
+      <path d="M11.6 2.8v2.9a.9.9 0 0 0 .9.9h2.8" />
+      <path d="M7.5 10.6h5M7.5 13.4h3.2" />
     </>
   ),
-  bookmarks: <path d="M6 3h8v14l-4-3.2L6 17z" />,
-  add: <path d="M10 4.5v11M4.5 10h11" />,
+  bookmarks: (
+    <path d="M5.6 4.1a1.4 1.4 0 0 1 1.4-1.3h6a1.4 1.4 0 0 1 1.4 1.3v13L10 13.7 5.6 17.1z" />
+  ),
+  add: <path d="M10 4.2v11.6M4.2 10h11.6" />,
   focus: (
     <>
-      <circle cx="10" cy="10" r="6" />
-      <circle cx="10" cy="10" r="2" />
+      <circle cx="10" cy="10" r="7" />
+      <circle cx="10" cy="10" r="3.2" />
+      {/* Filled, so the centre reads as a point rather than a third ring. */}
+      <circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none" />
     </>
   ),
   typewriter: (
     <>
-      <path d="M3.5 9h13v6.5h-13z" />
-      <path d="M6 9V4.5h8V9M7 12h6" />
+      <path d="M5.6 8V4.4a1 1 0 0 1 1-1h6.8a1 1 0 0 1 1 1V8" />
+      <rect x="2.6" y="8" width="14.8" height="6.4" rx="1.6" />
+      <path d="M6.6 11.2h6.8" />
     </>
   ),
   assistant: (
     <>
-      <path d="M4 4.5h12v9H8.5L5 16.5V13.5H4z" />
-      <path d="M8 8h4" />
+      <path d="M17.2 11.6a2.1 2.1 0 0 1-2.1 2.1H8l-3.6 3v-3h-.5a2.1 2.1 0 0 1-2.1-2.1V5.5a2.1 2.1 0 0 1 2.1-2.1h11.2a2.1 2.1 0 0 1 2.1 2.1z" />
+      {/* A spark inside the bubble: this is the one tool that writes back. */}
+      <path d="m9.6 5.9.85 1.95 1.95.85-1.95.85-.85 1.95-.85-1.95L6.8 8.7l1.95-.85z" />
     </>
   ),
   export: (
     <>
-      <path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5" />
-      <path d="M4 14v2.5h12V14" />
+      <path d="M10 2.9v8.7" />
+      <path d="m6.4 8.2 3.6 3.6 3.6-3.6" />
+      <path d="M3.4 13.6v1.9a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-1.9" />
     </>
   ),
   panel: (

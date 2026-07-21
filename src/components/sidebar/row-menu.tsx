@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -113,13 +113,42 @@ export function RowMenu({
     setOpen(true);
   };
 
-  // Opens below the trigger and right-aligned to it, then is pulled back on
-  // screen if the row sits near an edge.
-  const top = rect
-    ? Math.min(rect.bottom + 4, window.innerHeight - EDGE_PADDING)
-    : 0;
+  // Measured rather than guessed. Clamping the top edge alone is not enough —
+  // that only slides the menu down the screen while its own height carries on
+  // past the bottom, which is what left the last item cut off for rows near
+  // the foot of the list.
+  const [height, setHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (open && menuRef.current) setHeight(menuRef.current.offsetHeight);
+    else setHeight(0);
+  }, [open]);
+
+  const roomBelow = rect ? window.innerHeight - rect.bottom - EDGE_PADDING : 0;
+  const roomAbove = rect ? rect.top - EDGE_PADDING : 0;
+
+  // Flip above the trigger when it does not fit below and there is more room
+  // up there. Before the first measurement height is 0, so this opens
+  // downwards — useLayoutEffect then corrects it before the browser paints.
+  const flip = height > roomBelow && roomAbove > roomBelow;
+
+  // Anchoring the flipped menu by its bottom edge means the height never has to
+  // enter the arithmetic, so there is no second measure-and-reposition pass.
+  const vertical =
+    rect && flip
+      ? { bottom: window.innerHeight - rect.top + 4 }
+      : { top: rect ? rect.bottom + 4 : 0 };
+
+  // A menu taller than the screen scrolls rather than spilling off it.
+  const maxHeight = Math.max(120, flip ? roomAbove - 4 : roomBelow - 4);
+
   const left = rect
-    ? Math.max(EDGE_PADDING, Math.min(rect.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - EDGE_PADDING))
+    ? Math.max(
+        EDGE_PADDING,
+        Math.min(
+          rect.right - MENU_WIDTH,
+          window.innerWidth - MENU_WIDTH - EDGE_PADDING,
+        ),
+      )
     : 0;
 
   return (
@@ -169,8 +198,15 @@ export function RowMenu({
             role="menu"
             aria-label={`Actions for ${label}`}
             onKeyDown={onMenuKeyDown}
-            style={{ position: "fixed", top, left, width: MENU_WIDTH }}
-            className="z-50 rounded-lg border border-line bg-panel p-1.5 shadow-xl"
+            style={{
+              position: "fixed",
+              left,
+              width: MENU_WIDTH,
+              maxHeight,
+              ...vertical,
+            }}
+            className="z-50 overflow-y-auto rounded-lg border border-line
+                       bg-panel p-1.5 shadow-xl"
           >
             {items.map((item, i) => (
               <div key={item.label}>

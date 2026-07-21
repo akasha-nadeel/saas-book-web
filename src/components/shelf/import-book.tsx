@@ -177,7 +177,7 @@ export function ImportBook() {
 
             {/* The whole point of the preview: chapter detection is a guess,
                 and this is where it can be checked before it becomes a book. */}
-            <ol className="mt-2 max-h-80 overflow-y-auto rounded-md border border-line">
+            <ol className="scroll-slim mt-2 max-h-80 overflow-y-auto rounded-md border border-line">
               {proposal.chapters.map((chapter, i) => (
                 <li
                   key={i}

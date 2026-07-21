@@ -111,6 +111,50 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Scrollbars.
+
+   The platform default is a wide, light-grey bar with arrow buttons at each
+   end — furniture, and the brightest thing in a dark panel. This is a thin
+   thumb on no track at all.
+
+   The colour is a mid-grey at low alpha rather than a theme token, because
+   these appear over both the dark chrome and the white page, and one value
+   that is legible on both beats two rules that have to be kept in step.
+   -------------------------------------------------------------------------- */
+.scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(127 139 153 / 0.45) transparent;
+}
+
+.scroll-slim::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.scroll-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: rgb(127 139 153 / 0.45);
+  border-radius: 999px;
+  /* Inset by a transparent border, so the thumb reads as floating rather than
+     filling a gutter. */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.scroll-slim::-webkit-scrollbar-thumb:hover {
+  background: rgb(127 139 153 / 0.75);
+  background-clip: padding-box;
+}
+
+/* The pair of arrow buttons Chrome puts at each end of the bar. */
+.scroll-slim::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
    A rail that belongs to the page.
 
    Re-points the theme variables rather than restyling each control. Tailwind

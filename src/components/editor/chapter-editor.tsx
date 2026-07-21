@@ -17,8 +17,10 @@ import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { ExportDialog } from "@/components/export/export-dialog";
 import {
+  bookWordCount,
   findBook,
   pageSetupOf,
+  renameBook,
   renameChapter,
   saveBody,
   setPref,
@@ -34,8 +36,14 @@ import {
   useShelf,
 } from "@/lib/use-library";
 import { useTypewriter } from "@/lib/use-typewriter";
-import { setSaveState } from "@/lib/save-status";
-import { useAutosave } from "@/lib/use-autosave";
+import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
+
+const STATUS_LABEL: Record<SaveStatus, string> = {
+  saved: "Saved",
+  unsaved: "Unsaved",
+  saving: "Saving…",
+  error: "Save failed",
+};
 
 /** What one autosave carries: the document, plus the count the sidebar shows. */
 interface ChapterSnapshot {
@@ -292,6 +300,7 @@ function EditorSurface({
 
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
+  const written = bookWordCount(book);
 
   // Neighbours in the book's own order, so stepping through matches the order
   // the manuscript panel shows.
@@ -305,13 +314,6 @@ function EditorSurface({
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
     save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
   });
-
-  // Published upward for the manuscript panel to show. An external store rather
-  // than a prop: the panel is a cousin, not a child, and mirroring this into
-  // parent state would cascade a render on every keystroke.
-  useEffect(() => {
-    setSaveState({ status, lastSavedAt });
-  }, [status, lastSavedAt]);
 
   const editor = useEditor({
     // Required under Next's SSR — rendering immediately causes a hydration
@@ -367,26 +369,88 @@ function EditorSurface({
           prefs.focusMode ? "focus-mode" : ""
         }`}
       >
-        {/* Which book this page belongs to. On the paper's own colour, so it
-            reads as the top of the sheet rather than as chrome above it — and
-            it follows the page colour, since a white bar over a black page
-            would look like a rendering fault.
+        {/* The running head: which book this is on the left, how it is going on
+            the right. On the paper's own colour, so it reads as the top of the
+            sheet rather than as chrome above it — and it follows the page
+            colour, since a white bar over a black page would look like a
+            rendering fault.
 
-            Read-only. The title is editable in the manuscript panel, and two
-            live fields bound to one value invite a fight over the caret. */}
+            The title is editable here, and only here. It used to be read-only
+            because the manuscript panel carried the same field, and two live
+            inputs bound to one value fight over the caret — with the panel's
+            gone, this is the one place a book gets its name. */}
         <header
-          className="shrink-0 px-6 py-3"
+          className="relative shrink-0 px-6 py-3"
           style={{
             background: "var(--paper-bg)",
             borderBottom: "1px solid var(--paper-rule)",
           }}
         >
-          <h2
-            className="truncate font-serif text-lg"
-            style={{ color: "var(--paper-fg)" }}
-          >
-            {book.title}
-          </h2>
+          <div className="flex items-baseline justify-between gap-4">
+            <input
+              value={book.title}
+              onChange={(e) => renameBook(bookId, e.target.value)}
+              onBlur={(e) => {
+                // A book with no name is unfindable on the shelf.
+                if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
+              }}
+              aria-label="Book title"
+              spellCheck={false}
+              className="min-w-0 flex-1 truncate rounded-sm bg-transparent
+                         font-serif text-lg outline-none focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+              style={{ color: "var(--paper-fg)" }}
+            />
+
+            <div
+              className="flex shrink-0 items-baseline gap-4 font-sans text-sm"
+              style={{ color: "var(--paper-muted)" }}
+            >
+              <span className="tabular-nums">
+                {written.toLocaleString()}
+                {book.targetWords
+                  ? ` of ${book.targetWords.toLocaleString()}`
+                  : ""}{" "}
+                words
+              </span>
+              {/* Polite, so a failed save is announced rather than waiting to
+                  be noticed — silent data loss is what this exists to catch. */}
+              <span
+                aria-live="polite"
+                style={status === "error" ? { color: "#ff6568" } : undefined}
+              >
+                {STATUS_LABEL[status]}
+                {status === "saved" && lastSavedAt
+                  ? ` · ${lastSavedAt.toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}`
+                  : null}
+              </span>
+            </div>
+          </div>
+
+          {/* Progress sits on the header's own bottom edge rather than taking a
+              row of its own. It fills to 100% and stops while the count above
+              keeps climbing: passing a target is not an error, and a bar
+              overflowing its track would read like one. */}
+          {book.targetWords ? (
+            <div
+              role="progressbar"
+              aria-valuenow={written}
+              aria-valuemin={0}
+              aria-valuemax={book.targetWords}
+              aria-label="Words written toward your target"
+              className="absolute inset-x-0 bottom-0 h-0.5"
+            >
+              <div
+                className="h-full bg-accent transition-[width] duration-500"
+                style={{
+                  width: `${Math.min(100, Math.round((written / book.targetWords) * 100))}%`,
+                }}
+              />
+            </div>
+          ) : null}
         </header>
 
         {/* The workspace, and the page on it. Physical dimensions in inches —
@@ -394,7 +458,7 @@ function EditorSurface({
             straight into the style with no pixels-per-inch fudge. */}
         <div className="relative flex min-h-0 flex-1">
           <main
-            className={`min-h-0 flex-1 cursor-text overflow-auto
+            className={`scroll-slim min-h-0 flex-1 cursor-text overflow-auto
                         bg-surface ${page.fit ? "" : "px-8 py-8"}`}
             onClick={() => editor?.chain().focus().run()}
           >
