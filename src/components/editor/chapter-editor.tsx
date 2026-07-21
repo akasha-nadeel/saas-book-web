@@ -1,49 +1,32 @@
 "use client";
 
-import { useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
+import { renameChapter, saveBody, touchLastOpened } from "@/lib/chapter-store";
+import { useChapterBody, useHydrated, useManifest } from "@/lib/use-chapters";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
 
-const STORAGE_KEY = "openchapter:spike:chapter-1";
-
-/**
- * Spike storage. Deliberately isolated behind the same shape a Supabase read
- * and write will have, so swapping the backend later touches only this block.
- */
-function subscribeToDraft(onStoreChange: () => void) {
-  // Fires for writes from *other* tabs only, which is exactly what we want:
-  // our own saves must not invalidate the editor we're typing into.
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
+/** What one autosave carries: the document, plus the count the sidebar shows. */
+interface ChapterSnapshot {
+  doc: JSONContent;
+  words: number;
 }
 
-function getDraftSnapshot(): string | null {
-  try {
-    return window.localStorage.getItem(STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
+export function ChapterEditor({ chapterId }: { chapterId: string }) {
+  const hydrated = useHydrated();
+  const { bookTitle, chapters } = useManifest();
+  const raw = useChapterBody(chapterId);
 
-function getServerDraftSnapshot(): string | null {
-  return null;
-}
+  const chapter = chapters.find((c) => c.id === chapterId) ?? null;
 
-function saveDraft(doc: JSONContent) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
-}
-
-export function ChapterEditor() {
-  // Reading an external store this way keeps us SSR-safe without a loading
-  // flag: the server renders the empty snapshot, the client swaps in the real
-  // one straight after hydration.
-  const raw = useSyncExternalStore(
-    subscribeToDraft,
-    getDraftSnapshot,
-    getServerDraftSnapshot,
-  );
+  // Remembering the open chapter is what lets "/" land the writer back where
+  // they left off, so it is worth a write on every visit.
+  useEffect(() => {
+    if (hydrated) touchLastOpened(chapterId);
+  }, [hydrated, chapterId]);
 
   const initialContent = useMemo<JSONContent | null>(() => {
     if (!raw) return null;
@@ -54,38 +37,97 @@ export function ChapterEditor() {
     }
   }, [raw]);
 
+  // Nothing to render until storage has been read — see useHydrated.
+  if (!hydrated) return null;
+  if (!chapter) return <MissingChapter />;
+
   return (
-    <div className="flex flex-1 flex-col">
-      <ChapterHeader />
-      {/* Keyed on the stored draft so the surface remounts once, when the
-          client snapshot replaces the server's empty one. */}
-      <EditorSurface key={raw ?? "empty"} initialContent={initialContent} />
+    <div className="flex min-h-full flex-1 flex-col">
+      <ChapterHeader
+        bookTitle={bookTitle}
+        title={chapter.title}
+        chapterId={chapterId}
+      />
+      {/* Keyed on the stored text as well as the id, so a save from another tab
+          reloads the surface rather than leaving this one silently stale. */}
+      <EditorSurface
+        key={`${chapterId}:${raw ?? ""}`}
+        chapterId={chapterId}
+        initialContent={initialContent}
+      />
     </div>
   );
 }
 
-function ChapterHeader() {
+function MissingChapter() {
   return (
-    <header className="px-6 pt-16 pb-10">
-      <div className="mx-auto w-full max-w-(--measure-manuscript)">
-        <p className="font-sans text-xs uppercase tracking-[0.18em] text-warmgray">
-          The Salt Road
+    <main className="flex flex-1 items-center justify-center px-6">
+      <div className="text-center">
+        <p className="font-serif text-xl text-ink">This chapter isn’t here.</p>
+        <p className="mt-2 font-sans text-sm text-warmgray">
+          It may have been deleted, or the link may be wrong.
         </p>
-        <h1 className="mt-2 font-serif text-3xl text-ink">Chapter One</h1>
+        <Link
+          href="/"
+          className="mt-6 inline-block rounded-sm font-sans text-sm text-burgundy
+                     underline underline-offset-4 outline-none
+                     focus-visible:ring-2 focus-visible:ring-gold/60"
+        >
+          Back to your book
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+function ChapterHeader({
+  bookTitle,
+  title,
+  chapterId,
+}: {
+  bookTitle: string;
+  title: string;
+  chapterId: string;
+}) {
+  return (
+    <header className="pt-16 pb-10">
+      <div className="mx-auto w-full max-w-(--measure-manuscript) px-6">
+        <p className="font-sans text-xs tracking-[0.18em] text-warmgray uppercase">
+          {bookTitle}
+        </p>
+        {/* An input rather than a heading with contenteditable: the title is a
+            single line of plain text, and a plain input gets the caret, undo
+            and screen-reader behaviour right for free. */}
+        <input
+          value={title}
+          onChange={(e) => renameChapter(chapterId, e.target.value)}
+          onBlur={(e) => {
+            if (!e.target.value.trim()) {
+              renameChapter(chapterId, "Untitled chapter");
+            }
+          }}
+          aria-label="Chapter title"
+          spellCheck={false}
+          className="mt-2 w-full rounded-sm bg-transparent font-serif text-3xl
+                     text-ink outline-none focus-visible:ring-2
+                     focus-visible:ring-gold/60"
+        />
       </div>
     </header>
   );
 }
 
 function EditorSurface({
+  chapterId,
   initialContent,
 }: {
+  chapterId: string;
   initialContent: JSONContent | null;
 }) {
   const [words, setWords] = useState(0);
 
-  const { schedule, status, lastSavedAt } = useAutosave<JSONContent>({
-    save: saveDraft,
+  const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
+    save: ({ doc, words }) => saveBody(chapterId, doc, words),
   });
 
   // Word count is throttled rather than recomputed per keystroke. Setting
@@ -120,8 +162,11 @@ function EditorSurface({
       setWords(editor.storage.characterCount.words());
     },
     onUpdate: ({ editor }) => {
-      schedule(editor.getJSON());
-      throttleWordCount(editor.storage.characterCount.words());
+      const next = editor.storage.characterCount.words();
+      // Read the true count here, not the throttled state — the sidebar should
+      // land on the right number even if the last tick never fires.
+      schedule({ doc: editor.getJSON(), words: next });
+      throttleWordCount(next);
     },
   });
 
@@ -159,8 +204,11 @@ function StatusBar({
 }) {
   return (
     <footer
-      className="pointer-events-none fixed inset-x-0 bottom-0 px-6 py-5
-                 opacity-40 transition-opacity duration-500 hover:opacity-100
+      // Pinned to the manuscript column, not the viewport, so it stays centred
+      // on the same measure as the prose above it.
+      className="pointer-events-none fixed right-0 bottom-0
+                 left-(--sidebar-width) px-6 py-5 opacity-40
+                 transition-opacity duration-500 hover:opacity-100
                  focus-within:opacity-100"
     >
       <div className="mx-auto flex w-full max-w-(--measure-manuscript) items-baseline justify-between font-sans text-xs text-warmgray">
