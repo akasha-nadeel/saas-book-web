@@ -74,8 +74,11 @@ export function Bookshelf() {
         onCreate={handleCreate}
       />
 
-      <main className="flex-1 overflow-y-auto p-6">
-        <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col rounded-lg bg-panel p-8">
+      {/* One rounded corner, top-left, and the panel runs off the right and
+          bottom edges. The separation from the sidebar is the shade change and
+          that single corner — no border, no floating gap on four sides. */}
+      <main className="min-w-0 flex-1 overflow-hidden">
+        <div className="flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-8 py-7">
           <div className="flex items-baseline justify-between gap-6">
             <h1 className="font-serif text-2xl text-fg">All books</h1>
             <p className="shrink-0 font-sans text-sm text-muted">
@@ -145,8 +148,9 @@ function ShelfNav({
 }) {
   return (
     <aside
-      className="flex w-(--sidebar-width) shrink-0 flex-col border-r
-                 border-line bg-surface px-4 py-6"
+      // No right border: the panel's lighter shade and its rounded corner are
+      // what separate the two, as in the reference.
+      className="flex w-(--sidebar-width) shrink-0 flex-col bg-surface px-4 py-6"
       aria-label="Library"
     >
       <div className="px-2">
