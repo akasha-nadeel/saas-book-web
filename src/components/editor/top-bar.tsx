@@ -1,7 +1,61 @@
 "use client";
 
 import Link from "next/link";
-import { renameBook, setPref, type Book, type Prefs } from "@/lib/library-store";
+import {
+  renameBook,
+  setPref,
+  type Book,
+  type PaperColor,
+  type Prefs,
+} from "@/lib/library-store";
+
+/** Swatch previews. The real colours live in globals.css keyed by data-paper;
+ *  these only have to look like them at 20px. */
+const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
+  { value: "white", label: "White", swatch: "#ffffff" },
+  { value: "cream", label: "Cream", swatch: "#f5f1e8" },
+  { value: "sepia", label: "Sepia", swatch: "#f2e7d0" },
+  { value: "slate", label: "Slate", swatch: "#1d2732" },
+  { value: "black", label: "Black", swatch: "#0a0d11" },
+];
+
+/**
+ * Page colour, out in the open.
+ *
+ * It was a section inside the page-setup menu, which made changing it two
+ * clicks and a scroll. It is the one page setting a writer flips on a whim —
+ * because the light is different, or their eyes are tired — so it sits in the
+ * bar where a single click reaches it.
+ */
+function PaperSwatches({ paper }: { paper: PaperColor }) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Page colour"
+      className="flex shrink-0 items-center gap-1.5"
+    >
+      {PAPERS.map((p) => (
+        <button
+          key={p.value}
+          type="button"
+          role="radio"
+          aria-checked={p.value === paper}
+          aria-label={p.label}
+          title={`Page colour: ${p.label}`}
+          onClick={() => setPref("paper", p.value)}
+          className={`h-5 w-5 rounded-full border-2 outline-none
+                      transition-colors focus-visible:ring-2
+                      focus-visible:ring-accent/60 ${
+                        p.value === paper
+                          ? "border-accent"
+                          : "border-line hover:border-muted"
+                      }`}
+          style={{ background: p.swatch }}
+        />
+      ))}
+    </div>
+  );
+}
 
 /**
  * Breadcrumb, panel toggles, and export — the strip above everything.
@@ -111,6 +165,10 @@ export function TopBar({
         </span>
         <span className="truncate font-medium text-fg">{chapterTitle}</span>
       </nav>
+
+      <PaperSwatches paper={prefs.paper} />
+
+      <span aria-hidden="true" className="h-5 w-px shrink-0 bg-line" />
 
       <button
         type="button"

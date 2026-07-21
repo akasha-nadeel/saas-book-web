@@ -101,7 +101,7 @@ export function ChapterEditor({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <EditorToolbar editor={editor} book={book} paper={prefs.paper} />
+          <EditorToolbar editor={editor} book={book} />
           {/* Keyed on the stored text as well as the id, so a save from another
               tab reloads the surface rather than leaving this one stale. */}
           <EditorSurface

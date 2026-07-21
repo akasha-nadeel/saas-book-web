@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/react";
 import { PageMenu } from "@/components/editor/page-menu";
-import type { Book, PaperColor } from "@/lib/library-store";
+import type { Book } from "@/lib/library-store";
 
 /**
  * The formatting toolbar.
@@ -79,11 +79,9 @@ const Divider = () => <span className="mx-1 h-5 w-px bg-line" />;
 export function EditorToolbar({
   editor,
   book,
-  paper,
 }: {
   editor: Editor | null;
   book: Book;
-  paper: PaperColor;
 }) {
   useEditorState(editor);
 
@@ -223,7 +221,7 @@ export function EditorToolbar({
 
       {/* Pushed to the far end: it describes the page, not the text on it. */}
       <div className="ml-auto">
-        <PageMenu book={book} paper={paper} />
+        <PageMenu book={book} />
       </div>
     </div>
   );

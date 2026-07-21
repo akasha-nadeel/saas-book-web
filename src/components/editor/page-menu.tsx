@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  pageSetupOf,
-  setPageSetup,
-  setPref,
-  type Book,
-  type PaperColor,
-} from "@/lib/library-store";
+import { pageSetupOf, setPageSetup, type Book } from "@/lib/library-store";
 import {
   MARGIN_PRESETS,
   PAGE_SIZES,
@@ -21,17 +15,10 @@ import {
  * Word's Layout tab, as one menu.
  *
  * Word spreads size, orientation, margins and columns across four ribbon
- * dropdowns. There is one toolbar row here, so they share a panel — everything
- * that describes the page in one place, colour included.
+ * dropdowns. There is one toolbar row here, so they share a panel. Page colour
+ * is not among them — it lives in the nav bar, where it is one click away
+ * rather than two.
  */
-
-const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
-  { value: "white", label: "White", swatch: "#ffffff" },
-  { value: "cream", label: "Cream", swatch: "#f5f1e8" },
-  { value: "sepia", label: "Sepia", swatch: "#f2e7d0" },
-  { value: "slate", label: "Slate", swatch: "#1d2732" },
-  { value: "black", label: "Black", swatch: "#0a0d11" },
-];
 
 const COLUMNS: { value: ColumnCount; label: string }[] = [
   { value: 1, label: "One" },
@@ -71,11 +58,14 @@ function Choice({
       role="menuitemradio"
       aria-checked={selected}
       onClick={onClick}
+      // Solid accent with white on top, rather than the tinted fill with accent
+      // text this had before — same hue for background and text was the least
+      // readable thing in the menu.
       className={`rounded px-2 py-1 text-left font-sans text-sm outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
                     selected
-                      ? "bg-raised text-fg"
+                      ? "bg-accent text-white"
                       : "text-muted hover:bg-raised/50 hover:text-fg"
                   }`}
     >
@@ -84,13 +74,7 @@ function Choice({
   );
 }
 
-export function PageMenu({
-  book,
-  paper,
-}: {
-  book: Book;
-  paper: PaperColor;
-}) {
+export function PageMenu({ book }: { book: Book }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const page = pageSetupOf(book);
@@ -126,13 +110,9 @@ export function PageMenu({
                    hover:text-fg focus-visible:ring-2
                    focus-visible:ring-accent/60"
       >
-        <span
-          aria-hidden="true"
-          className="h-4 w-3.5 rounded-[2px] border border-line"
-          style={{
-            background: PAPERS.find((p) => p.value === paper)?.swatch,
-          }}
-        />
+        <span aria-hidden="true" className="text-sm leading-none">
+          ▤
+        </span>
         <span>{size.label}</span>
         <span aria-hidden="true" className="text-[0.6rem]">
           ▾
@@ -216,29 +196,6 @@ export function PageMenu({
                 absent rather than approximated. */}
           </Section>
 
-          <Section title="Page colour">
-            <div className="flex flex-wrap gap-1.5">
-              {PAPERS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={p.value === paper}
-                  aria-label={p.label}
-                  title={p.label}
-                  onClick={() => setPref("paper", p.value)}
-                  className={`h-7 w-7 rounded-full border-2 outline-none
-                              transition-colors focus-visible:ring-2
-                              focus-visible:ring-accent/60 ${
-                                p.value === paper
-                                  ? "border-fg"
-                                  : "border-line hover:border-muted"
-                              }`}
-                  style={{ background: p.swatch }}
-                />
-              ))}
-            </div>
-          </Section>
         </div>
       )}
     </div>
