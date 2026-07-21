@@ -23,15 +23,14 @@
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  /* The writing surface. These are the numbers most worth arguing about. */
+  /* The writing surface. The line measure used to live here too; the page now
+     fills its column, so the window sets the line length. */
   --text-manuscript: 1.1875rem; /* 19px */
   --text-manuscript--line-height: 1.75;
-  --measure-manuscript: 34rem; /* ~65 characters at 19px Fraunces */
 }
 
-/* App shell. Not a @theme token — this is a layout constant, not part of the
-   design language, but the status bar has to know it to stay centred on the
-   manuscript measure rather than on the viewport. */
+/* App shell. Not a @theme token — a layout constant, not part of the design
+   language. Sets the width of the chapters-and-notes panel. */
 :root {
   --sidebar-width: 16rem;
 }
@@ -84,12 +83,11 @@ body {
   --paper-rule: #232a33;
 }
 
-/* The sheet itself: a page sitting on the workspace, not a wash of colour to
-   the window edges. */
+/* The page fills its column. No shadow or inset: it is the surface being
+   written on, not a sheet floating on a desk. */
 .paper {
   background: var(--paper-bg);
   color: var(--paper-fg);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), 0 12px 32px rgb(0 0 0 / 0.22);
 }
 
 /* --------------------------------------------------------------------------

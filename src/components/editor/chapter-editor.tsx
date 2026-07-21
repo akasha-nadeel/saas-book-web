@@ -87,7 +87,15 @@ export function ChapterEditor({
       />
 
       <div className="flex min-h-0 flex-1">
-        {prefs.leftPanel && <LeftPanel bookId={bookId} chapterId={chapterId} />}
+        {prefs.leftPanel ? (
+          <LeftPanel bookId={bookId} chapterId={chapterId} />
+        ) : (
+          <CollapsedRail
+            side="left"
+            label="Show chapters and notes"
+            onOpen={() => setPref("leftPanel", true)}
+          />
+        )}
 
         <div className="flex min-w-0 flex-1 flex-col">
           <EditorToolbar editor={editor} prefs={prefs} />
@@ -104,6 +112,14 @@ export function ChapterEditor({
             onEditorReady={setEditor}
           />
         </div>
+
+        {!prefs.rightPanel && (
+          <CollapsedRail
+            side="right"
+            label="Show assistant"
+            onOpen={() => setPref("rightPanel", true)}
+          />
+        )}
 
         {prefs.rightPanel && (
           <aside
@@ -133,6 +149,47 @@ export function ChapterEditor({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * The strip left behind by a closed panel.
+ *
+ * A panel toggled shut from the top bar leaves no trace at the place it used
+ * to be, so the way back is only findable if you remember which button did it.
+ * A full-height edge handle keeps it reachable where the panel was.
+ */
+function CollapsedRail({
+  side,
+  label,
+  onOpen,
+}: {
+  side: "left" | "right";
+  label: string;
+  onOpen: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={label}
+      title={label}
+      className={`group flex w-4 shrink-0 items-center justify-center bg-panel
+                  outline-none transition-colors hover:bg-raised
+                  focus-visible:ring-2 focus-visible:ring-inset
+                  focus-visible:ring-accent/60 ${
+                    side === "left"
+                      ? "border-r border-line"
+                      : "border-l border-line"
+                  }`}
+    >
+      <span
+        aria-hidden="true"
+        className="text-xs text-muted transition-colors group-hover:text-fg"
+      >
+        {side === "left" ? "›" : "‹"}
+      </span>
+    </button>
   );
 }
 
@@ -241,25 +298,22 @@ function EditorSurface({
 
   return (
     <>
+      {/* The page fills the column edge to edge rather than floating as a
+          narrow sheet — the writing area is the point of the screen. */}
       <main
         data-paper={prefs.paper}
-        className={`manuscript min-h-0 flex-1 cursor-text overflow-y-auto px-6
-                    py-8 ${prefs.focusMode ? "focus-mode" : ""}`}
+        className={`manuscript paper min-h-0 flex-1 cursor-text overflow-y-auto
+                    ${prefs.focusMode ? "focus-mode" : ""}`}
         onClick={() => editor?.chain().focus().run()}
       >
-        {/* The sheet. A page sitting on the workspace, so the paper colour
-            reads as paper rather than as a repainted app. */}
         <div
-          className={`paper mx-auto w-full
-                      max-w-[calc(var(--measure-manuscript)+9rem)] rounded-sm
-                      px-18 pt-16 ${
-                        // Typewriter mode needs room below the last line, or
-                        // the caret can never reach the middle of the screen
-                        // at the end of a chapter.
-                        prefs.typewriter ? "pb-[60vh]" : "pb-24"
-                      }`}
+          className={`w-full px-12 pt-14 ${
+            // Typewriter mode needs room below the last line, or the caret can
+            // never reach the middle of the screen at the end of a chapter.
+            prefs.typewriter ? "pb-[60vh]" : "pb-24"
+          }`}
         >
-          <div className="mx-auto w-full max-w-(--measure-manuscript)">
+          <div className="w-full">
             <p
               className="font-sans text-xs tracking-[0.18em] uppercase"
               style={{ color: "var(--paper-muted)" }}
