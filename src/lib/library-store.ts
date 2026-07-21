@@ -394,3 +394,82 @@ export function ensureChapter(bookId: string): string | null {
 
   return createChapter(bookId, "Chapter One");
 }
+
+// ---------------------------------------------------------------------------
+// Migration
+//
+// Two older shapes can be sitting in storage. Both become the first book on the
+// shelf. Chapter ids were already UUIDs, so bodies keep their keys and are
+// never rewritten — the migration only ever moves metadata.
+// ---------------------------------------------------------------------------
+
+const LEGACY_MANIFEST_KEY = "openchapter:manifest";
+const LEGACY_SPIKE_KEY = "openchapter:spike:chapter-1";
+
+interface LegacyManifest {
+  bookTitle?: string;
+  chapters?: ChapterMeta[];
+  lastOpenedId?: string | null;
+}
+
+/**
+ * Idempotent by construction: each source key is removed once consumed, so a
+ * second call finds nothing. That matters because this runs from an effect and
+ * React runs effects twice in development.
+ */
+export function migrateLegacy() {
+  const migrated = migrateManifest() || migrateSpike();
+  if (!migrated) return;
+
+  // Land the writer on what they were working on before.
+  const shelf = getShelf();
+  commit({ ...shelf, lastOpenedBookId: shelf.books[shelf.books.length - 1].id });
+}
+
+function migrateManifest(): boolean {
+  const raw = readRaw(LEGACY_MANIFEST_KEY);
+  if (!raw) return false;
+
+  let legacy: LegacyManifest;
+  try {
+    legacy = JSON.parse(raw) as LegacyManifest;
+  } catch {
+    // Unreadable. Drop the key so it stops being retried on every load.
+    window.localStorage.removeItem(LEGACY_MANIFEST_KEY);
+    return false;
+  }
+
+  const chapters = Array.isArray(legacy.chapters) ? legacy.chapters : [];
+  const shelf = getShelf();
+
+  commit({
+    ...shelf,
+    books: [
+      ...shelf.books,
+      {
+        id: newId(),
+        title: legacy.bookTitle ?? "Untitled Book",
+        chapters,
+        lastOpenedId: legacy.lastOpenedId ?? chapters[0]?.id ?? null,
+        lastOpenedAt: Date.now(),
+      },
+    ],
+  });
+
+  window.localStorage.removeItem(LEGACY_MANIFEST_KEY);
+  return true;
+}
+
+function migrateSpike(): boolean {
+  const body = readRaw(LEGACY_SPIKE_KEY);
+  if (!body) return false;
+
+  const { chapterId } = createBook("Untitled Book");
+  try {
+    window.localStorage.setItem(bodyKey(chapterId), body);
+    window.localStorage.removeItem(LEGACY_SPIKE_KEY);
+  } catch {
+    // Couldn't carry the text over. The new book still exists.
+  }
+  return true;
+}

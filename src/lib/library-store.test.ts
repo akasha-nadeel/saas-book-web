@@ -8,6 +8,7 @@ import {
   ensureChapter,
   findBook,
   getShelf,
+  migrateLegacy,
   moveChapter,
   renameBook,
   renameChapter,
@@ -243,4 +244,74 @@ it("ensureChapter creates a chapter for an empty book", () => {
 
 it("ensureChapter reports null for an unknown book", () => {
   expect(ensureChapter("nope")).toBeNull();
+});
+
+it("migrates a single-book manifest onto the shelf", () => {
+  localStorage.setItem(
+    "openchapter:manifest",
+    JSON.stringify({
+      bookTitle: "The Salt Road",
+      chapters: [
+        { id: "c1", title: "Chapter One", words: 1204 },
+        { id: "c2", title: "Chapter Two", words: 847 },
+      ],
+      lastOpenedId: "c2",
+    }),
+  );
+  localStorage.setItem("openchapter:chapter:c1", '{"type":"doc"}');
+
+  migrateLegacy();
+
+  const [book] = getShelf().books;
+  expect(book.title).toBe("The Salt Road");
+  expect(book.chapters.map((c) => c.id)).toEqual(["c1", "c2"]);
+  expect(book.lastOpenedId).toBe("c2");
+  expect(bookWordCount(book)).toBe(2051);
+  // Bodies keep their keys — the ids are already unique.
+  expect(localStorage.getItem("openchapter:chapter:c1")).toBe('{"type":"doc"}');
+  expect(localStorage.getItem("openchapter:manifest")).toBeNull();
+});
+
+it("migrates the original spike chapter", () => {
+  localStorage.setItem("openchapter:spike:chapter-1", '{"type":"doc"}');
+
+  migrateLegacy();
+
+  const [book] = getShelf().books;
+  expect(book.chapters).toHaveLength(1);
+  const body = localStorage.getItem(
+    `openchapter:chapter:${book.chapters[0].id}`,
+  );
+  expect(body).toBe('{"type":"doc"}');
+  expect(localStorage.getItem("openchapter:spike:chapter-1")).toBeNull();
+});
+
+it("is idempotent — React runs effects twice in development", () => {
+  localStorage.setItem(
+    "openchapter:manifest",
+    JSON.stringify({ bookTitle: "Once", chapters: [], lastOpenedId: null }),
+  );
+
+  migrateLegacy();
+  migrateLegacy();
+
+  expect(getShelf().books).toHaveLength(1);
+});
+
+it("does nothing when there is nothing to migrate", () => {
+  migrateLegacy();
+  expect(getShelf().books).toEqual([]);
+});
+
+it("leaves existing books alone", () => {
+  const { bookId } = createBook("Already Here");
+  localStorage.setItem(
+    "openchapter:manifest",
+    JSON.stringify({ bookTitle: "Old", chapters: [], lastOpenedId: null }),
+  );
+
+  migrateLegacy();
+
+  expect(getShelf().books).toHaveLength(2);
+  expect(findBook(getShelf(), bookId)?.title).toBe("Already Here");
 });
