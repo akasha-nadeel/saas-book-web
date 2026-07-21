@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExportDialog } from "@/components/export/export-dialog";
 import { BookCover } from "@/components/shelf/book-cover";
+import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
@@ -19,7 +20,6 @@ import {
   type Book,
   type BookView,
 } from "@/lib/library-store";
-import { relativeTime } from "@/lib/relative-time";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 const VIEW_LABEL: Record<BookView, string> = {
@@ -34,6 +34,7 @@ export function Bookshelf() {
 
   const [exporting, setExporting] = useState<Book | null>(null);
   const [editing, setEditing] = useState<Book | null>(null);
+  const [opening, setOpening] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<"templates" | "upgrade" | null>(null);
   const [view, setView] = useState<BookView>("active");
@@ -186,6 +187,7 @@ export function Bookshelf() {
                 }
                 onExport={setExporting}
                 onEdit={setEditing}
+                onOpen={setOpening}
                 onArchive={(b) => archiveBook(b.id)}
                 onRestore={(b) => restoreBook(b.id)}
                 onTrash={handleTrash}
@@ -201,6 +203,17 @@ export function Bookshelf() {
       )}
       {editing && (
         <CoverDialog book={editing} onClose={() => setEditing(null)} />
+      )}
+      {opening && (
+        <BookDetailsDialog
+          book={opening}
+          onClose={() => setOpening(null)}
+          onEditCover={() => {
+            // Hand straight over rather than stacking a dialog on a dialog.
+            setEditing(opening);
+            setOpening(null);
+          }}
+        />
       )}
       {dialog === "templates" && (
         <TemplatesDialog onClose={() => setDialog(null)} />
@@ -404,6 +417,7 @@ function BookGrid({
   continueId,
   onExport,
   onEdit,
+  onOpen,
   onArchive,
   onRestore,
   onTrash,
@@ -414,6 +428,7 @@ function BookGrid({
   continueId: string | null;
   onExport: (book: Book) => void;
   onEdit: (book: Book) => void;
+  onOpen: (book: Book) => void;
   onArchive: (book: Book) => void;
   onRestore: (book: Book) => void;
   onTrash: (book: Book) => void;
@@ -428,10 +443,16 @@ function BookGrid({
     >
       {books.map((book) => (
         <li key={book.id} className="group relative">
-          {/* The whole cover is the link, so the target is the object rather
-              than the few words of its title. */}
+          {/* Still a real link: a plain click opens the details, but the href
+              keeps middle-click, ctrl-click and "open in new tab" going
+              straight to the manuscript, which is what those mean. */}
           <Link
             href={`/book/${book.id}`}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              e.preventDefault();
+              onOpen(book);
+            }}
             className="block rounded-md outline-none focus-visible:ring-2
                        focus-visible:ring-accent/60 focus-visible:ring-offset-4
                        focus-visible:ring-offset-panel"
@@ -503,14 +524,11 @@ function BookGrid({
                 </span>
               )}
             </div>
-            <p className="mt-0.5 font-sans text-xs text-muted">
-              {book.chapters.length}{" "}
-              {book.chapters.length === 1 ? "chapter" : "chapters"} ·{" "}
-              {bookWordCount(book).toLocaleString()} words
-            </p>
-            <p className="font-sans text-xs text-muted">
-              {relativeTime(book.lastOpenedAt)}
-            </p>
+            {book.subtitle ? (
+              <p className="mt-0.5 truncate font-sans text-xs text-muted">
+                {book.subtitle}
+              </p>
+            ) : null}
           </div>
         </li>
       ))}
