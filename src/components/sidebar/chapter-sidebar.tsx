@@ -150,7 +150,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         <button
           type="button"
           onClick={handleCreate}
-          className="w-full rounded-full bg-accent py-2 text-center font-sans
+          className="w-full rounded-md bg-accent py-2 text-center font-sans
                      text-sm font-semibold text-white outline-none
                      transition-colors hover:bg-accent-strong
                      focus-visible:ring-2 focus-visible:ring-accent/60"

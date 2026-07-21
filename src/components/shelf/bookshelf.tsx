@@ -159,7 +159,7 @@ function ShelfNav({
       <button
         type="button"
         onClick={onCreate}
-        className="mt-6 w-full rounded-full bg-accent py-2.5 font-sans text-sm
+        className="mt-6 w-full rounded-md bg-accent py-2.5 font-sans text-sm
                    font-semibold text-white outline-none transition-colors
                    hover:bg-accent-strong focus-visible:ring-2
                    focus-visible:ring-accent/60"
@@ -196,7 +196,7 @@ function Empty({ onCreate }: { onCreate: () => void }) {
       <button
         type="button"
         onClick={onCreate}
-        className="mt-4 rounded-full bg-accent px-4 py-2 font-sans text-sm
+        className="mt-4 rounded-md bg-accent px-4 py-2 font-sans text-sm
                    font-semibold text-white outline-none transition-colors
                    hover:bg-accent-strong focus-visible:ring-2
                    focus-visible:ring-accent/60"
