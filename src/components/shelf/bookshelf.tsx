@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExportDialog } from "@/components/export/export-dialog";
-import { NewBookDialog } from "@/components/shelf/new-book-dialog";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
 import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
 import {
@@ -32,9 +31,7 @@ export function Bookshelf() {
 
   const [exporting, setExporting] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
-  const [dialog, setDialog] = useState<
-    "new" | "templates" | "upgrade" | null
-  >(null);
+  const [dialog, setDialog] = useState<"templates" | "upgrade" | null>(null);
   const [view, setView] = useState<BookView>("active");
 
   // migrateLegacy is idempotent, but running it twice is still wasted work and
@@ -76,10 +73,6 @@ export function Bookshelf() {
     [shelf],
   );
 
-  // Setup comes first now. The dialog does the creating and the navigating,
-  // so there is one path into a new book rather than two that can drift.
-  const handleCreate = () => setDialog("new");
-
   // From the active or archived shelf, deleting means the trash — recoverable,
   // so no dialog. Only the permanent one asks.
   const handleTrash = (book: Book) => trashBook(book.id);
@@ -119,7 +112,6 @@ export function Bookshelf() {
           counts={counts}
           totalWords={totalWords}
           onView={setView}
-          onCreate={handleCreate}
         />
 
         {/* One rounded corner, top-left, and the panel runs off the right and
@@ -163,7 +155,7 @@ export function Bookshelf() {
 
             {books.length === 0 ? (
               view === "active" ? (
-                <Empty onCreate={handleCreate} />
+                <Empty />
               ) : (
                 <p className="mt-10 font-sans text-sm text-muted">
                   {view === "archived"
@@ -200,8 +192,6 @@ export function Bookshelf() {
       {exporting && (
         <ExportDialog book={exporting} onClose={() => setExporting(null)} />
       )}
-      {dialog === "new" && <NewBookDialog onClose={() => setDialog(null)} />}
-
       {dialog === "templates" && (
         <TemplatesDialog onClose={() => setDialog(null)} />
       )}
@@ -275,13 +265,11 @@ function ShelfNav({
   counts,
   totalWords,
   onView,
-  onCreate,
 }: {
   view: BookView;
   counts: Record<BookView, number>;
   totalWords: number;
   onView: (view: BookView) => void;
-  onCreate: () => void;
 }) {
   return (
     <aside
@@ -290,16 +278,17 @@ function ShelfNav({
       className="flex w-(--sidebar-width) shrink-0 flex-col bg-surface px-4 pt-2 pb-6"
       aria-label="Library"
     >
-      <button
-        type="button"
-        onClick={onCreate}
-        className="w-full rounded-md bg-accent py-2.5 font-sans text-sm
-                   font-semibold text-white outline-none transition-colors
-                   hover:bg-accent-strong focus-visible:ring-2
-                   focus-visible:ring-accent/60"
+      {/* A link, not a button: setting up a book is a place you go, and a
+          link is what lets it be opened in a new tab or middle-clicked. */}
+      <Link
+        href="/book/new"
+        className="block w-full rounded-md bg-accent py-2.5 text-center
+                   font-sans text-sm font-semibold text-white outline-none
+                   transition-colors hover:bg-accent-strong
+                   focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         New book
-      </button>
+      </Link>
 
       <nav className="mt-4 flex flex-col gap-0.5">
         {(["active", "archived", "trashed"] as BookView[]).map((value) => (
@@ -336,20 +325,19 @@ function ShelfNav({
   );
 }
 
-function Empty({ onCreate }: { onCreate: () => void }) {
+function Empty() {
   return (
     <div className="mt-16 text-center">
       <p className="font-serif text-lg text-fg">Nothing on the shelf yet.</p>
-      <button
-        type="button"
-        onClick={onCreate}
-        className="mt-4 rounded-md bg-accent px-4 py-2 font-sans text-sm
-                   font-semibold text-white outline-none transition-colors
-                   hover:bg-accent-strong focus-visible:ring-2
-                   focus-visible:ring-accent/60"
+      <Link
+        href="/book/new"
+        className="mt-4 inline-block rounded-md bg-accent px-4 py-2 font-sans
+                   text-sm font-semibold text-white outline-none
+                   transition-colors hover:bg-accent-strong
+                   focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         Start your first book
-      </button>
+      </Link>
     </div>
   );
 }
