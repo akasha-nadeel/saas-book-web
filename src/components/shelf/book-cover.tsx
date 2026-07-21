@@ -56,6 +56,43 @@ export function BookCover({
         />
       ) : null}
 
+      {/* Artwork hides the words, so hovering brings them back over a scrim.
+          Only for covers that have a picture — a typeset face is already the
+          text, and fading a second copy in over it would just shimmer.
+
+          It rides on the shelf card's `group`, so in the previews and the tool
+          rail, where there is no such ancestor, it never appears — which is
+          right: those are not places you hover to identify a book. */}
+      {image ? (
+        <div
+          className="absolute inset-0 flex flex-col rounded-l-[3px] rounded-r-md
+                     bg-black/25 opacity-0 transition-opacity duration-200
+                     group-hover:opacity-100"
+        >
+          {/* A shadow on the type rather than a heavier scrim. The artwork
+              stays visible through the overlay, and the words stay legible
+              even where they land on a pale part of it. */}
+          <div
+            className="book-face-inner flex h-full flex-col"
+            style={{ textShadow: "0 1px 3px rgba(0,0,0,0.85)" }}
+          >
+            <p className="book-face-title line-clamp-3 font-serif text-white">
+              {title}
+            </p>
+            {subtitle ? (
+              <p className="book-face-subtitle line-clamp-2 font-serif text-white/90 italic">
+                {subtitle}
+              </p>
+            ) : null}
+            {author ? (
+              <p className="book-face-author mt-auto truncate font-sans text-white/85 uppercase">
+                {author}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {/* The spine: a hard fold line with the shading falling away from it. */}
       <div
         aria-hidden="true"
