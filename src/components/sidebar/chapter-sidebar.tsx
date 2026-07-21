@@ -83,6 +83,21 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
+      {/* The wordmark opens the panel rather than closing it. At the foot it
+          was the last thing read and sat under the save state, where a brand
+          has nothing to say; at the head it labels what it belongs to. */}
+      <div className="shrink-0 border-b border-line px-4 py-3">
+        <Link
+          href="/"
+          className="rounded-sm font-display text-xl font-medium tracking-tight
+                     text-fg outline-none transition-colors
+                     hover:text-accent-strong focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          OpenChapter
+        </Link>
+      </div>
+
       <div className="shrink-0 px-4 pt-3 pb-3">
         {/* The book's title, not the word "Manuscript". A book you cannot
             rename is worse than a panel without a label. */}
@@ -244,9 +259,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             <Progress written={written} target={book.targetWords} />
           ) : null}
         </div>
-        <p className="border-t border-line px-4 py-3 font-display text-base font-medium text-fg">
-          OpenChapter
-        </p>
       </div>
     </div>
   );
