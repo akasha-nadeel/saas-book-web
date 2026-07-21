@@ -179,12 +179,9 @@ function ShelfTopNav({
 }) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-6 bg-surface px-6">
-      <div className="min-w-0">
-        <p className="font-serif text-lg leading-tight text-fg">OpenChapter</p>
-        <p className="font-sans text-[0.7rem] text-muted">
-          A place to write your novel
-        </p>
-      </div>
+      <p className="min-w-0 shrink-0 font-display text-2xl font-medium tracking-tight text-fg">
+        OpenChapter
+      </p>
 
       <nav className="ml-auto flex items-center gap-2 font-sans text-sm">
         <button
@@ -328,14 +325,17 @@ function BookTable({
           <tr
             key={book.id}
             className="group border-b border-line/60 transition-colors
-                       last:border-0 hover:bg-raised/60"
+                       last:border-0 hover:bg-raised"
           >
             <td className="py-3.5 pr-4">
               <Link
                 href={`/book/${book.id}`}
-                className="rounded-sm font-sans text-sm text-fg outline-none
-                           hover:text-accent focus-visible:ring-2
-                           focus-visible:ring-accent/60"
+                // Underline rather than recolour. This was going text-fg →
+                // accent, so hovering a row made its title darker and harder
+                // to read than the rows either side of it.
+                className="rounded-sm font-sans text-sm text-fg underline-offset-4
+                           outline-none group-hover:underline
+                           focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 {book.title}
               </Link>
@@ -366,7 +366,7 @@ function BookTable({
                   aria-label={`Export ${book.title}`}
                   title="Export"
                   className="rounded-md p-1.5 text-muted outline-none
-                             transition-colors hover:bg-raised hover:text-accent
+                             transition-colors hover:bg-line hover:text-fg
                              focus-visible:ring-2 focus-visible:ring-accent/60"
                 >
                   <svg

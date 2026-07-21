@@ -26,6 +26,7 @@
 
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 
   /* The writing surface. The line measure used to live here too; the page now
      fills its column, so the window sets the line length. */

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Fraunces, Inter, Poppins } from "next/font/google";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -16,6 +16,15 @@ const inter = Inter({
   display: "swap",
 });
 
+// The wordmark only. A geometric sans with circular bowls reads as a mark
+// rather than as more interface text.
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "OpenChapter",
   description: "A calm, focused place to write your novel — chapter by chapter.",
@@ -29,7 +38,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
+      className={`${fraunces.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}
     >
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}
