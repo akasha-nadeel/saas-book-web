@@ -16,6 +16,8 @@ import { ToolRail } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { ExportDialog } from "@/components/export/export-dialog";
+import { BookCover } from "@/components/shelf/book-cover";
+import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
   bookWordCount,
   findBook,
@@ -31,6 +33,7 @@ import {
 import { pageMetrics } from "@/lib/page-setup";
 import {
   useChapterBody,
+  useCover,
   useHydrated,
   usePrefs,
   useShelf,
@@ -62,8 +65,10 @@ export function ChapterEditor({
   const shelf = useShelf();
   const prefs = usePrefs();
   const raw = useChapterBody(chapterId);
+  const cover = useCover(bookId);
 
   const [exporting, setExporting] = useState(false);
+  const [editingCover, setEditingCover] = useState(false);
   // Lifted out of the surface so the toolbar and the assistant can both reach
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -178,6 +183,32 @@ export function ChapterEditor({
             </RailButton>
           }
         >
+          {/* Which book these tools act on, as the object rather than another
+              copy of its title — the running head already carries the words.
+
+              It is also the way in to changing it. A cover is the one thing
+              here you would click expecting to edit it, and there was nowhere
+              else in the editor to reach the title page from. */}
+          <button
+            type="button"
+            onClick={() => setEditingCover(true)}
+            aria-label={`Edit the cover of ${book.title}`}
+            title="Edit cover"
+            className="block w-10 shrink-0 rounded-md outline-none
+                       transition-transform hover:-translate-y-0.5
+                       focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <BookCover
+              title={book.title}
+              subtitle={book.subtitle}
+              author={book.author}
+              words={bookWordCount(book)}
+              image={cover}
+            />
+          </button>
+
+          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
           <ToolRail editor={editor} book={book} paper={prefs.paper} />
 
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
@@ -213,6 +244,9 @@ export function ChapterEditor({
           chapterId={chapterId}
           onClose={() => setExporting(false)}
         />
+      )}
+      {editingCover && (
+        <CoverDialog book={book} onClose={() => setEditingCover(false)} />
       )}
     </div>
   );
