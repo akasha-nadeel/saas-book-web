@@ -13,6 +13,7 @@ import {
   renameBook,
   setChapterPart,
   toggleBookmark,
+  type Book,
   type ChapterMeta,
   type ChapterPart,
 } from "@/lib/library-store";
@@ -24,8 +25,14 @@ import { useShelf } from "@/lib/use-library";
  * The manuscript: front matter, body, back matter.
  *
  * A part is a field on the chapter, so this is three filtered views of one
- * ordered list rather than three lists. Dragging between sections therefore
- * moves a chapter *and* reassigns it, which is what the reference does too.
+ * ordered list rather than three lists.
+ *
+ * The three are steps rather than accordions. Expanding all of them at once
+ * gave a list with three headers scattered through it and no way to see one
+ * section's shape without the others in the way; stepping into one shows that
+ * section and nothing else. The cost is that the other two sections are no
+ * longer on screen to drag onto, so they reappear as drop targets while a
+ * chapter is being dragged — the only moment they are wanted.
  */
 
 const PARTS: { key: ChapterPart; label: string; empty: string }[] = [
@@ -42,7 +49,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overPart, setOverPart] = useState<ChapterPart | null>(null);
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -50,6 +56,26 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   const activeId = pathname.startsWith(prefix)
     ? decodeURIComponent(pathname.slice(prefix.length))
     : null;
+
+  const activeChapter = book?.chapters.find((c) => c.id === activeId) ?? null;
+  const activePart: ChapterPart | null = activeChapter
+    ? (activeChapter.part ?? "body")
+    : null;
+
+  // null means the section list. Opens inside whichever section holds the open
+  // chapter, and follows the route when it moves to another one — arriving from
+  // a bookmark or the editor's next-chapter arrow must not leave the panel
+  // showing a list that does not contain the chapter on screen.
+  //
+  // Adjusting state during render is React's documented answer to this. An
+  // effect would paint the wrong section first and then correct it, and the
+  // set-state-in-effect rule rejects it besides.
+  const [browsing, setBrowsing] = useState<ChapterPart | null>(activePart);
+  const [followed, setFollowed] = useState<ChapterPart | null>(activePart);
+  if (activePart !== followed) {
+    setFollowed(activePart);
+    if (activePart) setBrowsing(activePart);
+  }
 
   if (!book) return null;
 
@@ -113,7 +139,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             chapter is this panel's primary action and now looks like one. */}
         <button
           type="button"
-          onClick={() => handleCreate("body")}
+          onClick={() => handleCreate(browsing ?? "body")}
           className="mt-3 w-full rounded-md bg-accent py-2.5 font-sans text-sm
                      font-semibold text-white outline-none transition-colors
                      hover:bg-accent-strong focus-visible:ring-2
@@ -124,176 +150,113 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
-        {PARTS.map(({ key, label, empty }) => {
-          const chapters = chaptersInPart(book, key);
-          const isOpen = !collapsed[key];
-
-          return (
-            <section
-              key={key}
-              onDragOver={(e) => {
-                // Without preventDefault the browser refuses the drop.
-                e.preventDefault();
-                setOverPart(key);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                handleDropOn(key);
-              }}
-              className={
-                overPart === key && dragId ? "bg-accent-deep/25" : undefined
-              }
-            >
-              <div className="flex items-center justify-between gap-2 bg-raised/40 px-4 py-2.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
-                  }
-                  aria-expanded={isOpen}
-                  className="flex items-center gap-2 rounded-sm font-sans
-                             text-sm font-semibold text-fg outline-none
-                             hover:text-accent-strong focus-visible:ring-2
-                             focus-visible:ring-accent/60"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`text-[0.6rem] transition-transform ${
-                      isOpen ? "rotate-90" : ""
-                    }`}
+        {browsing === null ? (
+          <ul>
+            {PARTS.map(({ key, label }) => {
+              const count = chaptersInPart(book, key).length;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => setBrowsing(key)}
+                    className="flex w-full items-center gap-2 border-b
+                               border-line px-4 py-3.5 text-left font-sans
+                               text-sm font-semibold text-fg outline-none
+                               transition-colors hover:bg-raised
+                               focus-visible:ring-inset focus-visible:ring-2
+                               focus-visible:ring-accent/60"
                   >
-                    ▶
-                  </span>
-                  {label}
-                </button>
+                    <span className="flex-1 truncate">{label}</span>
+                    <span className="shrink-0 font-normal tabular-nums text-muted">
+                      {count}
+                    </span>
+                    <span aria-hidden="true" className="shrink-0 text-muted">
+                      ›
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <>
+            <div className="flex items-center gap-1 border-b border-line px-2 py-2">
+              <button
+                type="button"
+                onClick={() => setBrowsing(null)}
+                className="flex items-center gap-1.5 rounded-md px-2 py-1.5
+                           font-sans text-sm font-semibold text-fg outline-none
+                           transition-colors hover:bg-raised
+                           focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                <span aria-hidden="true">‹</span>
+                {PARTS.find((p) => p.key === browsing)?.label}
+              </button>
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() => handleCreate(key)}
-                  aria-label={`Add to ${label}`}
-                  title={`Add to ${label}`}
-                  className="rounded-sm px-1 font-sans text-sm text-muted
-                             outline-none hover:text-fg focus-visible:ring-2
-                             focus-visible:ring-accent/60"
-                >
-                  add
-                </button>
+            <SectionChapters
+              book={book}
+              bookId={bookId}
+              part={browsing}
+              activeId={activeId}
+              dragId={dragId}
+              onDragId={setDragId}
+              onOverPart={setOverPart}
+              onDelete={handleDelete}
+            />
+
+            <div className="px-3 pt-3">
+              <button
+                type="button"
+                onClick={() => handleCreate(browsing)}
+                className="w-full rounded-md border border-dashed border-line
+                           py-2.5 font-sans text-sm text-muted outline-none
+                           transition-colors hover:border-accent
+                           hover:text-accent-strong focus-visible:ring-2
+                           focus-visible:ring-accent/60"
+              >
+                + Add to {PARTS.find((p) => p.key === browsing)?.label}
+              </button>
+            </div>
+
+            {/* The other two sections, shown only while something is being
+                dragged. Stepping into a section took them off screen, and a
+                chapter you can pick up but cannot put anywhere is worse than
+                a permanent strip nobody reads. */}
+            {dragId && (
+              <div className="sticky bottom-0 z-10 mt-4 border-t border-line bg-panel px-3 pt-3 pb-1">
+                <p className="pb-2 font-sans text-xs text-muted">Move to</p>
+                {PARTS.filter((p) => p.key !== browsing).map(
+                  ({ key, label }) => (
+                    <div
+                      key={key}
+                      onDragOver={(e) => {
+                        // Without preventDefault the browser refuses the drop.
+                        e.preventDefault();
+                        setOverPart(key);
+                      }}
+                      onDragLeave={() => setOverPart(null)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleDropOn(key);
+                        setBrowsing(key);
+                      }}
+                      className={`mb-1.5 rounded-md border border-dashed py-3
+                                  text-center font-sans text-sm
+                                  transition-colors ${
+                                    overPart === key
+                                      ? "border-accent bg-accent-deep/40 text-fg"
+                                      : "border-line text-muted"
+                                  }`}
+                    >
+                      {label}
+                    </div>
+                  ),
+                )}
               </div>
-
-              {isOpen && chapters.length === 0 && (
-                <p className="px-4 py-3 font-sans text-sm text-muted italic">
-                  {empty}
-                </p>
-              )}
-
-              {isOpen && chapters.length > 0 && (
-                <ol>
-                  {chapters.map((chapter) => {
-                    const isActive = chapter.id === activeId;
-                    // Numbering runs within the part, as it does in a book.
-                    const index = book.chapters.indexOf(chapter);
-
-                    return (
-                      <li
-                        key={chapter.id}
-                        draggable
-                        onDragStart={() => setDragId(chapter.id)}
-                        onDragEnd={() => {
-                          setDragId(null);
-                          setOverPart(null);
-                        }}
-                        className={`group relative ${
-                          dragId === chapter.id ? "opacity-40" : ""
-                        }`}
-                      >
-                        <Link
-                          href={`/book/${bookId}/chapter/${chapter.id}`}
-                          aria-current={isActive ? "page" : undefined}
-                          // Native drag is mouse-only, so reordering also needs
-                          // a keyboard path or it is unreachable for some.
-                          aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                          onKeyDown={(e) => {
-                            if (!e.altKey) return;
-                            if (e.key === "ArrowUp") {
-                              e.preventDefault();
-                              moveChapter(bookId, index, index - 1);
-                            } else if (e.key === "ArrowDown") {
-                              e.preventDefault();
-                              moveChapter(bookId, index, index + 1);
-                            }
-                          }}
-                          className={`flex items-center gap-2.5 border-l-4 py-3
-                                      pr-16 pl-3 font-sans text-sm outline-none
-                                      transition-colors focus-visible:ring-inset
-                                      focus-visible:ring-2
-                                      focus-visible:ring-accent/60 ${
-                                        isActive
-                                          ? "border-accent bg-accent-deep font-medium text-white"
-                                          : "border-transparent text-muted hover:bg-raised hover:text-fg"
-                                      }`}
-                        >
-                          <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
-                            {index + 1}
-                          </span>
-                          <span className="flex-1 truncate">
-                            {chapter.title}
-                          </span>
-                          {chapter.words > 0 && (
-                            <span className="shrink-0 text-xs tabular-nums opacity-50">
-                              {chapter.words.toLocaleString()}
-                            </span>
-                          )}
-                        </Link>
-
-                        {/* A marked chapter keeps its star; an unmarked one
-                            shows it on hover, so rows stay quiet until wanted. */}
-                        <button
-                          type="button"
-                          onClick={() => toggleBookmark(bookId, chapter.id)}
-                          aria-label={
-                            chapter.bookmarked
-                              ? `Remove bookmark from ${chapter.title}`
-                              : `Bookmark ${chapter.title}`
-                          }
-                          aria-pressed={Boolean(chapter.bookmarked)}
-                          title="Bookmark"
-                          className={`absolute top-1/2 right-9 -translate-y-1/2
-                                      rounded-sm px-1 py-0.5 text-sm leading-none
-                                      outline-none transition-opacity
-                                      focus-visible:opacity-100
-                                      focus-visible:ring-2
-                                      focus-visible:ring-accent/60 ${
-                                        chapter.bookmarked
-                                          ? "text-accent-strong opacity-100"
-                                          : "text-muted opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-fg"
-                                      }`}
-                        >
-                          {chapter.bookmarked ? "★" : "☆"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(chapter)}
-                          aria-label={`Delete ${chapter.title}`}
-                          className="absolute top-1/2 right-3 -translate-y-1/2
-                                     rounded-sm px-1.5 py-0.5 font-sans text-sm
-                                     leading-none text-muted opacity-0
-                                     outline-none transition-opacity
-                                     group-hover:opacity-60 hover:!opacity-100
-                                     hover:text-red-400 focus-visible:opacity-100
-                                     focus-visible:ring-2
-                                     focus-visible:ring-accent/60"
-                        >
-                          ×
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ol>
-              )}
-            </section>
-          );
-        })}
+            )}
+          </>
+        )}
       </div>
 
       {/* The reference closes the panel with a running total and its wordmark;
@@ -319,6 +282,142 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * One section's chapters.
+ *
+ * Numbering runs on the book's own order, not the section's, so a chapter keeps
+ * the number it has in the manuscript rather than being renumbered from 1 in
+ * every section.
+ */
+function SectionChapters({
+  book,
+  bookId,
+  part,
+  activeId,
+  dragId,
+  onDragId,
+  onOverPart,
+  onDelete,
+}: {
+  book: Book;
+  bookId: string;
+  part: ChapterPart;
+  activeId: string | null;
+  dragId: string | null;
+  onDragId: (id: string | null) => void;
+  onOverPart: (part: ChapterPart | null) => void;
+  onDelete: (chapter: ChapterMeta) => void;
+}) {
+  const chapters = chaptersInPart(book, part);
+  const empty = PARTS.find((p) => p.key === part)?.empty ?? "";
+
+  if (chapters.length === 0) {
+    return (
+      <p className="px-4 py-6 text-center font-sans text-sm text-muted italic">
+        {empty}
+      </p>
+    );
+  }
+
+  return (
+    <ol>
+      {chapters.map((chapter) => {
+        const isActive = chapter.id === activeId;
+        const index = book.chapters.indexOf(chapter);
+
+        return (
+          <li
+            key={chapter.id}
+            draggable
+            onDragStart={() => onDragId(chapter.id)}
+            onDragEnd={() => {
+              onDragId(null);
+              onOverPart(null);
+            }}
+            className={`group relative ${
+              dragId === chapter.id ? "opacity-40" : ""
+            }`}
+          >
+            <Link
+              href={`/book/${bookId}/chapter/${chapter.id}`}
+              aria-current={isActive ? "page" : undefined}
+              // Native drag is mouse-only, so reordering also needs a keyboard
+              // path or it is unreachable for some.
+              aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+              onKeyDown={(e) => {
+                if (!e.altKey) return;
+                if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  moveChapter(bookId, index, index - 1);
+                } else if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  moveChapter(bookId, index, index + 1);
+                }
+              }}
+              className={`flex items-center gap-2.5 border-l-4 py-3 pr-16 pl-3
+                          font-sans text-sm outline-none transition-colors
+                          focus-visible:ring-inset focus-visible:ring-2
+                          focus-visible:ring-accent/60 ${
+                            isActive
+                              ? "border-accent bg-accent-deep font-medium text-white"
+                              : "border-transparent text-muted hover:bg-raised hover:text-fg"
+                          }`}
+            >
+              <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
+                {index + 1}
+              </span>
+              <span className="flex-1 truncate">{chapter.title}</span>
+              {chapter.words > 0 && (
+                <span className="shrink-0 text-xs tabular-nums opacity-50">
+                  {chapter.words.toLocaleString()}
+                </span>
+              )}
+            </Link>
+
+            {/* A marked chapter keeps its star; an unmarked one shows it on
+                hover, so rows stay quiet until wanted. */}
+            <button
+              type="button"
+              onClick={() => toggleBookmark(bookId, chapter.id)}
+              aria-label={
+                chapter.bookmarked
+                  ? `Remove bookmark from ${chapter.title}`
+                  : `Bookmark ${chapter.title}`
+              }
+              aria-pressed={Boolean(chapter.bookmarked)}
+              title="Bookmark"
+              className={`absolute top-1/2 right-9 -translate-y-1/2 rounded-sm
+                          px-1 py-0.5 text-sm leading-none outline-none
+                          transition-opacity focus-visible:opacity-100
+                          focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                            chapter.bookmarked
+                              ? "text-accent-strong opacity-100"
+                              : "text-muted opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-fg"
+                          }`}
+            >
+              {chapter.bookmarked ? "★" : "☆"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onDelete(chapter)}
+              aria-label={`Delete ${chapter.title}`}
+              className="absolute top-1/2 right-3 -translate-y-1/2 rounded-sm
+                         px-1.5 py-0.5 font-sans text-sm leading-none text-muted
+                         opacity-0 outline-none transition-opacity
+                         group-hover:opacity-60 hover:!opacity-100
+                         hover:text-red-400 focus-visible:opacity-100
+                         focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              ×
+            </button>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
