@@ -117,6 +117,27 @@ body {
 .manuscript .tiptap em { font-style: italic; }
 .manuscript .tiptap strong { font-weight: 600; }
 
+/* --------------------------------------------------------------------------
+   Focus mode. The Focus extension marks the block holding the caret; the
+   dimming is entirely here, so toggling it costs nothing but a class.
+   -------------------------------------------------------------------------- */
+.manuscript.focus-mode .tiptap > * {
+  opacity: 0.25;
+  transition: opacity 300ms ease;
+}
+
+.manuscript.focus-mode .tiptap > .has-focus {
+  opacity: 1;
+}
+
+/* Someone who dims the page to concentrate is the last person who should be
+   made to watch things fade. */
+@media (prefers-reduced-motion: reduce) {
+  .manuscript.focus-mode .tiptap > * {
+    transition: none;
+  }
+}
+
 /* Placeholder shown on a genuinely empty chapter. */
 .manuscript .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

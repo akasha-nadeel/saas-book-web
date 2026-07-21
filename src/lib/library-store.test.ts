@@ -7,6 +7,7 @@ import {
   deleteChapter,
   ensureChapter,
   findBook,
+  getPrefs,
   getShelf,
   migrateLegacy,
   moveChapter,
@@ -14,6 +15,7 @@ import {
   renameChapter,
   saveBody,
   setBookAuthor,
+  setPref,
   touchLastOpened,
   touchLastOpenedBook,
   type Book,
@@ -340,4 +342,35 @@ it("keeps the author separate per book", () => {
 
   expect(findBook(getShelf(), a.bookId)!.author).toBe("One Author");
   expect(findBook(getShelf(), b.bookId)!.author).toBeUndefined();
+});
+
+it("starts with both writing modes off", () => {
+  expect(getPrefs()).toEqual({ focusMode: false, typewriter: false });
+});
+
+it("returns an identical prefs reference on repeat reads", () => {
+  // Same useSyncExternalStore constraint as the shelf.
+  expect(getPrefs()).toBe(getPrefs());
+});
+
+it("sets one preference without disturbing the other", () => {
+  setPref("focusMode", true);
+  expect(getPrefs()).toEqual({ focusMode: true, typewriter: false });
+
+  setPref("typewriter", true);
+  expect(getPrefs()).toEqual({ focusMode: true, typewriter: true });
+
+  setPref("focusMode", false);
+  expect(getPrefs()).toEqual({ focusMode: false, typewriter: true });
+});
+
+it("degrades to defaults when prefs are corrupt", () => {
+  localStorage.setItem("openchapter:prefs", "{ not json");
+  expect(getPrefs()).toEqual({ focusMode: false, typewriter: false });
+});
+
+it("keeps prefs out of the shelf document", () => {
+  // Preferences are not book data; a shelf write must not carry them.
+  setPref("focusMode", true);
+  expect(localStorage.getItem("openchapter:shelf")).toBeNull();
 });

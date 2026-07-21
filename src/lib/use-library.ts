@@ -4,10 +4,14 @@ import { useCallback, useSyncExternalStore } from "react";
 import {
   getBody,
   getServerBody,
+  getPrefs,
+  getServerPrefs,
   getServerShelf,
   getShelf,
   subscribeToBody,
+  subscribeToPrefs,
   subscribeToShelf,
+  type Prefs,
   type Shelf,
 } from "./library-store";
 
@@ -50,4 +54,9 @@ export function useChapterBody(id: string): string | null {
   // with Object.is, and equal strings are Object.is-equal, so no caching layer
   // is needed here the way it is for the parsed shelf.
   return useSyncExternalStore(subscribe, snapshot, getServerBody);
+}
+
+/** How the writer likes the editor to behave. Persisted, and shared across tabs. */
+export function usePrefs(): Prefs {
+  return useSyncExternalStore(subscribeToPrefs, getPrefs, getServerPrefs);
 }

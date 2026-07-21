@@ -479,3 +479,82 @@ function migrateSpike(): boolean {
 export function setBookAuthor(bookId: string, author: string) {
   commitBook(bookId, (book) => ({ ...book, author }));
 }
+
+// ---------------------------------------------------------------------------
+// Preferences
+//
+// Kept in their own document rather than on the shelf. How a writer likes the
+// editor to behave is not book data — it should not ride along in every shelf
+// write, and it should not travel with a book when this moves to Supabase.
+// ---------------------------------------------------------------------------
+
+const PREFS_KEY = "openchapter:prefs";
+
+export interface Prefs {
+  /** Dim every paragraph but the one being written. */
+  focusMode: boolean;
+  /** Hold the caret at a fixed height instead of letting it sink. */
+  typewriter: boolean;
+}
+
+const DEFAULT_PREFS: Prefs = Object.freeze({
+  focusMode: false,
+  typewriter: false,
+});
+
+const prefsListeners = new Set<() => void>();
+
+export function subscribeToPrefs(onStoreChange: () => void) {
+  prefsListeners.add(onStoreChange);
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === PREFS_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    prefsListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+let cachedPrefsRaw: string | null = null;
+let cachedPrefs: Prefs = DEFAULT_PREFS;
+
+/** Cached on its raw string, for the same reason getShelf is. */
+export function getPrefs(): Prefs {
+  const raw = readRaw(PREFS_KEY);
+  if (raw === cachedPrefsRaw) return cachedPrefs;
+
+  cachedPrefsRaw = raw;
+  cachedPrefs = parsePrefs(raw);
+  return cachedPrefs;
+}
+
+function parsePrefs(raw: string | null): Prefs {
+  if (!raw) return DEFAULT_PREFS;
+  try {
+    const parsed = JSON.parse(raw) as Partial<Prefs>;
+    return {
+      focusMode: parsed.focusMode === true,
+      typewriter: parsed.typewriter === true,
+    };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+export function getServerPrefs(): Prefs {
+  return DEFAULT_PREFS;
+}
+
+export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
+  const next = { ...getPrefs(), [key]: value };
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  } catch (err) {
+    console.error("[store] could not write prefs", err);
+    return;
+  }
+  for (const listener of prefsListeners) listener();
+}
