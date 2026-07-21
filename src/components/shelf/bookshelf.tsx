@@ -100,11 +100,13 @@ export function Bookshelf() {
                   type="button"
                   onClick={() => setExporting(book)}
                   aria-label={`Export ${book.title}`}
+                  // Visible without hovering, unlike the delete beside it: one
+                  // is how the writing leaves the app, the other destroys it.
                   className="absolute top-4 right-7 rounded-sm px-1.5 py-0.5
-                             font-sans text-xs leading-none text-warmgray
-                             opacity-0 outline-none transition-opacity
-                             group-hover:opacity-60 hover:!opacity-100
-                             hover:text-burgundy focus-visible:opacity-100
+                             font-sans text-xs tracking-[0.18em] uppercase
+                             leading-none text-warmgray opacity-70 outline-none
+                             transition-opacity hover:text-burgundy
+                             hover:opacity-100 focus-visible:opacity-100
                              focus-visible:ring-2 focus-visible:ring-gold/60"
                 >
                   Export
