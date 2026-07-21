@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExportDialog } from "@/components/export/export-dialog";
 import { BookCover } from "@/components/shelf/book-cover";
+import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
 import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
@@ -32,6 +33,7 @@ export function Bookshelf() {
   const shelf = useShelf();
 
   const [exporting, setExporting] = useState<Book | null>(null);
+  const [editing, setEditing] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
   const [dialog, setDialog] = useState<"templates" | "upgrade" | null>(null);
   const [view, setView] = useState<BookView>("active");
@@ -183,6 +185,7 @@ export function Bookshelf() {
                     : null
                 }
                 onExport={setExporting}
+                onEdit={setEditing}
                 onArchive={(b) => archiveBook(b.id)}
                 onRestore={(b) => restoreBook(b.id)}
                 onTrash={handleTrash}
@@ -195,6 +198,9 @@ export function Bookshelf() {
 
       {exporting && (
         <ExportDialog book={exporting} onClose={() => setExporting(null)} />
+      )}
+      {editing && (
+        <CoverDialog book={editing} onClose={() => setEditing(null)} />
       )}
       {dialog === "templates" && (
         <TemplatesDialog onClose={() => setDialog(null)} />
@@ -397,6 +403,7 @@ function BookGrid({
   view,
   continueId,
   onExport,
+  onEdit,
   onArchive,
   onRestore,
   onTrash,
@@ -406,6 +413,7 @@ function BookGrid({
   view: BookView;
   continueId: string | null;
   onExport: (book: Book) => void;
+  onEdit: (book: Book) => void;
   onArchive: (book: Book) => void;
   onRestore: (book: Book) => void;
   onTrash: (book: Book) => void;
@@ -452,6 +460,11 @@ function BookGrid({
                       },
                     ]
                   : [
+                      {
+                        label: "Edit cover",
+                        icon: menuIcons.rename,
+                        onSelect: () => onEdit(book),
+                      },
                       {
                         label: "Export",
                         icon: menuIcons.export,

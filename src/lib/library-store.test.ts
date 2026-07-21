@@ -13,6 +13,7 @@ import {
   ensureChapter,
   findBook,
   getCover,
+  setBookDetails,
   setCover,
   getNotes,
   getPrefs,
@@ -150,6 +151,38 @@ it("reports a failed cover write rather than swallowing it", () => {
   // The book saved; only the picture did not, and the caller can say so.
   expect(setCover(bookId, "data:image/webp;base64,EEEE")).toBe(false);
   vi.restoreAllMocks();
+});
+
+it("writes title, subtitle and author together", () => {
+  const { bookId } = createBook("Old", { subtitle: "Old sub", author: "Old" });
+
+  setBookDetails(bookId, {
+    title: "The Salt Road",
+    subtitle: "A novel",
+    author: "A. Writer",
+  });
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.title).toBe("The Salt Road");
+  expect(book.subtitle).toBe("A novel");
+  expect(book.author).toBe("A. Writer");
+});
+
+it("drops a cleared subtitle rather than storing an empty one", () => {
+  const { bookId } = createBook("A", { subtitle: "Sub", author: "Writer" });
+
+  setBookDetails(bookId, { title: "A", subtitle: "  ", author: "" });
+
+  const book = findBook(getShelf(), bookId)!;
+  // Absent, so the cover renders no line at all for it.
+  expect("subtitle" in book).toBe(false);
+  expect("author" in book).toBe(false);
+});
+
+it("refuses to leave a book with no title", () => {
+  const { bookId } = createBook("A");
+  setBookDetails(bookId, { title: "   ", subtitle: "", author: "" });
+  expect(findBook(getShelf(), bookId)!.title).toBe("Untitled Book");
 });
 
 it("finds a book by id and reports null for an unknown one", () => {

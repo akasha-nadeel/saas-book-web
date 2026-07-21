@@ -674,6 +674,30 @@ export function setBookAuthor(bookId: string, author: string) {
   commitBook(bookId, (book) => ({ ...book, author }));
 }
 
+/**
+ * The three fields the cover shows, written together.
+ *
+ * One commit rather than three, so the shelf never repaints mid-edit with a new
+ * title above an old byline. Blank means absent: a subtitle cleared to nothing
+ * should leave the cover, not sit on it as an empty line.
+ */
+export function setBookDetails(
+  bookId: string,
+  details: { title: string; subtitle: string; author: string },
+) {
+  commitBook(bookId, (book) => {
+    const next = { ...book, title: details.title.trim() || "Untitled Book" };
+
+    if (details.subtitle.trim()) next.subtitle = details.subtitle.trim();
+    else delete next.subtitle;
+
+    if (details.author.trim()) next.author = details.author.trim();
+    else delete next.author;
+
+    return next;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Preferences
 //

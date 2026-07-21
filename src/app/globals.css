@@ -111,6 +111,42 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   A typeset book face.
+
+   The same cover is drawn at a 96px preview and at a full-width card, so its
+   type is sized in container-query units rather than pixels. One set of rules
+   that stays in proportion beats a pixel size that only suits one of the two —
+   which is what made the title overflow its cover in the smaller of them.
+
+   Padding is a percentage for the same reason, and the extra on the left is
+   the spine: text that ran under it would sit on the fold.
+   -------------------------------------------------------------------------- */
+.book-face {
+  container-type: inline-size;
+}
+
+.book-face-inner {
+  padding: 9% 8% 8% 15%;
+}
+
+.book-face-title {
+  font-size: 12cqw;
+  line-height: 1.16;
+}
+
+.book-face-subtitle {
+  font-size: 6.6cqw;
+  line-height: 1.25;
+  margin-top: 5%;
+}
+
+.book-face-author {
+  font-size: 5.6cqw;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+}
+
+/* --------------------------------------------------------------------------
    Scrollbars.
 
    The platform default is a wide, light-grey bar with arrow buttons at each

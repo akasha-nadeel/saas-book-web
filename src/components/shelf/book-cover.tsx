@@ -36,7 +36,7 @@ export function BookCover({
 
   return (
     <div
-      className="relative aspect-[3/4] w-full rounded-l-[3px] rounded-r-md
+      className="book-face relative aspect-[3/4] w-full rounded-l-[3px] rounded-r-md
                  bg-gradient-to-br from-white to-[#e8eaef]
                  shadow-[0_10px_24px_-12px_rgba(0,0,0,0.75)]
                  transition-[transform,box-shadow] duration-200
@@ -80,23 +80,23 @@ export function BookCover({
       />
 
       {image ? null : (
-        <div className="relative flex h-full flex-col px-5 py-5 pl-7">
+        <div className="book-face-inner relative flex h-full flex-col">
           <h3
-            // Three lines then ellipsis: a long title should wrap like a title,
-            // not be cut off after four words.
-            className="line-clamp-3 font-serif text-lg leading-snug text-[#16191f]"
+            // Clamped, so a long title wraps like a title and then stops rather
+            // than growing past the bottom of the cover.
+            className="book-face-title line-clamp-3 font-serif text-[#16191f]"
             title={title}
           >
             {title}
           </h3>
           {subtitle ? (
-            <p className="mt-1.5 line-clamp-2 font-serif text-xs leading-snug text-[#4b5563] italic">
+            <p className="book-face-subtitle line-clamp-2 font-serif text-[#4b5563] italic">
               {subtitle}
             </p>
           ) : null}
           {author ? (
             /* Pushed to the foot of the cover, where a byline sits. */
-            <p className="mt-auto truncate font-sans text-[0.7rem] tracking-wide text-[#6b7280] uppercase">
+            <p className="book-face-author mt-auto truncate font-sans text-[#6b7280] uppercase">
               {author}
             </p>
           ) : null}

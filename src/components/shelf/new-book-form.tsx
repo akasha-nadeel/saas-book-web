@@ -64,7 +64,7 @@ export function NewBookForm() {
   };
 
   return (
-    <main className="min-h-dvh overflow-y-auto bg-surface px-4 py-12">
+    <main className="scroll-slim h-dvh overflow-y-auto bg-surface px-4 py-12">
       <div className="mx-auto w-full max-w-[34rem]">
         <h1 className="text-center font-serif text-3xl text-fg">
           Create a new book

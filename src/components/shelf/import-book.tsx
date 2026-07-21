@@ -70,10 +70,11 @@ export function ImportBook() {
     : 0;
 
   return (
-    // No overflow-y here: an ancestor that scrolls becomes the containing
-    // block for the sticky action bar below, which would pin it to the end of
-    // the content instead of to the bottom of the screen.
-    <main className="min-h-dvh bg-surface px-4 py-12">
+    // A fixed height with its own overflow, not min-height: the body is
+    // overflow-hidden for the editor's fixed shell, so a page that merely grows
+    // past the viewport has no way to reach what is below the fold. This also
+    // gives the sticky action bar a real scrollport to pin itself to.
+    <main className="scroll-slim h-dvh overflow-y-auto bg-surface px-4 py-12">
       <div className="mx-auto w-full max-w-[34rem]">
         <h1 className="text-center font-serif text-3xl text-fg">
           Import a manuscript
