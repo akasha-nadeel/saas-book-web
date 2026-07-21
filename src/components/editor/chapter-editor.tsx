@@ -66,8 +66,8 @@ export function ChapterEditor() {
 
 function ChapterHeader() {
   return (
-    <header className="pt-16 pb-10">
-      <div className="mx-auto w-full max-w-(--measure-manuscript) px-6">
+    <header className="px-6 pt-16 pb-10">
+      <div className="mx-auto w-full max-w-(--measure-manuscript)">
         <p className="font-sans text-xs uppercase tracking-[0.18em] text-warmgray">
           The Salt Road
         </p>
