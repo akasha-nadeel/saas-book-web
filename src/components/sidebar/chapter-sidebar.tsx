@@ -89,7 +89,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
-      <div className="flex h-14 shrink-0 items-center justify-between gap-3 px-4">
+      <div className="shrink-0 px-4 pt-3 pb-3">
         {/* The book's title, not the word "Manuscript". The bar that used to
             carry it is gone, and a book you cannot rename is worse than a
             panel without a label. */}
@@ -101,26 +101,21 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           }}
           aria-label="Book title"
           spellCheck={false}
-          className="min-w-0 flex-1 truncate rounded-sm bg-transparent font-sans
+          className="w-full truncate rounded-sm bg-transparent font-sans
                      text-lg font-semibold text-fg outline-none
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         />
+        {/* Full width and solid, matching New book on the shelf. Creating a
+            chapter is this panel's primary action and now looks like one. */}
         <button
           type="button"
           onClick={() => handleCreate("body")}
-          className="flex shrink-0 items-center gap-2 rounded-full font-sans
-                     text-sm font-semibold text-fg outline-none
-                     transition-colors hover:text-white focus-visible:ring-2
+          className="mt-3 w-full rounded-md bg-accent py-2.5 font-sans text-sm
+                     font-semibold text-white outline-none transition-colors
+                     hover:bg-accent-strong focus-visible:ring-2
                      focus-visible:ring-accent/60"
         >
-          Add
-          <span
-            aria-hidden="true"
-            className="flex h-7 w-7 items-center justify-center rounded-full
-                       bg-accent text-base leading-none text-white"
-          >
-            +
-          </span>
+          New chapter
         </button>
       </div>
 
