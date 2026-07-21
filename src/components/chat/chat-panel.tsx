@@ -193,8 +193,8 @@ export function ChatPanel({
           <button
             type="submit"
             disabled={busy || !input.trim()}
-            className="rounded-md bg-accent px-3 py-1.5 font-sans text-sm
-                       font-medium text-surface outline-none transition-colors
+            className="rounded-full bg-accent px-3 py-1.5 font-sans text-sm
+                       font-semibold text-white outline-none transition-colors
                        disabled:opacity-30 hover:bg-accent-strong
                        focus-visible:ring-2 focus-visible:ring-accent/60"
           >

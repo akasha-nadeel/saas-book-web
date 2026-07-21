@@ -159,8 +159,8 @@ function ShelfNav({
       <button
         type="button"
         onClick={onCreate}
-        className="mt-6 w-full rounded-md bg-accent py-2.5 font-sans text-sm
-                   font-medium text-surface outline-none transition-colors
+        className="mt-6 w-full rounded-full bg-accent py-2.5 font-sans text-sm
+                   font-semibold text-white outline-none transition-colors
                    hover:bg-accent-strong focus-visible:ring-2
                    focus-visible:ring-accent/60"
       >
@@ -173,8 +173,8 @@ function ShelfNav({
             link is worse than a short list. */}
         <span
           aria-current="page"
-          className="block rounded-md bg-accent/15 px-3 py-2 font-sans text-sm
-                     text-accent"
+          className="block rounded-md bg-accent-deep px-3 py-2 font-sans text-sm
+                     text-white"
         >
           All books
         </span>
@@ -196,8 +196,8 @@ function Empty({ onCreate }: { onCreate: () => void }) {
       <button
         type="button"
         onClick={onCreate}
-        className="mt-4 rounded-md bg-accent px-4 py-2 font-sans text-sm
-                   font-medium text-surface outline-none transition-colors
+        className="mt-4 rounded-full bg-accent px-4 py-2 font-sans text-sm
+                   font-semibold text-white outline-none transition-colors
                    hover:bg-accent-strong focus-visible:ring-2
                    focus-visible:ring-accent/60"
       >
@@ -257,7 +257,7 @@ function BookTable({
                 {book.title}
               </Link>
               {book.id === continueId && (
-                <span className="ml-3 rounded-full bg-accent/15 px-2 py-0.5 font-sans text-[0.65rem] tracking-wide text-accent uppercase">
+                <span className="ml-3 rounded-full bg-accent-deep px-2 py-0.5 font-sans text-[0.65rem] tracking-wide text-white uppercase">
                   Continue
                 </span>
               )}

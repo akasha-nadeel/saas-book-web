@@ -389,7 +389,7 @@ function ModeToggle({
       aria-pressed={on}
       className={`rounded-sm outline-none transition-colors
                   focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    on ? "text-accent" : "text-muted hover:text-fg"
+                    on ? "text-accent-strong" : "text-muted hover:text-fg"
                   }`}
     >
       {children}
@@ -419,7 +419,9 @@ function StatusBar({
           {words.toLocaleString()} {words === 1 ? "word" : "words"}
         </span>
         {sessionWords > 0 && (
-          <span className="text-accent">+{sessionWords.toLocaleString()}</span>
+          <span className="text-accent-strong">
+            +{sessionWords.toLocaleString()}
+          </span>
         )}
       </span>
 

@@ -36,11 +36,13 @@ export function LeftPanel({
             role="tab"
             aria-selected={tab === value}
             onClick={() => setTab(value)}
+            // White on the active tab, with the accent kept to the underline —
+            // green text on a dark panel was the least legible part of this.
             className={`flex-1 border-b-2 px-3 py-2.5 font-sans text-xs
                         tracking-wide uppercase outline-none transition-colors
                         focus-visible:ring-2 focus-visible:ring-accent/60 ${
                           tab === value
-                            ? "border-accent text-accent"
+                            ? "border-accent text-fg"
                             : "border-transparent text-muted hover:text-fg"
                         }`}
           >

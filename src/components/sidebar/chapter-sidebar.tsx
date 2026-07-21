@@ -104,12 +104,14 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                       moveChapter(bookId, index, index + 1);
                     }
                   }}
-                  className={`flex items-baseline gap-2 rounded-sm py-2 pr-8 pl-3
-                              font-sans text-sm outline-none
+                  // The open chapter is filled, not tinted — a solid deep green
+                  // with white on it, the way a selected nav row reads.
+                  className={`flex items-baseline gap-2 rounded-md py-2 pr-8 pl-3
+                              font-sans text-sm outline-none transition-colors
                               focus-visible:ring-2 focus-visible:ring-accent/60 ${
                                 isActive
-                                  ? "bg-accent/15 text-accent"
-                                  : "text-muted hover:text-fg"
+                                  ? "bg-accent-deep text-white"
+                                  : "text-muted hover:bg-raised hover:text-fg"
                               }`}
                 >
                   <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
@@ -142,15 +144,18 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         </ol>
       </nav>
 
-      <div className="px-2 pb-4">
+      <div className="px-3 pt-2 pb-4">
+        {/* A real primary button rather than a line of grey text — creating a
+            chapter is the main thing this panel is for. */}
         <button
           type="button"
           onClick={handleCreate}
-          className="w-full rounded-sm py-2 pl-3 text-left font-sans text-sm
-                     text-muted outline-none hover:text-accent
+          className="w-full rounded-full bg-accent py-2 text-center font-sans
+                     text-sm font-semibold text-white outline-none
+                     transition-colors hover:bg-accent-strong
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          + New chapter
+          New chapter
         </button>
       </div>
     </div>

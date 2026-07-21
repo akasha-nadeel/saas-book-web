@@ -17,8 +17,12 @@
   --color-fg: #eaf0f6; /* body text */
   --color-muted: #93a2b4; /* labels, metadata, anything secondary */
 
-  --color-accent: #1da25c; /* the single accent: actions and active state */
-  --color-accent-strong: #26b96c; /* its hover */
+  /* Two greens, not one. The bright one is for things you press; the deep one
+     fills the row or tab you are currently on. A single accent had to serve
+     both, which is why selected rows were a washed-out tint of a button. */
+  --color-accent: #118a45; /* actions: New book, Send, chosen menu rows */
+  --color-accent-strong: #15a352; /* its hover */
+  --color-accent-deep: #1e4d37; /* selected nav: the open chapter, active tab */
 
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
