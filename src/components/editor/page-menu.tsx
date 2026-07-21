@@ -107,12 +107,12 @@ export function PageMenu({ book }: { book: Book }) {
         aria-expanded={open}
         aria-label={`Page setup: ${PAGE_SIZES[page.size].label}`}
         title={`Page setup — ${PAGE_SIZES[page.size].label}`}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md
-                   text-muted outline-none transition-colors
+        className="flex h-11 w-11 shrink-0 items-center justify-center
+                   rounded-lg text-muted outline-none transition-colors
                    hover:bg-raised/50 hover:text-fg focus-visible:ring-2
                    focus-visible:ring-accent/60"
       >
-        <span aria-hidden="true" className="text-base leading-none">
+        <span aria-hidden="true" className="text-xl leading-none">
           ▤
         </span>
       </button>

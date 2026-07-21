@@ -64,9 +64,9 @@ function ToolButton({
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md
-                  text-sm outline-none transition-colors
-                  disabled:cursor-default disabled:opacity-25
+      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg
+                  text-base outline-none transition-colors
+                  disabled:cursor-default disabled:opacity-40
                   focus-visible:ring-2 focus-visible:ring-accent/60 ${
                     active
                       ? "bg-raised text-fg"
@@ -79,7 +79,7 @@ function ToolButton({
 }
 
 const Divider = () => (
-  <span aria-hidden="true" className="my-1 h-px w-6 shrink-0 bg-line" />
+  <span aria-hidden="true" className="my-1 h-px w-7 shrink-0 bg-line" />
 );
 
 const Icon = ({ children }: { children: React.ReactNode }) => (
@@ -88,10 +88,10 @@ const Icon = ({ children }: { children: React.ReactNode }) => (
     viewBox="0 0 20 20"
     fill="none"
     stroke="currentColor"
-    strokeWidth="1.6"
+    strokeWidth="1.75"
     strokeLinecap="round"
     strokeLinejoin="round"
-    className="h-4 w-4"
+    className="h-5 w-5"
   >
     {children}
   </svg>
@@ -188,9 +188,9 @@ function Flyout({
         aria-expanded={open}
         aria-label={label}
         title={label}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md
-                    outline-none transition-colors focus-visible:ring-2
-                    focus-visible:ring-accent/60 ${
+        className={`flex h-11 w-11 shrink-0 items-center justify-center
+                    rounded-lg outline-none transition-colors
+                    focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       open
                         ? "bg-raised text-fg"
                         : "text-muted hover:bg-raised/50 hover:text-fg"
@@ -277,7 +277,7 @@ export function ToolRail({
     >
       <Flyout
         label="Text formatting"
-        trigger={<span className="font-serif text-sm">Aa</span>}
+        trigger={<span className="font-serif text-lg">Aa</span>}
       >
         <div className="flex gap-1">
           {([1, 2, 3] as const).map((level) => (
@@ -289,7 +289,7 @@ export function ToolRail({
                 editor.chain().focus().toggleHeading({ level }).run()
               }
             >
-              <span className="font-serif text-xs">H{level}</span>
+              <span className="font-serif text-sm">H{level}</span>
             </ToolButton>
           ))}
         </div>
@@ -333,7 +333,7 @@ export function ToolRail({
             active={editor.isActive("code")}
             onClick={() => editor.chain().focus().toggleCode().run()}
           >
-            <span className="font-mono text-[0.65rem]">{"</>"}</span>
+            <span className="font-mono text-xs">{"</>"}</span>
           </ToolButton>
           <ToolButton
             label="Link"
