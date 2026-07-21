@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ExportDialog } from "@/components/export/export-dialog";
+import { BookCover } from "@/components/shelf/book-cover";
+import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
 import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
 import {
@@ -73,9 +75,11 @@ export function Bookshelf() {
     [shelf],
   );
 
-  // From the active or archived shelf, deleting means the trash — recoverable,
-  // so no dialog. Only the permanent one asks.
-  const handleTrash = (book: Book) => trashBook(book.id);
+  // Recoverable, but still a book vanishing off the shelf, and the action now
+  // sits in a menu rather than behind a deliberate icon click. Cheap dialog.
+  const handleTrash = (book: Book) => {
+    if (window.confirm(`Move “${book.title}” to the trash?`)) trashBook(book.id);
+  };
 
   const handleDeleteForever = (book: Book) => {
     const words = bookWordCount(book);
@@ -168,7 +172,7 @@ export function Bookshelf() {
                 No book matches “{query.trim()}”.
               </p>
             ) : (
-              <BookTable
+              <BookGrid
                 books={visible}
                 view={view}
                 // Only the genuinely most-recent book, not merely the first row
@@ -355,49 +359,19 @@ function Empty() {
   );
 }
 
-/** A row action. Icons are inline paths so there is no icon dependency. */
-function RowAction({
-  onClick,
-  label,
-  danger,
-  alwaysVisible,
-  children,
-}: {
-  onClick: () => void;
-  label: string;
-  danger?: boolean;
-  alwaysVisible?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className={`rounded-md p-1.5 text-muted outline-none transition-all
-                  hover:bg-line focus-visible:opacity-100 focus-visible:ring-2
-                  focus-visible:ring-accent/60 ${
-                    danger ? "hover:text-red-400" : "hover:text-fg"
-                  } ${alwaysVisible ? "" : "opacity-0 group-hover:opacity-100"}`}
-    >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 20 20"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-4 w-4"
-      >
-        {children}
-      </svg>
-    </button>
-  );
-}
-
-function BookTable({
+/**
+ * The shelf itself.
+ *
+ * A grid of covers rather than a table of rows. A table is the better shape for
+ * comparing many books on one column — which is not what anybody does here.
+ * They are looking for the one they were writing, and a spine is what they
+ * recognise it by.
+ *
+ * The figures the table carried are not lost, only demoted: chapters, words and
+ * when it was last opened sit under each cover, where they read as description
+ * rather than as data to be scanned.
+ */
+function BookGrid({
   books,
   view,
   continueId,
@@ -417,129 +391,100 @@ function BookTable({
   onDeleteForever: (book: Book) => void;
 }) {
   return (
-    <table className="mt-6 w-full border-collapse text-left">
-      <thead>
-        <tr className="border-b border-line font-sans text-xs tracking-wide text-muted uppercase">
-          <th scope="col" className="py-3 pr-4 font-medium">
-            Title
-          </th>
-          <th scope="col" className="py-3 pr-4 font-medium">
-            Chapters
-          </th>
-          <th scope="col" className="py-3 pr-4 font-medium">
-            Words
-          </th>
-          <th scope="col" className="py-3 pr-4 font-medium">
-            Last opened
-          </th>
-          <th scope="col" className="py-3 text-right font-medium">
-            Actions
-          </th>
-        </tr>
-      </thead>
-
-      <tbody>
-        {books.map((book) => (
-          <tr
-            key={book.id}
-            className="group border-b border-line/60 transition-colors
-                       last:border-0 hover:bg-raised"
+    <ul
+      className="mt-8 grid gap-x-6 gap-y-8"
+      style={{
+        gridTemplateColumns: "repeat(auto-fill, minmax(9.5rem, 1fr))",
+      }}
+    >
+      {books.map((book) => (
+        <li key={book.id} className="group relative">
+          {/* The whole cover is the link, so the target is the object rather
+              than the few words of its title. */}
+          <Link
+            href={`/book/${book.id}`}
+            className="block rounded-md outline-none focus-visible:ring-2
+                       focus-visible:ring-accent/60 focus-visible:ring-offset-4
+                       focus-visible:ring-offset-panel"
           >
-            <td className="py-3.5 pr-4">
-              <Link
-                href={`/book/${book.id}`}
-                // Underline rather than recolour. This was going text-fg →
-                // accent, so hovering a row made its title darker and harder
-                // to read than the rows either side of it.
-                className="rounded-sm font-sans text-sm text-fg underline-offset-4
-                           outline-none group-hover:underline
-                           focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
+            <BookCover
+              title={book.title}
+              author={book.author}
+              words={bookWordCount(book)}
+            />
+          </Link>
+
+          {/* Over the cover's top corner, revealed on hover. Actions on a shelf
+              are the exception; finding the book is the rule. */}
+          <div className="absolute top-2 right-2">
+            <RowMenu
+              label={book.title}
+              items={
+                view === "trashed"
+                  ? [
+                      {
+                        label: "Restore",
+                        icon: menuIcons.restore,
+                        onSelect: () => onRestore(book),
+                      },
+                      {
+                        label: "Delete forever",
+                        icon: menuIcons.trash,
+                        onSelect: () => onDeleteForever(book),
+                        danger: true,
+                      },
+                    ]
+                  : [
+                      {
+                        label: "Export",
+                        icon: menuIcons.export,
+                        onSelect: () => onExport(book),
+                      },
+                      view === "archived"
+                        ? {
+                            label: "Unarchive",
+                            icon: menuIcons.restore,
+                            onSelect: () => onRestore(book),
+                          }
+                        : {
+                            label: "Archive",
+                            icon: menuIcons.archive,
+                            onSelect: () => onArchive(book),
+                          },
+                      {
+                        label: "Move to trash",
+                        icon: menuIcons.trash,
+                        onSelect: () => onTrash(book),
+                        danger: true,
+                      },
+                    ]
+              }
+            />
+          </div>
+
+          <div className="mt-3">
+            <div className="flex items-baseline gap-2">
+              <p className="min-w-0 flex-1 truncate font-sans text-sm font-medium text-fg">
                 {book.title}
-              </Link>
+              </p>
               {book.id === continueId && (
-                <span className="ml-3 rounded-full bg-accent-deep px-2 py-0.5 font-sans text-[0.65rem] tracking-wide text-white uppercase">
+                <span className="shrink-0 rounded-full bg-accent-deep px-2 py-0.5 font-sans text-[0.6rem] tracking-wide text-white uppercase">
                   Continue
                 </span>
               )}
-            </td>
-
-            <td className="py-3.5 pr-4 font-sans text-sm tabular-nums text-muted">
-              {book.chapters.length}
-            </td>
-
-            <td className="py-3.5 pr-4 font-sans text-sm tabular-nums text-muted">
-              {bookWordCount(book).toLocaleString()}
-            </td>
-
-            <td className="py-3.5 pr-4 font-sans text-sm text-muted">
+            </div>
+            <p className="mt-0.5 font-sans text-xs text-muted">
+              {book.chapters.length}{" "}
+              {book.chapters.length === 1 ? "chapter" : "chapters"} ·{" "}
+              {bookWordCount(book).toLocaleString()} words
+            </p>
+            <p className="font-sans text-xs text-muted">
               {relativeTime(book.lastOpenedAt)}
-            </td>
-
-            <td className="py-3.5">
-              <div className="flex items-center justify-end gap-1">
-                {view === "trashed" ? (
-                  <>
-                    <RowAction
-                      alwaysVisible
-                      onClick={() => onRestore(book)}
-                      label={`Restore ${book.title}`}
-                    >
-                      <path d="M4 10a6 6 0 1 1 1.8 4.2" />
-                      <path d="M4 6v4h4" />
-                    </RowAction>
-                    <RowAction
-                      danger
-                      alwaysVisible
-                      onClick={() => onDeleteForever(book)}
-                      label={`Delete ${book.title} permanently`}
-                    >
-                      <path d="M4 6h12M8 6V4.5h4V6M6.5 6l.5 9.5h6l.5-9.5" />
-                    </RowAction>
-                  </>
-                ) : (
-                  <>
-                    <RowAction
-                      alwaysVisible
-                      onClick={() => onExport(book)}
-                      label={`Export ${book.title}`}
-                    >
-                      <path d="M10 3v9m0 0 3.5-3.5M10 12 6.5 8.5" />
-                      <path d="M4 14v2.5h12V14" />
-                    </RowAction>
-
-                    {view === "archived" ? (
-                      <RowAction
-                        onClick={() => onRestore(book)}
-                        label={`Unarchive ${book.title}`}
-                      >
-                        <path d="M4 10a6 6 0 1 1 1.8 4.2" />
-                        <path d="M4 6v4h4" />
-                      </RowAction>
-                    ) : (
-                      <RowAction
-                        onClick={() => onArchive(book)}
-                        label={`Archive ${book.title}`}
-                      >
-                        <path d="M3 5.5h14v3H3z" />
-                        <path d="M4.5 8.5v7h11v-7M8 11.5h4" />
-                      </RowAction>
-                    )}
-
-                    <RowAction
-                      danger
-                      onClick={() => onTrash(book)}
-                      label={`Move ${book.title} to trash`}
-                    >
-                      <path d="M4 6h12M8 6V4.5h4V6M6.5 6l.5 9.5h6l.5-9.5" />
-                    </RowAction>
-                  </>
-                )}
-              </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+            </p>
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 }
+

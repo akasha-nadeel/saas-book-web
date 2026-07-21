@@ -169,9 +169,8 @@ export function RowMenu({
         title="More"
         // Hover is handled in CSS rather than React state: tracking which row
         // is hovered would re-render the whole list on every mouse move.
-        className={`absolute top-1/2 right-2 flex h-7 w-7 -translate-y-1/2
-                    items-center justify-center rounded-md text-muted
-                    outline-none transition-opacity hover:bg-raised
+        className={`flex h-7 w-7 items-center justify-center rounded-md
+                    text-muted outline-none transition-opacity hover:bg-raised
                     hover:text-fg group-hover:opacity-100
                     focus-visible:opacity-100 focus-visible:ring-2
                     focus-visible:ring-accent/60 ${
@@ -270,6 +269,36 @@ export const menuIcons = {
       <path
         d="M13.5 3.5a1.8 1.8 0 0 1 2.5 2.5L7.5 14.5l-3.5 1 1-3.5z"
         strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  archive: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2.8" y="4" width="14.4" height="3.6" rx="1" />
+      <path
+        d="M4.4 7.6v7a1.4 1.4 0 0 0 1.4 1.4h8.4a1.4 1.4 0 0 0 1.4-1.4v-7"
+        strokeLinecap="round"
+      />
+      <path d="M8.2 10.8h3.6" strokeLinecap="round" />
+    </svg>
+  ),
+  restore: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path
+        d="M3.4 9.6a6.6 6.6 0 1 1 1.9 4.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M3.2 5.4v4.2h4.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  export: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M10 2.9v8.7" strokeLinecap="round" />
+      <path d="m6.4 8.2 3.6 3.6 3.6-3.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M3.4 13.6v1.9a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-1.9"
+        strokeLinecap="round"
       />
     </svg>
   ),

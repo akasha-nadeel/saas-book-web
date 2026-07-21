@@ -231,6 +231,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   )}
 
                   {renamingId !== chapter.id && (
+                    <span className="absolute top-1/2 right-2 -translate-y-1/2">
                     <RowMenu
                       label={chapter.title}
                       items={[
@@ -257,6 +258,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                         },
                       ]}
                     />
+                    </span>
                   )}
                 </li>
               );
