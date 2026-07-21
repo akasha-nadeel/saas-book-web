@@ -2,8 +2,9 @@ import type { JSONContent } from "@tiptap/react";
 import { getBody, type Book } from "@/lib/library-store";
 import { toBlocks, type LoadedChapter } from "./blocks";
 import { blocksToMarkdown } from "./markdown";
+import { DEFAULT_TYPESET, type TypesetOptions } from "./typeset";
 
-export type Format = "markdown" | "docx" | "epub";
+export type Format = "markdown" | "docx" | "epub" | "pdf";
 
 export type { LoadedChapter };
 
@@ -80,6 +81,8 @@ export interface ExportRequest {
   format: Format;
   /** DOCX only. Standard manuscript layout rather than a clean document. */
   manuscript: boolean;
+  /** EPUB and PDF only — the two outputs whose look is ours to decide. */
+  typeset?: TypesetOptions;
 }
 
 export async function runExport({
@@ -87,6 +90,7 @@ export async function runExport({
   chapterId,
   format,
   manuscript,
+  typeset = DEFAULT_TYPESET,
 }: ExportRequest): Promise<void> {
   const chapters = loadChapters(book, chapterId);
   const single = Boolean(chapterId);
@@ -108,6 +112,12 @@ export async function runExport({
     return;
   }
 
+  if (format === "pdf") {
+    const { printBook } = await import("./print");
+    printBook(book, chapters, typeset);
+    return;
+  }
+
   const { buildEpub } = await import("./epub");
-  download(await buildEpub(book, chapters), `${base}.epub`);
+  download(await buildEpub(book, chapters, typeset), `${base}.epub`);
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ExportDialog } from "@/components/export/export-dialog";
+import { useRouter } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
@@ -33,7 +33,6 @@ export function Bookshelf() {
   const hydrated = useHydrated();
   const shelf = useShelf();
 
-  const [exporting, setExporting] = useState<Book | null>(null);
   const [editing, setEditing] = useState<Book | null>(null);
   const [opening, setOpening] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
@@ -186,7 +185,6 @@ export function Bookshelf() {
                     ? (books[0]?.id ?? null)
                     : null
                 }
-                onExport={setExporting}
                 onEdit={setEditing}
                 onOpen={setOpening}
                 onArchive={(b) => archiveBook(b.id)}
@@ -199,9 +197,6 @@ export function Bookshelf() {
         </main>
       </div>
 
-      {exporting && (
-        <ExportDialog book={exporting} onClose={() => setExporting(null)} />
-      )}
       {editing && (
         <CoverDialog book={editing} onClose={() => setEditing(null)} />
       )}
@@ -395,7 +390,6 @@ function BookGrid({
   books,
   view,
   continueId,
-  onExport,
   onEdit,
   onOpen,
   onArchive,
@@ -406,7 +400,6 @@ function BookGrid({
   books: Book[];
   view: BookView;
   continueId: string | null;
-  onExport: (book: Book) => void;
   onEdit: (book: Book) => void;
   onOpen: (book: Book) => void;
   onArchive: (book: Book) => void;
@@ -427,7 +420,6 @@ function BookGrid({
           book={book}
           view={view}
           continueId={continueId}
-          onExport={onExport}
           onEdit={onEdit}
           onOpen={onOpen}
           onArchive={onArchive}
@@ -451,7 +443,6 @@ function BookCard({
   book,
   view,
   continueId,
-  onExport,
   onEdit,
   onOpen,
   onArchive,
@@ -462,7 +453,6 @@ function BookCard({
   book: Book;
   view: BookView;
   continueId: string | null;
-  onExport: (book: Book) => void;
   onEdit: (book: Book) => void;
   onOpen: (book: Book) => void;
   onArchive: (book: Book) => void;
@@ -470,6 +460,7 @@ function BookCard({
   onTrash: (book: Book) => void;
   onDeleteForever: (book: Book) => void;
 }) {
+  const router = useRouter();
   const cover = useCover(book.id);
 
   return (
@@ -543,7 +534,7 @@ function BookCard({
                   {
                     label: "Export",
                     icon: menuIcons.export,
-                    onSelect: () => onExport(book),
+                    onSelect: () => router.push(`/book/${book.id}/export`),
                   },
                   view === "archived"
                     ? {

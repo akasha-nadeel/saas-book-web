@@ -1,5 +1,10 @@
 import type { Book } from "@/lib/library-store";
 import { toBlocks, type LoadedChapter } from "./blocks";
+import {
+  DEFAULT_TYPESET,
+  typesetCss,
+  type TypesetOptions,
+} from "./typeset";
 import { blocksToXhtml, escapeXml } from "./xhtml";
 
 /**
@@ -99,7 +104,13 @@ ${items}
 </html>`;
 }
 
-export function chapterXhtml(title: string, body: string): string {
+export function chapterXhtml(
+  title: string,
+  body: string,
+  /** 1-based. Written into the markup and hidden by CSS when not wanted, so one
+      file serves both settings and a reader that restyles keeps the number. */
+  number?: number,
+): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
@@ -107,25 +118,17 @@ export function chapterXhtml(title: string, body: string): string {
     <link rel="stylesheet" type="text/css" href="style.css"/>
   </head>
   <body>
+    ${number ? `<p class="chapter-number">${number}</p>` : ""}
     <h1>${escapeXml(title)}</h1>
 ${body}
   </body>
 </html>`;
 }
 
-/** Matches the editor: indented paragraphs, no indent opening a scene. */
-const STYLESHEET = `body { margin: 1em; }
-h1 { text-align: center; margin: 2em 0 1em; font-weight: normal; }
-p { margin: 0; text-indent: 1.5em; }
-h1 + p, blockquote + p, .scene-break + p { text-indent: 0; }
-.scene-break { text-align: center; text-indent: 0; margin: 1.5em 0; }
-blockquote { margin: 1.5em; font-style: italic; }
-.figure { text-align: center; text-indent: 0; margin: 1.5em 0; }
-.figure img { max-width: 100%; height: auto; }`;
-
 export async function buildEpub(
   book: Book,
   chapters: LoadedChapter[],
+  typeset: TypesetOptions = DEFAULT_TYPESET,
 ): Promise<Blob> {
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
@@ -147,7 +150,7 @@ export async function buildEpub(
       : Date.now().toString(36)
   }`;
 
-  zip.file("OEBPS/style.css", STYLESHEET);
+  zip.file("OEBPS/style.css", typesetCss(typeset, false));
   zip.file(
     "OEBPS/content.opf",
     contentOpf({ title: book.title, author: book.author }, rendered, identifier),
@@ -157,7 +160,7 @@ export async function buildEpub(
   rendered.forEach((chapter, i) => {
     zip.file(
       `OEBPS/${chapterId(i)}.xhtml`,
-      chapterXhtml(chapter.title, chapter.xhtml),
+      chapterXhtml(chapter.title, chapter.xhtml, i + 1),
     );
   });
 

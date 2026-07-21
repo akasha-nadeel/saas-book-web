@@ -15,7 +15,6 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { ToolRail } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
-import { ExportDialog } from "@/components/export/export-dialog";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
@@ -67,7 +66,6 @@ export function ChapterEditor({
   const raw = useChapterBody(chapterId);
   const cover = useCover(bookId);
 
-  const [exporting, setExporting] = useState(false);
   const [editingCover, setEditingCover] = useState(false);
   // Lifted out of the surface so the toolbar and the assistant can both reach
   // it — they are siblings of the manuscript, not children of it.
@@ -178,7 +176,7 @@ export function ChapterEditor({
           side="right"
           paper={prefs.paper}
           footer={
-            <RailButton label="Export" onClick={() => setExporting(true)}>
+            <RailButton label="Export" href={`/book/${bookId}/export`}>
               {icons.export}
             </RailButton>
           }
@@ -238,13 +236,6 @@ export function ChapterEditor({
         </Rail>
       </>
 
-      {exporting && (
-        <ExportDialog
-          book={book}
-          chapterId={chapterId}
-          onClose={() => setExporting(false)}
-        />
-      )}
       {editingCover && (
         <CoverDialog book={book} onClose={() => setEditingCover(false)} />
       )}
