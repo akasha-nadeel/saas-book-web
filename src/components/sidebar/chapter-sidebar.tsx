@@ -10,9 +10,11 @@ import {
   findBook,
   moveChapter,
   renameBook,
+  renameChapter,
   toggleBookmark,
   type ChapterMeta,
 } from "@/lib/library-store";
+import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { useSaveState } from "@/lib/save-status";
 import type { SaveStatus } from "@/lib/use-autosave";
 import { useShelf } from "@/lib/use-library";
@@ -33,6 +35,9 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  // The chapter whose title is being edited in place, and the text so far.
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -77,6 +82,20 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
     setDragId(null);
     setOverId(null);
+  };
+
+  const startRename = (chapter: ChapterMeta) => {
+    setRenamingId(chapter.id);
+    setDraftTitle(chapter.title);
+  };
+
+  const commitRename = () => {
+    if (!renamingId) return;
+    const next = draftTitle.trim();
+    // A chapter with no name is unfindable in the list, so a cleared field
+    // means "leave it alone" rather than "call it nothing".
+    if (next) renameChapter(bookId, renamingId, next);
+    setRenamingId(null);
   };
 
   const written = bookWordCount(book);
@@ -158,82 +177,107 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                     dragId === chapter.id ? "opacity-40" : ""
                   } ${overId === chapter.id ? "bg-accent-deep/40" : ""}`}
                 >
-                  <Link
-                    href={`/book/${bookId}/chapter/${chapter.id}`}
-                    aria-current={isActive ? "page" : undefined}
-                    // Native drag is mouse-only, so reordering also needs a
-                    // keyboard path or it is unreachable for some.
-                    aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                    onKeyDown={(e) => {
-                      if (!e.altKey) return;
-                      if (e.key === "ArrowUp") {
+                  {renamingId === chapter.id ? (
+                    <form
+                      onSubmit={(e) => {
                         e.preventDefault();
-                        moveChapter(bookId, index, index - 1);
-                      } else if (e.key === "ArrowDown") {
-                        e.preventDefault();
-                        moveChapter(bookId, index, index + 1);
-                      }
-                    }}
-                    className={`flex items-center gap-2.5 border-l-4 py-3 pr-16
-                                pl-3 font-sans text-sm outline-none
-                                transition-colors focus-visible:ring-inset
-                                focus-visible:ring-2
-                                focus-visible:ring-accent/60 ${
-                                  isActive
-                                    ? "border-accent bg-accent-deep font-medium text-white"
-                                    : "border-transparent text-muted hover:bg-raised hover:text-fg"
-                                }`}
-                  >
-                    <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
-                      {index + 1}
-                    </span>
-                    <span className="flex-1 truncate">{chapter.title}</span>
+                        commitRename();
+                      }}
+                      className="border-l-4 border-accent py-1.5 pr-2 pl-3"
+                    >
+                      <input
+                        value={draftTitle}
+                        onChange={(e) => setDraftTitle(e.target.value)}
+                        onBlur={commitRename}
+                        onKeyDown={(e) => {
+                          // Escape abandons the edit; blur would otherwise
+                          // commit whatever half-typed text is in the field.
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        aria-label={`Rename ${chapter.title}`}
+                        autoFocus
+                        className="w-full rounded-md border border-accent
+                                   bg-surface px-2 py-1.5 font-sans text-sm
+                                   text-fg outline-none"
+                      />
+                    </form>
+                  ) : (
+                    <Link
+                      href={`/book/${bookId}/chapter/${chapter.id}`}
+                      aria-current={isActive ? "page" : undefined}
+                      // Native drag is mouse-only, so reordering also needs a
+                      // keyboard path or it is unreachable for some.
+                      aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                      onKeyDown={(e) => {
+                        if (!e.altKey) return;
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          moveChapter(bookId, index, index - 1);
+                        } else if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          moveChapter(bookId, index, index + 1);
+                        }
+                      }}
+                      className={`flex items-center gap-2.5 border-l-4 py-3 pr-10
+                                  pl-3 font-sans text-sm outline-none
+                                  transition-colors focus-visible:ring-inset
+                                  focus-visible:ring-2
+                                  focus-visible:ring-accent/60 ${
+                                    isActive
+                                      ? "border-accent bg-accent-deep font-medium text-white"
+                                      : "border-transparent text-muted hover:bg-raised hover:text-fg"
+                                  }`}
+                    >
+                      <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
+                        {index + 1}
+                      </span>
+                      <span className="flex-1 truncate">{chapter.title}</span>
+                      {/* A starred chapter keeps its mark in the row: the menu
+                          can say whether it is starred, but only when open. */}
+                      {chapter.bookmarked && (
+                        <span
+                          aria-label="Starred"
+                          className="shrink-0 text-xs text-accent-strong"
+                        >
+                          ★
+                        </span>
+                    )}
                     {chapter.words > 0 && (
                       <span className="shrink-0 text-xs tabular-nums opacity-50">
                         {chapter.words.toLocaleString()}
                       </span>
                     )}
                   </Link>
+                  )}
 
-                  {/* A marked chapter keeps its star; an unmarked one shows it
-                      on hover, so rows stay quiet until wanted. */}
-                  <button
-                    type="button"
-                    onClick={() => toggleBookmark(bookId, chapter.id)}
-                    aria-label={
-                      chapter.bookmarked
-                        ? `Remove bookmark from ${chapter.title}`
-                        : `Bookmark ${chapter.title}`
-                    }
-                    aria-pressed={Boolean(chapter.bookmarked)}
-                    title="Bookmark"
-                    className={`absolute top-1/2 right-9 -translate-y-1/2
-                                rounded-sm px-1 py-0.5 text-sm leading-none
-                                outline-none transition-opacity
-                                focus-visible:opacity-100 focus-visible:ring-2
-                                focus-visible:ring-accent/60 ${
-                                  chapter.bookmarked
-                                    ? "text-accent-strong opacity-100"
-                                    : "text-muted opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-fg"
-                                }`}
-                  >
-                    {chapter.bookmarked ? "★" : "☆"}
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(chapter)}
-                    aria-label={`Delete ${chapter.title}`}
-                    className="absolute top-1/2 right-3 -translate-y-1/2
-                               rounded-sm px-1.5 py-0.5 font-sans text-sm
-                               leading-none text-muted opacity-0 outline-none
-                               transition-opacity group-hover:opacity-60
-                               hover:!opacity-100 hover:text-red-400
-                               focus-visible:opacity-100 focus-visible:ring-2
-                               focus-visible:ring-accent/60"
-                  >
-                    ×
-                  </button>
+                  {renamingId !== chapter.id && (
+                    <RowMenu
+                      label={chapter.title}
+                      items={[
+                        {
+                          label: chapter.bookmarked ? "Unstar" : "Star",
+                          hint: "S",
+                          icon: chapter.bookmarked
+                            ? menuIcons.starFilled
+                            : menuIcons.star,
+                          onSelect: () => toggleBookmark(bookId, chapter.id),
+                        },
+                        {
+                          label: "Rename",
+                          hint: "R",
+                          icon: menuIcons.rename,
+                          onSelect: () => startRename(chapter),
+                        },
+                        {
+                          label: "Delete",
+                          hint: "D",
+                          icon: menuIcons.trash,
+                          onSelect: () => handleDelete(chapter),
+                          danger: true,
+                        },
+                      ]}
+                    />
+                  )}
                 </li>
               );
             })}
