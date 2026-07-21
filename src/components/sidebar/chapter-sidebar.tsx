@@ -60,15 +60,15 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   return (
     <aside
       className="flex w-(--sidebar-width) shrink-0 flex-col border-r
-                 border-ink/10 bg-ink/[0.025]"
+                 border-line bg-panel"
       aria-label="Chapters"
     >
       <div className="px-5 pt-6 pb-4">
         <Link
           href="/"
-          className="rounded-sm font-sans text-xs text-warmgray outline-none
-                     hover:text-burgundy focus-visible:ring-2
-                     focus-visible:ring-gold/60"
+          className="rounded-sm font-sans text-xs text-muted outline-none
+                     hover:text-accent focus-visible:ring-2
+                     focus-visible:ring-accent/60"
         >
           ← All books
         </Link>
@@ -81,8 +81,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           aria-label="Book title"
           spellCheck={false}
           className="mt-2 w-full truncate rounded-sm bg-transparent font-serif
-                     text-base text-ink outline-none focus-visible:ring-2
-                     focus-visible:ring-gold/60"
+                     text-base text-fg outline-none focus-visible:ring-2
+                     focus-visible:ring-accent/60"
         />
       </div>
 
@@ -111,7 +111,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 }}
                 className={`group relative rounded-sm ${
                   overIndex === index && dragIndex !== index
-                    ? "before:absolute before:inset-x-2 before:-top-px before:h-px before:bg-gold"
+                    ? "before:absolute before:inset-x-2 before:-top-px before:h-px before:bg-accent"
                     : ""
                 } ${dragIndex === index ? "opacity-40" : ""}`}
               >
@@ -133,10 +133,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   }}
                   className={`flex items-baseline gap-2 rounded-sm py-2 pr-8 pl-3
                               font-sans text-sm outline-none
-                              focus-visible:ring-2 focus-visible:ring-gold/60 ${
+                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
                                 isActive
-                                  ? "bg-burgundy/8 text-burgundy"
-                                  : "text-warmgray hover:text-ink"
+                                  ? "bg-accent/15 text-accent"
+                                  : "text-muted hover:text-fg"
                               }`}
                 >
                   <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
@@ -155,11 +155,11 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   onClick={() => handleDelete(chapter.id, chapter.title)}
                   aria-label={`Delete ${chapter.title}`}
                   className="absolute top-1/2 right-1 -translate-y-1/2 rounded-sm px-1.5
-                             py-0.5 font-sans text-sm leading-none text-warmgray
+                             py-0.5 font-sans text-sm leading-none text-muted
                              opacity-0 outline-none transition-opacity
                              group-hover:opacity-60 hover:!opacity-100
-                             hover:text-burgundy focus-visible:opacity-100
-                             focus-visible:ring-2 focus-visible:ring-gold/60"
+                             hover:text-accent focus-visible:opacity-100
+                             focus-visible:ring-2 focus-visible:ring-accent/60"
                 >
                   ×
                 </button>
@@ -174,8 +174,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           type="button"
           onClick={handleCreate}
           className="w-full rounded-sm py-2 pl-3 text-left font-sans text-sm
-                     text-warmgray outline-none hover:text-burgundy
-                     focus-visible:ring-2 focus-visible:ring-gold/60"
+                     text-muted outline-none hover:text-accent
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           + New chapter
         </button>

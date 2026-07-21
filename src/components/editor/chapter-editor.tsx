@@ -87,15 +87,15 @@ function MissingChapter() {
   return (
     <main className="flex flex-1 items-center justify-center px-6">
       <div className="text-center">
-        <p className="font-serif text-xl text-ink">This chapter isn’t here.</p>
-        <p className="mt-2 font-sans text-sm text-warmgray">
+        <p className="font-serif text-xl text-fg">This chapter isn’t here.</p>
+        <p className="mt-2 font-sans text-sm text-muted">
           It may have been deleted, or the link may be wrong.
         </p>
         <Link
           href="/"
-          className="mt-6 inline-block rounded-sm font-sans text-sm text-burgundy
+          className="mt-6 inline-block rounded-sm font-sans text-sm text-accent
                      underline underline-offset-4 outline-none
-                     focus-visible:ring-2 focus-visible:ring-gold/60"
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           Back to your books
         </Link>
@@ -121,7 +121,7 @@ function ChapterHeader({
     <header className="pt-16 pb-10">
       <div className="mx-auto w-full max-w-(--measure-manuscript) px-6">
         <div className="flex items-baseline justify-between gap-4">
-          <p className="font-sans text-xs tracking-[0.18em] text-warmgray uppercase">
+          <p className="font-sans text-xs tracking-[0.18em] text-muted uppercase">
             {book.title}
           </p>
           <button
@@ -131,10 +131,10 @@ function ChapterHeader({
             // out of the app, so it does not hide behind a hover the way the
             // destructive actions do.
             className="shrink-0 rounded-sm font-sans text-xs tracking-[0.18em]
-                       text-warmgray uppercase opacity-70 outline-none
-                       transition-opacity hover:text-burgundy hover:opacity-100
+                       text-muted uppercase opacity-70 outline-none
+                       transition-opacity hover:text-accent hover:opacity-100
                        focus-visible:opacity-100 focus-visible:ring-2
-                       focus-visible:ring-gold/60"
+                       focus-visible:ring-accent/60"
           >
             Export
           </button>
@@ -153,8 +153,8 @@ function ChapterHeader({
           aria-label="Chapter title"
           spellCheck={false}
           className="mt-2 w-full rounded-sm bg-transparent font-serif text-3xl
-                     text-ink outline-none focus-visible:ring-2
-                     focus-visible:ring-gold/60"
+                     text-fg outline-none focus-visible:ring-2
+                     focus-visible:ring-accent/60"
         />
       </div>
 
@@ -294,8 +294,8 @@ function ModeToggle({
       onClick={onToggle}
       aria-pressed={on}
       className={`rounded-sm outline-none transition-colors
-                  focus-visible:ring-2 focus-visible:ring-gold/60 ${
-                    on ? "text-burgundy" : "text-warmgray hover:text-ink"
+                  focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    on ? "text-accent" : "text-muted hover:text-fg"
                   }`}
     >
       {children}
@@ -327,13 +327,13 @@ function StatusBar({
                  transition-opacity duration-500 hover:opacity-100
                  focus-within:opacity-100"
     >
-      <div className="pointer-events-auto mx-auto flex w-full max-w-(--measure-manuscript) items-baseline justify-between gap-6 font-sans text-xs text-warmgray">
+      <div className="pointer-events-auto mx-auto flex w-full max-w-(--measure-manuscript) items-baseline justify-between gap-6 font-sans text-xs text-muted">
         <span className="flex items-baseline gap-3">
           <span>
             {words.toLocaleString()} {words === 1 ? "word" : "words"}
           </span>
           {sessionWords > 0 && (
-            <span className="text-gold">+{sessionWords.toLocaleString()}</span>
+            <span className="text-accent">+{sessionWords.toLocaleString()}</span>
           )}
         </span>
 
@@ -351,7 +351,7 @@ function StatusBar({
             Typewriter
           </ModeToggle>
         </span>
-        <span className={status === "error" ? "text-burgundy" : undefined}>
+        <span className={status === "error" ? "text-accent" : undefined}>
           {STATUS_LABEL[status]}
           {status === "saved" && lastSavedAt
             ? ` · ${lastSavedAt.toLocaleTimeString([], {

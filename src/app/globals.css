@@ -1,17 +1,24 @@
 @import "tailwindcss";
 
 /* --------------------------------------------------------------------------
-   Literary Burgundy — the OpenChapter palette.
-   Declared in @theme so Tailwind generates utilities: bg-cream, text-ink, etc.
+   The OpenChapter palette — a dark, low-glare workspace.
+
+   Named for the job each colour does rather than the colour it is, so a later
+   change of hue does not leave every class in the app lying about itself.
+   Three background steps, deepest first: the page, the panels sitting on it,
+   and the rows that lift on hover.
    -------------------------------------------------------------------------- */
 @theme {
-  --color-cream: #f5f1e8;
-  --color-offcream: #fffcf5;
-  --color-ink: #1a1a1a;
-  --color-burgundy: #7b2d26;
-  --color-gold: #d4a574;
-  --color-warmgray: #5f5e5a;
-  --color-forest: #2d4a3e;
+  --color-surface: #121821; /* the page */
+  --color-panel: #1d2732; /* cards, sidebars, the content well */
+  --color-raised: #28323f; /* hover, inputs, pressed states */
+  --color-line: #313d4c; /* hairlines and dividers */
+
+  --color-fg: #eaf0f6; /* body text */
+  --color-muted: #93a2b4; /* labels, metadata, anything secondary */
+
+  --color-accent: #1da25c; /* the single accent: actions and active state */
+  --color-accent-strong: #26b96c; /* its hover */
 
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -30,8 +37,8 @@
 }
 
 body {
-  background: var(--color-cream);
-  color: var(--color-ink);
+  background: var(--color-surface);
+  color: var(--color-fg);
   font-family: var(--font-sans);
 }
 
@@ -45,7 +52,7 @@ body {
   font-size: var(--text-manuscript);
   line-height: var(--text-manuscript--line-height);
   font-variation-settings: "SOFT" 25, "WONK" 0;
-  color: var(--color-ink);
+  color: var(--color-fg);
   outline: none;
 }
 
@@ -82,8 +89,8 @@ body {
 .manuscript .tiptap blockquote {
   margin: 1.5em 0;
   padding-left: 1.25em;
-  border-left: 2px solid var(--color-gold);
-  color: var(--color-warmgray);
+  border-left: 2px solid var(--color-accent);
+  color: var(--color-muted);
   font-style: italic;
 }
 
@@ -100,7 +107,7 @@ body {
 
 .manuscript .tiptap hr::before {
   content: "* * *";
-  color: var(--color-gold);
+  color: var(--color-accent);
   letter-spacing: 0.5em;
   font-size: 0.9em;
 }
@@ -144,16 +151,16 @@ body {
   float: left;
   height: 0;
   pointer-events: none;
-  color: var(--color-warmgray);
+  color: var(--color-muted);
   opacity: 0.55;
   font-style: italic;
 }
 
 /* A warmer caret than the browser default black. */
 .manuscript .tiptap {
-  caret-color: var(--color-burgundy);
+  caret-color: var(--color-accent);
 }
 
 .manuscript .tiptap ::selection {
-  background: color-mix(in srgb, var(--color-gold) 45%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
 }

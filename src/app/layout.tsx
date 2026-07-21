@@ -33,7 +33,7 @@ export default function RootLayout({
     >
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}
-      <body className="h-full overflow-hidden bg-cream text-ink">
+      <body className="h-full overflow-hidden bg-surface text-fg">
         {children}
       </body>
     </html>
