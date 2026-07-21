@@ -13,6 +13,7 @@ import {
   renameBook,
   renameChapter,
   saveBody,
+  setBookAuthor,
   touchLastOpened,
   touchLastOpenedBook,
   type Book,
@@ -314,4 +315,29 @@ it("leaves existing books alone", () => {
 
   expect(getShelf().books).toHaveLength(2);
   expect(findBook(getShelf(), bookId)?.title).toBe("Already Here");
+});
+
+it("starts a book with no author", () => {
+  const { bookId } = createBook("The Salt Road");
+  expect(findBook(getShelf(), bookId)!.author).toBeUndefined();
+});
+
+it("sets and updates a book's author", () => {
+  const { bookId } = createBook("The Salt Road");
+
+  setBookAuthor(bookId, "M. Reyes");
+  expect(findBook(getShelf(), bookId)!.author).toBe("M. Reyes");
+
+  setBookAuthor(bookId, "Mira Reyes");
+  expect(findBook(getShelf(), bookId)!.author).toBe("Mira Reyes");
+});
+
+it("keeps the author separate per book", () => {
+  const a = createBook("A");
+  const b = createBook("B");
+
+  setBookAuthor(a.bookId, "One Author");
+
+  expect(findBook(getShelf(), a.bookId)!.author).toBe("One Author");
+  expect(findBook(getShelf(), b.bookId)!.author).toBeUndefined();
 });

@@ -32,6 +32,8 @@ export interface ChapterMeta {
 export interface Book {
   id: string;
   title: string;
+  /** Optional. Used for the DOCX byline and EPUB's dc:creator. */
+  author?: string;
   /** Readonly because every snapshot handed out is shared and cached. */
   chapters: readonly ChapterMeta[];
   lastOpenedId: string | null;
@@ -472,4 +474,8 @@ function migrateSpike(): boolean {
     // Couldn't carry the text over. The new book still exists.
   }
   return true;
+}
+
+export function setBookAuthor(bookId: string, author: string) {
+  commitBook(bookId, (book) => ({ ...book, author }));
 }
