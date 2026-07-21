@@ -66,7 +66,7 @@ export function BookCover({
       {image ? (
         <div
           className="absolute inset-0 flex flex-col rounded-l-[3px] rounded-r-md
-                     bg-black/25 opacity-0 transition-opacity duration-200
+                     bg-black/20 opacity-0 transition-opacity duration-200
                      group-hover:opacity-100"
         >
           {/* A shadow on the type rather than a heavier scrim. The artwork
