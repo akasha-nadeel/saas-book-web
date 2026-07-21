@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* --------------------------------------------------------------------------
+   Literary Burgundy — the OpenChapter palette.
+   Declared in @theme so Tailwind generates utilities: bg-cream, text-ink, etc.
+   -------------------------------------------------------------------------- */
+@theme {
+  --color-cream: #f5f1e8;
+  --color-offcream: #fffcf5;
+  --color-ink: #1a1a1a;
+  --color-burgundy: #7b2d26;
+  --color-gold: #d4a574;
+  --color-warmgray: #5f5e5a;
+  --color-forest: #2d4a3e;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* The writing surface. These are the numbers most worth arguing about. */
+  --text-manuscript: 1.1875rem; /* 19px */
+  --text-manuscript--line-height: 1.75;
+  --measure-manuscript: 34rem; /* ~65 characters at 19px Fraunces */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+/* --------------------------------------------------------------------------
+   The manuscript itself.
+   Tiptap renders an uncontrolled contenteditable, so its internals are styled
+   here rather than with utility classes.
+   -------------------------------------------------------------------------- */
+.manuscript .tiptap {
+  font-family: var(--font-serif);
+  font-size: var(--text-manuscript);
+  line-height: var(--text-manuscript--line-height);
+  font-variation-settings: "SOFT" 25, "WONK" 0;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.manuscript .tiptap p {
+  margin: 0;
+  text-indent: 1.5em;
+}
+
+/* No indent on the first paragraph, or on one that opens a scene — this is
+   how printed books actually set body text. */
+.manuscript .tiptap p:first-child,
+.manuscript .tiptap h1 + p,
+.manuscript .tiptap h2 + p,
+.manuscript .tiptap h3 + p,
+.manuscript .tiptap hr + p,
+.manuscript .tiptap blockquote + p {
+  text-indent: 0;
+}
+
+.manuscript .tiptap h1,
+.manuscript .tiptap h2,
+.manuscript .tiptap h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-variation-settings: "SOFT" 0, "WONK" 1;
+  line-height: 1.25;
+  margin: 2em 0 0.75em;
+}
+
+.manuscript .tiptap h1 { font-size: 1.6em; }
+.manuscript .tiptap h2 { font-size: 1.35em; }
+.manuscript .tiptap h3 { font-size: 1.15em; }
+
+.manuscript .tiptap blockquote {
+  margin: 1.5em 0;
+  padding-left: 1.25em;
+  border-left: 2px solid var(--color-gold);
+  color: var(--color-warmgray);
+  font-style: italic;
+}
+
+.manuscript .tiptap blockquote p {
+  text-indent: 0;
+}
+
+/* Scene break. Centred asterisks, the way a paperback does it. */
+.manuscript .tiptap hr {
+  border: none;
+  margin: 2em 0;
+  text-align: center;
+}
+
+.manuscript .tiptap hr::before {
+  content: "* * *";
+  color: var(--color-gold);
+  letter-spacing: 0.5em;
+  font-size: 0.9em;
+}
+
+.manuscript .tiptap ul,
+.manuscript .tiptap ol {
+  margin: 1em 0;
+  padding-left: 1.5em;
+}
+
+.manuscript .tiptap ul { list-style: disc; }
+.manuscript .tiptap ol { list-style: decimal; }
+
+.manuscript .tiptap em { font-style: italic; }
+.manuscript .tiptap strong { font-weight: 600; }
+
+/* Placeholder shown on a genuinely empty chapter. */
+.manuscript .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--color-warmgray);
+  opacity: 0.55;
+  font-style: italic;
+}
+
+/* A warmer caret than the browser default black. */
+.manuscript .tiptap {
+  caret-color: var(--color-burgundy);
+}
+
+.manuscript .tiptap ::selection {
+  background: color-mix(in srgb, var(--color-gold) 45%, transparent);
 }
