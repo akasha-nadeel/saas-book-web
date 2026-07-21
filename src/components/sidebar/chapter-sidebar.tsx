@@ -6,27 +6,32 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   createChapter,
   deleteChapter,
+  findBook,
   moveChapter,
-  setBookTitle,
-} from "@/lib/chapter-store";
-import { useManifest } from "@/lib/use-chapters";
+  renameBook,
+} from "@/lib/library-store";
+import { useShelf } from "@/lib/use-library";
 
-export function ChapterSidebar() {
-  const { bookTitle, chapters } = useManifest();
+export function ChapterSidebar({ bookId }: { bookId: string }) {
+  const shelf = useShelf();
+  const book = findBook(shelf, bookId);
   const router = useRouter();
   const pathname = usePathname();
-
-  // The route is the source of truth for which chapter is open, so the sidebar
-  // needs no state of its own to stay in sync with the editor.
-  const activeId = pathname.startsWith("/chapter/")
-    ? decodeURIComponent(pathname.slice("/chapter/".length))
-    : null;
 
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
 
+  // The route is the source of truth for which chapter is open, so the sidebar
+  // needs no state of its own to stay in sync with the editor.
+  const prefix = `/book/${bookId}/chapter/`;
+  const activeId = pathname.startsWith(prefix)
+    ? decodeURIComponent(pathname.slice(prefix.length))
+    : null;
+
+  const chapters = book?.chapters ?? [];
+
   const handleCreate = () => {
-    router.push(`/chapter/${createChapter()}`);
+    router.push(`/book/${bookId}/chapter/${createChapter(bookId)}`);
   };
 
   const handleDelete = (id: string, title: string) => {
@@ -34,16 +39,20 @@ export function ChapterSidebar() {
     if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return;
 
     const remaining = chapters.filter((c) => c.id !== id);
-    deleteChapter(id);
+    deleteChapter(bookId, id);
 
-    // Only navigate if the writer just deleted the chapter they were looking at.
+    // Only navigate if the writer just deleted the chapter they were reading.
     if (id === activeId) {
-      router.replace(remaining.length ? `/chapter/${remaining[0].id}` : "/");
+      router.replace(
+        remaining.length
+          ? `/book/${bookId}/chapter/${remaining[0].id}`
+          : `/book/${bookId}`,
+      );
     }
   };
 
   const handleDrop = (to: number) => {
-    if (dragIndex !== null) moveChapter(dragIndex, to);
+    if (dragIndex !== null) moveChapter(bookId, dragIndex, to);
     setDragIndex(null);
     setOverIndex(null);
   };
@@ -55,13 +64,24 @@ export function ChapterSidebar() {
       aria-label="Chapters"
     >
       <div className="px-5 pt-6 pb-4">
+        <Link
+          href="/"
+          className="rounded-sm font-sans text-xs text-warmgray outline-none
+                     hover:text-burgundy focus-visible:ring-2
+                     focus-visible:ring-gold/60"
+        >
+          ← All books
+        </Link>
         <input
-          value={bookTitle}
-          onChange={(e) => setBookTitle(e.target.value)}
+          value={book?.title ?? ""}
+          onChange={(e) => renameBook(bookId, e.target.value)}
+          onBlur={(e) => {
+            if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
+          }}
           aria-label="Book title"
           spellCheck={false}
-          className="w-full truncate rounded-sm bg-transparent font-serif text-base
-                     text-ink outline-none focus-visible:ring-2
+          className="mt-2 w-full truncate rounded-sm bg-transparent font-serif
+                     text-base text-ink outline-none focus-visible:ring-2
                      focus-visible:ring-gold/60"
         />
       </div>
@@ -96,19 +116,19 @@ export function ChapterSidebar() {
                 } ${dragIndex === index ? "opacity-40" : ""}`}
               >
                 <Link
-                  href={`/chapter/${chapter.id}`}
+                  href={`/book/${bookId}/chapter/${chapter.id}`}
                   aria-current={isActive ? "page" : undefined}
-                  // Native drag-and-drop is mouse-only, so reordering also needs
-                  // a keyboard path or it is unreachable for some writers.
+                  // Native drag-and-drop is mouse-only, so reordering also
+                  // needs a keyboard path or it is unreachable for some writers.
                   aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                   onKeyDown={(e) => {
                     if (!e.altKey) return;
                     if (e.key === "ArrowUp") {
                       e.preventDefault();
-                      moveChapter(index, index - 1);
+                      moveChapter(bookId, index, index - 1);
                     } else if (e.key === "ArrowDown") {
                       e.preventDefault();
-                      moveChapter(index, index + 1);
+                      moveChapter(bookId, index, index + 1);
                     }
                   }}
                   className={`flex items-baseline gap-2 rounded-sm py-2 pr-8 pl-3

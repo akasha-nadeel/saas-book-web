@@ -5,8 +5,13 @@ import Link from "next/link";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
-import { renameChapter, saveBody, touchLastOpened } from "@/lib/chapter-store";
-import { useChapterBody, useHydrated, useManifest } from "@/lib/use-chapters";
+import {
+  findBook,
+  renameChapter,
+  saveBody,
+  touchLastOpened,
+} from "@/lib/library-store";
+import { useChapterBody, useHydrated, useShelf } from "@/lib/use-library";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
 
 /** What one autosave carries: the document, plus the count the sidebar shows. */
@@ -15,18 +20,25 @@ interface ChapterSnapshot {
   words: number;
 }
 
-export function ChapterEditor({ chapterId }: { chapterId: string }) {
+export function ChapterEditor({
+  bookId,
+  chapterId,
+}: {
+  bookId: string;
+  chapterId: string;
+}) {
   const hydrated = useHydrated();
-  const { bookTitle, chapters } = useManifest();
+  const shelf = useShelf();
   const raw = useChapterBody(chapterId);
 
-  const chapter = chapters.find((c) => c.id === chapterId) ?? null;
+  const book = findBook(shelf, bookId);
+  const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
-  // Remembering the open chapter is what lets "/" land the writer back where
-  // they left off, so it is worth a write on every visit.
+  // Remembering the open chapter is what lets a book's route land the writer
+  // back where they left off, so it is worth a write on every visit.
   useEffect(() => {
-    if (hydrated) touchLastOpened(chapterId);
-  }, [hydrated, chapterId]);
+    if (hydrated) touchLastOpened(bookId, chapterId);
+  }, [hydrated, bookId, chapterId]);
 
   const initialContent = useMemo<JSONContent | null>(() => {
     if (!raw) return null;
@@ -39,19 +51,21 @@ export function ChapterEditor({ chapterId }: { chapterId: string }) {
 
   // Nothing to render until storage has been read — see useHydrated.
   if (!hydrated) return null;
-  if (!chapter) return <MissingChapter />;
+  if (!book || !chapter) return <MissingChapter />;
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <ChapterHeader
-        bookTitle={bookTitle}
+        bookTitle={book.title}
         title={chapter.title}
+        bookId={bookId}
         chapterId={chapterId}
       />
       {/* Keyed on the stored text as well as the id, so a save from another tab
           reloads the surface rather than leaving this one silently stale. */}
       <EditorSurface
         key={`${chapterId}:${raw ?? ""}`}
+        bookId={bookId}
         chapterId={chapterId}
         initialContent={initialContent}
       />
@@ -73,7 +87,7 @@ function MissingChapter() {
                      underline underline-offset-4 outline-none
                      focus-visible:ring-2 focus-visible:ring-gold/60"
         >
-          Back to your book
+          Back to your books
         </Link>
       </div>
     </main>
@@ -83,10 +97,12 @@ function MissingChapter() {
 function ChapterHeader({
   bookTitle,
   title,
+  bookId,
   chapterId,
 }: {
   bookTitle: string;
   title: string;
+  bookId: string;
   chapterId: string;
 }) {
   return (
@@ -100,10 +116,10 @@ function ChapterHeader({
             and screen-reader behaviour right for free. */}
         <input
           value={title}
-          onChange={(e) => renameChapter(chapterId, e.target.value)}
+          onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
           onBlur={(e) => {
             if (!e.target.value.trim()) {
-              renameChapter(chapterId, "Untitled chapter");
+              renameChapter(bookId, chapterId, "Untitled chapter");
             }
           }}
           aria-label="Chapter title"
@@ -118,16 +134,18 @@ function ChapterHeader({
 }
 
 function EditorSurface({
+  bookId,
   chapterId,
   initialContent,
 }: {
+  bookId: string;
   chapterId: string;
   initialContent: JSONContent | null;
 }) {
   const [words, setWords] = useState(0);
 
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
-    save: ({ doc, words }) => saveBody(chapterId, doc, words),
+    save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
   });
 
   // Word count is throttled rather than recomputed per keystroke. Setting

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
-import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -32,12 +31,10 @@ export default function RootLayout({
       lang="en"
       className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
     >
-      {/* The shell itself never scrolls: the sidebar stays put and the
-          manuscript column scrolls inside it, which is what keeps the chapter
-          list reachable from the bottom of a long chapter. */}
-      <body className="flex h-full overflow-hidden bg-cream text-ink">
-        <ChapterSidebar />
-        <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
+      {/* Only the shell. The chapter sidebar lives in the book layout, so the
+          shelf can render full-width without one. */}
+      <body className="h-full overflow-hidden bg-cream text-ink">
+        {children}
       </body>
     </html>
   );
