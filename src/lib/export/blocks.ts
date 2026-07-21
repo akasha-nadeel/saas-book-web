@@ -33,6 +33,16 @@ export interface Run {
   href?: string;
 }
 
+/**
+ * A chapter with its document parsed, ready to render. Lives here rather than
+ * beside the orchestration so the format builders can import it without
+ * depending on the module that dynamically imports *them*.
+ */
+export interface LoadedChapter {
+  title: string;
+  doc: JSONContent;
+}
+
 export interface Block {
   kind: BlockKind;
   /** List nesting, 0 for everything else. */
@@ -43,14 +53,6 @@ export interface Block {
   language?: string;
   runs: Run[];
 }
-
-const MARK_FLAGS: Record<string, keyof Run> = {
-  bold: "bold",
-  italic: "italic",
-  strike: "strike",
-  code: "code",
-  underline: "underline",
-};
 
 function runsFrom(content: JSONContent[] | undefined): Run[] {
   const runs: Run[] = [];
@@ -64,12 +66,25 @@ function runsFrom(content: JSONContent[] | undefined): Run[] {
 
     const run: Run = { text: node.text };
     for (const mark of node.marks ?? []) {
-      const flag = MARK_FLAGS[mark.type];
-      if (flag) {
-        // Every flag but href is a literal true, which is what Run declares.
-        (run as Record<string, unknown>)[flag] = true;
-      } else if (mark.type === "link" && typeof mark.attrs?.href === "string") {
-        run.href = mark.attrs.href;
+      switch (mark.type) {
+        case "bold":
+          run.bold = true;
+          break;
+        case "italic":
+          run.italic = true;
+          break;
+        case "strike":
+          run.strike = true;
+          break;
+        case "code":
+          run.code = true;
+          break;
+        case "underline":
+          run.underline = true;
+          break;
+        case "link":
+          if (typeof mark.attrs?.href === "string") run.href = mark.attrs.href;
+          break;
       }
     }
     runs.push(run);

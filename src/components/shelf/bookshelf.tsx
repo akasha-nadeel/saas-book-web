@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ExportDialog } from "@/components/export/export-dialog";
 import {
   bookWordCount,
   createBook,
@@ -19,6 +20,8 @@ export function Bookshelf() {
 
   // migrateLegacy is idempotent, but running it twice is still wasted work and
   // React runs effects twice in development.
+  const [exporting, setExporting] = useState<Book | null>(null);
+
   const migrated = useRef(false);
   useEffect(() => {
     if (!hydrated || migrated.current) return;
@@ -95,6 +98,20 @@ export function Bookshelf() {
 
                 <button
                   type="button"
+                  onClick={() => setExporting(book)}
+                  aria-label={`Export ${book.title}`}
+                  className="absolute top-4 right-7 rounded-sm px-1.5 py-0.5
+                             font-sans text-xs leading-none text-warmgray
+                             opacity-0 outline-none transition-opacity
+                             group-hover:opacity-60 hover:!opacity-100
+                             hover:text-burgundy focus-visible:opacity-100
+                             focus-visible:ring-2 focus-visible:ring-gold/60"
+                >
+                  Export
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => handleDelete(book)}
                   aria-label={`Delete ${book.title}`}
                   className="absolute top-4 right-0 rounded-sm px-1.5 py-0.5
@@ -120,6 +137,10 @@ export function Bookshelf() {
         >
           + New book
         </button>
+
+        {exporting && (
+          <ExportDialog book={exporting} onClose={() => setExporting(null)} />
+        )}
       </div>
     </main>
   );

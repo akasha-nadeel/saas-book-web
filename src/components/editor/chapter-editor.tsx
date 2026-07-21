@@ -5,11 +5,13 @@ import Link from "next/link";
 import { EditorContent, useEditor, type JSONContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
+import { ExportDialog } from "@/components/export/export-dialog";
 import {
   findBook,
   renameChapter,
   saveBody,
   touchLastOpened,
+  type Book,
 } from "@/lib/library-store";
 import { useChapterBody, useHydrated, useShelf } from "@/lib/use-library";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
@@ -56,7 +58,7 @@ export function ChapterEditor({
   return (
     <div className="flex min-h-full flex-1 flex-col">
       <ChapterHeader
-        bookTitle={book.title}
+        book={book}
         title={chapter.title}
         bookId={bookId}
         chapterId={chapterId}
@@ -95,22 +97,37 @@ function MissingChapter() {
 }
 
 function ChapterHeader({
-  bookTitle,
+  book,
   title,
   bookId,
   chapterId,
 }: {
-  bookTitle: string;
+  book: Book;
   title: string;
   bookId: string;
   chapterId: string;
 }) {
+  const [exporting, setExporting] = useState(false);
+
   return (
-    <header className="pt-16 pb-10">
+    <header className="group/header pt-16 pb-10">
       <div className="mx-auto w-full max-w-(--measure-manuscript) px-6">
-        <p className="font-sans text-xs tracking-[0.18em] text-warmgray uppercase">
-          {bookTitle}
-        </p>
+        <div className="flex items-baseline justify-between gap-4">
+          <p className="font-sans text-xs tracking-[0.18em] text-warmgray uppercase">
+            {book.title}
+          </p>
+          <button
+            type="button"
+            onClick={() => setExporting(true)}
+            className="shrink-0 rounded-sm font-sans text-xs text-warmgray
+                       opacity-0 outline-none transition-opacity
+                       group-hover/header:opacity-100 hover:text-burgundy
+                       focus-visible:opacity-100 focus-visible:ring-2
+                       focus-visible:ring-gold/60"
+          >
+            Export
+          </button>
+        </div>
         {/* An input rather than a heading with contenteditable: the title is a
             single line of plain text, and a plain input gets the caret, undo
             and screen-reader behaviour right for free. */}
@@ -129,6 +146,14 @@ function ChapterHeader({
                      focus-visible:ring-gold/60"
         />
       </div>
+
+      {exporting && (
+        <ExportDialog
+          book={book}
+          chapterId={chapterId}
+          onClose={() => setExporting(false)}
+        />
+      )}
     </header>
   );
 }
