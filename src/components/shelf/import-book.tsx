@@ -70,7 +70,10 @@ export function ImportBook() {
     : 0;
 
   return (
-    <main className="min-h-dvh overflow-y-auto bg-surface px-4 py-12">
+    // No overflow-y here: an ancestor that scrolls becomes the containing
+    // block for the sticky action bar below, which would pin it to the end of
+    // the content instead of to the bottom of the screen.
+    <main className="min-h-dvh bg-surface px-4 py-12">
       <div className="mx-auto w-full max-w-[34rem]">
         <h1 className="text-center font-serif text-3xl text-fg">
           Import a manuscript
@@ -210,7 +213,14 @@ export function ImportBook() {
               </p>
             )}
 
-            <div className="mt-8 flex items-center justify-end gap-2">
+            {/* Pinned to the bottom of the viewport. A long chapter list pushed
+                this below the fold, which left the one action the whole screen
+                exists for out of sight at exactly the moment it was needed. */}
+            <div
+              className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center
+                         justify-end gap-2 border-t border-line bg-surface
+                         px-4 py-4"
+            >
               <button
                 type="button"
                 onClick={() => {
