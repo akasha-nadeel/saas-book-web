@@ -84,7 +84,7 @@ export function Rail({
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
       className={`flex w-(--rail-width) shrink-0 flex-col items-center gap-2
-                  bg-surface py-4 ${
+                  overflow-y-auto bg-surface py-4 ${
                     side === "left" ? "border-r" : "border-l"
                   } border-line`}
     >

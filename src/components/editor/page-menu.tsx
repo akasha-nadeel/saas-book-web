@@ -98,8 +98,6 @@ export function PageMenu({ book }: { book: Book }) {
     };
   }, [open]);
 
-  const size = PAGE_SIZES[page.size];
-
   return (
     <div ref={rootRef} className="relative">
       <button
@@ -107,26 +105,26 @@ export function PageMenu({ book }: { book: Book }) {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
-        title="Page setup"
-        className="flex h-8 items-center gap-2 rounded-md px-2 font-sans text-xs
-                   text-muted outline-none transition-colors hover:bg-raised
-                   hover:text-fg focus-visible:ring-2
+        aria-label={`Page setup: ${PAGE_SIZES[page.size].label}`}
+        title={`Page setup — ${PAGE_SIZES[page.size].label}`}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md
+                   text-muted outline-none transition-colors
+                   hover:bg-raised/50 hover:text-fg focus-visible:ring-2
                    focus-visible:ring-accent/60"
       >
-        <span aria-hidden="true" className="text-sm leading-none">
+        <span aria-hidden="true" className="text-base leading-none">
           ▤
-        </span>
-        <span>{size.label}</span>
-        <span aria-hidden="true" className="text-[0.6rem]">
-          ▾
         </span>
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute top-9 right-0 z-20 max-h-[70vh] w-64 overflow-y-auto
-                     rounded-md border border-line bg-panel shadow-lg"
+          // Opens leftward: this now sits in the right-edge rail, and a menu
+          // anchored to its right would open off-screen.
+          className="absolute top-0 right-full z-30 mr-2 max-h-[80vh] w-64
+                     overflow-y-auto rounded-md border border-line bg-panel
+                     shadow-lg"
         >
           <Section title="Width">
             <div className="grid grid-cols-2 gap-1">

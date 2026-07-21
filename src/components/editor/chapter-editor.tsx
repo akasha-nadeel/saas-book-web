@@ -12,7 +12,7 @@ import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
 import { ChatPanel } from "@/components/chat/chat-panel";
-import { EditorToolbar } from "@/components/editor/editor-toolbar";
+import { ToolRail } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { ColumnHeader } from "@/components/editor/top-bar";
@@ -128,7 +128,6 @@ export function ChapterEditor({
 
         <div className="flex min-w-0 flex-1 flex-col">
           <ColumnHeader book={book} paper={prefs.paper} />
-          <EditorToolbar editor={editor} book={book} />
           {/* Keyed on the stored text as well as the id, so a save from another
               tab reloads the surface rather than leaving this one stale. */}
           <EditorSurface
@@ -171,6 +170,10 @@ export function ChapterEditor({
             </RailButton>
           }
         >
+          <ToolRail editor={editor} book={book} />
+
+          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
           <RailButton
             label="Assistant"
             active={prefs.rightPanel}
@@ -178,8 +181,6 @@ export function ChapterEditor({
           >
             {icons.assistant}
           </RailButton>
-
-          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 
           <RailButton
             label="Focus mode"

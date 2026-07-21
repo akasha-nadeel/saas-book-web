@@ -88,8 +88,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
-      <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-5">
-        <span className="truncate font-sans text-xl font-semibold text-fg">
+      <div className="flex h-14 shrink-0 items-center justify-between gap-3 px-4">
+        <span className="truncate font-sans text-lg font-semibold text-fg">
           Manuscript
         </span>
         <button
@@ -132,7 +132,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 overPart === key && dragId ? "bg-accent-deep/25" : undefined
               }
             >
-              <div className="flex items-center justify-between gap-2 bg-raised/40 px-5 py-3">
+              <div className="flex items-center justify-between gap-2 bg-raised/40 px-4 py-2.5">
                 <button
                   type="button"
                   onClick={() =>
@@ -169,7 +169,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
               </div>
 
               {isOpen && chapters.length === 0 && (
-                <p className="px-5 py-4 font-sans text-sm text-muted italic">
+                <p className="px-4 py-3 font-sans text-sm text-muted italic">
                   {empty}
                 </p>
               )}
@@ -210,8 +210,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                               moveChapter(bookId, index, index + 1);
                             }
                           }}
-                          className={`flex items-center gap-3 border-l-4 py-3.5
-                                      pr-20 pl-4 font-sans text-sm outline-none
+                          className={`flex items-center gap-2.5 border-l-4 py-3
+                                      pr-16 pl-3 font-sans text-sm outline-none
                                       transition-colors focus-visible:ring-inset
                                       focus-visible:ring-2
                                       focus-visible:ring-accent/60 ${
@@ -287,10 +287,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       {/* The reference closes the panel with a running total and its wordmark;
           both belong to the manuscript rather than to any one chapter. */}
       <div className="shrink-0 border-t border-line">
-        <p className="px-5 py-3.5 font-sans text-sm text-muted">
+        <p className="px-4 py-3 font-sans text-sm text-muted">
           {bookWordCount(book).toLocaleString()} words
         </p>
-        <p className="border-t border-line px-5 py-3.5 font-display text-lg font-medium text-fg">
+        <p className="border-t border-line px-4 py-3 font-display text-base font-medium text-fg">
           OpenChapter
         </p>
       </div>

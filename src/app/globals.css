@@ -34,11 +34,29 @@
   --text-manuscript--line-height: 1.75;
 }
 
-/* App shell. Layout constants, not part of the design language. Measured off
-   the reference: a 5rem rail and a 24rem manuscript panel. */
+/* App shell. Layout constants, not part of the design language.
+
+   The panel scales with the window rather than taking one fixed number. The
+   reference's 24rem is measured on a very wide display; on a 1280px viewport
+   that panel plus two rails is over a third of the screen, and the page — the
+   thing being written — gets squeezed. So 24rem is the ceiling, not the rule. */
 :root {
-  --rail-width: 5rem;
-  --sidebar-width: 24rem;
+  --rail-width: 4rem;
+  --sidebar-width: 17rem;
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --rail-width: 4.5rem;
+    --sidebar-width: 20rem;
+  }
+}
+
+@media (min-width: 1800px) {
+  :root {
+    --rail-width: 5rem;
+    --sidebar-width: 24rem;
+  }
 }
 
 body {

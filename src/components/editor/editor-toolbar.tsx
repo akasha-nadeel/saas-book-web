@@ -7,14 +7,16 @@ import { ACCEPTED, importImage } from "@/lib/image-import";
 import type { Book } from "@/lib/library-store";
 
 /**
- * The formatting toolbar.
+ * The formatting tools, as a column in the right rail.
  *
- * Every control maps to a command StarterKit already provides — nothing here is
- * decorative. Quote, lists and scene break are deliberately absent: each is
- * still reachable by typing ("> ", "- ", "1. ", "---"), so those buttons were
- * duplicating a path that already existed rather than providing one. Active state is read through useSyncExternalStore rather than
- * component state, because the truth lives in the editor: pressing ⌘B or moving
- * the caret into bold text has to light the button just as clicking it does.
+ * These used to be a row above the manuscript. Moving them into the rail gives
+ * the page back that height — on a laptop the toolbar was a noticeable slice of
+ * the writing area — and matches the reference, which keeps no permanent
+ * toolbar over the page at all.
+ *
+ * Every control maps to a command StarterKit already provides. Quote, lists and
+ * scene break stay absent: each is reachable by typing "> ", "- ", "1. " or
+ * "---", so a button would duplicate a path rather than provide one.
  */
 
 function useEditorState(editor: Editor | null) {
@@ -38,7 +40,7 @@ function useEditorState(editor: Editor | null) {
   );
 }
 
-function Button({
+function ToolButton({
   onClick,
   active,
   disabled,
@@ -61,11 +63,9 @@ function Button({
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
-      // Active is the same neutral lift as hover, one step stronger — the
-      // accent is reserved for actions, not for "this mark is on".
-      className={`flex h-8 min-w-8 items-center justify-center rounded-md px-2
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md
                   text-sm outline-none transition-colors
-                  disabled:cursor-default disabled:opacity-30
+                  disabled:cursor-default disabled:opacity-25
                   focus-visible:ring-2 focus-visible:ring-accent/60 ${
                     active
                       ? "bg-raised text-fg"
@@ -77,9 +77,26 @@ function Button({
   );
 }
 
-const Divider = () => <span className="mx-1 h-5 w-px bg-line" />;
+const Divider = () => (
+  <span aria-hidden="true" className="my-1 h-px w-6 shrink-0 bg-line" />
+);
 
-export function EditorToolbar({
+const Icon = ({ children }: { children: React.ReactNode }) => (
+  <svg
+    aria-hidden="true"
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.6"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-4 w-4"
+  >
+    {children}
+  </svg>
+);
+
+export function ToolRail({
   editor,
   book,
 }: {
@@ -91,10 +108,7 @@ export function EditorToolbar({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  if (!editor) {
-    // Reserve the height so the manuscript doesn't jump when the editor mounts.
-    return <div className="h-12 border-b border-line" />;
-  }
+  if (!editor) return null;
 
   const promptForLink = () => {
     const previous = editor.getAttributes("link").href as string | undefined;
@@ -112,92 +126,84 @@ export function EditorToolbar({
     <div
       role="toolbar"
       aria-label="Formatting"
-      className="flex h-12 shrink-0 flex-wrap items-center gap-0.5 border-b
-                 border-line px-3"
+      aria-orientation="vertical"
+      className="flex flex-col items-center gap-1"
     >
       {([1, 2, 3] as const).map((level) => (
-        <Button
+        <ToolButton
           key={level}
           label={`Heading ${level}`}
           active={editor.isActive("heading", { level })}
-          onClick={() =>
-            editor.chain().focus().toggleHeading({ level }).run()
-          }
+          onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
         >
-          <span className="font-serif">H{level}</span>
-        </Button>
+          <span className="font-serif text-xs">H{level}</span>
+        </ToolButton>
       ))}
 
       <Divider />
 
-      <Button
+      <ToolButton
         label="Bold"
         shortcut="Ctrl+B"
         active={editor.isActive("bold")}
         onClick={() => editor.chain().focus().toggleBold().run()}
       >
         <span className="font-bold">B</span>
-      </Button>
-      <Button
+      </ToolButton>
+      <ToolButton
         label="Italic"
         shortcut="Ctrl+I"
         active={editor.isActive("italic")}
         onClick={() => editor.chain().focus().toggleItalic().run()}
       >
         <span className="font-serif italic">I</span>
-      </Button>
-      <Button
+      </ToolButton>
+      <ToolButton
         label="Underline"
         shortcut="Ctrl+U"
         active={editor.isActive("underline")}
         onClick={() => editor.chain().focus().toggleUnderline().run()}
       >
         <span className="underline">U</span>
-      </Button>
-      <Button
+      </ToolButton>
+      <ToolButton
         label="Strikethrough"
         active={editor.isActive("strike")}
         onClick={() => editor.chain().focus().toggleStrike().run()}
       >
         <span className="line-through">S</span>
-      </Button>
-      <Button
+      </ToolButton>
+      <ToolButton
         label="Inline code"
         active={editor.isActive("code")}
         onClick={() => editor.chain().focus().toggleCode().run()}
       >
-        <span className="font-mono text-xs">{"</>"}</span>
-      </Button>
-      <Button
+        <span className="font-mono text-[0.65rem]">{"</>"}</span>
+      </ToolButton>
+      <ToolButton
         label="Link"
         active={editor.isActive("link")}
         onClick={promptForLink}
       >
-        <span className="text-xs">🔗</span>
-      </Button>
+        <Icon>
+          <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
+          <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
+        </Icon>
+      </ToolButton>
 
       <Divider />
 
-      <Button
+      <ToolButton
         label="Insert image"
-        onClick={() => fileRef.current?.click()}
         disabled={busy}
+        onClick={() => fileRef.current?.click()}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
+        <Icon>
           <rect x="2.5" y="4" width="15" height="12" rx="2" />
           <circle cx="7" cy="8.5" r="1.2" />
           <path d="m3.5 14 4-4 3.5 3.5 2.5-2 3 3" />
-        </svg>
-      </Button>
+        </Icon>
+      </ToolButton>
       <input
         ref={fileRef}
         type="file"
@@ -224,61 +230,42 @@ export function EditorToolbar({
 
       <Divider />
 
-      <Button
+      <ToolButton
         label="Undo"
         shortcut="Ctrl+Z"
         disabled={!editor.can().undo()}
         onClick={() => editor.chain().focus().undo().run()}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
+        <Icon>
           <path d="M7 7H4V4" />
           <path d="M4.5 7.5a6 6 0 1 1-.8 5" />
-        </svg>
-      </Button>
-      <Button
+        </Icon>
+      </ToolButton>
+      <ToolButton
         label="Redo"
         shortcut="Ctrl+Shift+Z"
         disabled={!editor.can().redo()}
         onClick={() => editor.chain().focus().redo().run()}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
+        <Icon>
           <path d="M13 7h3V4" />
           <path d="M15.5 7.5a6 6 0 1 0 .8 5" />
-        </svg>
-      </Button>
+        </Icon>
+      </ToolButton>
+
+      <Divider />
+
+      <PageMenu book={book} />
 
       {problem && (
         <p
           role="status"
-          className="ml-2 max-w-64 truncate font-sans text-xs text-red-400"
           title={problem}
+          className="px-1 text-center font-sans text-[0.6rem] leading-tight text-red-400"
         >
-          {problem}
+          Too large
         </p>
       )}
-
-      {/* Pushed to the far end: it describes the page, not the text on it. */}
-      <div className="ml-auto">
-        <PageMenu book={book} />
-      </div>
     </div>
   );
 }
