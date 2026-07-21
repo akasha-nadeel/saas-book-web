@@ -1,16 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import {
   renameBook,
   setPref,
   type Book,
   type PaperColor,
-  type Prefs,
 } from "@/lib/library-store";
 
 /** Swatch previews. The real colours live in globals.css keyed by data-paper;
- *  these only have to look like them at 20px. */
+ *  these only have to look like them at 16px. */
 const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
   { value: "white", label: "White", swatch: "#ffffff" },
   { value: "cream", label: "Cream", swatch: "#f5f1e8" },
@@ -19,14 +17,6 @@ const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
   { value: "black", label: "Black", swatch: "#0a0d11" },
 ];
 
-/**
- * Page colour, out in the open.
- *
- * It was a section inside the page-setup menu, which made changing it two
- * clicks and a scroll. It is the one page setting a writer flips on a whim —
- * because the light is different, or their eyes are tired — so it sits in the
- * bar where a single click reaches it.
- */
 function PaperSwatches({ paper }: { paper: PaperColor }) {
   return (
     <div
@@ -43,7 +33,7 @@ function PaperSwatches({ paper }: { paper: PaperColor }) {
           aria-label={p.label}
           title={`Page colour: ${p.label}`}
           onClick={() => setPref("paper", p.value)}
-          className={`h-5 w-5 rounded-full border-2 outline-none
+          className={`h-4 w-4 rounded-full border-2 outline-none
                       transition-colors focus-visible:ring-2
                       focus-visible:ring-accent/60 ${
                         p.value === paper
@@ -58,63 +48,35 @@ function PaperSwatches({ paper }: { paper: PaperColor }) {
 }
 
 /**
- * Breadcrumb, panel toggles, and export — the strip above everything.
+ * The centre column's own header.
  *
- * The book title is editable in place here rather than in the sidebar, since
- * this is where the reference design puts it and it is the one spot visible
- * from every chapter.
+ * This used to span the whole window above the rails, which pushed both them
+ * and the manuscript panel down and broke the full-height columns the reference
+ * has. It belongs to the column it titles, so the rails now run floor to
+ * ceiling and the panel starts at the top of the window.
  */
-
-export function TopBar({
+export function ColumnHeader({
   book,
-  chapterTitle,
-  prefs,
+  paper,
 }: {
   book: Book;
-  chapterTitle: string;
-  prefs: Prefs;
+  paper: PaperColor;
 }) {
   return (
-    <header
-      className="flex h-12 shrink-0 items-center gap-2 border-b border-line
-                 bg-panel px-3"
-    >
-      <nav
-        aria-label="Breadcrumb"
-        className="flex min-w-0 flex-1 items-baseline gap-2 font-sans text-sm"
-      >
-        <Link
-          href="/"
-          className="shrink-0 rounded-sm text-muted outline-none
-                     hover:text-accent focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          All books
-        </Link>
-        <span aria-hidden="true" className="shrink-0 text-muted/60">
-          /
-        </span>
-        <input
-          value={book.title}
-          onChange={(e) => renameBook(book.id, e.target.value)}
-          onBlur={(e) => {
-            if (!e.target.value.trim()) renameBook(book.id, "Untitled Book");
-          }}
-          aria-label="Book title"
-          spellCheck={false}
-          className="w-40 shrink-0 truncate rounded-sm bg-transparent text-muted
-                     outline-none hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        />
-        <span aria-hidden="true" className="shrink-0 text-muted/60">
-          /
-        </span>
-        <span className="truncate font-medium text-fg">{chapterTitle}</span>
-      </nav>
-
-      {/* Panel toggles and Export live in the rails now; what is left here is
-          where you are, and what the page looks like. */}
-      <PaperSwatches paper={prefs.paper} />
+    <header className="flex h-11 shrink-0 items-center gap-4 border-b border-line px-4">
+      <input
+        value={book.title}
+        onChange={(e) => renameBook(book.id, e.target.value)}
+        onBlur={(e) => {
+          if (!e.target.value.trim()) renameBook(book.id, "Untitled Book");
+        }}
+        aria-label="Book title"
+        spellCheck={false}
+        className="min-w-0 flex-1 truncate rounded-sm bg-transparent font-sans
+                   text-sm text-fg outline-none focus-visible:ring-2
+                   focus-visible:ring-accent/60"
+      />
+      <PaperSwatches paper={paper} />
     </header>
   );
 }

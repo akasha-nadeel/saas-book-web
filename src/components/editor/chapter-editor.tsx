@@ -15,7 +15,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
-import { TopBar } from "@/components/editor/top-bar";
+import { ColumnHeader } from "@/components/editor/top-bar";
 import { ExportDialog } from "@/components/export/export-dialog";
 import {
   findBook,
@@ -84,14 +84,10 @@ export function ChapterEditor({
   if (!book || !chapter) return <MissingChapter />;
 
   return (
-    <div className="flex h-full flex-col">
-      <TopBar
-        book={book}
-        chapterTitle={chapter.title}
-        prefs={prefs}
-      />
-
-      <div className="flex min-h-0 flex-1">
+    // Rails and panel run the full height of the window; the header that used
+    // to sit above them now belongs to the centre column.
+    <div className="flex h-full">
+      <>
         <Rail side="left">
           <RailButton label="All books" href="/">
             {icons.home}
@@ -131,6 +127,7 @@ export function ChapterEditor({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
+          <ColumnHeader book={book} paper={prefs.paper} />
           <EditorToolbar editor={editor} book={book} />
           {/* Keyed on the stored text as well as the id, so a save from another
               tab reloads the surface rather than leaving this one stale. */}
@@ -139,6 +136,7 @@ export function ChapterEditor({
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapter.title}
+            chapterNumber={book.chapters.indexOf(chapter) + 1}
             book={book}
             initialContent={initialContent}
             prefs={prefs}
@@ -198,7 +196,7 @@ export function ChapterEditor({
             {icons.typewriter}
           </RailButton>
         </Rail>
-      </div>
+      </>
 
       {exporting && (
         <ExportDialog
@@ -208,6 +206,44 @@ export function ChapterEditor({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Step to the chapter either side of this one.
+ *
+ * Pinned to the workspace rather than the page, so it stays put whatever paper
+ * size is set, and absent at the ends rather than shown disabled — there is
+ * nothing to explain about an edge that does not exist.
+ */
+function ChapterStep({
+  bookId,
+  chapter,
+  side,
+}: {
+  bookId: string;
+  chapter: { id: string; title: string } | null;
+  side: "left" | "right";
+}) {
+  if (!chapter) return null;
+
+  return (
+    <Link
+      href={`/book/${bookId}/chapter/${chapter.id}`}
+      aria-label={`${side === "left" ? "Previous" : "Next"} chapter: ${chapter.title}`}
+      title={chapter.title}
+      onClick={(e) => e.stopPropagation()}
+      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2
+                  items-center justify-center rounded-full border border-line
+                  bg-panel/90 text-lg text-muted opacity-60 backdrop-blur
+                  outline-none transition-opacity hover:text-fg
+                  hover:opacity-100 focus-visible:opacity-100
+                  focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    side === "left" ? "left-3" : "right-3"
+                  }`}
+    >
+      <span aria-hidden="true">{side === "left" ? "‹" : "›"}</span>
+    </Link>
   );
 }
 
@@ -236,6 +272,7 @@ function EditorSurface({
   bookId,
   chapterId,
   chapterTitle,
+  chapterNumber,
   book,
   initialContent,
   prefs,
@@ -244,6 +281,7 @@ function EditorSurface({
   bookId: string;
   chapterId: string;
   chapterTitle: string;
+  chapterNumber: number;
   book: Book;
   initialContent: JSONContent | null;
   prefs: Prefs;
@@ -254,6 +292,15 @@ function EditorSurface({
 
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
+
+  // Neighbours in the book's own order, so stepping through matches the order
+  // the manuscript panel shows.
+  const index = book.chapters.findIndex((c) => c.id === chapterId);
+  const previous = index > 0 ? book.chapters[index - 1] : null;
+  const next =
+    index >= 0 && index < book.chapters.length - 1
+      ? book.chapters[index + 1]
+      : null;
 
   // Words at the moment this chapter opened, so the status bar can show what
   // was written in this sitting. State rather than a ref because it is read
@@ -325,6 +372,7 @@ function EditorSurface({
       {/* The workspace, and the page on it. Physical dimensions in inches —
           CSS understands `in` natively, so the numbers from pageMetrics go
           straight into the style with no pixels-per-inch fudge. */}
+      <div className="relative flex min-h-0 flex-1">
       <main
         data-paper={prefs.paper}
         data-columns={page.columns}
@@ -345,11 +393,13 @@ function EditorSurface({
             paddingRight: `${metrics.right}in`,
           }}
         >
+          {/* Centred, with the chapter's number above it, the way the page of
+              a printed book opens. */}
           <p
-            className="font-sans text-xs tracking-[0.18em] uppercase"
-            style={{ color: "var(--paper-muted)" }}
+            className="text-center font-serif text-5xl leading-none"
+            style={{ color: "var(--paper-muted)", opacity: 0.5 }}
           >
-            {book.title}
+            {chapterNumber}
           </p>
           {/* An input rather than a heading with contenteditable: the title is
               a single line of plain text, and a plain input gets the caret,
@@ -365,13 +415,17 @@ function EditorSurface({
             aria-label="Chapter title"
             spellCheck={false}
             style={{ color: "var(--paper-fg)" }}
-            className="mt-2 mb-10 w-full rounded-sm bg-transparent font-serif
-                       text-3xl outline-none focus-visible:ring-2
+            className="mt-6 mb-12 w-full rounded-sm bg-transparent text-center
+                       font-serif text-4xl outline-none focus-visible:ring-2
                        focus-visible:ring-accent/60"
           />
           <EditorContent editor={editor} />
         </div>
       </main>
+
+        <ChapterStep bookId={bookId} chapter={previous} side="left" />
+        <ChapterStep bookId={bookId} chapter={next} side="right" />
+      </div>
 
       <StatusBar
         words={words}
