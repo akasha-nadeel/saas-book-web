@@ -129,6 +129,19 @@ body {
   padding: 9% 8% 8% 15%;
 }
 
+/* The caption printed over cover artwork. Hidden below a readable width: at
+   the 40px cover in the tool rail the type would be about four pixels tall,
+   which is noise rather than information. */
+.book-face-caption {
+  display: none;
+}
+
+@container (min-width: 88px) {
+  .book-face-caption {
+    display: flex;
+  }
+}
+
 .book-face-title {
   font-size: 12cqw;
   line-height: 1.16;

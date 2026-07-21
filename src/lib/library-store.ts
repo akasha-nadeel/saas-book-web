@@ -45,6 +45,11 @@ export interface Book {
   title: string;
   /** Shown under the title on the cover. */
   subtitle?: string;
+  /**
+   * Leave cover artwork bare — no title, byline or scrim over it. Absent
+   * rather than false, so only the books deliberately set this way carry it.
+   */
+  bareCover?: true;
   /** Optional. Used for the DOCX byline and EPUB's dc:creator. */
   author?: string;
   /** What the writer set out to make. Absent on books made before setup. */
@@ -672,6 +677,21 @@ function migrateSpike(): boolean {
 
 export function setBookAuthor(bookId: string, author: string) {
   commitBook(bookId, (book) => ({ ...book, author }));
+}
+
+/**
+ * Whether cover artwork is shown without words printed over it.
+ *
+ * A jacket the writer designed already has its title on it, and printing ours
+ * on top of theirs is worse than showing nothing.
+ */
+export function setBareCover(bookId: string, bare: boolean) {
+  commitBook(bookId, (book) => {
+    const next = { ...book };
+    if (bare) next.bareCover = true;
+    else delete next.bareCover;
+    return next;
+  });
 }
 
 /**

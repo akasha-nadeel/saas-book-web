@@ -15,6 +15,7 @@ import {
   booksIn,
   deleteBook,
   migrateLegacy,
+  setBareCover,
   restoreBook,
   trashBook,
   type Book,
@@ -379,27 +380,6 @@ function Empty() {
 }
 
 /**
- * A cover that follows its book's art.
- *
- * Its own component so the subscription is per book: covers live at their own
- * storage keys, and reading them all through one hook would repaint every book
- * on the shelf whenever any one of them changed.
- */
-function ShelfCover({ book }: { book: Book }) {
-  const image = useCover(book.id);
-
-  return (
-    <BookCover
-      title={book.title}
-      subtitle={book.subtitle}
-      author={book.author}
-      words={bookWordCount(book)}
-      image={image}
-    />
-  );
-}
-
-/**
  * The shelf itself.
  *
  * A grid of covers rather than a table of rows. A table is the better shape for
@@ -442,97 +422,168 @@ function BookGrid({
       }}
     >
       {books.map((book) => (
-        <li key={book.id} className="group relative">
-          {/* Still a real link: a plain click opens the details, but the href
-              keeps middle-click, ctrl-click and "open in new tab" going
-              straight to the manuscript, which is what those mean. */}
-          <Link
-            href={`/book/${book.id}`}
-            onClick={(e) => {
-              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-              e.preventDefault();
-              onOpen(book);
-            }}
-            className="block rounded-md outline-none focus-visible:ring-2
-                       focus-visible:ring-accent/60 focus-visible:ring-offset-4
-                       focus-visible:ring-offset-panel"
-          >
-            <ShelfCover book={book} />
-          </Link>
-
-          {/* Over the cover's top corner, revealed on hover. Actions on a shelf
-              are the exception; finding the book is the rule. */}
-          <div className="absolute top-2 right-2">
-            <RowMenu
-              label={book.title}
-              items={
-                view === "trashed"
-                  ? [
-                      {
-                        label: "Restore",
-                        icon: menuIcons.restore,
-                        onSelect: () => onRestore(book),
-                      },
-                      {
-                        label: "Delete forever",
-                        icon: menuIcons.trash,
-                        onSelect: () => onDeleteForever(book),
-                        danger: true,
-                      },
-                    ]
-                  : [
-                      {
-                        label: "Edit cover",
-                        icon: menuIcons.rename,
-                        onSelect: () => onEdit(book),
-                      },
-                      {
-                        label: "Export",
-                        icon: menuIcons.export,
-                        onSelect: () => onExport(book),
-                      },
-                      view === "archived"
-                        ? {
-                            label: "Unarchive",
-                            icon: menuIcons.restore,
-                            onSelect: () => onRestore(book),
-                          }
-                        : {
-                            label: "Archive",
-                            icon: menuIcons.archive,
-                            onSelect: () => onArchive(book),
-                          },
-                      {
-                        label: "Move to trash",
-                        icon: menuIcons.trash,
-                        onSelect: () => onTrash(book),
-                        danger: true,
-                      },
-                    ]
-              }
-            />
-          </div>
-
-          <div className="mt-3">
-            <div className="flex items-baseline gap-2">
-              <p className="min-w-0 flex-1 truncate font-sans text-sm font-medium text-fg">
-                {book.title}
-              </p>
-              {book.id === continueId && (
-                <span className="shrink-0 rounded-full bg-accent-deep px-2 py-0.5 font-sans text-[0.6rem] tracking-wide text-white uppercase">
-                  Continue
-                </span>
-              )}
-            </div>
-            {book.subtitle ? (
-              <p className="mt-0.5 truncate font-sans text-xs text-muted">
-                {book.subtitle}
-              </p>
-            ) : null}
-          </div>
-        </li>
+        <BookCard
+          key={book.id}
+          book={book}
+          view={view}
+          continueId={continueId}
+          onExport={onExport}
+          onEdit={onEdit}
+          onOpen={onOpen}
+          onArchive={onArchive}
+          onRestore={onRestore}
+          onTrash={onTrash}
+          onDeleteForever={onDeleteForever}
+        />
       ))}
     </ul>
   );
 }
 
+/**
+ * One book on the shelf.
+ *
+ * Its own component so the cover is read once per book and shared: the card and
+ * its menu both need to know whether there is artwork, and a hook cannot be
+ * called from inside the map that lays the shelf out.
+ */
+function BookCard({
+  book,
+  view,
+  continueId,
+  onExport,
+  onEdit,
+  onOpen,
+  onArchive,
+  onRestore,
+  onTrash,
+  onDeleteForever,
+}: {
+  book: Book;
+  view: BookView;
+  continueId: string | null;
+  onExport: (book: Book) => void;
+  onEdit: (book: Book) => void;
+  onOpen: (book: Book) => void;
+  onArchive: (book: Book) => void;
+  onRestore: (book: Book) => void;
+  onTrash: (book: Book) => void;
+  onDeleteForever: (book: Book) => void;
+}) {
+  const cover = useCover(book.id);
+
+  return (
+    <li className="group relative">
+      {/* Still a real link: a plain click opens the details, but the href
+          keeps middle-click, ctrl-click and "open in new tab" going
+          straight to the manuscript, which is what those mean. */}
+      <Link
+        href={`/book/${book.id}`}
+        onClick={(e) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          e.preventDefault();
+          onOpen(book);
+        }}
+        className="block rounded-md outline-none focus-visible:ring-2
+                   focus-visible:ring-accent/60 focus-visible:ring-offset-4
+                   focus-visible:ring-offset-panel"
+      >
+        <BookCover
+          title={book.title}
+          subtitle={book.subtitle}
+          author={book.author}
+          words={bookWordCount(book)}
+          image={cover}
+          bare={book.bareCover}
+        />
+      </Link>
+
+      {/* Over the cover's top corner, revealed on hover. Actions on a shelf
+          are the exception; finding the book is the rule. */}
+      <div className="absolute top-2 right-2">
+        <RowMenu
+          label={book.title}
+          tone={cover ? "art" : "paper"}
+          items={
+            view === "trashed"
+              ? [
+                  {
+                    label: "Restore",
+                    icon: menuIcons.restore,
+                    onSelect: () => onRestore(book),
+                  },
+                  {
+                    label: "Delete forever",
+                    icon: menuIcons.trash,
+                    onSelect: () => onDeleteForever(book),
+                    danger: true,
+                  },
+                ]
+              : [
+                  {
+                    label: "Edit cover",
+                    icon: menuIcons.rename,
+                    onSelect: () => onEdit(book),
+                  },
+                  // Only where it can do anything: hiding the words on a
+                  // typeset cover would leave a blank rectangle.
+                  ...(cover
+                    ? [
+                        {
+                          label: book.bareCover
+                            ? "Show title on cover"
+                            : "Hide title on cover",
+                          icon: book.bareCover
+                            ? menuIcons.show
+                            : menuIcons.hide,
+                          onSelect: () => setBareCover(book.id, !book.bareCover),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "Export",
+                    icon: menuIcons.export,
+                    onSelect: () => onExport(book),
+                  },
+                  view === "archived"
+                    ? {
+                        label: "Unarchive",
+                        icon: menuIcons.restore,
+                        onSelect: () => onRestore(book),
+                      }
+                    : {
+                        label: "Archive",
+                        icon: menuIcons.archive,
+                        onSelect: () => onArchive(book),
+                      },
+                  {
+                    label: "Move to trash",
+                    icon: menuIcons.trash,
+                    onSelect: () => onTrash(book),
+                    danger: true,
+                  },
+                ]
+          }
+        />
+      </div>
+
+      <div className="mt-3">
+        <div className="flex items-baseline gap-2">
+          <p className="min-w-0 flex-1 truncate font-sans text-sm font-medium text-fg">
+            {book.title}
+          </p>
+          {book.id === continueId && (
+            <span className="shrink-0 rounded-full bg-accent-deep px-2 py-0.5 font-sans text-[0.6rem] tracking-wide text-white uppercase">
+              Continue
+            </span>
+          )}
+        </div>
+        {book.subtitle ? (
+          <p className="mt-0.5 truncate font-sans text-xs text-muted">
+            {book.subtitle}
+          </p>
+        ) : null}
+      </div>
+    </li>
+  );
+}

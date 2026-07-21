@@ -26,6 +26,17 @@ export interface RowMenuItem {
   danger?: boolean;
 }
 
+/**
+ * Three dots are a small target on a busy background, so everything but the
+ * chrome case sits on its own chip. Contrast that depends on what the writer
+ * happened to upload is not contrast.
+ */
+const TONE: Record<"chrome" | "paper" | "art", string> = {
+  chrome: "text-fg hover:bg-raised",
+  paper: "bg-black/10 text-[#16191f] hover:bg-black/25",
+  art: "bg-black/45 text-white hover:bg-black/65",
+};
+
 const MENU_WIDTH = 208;
 /** Roughly one item, so a menu never opens with its last item off screen. */
 const EDGE_PADDING = 8;
@@ -33,10 +44,17 @@ const EDGE_PADDING = 8;
 export function RowMenu({
   label,
   items,
+  tone = "chrome",
 }: {
   /** Names the row this menu belongs to, for screen readers. */
   label: string;
   items: RowMenuItem[];
+  /**
+   * Where the trigger sits. "paper" is a light surface, "art" is somebody's
+   * photograph — which could be any colour, so that one carries its own dark
+   * chip rather than trusting the image underneath it.
+   */
+  tone?: "chrome" | "paper" | "art";
 }) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -170,11 +188,10 @@ export function RowMenu({
         // Hover is handled in CSS rather than React state: tracking which row
         // is hovered would re-render the whole list on every mouse move.
         className={`flex h-7 w-7 items-center justify-center rounded-md
-                    text-muted outline-none transition-opacity hover:bg-raised
-                    hover:text-fg group-hover:opacity-100
+                    outline-none transition-opacity group-hover:opacity-100
                     focus-visible:opacity-100 focus-visible:ring-2
-                    focus-visible:ring-accent/60 ${
-                      open ? "bg-raised text-fg opacity-100" : "opacity-0"
+                    focus-visible:ring-accent/60 ${TONE[tone]} ${
+                      open ? "opacity-100" : "opacity-0"
                     }`}
       >
         <svg
@@ -300,6 +317,28 @@ export const menuIcons = {
         d="M3.4 13.6v1.9a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-1.9"
         strokeLinecap="round"
       />
+    </svg>
+  ),
+  hide: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path
+        d="M3 3.2 17 16.8"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7.4 5.6A7.6 7.6 0 0 1 10 5.2c4 0 6.6 2.8 7.4 4.8a9.6 9.6 0 0 1-2.6 3.3M12.3 12.4A2.6 2.6 0 0 1 8 10.2M5.5 7A9.7 9.7 0 0 0 2.6 10c.8 2 3.4 4.8 7.4 4.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
+  show: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path
+        d="M2.6 10C3.4 8 6 5.2 10 5.2S16.6 8 17.4 10c-.8 2-3.4 4.8-7.4 4.8S3.4 12 2.6 10z"
+        strokeLinejoin="round"
+      />
+      <circle cx="10" cy="10" r="2.4" />
     </svg>
   ),
   trash: (

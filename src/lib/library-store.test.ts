@@ -13,6 +13,7 @@ import {
   ensureChapter,
   findBook,
   getCover,
+  setBareCover,
   setBookDetails,
   setCover,
   getNotes,
@@ -183,6 +184,17 @@ it("refuses to leave a book with no title", () => {
   const { bookId } = createBook("A");
   setBookDetails(bookId, { title: "   ", subtitle: "", author: "" });
   expect(findBook(getShelf(), bookId)!.title).toBe("Untitled Book");
+});
+
+it("marks a cover bare and back again", () => {
+  const { bookId } = createBook("A");
+
+  setBareCover(bookId, true);
+  expect(findBook(getShelf(), bookId)!.bareCover).toBe(true);
+
+  setBareCover(bookId, false);
+  // Absent rather than false, so only books deliberately set this way carry it.
+  expect("bareCover" in findBook(getShelf(), bookId)!).toBe(false);
 });
 
 it("finds a book by id and reports null for an unknown one", () => {

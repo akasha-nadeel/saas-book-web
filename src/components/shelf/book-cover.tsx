@@ -21,6 +21,7 @@ export function BookCover({
   author,
   words,
   image,
+  bare,
 }: {
   title: string;
   subtitle?: string;
@@ -29,6 +30,8 @@ export function BookCover({
   words: number;
   /** Cover art as a data URL. Replaces the typeset face when present. */
   image?: string | null;
+  /** Show artwork bare: no caption, no scrim. Ignored without artwork. */
+  bare?: boolean;
 }) {
   // Eight leaves at 40k words, which is where a novel starts. Capped, because
   // past a point more lines just turn into a grey smear.
@@ -56,19 +59,15 @@ export function BookCover({
         />
       ) : null}
 
-      {/* Artwork hides the words, so hovering brings them back over a scrim.
-          Only for covers that have a picture — a typeset face is already the
-          text, and fading a second copy in over it would just shimmer.
+      {/* Artwork hides the words, so they are printed back over it — always,
+          the way they are on a real jacket, not only while the pointer is on
+          it. Only for covers that have a picture: a typeset face is already
+          the text, and a second copy over it would just double up.
 
-          It rides on the shelf card's `group`, so in the previews and the tool
-          rail, where there is no such ancestor, it never appears — which is
-          right: those are not places you hover to identify a book. */}
-      {image ? (
-        <div
-          className="absolute inset-0 flex flex-col rounded-l-[3px] rounded-r-md
-                     bg-black/20 opacity-0 transition-opacity duration-200
-                     group-hover:opacity-100"
-        >
+          The caption hides itself on covers too narrow to read it — see
+          .book-face-caption. */}
+      {image && !bare ? (
+        <div className="book-face-caption absolute inset-0 flex-col rounded-l-[3px] rounded-r-md bg-black/20">
           {/* A shadow on the type rather than a heavier scrim. The artwork
               stays visible through the overlay, and the words stay legible
               even where they land on a pale part of it. */}
