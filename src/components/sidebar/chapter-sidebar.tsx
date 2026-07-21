@@ -16,6 +16,8 @@ import {
   type ChapterMeta,
   type ChapterPart,
 } from "@/lib/library-store";
+import { useSaveState } from "@/lib/save-status";
+import type { SaveStatus } from "@/lib/use-autosave";
 import { useShelf } from "@/lib/use-library";
 
 /**
@@ -295,13 +297,48 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       {/* The reference closes the panel with a running total and its wordmark;
           both belong to the manuscript rather than to any one chapter. */}
       <div className="shrink-0 border-t border-line">
-        <p className="px-4 py-3 font-sans text-sm text-muted">
-          {bookWordCount(book).toLocaleString()} words
-        </p>
+        <div className="flex items-baseline justify-between gap-2 px-4 py-3 font-sans text-sm text-muted">
+          <span>{bookWordCount(book).toLocaleString()} words</span>
+          <SaveIndicator />
+        </div>
         <p className="border-t border-line px-4 py-3 font-display text-base font-medium text-fg">
           OpenChapter
         </p>
       </div>
     </div>
+  );
+}
+
+const STATUS_LABEL: Record<SaveStatus, string> = {
+  saved: "Saved",
+  unsaved: "Unsaved",
+  saving: "Saving…",
+  error: "Save failed",
+};
+
+/**
+ * Reads from the save store rather than a prop: the editor that knows the
+ * status is a cousin of this panel, not a parent.
+ *
+ * `aria-live="polite"` so a screen reader hears a failed save without having to
+ * go looking for it — silent data loss is the one thing this indicator exists
+ * to prevent.
+ */
+function SaveIndicator() {
+  const { status, lastSavedAt } = useSaveState();
+
+  return (
+    <span
+      aria-live="polite"
+      className={status === "error" ? "text-accent" : undefined}
+    >
+      {STATUS_LABEL[status]}
+      {status === "saved" && lastSavedAt
+        ? ` · ${lastSavedAt.toLocaleTimeString([], {
+            hour: "numeric",
+            minute: "2-digit",
+          })}`
+        : null}
+    </span>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   EditorContent,
@@ -34,7 +34,8 @@ import {
   useShelf,
 } from "@/lib/use-library";
 import { useTypewriter } from "@/lib/use-typewriter";
-import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
+import { setSaveState } from "@/lib/save-status";
+import { useAutosave } from "@/lib/use-autosave";
 
 /** What one autosave carries: the document, plus the count the sidebar shows. */
 interface ChapterSnapshot {
@@ -286,7 +287,6 @@ function EditorSurface({
   prefs: Prefs;
   onEditorReady: (editor: Editor) => void;
 }) {
-  const [words, setWords] = useState(0);
   const holdCaret = useTypewriter(prefs.typewriter);
 
   const page = pageSetupOf(book);
@@ -301,26 +301,16 @@ function EditorSurface({
       ? book.chapters[index + 1]
       : null;
 
-  // Words at the moment this chapter opened, so the status bar can show what
-  // was written in this sitting. State rather than a ref because it is read
-  // during render. Deliberately not persisted — a session ends when you close
-  // the tab, and carrying it across reloads would make the number lie.
-  const [openedWith, setOpenedWith] = useState<number | null>(null);
-
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
     save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
   });
 
-  // Word count is throttled rather than recomputed per keystroke. Setting
-  // React state on every input is the classic way to make Tiptap feel laggy.
-  const wordTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const throttleWordCount = (next: number) => {
-    if (wordTimer.current) return;
-    wordTimer.current = setTimeout(() => {
-      wordTimer.current = null;
-      setWords(next);
-    }, 400);
-  };
+  // Published upward for the manuscript panel to show. An external store rather
+  // than a prop: the panel is a cousin, not a child, and mirroring this into
+  // parent state would cascade a render on every keystroke.
+  useEffect(() => {
+    setSaveState({ status, lastSavedAt });
+  }, [status, lastSavedAt]);
 
   const editor = useEditor({
     // Required under Next's SSR — rendering immediately causes a hydration
@@ -346,17 +336,15 @@ function EditorSurface({
       },
     },
     onCreate: ({ editor }) => {
-      const initial = editor.storage.characterCount.words();
-      setWords(initial);
-      setOpenedWith(initial);
       onEditorReady(editor);
     },
     onUpdate: ({ editor }) => {
-      const next = editor.storage.characterCount.words();
-      // Read the true count here, not the throttled state — the sidebar should
-      // land on the right number even if the last tick never fires.
-      schedule({ doc: editor.getJSON(), words: next });
-      throttleWordCount(next);
+      // The chapter's count still reaches the panel: it is saved with the
+      // document and each chapter row renders its own.
+      schedule({
+        doc: editor.getJSON(),
+        words: editor.storage.characterCount.words(),
+      });
       holdCaret(editor);
     },
     onSelectionUpdate: ({ editor }) => {
@@ -427,59 +415,7 @@ function EditorSurface({
         <ChapterStep bookId={bookId} chapter={previous} side="left" />
         <ChapterStep bookId={bookId} chapter={next} side="right" />
       </div>
-
-      <StatusBar
-        words={words}
-        sessionWords={openedWith === null ? 0 : words - openedWith}
-        status={status}
-        lastSavedAt={lastSavedAt}
-      />
     </>
   );
 }
 
-const STATUS_LABEL: Record<SaveStatus, string> = {
-  saved: "Saved",
-  unsaved: "Unsaved changes",
-  saving: "Saving…",
-  error: "Could not save",
-};
-
-function StatusBar({
-  words,
-  sessionWords,
-  status,
-  lastSavedAt,
-}: {
-  words: number;
-  sessionWords: number;
-  status: SaveStatus;
-  lastSavedAt: Date | null;
-}) {
-  return (
-    // In the flow rather than pinned to the viewport: with three panes that can
-    // open and close there is no fixed offset that stays on the manuscript.
-    <footer className="flex h-9 shrink-0 items-center justify-between border-t border-line px-4 font-sans text-xs text-muted">
-      <span className="flex items-baseline gap-3">
-        <span>
-          {words.toLocaleString()} {words === 1 ? "word" : "words"}
-        </span>
-        {sessionWords > 0 && (
-          <span className="text-accent-strong">
-            +{sessionWords.toLocaleString()}
-          </span>
-        )}
-      </span>
-
-      <span className={status === "error" ? "text-accent" : undefined}>
-        {STATUS_LABEL[status]}
-        {status === "saved" && lastSavedAt
-          ? ` · ${lastSavedAt.toLocaleTimeString([], {
-              hour: "numeric",
-              minute: "2-digit",
-            })}`
-          : null}
-      </span>
-    </footer>
-  );
-}
