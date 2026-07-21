@@ -236,3 +236,47 @@ export function createBook(title?: string): {
 
   return { bookId, chapterId };
 }
+
+export function renameBook(bookId: string, title: string) {
+  commitBook(bookId, (book) => ({ ...book, title }));
+}
+
+export function deleteBook(bookId: string) {
+  const shelf = getShelf();
+  const doomed = findBook(shelf, bookId);
+  if (!doomed) return;
+
+  const books = shelf.books.filter((b) => b.id !== bookId);
+
+  commit({
+    books,
+    lastOpenedBookId:
+      shelf.lastOpenedBookId === bookId
+        ? (books[0]?.id ?? null)
+        : shelf.lastOpenedBookId,
+  });
+
+  // Shelf first, bodies second. The shelf entry is what makes the book visible,
+  // so if this half fails the writer sees a consistent app with some dead bytes
+  // in storage — the reverse order would show a book whose chapters are gone.
+  for (const chapter of doomed.chapters) {
+    try {
+      window.localStorage.removeItem(bodyKey(chapter.id));
+    } catch {
+      // Unreachable bytes, not a broken app.
+    }
+  }
+}
+
+export function touchLastOpenedBook(bookId: string) {
+  const shelf = getShelf();
+  if (!findBook(shelf, bookId)) return;
+
+  commit({
+    ...shelf,
+    books: shelf.books.map((b) =>
+      b.id === bookId ? { ...b, lastOpenedAt: Date.now() } : b,
+    ),
+    lastOpenedBookId: bookId,
+  });
+}
