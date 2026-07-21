@@ -163,6 +163,7 @@ export function ChapterEditor({
 
         <Rail
           side="right"
+          paper={prefs.paper}
           footer={
             <RailButton label="Export" onClick={() => setExporting(true)}>
               {icons.export}
@@ -356,64 +357,93 @@ function EditorSurface({
 
   return (
     <>
-      {/* The workspace, and the page on it. Physical dimensions in inches —
-          CSS understands `in` natively, so the numbers from pageMetrics go
-          straight into the style with no pixels-per-inch fudge. */}
-      <div className="relative flex min-h-0 flex-1">
-      <main
+      {/* The paper palette moves up here so the running head can share it.
+          Every rule that depends on it is a descendant selector, so hoisting
+          the class and both data attributes changes nothing below. */}
+      <div
         data-paper={prefs.paper}
         data-columns={page.columns}
-        className={`manuscript min-h-0 flex-1 cursor-text overflow-auto
-                    bg-surface ${page.fit ? "" : "px-8 py-8"} ${
-                      prefs.focusMode ? "focus-mode" : ""
-                    }`}
-        onClick={() => editor?.chain().focus().run()}
+        className={`manuscript flex min-h-0 flex-1 flex-col ${
+          prefs.focusMode ? "focus-mode" : ""
+        }`}
       >
-        {/* Fitted, the page is the column and needs no shadow — there is no
-            desk left showing for it to cast onto. */}
-        <div
-          className={page.fit ? "paper min-h-full" : "paper mx-auto shadow-lg"}
+        {/* Which book this page belongs to. On the paper's own colour, so it
+            reads as the top of the sheet rather than as chrome above it — and
+            it follows the page colour, since a white bar over a black page
+            would look like a rendering fault.
+
+            Read-only. The title is editable in the manuscript panel, and two
+            live fields bound to one value invite a fight over the caret. */}
+        <header
+          className="shrink-0 px-6 py-3"
           style={{
-            width: page.fit ? "100%" : `${metrics.width}in`,
-            minHeight: page.fit ? undefined : `${metrics.height}in`,
-            paddingTop: `${metrics.top}in`,
-            paddingBottom: prefs.typewriter ? "60vh" : `${metrics.bottom}in`,
-            paddingLeft: `${metrics.left}in`,
-            paddingRight: `${metrics.right}in`,
+            background: "var(--paper-bg)",
+            borderBottom: "1px solid var(--paper-rule)",
           }}
         >
-          {/* Centred, with the chapter's number above it, the way the page of
-              a printed book opens. */}
-          <p
-            className="text-center font-serif text-5xl leading-none"
-            style={{ color: "var(--paper-muted)", opacity: 0.5 }}
-          >
-            {chapterNumber}
-          </p>
-          {/* An input rather than a heading with contenteditable: the title is
-              a single line of plain text, and a plain input gets the caret,
-              undo and screen-reader behaviour right for free. */}
-          <input
-            value={chapterTitle}
-            onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
-            onBlur={(e) => {
-              if (!e.target.value.trim()) {
-                renameChapter(bookId, chapterId, "Untitled chapter");
-              }
-            }}
-            aria-label="Chapter title"
-            spellCheck={false}
+          <h2
+            className="truncate font-serif text-lg"
             style={{ color: "var(--paper-fg)" }}
-            className="mt-6 mb-12 w-full rounded-sm bg-transparent text-center
-                       font-serif text-4xl outline-none focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          />
-          <EditorContent editor={editor} />
-        </div>
-      </main>
+          >
+            {book.title}
+          </h2>
+        </header>
 
-        <ChapterStep bookId={bookId} chapter={previous} side="left" />
-        <ChapterStep bookId={bookId} chapter={next} side="right" />
+        {/* The workspace, and the page on it. Physical dimensions in inches —
+            CSS understands `in` natively, so the numbers from pageMetrics go
+            straight into the style with no pixels-per-inch fudge. */}
+        <div className="relative flex min-h-0 flex-1">
+          <main
+            className={`min-h-0 flex-1 cursor-text overflow-auto
+                        bg-surface ${page.fit ? "" : "px-8 py-8"}`}
+            onClick={() => editor?.chain().focus().run()}
+          >
+            {/* Fitted, the page is the column and needs no shadow — there is no
+                desk left showing for it to cast onto. */}
+            <div
+              className={page.fit ? "paper min-h-full" : "paper mx-auto shadow-lg"}
+              style={{
+                width: page.fit ? "100%" : `${metrics.width}in`,
+                minHeight: page.fit ? undefined : `${metrics.height}in`,
+                paddingTop: `${metrics.top}in`,
+                paddingBottom: prefs.typewriter ? "60vh" : `${metrics.bottom}in`,
+                paddingLeft: `${metrics.left}in`,
+                paddingRight: `${metrics.right}in`,
+              }}
+            >
+              {/* Centred, with the chapter's number above it, the way the page of
+                  a printed book opens. */}
+              <p
+                className="text-center font-serif text-5xl leading-none"
+                style={{ color: "var(--paper-muted)", opacity: 0.5 }}
+              >
+                {chapterNumber}
+              </p>
+              {/* An input rather than a heading with contenteditable: the title is
+                  a single line of plain text, and a plain input gets the caret,
+                  undo and screen-reader behaviour right for free. */}
+              <input
+                value={chapterTitle}
+                onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
+                onBlur={(e) => {
+                  if (!e.target.value.trim()) {
+                    renameChapter(bookId, chapterId, "Untitled chapter");
+                  }
+                }}
+                aria-label="Chapter title"
+                spellCheck={false}
+                style={{ color: "var(--paper-fg)" }}
+                className="mt-6 mb-12 w-full rounded-sm bg-transparent text-center
+                           font-serif text-4xl outline-none focus-visible:ring-2
+                           focus-visible:ring-accent/60"
+              />
+              <EditorContent editor={editor} />
+            </div>
+          </main>
+
+          <ChapterStep bookId={bookId} chapter={previous} side="left" />
+          <ChapterStep bookId={bookId} chapter={next} side="right" />
+        </div>
       </div>
     </>
   );

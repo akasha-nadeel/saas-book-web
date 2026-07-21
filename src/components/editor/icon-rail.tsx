@@ -75,18 +75,26 @@ export function Rail({
   side,
   children,
   footer,
+  paper,
 }: {
   side: "left" | "right";
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /**
+   * Set to take the page's colours instead of the chrome's. The tools act on
+   * the manuscript, so they sit with it; the left rail navigates the app and
+   * stays with the app.
+   */
+  paper?: string;
 }) {
   return (
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
+      data-paper={paper}
       className={`flex w-(--rail-width) shrink-0 flex-col items-center gap-2
-                  overflow-y-auto bg-surface py-4 ${
-                    side === "left" ? "border-r" : "border-l"
-                  } border-line`}
+                  overflow-y-auto py-4 ${
+                    paper ? "rail-paper" : "bg-surface"
+                  } ${side === "left" ? "border-r" : "border-l"} border-line`}
     >
       {children}
       {footer && <div className="mt-auto flex flex-col gap-1">{footer}</div>}

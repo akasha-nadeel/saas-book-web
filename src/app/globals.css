@@ -72,39 +72,65 @@ body {
    its own text, muted and rule colours, because a background is only half a
    decision — the pairing is what stays readable.
    -------------------------------------------------------------------------- */
-.manuscript {
+/* Keyed on the attribute alone, not on .manuscript, so anything that should
+   sit with the page rather than with the chrome can opt in — the running head
+   and the tool rail both do. */
+[data-paper] {
   --paper-bg: #ffffff;
   --paper-fg: #16191f;
   --paper-muted: #6b7280;
   --paper-rule: #d9dde3;
 }
 
-.manuscript[data-paper="cream"] {
+[data-paper="cream"] {
   --paper-bg: #f5f1e8;
   --paper-fg: #1f1d1a;
   --paper-muted: #6d6862;
   --paper-rule: #ded7c8;
 }
 
-.manuscript[data-paper="sepia"] {
+[data-paper="sepia"] {
   --paper-bg: #f2e7d0;
   --paper-fg: #3a2f22;
   --paper-muted: #7a6a52;
   --paper-rule: #ddceb0;
 }
 
-.manuscript[data-paper="slate"] {
+[data-paper="slate"] {
   --paper-bg: #1d2732;
   --paper-fg: #e6ecf3;
   --paper-muted: #93a2b4;
   --paper-rule: #313d4c;
 }
 
-.manuscript[data-paper="black"] {
+[data-paper="black"] {
   --paper-bg: #0a0d11;
   --paper-fg: #dfe5ec;
   --paper-muted: #7f8b99;
   --paper-rule: #232a33;
+}
+
+/* --------------------------------------------------------------------------
+   A rail that belongs to the page.
+
+   Re-points the theme variables rather than restyling each control. Tailwind
+   compiles text-muted to color: var(--color-muted), so overriding the variable
+   here carries every utility in the subtree — including the toolbar's buttons,
+   which live in another file and are not touched.
+   -------------------------------------------------------------------------- */
+.rail-paper {
+  background: var(--paper-bg);
+
+  --color-fg: var(--paper-fg);
+  /* Full-strength ink, not the muted grey the dark chrome uses. A tool sitting
+     on the page should read as clearly as the page does; the hover tint below
+     is what distinguishes the one under the pointer. */
+  --color-muted: var(--paper-fg);
+  --color-line: var(--paper-rule);
+  --color-panel: var(--paper-bg);
+  /* Hover tint mixed from the page's own ink, so it lands right on all five
+     papers instead of being a grey that only suits white. */
+  --color-raised: color-mix(in srgb, var(--paper-fg) 12%, transparent);
 }
 
 /* A sheet of paper on the workspace, at its real dimensions. */
