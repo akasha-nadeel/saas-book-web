@@ -1,6 +1,8 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import {
+  archiveBook,
   bookWordCount,
+  booksIn,
   createBook,
   createBookFromTemplate,
   createChapter,
@@ -15,6 +17,7 @@ import {
   moveChapter,
   pageSetupOf,
   renameBook,
+  restoreBook,
   renameChapter,
   saveBody,
   saveNotes,
@@ -22,6 +25,7 @@ import {
   setPageSetup,
   setPref,
   touchLastOpened,
+  trashBook,
   touchLastOpenedBook,
   type Book,
 } from "@/lib/library-store";
@@ -521,4 +525,77 @@ it("still makes one chapter for an empty template", () => {
   // A book with no chapters is a dead end for the route that opens it.
   const { bookId } = createBookFromTemplate("Bare", []);
   expect(findBook(getShelf(), bookId)!.chapters).toHaveLength(1);
+});
+
+it("starts a book active, in neither archive nor trash", () => {
+  const { bookId } = createBook("A");
+  const shelf = getShelf();
+  expect(booksIn(shelf, "active").map((b) => b.id)).toEqual([bookId]);
+  expect(booksIn(shelf, "archived")).toEqual([]);
+  expect(booksIn(shelf, "trashed")).toEqual([]);
+});
+
+it("archives and unarchives a book", () => {
+  const { bookId } = createBook("A");
+
+  archiveBook(bookId);
+  expect(booksIn(getShelf(), "active")).toEqual([]);
+  expect(booksIn(getShelf(), "archived").map((b) => b.id)).toEqual([bookId]);
+
+  restoreBook(bookId);
+  expect(booksIn(getShelf(), "active").map((b) => b.id)).toEqual([bookId]);
+});
+
+it("trashes a book without touching its chapters", () => {
+  const { bookId, chapterId } = createBook("A");
+  saveBody(bookId, chapterId, { type: "doc" }, 12);
+
+  trashBook(bookId);
+
+  expect(booksIn(getShelf(), "trashed").map((b) => b.id)).toEqual([bookId]);
+  // The whole point of a trash: the words are still there.
+  expect(localStorage.getItem(`openchapter:chapter:${chapterId}`)).not.toBeNull();
+  expect(findBook(getShelf(), bookId)!.chapters[0].words).toBe(12);
+});
+
+it("shows a trashed book only in trash, even if it was archived", () => {
+  const { bookId } = createBook("A");
+  archiveBook(bookId);
+  trashBook(bookId);
+
+  expect(booksIn(getShelf(), "archived")).toEqual([]);
+  expect(booksIn(getShelf(), "trashed").map((b) => b.id)).toEqual([bookId]);
+});
+
+it("restores a trashed book all the way back to active", () => {
+  const { bookId } = createBook("A");
+  archiveBook(bookId);
+  trashBook(bookId);
+
+  restoreBook(bookId);
+
+  expect(booksIn(getShelf(), "active").map((b) => b.id)).toEqual([bookId]);
+  expect(booksIn(getShelf(), "archived")).toEqual([]);
+});
+
+it("still deletes permanently, chapters and all", () => {
+  const { bookId, chapterId } = createBook("A");
+  saveBody(bookId, chapterId, { type: "doc" }, 3);
+  trashBook(bookId);
+
+  deleteBook(bookId);
+
+  expect(findBook(getShelf(), bookId)).toBeNull();
+  expect(localStorage.getItem(`openchapter:chapter:${chapterId}`)).toBeNull();
+});
+
+it("moves lastOpenedBookId off a book that leaves the active list", () => {
+  const keep = createBook("Keep");
+  const gone = createBook("Gone");
+  touchLastOpenedBook(gone.bookId);
+
+  archiveBook(gone.bookId);
+
+  // Otherwise "Continue writing" points at a book no longer on the shelf.
+  expect(getShelf().lastOpenedBookId).toBe(keep.bookId);
 });

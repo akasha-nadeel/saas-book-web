@@ -39,6 +39,10 @@ export interface Book {
   author?: string;
   /** Page geometry. Absent means the default — see pageSetupOf. */
   page?: PageSetup;
+  /** Set aside but kept. Epoch ms. */
+  archivedAt?: number;
+  /** Deleted but recoverable. Epoch ms. Wins over archivedAt. */
+  trashedAt?: number;
   /** Readonly because every snapshot handed out is shared and cached. */
   chapters: readonly ChapterMeta[];
   lastOpenedId: string | null;
@@ -675,4 +679,77 @@ export function createBookFromTemplate(
   for (const chapterTitle of rest) createChapter(bookId, chapterTitle);
 
   return { bookId, chapterId };
+}
+
+
+// ---------------------------------------------------------------------------
+// Archive and trash
+//
+// Deleting used to be immediate and permanent, and it took every chapter of a
+// book with it. Trash makes that recoverable: the record is flagged and
+// nothing on disk is touched, so the words survive a misclick. Permanent
+// deletion still exists, but now it is reachable only from the trash.
+// ---------------------------------------------------------------------------
+
+export type BookView = "active" | "archived" | "trashed";
+
+/** Trash wins over archive: a trashed book appears in one list, not two. */
+export function booksIn(shelf: Shelf, view: BookView): Book[] {
+  return shelf.books.filter((book) => {
+    if (book.trashedAt) return view === "trashed";
+    if (book.archivedAt) return view === "archived";
+    return view === "active";
+  });
+}
+
+/**
+ * Keeps lastOpenedBookId pointing at something still on the shelf, so
+ * "Continue writing" never offers a book the writer just put away.
+ */
+function reseatLastOpened(shelf: Shelf, leavingId: string): string | null {
+  if (shelf.lastOpenedBookId !== leavingId) return shelf.lastOpenedBookId;
+  const next = booksIn(shelf, "active").find((b) => b.id !== leavingId);
+  return next?.id ?? null;
+}
+
+function setFlags(bookId: string, patch: Partial<Book>) {
+  const shelf = getShelf();
+  if (!findBook(shelf, bookId)) return;
+
+  const leaving = patch.archivedAt !== undefined || patch.trashedAt !== undefined;
+
+  commit({
+    ...shelf,
+    books: shelf.books.map((b) => (b.id === bookId ? { ...b, ...patch } : b)),
+    lastOpenedBookId: leaving
+      ? reseatLastOpened(shelf, bookId)
+      : shelf.lastOpenedBookId,
+  });
+}
+
+export function archiveBook(bookId: string) {
+  setFlags(bookId, { archivedAt: Date.now() });
+}
+
+export function trashBook(bookId: string) {
+  setFlags(bookId, { trashedAt: Date.now() });
+}
+
+/** Back to the active shelf, out of both archive and trash. */
+export function restoreBook(bookId: string) {
+  const shelf = getShelf();
+  if (!findBook(shelf, bookId)) return;
+
+  commit({
+    ...shelf,
+    books: shelf.books.map((b) => {
+      if (b.id !== bookId) return b;
+      // Drop the keys rather than setting them undefined, so the stored record
+      // matches a book that was never archived in the first place.
+      const restored = { ...b };
+      delete restored.archivedAt;
+      delete restored.trashedAt;
+      return restored;
+    }),
+  });
 }
