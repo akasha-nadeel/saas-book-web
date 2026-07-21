@@ -195,20 +195,21 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                      text-lg font-semibold text-fg outline-none
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         />
-        {/* One primary-action slot whose meaning follows the level you are
-            standing on: from the list it adds a section, inside a section it
-            adds a chapter to that section. Two buttons here would both have
-            claimed to be the main thing to do. */}
-        <button
-          type="button"
-          onClick={() => (current ? handleCreate(current.id) : startNaming())}
-          className="mt-3 w-full rounded-md bg-accent py-2.5 font-sans text-sm
-                     font-semibold text-white outline-none transition-colors
-                     hover:bg-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          {current ? `Add to ${current.label}` : "New section"}
-        </button>
+        {/* Only from the list. Adding a chapter belongs to the section it goes
+            into, so that button lives in the section's own header rather than
+            up here where it would be a second full-width claim on attention. */}
+        {!current && (
+          <button
+            type="button"
+            onClick={startNaming}
+            className="mt-3 w-full rounded-md bg-accent py-2.5 font-sans text-sm
+                       font-semibold text-white outline-none transition-colors
+                       hover:bg-accent-strong focus-visible:ring-2
+                       focus-visible:ring-accent/60"
+          >
+            New section
+          </button>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-3">
@@ -282,6 +283,23 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 <span aria-hidden="true">‹</span>
                 <span className="truncate">{current?.label}</span>
               </button>
+
+              {/* Sits with the section it adds to, so which section a new
+                  chapter lands in is never a guess. */}
+              {current && (
+                <button
+                  type="button"
+                  onClick={() => handleCreate(current.id)}
+                  title={`New chapter in ${current.label}`}
+                  className="shrink-0 rounded-md bg-accent px-2.5 py-1.5
+                             font-sans text-xs font-semibold text-white
+                             outline-none transition-colors
+                             hover:bg-accent-strong focus-visible:ring-2
+                             focus-visible:ring-accent/60"
+                >
+                  New chapter
+                </button>
+              )}
 
               {/* Only sections the writer added. Front matter, Body and Back
                   matter are the shape of a book, not a preference. */}
