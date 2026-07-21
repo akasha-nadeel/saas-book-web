@@ -150,6 +150,55 @@ export function ImportBook() {
                 manuscript as .docx first.
               </p>
             </div>
+
+            {/* Announced, not pretended. Transcription is not a parser — it
+                needs a speech model, which means a server and a bill — so this
+                says where it is going rather than offering a button that would
+                take a file and lose it. */}
+            <section className="mt-8 rounded-lg border border-dashed border-line p-5">
+              <div className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted"
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                  >
+                    <rect x="7.6" y="2.6" width="4.8" height="9" rx="2.4" />
+                    <path d="M4.8 9.4a5.2 5.2 0 0 0 10.4 0" />
+                    <path d="M10 14.6v2.8" />
+                  </svg>
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-sans text-sm font-semibold text-fg">
+                    Audiobook to text
+                  </h2>
+                  <p className="mt-1 font-sans text-xs text-muted">
+                    Upload a recording and have it transcribed into chapters.
+                    Not built yet — this is here so you know it is planned, not
+                    because it works.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled
+                  title="Not available yet"
+                  className="shrink-0 cursor-not-allowed rounded-md border
+                             border-line px-3 py-2 font-sans text-sm text-muted
+                             opacity-60"
+                >
+                  Coming soon
+                </button>
+              </div>
+            </section>
           </>
         ) : (
           <div className="mt-9">
