@@ -748,7 +748,6 @@ export interface Prefs {
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
   /** The assistant panel. */
-  rightPanel: boolean;
   /** The colour of the page under the prose. */
   paper: PaperColor;
 }
@@ -759,7 +758,6 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
-  rightPanel: false,
   // White by default: the chrome is dark, the page is not. Long-form prose is
   // what most people still read most comfortably on a light surface.
   paper: "white",
@@ -802,7 +800,6 @@ function parsePrefs(raw: string | null): Prefs {
       focusMode: parsed.focusMode === true,
       typewriter: parsed.typewriter === true,
       leftPanel: parsed.leftPanel !== false,
-      rightPanel: parsed.rightPanel === true,
       paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
         ? (parsed.paper as PaperColor)
         : DEFAULT_PREFS.paper,

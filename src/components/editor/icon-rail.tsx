@@ -151,9 +151,13 @@ export const icons = {
   ),
   assistant: (
     <>
-      <path d="M17.2 11.6a2.1 2.1 0 0 1-2.1 2.1H8l-3.6 3v-3h-.5a2.1 2.1 0 0 1-2.1-2.1V5.5a2.1 2.1 0 0 1 2.1-2.1h11.2a2.1 2.1 0 0 1 2.1 2.1z" />
-      {/* A spark inside the bubble: this is the one tool that writes back. */}
-      <path d="m9.6 5.9.85 1.95 1.95.85-1.95.85-.85 1.95-.85-1.95L6.8 8.7l1.95-.85z" />
+      {/* The four-pointed spark that has come to mean "a machine wrote this".
+          Concave sides rather than a straight-edged star: it reads as light
+          rather than as a rating. */}
+      <path d="M9.6 2.6c.9 3.4 1.7 4.2 5.1 5.1-3.4.9-4.2 1.7-5.1 5.1-.9-3.4-1.7-4.2-5.1-5.1 3.4-.9 4.2-1.7 5.1-5.1z" />
+      {/* A second, smaller one, so the mark reads as a sparkle and not as a
+          single lopsided shape. */}
+      <path d="M15 12.4c.45 1.7.85 2.1 2.55 2.55-1.7.45-2.1.85-2.55 2.55-.45-1.7-.85-2.1-2.55-2.55 1.7-.45 2.1-.85 2.55-2.55z" />
     </>
   ),
   export: (

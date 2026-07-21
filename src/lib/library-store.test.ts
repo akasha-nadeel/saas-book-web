@@ -620,7 +620,6 @@ it("starts with both writing modes off", () => {
     focusMode: false,
     typewriter: false,
     leftPanel: true,
-    rightPanel: false,
     paper: "white",
   });
 });
@@ -647,7 +646,6 @@ it("degrades to defaults when prefs are corrupt", () => {
     focusMode: false,
     typewriter: false,
     leftPanel: true,
-    rightPanel: false,
     paper: "white",
   });
 });
@@ -696,10 +694,7 @@ it("deletes notes for every chapter of a deleted book", () => {
 
 it("remembers which panels are open", () => {
   expect(getPrefs().leftPanel).toBe(true);
-  expect(getPrefs().rightPanel).toBe(false);
 
-  setPref("rightPanel", true);
-  expect(getPrefs().rightPanel).toBe(true);
   expect(getPrefs().leftPanel).toBe(true);
 });
 

@@ -11,7 +11,6 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
-import { ChatPanel } from "@/components/chat/chat-panel";
 import { ToolRail } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
@@ -111,6 +110,7 @@ export function ChapterEditor({
               ["chapters", "Manuscript", icons.chapters],
               ["notes", "Notes", icons.notes],
               ["bookmarks", "Bookmarks", icons.bookmarks],
+              ["assistant", "Assistant", icons.assistant],
             ] as const
           ).map(([value, label, icon]) => (
             <RailButton
@@ -134,7 +134,13 @@ export function ChapterEditor({
         </Rail>
 
         {prefs.leftPanel && (
-          <LeftPanel tab={tab} bookId={bookId} chapterId={chapterId} />
+          <LeftPanel
+            tab={tab}
+            bookId={bookId}
+            chapterId={chapterId}
+            chapterTitle={chapter.title}
+            getChapterText={() => editor?.getText() ?? ""}
+          />
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -152,25 +158,6 @@ export function ChapterEditor({
             onEditorReady={setEditor}
           />
         </div>
-
-        {prefs.rightPanel && (
-          <aside
-            className="flex w-80 shrink-0 flex-col border-l border-line bg-panel"
-            aria-label="Assistant"
-          >
-            <div className="flex h-10 shrink-0 items-center border-b border-line px-3">
-              <span className="font-sans text-xs tracking-wide text-muted uppercase">
-                Assistant
-              </span>
-            </div>
-            <div className="min-h-0 flex-1">
-              <ChatPanel
-                chapterTitle={chapter.title}
-                getChapterText={() => editor?.getText() ?? ""}
-              />
-            </div>
-          </aside>
-        )}
 
         <Rail
           side="right"
@@ -210,14 +197,6 @@ export function ChapterEditor({
           <ToolRail editor={editor} book={book} paper={prefs.paper} />
 
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-          <RailButton
-            label="Assistant"
-            active={prefs.rightPanel}
-            onClick={() => setPref("rightPanel", !prefs.rightPanel)}
-          >
-            {icons.assistant}
-          </RailButton>
 
           <RailButton
             label="Focus mode"
