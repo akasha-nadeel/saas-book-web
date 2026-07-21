@@ -494,6 +494,18 @@ export function setBookAuthor(bookId: string, author: string) {
 
 const PREFS_KEY = "openchapter:prefs";
 
+/** The writing surface's background. A closed set, because each one needs a
+ *  text colour chosen to stay readable against it. */
+export type PaperColor = "white" | "cream" | "sepia" | "slate" | "black";
+
+const PAPER_COLORS: readonly PaperColor[] = [
+  "white",
+  "cream",
+  "sepia",
+  "slate",
+  "black",
+];
+
 export interface Prefs {
   /** Dim every paragraph but the one being written. */
   focusMode: boolean;
@@ -503,6 +515,8 @@ export interface Prefs {
   leftPanel: boolean;
   /** The assistant panel. */
   rightPanel: boolean;
+  /** The colour of the page under the prose. */
+  paper: PaperColor;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -512,6 +526,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // only part of the app that talks to a server.
   leftPanel: true,
   rightPanel: false,
+  // White by default: the chrome is dark, the page is not. Long-form prose is
+  // what most people still read most comfortably on a light surface.
+  paper: "white",
 });
 
 const prefsListeners = new Set<() => void>();
@@ -552,6 +569,9 @@ function parsePrefs(raw: string | null): Prefs {
       typewriter: parsed.typewriter === true,
       leftPanel: parsed.leftPanel !== false,
       rightPanel: parsed.rightPanel === true,
+      paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
+        ? (parsed.paper as PaperColor)
+        : DEFAULT_PREFS.paper,
     };
   } catch {
     return DEFAULT_PREFS;

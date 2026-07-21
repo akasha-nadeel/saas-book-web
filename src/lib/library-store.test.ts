@@ -352,6 +352,7 @@ it("starts with both writing modes off", () => {
     typewriter: false,
     leftPanel: true,
     rightPanel: false,
+    paper: "white",
   });
 });
 
@@ -378,6 +379,7 @@ it("degrades to defaults when prefs are corrupt", () => {
     typewriter: false,
     leftPanel: true,
     rightPanel: false,
+    paper: "white",
   });
 });
 
@@ -430,4 +432,23 @@ it("remembers which panels are open", () => {
   setPref("rightPanel", true);
   expect(getPrefs().rightPanel).toBe(true);
   expect(getPrefs().leftPanel).toBe(true);
+});
+
+it("defaults the page to white paper", () => {
+  expect(getPrefs().paper).toBe("white");
+});
+
+it("changes the paper colour", () => {
+  setPref("paper", "sepia");
+  expect(getPrefs().paper).toBe("sepia");
+});
+
+it("falls back to white for an unknown paper colour", () => {
+  // Prefs come from localStorage, which anything can write to. A bogus value
+  // must not leave the manuscript with no background at all.
+  localStorage.setItem(
+    "openchapter:prefs",
+    JSON.stringify({ paper: "chartreuse" }),
+  );
+  expect(getPrefs().paper).toBe("white");
 });

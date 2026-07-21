@@ -90,7 +90,7 @@ export function ChapterEditor({
         {prefs.leftPanel && <LeftPanel bookId={bookId} chapterId={chapterId} />}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <EditorToolbar editor={editor} />
+          <EditorToolbar editor={editor} prefs={prefs} />
           {/* Keyed on the stored text as well as the id, so a save from another
               tab reloads the surface rather than leaving this one stale. */}
           <EditorSurface
@@ -242,35 +242,50 @@ function EditorSurface({
   return (
     <>
       <main
-        className={`manuscript min-h-0 flex-1 cursor-text overflow-y-auto px-6 ${
-          // Typewriter mode needs room below the last line, or the caret can
-          // never reach the middle of the screen at the end of a chapter.
-          prefs.typewriter ? "pb-[60vh]" : "pb-32"
-        } ${prefs.focusMode ? "focus-mode" : ""}`}
+        data-paper={prefs.paper}
+        className={`manuscript min-h-0 flex-1 cursor-text overflow-y-auto px-6
+                    py-8 ${prefs.focusMode ? "focus-mode" : ""}`}
         onClick={() => editor?.chain().focus().run()}
       >
-        <div className="mx-auto w-full max-w-(--measure-manuscript) pt-12">
-          <p className="font-sans text-xs tracking-[0.18em] text-muted uppercase">
-            {bookTitle}
-          </p>
-          {/* An input rather than a heading with contenteditable: the title is
-              a single line of plain text, and a plain input gets the caret,
-              undo and screen-reader behaviour right for free. */}
-          <input
-            value={chapterTitle}
-            onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
-            onBlur={(e) => {
-              if (!e.target.value.trim()) {
-                renameChapter(bookId, chapterId, "Untitled chapter");
-              }
-            }}
-            aria-label="Chapter title"
-            spellCheck={false}
-            className="mt-2 mb-10 w-full rounded-sm bg-transparent font-serif
-                       text-3xl text-fg outline-none focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          />
-          <EditorContent editor={editor} />
+        {/* The sheet. A page sitting on the workspace, so the paper colour
+            reads as paper rather than as a repainted app. */}
+        <div
+          className={`paper mx-auto w-full
+                      max-w-[calc(var(--measure-manuscript)+9rem)] rounded-sm
+                      px-18 pt-16 ${
+                        // Typewriter mode needs room below the last line, or
+                        // the caret can never reach the middle of the screen
+                        // at the end of a chapter.
+                        prefs.typewriter ? "pb-[60vh]" : "pb-24"
+                      }`}
+        >
+          <div className="mx-auto w-full max-w-(--measure-manuscript)">
+            <p
+              className="font-sans text-xs tracking-[0.18em] uppercase"
+              style={{ color: "var(--paper-muted)" }}
+            >
+              {bookTitle}
+            </p>
+            {/* An input rather than a heading with contenteditable: the title
+                is a single line of plain text, and a plain input gets the
+                caret, undo and screen-reader behaviour right for free. */}
+            <input
+              value={chapterTitle}
+              onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
+              onBlur={(e) => {
+                if (!e.target.value.trim()) {
+                  renameChapter(bookId, chapterId, "Untitled chapter");
+                }
+              }}
+              aria-label="Chapter title"
+              spellCheck={false}
+              style={{ color: "var(--paper-fg)" }}
+              className="mt-2 mb-10 w-full rounded-sm bg-transparent font-serif
+                         text-3xl outline-none focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+            />
+            <EditorContent editor={editor} />
+          </div>
         </div>
       </main>
 

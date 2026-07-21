@@ -43,6 +43,56 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The page.
+
+   The chrome is dark; the page under the prose need not be. Each choice sets
+   its own text, muted and rule colours, because a background is only half a
+   decision — the pairing is what stays readable.
+   -------------------------------------------------------------------------- */
+.manuscript {
+  --paper-bg: #ffffff;
+  --paper-fg: #16191f;
+  --paper-muted: #6b7280;
+  --paper-rule: #d9dde3;
+}
+
+.manuscript[data-paper="cream"] {
+  --paper-bg: #f5f1e8;
+  --paper-fg: #1f1d1a;
+  --paper-muted: #6d6862;
+  --paper-rule: #ded7c8;
+}
+
+.manuscript[data-paper="sepia"] {
+  --paper-bg: #f2e7d0;
+  --paper-fg: #3a2f22;
+  --paper-muted: #7a6a52;
+  --paper-rule: #ddceb0;
+}
+
+.manuscript[data-paper="slate"] {
+  --paper-bg: #1d2732;
+  --paper-fg: #e6ecf3;
+  --paper-muted: #93a2b4;
+  --paper-rule: #313d4c;
+}
+
+.manuscript[data-paper="black"] {
+  --paper-bg: #0a0d11;
+  --paper-fg: #dfe5ec;
+  --paper-muted: #7f8b99;
+  --paper-rule: #232a33;
+}
+
+/* The sheet itself: a page sitting on the workspace, not a wash of colour to
+   the window edges. */
+.paper {
+  background: var(--paper-bg);
+  color: var(--paper-fg);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), 0 12px 32px rgb(0 0 0 / 0.22);
+}
+
+/* --------------------------------------------------------------------------
    The manuscript itself.
    Tiptap renders an uncontrolled contenteditable, so its internals are styled
    here rather than with utility classes.
@@ -52,7 +102,7 @@ body {
   font-size: var(--text-manuscript);
   line-height: var(--text-manuscript--line-height);
   font-variation-settings: "SOFT" 25, "WONK" 0;
-  color: var(--color-fg);
+  color: var(--paper-fg);
   outline: none;
 }
 
@@ -89,8 +139,8 @@ body {
 .manuscript .tiptap blockquote {
   margin: 1.5em 0;
   padding-left: 1.25em;
-  border-left: 2px solid var(--color-accent);
-  color: var(--color-muted);
+  border-left: 2px solid var(--paper-rule);
+  color: var(--paper-muted);
   font-style: italic;
 }
 
@@ -107,7 +157,7 @@ body {
 
 .manuscript .tiptap hr::before {
   content: "* * *";
-  color: var(--color-accent);
+  color: var(--paper-muted);
   letter-spacing: 0.5em;
   font-size: 0.9em;
 }
@@ -151,16 +201,30 @@ body {
   float: left;
   height: 0;
   pointer-events: none;
-  color: var(--color-muted);
-  opacity: 0.55;
+  color: var(--paper-muted);
+  opacity: 0.75;
   font-style: italic;
 }
 
-/* A warmer caret than the browser default black. */
 .manuscript .tiptap {
   caret-color: var(--color-accent);
 }
 
 .manuscript .tiptap ::selection {
-  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* Inline code and links also belong to the page, not the chrome. */
+.manuscript .tiptap code {
+  background: color-mix(in srgb, var(--paper-fg) 8%, transparent);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+}
+
+.manuscript .tiptap a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--paper-rule);
 }
