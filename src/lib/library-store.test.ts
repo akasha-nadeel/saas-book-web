@@ -265,6 +265,72 @@ it("deletes a chapter, its body, and fixes lastOpenedId", () => {
   expect(findBook(getShelf(), bookId)!.lastOpenedId).toBe(chapterId);
 });
 
+it("never names two chapters the same after a delete", () => {
+  const { bookId } = createBook();
+  const two = createChapter(bookId); // Chapter 2
+  createChapter(bookId); // Chapter 3
+
+  deleteChapter(bookId, two);
+  createChapter(bookId);
+
+  // Numbering off the count would say "Chapter 3" here, which already exists.
+  const titles = titlesOf(bookId);
+  expect(titles).toEqual(["Chapter One", "Chapter 3", "Chapter 4"]);
+  expect(new Set(titles).size).toBe(titles.length);
+});
+
+it("numbers past a chapter the writer numbered by hand", () => {
+  const { bookId } = createBook();
+  renameChapter(bookId, findBook(getShelf(), bookId)!.chapters[0].id, "Chapter 12");
+
+  createChapter(bookId);
+  expect(titlesOf(bookId)).toEqual(["Chapter 12", "Chapter 13"]);
+});
+
+it("leaves a named chapter out of the numbering", () => {
+  const { bookId } = createBook();
+  createChapter(bookId, "The Salt Flats");
+
+  // Titles that are not "Chapter N" say nothing about which numbers are free.
+  createChapter(bookId);
+  expect(titlesOf(bookId)).toEqual([
+    "Chapter One",
+    "The Salt Flats",
+    "Chapter 3",
+  ]);
+});
+
+it("lands on the neighbour after deleting the open chapter", () => {
+  const { bookId } = createBook();
+  createChapter(bookId, "Two");
+  const three = createChapter(bookId, "Three");
+  createChapter(bookId, "Four");
+  touchLastOpened(bookId, three);
+
+  deleteChapter(bookId, three);
+
+  // Not the first chapter of the book: deleting chapter twenty should not throw
+  // the writer back to chapter one.
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.find((c) => c.id === book.lastOpenedId)?.title).toBe(
+    "Four",
+  );
+});
+
+it("falls back to the previous chapter when the last one goes", () => {
+  const { bookId } = createBook();
+  createChapter(bookId, "Two");
+  const three = createChapter(bookId, "Three");
+  touchLastOpened(bookId, three);
+
+  deleteChapter(bookId, three);
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.find((c) => c.id === book.lastOpenedId)?.title).toBe(
+    "Two",
+  );
+});
+
 it("keeps chapter ids unique across books", () => {
   const a = createBook("A");
   const b = createBook("B");

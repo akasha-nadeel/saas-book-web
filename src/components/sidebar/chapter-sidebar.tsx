@@ -109,15 +109,24 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     if (!window.confirm(`Delete “${chapter.title}”? This cannot be undone.`))
       return;
 
+    // Prefer a neighbour inside the same section. Being thrown into a different
+    // section than the one being worked in is disorienting, and landing on the
+    // book's first chapter every time -- which is what this used to do -- loses
+    // the writer's place completely.
+    const siblings = chaptersInPart(book, chapter.part ?? "body");
+    const s = siblings.findIndex((c) => c.id === chapter.id);
+    const inSection = siblings[s + 1] ?? siblings[s - 1] ?? null;
+
+    const i = book.chapters.findIndex((c) => c.id === chapter.id);
     const remaining = book.chapters.filter((c) => c.id !== chapter.id);
+    const target = inSection ?? remaining[i] ?? remaining[i - 1] ?? null;
+
     deleteChapter(bookId, chapter.id);
 
     // Only navigate if the writer just deleted the chapter they were reading.
     if (chapter.id === activeId) {
       router.replace(
-        remaining.length
-          ? `/book/${bookId}/chapter/${remaining[0].id}`
-          : `/book/${bookId}`,
+        target ? `/book/${bookId}/chapter/${target.id}` : `/book/${bookId}`,
       );
     }
   };
@@ -399,9 +408,12 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 /**
  * One section's chapters.
  *
- * Numbering runs on the book's own order, not the section's, so a chapter keeps
- * the number it has in the manuscript rather than being renumbered from 1 in
- * every section.
+ * The number on a row is its position in this section, so a section always
+ * counts 1, 2, 3. It used to be the position in the whole book, which is a
+ * different thing entirely: a chapter created while standing in Front matter is
+ * appended to the end of the flat list and then tagged, so Body would show
+ * "1, 3, 6" and look broken. The title beside it is a name, not a position, and
+ * the two are free to disagree once chapters are deleted or renamed.
  */
 function SectionChapters({
   book,
@@ -435,8 +447,10 @@ function SectionChapters({
 
   return (
     <ol>
-      {chapters.map((chapter) => {
+      {chapters.map((chapter, position) => {
         const isActive = chapter.id === activeId;
+        // Reordering works on the book's own list, so it still needs the real
+        // index -- only what is displayed changes.
         const index = book.chapters.indexOf(chapter);
 
         return (
@@ -478,7 +492,7 @@ function SectionChapters({
                           }`}
             >
               <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
-                {index + 1}
+                {position + 1}
               </span>
               <span className="flex-1 truncate">{chapter.title}</span>
               {chapter.words > 0 && (

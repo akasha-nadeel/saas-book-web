@@ -361,13 +361,30 @@ export function touchLastOpenedBook(bookId: string) {
   });
 }
 
+/**
+ * The next unused "Chapter N".
+ *
+ * Counting the chapters is not enough. Delete the second of three and the count
+ * says the next one is 3 — which is still sitting there, so the book ends up
+ * with two chapters of the same name. Numbering from the highest already in use
+ * collides with nothing and renames nobody's chapter.
+ */
+function nextChapterTitle(chapters: readonly ChapterMeta[]): string {
+  let highest = chapters.length;
+  for (const c of chapters) {
+    const match = /^Chapter (\d+)$/.exec(c.title);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `Chapter ${highest + 1}`;
+}
+
 export function createChapter(bookId: string, title?: string): string {
   const id = newId();
   commitBook(bookId, (book) => ({
     ...book,
     chapters: [
       ...book.chapters,
-      { id, title: title ?? `Chapter ${book.chapters.length + 1}`, words: 0 },
+      { id, title: title ?? nextChapterTitle(book.chapters), words: 0 },
     ],
     lastOpenedId: id,
   }));
@@ -389,13 +406,20 @@ export function renameChapter(
 
 export function deleteChapter(bookId: string, chapterId: string) {
   commitBook(bookId, (book) => {
+    const index = book.chapters.findIndex((c) => c.id === chapterId);
     const chapters = book.chapters.filter((c) => c.id !== chapterId);
+
+    // Whatever took its place, or the one before it if it was last. Falling
+    // back to the first chapter sent a writer who deleted chapter twenty all
+    // the way back to chapter one.
+    const neighbour = index < 0 ? null : (chapters[index] ?? chapters[index - 1]);
+
     return {
       ...book,
       chapters,
       lastOpenedId:
         book.lastOpenedId === chapterId
-          ? (chapters[0]?.id ?? null)
+          ? (neighbour?.id ?? null)
           : book.lastOpenedId,
     };
   });
