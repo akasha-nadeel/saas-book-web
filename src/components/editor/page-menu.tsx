@@ -61,12 +61,15 @@ function Choice({
       // Solid accent with white on top, rather than the tinted fill with accent
       // text this had before — same hue for background and text was the least
       // readable thing in the menu.
+      //
+      // Both states lighten on hover, so the row under the pointer is obvious
+      // whether or not it is the one already chosen.
       className={`rounded px-2 py-1 text-left font-sans text-sm outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
                     selected
-                      ? "bg-accent text-white"
-                      : "text-muted hover:bg-raised/50 hover:text-fg"
+                      ? "bg-accent text-white hover:bg-accent-strong"
+                      : "text-muted hover:bg-raised hover:text-fg"
                   }`}
     >
       {children}
