@@ -66,69 +66,77 @@ export function Bookshelf() {
 
   if (!hydrated) return null;
 
+  // Where "Continue writing" goes: the last book opened, or the most recent.
+  const continueId = books.some((b) => b.id === shelf.lastOpenedBookId)
+    ? shelf.lastOpenedBookId
+    : (books[0]?.id ?? null);
+
   return (
-    <div className="flex h-full">
-      <ShelfNav
-        bookCount={books.length}
-        totalWords={totalWords}
-        onCreate={handleCreate}
-      />
+    // The bar spans the full width and both the sidebar and the panel begin
+    // below it — that stacking is what makes the panel's one rounded corner
+    // sit where it does in the reference.
+    <div className="flex h-full flex-col">
+      <ShelfTopNav continueId={continueId} onCreate={handleCreate} />
 
-      {/* One rounded corner, top-left, and the panel runs off the right and
-          bottom edges. The separation from the sidebar is the shade change and
-          that single corner — no border, no floating gap on four sides. */}
-      <main className="min-w-0 flex-1 overflow-hidden">
-        <div className="flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-8 py-7">
-          <div className="flex items-baseline justify-between gap-6">
-            <h1 className="font-serif text-2xl text-fg">All books</h1>
-            <p className="shrink-0 font-sans text-sm text-muted">
-              {totalWords.toLocaleString()} words written
-            </p>
+      <div className="flex min-h-0 flex-1">
+        <ShelfNav bookCount={books.length} totalWords={totalWords} />
+
+        {/* One rounded corner, top-left, and the panel runs off the right and
+            bottom edges. The separation from the sidebar is the shade change and
+            that single corner — no border, no floating gap on four sides. */}
+        <main className="min-w-0 flex-1 overflow-hidden">
+          <div className="flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-8 py-7">
+            <div className="flex items-baseline justify-between gap-6">
+              <h1 className="font-serif text-2xl text-fg">All books</h1>
+              <p className="shrink-0 font-sans text-sm text-muted">
+                {totalWords.toLocaleString()} words written
+              </p>
+            </div>
+
+            <label className="relative mt-6 block">
+              <span className="sr-only">Search books</span>
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                className="pointer-events-none absolute top-1/2 left-3 h-4 w-4
+                           -translate-y-1/2 text-muted"
+              >
+                <circle cx="9" cy="9" r="6" />
+                <path d="m13.5 13.5 3 3" strokeLinecap="round" />
+              </svg>
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search in all books…"
+                className="w-full rounded-md border border-line bg-surface py-2.5
+                           pr-3 pl-10 font-sans text-sm text-fg
+                           placeholder:text-muted focus-visible:border-accent
+                           focus-visible:outline-none"
+              />
+            </label>
+
+            {books.length === 0 ? (
+              <Empty onCreate={handleCreate} />
+            ) : visible.length === 0 ? (
+              <p className="mt-10 font-sans text-sm text-muted">
+                No book matches “{query.trim()}”.
+              </p>
+            ) : (
+              <BookTable
+                books={visible}
+                // Only the genuinely most-recent book, not merely the first row
+                // after a search has reordered what you can see.
+                continueId={query.trim() ? null : (books[0]?.id ?? null)}
+                onExport={setExporting}
+                onDelete={handleDelete}
+              />
+            )}
           </div>
-
-          <label className="relative mt-6 block">
-            <span className="sr-only">Search books</span>
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4
-                         -translate-y-1/2 text-muted"
-            >
-              <circle cx="9" cy="9" r="6" />
-              <path d="m13.5 13.5 3 3" strokeLinecap="round" />
-            </svg>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search in all books…"
-              className="w-full rounded-md border border-line bg-surface py-2.5
-                         pr-3 pl-10 font-sans text-sm text-fg
-                         placeholder:text-muted focus-visible:border-accent
-                         focus-visible:outline-none"
-            />
-          </label>
-
-          {books.length === 0 ? (
-            <Empty onCreate={handleCreate} />
-          ) : visible.length === 0 ? (
-            <p className="mt-10 font-sans text-sm text-muted">
-              No book matches “{query.trim()}”.
-            </p>
-          ) : (
-            <BookTable
-              books={visible}
-              // Only the genuinely most-recent book, not merely the first row
-              // after a search has reordered what you can see.
-              continueId={query.trim() ? null : (books[0]?.id ?? null)}
-              onExport={setExporting}
-              onDelete={handleDelete}
-            />
-          )}
-        </div>
-      </main>
+        </main>
+      </div>
 
       {exporting && (
         <ExportDialog book={exporting} onClose={() => setExporting(null)} />
@@ -137,41 +145,71 @@ export function Bookshelf() {
   );
 }
 
+/**
+ * The bar across the top.
+ *
+ * The reference carries Product, Solutions, Templates and Pricing here — links
+ * to marketing pages for a hosted product. This app has none of those, so the
+ * bar holds the two things a writer actually wants reachable from anywhere:
+ * getting back into the book they were writing, and starting a new one.
+ */
+function ShelfTopNav({
+  continueId,
+  onCreate,
+}: {
+  continueId: string | null;
+  onCreate: () => void;
+}) {
+  return (
+    <header className="flex h-16 shrink-0 items-center gap-6 bg-surface px-6">
+      <div className="min-w-0">
+        <p className="font-serif text-lg leading-tight text-fg">OpenChapter</p>
+        <p className="font-sans text-[0.7rem] text-muted">
+          A place to write your novel
+        </p>
+      </div>
+
+      <nav className="ml-auto flex items-center gap-5 font-sans text-sm">
+        {continueId && (
+          <Link
+            href={`/book/${continueId}`}
+            className="rounded-md text-muted outline-none transition-colors
+                       hover:text-fg focus-visible:ring-2
+                       focus-visible:ring-accent/60"
+          >
+            Continue writing
+          </Link>
+        )}
+        <button
+          type="button"
+          onClick={onCreate}
+          className="rounded-md bg-accent px-4 py-2 font-sans text-sm
+                     font-semibold text-white outline-none transition-colors
+                     hover:bg-accent-strong focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          New book
+        </button>
+      </nav>
+    </header>
+  );
+}
+
 function ShelfNav({
   bookCount,
   totalWords,
-  onCreate,
 }: {
   bookCount: number;
   totalWords: number;
-  onCreate: () => void;
 }) {
   return (
     <aside
       // No right border: the panel's lighter shade and its rounded corner are
       // what separate the two, as in the reference.
-      className="flex w-(--sidebar-width) shrink-0 flex-col bg-surface px-4 py-6"
+      className="flex w-(--sidebar-width) shrink-0 flex-col bg-surface px-4 pt-2 pb-6"
       aria-label="Library"
     >
-      <div className="px-2">
-        <p className="font-serif text-lg text-fg">OpenChapter</p>
-        <p className="mt-1 font-sans text-xs text-muted">
-          A place to write your novel
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={onCreate}
-        className="mt-6 w-full rounded-md bg-accent py-2.5 font-sans text-sm
-                   font-semibold text-white outline-none transition-colors
-                   hover:bg-accent-strong focus-visible:ring-2
-                   focus-visible:ring-accent/60"
-      >
-        New book
-      </button>
-
-      <nav className="mt-6">
+      <nav>
         {/* One item, because one is all that is real. Overleaf's Archived and
             Trashed correspond to features this app does not have, and a dead
             link is worse than a short list. */}
