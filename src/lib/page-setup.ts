@@ -32,6 +32,17 @@ export interface PageSetup {
   orientation: Orientation;
   margins: MarginPreset;
   columns: ColumnCount;
+  /**
+   * Whether the page fills the editing column instead of sitting at its
+   * physical width.
+   *
+   * These are two different questions and were fighting each other while they
+   * shared one answer: a Letter page cannot fill a window wider than 8.5in
+   * without ceasing to be Letter. Size, orientation and margins describe the
+   * document that leaves the app; this describes the surface you write on.
+   * Export ignores it entirely.
+   */
+  fit: boolean;
 }
 
 export const DEFAULT_PAGE: PageSetup = Object.freeze({
@@ -39,6 +50,7 @@ export const DEFAULT_PAGE: PageSetup = Object.freeze({
   orientation: "portrait",
   margins: "normal",
   columns: 1,
+  fit: true,
 });
 
 /** Portrait dimensions in inches. Landscape swaps them; see pageMetrics. */

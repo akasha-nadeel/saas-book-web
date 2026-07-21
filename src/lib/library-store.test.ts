@@ -475,6 +475,7 @@ it("gives a book a default page setup without storing one", () => {
     orientation: "portrait",
     margins: "normal",
     columns: 1,
+    fit: true,
   });
 });
 
@@ -490,6 +491,7 @@ it("patches one page setting without disturbing the rest", () => {
     orientation: "landscape",
     margins: "normal",
     columns: 1,
+    fit: true,
   });
 });
 

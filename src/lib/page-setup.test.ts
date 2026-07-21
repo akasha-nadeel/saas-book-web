@@ -83,3 +83,17 @@ it("falls back to defaults for an unknown size or margin", () => {
   expect([m.width, m.height]).toEqual([8.5, 11]);
   expect(m.left).toBe(1);
 });
+
+it("fits the window by default, while keeping a paper size for export", () => {
+  // The editing surface and the exported document are different questions:
+  // Letter is what leaves the app, fit is how it looks while writing.
+  expect(DEFAULT_PAGE.fit).toBe(true);
+  expect(DEFAULT_PAGE.size).toBe("letter");
+});
+
+it("reports the same metrics whether or not it fits the window", () => {
+  // Export reads these, and export never fits a window.
+  const fixed = pageMetrics(setup({ fit: false }));
+  const fluid = pageMetrics(setup({ fit: true }));
+  expect(fluid).toEqual(fixed);
+});

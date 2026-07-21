@@ -128,6 +128,26 @@ export function PageMenu({ book }: { book: Book }) {
           className="absolute top-9 right-0 z-20 max-h-[70vh] w-64 overflow-y-auto
                      rounded-md border border-line bg-panel shadow-lg"
         >
+          <Section title="Width">
+            <div className="grid grid-cols-2 gap-1">
+              <Choice
+                selected={page.fit}
+                onClick={() => setPageSetup(book.id, { fit: true })}
+              >
+                Fit window
+              </Choice>
+              <Choice
+                selected={!page.fit}
+                onClick={() => setPageSetup(book.id, { fit: false })}
+              >
+                Page size
+              </Choice>
+            </div>
+            <p className="mt-1.5 font-sans text-[0.68rem] leading-snug text-muted">
+              Only affects writing. Export always uses the page size below.
+            </p>
+          </Section>
+
           <Section title="Size">
             <div className="flex flex-col">
               {(Object.keys(PAGE_SIZES) as PageSize[]).map((value) => (

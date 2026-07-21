@@ -233,14 +233,14 @@ function ChapterStep({
       aria-label={`${side === "left" ? "Previous" : "Next"} chapter: ${chapter.title}`}
       title={chapter.title}
       onClick={(e) => e.stopPropagation()}
-      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2
-                  items-center justify-center rounded-full border border-line
-                  bg-panel/90 text-lg text-muted opacity-60 backdrop-blur
-                  outline-none transition-opacity hover:text-fg
-                  hover:opacity-100 focus-visible:opacity-100
+      className={`absolute top-1/2 z-10 flex h-12 w-8 -translate-y-1/2
+                  items-center justify-center text-2xl leading-none
+                  opacity-35 outline-none transition-opacity
+                  hover:opacity-90 focus-visible:opacity-100
                   focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    side === "left" ? "left-3" : "right-3"
+                    side === "left" ? "left-1" : "right-1"
                   }`}
+      style={{ color: "var(--paper-muted)" }}
     >
       <span aria-hidden="true">{side === "left" ? "‹" : "›"}</span>
     </Link>
@@ -377,16 +377,18 @@ function EditorSurface({
         data-paper={prefs.paper}
         data-columns={page.columns}
         className={`manuscript min-h-0 flex-1 cursor-text overflow-auto
-                    bg-surface px-8 py-8 ${
+                    bg-surface ${page.fit ? "" : "px-8 py-8"} ${
                       prefs.focusMode ? "focus-mode" : ""
                     }`}
         onClick={() => editor?.chain().focus().run()}
       >
+        {/* Fitted, the page is the column and needs no shadow — there is no
+            desk left showing for it to cast onto. */}
         <div
-          className="paper mx-auto shadow-lg"
+          className={page.fit ? "paper min-h-full" : "paper mx-auto shadow-lg"}
           style={{
-            width: `${metrics.width}in`,
-            minHeight: `${metrics.height}in`,
+            width: page.fit ? "100%" : `${metrics.width}in`,
+            minHeight: page.fit ? undefined : `${metrics.height}in`,
             paddingTop: `${metrics.top}in`,
             paddingBottom: prefs.typewriter ? "60vh" : `${metrics.bottom}in`,
             paddingLeft: `${metrics.left}in`,
