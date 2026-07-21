@@ -12,11 +12,13 @@ import {
   getShelf,
   migrateLegacy,
   moveChapter,
+  pageSetupOf,
   renameBook,
   renameChapter,
   saveBody,
   saveNotes,
   setBookAuthor,
+  setPageSetup,
   setPref,
   touchLastOpened,
   touchLastOpenedBook,
@@ -451,4 +453,43 @@ it("falls back to white for an unknown paper colour", () => {
     JSON.stringify({ paper: "chartreuse" }),
   );
   expect(getPrefs().paper).toBe("white");
+});
+
+it("gives a book a default page setup without storing one", () => {
+  const { bookId } = createBook();
+  const book = findBook(getShelf(), bookId)!;
+  // Not written on create: an absent field reads as the default, so existing
+  // books need no migration.
+  expect(book.page).toBeUndefined();
+  expect(pageSetupOf(book)).toEqual({
+    size: "letter",
+    orientation: "portrait",
+    margins: "normal",
+    columns: 1,
+  });
+});
+
+it("patches one page setting without disturbing the rest", () => {
+  const { bookId } = createBook();
+
+  setPageSetup(bookId, { size: "a4" });
+  setPageSetup(bookId, { orientation: "landscape" });
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(pageSetupOf(book)).toEqual({
+    size: "a4",
+    orientation: "landscape",
+    margins: "normal",
+    columns: 1,
+  });
+});
+
+it("keeps page setup per book", () => {
+  const a = createBook("A");
+  const b = createBook("B");
+
+  setPageSetup(a.bookId, { size: "a5", columns: 2 });
+
+  expect(pageSetupOf(findBook(getShelf(), a.bookId)!).size).toBe("a5");
+  expect(pageSetupOf(findBook(getShelf(), b.bookId)!).size).toBe("letter");
 });

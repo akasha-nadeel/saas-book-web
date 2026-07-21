@@ -17,12 +17,15 @@ import { TopBar } from "@/components/editor/top-bar";
 import { ExportDialog } from "@/components/export/export-dialog";
 import {
   findBook,
+  pageSetupOf,
   renameChapter,
   saveBody,
   setPref,
   touchLastOpened,
+  type Book,
   type Prefs,
 } from "@/lib/library-store";
+import { pageMetrics } from "@/lib/page-setup";
 import {
   useChapterBody,
   useHydrated,
@@ -98,7 +101,7 @@ export function ChapterEditor({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <EditorToolbar editor={editor} prefs={prefs} />
+          <EditorToolbar editor={editor} book={book} paper={prefs.paper} />
           {/* Keyed on the stored text as well as the id, so a save from another
               tab reloads the surface rather than leaving this one stale. */}
           <EditorSurface
@@ -106,7 +109,7 @@ export function ChapterEditor({
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapter.title}
-            bookTitle={book.title}
+            book={book}
             initialContent={initialContent}
             prefs={prefs}
             onEditorReady={setEditor}
@@ -218,7 +221,7 @@ function EditorSurface({
   bookId,
   chapterId,
   chapterTitle,
-  bookTitle,
+  book,
   initialContent,
   prefs,
   onEditorReady,
@@ -226,13 +229,16 @@ function EditorSurface({
   bookId: string;
   chapterId: string;
   chapterTitle: string;
-  bookTitle: string;
+  book: Book;
   initialContent: JSONContent | null;
   prefs: Prefs;
   onEditorReady: (editor: Editor) => void;
 }) {
   const [words, setWords] = useState(0);
   const holdCaret = useTypewriter(prefs.typewriter);
+
+  const page = pageSetupOf(book);
+  const metrics = pageMetrics(page);
 
   // Words at the moment this chapter opened, so the status bar can show what
   // was written in this sitting. State rather than a ref because it is read
@@ -298,48 +304,54 @@ function EditorSurface({
 
   return (
     <>
-      {/* The page fills the column edge to edge rather than floating as a
-          narrow sheet — the writing area is the point of the screen. */}
+      {/* The workspace, and the page on it. Physical dimensions in inches —
+          CSS understands `in` natively, so the numbers from pageMetrics go
+          straight into the style with no pixels-per-inch fudge. */}
       <main
         data-paper={prefs.paper}
-        className={`manuscript paper min-h-0 flex-1 cursor-text overflow-y-auto
-                    ${prefs.focusMode ? "focus-mode" : ""}`}
+        data-columns={page.columns}
+        className={`manuscript min-h-0 flex-1 cursor-text overflow-auto
+                    bg-surface px-8 py-8 ${
+                      prefs.focusMode ? "focus-mode" : ""
+                    }`}
         onClick={() => editor?.chain().focus().run()}
       >
         <div
-          className={`w-full px-12 pt-14 ${
-            // Typewriter mode needs room below the last line, or the caret can
-            // never reach the middle of the screen at the end of a chapter.
-            prefs.typewriter ? "pb-[60vh]" : "pb-24"
-          }`}
+          className="paper mx-auto shadow-lg"
+          style={{
+            width: `${metrics.width}in`,
+            minHeight: `${metrics.height}in`,
+            paddingTop: `${metrics.top}in`,
+            paddingBottom: prefs.typewriter ? "60vh" : `${metrics.bottom}in`,
+            paddingLeft: `${metrics.left}in`,
+            paddingRight: `${metrics.right}in`,
+          }}
         >
-          <div className="w-full">
-            <p
-              className="font-sans text-xs tracking-[0.18em] uppercase"
-              style={{ color: "var(--paper-muted)" }}
-            >
-              {bookTitle}
-            </p>
-            {/* An input rather than a heading with contenteditable: the title
-                is a single line of plain text, and a plain input gets the
-                caret, undo and screen-reader behaviour right for free. */}
-            <input
-              value={chapterTitle}
-              onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
-              onBlur={(e) => {
-                if (!e.target.value.trim()) {
-                  renameChapter(bookId, chapterId, "Untitled chapter");
-                }
-              }}
-              aria-label="Chapter title"
-              spellCheck={false}
-              style={{ color: "var(--paper-fg)" }}
-              className="mt-2 mb-10 w-full rounded-sm bg-transparent font-serif
-                         text-3xl outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/60"
-            />
-            <EditorContent editor={editor} />
-          </div>
+          <p
+            className="font-sans text-xs tracking-[0.18em] uppercase"
+            style={{ color: "var(--paper-muted)" }}
+          >
+            {book.title}
+          </p>
+          {/* An input rather than a heading with contenteditable: the title is
+              a single line of plain text, and a plain input gets the caret,
+              undo and screen-reader behaviour right for free. */}
+          <input
+            value={chapterTitle}
+            onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
+            onBlur={(e) => {
+              if (!e.target.value.trim()) {
+                renameChapter(bookId, chapterId, "Untitled chapter");
+              }
+            }}
+            aria-label="Chapter title"
+            spellCheck={false}
+            style={{ color: "var(--paper-fg)" }}
+            className="mt-2 mb-10 w-full rounded-sm bg-transparent font-serif
+                       text-3xl outline-none focus-visible:ring-2
+                       focus-visible:ring-accent/60"
+          />
+          <EditorContent editor={editor} />
         </div>
       </main>
 

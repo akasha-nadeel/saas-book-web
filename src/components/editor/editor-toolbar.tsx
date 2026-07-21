@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/react";
-import { setPref, type PaperColor, type Prefs } from "@/lib/library-store";
+import { PageMenu } from "@/components/editor/page-menu";
+import type { Book, PaperColor } from "@/lib/library-store";
 
 /**
  * The formatting toolbar.
@@ -73,104 +74,14 @@ function Button({
 
 const Divider = () => <span className="mx-1 h-5 w-px bg-line" />;
 
-/** Swatch previews. The real colours live in globals.css keyed by data-paper;
- *  these only have to look like them in a 16px circle. */
-const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
-  { value: "white", label: "White", swatch: "#ffffff" },
-  { value: "cream", label: "Cream", swatch: "#f5f1e8" },
-  { value: "sepia", label: "Sepia", swatch: "#f2e7d0" },
-  { value: "slate", label: "Slate", swatch: "#1d2732" },
-  { value: "black", label: "Black", swatch: "#0a0d11" },
-];
-
-function PaperPicker({ paper }: { paper: PaperColor }) {
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const current = PAPERS.find((p) => p.value === paper) ?? PAPERS[0];
-
-  // Close on an outside click or Escape — the two things every menu owes you.
-  useEffect(() => {
-    if (!open) return;
-    const onPointer = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("pointerdown", onPointer);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onPointer);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Page colour: ${current.label}`}
-        title="Page colour"
-        className="flex h-8 items-center gap-1.5 rounded-md px-2 text-muted
-                   outline-none transition-colors hover:bg-raised hover:text-fg
-                   focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        <span
-          aria-hidden="true"
-          className="h-4 w-4 rounded-full border border-line"
-          style={{ background: current.swatch }}
-        />
-        <span aria-hidden="true" className="text-[0.6rem]">
-          ▾
-        </span>
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          className="absolute top-9 right-0 z-20 w-40 rounded-md border
-                     border-line bg-panel p-1 shadow-lg"
-        >
-          {PAPERS.map((p) => (
-            <button
-              key={p.value}
-              role="menuitemradio"
-              aria-checked={p.value === paper}
-              onClick={() => {
-                setPref("paper", p.value);
-                setOpen(false);
-              }}
-              className={`flex w-full items-center gap-2.5 rounded px-2 py-1.5
-                          text-left font-sans text-sm outline-none
-                          focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                            p.value === paper
-                              ? "text-accent"
-                              : "text-muted hover:bg-raised hover:text-fg"
-                          }`}
-            >
-              <span
-                aria-hidden="true"
-                className="h-4 w-4 shrink-0 rounded-full border border-line"
-                style={{ background: p.swatch }}
-              />
-              {p.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function EditorToolbar({
   editor,
-  prefs,
+  book,
+  paper,
 }: {
   editor: Editor | null;
-  prefs: Prefs;
+  book: Book;
+  paper: PaperColor;
 }) {
   useEditorState(editor);
 
@@ -308,9 +219,9 @@ export function EditorToolbar({
         <span className="text-sm">↷</span>
       </Button>
 
-      {/* Pushed to the far end: it changes the workspace, not the text. */}
+      {/* Pushed to the far end: it describes the page, not the text on it. */}
       <div className="ml-auto">
-        <PaperPicker paper={prefs.paper} />
+        <PageMenu book={book} paper={paper} />
       </div>
     </div>
   );

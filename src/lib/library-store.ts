@@ -20,6 +20,8 @@
  * the chapters they describe.
  */
 
+import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
+
 const SHELF_KEY = "openchapter:shelf";
 const BODY_PREFIX = "openchapter:chapter:";
 const NOTES_PREFIX = "openchapter:notes:";
@@ -35,6 +37,8 @@ export interface Book {
   title: string;
   /** Optional. Used for the DOCX byline and EPUB's dc:creator. */
   author?: string;
+  /** Page geometry. Absent means the default — see pageSetupOf. */
+  page?: PageSetup;
   /** Readonly because every snapshot handed out is shared and cached. */
   chapters: readonly ChapterMeta[];
   lastOpenedId: string | null;
@@ -625,4 +629,26 @@ export function saveNotes(id: string, text: string) {
   } catch (err) {
     console.error("[store] could not write notes", err);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Page setup
+//
+// On the book rather than in prefs: in Word this belongs to the document, and
+// here the document is the book. It also has somewhere to go later — DOCX
+// export already writes a page size and margins.
+//
+// Stored only once changed. An absent field reads as the default, so books
+// created before this existed need no migration.
+// ---------------------------------------------------------------------------
+
+export function pageSetupOf(book: Book): PageSetup {
+  return { ...DEFAULT_PAGE, ...(book.page ?? {}) };
+}
+
+export function setPageSetup(bookId: string, patch: Partial<PageSetup>) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    page: { ...pageSetupOf(book), ...patch },
+  }));
 }

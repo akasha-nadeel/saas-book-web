@@ -83,11 +83,33 @@ body {
   --paper-rule: #232a33;
 }
 
-/* The page fills its column. No shadow or inset: it is the surface being
-   written on, not a sheet floating on a desk. */
+/* A sheet of paper on the workspace, at its real dimensions. */
 .paper {
   background: var(--paper-bg);
   color: var(--paper-fg);
+}
+
+/* Columns apply to the prose only — the chapter title spans the page, as a
+   heading does in Word. */
+.manuscript[data-columns="2"] .tiptap {
+  column-count: 2;
+}
+
+.manuscript[data-columns="3"] .tiptap {
+  column-count: 3;
+}
+
+.manuscript[data-columns="2"] .tiptap,
+.manuscript[data-columns="3"] .tiptap {
+  column-gap: 0.5in;
+  column-rule: 1px solid transparent;
+}
+
+/* A heading should not be orphaned at the foot of a column. */
+.manuscript .tiptap h1,
+.manuscript .tiptap h2,
+.manuscript .tiptap h3 {
+  break-after: avoid;
 }
 
 /* --------------------------------------------------------------------------
