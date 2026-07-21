@@ -5,6 +5,7 @@ import {
   bookmarks,
   booksIn,
   createBook,
+  createBookFromImport,
   createBookFromTemplate,
   createChapter,
   deleteBook,
@@ -323,6 +324,61 @@ it("falls back to the previous chapter when the last one goes", () => {
   expect(book.chapters.find((c) => c.id === book.lastOpenedId)?.title).toBe(
     "Two",
   );
+});
+
+it("creates a whole book from an import, bodies and all", () => {
+  const result = createBookFromImport("The Salt Road", [
+    { title: "Chapter One", doc: { type: "doc" }, words: 1200 },
+    { title: "Chapter Two", doc: { type: "doc" }, words: 800 },
+  ])!;
+
+  const book = findBook(getShelf(), result.bookId)!;
+  expect(book.title).toBe("The Salt Road");
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "Chapter One",
+    "Chapter Two",
+  ]);
+  expect(bookWordCount(book)).toBe(2000);
+
+  // The shelf entry is worthless if the text it points at is not there.
+  for (const chapter of book.chapters) {
+    expect(
+      localStorage.getItem(`openchapter:chapter:${chapter.id}`),
+    ).not.toBeNull();
+  }
+  expect(result.chapterId).toBe(book.chapters[0].id);
+});
+
+it("leaves nothing behind when an import cannot be stored", () => {
+  const setItem = localStorage.setItem.bind(localStorage);
+  let calls = 0;
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation((k, v) => {
+    calls += 1;
+    // Fail partway, as a quota limit would on a long manuscript.
+    if (calls === 3) throw new DOMException("quota", "QuotaExceededError");
+    setItem(k, v);
+  });
+
+  const result = createBookFromImport("Too Big", [
+    { title: "One", doc: { type: "doc" }, words: 1 },
+    { title: "Two", doc: { type: "doc" }, words: 1 },
+    { title: "Three", doc: { type: "doc" }, words: 1 },
+  ]);
+
+  vi.restoreAllMocks();
+
+  // No book, and no orphaned bodies: a half-imported novel that looks whole is
+  // worse than a failed import.
+  expect(result).toBeNull();
+  expect(getShelf().books).toHaveLength(0);
+  const orphans = Object.keys(localStorage).filter((k) =>
+    k.startsWith("openchapter:chapter:"),
+  );
+  expect(orphans).toEqual([]);
+});
+
+it("refuses an import with no chapters", () => {
+  expect(createBookFromImport("Empty", [])).toBeNull();
 });
 
 it("keeps chapter ids unique across books", () => {

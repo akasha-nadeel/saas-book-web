@@ -290,6 +290,19 @@ function ShelfNav({
         New book
       </Link>
 
+      {/* Quieter than New book on purpose: most visits start something, and
+          importing is the once-per-manuscript path. */}
+      <Link
+        href="/book/import"
+        className="mt-2 block w-full rounded-md border border-line py-2.5
+                   text-center font-sans text-sm font-medium text-muted
+                   outline-none transition-colors hover:border-accent/60
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/60"
+      >
+        Import a book
+      </Link>
+
       <nav className="mt-4 flex flex-col gap-0.5">
         {(["active", "archived", "trashed"] as BookView[]).map((value) => (
           <button

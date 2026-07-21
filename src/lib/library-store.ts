@@ -354,6 +354,68 @@ export function createChapter(bookId: string, title?: string): string {
   return id;
 }
 
+/**
+ * A whole book at once, from an imported file.
+ *
+ * Bodies are written before the shelf entry so that a book never appears in the
+ * library pointing at text that is not there. If any write fails — a manuscript
+ * larger than the browser will hold is the likely reason — everything already
+ * written is removed and nothing is committed. A half-imported novel that looks
+ * complete is the worst outcome available here.
+ *
+ * Returns null on failure, so the caller can say what happened.
+ */
+export function createBookFromImport(
+  title: string,
+  chapters: readonly { title: string; doc: unknown; words: number }[],
+  setup?: BookSetup,
+): { bookId: string; chapterId: string } | null {
+  if (!chapters.length) return null;
+
+  const bookId = newId();
+  const metas: ChapterMeta[] = [];
+  const written: string[] = [];
+
+  try {
+    for (const chapter of chapters) {
+      const id = newId();
+      window.localStorage.setItem(bodyKey(id), JSON.stringify(chapter.doc));
+      written.push(id);
+      metas.push({ id, title: chapter.title, words: chapter.words });
+    }
+  } catch (err) {
+    console.error("[store] import failed, rolling back", err);
+    for (const id of written) {
+      try {
+        window.localStorage.removeItem(bodyKey(id));
+      } catch {
+        // Nothing further to try; the shelf is untouched either way.
+      }
+    }
+    return null;
+  }
+
+  const shelf = getShelf();
+  const book: Book = {
+    id: bookId,
+    title: title.trim() || "Untitled Book",
+    ...(setup?.kind ? { kind: setup.kind } : {}),
+    ...(setup?.genre ? { genre: setup.genre } : {}),
+    ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
+    chapters: metas,
+    lastOpenedId: metas[0].id,
+    lastOpenedAt: Date.now(),
+  };
+
+  commit({
+    ...shelf,
+    books: [...shelf.books, book],
+    lastOpenedBookId: bookId,
+  });
+
+  return { bookId, chapterId: metas[0].id };
+}
+
 export function renameChapter(
   bookId: string,
   chapterId: string,
