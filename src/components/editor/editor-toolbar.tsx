@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { PageMenu } from "@/components/editor/page-menu";
 import { ACCEPTED, importImage } from "@/lib/image-import";
-import type { Book } from "@/lib/library-store";
+import { setPref, type Book, type PaperColor } from "@/lib/library-store";
 
 /**
  * The formatting tools, as a column in the right rail.
@@ -99,14 +100,15 @@ const Icon = ({ children }: { children: React.ReactNode }) => (
 /**
  * A rail button whose tools fly out beside it.
  *
- * Opens on hover, but not only on hover: a hover-only menu is unreachable by
- * keyboard and does not exist at all on a touch screen, so click and focus open
- * it too, and Escape closes it.
+ * Rendered through a portal, which is not decoration: the rail scrolls, and an
+ * overflow container clips absolutely positioned children. Anchored inside it
+ * the panel was drawn but cut off at the rail's edge — visible as a sliver and
+ * nothing more. A portal escapes the clip; the cost is positioning by hand from
+ * the trigger's rect.
  *
- * The gap between button and panel is padding on the wrapper rather than a
- * margin on the panel, so the pointer never crosses dead space on its way over
- * — that gap is the usual reason these menus snap shut mid-reach. A short
- * closing delay covers the rest.
+ * Opens on hover, but not only on hover: a hover-only menu cannot be reached
+ * from a keyboard and does not exist at all on a touch screen, so click and
+ * focus open it too, and Escape closes it.
  */
 function Flyout({
   label,
@@ -118,54 +120,70 @@ function Flyout({
   trigger: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
+    setRect(triggerRef.current?.getBoundingClientRect() ?? null);
     setOpen(true);
   };
   const hideSoon = () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = setTimeout(() => setOpen(false), 200);
+    // Long enough to cross the gap, short enough not to linger.
+    closeTimer.current = setTimeout(() => setOpen(false), 220);
   };
 
-  useEffect(() => () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
+
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
     };
     const onPointer = (e: PointerEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // The panel is portalled, so it is not inside the trigger's subtree —
+      // both have to be checked or clicking a tool would dismiss the menu.
+      if (
+        !triggerRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
     };
+    // A fixed position taken from a rect goes stale the moment anything moves.
+    const onMove = () => setOpen(false);
+
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
+    window.addEventListener("resize", onMove);
+    document.addEventListener("scroll", onMove, true);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("resize", onMove);
+      document.removeEventListener("scroll", onMove, true);
     };
   }, [open]);
 
   return (
-    <div
-      ref={rootRef}
-      className="relative"
-      onMouseEnter={show}
-      onMouseLeave={hideSoon}
-      onFocus={show}
-      onBlur={(e) => {
-        // Only close when focus leaves the whole group, not when it moves
-        // between the trigger and the tools inside.
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) setOpen(false);
-      }}
-    >
+    <>
       <button
+        ref={triggerRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? setOpen(false) : show())}
+        onMouseEnter={show}
+        onMouseLeave={hideSoon}
+        onFocus={show}
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={label}
@@ -181,25 +199,55 @@ function Flyout({
         {trigger}
       </button>
 
-      {open && (
-        // Padding, not margin: a margin would leave a gap the pointer falls
-        // through on its way to the panel.
-        <div className="absolute top-0 right-full z-30 pr-2">
-          <div className="flex flex-col gap-1 rounded-md border border-line bg-panel p-2 shadow-lg">
-            {children}
-          </div>
-        </div>
-      )}
-    </div>
+      {open &&
+        rect &&
+        createPortal(
+          <div
+            ref={panelRef}
+            onMouseEnter={show}
+            onMouseLeave={hideSoon}
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setOpen(false);
+              }
+            }}
+            style={{
+              position: "fixed",
+              top: rect.top,
+              left: rect.left,
+              // Sits to the left of the rail, with the gap as padding so the
+              // pointer never crosses dead space on its way over.
+              transform: "translateX(-100%)",
+              paddingRight: 8,
+            }}
+            className="z-50"
+          >
+            <div className="flex flex-col gap-1 rounded-md border border-line bg-panel p-2 shadow-xl">
+              {children}
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
+
+const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
+  { value: "white", label: "White", swatch: "#ffffff" },
+  { value: "cream", label: "Cream", swatch: "#f5f1e8" },
+  { value: "sepia", label: "Sepia", swatch: "#f2e7d0" },
+  { value: "slate", label: "Slate", swatch: "#1d2732" },
+  { value: "black", label: "Black", swatch: "#0a0d11" },
+];
 
 export function ToolRail({
   editor,
   book,
+  paper,
 }: {
   editor: Editor | null;
   book: Book;
+  paper: PaperColor;
 }) {
   useEditorState(editor);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -297,6 +345,34 @@ export function ToolRail({
               <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
             </Icon>
           </ToolButton>
+        </div>
+
+        <span aria-hidden="true" className="h-px w-full bg-line" />
+
+        <div
+          role="radiogroup"
+          aria-label="Page colour"
+          className="flex items-center justify-center gap-1.5 py-1"
+        >
+          {PAPERS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              role="radio"
+              aria-checked={p.value === paper}
+              aria-label={p.label}
+              title={`Page colour: ${p.label}`}
+              onClick={() => setPref("paper", p.value)}
+              className={`h-5 w-5 rounded-full border-2 outline-none
+                          transition-colors focus-visible:ring-2
+                          focus-visible:ring-accent/60 ${
+                            p.value === paper
+                              ? "border-accent"
+                              : "border-line hover:border-muted"
+                          }`}
+              style={{ background: p.swatch }}
+            />
+          ))}
         </div>
       </Flyout>
 

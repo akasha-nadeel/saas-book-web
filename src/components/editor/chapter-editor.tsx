@@ -15,7 +15,6 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { ToolRail } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
-import { ColumnHeader } from "@/components/editor/top-bar";
 import { ExportDialog } from "@/components/export/export-dialog";
 import {
   findBook,
@@ -127,7 +126,6 @@ export function ChapterEditor({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <ColumnHeader book={book} paper={prefs.paper} />
           {/* Keyed on the stored text as well as the id, so a save from another
               tab reloads the surface rather than leaving this one stale. */}
           <EditorSurface
@@ -170,7 +168,7 @@ export function ChapterEditor({
             </RailButton>
           }
         >
-          <ToolRail editor={editor} book={book} />
+          <ToolRail editor={editor} book={book} paper={prefs.paper} />
 
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 

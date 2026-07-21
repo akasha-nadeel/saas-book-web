@@ -10,6 +10,7 @@ import {
   deleteChapter,
   findBook,
   moveChapter,
+  renameBook,
   setChapterPart,
   toggleBookmark,
   type ChapterMeta,
@@ -89,9 +90,21 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 px-4">
-        <span className="truncate font-sans text-lg font-semibold text-fg">
-          Manuscript
-        </span>
+        {/* The book's title, not the word "Manuscript". The bar that used to
+            carry it is gone, and a book you cannot rename is worse than a
+            panel without a label. */}
+        <input
+          value={book.title}
+          onChange={(e) => renameBook(bookId, e.target.value)}
+          onBlur={(e) => {
+            if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
+          }}
+          aria-label="Book title"
+          spellCheck={false}
+          className="min-w-0 flex-1 truncate rounded-sm bg-transparent font-sans
+                     text-lg font-semibold text-fg outline-none
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        />
         <button
           type="button"
           onClick={() => handleCreate("body")}
