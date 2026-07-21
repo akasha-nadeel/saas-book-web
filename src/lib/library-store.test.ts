@@ -7,6 +7,7 @@ import {
   deleteChapter,
   ensureChapter,
   findBook,
+  getNotes,
   getPrefs,
   getShelf,
   migrateLegacy,
@@ -14,6 +15,7 @@ import {
   renameBook,
   renameChapter,
   saveBody,
+  saveNotes,
   setBookAuthor,
   setPref,
   touchLastOpened,
@@ -345,7 +347,12 @@ it("keeps the author separate per book", () => {
 });
 
 it("starts with both writing modes off", () => {
-  expect(getPrefs()).toEqual({ focusMode: false, typewriter: false });
+  expect(getPrefs()).toEqual({
+    focusMode: false,
+    typewriter: false,
+    leftPanel: true,
+    rightPanel: false,
+  });
 });
 
 it("returns an identical prefs reference on repeat reads", () => {
@@ -353,24 +360,74 @@ it("returns an identical prefs reference on repeat reads", () => {
   expect(getPrefs()).toBe(getPrefs());
 });
 
-it("sets one preference without disturbing the other", () => {
+it("sets one preference without disturbing the others", () => {
   setPref("focusMode", true);
-  expect(getPrefs()).toEqual({ focusMode: true, typewriter: false });
+  expect(getPrefs()).toMatchObject({ focusMode: true, typewriter: false });
 
   setPref("typewriter", true);
-  expect(getPrefs()).toEqual({ focusMode: true, typewriter: true });
+  expect(getPrefs()).toMatchObject({ focusMode: true, typewriter: true });
 
   setPref("focusMode", false);
-  expect(getPrefs()).toEqual({ focusMode: false, typewriter: true });
+  expect(getPrefs()).toMatchObject({ focusMode: false, typewriter: true });
 });
 
 it("degrades to defaults when prefs are corrupt", () => {
   localStorage.setItem("openchapter:prefs", "{ not json");
-  expect(getPrefs()).toEqual({ focusMode: false, typewriter: false });
+  expect(getPrefs()).toEqual({
+    focusMode: false,
+    typewriter: false,
+    leftPanel: true,
+    rightPanel: false,
+  });
 });
 
 it("keeps prefs out of the shelf document", () => {
   // Preferences are not book data; a shelf write must not carry them.
   setPref("focusMode", true);
   expect(localStorage.getItem("openchapter:shelf")).toBeNull();
+});
+
+it("starts a chapter with no notes", () => {
+  const { chapterId } = createBook();
+  expect(getNotes(chapterId)).toBeNull();
+});
+
+it("saves and reads chapter notes", () => {
+  const { chapterId } = createBook();
+  saveNotes(chapterId, "Cut the market scene.");
+  expect(getNotes(chapterId)).toBe("Cut the market scene.");
+});
+
+it("keeps notes out of the shelf document", () => {
+  // Notes are unbounded text, like a chapter body. Putting them in the shelf
+  // would make every keystroke rewrite the document the sidebar reads.
+  const { chapterId } = createBook();
+  saveNotes(chapterId, "a long note");
+  expect(localStorage.getItem("openchapter:shelf")).not.toContain("a long note");
+  expect(localStorage.getItem(`openchapter:notes:${chapterId}`)).toBe(
+    "a long note",
+  );
+});
+
+it("deletes notes along with the chapter", () => {
+  const { bookId, chapterId } = createBook();
+  saveNotes(chapterId, "gone soon");
+  deleteChapter(bookId, chapterId);
+  expect(getNotes(chapterId)).toBeNull();
+});
+
+it("deletes notes for every chapter of a deleted book", () => {
+  const { bookId, chapterId } = createBook();
+  saveNotes(chapterId, "gone soon");
+  deleteBook(bookId);
+  expect(getNotes(chapterId)).toBeNull();
+});
+
+it("remembers which panels are open", () => {
+  expect(getPrefs().leftPanel).toBe(true);
+  expect(getPrefs().rightPanel).toBe(false);
+
+  setPref("rightPanel", true);
+  expect(getPrefs().rightPanel).toBe(true);
+  expect(getPrefs().leftPanel).toBe(true);
 });

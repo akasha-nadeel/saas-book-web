@@ -22,6 +22,7 @@
 
 const SHELF_KEY = "openchapter:shelf";
 const BODY_PREFIX = "openchapter:chapter:";
+const NOTES_PREFIX = "openchapter:notes:";
 
 export interface ChapterMeta {
   id: string;
@@ -57,6 +58,7 @@ const EMPTY_SHELF: Shelf = Object.freeze({
 });
 
 const bodyKey = (id: string) => `${BODY_PREFIX}${id}`;
+const notesKey = (id: string) => `${NOTES_PREFIX}${id}`;
 
 function newId(): string {
   // randomUUID needs a secure context; plain http://<lan-ip>:3000 isn't one.
@@ -264,6 +266,7 @@ export function deleteBook(bookId: string) {
   for (const chapter of doomed.chapters) {
     try {
       window.localStorage.removeItem(bodyKey(chapter.id));
+      window.localStorage.removeItem(notesKey(chapter.id));
     } catch {
       // Unreachable bytes, not a broken app.
     }
@@ -324,6 +327,7 @@ export function deleteChapter(bookId: string, chapterId: string) {
 
   try {
     window.localStorage.removeItem(bodyKey(chapterId));
+    window.localStorage.removeItem(notesKey(chapterId));
   } catch {
     // The shelf entry is gone, which is what removes it from the UI. An
     // orphaned body is wasted bytes, not a broken app.
@@ -495,11 +499,19 @@ export interface Prefs {
   focusMode: boolean;
   /** Hold the caret at a fixed height instead of letting it sink. */
   typewriter: boolean;
+  /** The chapters-and-notes panel. */
+  leftPanel: boolean;
+  /** The assistant panel. */
+  rightPanel: boolean;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
   focusMode: false,
   typewriter: false,
+  // Navigation is open by default; the assistant is opt-in, since it is the
+  // only part of the app that talks to a server.
+  leftPanel: true,
+  rightPanel: false,
 });
 
 const prefsListeners = new Set<() => void>();
@@ -538,6 +550,8 @@ function parsePrefs(raw: string | null): Prefs {
     return {
       focusMode: parsed.focusMode === true,
       typewriter: parsed.typewriter === true,
+      leftPanel: parsed.leftPanel !== false,
+      rightPanel: parsed.rightPanel === true,
     };
   } catch {
     return DEFAULT_PREFS;
@@ -557,4 +571,38 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
     return;
   }
   for (const listener of prefsListeners) listener();
+}
+
+// ---------------------------------------------------------------------------
+// Chapter notes
+//
+// At their own key, like chapter bodies and for the same reason: notes are
+// unbounded text a writer types into, and putting them in the shelf would make
+// every keystroke rewrite the document the sidebar reads.
+// ---------------------------------------------------------------------------
+
+export function subscribeToNotes(id: string, onStoreChange: () => void) {
+  const key = notesKey(id);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
+export function getNotes(id: string): string | null {
+  return readRaw(notesKey(id));
+}
+
+export function getServerNotes(): string | null {
+  return null;
+}
+
+export function saveNotes(id: string, text: string) {
+  try {
+    if (text) window.localStorage.setItem(notesKey(id), text);
+    else window.localStorage.removeItem(notesKey(id));
+  } catch (err) {
+    console.error("[store] could not write notes", err);
+  }
 }

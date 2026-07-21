@@ -8,7 +8,6 @@ import {
   deleteChapter,
   findBook,
   moveChapter,
-  renameBook,
 } from "@/lib/library-store";
 import { useShelf } from "@/lib/use-library";
 
@@ -58,35 +57,9 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   };
 
   return (
-    <aside
-      className="flex w-(--sidebar-width) shrink-0 flex-col border-r
-                 border-line bg-panel"
-      aria-label="Chapters"
-    >
-      <div className="px-5 pt-6 pb-4">
-        <Link
-          href="/"
-          className="rounded-sm font-sans text-xs text-muted outline-none
-                     hover:text-accent focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          ← All books
-        </Link>
-        <input
-          value={book?.title ?? ""}
-          onChange={(e) => renameBook(bookId, e.target.value)}
-          onBlur={(e) => {
-            if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
-          }}
-          aria-label="Book title"
-          spellCheck={false}
-          className="mt-2 w-full truncate rounded-sm bg-transparent font-serif
-                     text-base text-fg outline-none focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        />
-      </div>
-
-      <nav className="flex-1 overflow-y-auto px-2 pb-2">
+    // No width or chrome of its own: it is one tab inside the left panel now.
+    <div className="flex h-full flex-col" aria-label="Chapters">
+      <nav className="flex-1 px-2 pt-2 pb-2">
         <ol>
           {chapters.map((chapter, index) => {
             const isActive = chapter.id === activeId;
@@ -180,6 +153,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           + New chapter
         </button>
       </div>
-    </aside>
+    </div>
   );
 }

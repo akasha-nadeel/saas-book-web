@@ -4,11 +4,14 @@ import { useCallback, useSyncExternalStore } from "react";
 import {
   getBody,
   getServerBody,
+  getNotes,
   getPrefs,
+  getServerNotes,
   getServerPrefs,
   getServerShelf,
   getShelf,
   subscribeToBody,
+  subscribeToNotes,
   subscribeToPrefs,
   subscribeToShelf,
   type Prefs,
@@ -59,4 +62,14 @@ export function useChapterBody(id: string): string | null {
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */
 export function usePrefs(): Prefs {
   return useSyncExternalStore(subscribeToPrefs, getPrefs, getServerPrefs);
+}
+
+/** A chapter's notes, or null if none have been written. */
+export function useNotes(id: string): string | null {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToNotes(id, onStoreChange),
+    [id],
+  );
+  const snapshot = useCallback(() => getNotes(id), [id]);
+  return useSyncExternalStore(subscribe, snapshot, getServerNotes);
 }
