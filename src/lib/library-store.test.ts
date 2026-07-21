@@ -3,8 +3,6 @@ import {
   archiveBook,
   bookWordCount,
   bookmarks,
-  addPart,
-  chaptersInPart,
   booksIn,
   createBook,
   createBookFromTemplate,
@@ -25,10 +23,6 @@ import {
   saveBody,
   saveNotes,
   setBookAuthor,
-  partsOf,
-  removePart,
-  renamePart,
-  setChapterPart,
   setPageSetup,
   setPref,
   touchLastOpened,
@@ -779,127 +773,11 @@ it("drops a bookmark with the chapter it marked", () => {
   ]);
 });
 
-it("puts a new chapter in the body by default", () => {
-  const { bookId, chapterId } = createBook("A");
-  const book = findBook(getShelf(), bookId)!;
-  // Absent rather than "body", so books made before matter existed need no
-  // migration and still read correctly.
-  expect(book.chapters[0].part).toBeUndefined();
-  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([chapterId]);
-});
-
-it("moves a chapter into front or back matter", () => {
-  const { bookId, chapterId } = createBook("A");
-
-  setChapterPart(bookId, chapterId, "front");
-  let book = findBook(getShelf(), bookId)!;
-  expect(chaptersInPart(book, "front").map((c) => c.id)).toEqual([chapterId]);
-  expect(chaptersInPart(book, "body")).toEqual([]);
-
-  setChapterPart(bookId, chapterId, "body");
-  book = findBook(getShelf(), bookId)!;
-  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([chapterId]);
-  expect(chaptersInPart(book, "front")).toEqual([]);
-});
-
-it("keeps each part in the book's own chapter order", () => {
+it("counts words across every chapter in the book", () => {
   const { bookId, chapterId } = createBook("A");
   const two = createChapter(bookId, "Two");
-  const three = createChapter(bookId, "Three");
-
-  setChapterPart(bookId, three, "front");
-  setChapterPart(bookId, chapterId, "front");
-
-  const book = findBook(getShelf(), bookId)!;
-  // chapterId comes first because it is first in the book, not because it was
-  // assigned last.
-  expect(chaptersInPart(book, "front").map((c) => c.id)).toEqual([
-    chapterId,
-    three,
-  ]);
-  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([two]);
-});
-
-it("starts every book with the three default sections", () => {
-  const { bookId } = createBook("A");
-  const book = findBook(getShelf(), bookId)!;
-
-  // Absent rather than a stored copy, so books made before sections were
-  // editable read identically.
-  expect(book.parts).toBeUndefined();
-  expect(partsOf(book).map((p) => p.id)).toEqual(["front", "body", "back"]);
-});
-
-it("adds a section and files chapters under it", () => {
-  const { bookId, chapterId } = createBook("A");
-  const partId = addPart(bookId, "Interludes")!;
-
-  setChapterPart(bookId, chapterId, partId);
-  const book = findBook(getShelf(), bookId)!;
-
-  expect(partsOf(book).map((p) => p.label)).toEqual([
-    "Front matter",
-    "Body",
-    "Back matter",
-    "Interludes",
-  ]);
-  expect(chaptersInPart(book, partId).map((c) => c.id)).toEqual([chapterId]);
-});
-
-it("refuses a blank section label", () => {
-  const { bookId } = createBook("A");
-  expect(addPart(bookId, "   ")).toBeNull();
-  expect(partsOf(findBook(getShelf(), bookId)!)).toHaveLength(3);
-});
-
-it("returns a removed section's chapters to the body", () => {
-  const { bookId, chapterId } = createBook("A");
-  const partId = addPart(bookId, "Interludes")!;
-  setChapterPart(bookId, chapterId, partId);
-
-  removePart(bookId, partId);
-  const book = findBook(getShelf(), bookId)!;
-
-  // The section is a label on a group of chapters. Deleting it must not delete
-  // what it labelled.
-  expect(partsOf(book).map((p) => p.id)).toEqual(["front", "body", "back"]);
-  expect(book.chapters).toHaveLength(1);
-  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([chapterId]);
-  expect(book.chapters[0].part).toBeUndefined();
-});
-
-it("refuses to remove a built-in section", () => {
-  const { bookId } = createBook("A");
-  addPart(bookId, "Interludes");
-
-  for (const id of ["front", "body", "back"]) {
-    removePart(bookId, id);
-  }
-
-  expect(partsOf(findBook(getShelf(), bookId)!).map((p) => p.id)).toEqual([
-    "front",
-    "body",
-    "back",
-    expect.any(String),
-  ]);
-});
-
-it("renames a section without touching its chapters", () => {
-  const { bookId, chapterId } = createBook("A");
-  const partId = addPart(bookId, "Interlude")!;
-  setChapterPart(bookId, chapterId, partId);
-
-  renamePart(bookId, partId, "Interludes");
-  const book = findBook(getShelf(), bookId)!;
-
-  expect(partsOf(book).find((p) => p.id === partId)?.label).toBe("Interludes");
-  expect(chaptersInPart(book, partId).map((c) => c.id)).toEqual([chapterId]);
-});
-
-it("counts words for the whole book regardless of part", () => {
-  const { bookId, chapterId } = createBook("A");
   saveBody(bookId, chapterId, { type: "doc" }, 500);
-  setChapterPart(bookId, chapterId, "back");
+  saveBody(bookId, two, { type: "doc" }, 204);
 
-  expect(bookWordCount(findBook(getShelf(), bookId)!)).toBe(500);
+  expect(bookWordCount(findBook(getShelf(), bookId)!)).toBe(704);
 });
