@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  bookWordCount,
   chaptersInPart,
   createChapter,
   deleteChapter,
@@ -87,20 +88,24 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2.5">
-        <span className="truncate font-sans text-sm font-semibold text-fg">
+      <div className="flex h-16 shrink-0 items-center justify-between gap-3 px-5">
+        <span className="truncate font-sans text-xl font-semibold text-fg">
           Manuscript
         </span>
         <button
           type="button"
           onClick={() => handleCreate("body")}
-          className="flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1
-                     font-sans text-xs font-semibold text-white outline-none
-                     transition-colors hover:bg-accent-strong
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="flex shrink-0 items-center gap-2 rounded-full font-sans
+                     text-sm font-semibold text-fg outline-none
+                     transition-colors hover:text-white focus-visible:ring-2
+                     focus-visible:ring-accent/60"
         >
           Add
-          <span aria-hidden="true" className="text-sm leading-none">
+          <span
+            aria-hidden="true"
+            className="flex h-7 w-7 items-center justify-center rounded-full
+                       bg-accent text-base leading-none text-white"
+          >
             +
           </span>
         </button>
@@ -127,17 +132,17 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 overPart === key && dragId ? "bg-accent-deep/25" : undefined
               }
             >
-              <div className="flex items-center justify-between gap-2 px-3 py-2">
+              <div className="flex items-center justify-between gap-2 bg-raised/40 px-5 py-3">
                 <button
                   type="button"
                   onClick={() =>
                     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
                   }
                   aria-expanded={isOpen}
-                  className="flex items-center gap-1.5 rounded-sm font-sans
-                             text-xs font-semibold tracking-wide text-fg
-                             uppercase outline-none hover:text-accent-strong
-                             focus-visible:ring-2 focus-visible:ring-accent/60"
+                  className="flex items-center gap-2 rounded-sm font-sans
+                             text-sm font-semibold text-fg outline-none
+                             hover:text-accent-strong focus-visible:ring-2
+                             focus-visible:ring-accent/60"
                 >
                   <span
                     aria-hidden="true"
@@ -155,7 +160,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   onClick={() => handleCreate(key)}
                   aria-label={`Add to ${label}`}
                   title={`Add to ${label}`}
-                  className="rounded-sm px-1 font-sans text-xs text-muted
+                  className="rounded-sm px-1 font-sans text-sm text-muted
                              outline-none hover:text-fg focus-visible:ring-2
                              focus-visible:ring-accent/60"
                 >
@@ -164,13 +169,13 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
               </div>
 
               {isOpen && chapters.length === 0 && (
-                <p className="px-3 pb-3 font-sans text-xs text-muted italic">
+                <p className="px-5 py-4 font-sans text-sm text-muted italic">
                   {empty}
                 </p>
               )}
 
               {isOpen && chapters.length > 0 && (
-                <ol className="px-2 pb-2">
+                <ol>
                   {chapters.map((chapter) => {
                     const isActive = chapter.id === activeId;
                     // Numbering runs within the part, as it does in a book.
@@ -185,7 +190,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                           setDragId(null);
                           setOverPart(null);
                         }}
-                        className={`group relative rounded-sm ${
+                        className={`group relative ${
                           dragId === chapter.id ? "opacity-40" : ""
                         }`}
                       >
@@ -205,15 +210,19 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                               moveChapter(bookId, index, index + 1);
                             }
                           }}
-                          className={`flex items-baseline gap-2 rounded-md py-2
-                                      pr-16 pl-3 font-sans text-sm outline-none
-                                      transition-colors focus-visible:ring-2
+                          className={`flex items-center gap-3 border-l-4 py-3.5
+                                      pr-20 pl-4 font-sans text-sm outline-none
+                                      transition-colors focus-visible:ring-inset
+                                      focus-visible:ring-2
                                       focus-visible:ring-accent/60 ${
                                         isActive
-                                          ? "bg-accent-deep text-white"
-                                          : "text-muted hover:bg-raised hover:text-fg"
+                                          ? "border-accent bg-accent-deep font-medium text-white"
+                                          : "border-transparent text-muted hover:bg-raised hover:text-fg"
                                       }`}
                         >
+                          <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
+                            {index + 1}
+                          </span>
                           <span className="flex-1 truncate">
                             {chapter.title}
                           </span>
@@ -236,7 +245,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                           }
                           aria-pressed={Boolean(chapter.bookmarked)}
                           title="Bookmark"
-                          className={`absolute top-1/2 right-7 -translate-y-1/2
+                          className={`absolute top-1/2 right-9 -translate-y-1/2
                                       rounded-sm px-1 py-0.5 text-sm leading-none
                                       outline-none transition-opacity
                                       focus-visible:opacity-100
@@ -254,7 +263,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                           type="button"
                           onClick={() => handleDelete(chapter)}
                           aria-label={`Delete ${chapter.title}`}
-                          className="absolute top-1/2 right-1 -translate-y-1/2
+                          className="absolute top-1/2 right-3 -translate-y-1/2
                                      rounded-sm px-1.5 py-0.5 font-sans text-sm
                                      leading-none text-muted opacity-0
                                      outline-none transition-opacity
@@ -273,6 +282,17 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             </section>
           );
         })}
+      </div>
+
+      {/* The reference closes the panel with a running total and its wordmark;
+          both belong to the manuscript rather than to any one chapter. */}
+      <div className="shrink-0 border-t border-line">
+        <p className="px-5 py-3.5 font-sans text-sm text-muted">
+          {bookWordCount(book).toLocaleString()} words
+        </p>
+        <p className="border-t border-line px-5 py-3.5 font-display text-lg font-medium text-fg">
+          OpenChapter
+        </p>
       </div>
     </div>
   );

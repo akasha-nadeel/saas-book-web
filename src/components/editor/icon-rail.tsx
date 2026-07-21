@@ -24,11 +24,13 @@ export function RailButton({
   href?: string;
   children: React.ReactNode;
 }) {
-  const className = `flex h-10 w-10 items-center justify-center rounded-md
+  // A large filled tile for the active rail item, as in the reference, rather
+  // than a subtle tint — at this size the rail is the primary navigation.
+  const className = `flex h-12 w-12 items-center justify-center rounded-xl
                      outline-none transition-colors focus-visible:ring-2
                      focus-visible:ring-accent/60 ${
                        active
-                         ? "bg-accent-deep text-white"
+                         ? "bg-accent text-white"
                          : "text-muted hover:bg-raised hover:text-fg"
                      }`;
 
@@ -81,8 +83,10 @@ export function Rail({
   return (
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
-      className={`flex w-14 shrink-0 flex-col items-center gap-1 bg-surface py-3
-                  ${side === "left" ? "border-r" : "border-l"} border-line`}
+      className={`flex w-(--rail-width) shrink-0 flex-col items-center gap-2
+                  bg-surface py-4 ${
+                    side === "left" ? "border-r" : "border-l"
+                  } border-line`}
     >
       {children}
       {footer && <div className="mt-auto flex flex-col gap-1">{footer}</div>}

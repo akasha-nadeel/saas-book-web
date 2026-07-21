@@ -34,10 +34,11 @@
   --text-manuscript--line-height: 1.75;
 }
 
-/* App shell. Not a @theme token — a layout constant, not part of the design
-   language. Sets the width of the chapters-and-notes panel. */
+/* App shell. Layout constants, not part of the design language. Measured off
+   the reference: a 5rem rail and a 24rem manuscript panel. */
 :root {
-  --sidebar-width: 16rem;
+  --rail-width: 5rem;
+  --sidebar-width: 24rem;
 }
 
 body {
