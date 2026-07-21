@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ExportDialog } from "@/components/export/export-dialog";
+import { TemplatesDialog } from "@/components/shelf/templates-dialog";
+import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
 import {
   bookWordCount,
   createBook,
@@ -21,6 +23,7 @@ export function Bookshelf() {
 
   const [exporting, setExporting] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
+  const [dialog, setDialog] = useState<"templates" | "upgrade" | null>(null);
 
   // migrateLegacy is idempotent, but running it twice is still wasted work and
   // React runs effects twice in development.
@@ -76,10 +79,18 @@ export function Bookshelf() {
     // below it — that stacking is what makes the panel's one rounded corner
     // sit where it does in the reference.
     <div className="flex h-full flex-col">
-      <ShelfTopNav continueId={continueId} onCreate={handleCreate} />
+      <ShelfTopNav
+        continueId={continueId}
+        onTemplates={() => setDialog("templates")}
+        onUpgrade={() => setDialog("upgrade")}
+      />
 
       <div className="flex min-h-0 flex-1">
-        <ShelfNav bookCount={books.length} totalWords={totalWords} />
+        <ShelfNav
+          bookCount={books.length}
+          totalWords={totalWords}
+          onCreate={handleCreate}
+        />
 
         {/* One rounded corner, top-left, and the panel runs off the right and
             bottom edges. The separation from the sidebar is the shade change and
@@ -141,6 +152,10 @@ export function Bookshelf() {
       {exporting && (
         <ExportDialog book={exporting} onClose={() => setExporting(null)} />
       )}
+      {dialog === "templates" && (
+        <TemplatesDialog onClose={() => setDialog(null)} />
+      )}
+      {dialog === "upgrade" && <UpgradeDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -148,17 +163,19 @@ export function Bookshelf() {
 /**
  * The bar across the top.
  *
- * The reference carries Product, Solutions, Templates and Pricing here — links
- * to marketing pages for a hosted product. This app has none of those, so the
- * bar holds the two things a writer actually wants reachable from anywhere:
- * getting back into the book they were writing, and starting a new one.
+ * Templates and Upgrade sit where the reference puts its product links.
+ * Templates does real work — it builds a book with its chapters laid out.
+ * Upgrade cannot: there are no accounts and no billing, so it opens a dialog
+ * saying so rather than pretending to sell something.
  */
 function ShelfTopNav({
   continueId,
-  onCreate,
+  onTemplates,
+  onUpgrade,
 }: {
   continueId: string | null;
-  onCreate: () => void;
+  onTemplates: () => void;
+  onUpgrade: () => void;
 }) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-6 bg-surface px-6">
@@ -169,26 +186,37 @@ function ShelfTopNav({
         </p>
       </div>
 
-      <nav className="ml-auto flex items-center gap-5 font-sans text-sm">
+      <nav className="ml-auto flex items-center gap-2 font-sans text-sm">
+        <button
+          type="button"
+          onClick={onTemplates}
+          className="rounded-md px-3 py-2 text-muted outline-none
+                     transition-colors hover:bg-raised hover:text-fg
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          Templates
+        </button>
+
         {continueId && (
           <Link
             href={`/book/${continueId}`}
-            className="rounded-md text-muted outline-none transition-colors
-                       hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
+            className="rounded-md px-3 py-2 text-muted outline-none
+                       transition-colors hover:bg-raised hover:text-fg
+                       focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             Continue writing
           </Link>
         )}
+
         <button
           type="button"
-          onClick={onCreate}
-          className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                     font-semibold text-white outline-none transition-colors
+          onClick={onUpgrade}
+          className="ml-2 rounded-md bg-accent px-4 py-2 font-semibold
+                     text-white outline-none transition-colors
                      hover:bg-accent-strong focus-visible:ring-2
                      focus-visible:ring-accent/60"
         >
-          New book
+          Upgrade
         </button>
       </nav>
     </header>
@@ -198,9 +226,11 @@ function ShelfTopNav({
 function ShelfNav({
   bookCount,
   totalWords,
+  onCreate,
 }: {
   bookCount: number;
   totalWords: number;
+  onCreate: () => void;
 }) {
   return (
     <aside
@@ -209,7 +239,18 @@ function ShelfNav({
       className="flex w-(--sidebar-width) shrink-0 flex-col bg-surface px-4 pt-2 pb-6"
       aria-label="Library"
     >
-      <nav>
+      <button
+        type="button"
+        onClick={onCreate}
+        className="w-full rounded-md bg-accent py-2.5 font-sans text-sm
+                   font-semibold text-white outline-none transition-colors
+                   hover:bg-accent-strong focus-visible:ring-2
+                   focus-visible:ring-accent/60"
+      >
+        New book
+      </button>
+
+      <nav className="mt-4">
         {/* One item, because one is all that is real. Overleaf's Archived and
             Trashed correspond to features this app does not have, and a dead
             link is worse than a short list. */}

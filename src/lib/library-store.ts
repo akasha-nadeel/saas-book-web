@@ -652,3 +652,27 @@ export function setPageSetup(bookId: string, patch: Partial<PageSetup>) {
     page: { ...pageSetupOf(book), ...patch },
   }));
 }
+
+/**
+ * A book with its chapters already laid out.
+ *
+ * Composed from the calls above rather than writing the shelf directly, so a
+ * template gets exactly the same book a writer would build by hand.
+ */
+export function createBookFromTemplate(
+  title: string,
+  chapterTitles: readonly string[],
+): { bookId: string; chapterId: string } {
+  const { bookId, chapterId } = createBook(title);
+
+  // createBook already made one chapter; rename it rather than leaving a stray
+  // "Chapter One" in front of the template's own first chapter.
+  const [first, ...rest] = chapterTitles.length
+    ? chapterTitles
+    : ["Chapter One"];
+
+  renameChapter(bookId, chapterId, first);
+  for (const chapterTitle of rest) createChapter(bookId, chapterTitle);
+
+  return { bookId, chapterId };
+}

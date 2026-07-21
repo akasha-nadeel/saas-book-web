@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import {
   bookWordCount,
   createBook,
+  createBookFromTemplate,
   createChapter,
   deleteBook,
   deleteChapter,
@@ -492,4 +493,32 @@ it("keeps page setup per book", () => {
 
   expect(pageSetupOf(findBook(getShelf(), a.bookId)!).size).toBe("a5");
   expect(pageSetupOf(findBook(getShelf(), b.bookId)!).size).toBe("letter");
+});
+
+it("creates a book from a template's chapter list", () => {
+  const { bookId } = createBookFromTemplate("The Salt Road", [
+    "Act One",
+    "Act Two",
+    "Act Three",
+  ]);
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.title).toBe("The Salt Road");
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "Act One",
+    "Act Two",
+    "Act Three",
+  ]);
+});
+
+it("returns the first chapter so the caller can open it", () => {
+  const { bookId, chapterId } = createBookFromTemplate("T", ["Opening", "Next"]);
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters[0].id).toBe(chapterId);
+});
+
+it("still makes one chapter for an empty template", () => {
+  // A book with no chapters is a dead end for the route that opens it.
+  const { bookId } = createBookFromTemplate("Bare", []);
+  expect(findBook(getShelf(), bookId)!.chapters).toHaveLength(1);
 });
