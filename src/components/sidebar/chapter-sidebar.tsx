@@ -59,7 +59,23 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   return (
     // No width or chrome of its own: it is one tab inside the left panel now.
     <div className="flex h-full flex-col" aria-label="Chapters">
-      <nav className="flex-1 px-2 pt-2 pb-2">
+      {/* The create action leads, above the list and outside the scroll area —
+          on a forty-chapter book a button at the bottom is off-screen exactly
+          when the list is long enough to need it. */}
+      <div className="shrink-0 px-3 pt-3 pb-2">
+        <button
+          type="button"
+          onClick={handleCreate}
+          className="w-full rounded-md bg-accent py-2 text-center font-sans
+                     text-sm font-semibold text-white outline-none
+                     transition-colors hover:bg-accent-strong
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          New chapter
+        </button>
+      </div>
+
+      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         <ol>
           {chapters.map((chapter, index) => {
             const isActive = chapter.id === activeId;
@@ -143,21 +159,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           })}
         </ol>
       </nav>
-
-      <div className="px-3 pt-2 pb-4">
-        {/* A real primary button rather than a line of grey text — creating a
-            chapter is the main thing this panel is for. */}
-        <button
-          type="button"
-          onClick={handleCreate}
-          className="w-full rounded-md bg-accent py-2 text-center font-sans
-                     text-sm font-semibold text-white outline-none
-                     transition-colors hover:bg-accent-strong
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          New chapter
-        </button>
-      </div>
     </div>
   );
 }

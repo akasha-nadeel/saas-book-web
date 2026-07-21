@@ -51,7 +51,9 @@ export function LeftPanel({
         ))}
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      {/* No scroll of its own: each tab owns its scrolling, so the chapter list
+          can scroll under a pinned button while notes scroll whole. */}
+      <div className="min-h-0 flex-1">
         {tab === "chapters" ? (
           <ChapterSidebar bookId={bookId} />
         ) : (
