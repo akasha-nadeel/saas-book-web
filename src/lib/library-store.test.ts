@@ -3,6 +3,7 @@ import {
   archiveBook,
   bookWordCount,
   bookmarks,
+  chaptersInPart,
   booksIn,
   createBook,
   createBookFromTemplate,
@@ -23,6 +24,7 @@ import {
   saveBody,
   saveNotes,
   setBookAuthor,
+  setChapterPart,
   setPageSetup,
   setPref,
   touchLastOpened,
@@ -660,4 +662,53 @@ it("drops a bookmark with the chapter it marked", () => {
   expect(findBook(getShelf(), bookId)!.chapters.map((c) => c.id)).toEqual([
     chapterId,
   ]);
+});
+
+it("puts a new chapter in the body by default", () => {
+  const { bookId, chapterId } = createBook("A");
+  const book = findBook(getShelf(), bookId)!;
+  // Absent rather than "body", so books made before matter existed need no
+  // migration and still read correctly.
+  expect(book.chapters[0].part).toBeUndefined();
+  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([chapterId]);
+});
+
+it("moves a chapter into front or back matter", () => {
+  const { bookId, chapterId } = createBook("A");
+
+  setChapterPart(bookId, chapterId, "front");
+  let book = findBook(getShelf(), bookId)!;
+  expect(chaptersInPart(book, "front").map((c) => c.id)).toEqual([chapterId]);
+  expect(chaptersInPart(book, "body")).toEqual([]);
+
+  setChapterPart(bookId, chapterId, "body");
+  book = findBook(getShelf(), bookId)!;
+  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([chapterId]);
+  expect(chaptersInPart(book, "front")).toEqual([]);
+});
+
+it("keeps each part in the book's own chapter order", () => {
+  const { bookId, chapterId } = createBook("A");
+  const two = createChapter(bookId, "Two");
+  const three = createChapter(bookId, "Three");
+
+  setChapterPart(bookId, three, "front");
+  setChapterPart(bookId, chapterId, "front");
+
+  const book = findBook(getShelf(), bookId)!;
+  // chapterId comes first because it is first in the book, not because it was
+  // assigned last.
+  expect(chaptersInPart(book, "front").map((c) => c.id)).toEqual([
+    chapterId,
+    three,
+  ]);
+  expect(chaptersInPart(book, "body").map((c) => c.id)).toEqual([two]);
+});
+
+it("counts words for the whole book regardless of part", () => {
+  const { bookId, chapterId } = createBook("A");
+  saveBody(bookId, chapterId, { type: "doc" }, 500);
+  setChapterPart(bookId, chapterId, "back");
+
+  expect(bookWordCount(findBook(getShelf(), bookId)!)).toBe(500);
 });

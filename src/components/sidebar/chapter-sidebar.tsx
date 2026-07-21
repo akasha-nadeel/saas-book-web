@@ -4,13 +4,31 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  chaptersInPart,
   createChapter,
   deleteChapter,
   findBook,
   moveChapter,
+  setChapterPart,
   toggleBookmark,
+  type ChapterMeta,
+  type ChapterPart,
 } from "@/lib/library-store";
 import { useShelf } from "@/lib/use-library";
+
+/**
+ * The manuscript: front matter, body, back matter.
+ *
+ * A part is a field on the chapter, so this is three filtered views of one
+ * ordered list rather than three lists. Dragging between sections therefore
+ * moves a chapter *and* reassigns it, which is what the reference does too.
+ */
+
+const PARTS: { key: ChapterPart; label: string; empty: string }[] = [
+  { key: "front", label: "Front matter", empty: "Copyright, dedication…" },
+  { key: "body", label: "Body", empty: "Drag chapters here" },
+  { key: "back", label: "Back matter", empty: "Acknowledgements, notes…" },
+];
 
 export function ChapterSidebar({ bookId }: { bookId: string }) {
   const shelf = useShelf();
@@ -18,8 +36,9 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [dragIndex, setDragIndex] = useState<number | null>(null);
-  const [overIndex, setOverIndex] = useState<number | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overPart, setOverPart] = useState<ChapterPart | null>(null);
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -28,21 +47,24 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     ? decodeURIComponent(pathname.slice(prefix.length))
     : null;
 
-  const chapters = book?.chapters ?? [];
+  if (!book) return null;
 
-  const handleCreate = () => {
-    router.push(`/book/${bookId}/chapter/${createChapter(bookId)}`);
+  const handleCreate = (part: ChapterPart) => {
+    const id = createChapter(bookId);
+    if (part !== "body") setChapterPart(bookId, id, part);
+    router.push(`/book/${bookId}/chapter/${id}`);
   };
 
-  const handleDelete = (id: string, title: string) => {
+  const handleDelete = (chapter: ChapterMeta) => {
     // A chapter is somebody's prose. Cheap dialog, but never silently.
-    if (!window.confirm(`Delete “${title}”? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete “${chapter.title}”? This cannot be undone.`))
+      return;
 
-    const remaining = chapters.filter((c) => c.id !== id);
-    deleteChapter(bookId, id);
+    const remaining = book.chapters.filter((c) => c.id !== chapter.id);
+    deleteChapter(bookId, chapter.id);
 
     // Only navigate if the writer just deleted the chapter they were reading.
-    if (id === activeId) {
+    if (chapter.id === activeId) {
       router.replace(
         remaining.length
           ? `/book/${bookId}/chapter/${remaining[0].id}`
@@ -51,139 +73,207 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     }
   };
 
-  const handleDrop = (to: number) => {
-    if (dragIndex !== null) moveChapter(bookId, dragIndex, to);
-    setDragIndex(null);
-    setOverIndex(null);
+  /** Drop onto a section: reassign, and move to that section's end. */
+  const handleDropOn = (part: ChapterPart) => {
+    if (!dragId) return;
+
+    const chapter = book.chapters.find((c) => c.id === dragId);
+    if (chapter && (chapter.part ?? "body") !== part) {
+      setChapterPart(bookId, dragId, part);
+    }
+    setDragId(null);
+    setOverPart(null);
   };
 
   return (
-    // No width or chrome of its own: it is one tab inside the left panel now.
-    <div className="flex h-full flex-col" aria-label="Chapters">
-      {/* The create action leads, above the list and outside the scroll area —
-          on a forty-chapter book a button at the bottom is off-screen exactly
-          when the list is long enough to need it. */}
-      <div className="shrink-0 px-3 pt-3 pb-2">
+    <div className="flex h-full flex-col" aria-label="Manuscript">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-2.5">
+        <span className="truncate font-sans text-sm font-semibold text-fg">
+          Manuscript
+        </span>
         <button
           type="button"
-          onClick={handleCreate}
-          className="w-full rounded-md bg-accent py-2 text-center font-sans
-                     text-sm font-semibold text-white outline-none
+          onClick={() => handleCreate("body")}
+          className="flex items-center gap-1.5 rounded-md bg-accent px-2.5 py-1
+                     font-sans text-xs font-semibold text-white outline-none
                      transition-colors hover:bg-accent-strong
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          New chapter
+          Add
+          <span aria-hidden="true" className="text-sm leading-none">
+            +
+          </span>
         </button>
       </div>
 
-      <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-        <ol>
-          {chapters.map((chapter, index) => {
-            const isActive = chapter.id === activeId;
+      <div className="min-h-0 flex-1 overflow-y-auto pb-3">
+        {PARTS.map(({ key, label, empty }) => {
+          const chapters = chaptersInPart(book, key);
+          const isOpen = !collapsed[key];
 
-            return (
-              <li
-                key={chapter.id}
-                draggable
-                onDragStart={() => setDragIndex(index)}
-                onDragEnd={() => {
-                  setDragIndex(null);
-                  setOverIndex(null);
-                }}
-                onDragOver={(e) => {
-                  // Without preventDefault the browser refuses the drop.
-                  e.preventDefault();
-                  setOverIndex(index);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  handleDrop(index);
-                }}
-                className={`group relative rounded-sm ${
-                  overIndex === index && dragIndex !== index
-                    ? "before:absolute before:inset-x-2 before:-top-px before:h-px before:bg-accent"
-                    : ""
-                } ${dragIndex === index ? "opacity-40" : ""}`}
-              >
-                <Link
-                  href={`/book/${bookId}/chapter/${chapter.id}`}
-                  aria-current={isActive ? "page" : undefined}
-                  // Native drag-and-drop is mouse-only, so reordering also
-                  // needs a keyboard path or it is unreachable for some writers.
-                  aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                  onKeyDown={(e) => {
-                    if (!e.altKey) return;
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      moveChapter(bookId, index, index - 1);
-                    } else if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      moveChapter(bookId, index, index + 1);
-                    }
-                  }}
-                  // The open chapter is filled, not tinted — a solid deep green
-                  // with white on it, the way a selected nav row reads.
-                  className={`flex items-baseline gap-2 rounded-md py-2 pr-16 pl-3
-                              font-sans text-sm outline-none transition-colors
-                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                                isActive
-                                  ? "bg-accent-deep text-white"
-                                  : "text-muted hover:bg-raised hover:text-fg"
-                              }`}
-                >
-                  <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
-                    {index + 1}
-                  </span>
-                  <span className="flex-1 truncate">{chapter.title}</span>
-                  {chapter.words > 0 && (
-                    <span className="shrink-0 text-xs tabular-nums opacity-50">
-                      {chapter.words.toLocaleString()}
-                    </span>
-                  )}
-                </Link>
-
-                {/* A marked chapter keeps its star visible; an unmarked one
-                    shows it on hover, so the row stays quiet until wanted. */}
+          return (
+            <section
+              key={key}
+              onDragOver={(e) => {
+                // Without preventDefault the browser refuses the drop.
+                e.preventDefault();
+                setOverPart(key);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                handleDropOn(key);
+              }}
+              className={
+                overPart === key && dragId ? "bg-accent-deep/25" : undefined
+              }
+            >
+              <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <button
                   type="button"
-                  onClick={() => toggleBookmark(bookId, chapter.id)}
-                  aria-label={
-                    chapter.bookmarked
-                      ? `Remove bookmark from ${chapter.title}`
-                      : `Bookmark ${chapter.title}`
+                  onClick={() =>
+                    setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }))
                   }
-                  aria-pressed={Boolean(chapter.bookmarked)}
-                  title="Bookmark"
-                  className={`absolute top-1/2 right-7 -translate-y-1/2 rounded-sm
-                              px-1 py-0.5 text-sm leading-none outline-none
-                              transition-opacity focus-visible:opacity-100
-                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                                chapter.bookmarked
-                                  ? "text-accent-strong opacity-100"
-                                  : "text-muted opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-fg"
-                              }`}
-                >
-                  {chapter.bookmarked ? "★" : "☆"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDelete(chapter.id, chapter.title)}
-                  aria-label={`Delete ${chapter.title}`}
-                  className="absolute top-1/2 right-1 -translate-y-1/2 rounded-sm px-1.5
-                             py-0.5 font-sans text-sm leading-none text-muted
-                             opacity-0 outline-none transition-opacity
-                             group-hover:opacity-60 hover:!opacity-100
-                             hover:text-red-400 focus-visible:opacity-100
+                  aria-expanded={isOpen}
+                  className="flex items-center gap-1.5 rounded-sm font-sans
+                             text-xs font-semibold tracking-wide text-fg
+                             uppercase outline-none hover:text-accent-strong
                              focus-visible:ring-2 focus-visible:ring-accent/60"
                 >
-                  ×
+                  <span
+                    aria-hidden="true"
+                    className={`text-[0.6rem] transition-transform ${
+                      isOpen ? "rotate-90" : ""
+                    }`}
+                  >
+                    ▶
+                  </span>
+                  {label}
                 </button>
-              </li>
-            );
-          })}
-        </ol>
-      </nav>
+
+                <button
+                  type="button"
+                  onClick={() => handleCreate(key)}
+                  aria-label={`Add to ${label}`}
+                  title={`Add to ${label}`}
+                  className="rounded-sm px-1 font-sans text-xs text-muted
+                             outline-none hover:text-fg focus-visible:ring-2
+                             focus-visible:ring-accent/60"
+                >
+                  add
+                </button>
+              </div>
+
+              {isOpen && chapters.length === 0 && (
+                <p className="px-3 pb-3 font-sans text-xs text-muted italic">
+                  {empty}
+                </p>
+              )}
+
+              {isOpen && chapters.length > 0 && (
+                <ol className="px-2 pb-2">
+                  {chapters.map((chapter) => {
+                    const isActive = chapter.id === activeId;
+                    // Numbering runs within the part, as it does in a book.
+                    const index = book.chapters.indexOf(chapter);
+
+                    return (
+                      <li
+                        key={chapter.id}
+                        draggable
+                        onDragStart={() => setDragId(chapter.id)}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setOverPart(null);
+                        }}
+                        className={`group relative rounded-sm ${
+                          dragId === chapter.id ? "opacity-40" : ""
+                        }`}
+                      >
+                        <Link
+                          href={`/book/${bookId}/chapter/${chapter.id}`}
+                          aria-current={isActive ? "page" : undefined}
+                          // Native drag is mouse-only, so reordering also needs
+                          // a keyboard path or it is unreachable for some.
+                          aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                          onKeyDown={(e) => {
+                            if (!e.altKey) return;
+                            if (e.key === "ArrowUp") {
+                              e.preventDefault();
+                              moveChapter(bookId, index, index - 1);
+                            } else if (e.key === "ArrowDown") {
+                              e.preventDefault();
+                              moveChapter(bookId, index, index + 1);
+                            }
+                          }}
+                          className={`flex items-baseline gap-2 rounded-md py-2
+                                      pr-16 pl-3 font-sans text-sm outline-none
+                                      transition-colors focus-visible:ring-2
+                                      focus-visible:ring-accent/60 ${
+                                        isActive
+                                          ? "bg-accent-deep text-white"
+                                          : "text-muted hover:bg-raised hover:text-fg"
+                                      }`}
+                        >
+                          <span className="flex-1 truncate">
+                            {chapter.title}
+                          </span>
+                          {chapter.words > 0 && (
+                            <span className="shrink-0 text-xs tabular-nums opacity-50">
+                              {chapter.words.toLocaleString()}
+                            </span>
+                          )}
+                        </Link>
+
+                        {/* A marked chapter keeps its star; an unmarked one
+                            shows it on hover, so rows stay quiet until wanted. */}
+                        <button
+                          type="button"
+                          onClick={() => toggleBookmark(bookId, chapter.id)}
+                          aria-label={
+                            chapter.bookmarked
+                              ? `Remove bookmark from ${chapter.title}`
+                              : `Bookmark ${chapter.title}`
+                          }
+                          aria-pressed={Boolean(chapter.bookmarked)}
+                          title="Bookmark"
+                          className={`absolute top-1/2 right-7 -translate-y-1/2
+                                      rounded-sm px-1 py-0.5 text-sm leading-none
+                                      outline-none transition-opacity
+                                      focus-visible:opacity-100
+                                      focus-visible:ring-2
+                                      focus-visible:ring-accent/60 ${
+                                        chapter.bookmarked
+                                          ? "text-accent-strong opacity-100"
+                                          : "text-muted opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-fg"
+                                      }`}
+                        >
+                          {chapter.bookmarked ? "★" : "☆"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(chapter)}
+                          aria-label={`Delete ${chapter.title}`}
+                          className="absolute top-1/2 right-1 -translate-y-1/2
+                                     rounded-sm px-1.5 py-0.5 font-sans text-sm
+                                     leading-none text-muted opacity-0
+                                     outline-none transition-opacity
+                                     group-hover:opacity-60 hover:!opacity-100
+                                     hover:text-red-400 focus-visible:opacity-100
+                                     focus-visible:ring-2
+                                     focus-visible:ring-accent/60"
+                        >
+                          ×
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

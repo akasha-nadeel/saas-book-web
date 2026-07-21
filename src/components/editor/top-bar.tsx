@@ -65,74 +65,20 @@ function PaperSwatches({ paper }: { paper: PaperColor }) {
  * from every chapter.
  */
 
-function PanelToggle({
-  on,
-  onToggle,
-  label,
-  side,
-}: {
-  on: boolean;
-  onToggle: () => void;
-  label: string;
-  side: "left" | "right";
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={on}
-      aria-label={label}
-      title={label}
-      className={`flex h-8 w-8 items-center justify-center rounded-md
-                  outline-none transition-colors focus-visible:ring-2
-                  focus-visible:ring-accent/60 ${
-                    on
-                      ? "bg-raised text-fg"
-                      : "text-muted hover:bg-raised/50 hover:text-fg"
-                  }`}
-    >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 20 20"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        className="h-4 w-4"
-      >
-        <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
-        {side === "left" ? (
-          <path d="M8 3.5v13" />
-        ) : (
-          <path d="M12 3.5v13" />
-        )}
-      </svg>
-    </button>
-  );
-}
-
 export function TopBar({
   book,
   chapterTitle,
   prefs,
-  onExport,
 }: {
   book: Book;
   chapterTitle: string;
   prefs: Prefs;
-  onExport: () => void;
 }) {
   return (
     <header
       className="flex h-12 shrink-0 items-center gap-2 border-b border-line
                  bg-panel px-3"
     >
-      <PanelToggle
-        side="left"
-        on={prefs.leftPanel}
-        label="Toggle chapters and notes"
-        onToggle={() => setPref("leftPanel", !prefs.leftPanel)}
-      />
-
       <nav
         aria-label="Breadcrumb"
         className="flex min-w-0 flex-1 items-baseline gap-2 font-sans text-sm"
@@ -166,27 +112,9 @@ export function TopBar({
         <span className="truncate font-medium text-fg">{chapterTitle}</span>
       </nav>
 
+      {/* Panel toggles and Export live in the rails now; what is left here is
+          where you are, and what the page looks like. */}
       <PaperSwatches paper={prefs.paper} />
-
-      <span aria-hidden="true" className="h-5 w-px shrink-0 bg-line" />
-
-      <button
-        type="button"
-        onClick={onExport}
-        className="shrink-0 rounded-md px-2.5 py-1.5 font-sans text-xs
-                   tracking-wide text-muted uppercase outline-none
-                   transition-colors hover:bg-raised hover:text-fg
-                   focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        Export
-      </button>
-
-      <PanelToggle
-        side="right"
-        on={prefs.rightPanel}
-        label="Toggle assistant"
-        onToggle={() => setPref("rightPanel", !prefs.rightPanel)}
-      />
     </header>
   );
 }

@@ -26,12 +26,17 @@ const SHELF_KEY = "openchapter:shelf";
 const BODY_PREFIX = "openchapter:chapter:";
 const NOTES_PREFIX = "openchapter:notes:";
 
+/** A book's three regions. "body" is the default and is stored as absent. */
+export type ChapterPart = "front" | "body" | "back";
+
 export interface ChapterMeta {
   id: string;
   title: string;
   words: number;
   /** Flagged for quick return. Absent rather than false when not marked. */
   bookmarked?: true;
+  /** Where it sits in the book. Absent means the body. */
+  part?: ChapterPart;
 }
 
 export interface Book {
@@ -796,4 +801,37 @@ export function bookmarks(shelf: Shelf): Bookmark[] {
     }
   }
   return found;
+}
+
+
+// ---------------------------------------------------------------------------
+// Front matter, body, back matter
+//
+// A part is a field on the chapter, not a separate list, so chapter order stays
+// the single source of truth: moving a chapter between parts never reorders it,
+// and each part renders in the order the book already has.
+// ---------------------------------------------------------------------------
+
+export function chaptersInPart(book: Book, part: ChapterPart): ChapterMeta[] {
+  return book.chapters.filter((c) => (c.part ?? "body") === part);
+}
+
+export function setChapterPart(
+  bookId: string,
+  chapterId: string,
+  part: ChapterPart,
+) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    chapters: book.chapters.map((c) => {
+      if (c.id !== chapterId) return c;
+      if (part === "body") {
+        // Store the default as absent, matching a chapter never moved.
+        const next = { ...c };
+        delete next.part;
+        return next;
+      }
+      return { ...c, part };
+    }),
+  }));
 }

@@ -13,7 +13,8 @@ import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
 import Image from "@tiptap/extension-image";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
-import { LeftPanel } from "@/components/editor/left-panel";
+import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
+import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { TopBar } from "@/components/editor/top-bar";
 import { ExportDialog } from "@/components/export/export-dialog";
 import {
@@ -58,6 +59,7 @@ export function ChapterEditor({
   // Lifted out of the surface so the toolbar and the assistant can both reach
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [tab, setTab] = useState<PanelTab>("chapters");
 
   const book = findBook(shelf, bookId);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
@@ -87,18 +89,45 @@ export function ChapterEditor({
         book={book}
         chapterTitle={chapter.title}
         prefs={prefs}
-        onExport={() => setExporting(true)}
       />
 
       <div className="flex min-h-0 flex-1">
-        {prefs.leftPanel ? (
-          <LeftPanel bookId={bookId} chapterId={chapterId} />
-        ) : (
-          <CollapsedRail
-            side="left"
-            label="Show chapters and notes"
-            onOpen={() => setPref("leftPanel", true)}
-          />
+        <Rail side="left">
+          <RailButton label="All books" href="/">
+            {icons.home}
+          </RailButton>
+
+          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
+          {(
+            [
+              ["chapters", "Manuscript", icons.chapters],
+              ["notes", "Notes", icons.notes],
+              ["bookmarks", "Bookmarks", icons.bookmarks],
+            ] as const
+          ).map(([value, label, icon]) => (
+            <RailButton
+              key={value}
+              label={label}
+              // Clicking the panel you are already on closes it, so the rail
+              // doubles as the way to get the width back.
+              active={prefs.leftPanel && tab === value}
+              onClick={() => {
+                if (prefs.leftPanel && tab === value) {
+                  setPref("leftPanel", false);
+                } else {
+                  setTab(value);
+                  setPref("leftPanel", true);
+                }
+              }}
+            >
+              {icon}
+            </RailButton>
+          ))}
+        </Rail>
+
+        {prefs.leftPanel && (
+          <LeftPanel tab={tab} bookId={bookId} chapterId={chapterId} />
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -116,14 +145,6 @@ export function ChapterEditor({
             onEditorReady={setEditor}
           />
         </div>
-
-        {!prefs.rightPanel && (
-          <CollapsedRail
-            side="right"
-            label="Show assistant"
-            onOpen={() => setPref("rightPanel", true)}
-          />
-        )}
 
         {prefs.rightPanel && (
           <aside
@@ -143,6 +164,40 @@ export function ChapterEditor({
             </div>
           </aside>
         )}
+
+        <Rail
+          side="right"
+          footer={
+            <RailButton label="Export" onClick={() => setExporting(true)}>
+              {icons.export}
+            </RailButton>
+          }
+        >
+          <RailButton
+            label="Assistant"
+            active={prefs.rightPanel}
+            onClick={() => setPref("rightPanel", !prefs.rightPanel)}
+          >
+            {icons.assistant}
+          </RailButton>
+
+          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
+          <RailButton
+            label="Focus mode"
+            active={prefs.focusMode}
+            onClick={() => setPref("focusMode", !prefs.focusMode)}
+          >
+            {icons.focus}
+          </RailButton>
+          <RailButton
+            label="Typewriter scrolling"
+            active={prefs.typewriter}
+            onClick={() => setPref("typewriter", !prefs.typewriter)}
+          >
+            {icons.typewriter}
+          </RailButton>
+        </Rail>
       </div>
 
       {exporting && (
@@ -153,47 +208,6 @@ export function ChapterEditor({
         />
       )}
     </div>
-  );
-}
-
-/**
- * The strip left behind by a closed panel.
- *
- * A panel toggled shut from the top bar leaves no trace at the place it used
- * to be, so the way back is only findable if you remember which button did it.
- * A full-height edge handle keeps it reachable where the panel was.
- */
-function CollapsedRail({
-  side,
-  label,
-  onOpen,
-}: {
-  side: "left" | "right";
-  label: string;
-  onOpen: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      aria-label={label}
-      title={label}
-      className={`group flex w-4 shrink-0 items-center justify-center bg-panel
-                  outline-none transition-colors hover:bg-raised
-                  focus-visible:ring-2 focus-visible:ring-inset
-                  focus-visible:ring-accent/60 ${
-                    side === "left"
-                      ? "border-r border-line"
-                      : "border-l border-line"
-                  }`}
-    >
-      <span
-        aria-hidden="true"
-        className="text-xs text-muted transition-colors group-hover:text-fg"
-      >
-        {side === "left" ? "›" : "‹"}
-      </span>
-    </button>
   );
 }
 
@@ -364,7 +378,6 @@ function EditorSurface({
         sessionWords={openedWith === null ? 0 : words - openedWith}
         status={status}
         lastSavedAt={lastSavedAt}
-        prefs={prefs}
       />
     </>
   );
@@ -377,42 +390,16 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
   error: "Could not save",
 };
 
-function ModeToggle({
-  on,
-  onToggle,
-  children,
-}: {
-  on: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={on}
-      className={`rounded-sm outline-none transition-colors
-                  focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    on ? "text-accent-strong" : "text-muted hover:text-fg"
-                  }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 function StatusBar({
   words,
   sessionWords,
   status,
   lastSavedAt,
-  prefs,
 }: {
   words: number;
   sessionWords: number;
   status: SaveStatus;
   lastSavedAt: Date | null;
-  prefs: Prefs;
 }) {
   return (
     // In the flow rather than pinned to the viewport: with three panes that can
@@ -427,21 +414,6 @@ function StatusBar({
             +{sessionWords.toLocaleString()}
           </span>
         )}
-      </span>
-
-      <span className="flex items-baseline gap-4">
-        <ModeToggle
-          on={prefs.focusMode}
-          onToggle={() => setPref("focusMode", !prefs.focusMode)}
-        >
-          Focus
-        </ModeToggle>
-        <ModeToggle
-          on={prefs.typewriter}
-          onToggle={() => setPref("typewriter", !prefs.typewriter)}
-        >
-          Typewriter
-        </ModeToggle>
       </span>
 
       <span className={status === "error" ? "text-accent" : undefined}>
