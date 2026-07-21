@@ -280,3 +280,117 @@ export function touchLastOpenedBook(bookId: string) {
     lastOpenedBookId: bookId,
   });
 }
+
+export function createChapter(bookId: string, title?: string): string {
+  const id = newId();
+  commitBook(bookId, (book) => ({
+    ...book,
+    chapters: [
+      ...book.chapters,
+      { id, title: title ?? `Chapter ${book.chapters.length + 1}`, words: 0 },
+    ],
+    lastOpenedId: id,
+  }));
+  return id;
+}
+
+export function renameChapter(
+  bookId: string,
+  chapterId: string,
+  title: string,
+) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    chapters: book.chapters.map((c) =>
+      c.id === chapterId ? { ...c, title } : c,
+    ),
+  }));
+}
+
+export function deleteChapter(bookId: string, chapterId: string) {
+  commitBook(bookId, (book) => {
+    const chapters = book.chapters.filter((c) => c.id !== chapterId);
+    return {
+      ...book,
+      chapters,
+      lastOpenedId:
+        book.lastOpenedId === chapterId
+          ? (chapters[0]?.id ?? null)
+          : book.lastOpenedId,
+    };
+  });
+
+  try {
+    window.localStorage.removeItem(bodyKey(chapterId));
+  } catch {
+    // The shelf entry is gone, which is what removes it from the UI. An
+    // orphaned body is wasted bytes, not a broken app.
+  }
+}
+
+/** Moves the chapter at `from` so that it sits at index `to`. */
+export function moveChapter(bookId: string, from: number, to: number) {
+  commitBook(bookId, (book) => {
+    const chapters = [...book.chapters];
+    if (
+      from === to ||
+      from < 0 ||
+      to < 0 ||
+      from >= chapters.length ||
+      to >= chapters.length
+    ) {
+      return book;
+    }
+    const [moved] = chapters.splice(from, 1);
+    chapters.splice(to, 0, moved);
+    return { ...book, chapters };
+  });
+}
+
+/**
+ * Persists a chapter's text. Body and word count are two writes, so they can
+ * in principle diverge — the body goes first, since a stale count in the
+ * sidebar is cosmetic and lost prose is not.
+ */
+export function saveBody(
+  bookId: string,
+  chapterId: string,
+  doc: unknown,
+  words: number,
+) {
+  window.localStorage.setItem(bodyKey(chapterId), JSON.stringify(doc));
+
+  const book = findBook(getShelf(), bookId);
+  const current = book?.chapters.find((c) => c.id === chapterId);
+  if (!current || current.words === words) return;
+
+  commitBook(bookId, (b) => ({
+    ...b,
+    chapters: b.chapters.map((c) => (c.id === chapterId ? { ...c, words } : c)),
+  }));
+}
+
+export function touchLastOpened(bookId: string, chapterId: string) {
+  const book = findBook(getShelf(), bookId);
+  if (!book || book.lastOpenedId === chapterId) return;
+  commitBook(bookId, (b) => ({ ...b, lastOpenedId: chapterId }));
+}
+
+/**
+ * The chapter `/book/[bookId]` should open, creating one if the book is empty.
+ * Returns null only when the book itself does not exist.
+ *
+ * Idempotent, because it is called from an effect that React runs twice in
+ * development — a version that blindly created a chapter would leave every
+ * developer with a phantom extra chapter on first load.
+ */
+export function ensureChapter(bookId: string): string | null {
+  const book = findBook(getShelf(), bookId);
+  if (!book) return null;
+
+  const remembered = book.chapters.some((c) => c.id === book.lastOpenedId);
+  if (remembered) return book.lastOpenedId;
+  if (book.chapters.length > 0) return book.chapters[0].id;
+
+  return createChapter(bookId, "Chapter One");
+}

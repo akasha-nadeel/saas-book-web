@@ -2,10 +2,17 @@ import { beforeEach, expect, it, vi } from "vitest";
 import {
   bookWordCount,
   createBook,
+  createChapter,
   deleteBook,
+  deleteChapter,
+  ensureChapter,
   findBook,
   getShelf,
+  moveChapter,
   renameBook,
+  renameChapter,
+  saveBody,
+  touchLastOpened,
   touchLastOpenedBook,
   type Book,
 } from "@/lib/library-store";
@@ -111,4 +118,129 @@ it("records when a book was last opened, for shelf ordering", () => {
 
   expect(findBook(getShelf(), bookId)!.lastOpenedAt).toBe(before + 60_000);
   vi.useRealTimers();
+});
+
+const titlesOf = (bookId: string) =>
+  findBook(getShelf(), bookId)!.chapters.map((c) => c.title);
+
+it("appends chapters in order", () => {
+  const { bookId } = createBook();
+  createChapter(bookId, "Chapter Two");
+  createChapter(bookId, "Chapter Three");
+  expect(titlesOf(bookId)).toEqual([
+    "Chapter One",
+    "Chapter Two",
+    "Chapter Three",
+  ]);
+});
+
+it("numbers an unnamed chapter by its position", () => {
+  const { bookId } = createBook();
+  createChapter(bookId);
+  expect(titlesOf(bookId)).toEqual(["Chapter One", "Chapter 2"]);
+});
+
+it("renames a chapter", () => {
+  const { bookId, chapterId } = createBook();
+  renameChapter(bookId, chapterId, "The Salt Flats");
+  expect(titlesOf(bookId)).toEqual(["The Salt Flats"]);
+});
+
+it("reorders chapters in both directions", () => {
+  const { bookId } = createBook();
+  createChapter(bookId, "Chapter Two");
+  createChapter(bookId, "Chapter Three");
+
+  moveChapter(bookId, 2, 0);
+  expect(titlesOf(bookId)).toEqual([
+    "Chapter Three",
+    "Chapter One",
+    "Chapter Two",
+  ]);
+
+  moveChapter(bookId, 0, 2);
+  expect(titlesOf(bookId)).toEqual([
+    "Chapter One",
+    "Chapter Two",
+    "Chapter Three",
+  ]);
+});
+
+it("ignores out-of-range and no-op moves", () => {
+  const { bookId } = createBook();
+  createChapter(bookId, "Chapter Two");
+  const before = titlesOf(bookId);
+
+  moveChapter(bookId, 0, -1);
+  moveChapter(bookId, 0, 99);
+  moveChapter(bookId, 1, 1);
+
+  expect(titlesOf(bookId)).toEqual(before);
+});
+
+it("writes the body and denormalises the word count", () => {
+  const { bookId, chapterId } = createBook();
+  saveBody(bookId, chapterId, { type: "doc" }, 1204);
+
+  expect(
+    localStorage.getItem(`openchapter:chapter:${chapterId}`),
+  ).not.toBeNull();
+  expect(findBook(getShelf(), bookId)!.chapters[0].words).toBe(1204);
+});
+
+it("deletes a chapter, its body, and fixes lastOpenedId", () => {
+  const { bookId, chapterId } = createBook();
+  const second = createChapter(bookId, "Chapter Two");
+  saveBody(bookId, second, { type: "doc" }, 5);
+  touchLastOpened(bookId, second);
+
+  deleteChapter(bookId, second);
+
+  expect(titlesOf(bookId)).toEqual(["Chapter One"]);
+  expect(localStorage.getItem(`openchapter:chapter:${second}`)).toBeNull();
+  expect(findBook(getShelf(), bookId)!.lastOpenedId).toBe(chapterId);
+});
+
+it("keeps chapter ids unique across books", () => {
+  const a = createBook("A");
+  const b = createBook("B");
+  expect(a.chapterId).not.toBe(b.chapterId);
+});
+
+it("does not touch another book's chapters", () => {
+  const a = createBook("A");
+  const b = createBook("B");
+  createChapter(a.bookId, "Only in A");
+
+  expect(titlesOf(a.bookId)).toHaveLength(2);
+  expect(titlesOf(b.bookId)).toHaveLength(1);
+});
+
+it("ensureChapter opens the last-opened chapter", () => {
+  const { bookId } = createBook();
+  const second = createChapter(bookId, "Chapter Two");
+  touchLastOpened(bookId, second);
+  expect(ensureChapter(bookId)).toBe(second);
+});
+
+it("ensureChapter falls back to the first chapter when the memory is stale", () => {
+  const { bookId, chapterId } = createBook();
+  const second = createChapter(bookId, "Chapter Two");
+  touchLastOpened(bookId, second);
+  deleteChapter(bookId, second);
+  expect(ensureChapter(bookId)).toBe(chapterId);
+});
+
+it("ensureChapter creates a chapter for an empty book", () => {
+  const { bookId, chapterId } = createBook();
+  deleteChapter(bookId, chapterId);
+  expect(findBook(getShelf(), bookId)!.chapters).toHaveLength(0);
+
+  const created = ensureChapter(bookId);
+  expect(created).not.toBeNull();
+  expect(findBook(getShelf(), bookId)!.chapters).toHaveLength(1);
+});
+
+it("ensureChapter reports null for an unknown book", () => {
+  expect(ensureChapter("nope")).toBeNull();
 });
