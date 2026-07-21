@@ -58,13 +58,15 @@ function Button({
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
+      // Active is the same neutral lift as hover, one step stronger — the
+      // accent is reserved for actions, not for "this mark is on".
       className={`flex h-8 min-w-8 items-center justify-center rounded-md px-2
                   text-sm outline-none transition-colors
                   disabled:cursor-default disabled:opacity-30
                   focus-visible:ring-2 focus-visible:ring-accent/60 ${
                     active
-                      ? "bg-accent/15 text-accent"
-                      : "text-muted hover:bg-raised hover:text-fg"
+                      ? "bg-raised text-fg"
+                      : "text-muted hover:bg-raised/50 hover:text-fg"
                   }`}
     >
       {children}

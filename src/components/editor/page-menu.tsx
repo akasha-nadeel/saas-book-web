@@ -75,8 +75,8 @@ function Choice({
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
                     selected
-                      ? "bg-accent/15 text-accent"
-                      : "text-muted hover:bg-raised hover:text-fg"
+                      ? "bg-raised text-fg"
+                      : "text-muted hover:bg-raised/50 hover:text-fg"
                   }`}
     >
       {children}
@@ -231,7 +231,7 @@ export function PageMenu({
                               transition-colors focus-visible:ring-2
                               focus-visible:ring-accent/60 ${
                                 p.value === paper
-                                  ? "border-accent"
+                                  ? "border-fg"
                                   : "border-line hover:border-muted"
                               }`}
                   style={{ background: p.swatch }}
