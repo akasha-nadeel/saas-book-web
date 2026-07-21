@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import {
   archiveBook,
   bookWordCount,
+  bookmarks,
   booksIn,
   createBook,
   createBookFromTemplate,
@@ -26,6 +27,7 @@ import {
   setPref,
   touchLastOpened,
   trashBook,
+  toggleBookmark,
   touchLastOpenedBook,
   type Book,
 } from "@/lib/library-store";
@@ -598,4 +600,64 @@ it("moves lastOpenedBookId off a book that leaves the active list", () => {
 
   // Otherwise "Continue writing" points at a book no longer on the shelf.
   expect(getShelf().lastOpenedBookId).toBe(keep.bookId);
+});
+
+it("starts a chapter unbookmarked", () => {
+  const { bookId } = createBook("A");
+  expect(bookmarks(getShelf())).toEqual([]);
+  expect(findBook(getShelf(), bookId)!.chapters[0].bookmarked).toBeUndefined();
+});
+
+it("toggles a bookmark on and off", () => {
+  const { bookId, chapterId } = createBook("A");
+
+  toggleBookmark(bookId, chapterId);
+  expect(bookmarks(getShelf()).map((m) => m.chapter.id)).toEqual([chapterId]);
+
+  toggleBookmark(bookId, chapterId);
+  expect(bookmarks(getShelf())).toEqual([]);
+});
+
+it("collects bookmarks across every book", () => {
+  const a = createBook("A");
+  const b = createBook("B");
+  toggleBookmark(a.bookId, a.chapterId);
+  toggleBookmark(b.bookId, b.chapterId);
+
+  const found = bookmarks(getShelf());
+  expect(found).toHaveLength(2);
+  // Each carries its book, so the panel can say where a chapter lives.
+  expect(found.map((m) => m.book.title).sort()).toEqual(["A", "B"]);
+});
+
+it("hides bookmarks belonging to a trashed book", () => {
+  const { bookId, chapterId } = createBook("A");
+  toggleBookmark(bookId, chapterId);
+
+  trashBook(bookId);
+
+  expect(bookmarks(getShelf())).toEqual([]);
+});
+
+it("brings bookmarks back when the book is restored", () => {
+  const { bookId, chapterId } = createBook("A");
+  toggleBookmark(bookId, chapterId);
+  trashBook(bookId);
+
+  restoreBook(bookId);
+
+  expect(bookmarks(getShelf()).map((m) => m.chapter.id)).toEqual([chapterId]);
+});
+
+it("drops a bookmark with the chapter it marked", () => {
+  const { bookId, chapterId } = createBook("A");
+  const second = createChapter(bookId, "Two");
+  toggleBookmark(bookId, second);
+
+  deleteChapter(bookId, second);
+
+  expect(bookmarks(getShelf())).toEqual([]);
+  expect(findBook(getShelf(), bookId)!.chapters.map((c) => c.id)).toEqual([
+    chapterId,
+  ]);
 });

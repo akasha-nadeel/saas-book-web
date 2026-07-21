@@ -30,6 +30,8 @@ export interface ChapterMeta {
   id: string;
   title: string;
   words: number;
+  /** Flagged for quick return. Absent rather than false when not marked. */
+  bookmarked?: true;
 }
 
 export interface Book {
@@ -752,4 +754,46 @@ export function restoreBook(bookId: string) {
       return restored;
     }),
   });
+}
+
+
+// ---------------------------------------------------------------------------
+// Bookmarks
+//
+// A flag on the chapter rather than a list of its own, so a bookmark cannot
+// outlive the chapter it points at — deleting a chapter takes its bookmark with
+// it, with no separate list to keep in step.
+// ---------------------------------------------------------------------------
+
+export interface Bookmark {
+  book: Book;
+  chapter: ChapterMeta;
+}
+
+export function toggleBookmark(bookId: string, chapterId: string) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    chapters: book.chapters.map((c) => {
+      if (c.id !== chapterId) return c;
+      if (c.bookmarked) {
+        const next = { ...c };
+        delete next.bookmarked;
+        return next;
+      }
+      return { ...c, bookmarked: true as const };
+    }),
+  }));
+}
+
+/** Every bookmarked chapter in the library, each with the book it lives in. */
+export function bookmarks(shelf: Shelf): Bookmark[] {
+  const found: Bookmark[] = [];
+  for (const book of shelf.books) {
+    // A trashed book's chapters are not somewhere to jump to.
+    if (book.trashedAt) continue;
+    for (const chapter of book.chapters) {
+      if (chapter.bookmarked) found.push({ book, chapter });
+    }
+  }
+  return found;
 }

@@ -186,3 +186,16 @@ it("turns a hard break into a newline run", () => {
 it("returns nothing for an empty document", () => {
   expect(toBlocks({ type: "doc" })).toEqual([]);
 });
+
+it("reads an image node", () => {
+  expect(
+    toBlocks(doc({ type: "image", attrs: { src: "data:image/webp;base64,AA", alt: "Map" } })),
+  ).toEqual([
+    { kind: "image", depth: 0, src: "data:image/webp;base64,AA", alt: "Map", runs: [] },
+  ]);
+});
+
+it("skips an image with no source", () => {
+  // Otherwise every export format renders a broken picture.
+  expect(toBlocks(doc({ type: "image", attrs: { alt: "Map" } }))).toEqual([]);
+});

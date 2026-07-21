@@ -111,3 +111,11 @@ it("renders an empty paragraph as a spacer", () => {
 it("returns an empty string for no blocks", () => {
   expect(blocksToXhtml([])).toBe("");
 });
+
+it("renders an image, escaping its attributes", () => {
+  expect(
+    blocksToXhtml([
+      { kind: "image", depth: 0, src: "x.png?a=1&b=2", alt: 'A "map"', runs: [] },
+    ]),
+  ).toBe('<p class="figure"><img src="x.png?a=1&amp;b=2" alt="A &quot;map&quot;" /></p>');
+});

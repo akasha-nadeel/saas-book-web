@@ -146,6 +146,24 @@ export async function buildDocx(
           );
           break;
 
+        case "image":
+          // Embedding a data URL as a real DOCX image is not wired up yet.
+          // A visible marker beats a silent hole where a picture was.
+          out.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              spacing: bodySpacing,
+              children: [
+                new TextRun({
+                  text: block.alt ? `[image: ${block.alt}]` : "[image]",
+                  italics: true,
+                }),
+              ],
+            }),
+          );
+          opensSection = true;
+          break;
+
         case "code":
           out.push(
             new Paragraph({

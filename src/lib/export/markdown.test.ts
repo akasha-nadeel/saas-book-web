@@ -109,3 +109,19 @@ it("renders an empty paragraph as nothing", () => {
 it("returns an empty string for no blocks", () => {
   expect(blocksToMarkdown([])).toBe("");
 });
+
+it("renders an image", () => {
+  expect(
+    blocksToMarkdown([
+      { kind: "image", depth: 0, src: "data:image/webp;base64,AA", alt: "A map", runs: [] },
+    ]),
+  ).toBe("![A map](data:image/webp;base64,AA)");
+});
+
+it("renders an image with no alt text", () => {
+  expect(
+    blocksToMarkdown([
+      { kind: "image", depth: 0, src: "data:image/webp;base64,AA", runs: [] },
+    ]),
+  ).toBe("![](data:image/webp;base64,AA)");
+});

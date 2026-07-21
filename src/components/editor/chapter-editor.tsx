@@ -10,6 +10,7 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
+import Image from "@tiptap/extension-image";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { EditorToolbar } from "@/components/editor/editor-toolbar";
 import { LeftPanel } from "@/components/editor/left-panel";
@@ -272,6 +273,9 @@ function EditorSurface({
       // Marks the block the caret is in. Focus mode is then pure CSS —
       // everything without this class dims.
       Focus.configure({ className: "has-focus", mode: "shallowest" }),
+      // Images are stored inline as data URLs — see lib/image-import for why
+      // they are downscaled first.
+      Image.configure({ inline: false, allowBase64: true }),
     ],
     content: initialContent ?? "",
     editorProps: {

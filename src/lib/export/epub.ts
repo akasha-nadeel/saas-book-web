@@ -119,7 +119,9 @@ h1 { text-align: center; margin: 2em 0 1em; font-weight: normal; }
 p { margin: 0; text-indent: 1.5em; }
 h1 + p, blockquote + p, .scene-break + p { text-indent: 0; }
 .scene-break { text-align: center; text-indent: 0; margin: 1.5em 0; }
-blockquote { margin: 1.5em; font-style: italic; }`;
+blockquote { margin: 1.5em; font-style: italic; }
+.figure { text-align: center; text-indent: 0; margin: 1.5em 0; }
+.figure img { max-width: 100%; height: auto; }`;
 
 export async function buildEpub(
   book: Book,

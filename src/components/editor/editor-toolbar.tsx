@@ -1,15 +1,18 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/react";
 import { PageMenu } from "@/components/editor/page-menu";
+import { ACCEPTED, importImage } from "@/lib/image-import";
 import type { Book } from "@/lib/library-store";
 
 /**
  * The formatting toolbar.
  *
  * Every control maps to a command StarterKit already provides — nothing here is
- * decorative. Active state is read through useSyncExternalStore rather than
+ * decorative. Quote, lists and scene break are deliberately absent: each is
+ * still reachable by typing ("> ", "- ", "1. ", "---"), so those buttons were
+ * duplicating a path that already existed rather than providing one. Active state is read through useSyncExternalStore rather than
  * component state, because the truth lives in the editor: pressing ⌘B or moving
  * the caret into bold text has to light the button just as clicking it does.
  */
@@ -84,6 +87,9 @@ export function EditorToolbar({
   book: Book;
 }) {
   useEditorState(editor);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
 
   if (!editor) {
     // Reserve the height so the manuscript doesn't jump when the editor mounts.
@@ -173,32 +179,48 @@ export function EditorToolbar({
       <Divider />
 
       <Button
-        label="Quote"
-        active={editor.isActive("blockquote")}
-        onClick={() => editor.chain().focus().toggleBlockquote().run()}
+        label="Insert image"
+        onClick={() => fileRef.current?.click()}
+        disabled={busy}
       >
-        <span className="font-serif text-base leading-none">&ldquo;</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <rect x="2.5" y="4" width="15" height="12" rx="2" />
+          <circle cx="7" cy="8.5" r="1.2" />
+          <path d="m3.5 14 4-4 3.5 3.5 2.5-2 3 3" />
+        </svg>
       </Button>
-      <Button
-        label="Bulleted list"
-        active={editor.isActive("bulletList")}
-        onClick={() => editor.chain().focus().toggleBulletList().run()}
-      >
-        <span className="text-xs">•—</span>
-      </Button>
-      <Button
-        label="Numbered list"
-        active={editor.isActive("orderedList")}
-        onClick={() => editor.chain().focus().toggleOrderedList().run()}
-      >
-        <span className="text-xs">1.</span>
-      </Button>
-      <Button
-        label="Scene break"
-        onClick={() => editor.chain().focus().setHorizontalRule().run()}
-      >
-        <span className="tracking-[0.2em] text-xs">***</span>
-      </Button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept={ACCEPTED}
+        className="sr-only"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          // Reset immediately, or picking the same file twice does nothing.
+          e.target.value = "";
+          if (!file) return;
+
+          setBusy(true);
+          setProblem(null);
+          const result = await importImage(file);
+          setBusy(false);
+
+          if (!result.ok) {
+            setProblem(result.error);
+            return;
+          }
+          editor.chain().focus().setImage({ src: result.src }).run();
+        }}
+      />
 
       <Divider />
 
@@ -208,7 +230,19 @@ export function EditorToolbar({
         disabled={!editor.can().undo()}
         onClick={() => editor.chain().focus().undo().run()}
       >
-        <span className="text-sm">↶</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <path d="M7 7H4V4" />
+          <path d="M4.5 7.5a6 6 0 1 1-.8 5" />
+        </svg>
       </Button>
       <Button
         label="Redo"
@@ -216,8 +250,30 @@ export function EditorToolbar({
         disabled={!editor.can().redo()}
         onClick={() => editor.chain().focus().redo().run()}
       >
-        <span className="text-sm">↷</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-4 w-4"
+        >
+          <path d="M13 7h3V4" />
+          <path d="M15.5 7.5a6 6 0 1 0 .8 5" />
+        </svg>
       </Button>
+
+      {problem && (
+        <p
+          role="status"
+          className="ml-2 max-w-64 truncate font-sans text-xs text-red-400"
+          title={problem}
+        >
+          {problem}
+        </p>
+      )}
 
       {/* Pushed to the far end: it describes the page, not the text on it. */}
       <div className="ml-auto">

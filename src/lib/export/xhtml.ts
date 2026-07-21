@@ -103,6 +103,11 @@ export function blocksToXhtml(blocks: Block[]): string {
       case "sceneBreak":
         out.push('<p class="scene-break">* * *</p>');
         break;
+      case "image":
+        out.push(
+          `<p class="figure"><img src="${escapeXml(block.src ?? "")}" alt="${escapeXml(block.alt ?? "")}" /></p>`,
+        );
+        break;
       case "code":
         out.push(`<pre><code>${text}</code></pre>`);
         break;

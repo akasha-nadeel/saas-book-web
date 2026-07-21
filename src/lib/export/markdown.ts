@@ -64,6 +64,10 @@ export function blocksToMarkdown(blocks: Block[]): string {
         rendered.push("* * *");
         break;
 
+      case "image":
+        rendered.push(`![${block.alt ?? ""}](${block.src ?? ""})`);
+        break;
+
       case "code":
         rendered.push(`\`\`\`${block.language ?? ""}\n${text}\n\`\`\``);
         break;

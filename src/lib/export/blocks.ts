@@ -19,7 +19,8 @@ export type BlockKind =
   | "bullet"
   | "ordered"
   | "code"
-  | "sceneBreak";
+  | "sceneBreak"
+  | "image";
 
 export interface Run {
   text: string;
@@ -51,6 +52,9 @@ export interface Block {
   level?: number;
   /** Only set on code blocks, when the editor recorded one. */
   language?: string;
+  /** Only set on images. A data URL — see lib/image-import. */
+  src?: string;
+  alt?: string;
   runs: Run[];
 }
 
@@ -142,6 +146,23 @@ function walk(nodes: JSONContent[], depth: number, out: Block[]) {
           ...(typeof language === "string" && language ? { language } : {}),
           runs: runsFrom(node.content),
         });
+        break;
+      }
+
+      case "image": {
+        const src = node.attrs?.src;
+        // An image with no source is not worth a block; anything else would
+        // render as a broken picture in every export format.
+        if (typeof src === "string" && src) {
+          const alt = node.attrs?.alt;
+          out.push({
+            kind: "image",
+            depth,
+            src,
+            ...(typeof alt === "string" && alt ? { alt } : {}),
+            runs: [],
+          });
+        }
         break;
       }
 

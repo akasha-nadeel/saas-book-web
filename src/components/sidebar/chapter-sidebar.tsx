@@ -8,6 +8,7 @@ import {
   deleteChapter,
   findBook,
   moveChapter,
+  toggleBookmark,
 } from "@/lib/library-store";
 import { useShelf } from "@/lib/use-library";
 
@@ -122,7 +123,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   }}
                   // The open chapter is filled, not tinted — a solid deep green
                   // with white on it, the way a selected nav row reads.
-                  className={`flex items-baseline gap-2 rounded-md py-2 pr-8 pl-3
+                  className={`flex items-baseline gap-2 rounded-md py-2 pr-16 pl-3
                               font-sans text-sm outline-none transition-colors
                               focus-visible:ring-2 focus-visible:ring-accent/60 ${
                                 isActive
@@ -141,6 +142,30 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   )}
                 </Link>
 
+                {/* A marked chapter keeps its star visible; an unmarked one
+                    shows it on hover, so the row stays quiet until wanted. */}
+                <button
+                  type="button"
+                  onClick={() => toggleBookmark(bookId, chapter.id)}
+                  aria-label={
+                    chapter.bookmarked
+                      ? `Remove bookmark from ${chapter.title}`
+                      : `Bookmark ${chapter.title}`
+                  }
+                  aria-pressed={Boolean(chapter.bookmarked)}
+                  title="Bookmark"
+                  className={`absolute top-1/2 right-7 -translate-y-1/2 rounded-sm
+                              px-1 py-0.5 text-sm leading-none outline-none
+                              transition-opacity focus-visible:opacity-100
+                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                chapter.bookmarked
+                                  ? "text-accent-strong opacity-100"
+                                  : "text-muted opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:text-fg"
+                              }`}
+                >
+                  {chapter.bookmarked ? "★" : "☆"}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => handleDelete(chapter.id, chapter.title)}
@@ -149,7 +174,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                              py-0.5 font-sans text-sm leading-none text-muted
                              opacity-0 outline-none transition-opacity
                              group-hover:opacity-60 hover:!opacity-100
-                             hover:text-accent focus-visible:opacity-100
+                             hover:text-red-400 focus-visible:opacity-100
                              focus-visible:ring-2 focus-visible:ring-accent/60"
                 >
                   ×
