@@ -3,9 +3,11 @@
 import { useCallback, useSyncExternalStore } from "react";
 import {
   getBody,
+  getBodyReload,
   getCover,
   getServerCover,
   getServerBody,
+  getServerBodyReload,
   getNotes,
   getPrefs,
   getServerNotes,
@@ -13,6 +15,7 @@ import {
   getServerShelf,
   getShelf,
   subscribeToBody,
+  subscribeToBodyReload,
   subscribeToCover,
   subscribeToNotes,
   subscribeToPrefs,
@@ -60,6 +63,21 @@ export function useChapterBody(id: string): string | null {
   // with Object.is, and equal strings are Object.is-equal, so no caching layer
   // is needed here the way it is for the parsed shelf.
   return useSyncExternalStore(subscribe, snapshot, getServerBody);
+}
+
+/**
+ * A counter that moves only when another tab saves this chapter — never on this
+ * tab's own autosaves. The editor keys its surface on it so a cross-tab save
+ * reloads the text without remounting the surface being typed into. See
+ * subscribeToBodyReload for why the stored text itself can't do this job.
+ */
+export function useBodyReload(id: string): number {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToBodyReload(id, onStoreChange),
+    [id],
+  );
+  const snapshot = useCallback(() => getBodyReload(id), [id]);
+  return useSyncExternalStore(subscribe, snapshot, getServerBodyReload);
 }
 
 /** A book's cover art as a data URL, or null. */

@@ -26,7 +26,7 @@ export function BookmarksPanel({ bookId }: { bookId: string }) {
   }
 
   return (
-    <ol className="flex h-full flex-col gap-0.5 overflow-y-auto p-2">
+    <ol className="scroll-slim flex h-full flex-col gap-0.5 overflow-y-auto p-2">
       {marks.map(({ book, chapter }) => (
         <li key={`${book.id}:${chapter.id}`} className="group relative">
           <Link

@@ -91,9 +91,13 @@ export function Rail({
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
       data-paper={paper}
+      // The left rail is app navigation, so it wears the nav chrome (see
+      // .nav-chrome) to match the shelf's sidebar — and reverts to neutral in
+      // dark, like the rest of the chrome. The right rail takes the paper's
+      // colours instead: its tools belong to the page, not the app.
       className={`scroll-slim flex w-(--rail-width) shrink-0 flex-col
                   items-center gap-2 overflow-y-auto py-4 ${
-                    paper ? "rail-paper" : "bg-surface"
+                    paper ? "rail-paper" : "nav-chrome"
                   } ${side === "left" ? "border-r" : "border-l"} border-line`}
     >
       {children}
@@ -171,6 +175,14 @@ export const icons = {
     <>
       <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
       <path d="M8 3.5v13" />
+    </>
+  ),
+  // The contrast mark: a ring with one half inked. It shows the choice rather
+  // than a single side of it, the way a bare sun or moon would.
+  theme: (
+    <>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" />
     </>
   ),
 };

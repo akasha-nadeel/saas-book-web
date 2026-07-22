@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter, Poppins } from "next/font/google";
 import "./globals.css";
+import { ThemeSync } from "@/components/theme/theme-sync";
+import { AppLoader } from "@/components/app-loader";
+
+/**
+ * Sets the theme on <html> before the first paint, so a writer who chose dark
+ * never sees a white flash on load. It runs before React hydrates, so it cannot
+ * import library-store; it reads the same key that module writes and defaults to
+ * light on anything unexpected. ThemeSync takes over once React is running.
+ */
+const THEME_BOOTSTRAP = `try{var t=JSON.parse(localStorage.getItem('openchapter:prefs')||'{}').theme;document.documentElement.dataset.theme=t==='dark'?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}`;
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -36,13 +46,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning: the bootstrap script writes data-theme onto this
+    // element before hydration, which the server markup does not carry.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${fraunces.variable} ${inter.variable} ${poppins.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}
       <body className="h-full overflow-hidden bg-surface text-fg">
+        <ThemeSync />
+        <AppLoader />
         {children}
       </body>
     </html>

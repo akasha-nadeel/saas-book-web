@@ -154,6 +154,39 @@ export function subscribeToBody(id: string, onStoreChange: () => void) {
 }
 
 // ---------------------------------------------------------------------------
+// Body reload signal
+//
+// The editor keys its writing surface on this counter so the surface remounts —
+// and re-reads the text — when *another* tab saves the same chapter. Keying on
+// the stored text itself looked equivalent, but it also fired on the tab's own
+// autosave: the save wrote the body, a re-render re-read it, the key changed,
+// and Tiptap remounted in the middle of a keystroke. The `storage` event never
+// fires in the tab that wrote, so this counter moves only for cross-tab writes.
+// ---------------------------------------------------------------------------
+
+const bodyReloads = new Map<string, number>();
+
+export function subscribeToBodyReload(id: string, onStoreChange: () => void) {
+  const key = bodyKey(id);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) {
+      bodyReloads.set(id, (bodyReloads.get(id) ?? 0) + 1);
+      onStoreChange();
+    }
+  };
+  window.addEventListener("storage", onStorage);
+  return () => window.removeEventListener("storage", onStorage);
+}
+
+export function getBodyReload(id: string): number {
+  return bodyReloads.get(id) ?? 0;
+}
+
+export function getServerBodyReload(): number {
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Reads
 // ---------------------------------------------------------------------------
 
@@ -740,6 +773,10 @@ const PAPER_COLORS: readonly PaperColor[] = [
   "black",
 ];
 
+/** The whole app's colour scheme. The paper above is a separate choice — a
+ *  writer can keep a cream page whichever theme the chrome is wearing. */
+export type Theme = "light" | "dark";
+
 export interface Prefs {
   /** Dim every paragraph but the one being written. */
   focusMode: boolean;
@@ -747,9 +784,10 @@ export interface Prefs {
   typewriter: boolean;
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
-  /** The assistant panel. */
   /** The colour of the page under the prose. */
   paper: PaperColor;
+  /** The chrome's colour scheme — light or dark. */
+  theme: Theme;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -758,9 +796,11 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
-  // White by default: the chrome is dark, the page is not. Long-form prose is
+  // White by default, and now on a light chrome to match. Long-form prose is
   // what most people still read most comfortably on a light surface.
   paper: "white",
+  // Light out of the box; the toggle switches to the dark workspace.
+  theme: "light",
 });
 
 const prefsListeners = new Set<() => void>();
@@ -803,6 +843,7 @@ function parsePrefs(raw: string | null): Prefs {
       paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
         ? (parsed.paper as PaperColor)
         : DEFAULT_PREFS.paper,
+      theme: parsed.theme === "dark" ? "dark" : "light",
     };
   } catch {
     return DEFAULT_PREFS;

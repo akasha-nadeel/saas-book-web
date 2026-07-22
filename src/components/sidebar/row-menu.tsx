@@ -45,6 +45,7 @@ export function RowMenu({
   label,
   items,
   tone = "chrome",
+  active = false,
 }: {
   /** Names the row this menu belongs to, for screen readers. */
   label: string;
@@ -55,6 +56,12 @@ export function RowMenu({
    * chip rather than trusting the image underneath it.
    */
   tone?: "chrome" | "paper" | "art";
+  /**
+   * Keep the trigger shown rather than revealing it on hover. Set on the row
+   * the writer is already on: its actions should be one click away, not one
+   * hover, and it is the one row a touch user cannot hover to find.
+   */
+  active?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -191,7 +198,7 @@ export function RowMenu({
                     outline-none transition-opacity group-hover:opacity-100
                     focus-visible:opacity-100 focus-visible:ring-2
                     focus-visible:ring-accent/60 ${TONE[tone]} ${
-                      open ? "opacity-100" : "opacity-0"
+                      open || active ? "opacity-100" : "opacity-0"
                     }`}
       >
         <svg

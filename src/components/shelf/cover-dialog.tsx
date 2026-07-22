@@ -89,6 +89,7 @@ export function CoverDialog({
               author={author.trim() || undefined}
               words={bookWordCount(book)}
               image={preview}
+              seed={book.id}
             />
           </div>
 

@@ -30,6 +30,7 @@ import {
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
 import {
+  useBodyReload,
   useChapterBody,
   useCover,
   useHydrated,
@@ -38,6 +39,7 @@ import {
 } from "@/lib/use-library";
 import { useTypewriter } from "@/lib/use-typewriter";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
+import { LoadingScreen } from "@/components/loading-screen";
 
 const STATUS_LABEL: Record<SaveStatus, string> = {
   saved: "Saved",
@@ -52,6 +54,12 @@ interface ChapterSnapshot {
   words: number;
 }
 
+// Remembers the book whose opening splash has already played, so moving from
+// chapter to chapter inside it never shows the loading screen again — only
+// entering a different book does. Module scope, so it survives the surface's
+// remounts between chapters.
+let splashedBookId: string | null = null;
+
 export function ChapterEditor({
   bookId,
   chapterId,
@@ -63,6 +71,7 @@ export function ChapterEditor({
   const shelf = useShelf();
   const prefs = usePrefs();
   const raw = useChapterBody(chapterId);
+  const reload = useBodyReload(chapterId);
   const cover = useCover(bookId);
 
   const [editingCover, setEditingCover] = useState(false);
@@ -70,6 +79,24 @@ export function ChapterEditor({
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
   const [tab, setTab] = useState<PanelTab>("chapters");
+
+  // Opening a book is worth marking; it renders faster than the eye can catch,
+  // so the loading screen is held for a beat, then faded. It plays only on the
+  // way *into* a book — the id above is remembered across the surface's remounts
+  // between chapters, so flipping chapter to chapter never replays it.
+  const [splash, setSplash] = useState<"show" | "leaving" | "gone">(() =>
+    splashedBookId === bookId ? "gone" : "show",
+  );
+  useEffect(() => {
+    if (splashedBookId === bookId) return;
+    splashedBookId = bookId;
+    const hold = setTimeout(() => setSplash("leaving"), 1000);
+    const drop = setTimeout(() => setSplash("gone"), 1000 + 350);
+    return () => {
+      clearTimeout(hold);
+      clearTimeout(drop);
+    };
+  }, [bookId]);
 
   const book = findBook(shelf, bookId);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
@@ -90,7 +117,7 @@ export function ChapterEditor({
   }, [raw]);
 
   // Nothing to render until storage has been read — see useHydrated.
-  if (!hydrated) return null;
+  if (!hydrated) return <LoadingScreen />;
   if (!book || !chapter) return <MissingChapter />;
 
   return (
@@ -99,6 +126,18 @@ export function ChapterEditor({
     <div className="flex h-full">
       <>
         <Rail side="left">
+          {/* Shown only while the panel is hidden — the way back. When it is
+              open, the collapse control in the panel header is what hides it, so
+              there is one button, never two. */}
+          {!prefs.leftPanel && (
+            <RailButton
+              label="Show panel"
+              onClick={() => setPref("leftPanel", true)}
+            >
+              {icons.panel}
+            </RailButton>
+          )}
+
           <RailButton label="All books" href="/">
             {icons.home}
           </RailButton>
@@ -131,6 +170,20 @@ export function ChapterEditor({
               {icon}
             </RailButton>
           ))}
+
+          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
+          {/* The app-wide theme toggle. A rail item rather than a footer, so the
+              dev-tools badge (and any other bottom overlay) can't sit on top of
+              it — the footer landed exactly where that badge does. */}
+          <RailButton
+            label={`Switch to ${prefs.theme === "dark" ? "light" : "dark"} theme`}
+            onClick={() =>
+              setPref("theme", prefs.theme === "dark" ? "light" : "dark")
+            }
+          >
+            {icons.theme}
+          </RailButton>
         </Rail>
 
         {prefs.leftPanel && (
@@ -144,10 +197,11 @@ export function ChapterEditor({
         )}
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Keyed on the stored text as well as the id, so a save from another
-              tab reloads the surface rather than leaving this one stale. */}
+          {/* Keyed on the id and a cross-tab reload counter — not the stored
+              text — so a save from another tab reloads the surface, while this
+              tab's own autosaves never remount it mid-keystroke. */}
           <EditorSurface
-            key={`${chapterId}:${raw ?? ""}`}
+            key={`${chapterId}:${reload}`}
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapter.title}
@@ -189,6 +243,7 @@ export function ChapterEditor({
               author={book.author}
               words={bookWordCount(book)}
               image={cover}
+              seed={book.id}
             />
           </button>
 
@@ -218,6 +273,9 @@ export function ChapterEditor({
       {editingCover && (
         <CoverDialog book={book} onClose={() => setEditingCover(false)} />
       )}
+
+      {/* The opening splash, over the editor while it settles, then faded. */}
+      {splash !== "gone" && <LoadingScreen leaving={splash === "leaving"} />}
     </div>
   );
 }
@@ -369,6 +427,16 @@ function EditorSurface({
       <div
         data-paper={prefs.paper}
         data-columns={page.columns}
+        // The workspace scrollbar (and its inputs) follow the paper, not the app
+        // theme: a writer looks at a light page even when the chrome is dark, so
+        // its scrollbar must be light too. Set inline so it lands cleanly on the
+        // element and cascades to the scrolling <main> inside.
+        style={{
+          colorScheme:
+            prefs.paper === "slate" || prefs.paper === "black"
+              ? "dark"
+              : "light",
+        }}
         className={`manuscript flex min-h-0 flex-1 flex-col ${
           prefs.focusMode ? "focus-mode" : ""
         }`}
@@ -421,7 +489,9 @@ function EditorSurface({
                   be noticed — silent data loss is what this exists to catch. */}
               <span
                 aria-live="polite"
-                style={status === "error" ? { color: "#ff6568" } : undefined}
+                style={
+                  status === "error" ? { color: "var(--color-danger)" } : undefined
+                }
               >
                 {STATUS_LABEL[status]}
                 {status === "saved" && lastSavedAt
@@ -462,7 +532,7 @@ function EditorSurface({
             straight into the style with no pixels-per-inch fudge. */}
         <div className="relative flex min-h-0 flex-1">
           <main
-            className={`scroll-slim min-h-0 flex-1 cursor-text overflow-auto
+            className={`scroll-paper min-h-0 flex-1 cursor-text overflow-auto
                         bg-surface ${page.fit ? "" : "px-8 py-8"}`}
             onClick={() => editor?.chain().focus().run()}
           >

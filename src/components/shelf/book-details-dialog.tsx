@@ -53,6 +53,7 @@ export function BookDetailsDialog({
               author={book.author}
               words={words}
               image={cover}
+              seed={book.id}
             />
           </div>
 

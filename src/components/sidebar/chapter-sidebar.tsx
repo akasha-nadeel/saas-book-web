@@ -9,6 +9,7 @@ import {
   findBook,
   moveChapter,
   renameChapter,
+  setPref,
   toggleBookmark,
   type ChapterMeta,
 } from "@/lib/library-store";
@@ -96,10 +97,9 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
-      {/* The wordmark opens the panel rather than closing it. At the foot it
-          was the last thing read and sat under the save state, where a brand
-          has nothing to say; at the head it labels what it belongs to. */}
-      <div className="shrink-0 border-b border-line px-4 py-3">
+      {/* The wordmark opens the shelf. Beside it, the collapse control hides the
+          panel and leaves the rail standing — the rail's tabs bring it back. */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-3">
         <Link
           href="/"
           className="rounded-sm font-display text-xl font-medium tracking-tight
@@ -109,6 +109,28 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         >
           OpenChapter
         </Link>
+
+        <button
+          type="button"
+          onClick={() => setPref("leftPanel", false)}
+          aria-label="Hide panel"
+          title="Hide panel"
+          className="-mr-1 shrink-0 rounded-md p-1.5 text-muted outline-none
+                     transition-colors hover:bg-raised hover:text-fg
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="h-5 w-5"
+          >
+            <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+            <path d="M7.5 3.5v13" />
+          </svg>
+        </button>
       </div>
 
       <div className="shrink-0 px-4 pt-3 pb-3">
@@ -204,7 +226,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                                   focus-visible:ring-2
                                   focus-visible:ring-accent/60 ${
                                     isActive
-                                      ? "border-accent bg-accent-deep font-medium text-white"
+                                      ? "border-accent bg-selected font-medium text-selected-fg"
                                       : "border-transparent text-muted hover:bg-raised hover:text-fg"
                                   }`}
                     >
@@ -234,6 +256,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                     <span className="absolute top-1/2 right-2 -translate-y-1/2">
                     <RowMenu
                       label={chapter.title}
+                      active={isActive}
                       items={[
                         {
                           label: chapter.bookmarked ? "Unstar" : "Star",

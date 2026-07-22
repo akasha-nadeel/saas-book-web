@@ -71,7 +71,7 @@ export function NotesPanel({ chapterId }: { chapterId: string }) {
   const setValue = { synopsis: setSynopsis, notes: setNotes };
 
   return (
-    <div className="flex h-full flex-col gap-1 overflow-y-auto p-3">
+    <div className="scroll-slim flex h-full flex-col gap-1 overflow-y-auto p-3">
       {SECTIONS.map((section) => (
         <section key={section.key}>
           <button

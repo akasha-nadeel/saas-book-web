@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
@@ -9,6 +9,11 @@ import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
 import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
+import { HelpDialog } from "@/components/shelf/help-dialog";
+import { SupportDialog } from "@/components/shelf/support-dialog";
+import { SoundsDialog } from "@/components/shelf/sounds-dialog";
+import { ImportDialog } from "@/components/shelf/import-dialog";
+import { LoadingScreen } from "@/components/loading-screen";
 import {
   archiveBook,
   bookWordCount,
@@ -16,17 +21,57 @@ import {
   deleteBook,
   migrateLegacy,
   setBareCover,
+  setPref,
   restoreBook,
   trashBook,
   type Book,
   type BookView,
 } from "@/lib/library-store";
-import { useCover, useHydrated, useShelf } from "@/lib/use-library";
+import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 
 const VIEW_LABEL: Record<BookView, string> = {
   active: "All books",
   archived: "Archived books",
   trashed: "Trashed books",
+};
+
+/**
+ * A supplied icon shown through a mask, so it takes the button's own text colour
+ * (currentColor) and follows the theme and hover. The source PNGs arrive in
+ * mixed colours; masking them from their shape makes them one. See
+ * public/icon-*.png.
+ */
+function MaskIcon({
+  src,
+  className = "h-6 w-6",
+}: {
+  src: string;
+  className?: string;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`${className} shrink-0 bg-current`}
+      style={{
+        maskImage: `url(${src})`,
+        WebkitMaskImage: `url(${src})`,
+        maskSize: "contain",
+        WebkitMaskSize: "contain",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+        maskPosition: "center",
+        WebkitMaskPosition: "center",
+      }}
+    />
+  );
+}
+
+// One icon apiece for the view tabs — books for the whole shelf, a case for
+// what's set aside, a bin for what's on its way out.
+const VIEW_ICON: Record<BookView, ReactNode> = {
+  active: <MaskIcon src="/icon-books.png" className="h-7 w-7" />,
+  archived: <MaskIcon src="/icon-archived.png" className="h-7 w-7" />,
+  trashed: <MaskIcon src="/icon-trashed.png" className="h-7 w-7" />,
 };
 
 export function Bookshelf() {
@@ -36,7 +81,9 @@ export function Bookshelf() {
   const [editing, setEditing] = useState<Book | null>(null);
   const [opening, setOpening] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
-  const [dialog, setDialog] = useState<"templates" | "upgrade" | null>(null);
+  const [dialog, setDialog] = useState<
+    "templates" | "upgrade" | "help" | "support" | "sounds" | "import" | null
+  >(null);
   const [view, setView] = useState<BookView>("active");
 
   // migrateLegacy is idempotent, but running it twice is still wasted work and
@@ -93,7 +140,7 @@ export function Bookshelf() {
     if (window.confirm(warning)) deleteBook(book.id);
   };
 
-  if (!hydrated) return null;
+  if (!hydrated) return <LoadingScreen />;
 
   // Where "Continue writing" goes: the last book opened, or the most recent
   // active one. Never an archived or trashed book.
@@ -117,17 +164,23 @@ export function Bookshelf() {
         <ShelfNav
           view={view}
           counts={counts}
-          totalWords={totalWords}
           onView={setView}
+          onImport={() => setDialog("import")}
+          onSounds={() => setDialog("sounds")}
+          onHelp={() => setDialog("help")}
+          onSupport={() => setDialog("support")}
+          onUpgrade={() => setDialog("upgrade")}
         />
 
         {/* One rounded corner, top-left, and the panel runs off the right and
             bottom edges. The separation from the sidebar is the shade change and
-            that single corner — no border, no floating gap on four sides. */}
-        <main className="min-w-0 flex-1 overflow-hidden">
-          <div className="flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-8 py-7">
+            that single corner — no border, no floating gap on four sides. The
+            green backs this area so the rounded corner nests into the chrome
+            rather than cutting to the page behind it. */}
+        <main className="min-w-0 flex-1 overflow-hidden bg-nav">
+          <div className="scroll-slim flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-8 py-7">
             <div className="flex items-baseline justify-between gap-6">
-              <h1 className="font-serif text-2xl text-fg">
+              <h1 className="font-serif text-3xl text-fg">
                 {VIEW_LABEL[view]}
               </h1>
               <p className="shrink-0 font-sans text-sm text-muted">
@@ -215,6 +268,10 @@ export function Bookshelf() {
         <TemplatesDialog onClose={() => setDialog(null)} />
       )}
       {dialog === "upgrade" && <UpgradeDialog onClose={() => setDialog(null)} />}
+      {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
+      {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
+      {dialog === "sounds" && <SoundsDialog onClose={() => setDialog(null)} />}
+      {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -237,8 +294,11 @@ function ShelfTopNav({
   onUpgrade: () => void;
 }) {
   return (
-    <header className="flex h-16 shrink-0 items-center gap-6 bg-surface px-6">
-      <p className="min-w-0 shrink-0 font-display text-2xl font-medium tracking-tight text-fg">
+    <header className="nav-chrome flex h-16 shrink-0 items-center gap-6 px-6">
+      {/* Pure white, not the chrome's near-white ink: the wordmark sits on the
+          dark nav in both themes, so it reads as the brand mark rather than as
+          another line of interface text. */}
+      <p className="min-w-0 shrink-0 font-display text-2xl font-medium tracking-tight text-white">
         OpenChapter
       </p>
 
@@ -282,19 +342,30 @@ function ShelfTopNav({
 function ShelfNav({
   view,
   counts,
-  totalWords,
   onView,
+  onImport,
+  onSounds,
+  onHelp,
+  onSupport,
+  onUpgrade,
 }: {
   view: BookView;
   counts: Record<BookView, number>;
-  totalWords: number;
   onView: (view: BookView) => void;
+  onImport: () => void;
+  onSounds: () => void;
+  onHelp: () => void;
+  onSupport: () => void;
+  onUpgrade: () => void;
 }) {
+  const { theme } = usePrefs();
+
   return (
     <aside
-      // No right border: the panel's lighter shade and its rounded corner are
-      // what separate the two, as in the reference.
-      className="flex w-(--sidebar-width) shrink-0 flex-col bg-surface px-4 pt-2 pb-6"
+      // The nav chrome; see .nav-chrome. Its shade change against the white
+      // content well, plus that panel's one rounded corner, is what separates
+      // the two — no border needed.
+      className="nav-chrome flex w-(--sidebar-width) shrink-0 flex-col px-4 pt-2 pb-3"
       aria-label="Library"
     >
       {/* A link, not a button: setting up a book is a place you go, and a
@@ -302,7 +373,7 @@ function ShelfNav({
       <Link
         href="/book/new"
         className="block w-full rounded-md bg-accent py-2.5 text-center
-                   font-sans text-sm font-semibold text-white outline-none
+                   font-sans text-base font-semibold text-white outline-none
                    transition-colors hover:bg-accent-strong
                    focus-visible:ring-2 focus-visible:ring-accent/60"
       >
@@ -310,17 +381,19 @@ function ShelfNav({
       </Link>
 
       {/* Quieter than New book on purpose: most visits start something, and
-          importing is the once-per-manuscript path. */}
-      <Link
-        href="/book/import"
+          importing is the once-per-manuscript path. Opens the import modal
+          rather than a page, so the shelf stays put behind it. */}
+      <button
+        type="button"
+        onClick={onImport}
         className="mt-2 block w-full rounded-md border border-line py-2.5
-                   text-center font-sans text-sm font-medium text-muted
+                   text-center font-sans text-base font-medium text-muted
                    outline-none transition-colors hover:border-accent/60
                    hover:bg-raised hover:text-fg focus-visible:ring-2
                    focus-visible:ring-accent/60"
       >
         Import a book
-      </Link>
+      </button>
 
       <nav className="mt-4 flex flex-col gap-0.5">
         {(["active", "archived", "trashed"] as BookView[]).map((value) => (
@@ -329,18 +402,21 @@ function ShelfNav({
             type="button"
             onClick={() => onView(value)}
             aria-current={view === value ? "page" : undefined}
-            className={`flex items-baseline justify-between gap-2 rounded-md px-3
-                        py-2 text-left font-sans text-sm outline-none
+            className={`flex items-center justify-between gap-2 rounded-md px-3
+                        py-2.5 text-left font-sans text-base outline-none
                         transition-colors focus-visible:ring-2
                         focus-visible:ring-accent/60 ${
                           view === value
-                            ? "bg-accent-deep text-white"
+                            ? "bg-selected text-selected-fg"
                             : "text-muted hover:bg-raised hover:text-fg"
                         }`}
           >
-            <span>{VIEW_LABEL[value]}</span>
+            <span className="flex items-center gap-2.5">
+              {VIEW_ICON[value]}
+              {VIEW_LABEL[value]}
+            </span>
             {counts[value] > 0 && (
-              <span className="shrink-0 text-xs tabular-nums opacity-70">
+              <span className="shrink-0 text-sm tabular-nums opacity-70">
                 {counts[value]}
               </span>
             )}
@@ -348,10 +424,155 @@ function ShelfNav({
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-line px-3 pt-4 font-sans text-xs text-muted">
-        {counts.active} {counts.active === 1 ? "book" : "books"}
-        {" · "}
-        {totalWords.toLocaleString()} words
+      {/* A single line sets the views above apart from the tools below. */}
+      <div aria-hidden="true" className="my-2 h-px bg-line" />
+
+      {/* Sounds, help, support, and the theme toggle — the tools, under the
+          line, with Theme last. */}
+      <div className="flex flex-col gap-0.5">
+        <button
+          type="button"
+          onClick={onSounds}
+          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
+                     font-sans text-base text-muted outline-none transition-colors
+                     hover:bg-raised hover:text-fg focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          <MaskIcon src="/icon-sounds.png" className="h-7 w-7" />
+          Sounds
+        </button>
+
+        <button
+          type="button"
+          onClick={onHelp}
+          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
+                     font-sans text-base text-muted outline-none transition-colors
+                     hover:bg-raised hover:text-fg focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="h-6 w-7 shrink-0"
+          >
+            <circle cx="10" cy="10" r="7.5" />
+            <path
+              d="M8 7.9a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.4"
+              strokeLinecap="round"
+            />
+            <circle cx="10" cy="14.2" r="0.6" fill="currentColor" stroke="none" />
+          </svg>
+          Help
+        </button>
+
+        <button
+          type="button"
+          onClick={onSupport}
+          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
+                     font-sans text-base text-muted outline-none transition-colors
+                     hover:bg-raised hover:text-fg focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="h-6 w-7 shrink-0"
+          >
+            <path
+              d="M4 4.5h12A1.5 1.5 0 0 1 17.5 6v6a1.5 1.5 0 0 1-1.5 1.5H8.5L5 16.5v-3H4A1.5 1.5 0 0 1 2.5 12V6A1.5 1.5 0 0 1 4 4.5z"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Support
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPref("theme", theme === "dark" ? "light" : "dark")}
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
+                     font-sans text-base text-muted outline-none transition-colors
+                     hover:bg-raised hover:text-fg focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="h-6 w-7 shrink-0"
+          >
+            <circle cx="10" cy="10" r="7" />
+            {/* The right half, filled — the contrast mark. */}
+            <path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" />
+          </svg>
+          Theme
+        </button>
+      </div>
+
+      {/* The account, at the foot of the shelf. There is no sign-in yet — auth
+          has been left out on purpose — so this is a guest on the free tier
+          rather than a person; clicking it opens the plan note, which says as
+          much. Built from tokens, so it fits the navy sidebar in light and the
+          neutral one in dark without a second rule. */}
+      <div className="mt-auto border-t border-line pt-3">
+        <button
+          type="button"
+          onClick={onUpgrade}
+          aria-label="Your account and plan"
+          className="flex w-full items-center gap-3 rounded-lg px-2 py-2
+                     text-left outline-none transition-colors hover:bg-raised
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 shrink-0 items-center justify-center
+                       rounded-full bg-accent text-white"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="h-5 w-5"
+            >
+              <circle cx="10" cy="7" r="3" />
+              <path d="M4.5 16a5.5 5.5 0 0 1 11 0" strokeLinecap="round" />
+            </svg>
+          </span>
+
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-sans text-sm font-medium text-fg">
+              Guest
+            </span>
+            <span className="block truncate font-sans text-xs text-muted">
+              Free plan
+            </span>
+          </span>
+
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            className="h-4 w-4 shrink-0 text-muted"
+          >
+            <path
+              d="m7 8 3-3 3 3M7 12l3 3 3-3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
       </div>
     </aside>
   );
@@ -486,6 +707,7 @@ function BookCard({
           words={bookWordCount(book)}
           image={cover}
           bare={book.bareCover}
+          seed={book.id}
         />
       </Link>
 

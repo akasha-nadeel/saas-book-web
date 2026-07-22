@@ -30,8 +30,10 @@ export function LeftPanel({
 }) {
   return (
     <aside
-      className="flex w-(--sidebar-width) shrink-0 flex-col border-r
-                 border-line bg-panel"
+      // The pale half of the two-tone nav; see .panel-chrome. Blue in light,
+      // plain dark panel at night.
+      className="panel-chrome flex w-(--sidebar-width) shrink-0 flex-col border-r
+                 border-line"
       aria-label="Manuscript panel"
     >
       {tab === "chapters" && <ChapterSidebar bookId={bookId} />}

@@ -1,28 +1,54 @@
 @import "tailwindcss";
 
 /* --------------------------------------------------------------------------
-   The OpenChapter palette — a dark, low-glare workspace.
+   The OpenChapter palette.
 
    Named for the job each colour does rather than the colour it is, so a later
-   change of hue does not leave every class in the app lying about itself.
-   Three background steps, deepest first: the page, the panels sitting on it,
-   and the rows that lift on hover.
+   change of hue — or a change of whole theme — does not leave every class in
+   the app lying about itself. That naming is what makes the theme toggle a
+   handful of variables rather than a rewrite: re-point a token here and every
+   `bg-surface`, `text-fg`, `bg-accent` in the app follows, none the wiser.
+
+   Light is the default and lives in @theme (so it is also what SSR and a
+   JS-off page render). Dark re-points the same tokens under
+   [data-theme="dark"], further down.
+
+   Light inverts the elevation logic of a dark UI: the desk is a soft grey, and
+   panels are white sitting *up* on it, lifted by a hairline and a shadow rather
+   than by a brighter fill. So `raised` is a touch darker than `panel`, not
+   lighter — a hover on white deepens, it does not glow.
    -------------------------------------------------------------------------- */
 @theme {
-  --color-surface: #121821; /* the page */
-  --color-panel: #1d2732; /* cards, sidebars, the content well */
-  --color-raised: #28323f; /* hover, inputs, pressed states */
-  --color-line: #313d4c; /* hairlines and dividers */
+  --color-surface: #f5f6f8; /* the page — the desk everything sits on */
+  --color-panel: #ffffff; /* cards, sidebars, the content well */
+  --color-raised: #eaedf1; /* hover, inputs, pressed states */
+  --color-line: #e3e7ec; /* hairlines and dividers */
 
-  --color-fg: #eaf0f6; /* body text */
-  --color-muted: #93a2b4; /* labels, metadata, anything secondary */
+  --color-fg: #1a222d; /* body text — slate ink, not a hard black */
+  --color-muted: #586573; /* labels, metadata, anything secondary */
 
-  /* Two greens, not one. The bright one is for things you press; the deep one
-     fills the row or tab you are currently on. A single accent had to serve
-     both, which is why selected rows were a washed-out tint of a button. */
-  --color-accent: #118a45; /* actions: New book, Send, chosen menu rows */
-  --color-accent-strong: #15a352; /* its hover */
-  --color-accent-deep: #1e4d37; /* selected nav: the open chapter, active tab */
+  /* Two blues, not one. The base one is for things you press; the deep one
+     fills the row or tab you are currently on. Both carry white text as a fill
+     and read as a soft wash at low alpha, so they hold up in either theme. */
+  --color-accent: #1c66cc; /* actions: New book, Send, chosen menu rows */
+  --color-accent-strong: #154f9f; /* its hover — deepens on a light ground */
+  --color-accent-deep: #1f5aa8; /* selected nav: the open chapter, active tab */
+
+  /* A single alarm colour, tuned per theme for contrast on its own ground. */
+  --color-danger: #c0362c; /* a failed save, and anything else gone wrong */
+
+  /* Selected navigation — the open chapter, the chosen view tab. On light this
+     is a soft blue wash with deep-blue ink, not a saturated block: a heavy
+     fill reads as a button you should press, and these only say "you are here".
+     Dark keeps the original deep fill with light text (see the override). */
+  --color-selected: #dbe7f7; /* the highlighted row's ground */
+  --color-selected-fg: #154f9f; /* its text */
+
+  /* Backs the shelf chrome and — so its rounded corner nests into the chrome
+     rather than the page — the content area behind it. Navy in light; under
+     [data-theme="dark"] it becomes the page colour, and the chrome stays
+     neutral. See .nav-chrome. */
+  --color-nav: #123a63;
 
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -34,6 +60,45 @@
   --text-manuscript--line-height: 1.75;
 }
 
+/* --------------------------------------------------------------------------
+   Dark theme.
+
+   The original low-glare workspace, re-pointed onto the same tokens. Here the
+   steps run the other way — the page is the deepest, panels sit lighter on it,
+   and a hover lifts by brightening — which is why the neutrals, not just their
+   order, differ from the light set above.
+
+   Set on <html> by the toggle and, before first paint, by the inline script in
+   the root layout. No component references it: they all speak in tokens.
+   -------------------------------------------------------------------------- */
+:root[data-theme="dark"] {
+  /* Native scrollbars, form controls and the like render dark to match. */
+  color-scheme: dark;
+
+  --color-surface: #121821;
+  --color-panel: #1d2732;
+  --color-raised: #28323f;
+  --color-line: #313d4c;
+
+  --color-fg: #eaf0f6;
+  --color-muted: #93a2b4;
+
+  --color-accent: #3b82f6;
+  --color-accent-strong: #5a97f8;
+  --color-accent-deep: #22405f;
+
+  --color-danger: #ff6568;
+
+  /* The old look: a deep fill with light text. Held apart from accent-deep so
+     the drag-over washes that still use accent-deep are free to differ. */
+  --color-selected: #22405f;
+  --color-selected-fg: #eaf0f6;
+
+  /* No blue chrome at night: the nav backdrop is just the page colour, so the
+     shelf's header and sidebar read as ordinary dark chrome. */
+  --color-nav: var(--color-surface);
+}
+
 /* App shell. Layout constants, not part of the design language.
 
    The panel scales with the window rather than taking one fixed number. The
@@ -41,6 +106,11 @@
    that panel plus two rails is over a third of the screen, and the page — the
    thing being written — gets squeezed. So 24rem is the ceiling, not the rule. */
 :root {
+  /* Light by default, so the browser never lays its dark OS scrollbar over the
+     light UI. The dark theme flips this to `dark` above. Without it, native
+     scrollbars and form controls ignore the app's theme entirely. */
+  color-scheme: light;
+
   --rail-width: 4rem;
   --sidebar-width: 17rem;
 }
@@ -204,6 +274,132 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Loading screen.
+
+   The book mark fills from the foot up on a loop — a dim outline underneath, a
+   bright copy on top revealed by a clip rectangle that scales up from its base.
+   All CSS, so it runs with no JavaScript and animates inside a server-rendered
+   fallback. Themed, so it shares the app's ground and never flashes.
+   -------------------------------------------------------------------------- */
+.oc-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.4rem;
+  background: var(--color-surface);
+}
+
+.oc-loader-mark {
+  position: relative;
+  width: 16rem;
+  height: 16rem;
+  /* The real logo isolates the shape; the layers below show only through it.
+     Sized past 100% to crop the square's padding so the mark reads large. The
+     query busts the browser cache when the file is re-exported. */
+  -webkit-mask: url("/logo.png?v=2") center / 135% no-repeat;
+  mask: url("/logo.png?v=2") center / 135% no-repeat;
+}
+
+/* The unfilled logo: a faint wash of the accent. */
+.oc-loader-base {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-accent) 26%, transparent);
+}
+
+/* The fill that rises through it, from the foot up. */
+.oc-loader-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--color-accent);
+  transform-origin: bottom;
+  animation: oc-loader-rise 1.9s ease-in-out infinite;
+}
+
+@keyframes oc-loader-rise {
+  0%,
+  100% {
+    transform: scaleY(0);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.oc-loader-text {
+  font-family: var(--font-serif);
+  font-size: 2.25rem;
+  letter-spacing: 0.01em;
+  color: var(--color-muted);
+}
+
+/* Fades out when the splash lets go, so it lifts rather than cuts. */
+.oc-loader-leaving {
+  animation: oc-loader-fade 340ms ease forwards;
+}
+
+@keyframes oc-loader-fade {
+  to {
+    opacity: 0;
+  }
+}
+
+/* A steady, filled mark for anyone who would rather not watch it pulse. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-loader-fill {
+    animation: none;
+    transform: scaleY(1);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The manuscript's own scrollbar.
+
+   .scroll-slim leaves the track transparent, which lets the browser fill the
+   gutter from the app's color-scheme — a dark gutter in dark mode. That is fine
+   over the dark chrome, but the manuscript is a white page, and a dark bar down
+   the side of it was the bug. Here the track is an *explicit* paper colour, so
+   there is no gutter for the theme to reach, and the thumb is mixed from the
+   paper's own ink. The result follows the paper, not the chrome: light on a
+   white page in either theme, and dark on a slate or black one.
+   -------------------------------------------------------------------------- */
+.scroll-paper {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--paper-fg) 32%, transparent)
+    var(--paper-bg);
+}
+
+.scroll-paper::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.scroll-paper::-webkit-scrollbar-track {
+  background: var(--paper-bg);
+}
+
+.scroll-paper::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--paper-fg) 32%, transparent);
+  border-radius: 999px;
+  /* Inset against the paper-coloured track, so the thumb reads as floating. */
+  border: 3px solid var(--paper-bg);
+  background-clip: padding-box;
+}
+
+.scroll-paper::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--paper-fg) 50%, transparent);
+  background-clip: padding-box;
+}
+
+.scroll-paper::-webkit-scrollbar-button {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
    A rail that belongs to the page.
 
    Re-points the theme variables rather than restyling each control. Tailwind
@@ -224,6 +420,93 @@ body {
   /* Hover tint mixed from the page's own ink, so it lands right on all five
      papers instead of being a grey that only suits white. */
   --color-raised: color-mix(in srgb, var(--paper-fg) 12%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Navigation chrome (the deep half of the two-tone nav).
+
+   The shelf's header and sidebar, and the editor's icon rail, wear a deep navy,
+   the way the Nexus dashboard frames its light content. Like .rail-paper above,
+   it re-points the theme tokens rather than restyling each control, so every
+   `text-muted`, `hover:bg-raised`, `bg-selected` and filled button inside
+   adapts on its own — and no child is ever left with dark ink on a dark ground.
+
+   Named for its job, not its hue: the colour lives in --color-nav, so a change
+   of theme is one token, not a rename. The lifts (raised, selected, line) are
+   mixed from white, so they read as a brighter shade of whatever sits beneath.
+   -------------------------------------------------------------------------- */
+.nav-chrome {
+  /* Dark mode and the no-JS fallback: plain chrome, the page's own colour and
+     tokens. The light rule below paints the brand colour over this. */
+  background: var(--color-surface);
+
+  /* The filled actions on the chrome — New book, Upgrade, the active rail tile
+     — take the harmonised navy-blue in every theme, so they never fall back to
+     the brighter global accent. That is why this sits on the base, not in the
+     light-only rule below. */
+  --color-accent: #2670be;
+  --color-accent-strong: #3080d2;
+}
+
+/* Light theme only — and the JS-off default, which renders light. Dark keeps
+   the neutral chrome above: the shelf should not turn blue at night. */
+:root:not([data-theme="dark"]) .nav-chrome {
+  background: var(--color-nav);
+
+  --color-surface: var(--color-nav);
+  --color-panel: var(--color-nav);
+
+  --color-fg: #eef4fb; /* near-white ink for the wordmark and active items */
+  /* Secondary text — the unselected view tabs, the Import button, the counts
+     and the footer. On this deep navy a soft blue-grey sinks into the ground,
+     so it is lifted to a crisp light blue-grey: clearly legible (~8:1), yet a
+     visible step below the near-white above it so the hierarchy still reads. */
+  --color-muted: #cbd8e8;
+  --color-line: color-mix(in srgb, #ffffff 15%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 10%, transparent);
+
+  /* Selected nav — the chosen view tab — lifts brighter with white text, the
+     way the reference marks the page you are on. */
+  --color-selected: color-mix(in srgb, #ffffff 16%, transparent);
+  --color-selected-fg: #ffffff;
+}
+
+/* --------------------------------------------------------------------------
+   Panel chrome (the brighter-blue half of the two-tone nav).
+
+   The chapters / notes / assistant panel that sits between the navy rail and
+   the manuscript. Same scoping as .nav-chrome: a rich blue in light, the plain
+   dark panel at night.
+
+   Deep enough now to carry white text, so it is inked like the rail rather than
+   tinted: titles go near-white, the lifts (line, hover, selected) are mixed
+   from white, and the fields lift as subtle dark panels instead of white boxes.
+   A lighter shade of the rail's own navy — the same colour, one step up — so the
+   two read as kin rather than as two different blues. The New chapter button
+   brightens to rise off the ground. */
+.panel-chrome {
+  background: var(--color-panel);
+
+  /* New chapter and Send take the same harmonised navy-blue as the rail, in
+     every theme — see .nav-chrome. */
+  --color-accent: #2670be;
+  --color-accent-strong: #3080d2;
+}
+
+:root:not([data-theme="dark"]) .panel-chrome {
+  background: #1c4d7a;
+
+  --color-panel: #1c4d7a;
+  --color-surface: color-mix(in srgb, #ffffff 8%, transparent); /* fields: a subtle lift */
+
+  --color-fg: #eef4fb; /* chapter titles and typed text, near white */
+  --color-muted: #c6d8ee; /* unselected titles, numbers, labels — light and crisp */
+  --color-line: color-mix(in srgb, #ffffff 16%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 10%, transparent);
+
+  /* Selected nav — the open chapter — lifts brighter with white text. */
+  --color-selected: color-mix(in srgb, #ffffff 18%, transparent);
+  --color-selected-fg: #ffffff;
 }
 
 /* A sheet of paper on the workspace, at its real dimensions. */

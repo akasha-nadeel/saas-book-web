@@ -122,6 +122,7 @@ export function ExportPage({ bookId }: { bookId: string }) {
               words={0}
               image={cover}
               bare={book.bareCover}
+              seed={book.id}
             />
           </div>
           <div className="min-w-0">
