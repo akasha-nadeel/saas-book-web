@@ -21,21 +21,34 @@ export function LeftPanel({
   chapterId,
   chapterTitle,
   getChapterText,
+  onClose,
 }: {
   tab: PanelTab;
   bookId: string;
   chapterId: string;
   chapterTitle: string;
   getChapterText: () => string;
+  /** Dismiss the panel — used by the mobile overlay's backdrop. */
+  onClose?: () => void;
 }) {
   return (
-    <aside
-      // The pale half of the two-tone nav; see .panel-chrome. Blue in light,
-      // plain dark panel at night.
-      className="panel-chrome flex w-(--sidebar-width) shrink-0 flex-col border-r
-                 border-line"
-      aria-label="Manuscript panel"
-    >
+    <>
+      {/* Below md the panel floats over the manuscript rather than taking a
+          column from it; this backdrop dims the page and closes on a tap. */}
+      <div
+        aria-hidden="true"
+        onClick={onClose}
+        className="fixed inset-0 z-30 bg-black/50 md:hidden"
+      />
+      <aside
+        // The pale half of the two-tone nav; see .panel-chrome. Blue in light,
+        // plain dark panel at night. Below md it sits over the page next to the
+        // rail; at md and up it's a static column as before.
+        className="panel-chrome fixed top-0 bottom-0 left-(--rail-width) z-40 flex
+                   w-(--sidebar-width) max-w-[80vw] shrink-0 flex-col border-r
+                   border-line md:static md:left-auto md:z-auto md:max-w-none"
+        aria-label="Manuscript panel"
+      >
       {tab === "chapters" && <ChapterSidebar bookId={bookId} />}
       {tab === "notes" && <NotesPanel key={chapterId} chapterId={chapterId} />}
       {tab === "bookmarks" && <BookmarksPanel bookId={bookId} />}
@@ -54,6 +67,7 @@ export function LeftPanel({
           </div>
         </>
       )}
-    </aside>
+      </aside>
+    </>
   );
 }

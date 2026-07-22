@@ -76,6 +76,7 @@ export function Rail({
   children,
   footer,
   paper,
+  className = "",
 }: {
   side: "left" | "right";
   children: React.ReactNode;
@@ -86,6 +87,8 @@ export function Rail({
    * stays with the app.
    */
   paper?: string;
+  /** Extra classes — e.g. to hide the tool rail on small screens. */
+  className?: string;
 }) {
   return (
     <nav
@@ -98,7 +101,7 @@ export function Rail({
       className={`scroll-slim flex w-(--rail-width) shrink-0 flex-col
                   items-center gap-2 overflow-y-auto py-4 ${
                     paper ? "rail-paper" : "nav-chrome"
-                  } ${side === "left" ? "border-r" : "border-l"} border-line`}
+                  } ${side === "left" ? "border-r" : "border-l"} border-line ${className}`}
     >
       {children}
       {footer && <div className="mt-auto flex flex-col gap-1">{footer}</div>}

@@ -85,6 +85,8 @@ export function Bookshelf() {
     "templates" | "upgrade" | "help" | "support" | "sounds" | "import" | null
   >(null);
   const [view, setView] = useState<BookView>("active");
+  // The sidebar is a slide-in drawer below md; this is whether it's open.
+  const [navOpen, setNavOpen] = useState(false);
 
   // migrateLegacy is idempotent, but running it twice is still wasted work and
   // React runs effects twice in development.
@@ -158,18 +160,39 @@ export function Bookshelf() {
         continueId={continueId}
         onTemplates={() => setDialog("templates")}
         onUpgrade={() => setDialog("upgrade")}
+        onToggleNav={() => setNavOpen((open) => !open)}
       />
 
       <div className="flex min-h-0 flex-1">
         <ShelfNav
           view={view}
           counts={counts}
-          onView={setView}
-          onImport={() => setDialog("import")}
-          onSounds={() => setDialog("sounds")}
-          onHelp={() => setDialog("help")}
-          onSupport={() => setDialog("support")}
-          onUpgrade={() => setDialog("upgrade")}
+          navOpen={navOpen}
+          onCloseNav={() => setNavOpen(false)}
+          onView={(v) => {
+            setView(v);
+            setNavOpen(false);
+          }}
+          onImport={() => {
+            setNavOpen(false);
+            setDialog("import");
+          }}
+          onSounds={() => {
+            setNavOpen(false);
+            setDialog("sounds");
+          }}
+          onHelp={() => {
+            setNavOpen(false);
+            setDialog("help");
+          }}
+          onSupport={() => {
+            setNavOpen(false);
+            setDialog("support");
+          }}
+          onUpgrade={() => {
+            setNavOpen(false);
+            setDialog("upgrade");
+          }}
         />
 
         {/* One rounded corner, top-left, and the panel runs off the right and
@@ -178,9 +201,9 @@ export function Bookshelf() {
             green backs this area so the rounded corner nests into the chrome
             rather than cutting to the page behind it. */}
         <main className="min-w-0 flex-1 overflow-hidden bg-nav">
-          <div className="scroll-slim flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-8 py-7">
-            <div className="flex items-baseline justify-between gap-6">
-              <h1 className="font-serif text-3xl text-fg">
+          <div className="scroll-slim flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-4 py-5 md:px-8 md:py-7">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+              <h1 className="font-serif text-2xl text-fg md:text-3xl">
                 {VIEW_LABEL[view]}
               </h1>
               <p className="shrink-0 font-sans text-sm text-muted">
@@ -288,27 +311,54 @@ function ShelfTopNav({
   continueId,
   onTemplates,
   onUpgrade,
+  onToggleNav,
 }: {
   continueId: string | null;
   onTemplates: () => void;
   onUpgrade: () => void;
+  onToggleNav: () => void;
 }) {
   return (
-    <header className="nav-chrome flex h-16 shrink-0 items-center gap-6 px-6">
+    <header className="nav-chrome flex h-16 shrink-0 items-center gap-3 px-4 md:gap-6 md:px-6">
+      {/* The menu button reveals the sidebar drawer; it belongs to small screens
+          only, where the sidebar is off-canvas. */}
+      <button
+        type="button"
+        onClick={onToggleNav}
+        aria-label="Open menu"
+        className="-ml-1 rounded-md p-2 text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/60 md:hidden"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          className="h-5 w-5"
+        >
+          <path d="M3 6h14M3 10h14M3 14h14" />
+        </svg>
+      </button>
+
       {/* Pure white, not the chrome's near-white ink: the wordmark sits on the
           dark nav in both themes, so it reads as the brand mark rather than as
           another line of interface text. */}
-      <p className="min-w-0 shrink-0 font-display text-2xl font-medium tracking-tight text-white">
+      <p className="min-w-0 shrink-0 font-display text-xl font-medium tracking-tight text-white md:text-2xl">
         OpenChapter
       </p>
 
       <nav className="ml-auto flex items-center gap-2 font-sans text-sm">
+        {/* The two quiet links fold away on small screens — New book and the
+            book cards carry those jobs there. */}
         <button
           type="button"
           onClick={onTemplates}
-          className="rounded-md px-3 py-2 text-muted outline-none
+          className="hidden rounded-md px-3 py-2 text-muted outline-none
                      transition-colors hover:bg-raised hover:text-fg
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
+                     focus-visible:ring-2 focus-visible:ring-accent/60 md:block"
         >
           Templates
         </button>
@@ -316,9 +366,9 @@ function ShelfTopNav({
         {continueId && (
           <Link
             href={`/book/${continueId}`}
-            className="rounded-md px-3 py-2 text-muted outline-none
+            className="hidden rounded-md px-3 py-2 text-muted outline-none
                        transition-colors hover:bg-raised hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
+                       focus-visible:ring-2 focus-visible:ring-accent/60 md:block"
           >
             Continue writing
           </Link>
@@ -327,10 +377,10 @@ function ShelfTopNav({
         <button
           type="button"
           onClick={onUpgrade}
-          className="ml-2 rounded-md bg-accent px-4 py-2 font-semibold
+          className="rounded-md bg-accent px-4 py-2 font-semibold
                      text-white outline-none transition-colors
                      hover:bg-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60"
+                     focus-visible:ring-accent/60 md:ml-2"
         >
           Upgrade
         </button>
@@ -342,6 +392,8 @@ function ShelfTopNav({
 function ShelfNav({
   view,
   counts,
+  navOpen,
+  onCloseNav,
   onView,
   onImport,
   onSounds,
@@ -351,6 +403,8 @@ function ShelfNav({
 }: {
   view: BookView;
   counts: Record<BookView, number>;
+  navOpen: boolean;
+  onCloseNav: () => void;
   onView: (view: BookView) => void;
   onImport: () => void;
   onSounds: () => void;
@@ -361,13 +415,29 @@ function ShelfNav({
   const { theme } = usePrefs();
 
   return (
-    <aside
-      // The nav chrome; see .nav-chrome. Its shade change against the white
-      // content well, plus that panel's one rounded corner, is what separates
-      // the two — no border needed.
-      className="nav-chrome flex w-(--sidebar-width) shrink-0 flex-col px-4 pt-2 pb-3"
-      aria-label="Library"
-    >
+    <>
+      {/* Below md the sidebar is a drawer; this dims the page behind it and
+          closes it on a tap outside. */}
+      {navOpen && (
+        <div
+          aria-hidden="true"
+          onClick={onCloseNav}
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+        />
+      )}
+
+      <aside
+        // The nav chrome; see .nav-chrome. Its shade change against the white
+        // content well, plus that panel's one rounded corner, is what separates
+        // the two — no border needed. Below md it slides in from the left over
+        // the content; at md and up it sits static in the row as before.
+        className={`nav-chrome fixed top-16 bottom-0 left-0 z-40 flex
+                    w-(--sidebar-width) max-w-[85vw] shrink-0 flex-col px-4 pt-2
+                    pb-3 transition-transform duration-200 ease-out
+                    md:static md:top-auto md:z-auto md:max-w-none md:translate-x-0
+                    ${navOpen ? "translate-x-0" : "-translate-x-full"}`}
+        aria-label="Library"
+      >
       {/* A link, not a button: setting up a book is a place you go, and a
           link is what lets it be opened in a new tab or middle-clicked. */}
       <Link
@@ -574,7 +644,8 @@ function ShelfNav({
           </svg>
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

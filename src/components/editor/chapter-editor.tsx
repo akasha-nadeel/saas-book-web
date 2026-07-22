@@ -193,6 +193,7 @@ export function ChapterEditor({
             chapterId={chapterId}
             chapterTitle={chapter.title}
             getChapterText={() => editor?.getText() ?? ""}
+            onClose={() => setPref("leftPanel", false)}
           />
         )}
 
@@ -216,6 +217,10 @@ export function ChapterEditor({
         <Rail
           side="right"
           paper={prefs.paper}
+          // Hidden on phones: the formatting tools want a pointer and room, and
+          // the screen has neither to spare next to the page. Export moves to the
+          // manuscript header there instead.
+          className="hidden md:flex"
           footer={
             <RailButton label="Export" href={`/book/${bookId}/export`}>
               {icons.export}
@@ -452,13 +457,13 @@ function EditorSurface({
             inputs bound to one value fight over the caret — with the panel's
             gone, this is the one place a book gets its name. */}
         <header
-          className="relative shrink-0 px-6 py-3"
+          className="relative shrink-0 px-4 py-3 md:px-6"
           style={{
             background: "var(--paper-bg)",
             borderBottom: "1px solid var(--paper-rule)",
           }}
         >
-          <div className="flex items-baseline justify-between gap-4">
+          <div className="flex items-baseline justify-between gap-3 md:gap-4">
             <input
               value={book.title}
               onChange={(e) => renameBook(bookId, e.target.value)}
@@ -469,21 +474,26 @@ function EditorSurface({
               aria-label="Book title"
               spellCheck={false}
               className="min-w-0 flex-1 truncate rounded-sm bg-transparent
-                         font-serif text-lg outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/60"
+                         font-serif text-base outline-none focus-visible:ring-2
+                         focus-visible:ring-accent/60 md:text-lg"
               style={{ color: "var(--paper-fg)" }}
             />
 
             <div
-              className="flex shrink-0 items-baseline gap-4 font-sans text-sm"
+              className="flex shrink-0 items-baseline gap-3 font-sans text-xs
+                         md:gap-4 md:text-sm"
               style={{ color: "var(--paper-muted)" }}
             >
               <span className="tabular-nums">
                 {written.toLocaleString()}
-                {book.targetWords
-                  ? ` of ${book.targetWords.toLocaleString()}`
-                  : ""}{" "}
-                words
+                {/* The "of target" and the word "words" are dropped on phones,
+                    where the header has no room to spare. */}
+                <span className="hidden sm:inline">
+                  {book.targetWords
+                    ? ` of ${book.targetWords.toLocaleString()}`
+                    : ""}{" "}
+                  words
+                </span>
               </span>
               {/* Polite, so a failed save is announced rather than waiting to
                   be noticed — silent data loss is what this exists to catch. */}
@@ -533,13 +543,15 @@ function EditorSurface({
         <div className="relative flex min-h-0 flex-1">
           <main
             className={`scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                        bg-surface ${page.fit ? "" : "px-8 py-8"}`}
+                        bg-surface ${page.fit ? "" : "px-3 py-4 md:px-8 md:py-8"}`}
             onClick={() => editor?.chain().focus().run()}
           >
             {/* Fitted, the page is the column and needs no shadow — there is no
-                desk left showing for it to cast onto. */}
+                desk left showing for it to cast onto. A real page is a fixed
+                width; capped to the viewport so it never forces the phone to
+                scroll sideways. */}
             <div
-              className={page.fit ? "paper min-h-full" : "paper mx-auto shadow-lg"}
+              className={page.fit ? "paper min-h-full" : "paper mx-auto max-w-full shadow-lg"}
               style={{
                 width: page.fit ? "100%" : `${metrics.width}in`,
                 minHeight: page.fit ? undefined : `${metrics.height}in`,

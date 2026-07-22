@@ -111,8 +111,17 @@
      scrollbars and form controls ignore the app's theme entirely. */
   color-scheme: light;
 
-  --rail-width: 4rem;
-  --sidebar-width: 17rem;
+  /* Phone-first: a narrower rail, and a panel that nearly fills the screen
+     since it opens as an overlay there rather than sitting beside the page. */
+  --rail-width: 3.25rem;
+  --sidebar-width: 15rem;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --rail-width: 4rem;
+    --sidebar-width: 17rem;
+  }
 }
 
 @media (min-width: 1440px) {

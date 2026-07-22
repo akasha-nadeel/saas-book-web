@@ -112,9 +112,9 @@ export function ExportPage({ bookId }: { bookId: string }) {
 
   return (
     <main className="scroll-slim h-dvh overflow-y-auto bg-surface">
-      <header className="border-b border-line bg-panel px-6 py-6">
-        <div className="mx-auto flex max-w-5xl items-center gap-5">
-          <div className="w-20 shrink-0">
+      <header className="border-b border-line bg-panel px-4 py-5 md:px-6 md:py-6">
+        <div className="mx-auto flex max-w-5xl items-center gap-4 md:gap-5">
+          <div className="w-14 shrink-0 md:w-20">
             <BookCover
               title={book.title}
               subtitle={book.subtitle}
@@ -126,7 +126,7 @@ export function ExportPage({ bookId }: { bookId: string }) {
             />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate font-serif text-2xl text-fg">
+            <h1 className="truncate font-serif text-xl text-fg md:text-2xl">
               {book.title}
             </h1>
             <p className="mt-1 font-sans text-sm text-muted">
@@ -135,12 +135,15 @@ export function ExportPage({ bookId }: { bookId: string }) {
           </div>
           <Link
             href={`/book/${bookId}`}
+            aria-label="Back to writing"
             className="ml-auto shrink-0 rounded-md px-3 py-2 font-sans text-sm
                        text-muted outline-none transition-colors
                        hover:bg-raised hover:text-fg focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >
-            Back to writing
+            {/* An arrow on phones, the words where there's room. */}
+            <span className="md:hidden" aria-hidden="true">←</span>
+            <span className="hidden md:inline">Back to writing</span>
           </Link>
         </div>
       </header>

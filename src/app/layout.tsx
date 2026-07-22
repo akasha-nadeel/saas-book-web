@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeSync } from "@/components/theme/theme-sync";
@@ -38,6 +38,18 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "OpenChapter",
   description: "A calm, focused place to write your novel — chapter by chapter.",
+};
+
+// The app shell is fixed-height and manages its own scrolling, so lock the page
+// to the device width and let the panels handle overflow. themeColor follows the
+// scheme, so the mobile browser chrome matches the app rather than flashing.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#121821" },
+  ],
 };
 
 export default function RootLayout({
