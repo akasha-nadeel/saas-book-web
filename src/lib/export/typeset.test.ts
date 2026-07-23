@@ -85,8 +85,11 @@ it("adds no page rules to an EPUB, whose reader paginates", () => {
   expect(css).not.toContain("page-break-before: always");
 });
 
-it("adds no running head of its own — the browser's header serves, or none", () => {
-  // A custom running head duplicated the browser's page header, so it was
-  // removed; a clean page is one title or none, never two.
-  expect(typesetCss(DEFAULT_TYPESET, true)).not.toContain(".running-head");
+it("puts a running head on the right in print, not in the EPUB", () => {
+  const print = typesetCss(DEFAULT_TYPESET, true);
+  expect(print).toContain(".running-head");
+  expect(print).toContain("position: fixed");
+  expect(print).toMatch(/\.running-head[^}]*right:/);
+
+  expect(typesetCss(DEFAULT_TYPESET, false)).not.toContain(".running-head");
 });

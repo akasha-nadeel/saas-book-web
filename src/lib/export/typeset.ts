@@ -137,6 +137,24 @@ export function typesetCss(
 
   return `
 ${forPrint ? `@page { size: ${trim.width}in ${trim.height}in; margin: ${ends}in ${side}in; }` : ""}
+${
+  // The running head: the book's title in the top margin of every printed page,
+  // on the outer (right) edge. A fixed element the browser repeats per page.
+  // It only reads cleanly with the browser's own centred header switched off —
+  // which the export dialog asks the writer to do.
+  forPrint
+    ? `.running-head {
+  position: fixed;
+  top: ${(ends * 0.4).toFixed(2)}in;
+  right: ${side}in;
+  margin: 0;
+  text-indent: 0;
+  font-size: ${(t.bodyPt * 0.8).toFixed(1)}pt;
+  color: #555;
+  ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.05em;" : "font-style: italic;"}
+}`
+    : ""
+}
 body {
   font-family: ${t.stack};
   font-size: ${t.bodyPt}pt;
