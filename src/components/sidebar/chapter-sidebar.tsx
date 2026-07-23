@@ -320,11 +320,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 ★
               </span>
             )}
-            {chapter.words > 0 && (
-              <span className="shrink-0 text-xs tabular-nums opacity-80">
-                {chapter.words.toLocaleString()}
-              </span>
-            )}
           </Link>
         )}
 
