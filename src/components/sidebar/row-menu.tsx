@@ -246,7 +246,7 @@ export function RowMenu({
                     item.onSelect();
                   }}
                   className={`flex w-full items-center gap-2.5 rounded-md px-2.5
-                              py-2 text-left font-sans text-sm outline-none
+                              py-1.5 text-left font-sans text-sm outline-none
                               transition-colors focus-visible:ring-2
                               focus-visible:ring-accent/60 ${
                                 item.danger
