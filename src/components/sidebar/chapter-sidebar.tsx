@@ -478,18 +478,14 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-3">
-        {book.chapters.length === 0 ? (
-          <p className="px-4 py-6 text-center font-sans text-sm text-muted italic">
-            No chapters yet
-          </p>
-        ) : (
-          // Front matter, body, back matter — each a section that folds away.
-          // Shown only when it holds something; the body is open by default.
+        {
+          // Front matter, body, back matter — the three parts always show, even
+          // empty, so the structure of a book is visible and a writer knows
+          // where a title page or an epilogue would go.
           (["front", "body", "back"] as const).map((part) => {
             const chapters = book.chapters.filter(
               (c) => chapterMatterOf(c) === part,
             );
-            if (chapters.length === 0) return null;
             const open = openParts[part];
 
             return (
@@ -526,11 +522,20 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   </span>
                 </button>
 
-                {open && <ol>{chapters.map(renderChapter)}</ol>}
+                {open &&
+                  (chapters.length > 0 ? (
+                    <ol>{chapters.map(renderChapter)}</ol>
+                  ) : (
+                    <p className="px-4 py-2.5 font-sans text-xs text-muted italic">
+                      {part === "body"
+                        ? "No chapters yet."
+                        : "Move a chapter here from its ⋯ menu."}
+                    </p>
+                  ))}
               </section>
             );
           })
-        )}
+        }
       </div>
 
       {pending && (
