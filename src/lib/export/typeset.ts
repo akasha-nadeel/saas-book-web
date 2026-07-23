@@ -146,7 +146,10 @@ ${
     ? `.running-head {
   position: fixed;
   top: ${(ends * 0.4).toFixed(2)}in;
-  right: ${side}in;
+  left: 0;
+  right: 0;
+  text-align: right;
+  padding-right: ${side}in;
   margin: 0;
   text-indent: 0;
   font-size: ${(t.bodyPt * 0.8).toFixed(1)}pt;
