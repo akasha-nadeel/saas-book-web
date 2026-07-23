@@ -56,7 +56,6 @@ ${xhtml}
     <style>${typesetCss(typeset, true)}</style>
   </head>
   <body>
-    <div class="running-head">${escapeXml(book.title)}</div>
     ${front}
     ${body}
   </body>

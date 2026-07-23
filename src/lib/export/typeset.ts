@@ -137,25 +137,6 @@ export function typesetCss(
 
   return `
 ${forPrint ? `@page { size: ${trim.width}in ${trim.height}in; margin: ${ends}in ${side}in; }` : ""}
-${
-  // The running head: the book's title in the top margin of every printed page,
-  // set to the outer (right) edge. A fixed element, which the browser repeats on
-  // each page — the only way to a running head without the browser's own header,
-  // which the writer is asked to switch off. EPUB has no such thing; a reader
-  // supplies its own chrome.
-  forPrint
-    ? `.running-head {
-  position: fixed;
-  top: ${(ends * 0.42).toFixed(2)}in;
-  right: ${side}in;
-  margin: 0;
-  text-indent: 0;
-  font-size: ${(t.bodyPt * 0.82).toFixed(1)}pt;
-  color: #555;
-  ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.05em;" : "font-style: italic;"}
-}`
-    : ""
-}
 body {
   font-family: ${t.stack};
   font-size: ${t.bodyPt}pt;
