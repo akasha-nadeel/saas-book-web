@@ -158,6 +158,8 @@ export function Bookshelf() {
     <div className="flex h-full flex-col">
       <ShelfTopNav
         continueId={continueId}
+        navOpen={navOpen}
+        onImport={() => setDialog("import")}
         onTemplates={() => setDialog("templates")}
         onUpgrade={() => setDialog("upgrade")}
         onToggleNav={() => setNavOpen((open) => !open)}
@@ -201,7 +203,7 @@ export function Bookshelf() {
             green backs this area so the rounded corner nests into the chrome
             rather than cutting to the page behind it. */}
         <main className="min-w-0 flex-1 overflow-hidden bg-nav">
-          <div className="scroll-slim flex h-full flex-col overflow-y-auto rounded-tl-2xl bg-panel px-4 py-5 md:px-8 md:py-7">
+          <div className="scroll-slim flex h-full flex-col overflow-y-auto rounded-t-2xl bg-panel px-4 py-5 md:rounded-tr-none md:rounded-tl-2xl md:px-8 md:py-7">
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
               <h1 className="font-serif text-2xl text-fg md:text-3xl">
                 {VIEW_LABEL[view]}
@@ -309,23 +311,28 @@ export function Bookshelf() {
  */
 function ShelfTopNav({
   continueId,
+  navOpen,
+  onImport,
   onTemplates,
   onUpgrade,
   onToggleNav,
 }: {
   continueId: string | null;
+  navOpen: boolean;
+  onImport: () => void;
   onTemplates: () => void;
   onUpgrade: () => void;
   onToggleNav: () => void;
 }) {
   return (
     <header className="nav-chrome flex h-16 shrink-0 items-center gap-3 px-4 md:gap-6 md:px-6">
-      {/* The menu button reveals the sidebar drawer; it belongs to small screens
-          only, where the sidebar is off-canvas. */}
+      {/* Opens the sidebar sheet on small screens, where the sidebar is off the
+          page; becomes an ✕ to close while it's open. */}
       <button
         type="button"
         onClick={onToggleNav}
-        aria-label="Open menu"
+        aria-label={navOpen ? "Close menu" : "Open menu"}
+        aria-expanded={navOpen}
         className="-ml-1 rounded-md p-2 text-muted outline-none transition-colors
                    hover:bg-raised hover:text-fg focus-visible:ring-2
                    focus-visible:ring-accent/60 md:hidden"
@@ -339,20 +346,42 @@ function ShelfTopNav({
           strokeLinecap="round"
           className="h-5 w-5"
         >
-          <path d="M3 6h14M3 10h14M3 14h14" />
+          {navOpen ? (
+            <path d="M5 5l10 10M15 5L5 15" />
+          ) : (
+            <path d="M3 6h14M3 10h14M3 14h14" />
+          )}
         </svg>
       </button>
 
-      {/* Pure white, not the chrome's near-white ink: the wordmark sits on the
-          dark nav in both themes, so it reads as the brand mark rather than as
-          another line of interface text. */}
-      <p className="min-w-0 shrink-0 font-display text-xl font-medium tracking-tight text-white md:text-2xl">
+      {/* Pure white wordmark. Hidden on phones — the brand moves into the menu
+          sheet there, freeing the bar for New book and Import. */}
+      <p className="hidden min-w-0 shrink-0 font-display text-xl font-medium tracking-tight text-white md:block md:text-2xl">
         OpenChapter
       </p>
 
       <nav className="ml-auto flex items-center gap-2 font-sans text-sm">
-        {/* The two quiet links fold away on small screens — New book and the
-            book cards carry those jobs there. */}
+        {/* New book and Import ride in the top bar on phones, where the sheet no
+            longer carries them; hidden at md, where the sidebar has them. */}
+        <button
+          type="button"
+          onClick={onImport}
+          className="rounded-md border border-white/25 px-3 py-2 font-medium
+                     text-white outline-none transition-colors hover:bg-white/10
+                     focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
+        >
+          Import
+        </button>
+        <Link
+          href="/book/new"
+          className="rounded-md bg-accent px-3 py-2 font-semibold text-white
+                     outline-none transition-colors hover:bg-accent-strong
+                     focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
+        >
+          New book
+        </Link>
+
+        {/* The two quiet links fold away on small screens. */}
         <button
           type="button"
           onClick={onTemplates}
@@ -377,10 +406,10 @@ function ShelfTopNav({
         <button
           type="button"
           onClick={onUpgrade}
-          className="rounded-md bg-accent px-4 py-2 font-semibold
+          className="hidden rounded-md bg-accent px-4 py-2 font-semibold
                      text-white outline-none transition-colors
                      hover:bg-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60 md:ml-2"
+                     focus-visible:ring-accent/60 md:ml-2 md:block"
         >
           Upgrade
         </button>
@@ -429,23 +458,60 @@ function ShelfNav({
       <aside
         // The nav chrome; see .nav-chrome. Its shade change against the white
         // content well, plus that panel's one rounded corner, is what separates
-        // the two — no border needed. Below md it slides in from the left over
-        // the content; at md and up it sits static in the row as before.
-        className={`nav-chrome fixed top-16 bottom-0 left-0 z-40 flex
-                    w-(--sidebar-width) max-w-[85vw] shrink-0 flex-col px-4 pt-2
-                    pb-3 transition-transform duration-200 ease-out
-                    md:static md:top-auto md:z-auto md:max-w-none md:translate-x-0
-                    ${navOpen ? "translate-x-0" : "-translate-x-full"}`}
+        // the two — no border needed. Below md it's a bottom sheet: it slides up
+        // from the foot, full width with a rounded top and a drag handle. At md
+        // and up it resets to the static side column it has always been.
+        className={`nav-chrome fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh]
+                    flex-col rounded-t-2xl px-4 pt-2 pb-3 shadow-2xl
+                    transition-transform duration-300 ease-out
+                    md:static md:z-auto md:max-h-none md:w-(--sidebar-width)
+                    md:shrink-0 md:rounded-none md:shadow-none md:transition-none
+                    ${navOpen ? "translate-y-0" : "translate-y-full"}
+                    md:translate-y-0`}
         aria-label="Library"
       >
-      {/* A link, not a button: setting up a book is a place you go, and a
-          link is what lets it be opened in a new tab or middle-clicked. */}
+        {/* The grabber, at the top of the sheet — a bottom-sheet convention,
+            and a second way to dismiss it. Sheet only. */}
+        <button
+          type="button"
+          onClick={onCloseNav}
+          aria-label="Close menu"
+          className="mx-auto mb-1 flex h-5 w-full items-center justify-center md:hidden"
+        >
+          <span className="h-1.5 w-10 rounded-full bg-current opacity-40" />
+        </button>
+
+      {/* The brand at the head of the sheet. Sheet only — on desktop the
+          wordmark lives in the top bar, and New book/Import sit here instead. */}
+      <div className="mb-2 flex items-center gap-2.5 px-1 md:hidden">
+        <span
+          aria-hidden="true"
+          className="h-6 w-6 bg-white"
+          style={{
+            maskImage: "url(/logo.png?v=2)",
+            WebkitMaskImage: "url(/logo.png?v=2)",
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+          }}
+        />
+        <span className="font-display text-lg font-medium tracking-tight text-white">
+          OpenChapter
+        </span>
+      </div>
+
+      {/* New book and Import live here on desktop; on the phone they move up to
+          the top bar, so they are hidden in the sheet. A link, not a button:
+          setting up a book is a place you go. */}
       <Link
         href="/book/new"
-        className="block w-full rounded-md bg-accent py-2.5 text-center
+        className="hidden w-full rounded-md bg-accent py-2.5 text-center
                    font-sans text-base font-semibold text-white outline-none
                    transition-colors hover:bg-accent-strong
-                   focus-visible:ring-2 focus-visible:ring-accent/60"
+                   focus-visible:ring-2 focus-visible:ring-accent/60 md:block"
       >
         New book
       </Link>
@@ -456,16 +522,16 @@ function ShelfNav({
       <button
         type="button"
         onClick={onImport}
-        className="mt-2 block w-full rounded-md border border-line py-2.5
+        className="mt-2 hidden w-full rounded-md border border-line py-2.5
                    text-center font-sans text-base font-medium text-muted
                    outline-none transition-colors hover:border-accent/60
                    hover:bg-raised hover:text-fg focus-visible:ring-2
-                   focus-visible:ring-accent/60"
+                   focus-visible:ring-accent/60 md:block"
       >
         Import a book
       </button>
 
-      <nav className="mt-4 flex flex-col gap-0.5">
+      <nav className="mt-2 flex flex-col gap-0.5 md:mt-4">
         {(["active", "archived", "trashed"] as BookView[]).map((value) => (
           <button
             key={value}
@@ -586,14 +652,38 @@ function ShelfNav({
           </svg>
           Theme
         </button>
+
+        {/* Upgrade lives in the top bar on desktop; on the phone the bar has no
+            room for it, so it sits here in the menu instead. */}
+        <button
+          type="button"
+          onClick={onUpgrade}
+          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
+                     font-sans text-base text-muted outline-none transition-colors
+                     hover:bg-raised hover:text-fg focus-visible:ring-2
+                     focus-visible:ring-accent/60 md:hidden"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-6 w-7 shrink-0"
+          >
+            <path d="M10 3.5 5 9h3v7.5h4V9h3z" />
+          </svg>
+          Upgrade
+        </button>
       </div>
 
       {/* The account, at the foot of the shelf. There is no sign-in yet — auth
           has been left out on purpose — so this is a guest on the free tier
           rather than a person; clicking it opens the plan note, which says as
-          much. Built from tokens, so it fits the navy sidebar in light and the
-          neutral one in dark without a second rule. */}
-      <div className="mt-auto border-t border-line pt-3">
+          much. Desktop only: the phone's sheet keeps to navigation. */}
+      <div className="mt-auto hidden border-t border-line pt-3 md:block">
         <button
           type="button"
           onClick={onUpgrade}
