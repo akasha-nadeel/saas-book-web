@@ -91,6 +91,13 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   const [importError, setImportError] = useState<string | null>(null);
   const [pending, setPending] = useState<ImportedChapter[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Which of the three parts are expanded. The body — the manuscript itself —
+  // is open by default; front and back matter fold away until wanted.
+  const [openParts, setOpenParts] = useState<Record<ChapterMatter, boolean>>({
+    front: false,
+    body: true,
+    back: false,
+  });
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -212,6 +219,160 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     setRenamingId(null);
   };
 
+  /** One chapter row, used inside whichever part it belongs to. */
+  const renderChapter = (chapter: ChapterMeta) => {
+    const index = book.chapters.findIndex((c) => c.id === chapter.id);
+    const isActive = chapter.id === activeId;
+    const matter = chapterMatterOf(chapter);
+    // Body chapters are numbered; front and back matter are named.
+    const number = chapterNumberOf(book, chapter.id);
+
+    return (
+      <li
+        key={chapter.id}
+        draggable
+        onDragStart={() => setDragId(chapter.id)}
+        onDragEnd={() => {
+          setDragId(null);
+          setOverId(null);
+        }}
+        onDragOver={(e) => {
+          // Without preventDefault the browser refuses the drop.
+          e.preventDefault();
+          if (dragId && dragId !== chapter.id) setOverId(chapter.id);
+        }}
+        onDragLeave={() => setOverId(null)}
+        onDrop={(e) => {
+          e.preventDefault();
+          handleDropOn(chapter.id);
+        }}
+        className={`group relative ${
+          dragId === chapter.id ? "opacity-40" : ""
+        } ${overId === chapter.id ? "bg-accent-deep/40" : ""}`}
+      >
+        {renamingId === chapter.id ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              commitRename();
+            }}
+            className="border-l-4 border-accent py-1.5 pr-2 pl-3"
+          >
+            <input
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                // Escape abandons the edit; blur would otherwise commit
+                // whatever half-typed text is in the field.
+                if (e.key === "Escape") setRenamingId(null);
+              }}
+              aria-label={`Rename ${chapter.title}`}
+              autoFocus
+              className="w-full rounded-md border border-accent bg-surface px-2
+                         py-1.5 font-sans text-sm text-fg outline-none"
+            />
+          </form>
+        ) : (
+          <Link
+            href={`/book/${bookId}/chapter/${chapter.id}`}
+            aria-current={isActive ? "page" : undefined}
+            // A link is draggable by default — the browser would drag its URL
+            // and never fire the row's reorder drag. Turning that off lets the
+            // row (the draggable <li>) be dragged.
+            draggable={false}
+            // Native drag is mouse-only, so reordering also needs a keyboard
+            // path or it is unreachable for some.
+            aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+            onKeyDown={(e) => {
+              if (!e.altKey) return;
+              // Only within the same part, so a nudge never lands a chapter in
+              // the wrong matter.
+              const step =
+                e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+              if (!step) return;
+              e.preventDefault();
+              const neighbour = book.chapters[index + step];
+              if (neighbour && chapterMatterOf(neighbour) === matter) {
+                moveChapter(bookId, index, index + step);
+              }
+            }}
+            className={`flex items-center gap-2.5 border-l-4 py-3 pr-10 pl-3
+                        font-sans text-sm outline-none transition-colors
+                        focus-visible:ring-inset focus-visible:ring-2
+                        focus-visible:ring-accent/60 ${
+                          isActive
+                            ? "border-accent bg-selected font-medium text-selected-fg"
+                            : "border-transparent text-fg hover:bg-raised"
+                        }`}
+          >
+            <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-100">
+              {number ?? ""}
+            </span>
+            <span className="flex-1 truncate">{chapter.title}</span>
+            {/* A starred chapter keeps its mark in the row: the menu can say
+                whether it is starred, but only when open. */}
+            {chapter.bookmarked && (
+              <span
+                aria-label="Starred"
+                className="shrink-0 text-xs text-accent-strong"
+              >
+                ★
+              </span>
+            )}
+            {chapter.words > 0 && (
+              <span className="shrink-0 text-xs tabular-nums opacity-80">
+                {chapter.words.toLocaleString()}
+              </span>
+            )}
+          </Link>
+        )}
+
+        {renamingId !== chapter.id && (
+          <span className="absolute top-1/2 right-2 -translate-y-1/2">
+            <RowMenu
+              label={chapter.title}
+              active={isActive}
+              items={[
+                {
+                  label: chapter.bookmarked ? "Unstar" : "Star",
+                  hint: "S",
+                  icon: chapter.bookmarked
+                    ? menuIcons.starFilled
+                    : menuIcons.star,
+                  onSelect: () => toggleBookmark(bookId, chapter.id),
+                },
+                {
+                  label: "Rename",
+                  hint: "R",
+                  icon: menuIcons.rename,
+                  onSelect: () => startRename(chapter),
+                },
+                // The two parts this chapter is not in — moving it opens that
+                // part, so it does not vanish into a folded section.
+                ...MATTER_MOVES.filter((m) => m.matter !== matter).map((m) => ({
+                  label: m.label,
+                  icon: m.icon,
+                  onSelect: () => {
+                    setChapterMatter(bookId, chapter.id, m.matter);
+                    setOpenParts((o) => ({ ...o, [m.matter]: true }));
+                  },
+                })),
+                {
+                  label: "Delete",
+                  hint: "D",
+                  icon: menuIcons.trash,
+                  onSelect: () => handleDelete(chapter),
+                  danger: true,
+                },
+              ]}
+            />
+          </span>
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="flex h-full flex-col" aria-label="Manuscript">
       {/* The wordmark opens the shelf. Beside it, the collapse control hides the
@@ -327,176 +488,53 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             No chapters yet
           </p>
         ) : (
-          <ol>
-            {book.chapters.map((chapter, index) => {
-              const isActive = chapter.id === activeId;
-              const matter = chapterMatterOf(chapter);
-              const prevMatter =
-                index > 0 ? chapterMatterOf(book.chapters[index - 1]) : null;
-              // A part label the first time a part begins: always for front and
-              // back, and for the body only when front matter preceded it (so a
-              // plain book of chapters shows no header at all).
-              const label =
-                matter !== prevMatter &&
-                (matter !== "body" || prevMatter === "front")
-                  ? matterLabel[matter]
-                  : null;
-              // Body chapters are numbered; front and back matter are named.
-              const number = chapterNumberOf(book, chapter.id);
+          // Front matter, body, back matter — each a section that folds away.
+          // Shown only when it holds something; the body is open by default.
+          (["front", "body", "back"] as const).map((part) => {
+            const chapters = book.chapters.filter(
+              (c) => chapterMatterOf(c) === part,
+            );
+            if (chapters.length === 0) return null;
+            const open = openParts[part];
 
-              return (
-                <div key={chapter.id}>
-                  {label && (
-                    <p className="px-4 pt-3 pb-1 font-sans text-[0.65rem] font-semibold tracking-wider text-muted uppercase">
-                      {label}
-                    </p>
-                  )}
-                <li
-                  draggable
-                  onDragStart={() => setDragId(chapter.id)}
-                  onDragEnd={() => {
-                    setDragId(null);
-                    setOverId(null);
-                  }}
-                  onDragOver={(e) => {
-                    // Without preventDefault the browser refuses the drop.
-                    e.preventDefault();
-                    if (dragId && dragId !== chapter.id) setOverId(chapter.id);
-                  }}
-                  onDragLeave={() => setOverId(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleDropOn(chapter.id);
-                  }}
-                  className={`group relative ${
-                    dragId === chapter.id ? "opacity-40" : ""
-                  } ${overId === chapter.id ? "bg-accent-deep/40" : ""}`}
+            return (
+              <section key={part}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenParts((o) => ({ ...o, [part]: !o[part] }))
+                  }
+                  aria-expanded={open}
+                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left
+                             font-sans text-[0.65rem] font-semibold tracking-wider
+                             text-muted uppercase outline-none transition-colors
+                             hover:text-fg focus-visible:ring-2
+                             focus-visible:ring-accent/60"
                 >
-                  {renamingId === chapter.id ? (
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        commitRename();
-                      }}
-                      className="border-l-4 border-accent py-1.5 pr-2 pl-3"
-                    >
-                      <input
-                        value={draftTitle}
-                        onChange={(e) => setDraftTitle(e.target.value)}
-                        onBlur={commitRename}
-                        onKeyDown={(e) => {
-                          // Escape abandons the edit; blur would otherwise
-                          // commit whatever half-typed text is in the field.
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                        aria-label={`Rename ${chapter.title}`}
-                        autoFocus
-                        className="w-full rounded-md border border-accent
-                                   bg-surface px-2 py-1.5 font-sans text-sm
-                                   text-fg outline-none"
-                      />
-                    </form>
-                  ) : (
-                    <Link
-                      href={`/book/${bookId}/chapter/${chapter.id}`}
-                      aria-current={isActive ? "page" : undefined}
-                      // A link is draggable by default — the browser would drag
-                      // its URL and never fire the row's reorder drag. Turning
-                      // that off lets the row (the draggable <li>) be dragged.
-                      draggable={false}
-                      // Native drag is mouse-only, so reordering also needs a
-                      // keyboard path or it is unreachable for some.
-                      aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                      onKeyDown={(e) => {
-                        if (!e.altKey) return;
-                        // Only within the same part, so a nudge never lands a
-                        // chapter in the wrong matter.
-                        const step = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
-                        if (!step) return;
-                        e.preventDefault();
-                        const neighbour = book.chapters[index + step];
-                        if (neighbour && chapterMatterOf(neighbour) === matter) {
-                          moveChapter(bookId, index, index + step);
-                        }
-                      }}
-                      className={`flex items-center gap-2.5 border-l-4 py-3 pr-10
-                                  pl-3 font-sans text-sm outline-none
-                                  transition-colors focus-visible:ring-inset
-                                  focus-visible:ring-2
-                                  focus-visible:ring-accent/60 ${
-                                    isActive
-                                      ? "border-accent bg-selected font-medium text-selected-fg"
-                                      : "border-transparent text-fg hover:bg-raised"
-                                  }`}
-                    >
-                      <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-100">
-                        {number ?? ""}
-                      </span>
-                      <span className="flex-1 truncate">{chapter.title}</span>
-                      {/* A starred chapter keeps its mark in the row: the menu
-                          can say whether it is starred, but only when open. */}
-                      {chapter.bookmarked && (
-                        <span
-                          aria-label="Starred"
-                          className="shrink-0 text-xs text-accent-strong"
-                        >
-                          ★
-                        </span>
-                    )}
-                    {chapter.words > 0 && (
-                      <span className="shrink-0 text-xs tabular-nums opacity-80">
-                        {chapter.words.toLocaleString()}
-                      </span>
-                    )}
-                  </Link>
-                  )}
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`h-3 w-3 shrink-0 transition-transform ${
+                      open ? "rotate-90" : ""
+                    }`}
+                  >
+                    <path d="m7 5 5 5-5 5" />
+                  </svg>
+                  <span className="flex-1">{matterLabel[part]}</span>
+                  <span className="tabular-nums opacity-70">
+                    {chapters.length}
+                  </span>
+                </button>
 
-                  {renamingId !== chapter.id && (
-                    <span className="absolute top-1/2 right-2 -translate-y-1/2">
-                    <RowMenu
-                      label={chapter.title}
-                      active={isActive}
-                      items={[
-                        {
-                          label: chapter.bookmarked ? "Unstar" : "Star",
-                          hint: "S",
-                          icon: chapter.bookmarked
-                            ? menuIcons.starFilled
-                            : menuIcons.star,
-                          onSelect: () => toggleBookmark(bookId, chapter.id),
-                        },
-                        {
-                          label: "Rename",
-                          hint: "R",
-                          icon: menuIcons.rename,
-                          onSelect: () => startRename(chapter),
-                        },
-                        // The two parts this chapter is not in — so it can be
-                        // moved to front matter, the body, or back matter.
-                        ...MATTER_MOVES.filter(
-                          (m) => m.matter !== matter,
-                        ).map((m) => ({
-                          label: m.label,
-                          icon: m.icon,
-                          onSelect: () =>
-                            setChapterMatter(bookId, chapter.id, m.matter),
-                        })),
-                        {
-                          label: "Delete",
-                          hint: "D",
-                          icon: menuIcons.trash,
-                          onSelect: () => handleDelete(chapter),
-                          danger: true,
-                        },
-                      ]}
-                    />
-                    </span>
-                  )}
-                </li>
-                </div>
-              );
-            })}
-          </ol>
+                {open && <ol>{chapters.map(renderChapter)}</ol>}
+              </section>
+            );
+          })
         )}
       </div>
 
