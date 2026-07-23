@@ -505,10 +505,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                     setOpenParts((o) => ({ ...o, [part]: !o[part] }))
                   }
                   aria-expanded={open}
-                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left
-                             font-sans text-[0.65rem] font-semibold tracking-wider
-                             text-muted uppercase outline-none transition-colors
-                             hover:text-fg focus-visible:ring-2
+                  className="flex w-full items-center gap-2 border-t border-line
+                             px-3 py-3 text-left font-sans text-sm font-semibold
+                             tracking-wide text-muted uppercase outline-none
+                             transition-colors hover:text-fg focus-visible:ring-2
                              focus-visible:ring-accent/60"
                 >
                   <svg
@@ -519,7 +519,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                     strokeWidth="1.8"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className={`h-3 w-3 shrink-0 transition-transform ${
+                    className={`h-4 w-4 shrink-0 transition-transform ${
                       open ? "rotate-90" : ""
                     }`}
                   >
