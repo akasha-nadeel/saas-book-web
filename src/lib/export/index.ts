@@ -1,5 +1,10 @@
 import type { JSONContent } from "@tiptap/react";
-import { getBody, orderedChapters, type Book } from "@/lib/library-store";
+import {
+  chapterNumberOf,
+  getBody,
+  orderedChapters,
+  type Book,
+} from "@/lib/library-store";
 import { toBlocks, type LoadedChapter } from "./blocks";
 import { blocksToMarkdown } from "./markdown";
 import { DEFAULT_TYPESET, type TypesetOptions } from "./typeset";
@@ -34,7 +39,7 @@ export function loadChapters(book: Book, chapterId?: string): LoadedChapter[] {
         doc = EMPTY_DOC;
       }
     }
-    return { title: chapter.title, doc };
+    return { title: chapter.title, doc, number: chapterNumberOf(book, chapter.id) };
   });
 }
 

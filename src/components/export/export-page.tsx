@@ -227,6 +227,32 @@ export function ExportPage({ bookId }: { bookId: string }) {
               </Card>
 
               <Card
+                title="Front matter"
+                note="Pages generated for you, placed at the front of the book."
+              >
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Toggle
+                    label="Title page"
+                    hint="The book's title and author"
+                    on={typeset.titlePage}
+                    onChange={(v) => set("titlePage", v)}
+                  />
+                  <Toggle
+                    label="Copyright page"
+                    hint="© this year, in the author's name"
+                    on={typeset.copyright}
+                    onChange={(v) => set("copyright", v)}
+                  />
+                  <Toggle
+                    label="Contents"
+                    hint="A list of the chapters"
+                    on={typeset.contents}
+                    onChange={(v) => set("contents", v)}
+                  />
+                </div>
+              </Card>
+
+              <Card
                 title="Trim size"
                 note={
                   format === "epub"

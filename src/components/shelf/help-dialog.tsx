@@ -112,7 +112,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Typeset",
-        desc: "Choose how your EPUB and PDF are laid out.",
+        desc: "Choose how your EPUB and PDF are laid out — template, trim size, drop caps.",
+      },
+      {
+        name: "Generated front matter",
+        desc: "For EPUB and PDF, switch on a title page, a copyright page, and a contents list — built from your book and placed at the front.",
       },
       {
         name: "Scope",

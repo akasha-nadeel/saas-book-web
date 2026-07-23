@@ -3,6 +3,7 @@ import type { LoadedChapter } from "./blocks";
 import { toBlocks } from "./blocks";
 import { escapeXml, blocksToXhtml } from "./xhtml";
 import { typesetCss, type TypesetOptions } from "./typeset";
+import { frontSections } from "./front-matter";
 
 /**
  * A PDF, by way of the browser's own print engine.
@@ -27,11 +28,20 @@ export function printBook(
   chapters: LoadedChapter[],
   typeset: TypesetOptions,
 ): void {
+  // Generated title / copyright / contents pages, then the chapters. Front and
+  // back matter carry no number — only body chapters do.
+  const front = frontSections(book, chapters, typeset)
+    .map((s) => s.html)
+    .join("\n");
+
   const body = chapters
-    .map((chapter, i) => {
+    .map((chapter) => {
       const xhtml = blocksToXhtml(toBlocks(chapter.doc));
-      return `<section>
-  <p class="chapter-number">${i + 1}</p>
+      const number =
+        chapter.number !== null
+          ? `\n  <p class="chapter-number">${chapter.number}</p>`
+          : "";
+      return `<section>${number}
   <h1>${escapeXml(chapter.title)}</h1>
 ${xhtml}
 </section>`;
@@ -46,6 +56,7 @@ ${xhtml}
     <style>${typesetCss(typeset, true)}</style>
   </head>
   <body>
+    ${front}
     ${body}
   </body>
 </html>`;

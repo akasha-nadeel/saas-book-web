@@ -42,6 +42,9 @@ export interface Run {
 export interface LoadedChapter {
   title: string;
   doc: JSONContent;
+  /** The body-chapter number, or null for front and back matter — which are
+   *  named, so the exporters print no numeral above them. */
+  number: number | null;
 }
 
 export interface Block {

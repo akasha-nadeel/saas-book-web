@@ -44,8 +44,11 @@ should either ship or lose the card.
       list stays one sequence with a quiet label per part, only body chapters are
       numbered, and export lays out front → body → back. The old sectioned
       version (drill-down, per-part drop strips) stays cut — see `207f805`.
-      *Phase 2 (not built):* auto-generated title page / copyright / TOC toggles
-      in the export dialog, and unnumbered/centred typeset for front-matter pages.
+      *Phase 2 (done):* the export dialog generates a title page, copyright page,
+      and contents list for EPUB and PDF, and front/back matter is set unnumbered
+      (only body chapters carry a numeral). *Left:* the same generated pages for
+      DOCX/Markdown if wanted, and real page numbers in the print contents (the
+      browser print engine cannot produce them).
 - [ ] **Search across a book.** Nothing searches chapter text; the shelf search
       only matches titles.
 - [ ] **Per-chapter status and synopsis.** Offered early, never chosen.

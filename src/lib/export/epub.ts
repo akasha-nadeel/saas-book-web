@@ -6,6 +6,7 @@ import {
   type TypesetOptions,
 } from "./typeset";
 import { blocksToXhtml, escapeXml } from "./xhtml";
+import { frontSections } from "./front-matter";
 
 /**
  * EPUB 3. Two details produce most invalid files, and both are handled here
@@ -43,16 +44,37 @@ export function contentOpf(
   meta: EpubMeta,
   chapters: EpubChapter[],
   identifier: string,
+  /** Generated front-matter ids (title, copyright, contents), which come before
+   *  the chapters in the manifest and the spine. */
+  frontIds: readonly string[] = [],
 ): string {
-  const manifest = chapters
+  const frontManifest = frontIds
     .map(
-      (_, i) =>
-        `    <item id="${chapterId(i)}" href="${chapterId(i)}.xhtml" media-type="application/xhtml+xml"/>`,
+      (id) =>
+        `    <item id="${id}" href="${id}.xhtml" media-type="application/xhtml+xml"/>`,
     )
     .join("\n");
+  const frontSpine = frontIds
+    .map((id) => `    <itemref idref="${id}" />`)
+    .join("\n");
 
-  const spine = chapters
-    .map((_, i) => `    <itemref idref="${chapterId(i)}" />`)
+  const manifest = [
+    frontManifest,
+    chapters
+      .map(
+        (_, i) =>
+          `    <item id="${chapterId(i)}" href="${chapterId(i)}.xhtml" media-type="application/xhtml+xml"/>`,
+      )
+      .join("\n"),
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const spine = [
+    frontSpine,
+    chapters.map((_, i) => `    <itemref idref="${chapterId(i)}" />`).join("\n"),
+  ]
+    .filter(Boolean)
     .join("\n");
 
   const creator = meta.author
@@ -104,6 +126,21 @@ ${items}
 </html>`;
 }
 
+/** A plain XHTML page — used for the generated front matter, which has no
+ *  chapter number or heading of its own; its section carries its own markup. */
+export function pageXhtml(title: string, inner: string): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <title>${escapeXml(title)}</title>
+    <link rel="stylesheet" type="text/css" href="style.css"/>
+  </head>
+  <body>
+    ${inner}
+  </body>
+</html>`;
+}
+
 export function chapterXhtml(
   title: string,
   body: string,
@@ -150,17 +187,30 @@ export async function buildEpub(
       : Date.now().toString(36)
   }`;
 
+  // Generated title / copyright / contents pages, before the chapters.
+  const front = frontSections(book, chapters, typeset);
+
   zip.file("OEBPS/style.css", typesetCss(typeset, false));
   zip.file(
     "OEBPS/content.opf",
-    contentOpf({ title: book.title, author: book.author }, rendered, identifier),
+    contentOpf(
+      { title: book.title, author: book.author },
+      rendered,
+      identifier,
+      front.map((s) => s.id),
+    ),
   );
   zip.file("OEBPS/nav.xhtml", navXhtml(book.title, rendered));
 
+  for (const section of front) {
+    zip.file(`OEBPS/${section.id}.xhtml`, pageXhtml(book.title, section.html));
+  }
+
   rendered.forEach((chapter, i) => {
+    // Body chapters carry their number; front and back matter do not.
     zip.file(
       `OEBPS/${chapterId(i)}.xhtml`,
-      chapterXhtml(chapter.title, chapter.xhtml, i + 1),
+      chapterXhtml(chapter.title, chapter.xhtml, chapters[i].number ?? undefined),
     );
   });
 

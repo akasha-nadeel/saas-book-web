@@ -93,6 +93,12 @@ export interface TypesetOptions {
   hideChapterNumbers: boolean;
   /** A raised initial on the first paragraph of each chapter. */
   dropCaps: boolean;
+  /** Generate a title page from the book's title and author. */
+  titlePage: boolean;
+  /** Generate a copyright page. */
+  copyright: boolean;
+  /** Generate a contents page listing the chapters. */
+  contents: boolean;
 }
 
 export const DEFAULT_TYPESET: TypesetOptions = {
@@ -100,6 +106,11 @@ export const DEFAULT_TYPESET: TypesetOptions = {
   trim: "5.5x8.5",
   hideChapterNumbers: false,
   dropCaps: false,
+  // A real book opens on a title page and lists its contents; copyright needs a
+  // name the writer may not have set, so it is off until asked for.
+  titlePage: true,
+  copyright: false,
+  contents: true,
 };
 
 /**
@@ -165,5 +176,43 @@ ${
 blockquote { margin: 1.5em; font-style: italic; text-indent: 0; }
 .figure { text-align: center; text-indent: 0; margin: 1.5em 0; }
 .figure img { max-width: 100%; height: auto; }
+
+/* Generated front matter. Each opens its own page in print; an e-reader
+   paginates as it likes. */
+.front-page {
+  ${forPrint ? "page-break-before: always; break-before: page;" : ""}
+  text-indent: 0;
+}
+${forPrint ? ".front-page:first-of-type { page-break-before: avoid; break-before: avoid; }" : ""}
+.title-page {
+  text-align: center;
+  ${forPrint ? "padding-top: 30%;" : "padding-top: 4em;"}
+}
+.title-page .book-title {
+  font-size: ${(t.bodyPt * 2.2).toFixed(1)}pt;
+  font-weight: normal;
+  ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.06em;" : ""}
+  margin: 0 0 0.8em;
+  page-break-before: avoid;
+  break-before: avoid;
+}
+.title-page .book-subtitle {
+  font-size: ${(t.bodyPt * 1.3).toFixed(1)}pt;
+  font-style: italic;
+  margin: 0 0 1.5em;
+}
+.title-page .book-author {
+  font-size: ${(t.bodyPt * 1.2).toFixed(1)}pt;
+  margin: 0;
+}
+.copyright {
+  ${forPrint ? "padding-top: 60%;" : "padding-top: 4em;"}
+  font-size: ${(t.bodyPt * 0.9).toFixed(1)}pt;
+  text-align: left;
+}
+.copyright p { text-indent: 0; margin: 0 0 0.6em; }
+.contents h1 { page-break-before: avoid; break-before: avoid; }
+.contents ol { list-style: none; padding: 0; margin: 1.5em 0 0; }
+.contents li { text-indent: 0; margin: 0.4em 0; }
 `.trim();
 }
