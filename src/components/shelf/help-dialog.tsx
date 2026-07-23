@@ -53,6 +53,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "A deleted chapter is kept in the Deleted chapters tab (the trash icon on the editor rail), where you can restore it whole — or delete it for good.",
       },
       {
+        name: "Front & back matter",
+        desc: "From a chapter’s ⋯ menu, move it to front matter (title page, dedication, preface) or back matter (epilogue, author bio). Only body chapters are numbered; front and back are named, and export lays the book out front → body → back.",
+      },
+      {
         name: "Import into a book",
         desc: "Use “Import a file” in the chapters panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after.",
       },

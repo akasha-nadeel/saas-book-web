@@ -39,9 +39,13 @@ should either ship or lose the card.
 
 ## Editor
 
-- [ ] **Front/back matter.** Built, then removed on request — the panel is a flat
-      chapter list now. If it returns, it should not resurrect the drill-down:
-      see commit `207f805` for what was cut and why.
+- [x] **Front/back matter.** Back, as a flat tag rather than the old drill-down.
+      A chapter's ⋯ menu moves it to front matter, the body, or back matter; the
+      list stays one sequence with a quiet label per part, only body chapters are
+      numbered, and export lays out front → body → back. The old sectioned
+      version (drill-down, per-part drop strips) stays cut — see `207f805`.
+      *Phase 2 (not built):* auto-generated title page / copyright / TOC toggles
+      in the export dialog, and unnumbered/centred typeset for front-matter pages.
 - [ ] **Search across a book.** Nothing searches chapter text; the shelf search
       only matches titles.
 - [ ] **Per-chapter status and synopsis.** Offered early, never chosen.

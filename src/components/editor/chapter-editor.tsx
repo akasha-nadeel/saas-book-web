@@ -18,6 +18,7 @@ import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
   bookWordCount,
+  chapterNumberOf,
   findBook,
   pageSetupOf,
   renameBook,
@@ -207,7 +208,7 @@ export function ChapterEditor({
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapter.title}
-            chapterNumber={book.chapters.indexOf(chapter) + 1}
+            chapterNumber={chapterNumberOf(book, chapterId)}
             book={book}
             initialContent={initialContent}
             prefs={prefs}
@@ -358,7 +359,9 @@ function EditorSurface({
   bookId: string;
   chapterId: string;
   chapterTitle: string;
-  chapterNumber: number;
+  /** The body-chapter number, or null for front and back matter — which are
+   *  named, so no number is printed above their title. */
+  chapterNumber: number | null;
   book: Book;
   initialContent: JSONContent | null;
   prefs: Prefs;
@@ -562,14 +565,17 @@ function EditorSurface({
                 paddingRight: `${metrics.right}in`,
               }}
             >
-              {/* Centred, with the chapter's number above it, the way the page of
-                  a printed book opens. */}
-              <p
-                className="text-center font-serif text-5xl leading-none"
-                style={{ color: "var(--paper-muted)", opacity: 0.5 }}
-              >
-                {chapterNumber}
-              </p>
+              {/* Centred, with the chapter's number above it, the way the page
+                  of a printed book opens. Front and back matter carry no number
+                  — a title page or a dedication is named, not numbered. */}
+              {chapterNumber !== null && (
+                <p
+                  className="text-center font-serif text-5xl leading-none"
+                  style={{ color: "var(--paper-muted)", opacity: 0.5 }}
+                >
+                  {chapterNumber}
+                </p>
+              )}
               {/* An input rather than a heading with contenteditable: the title is
                   a single line of plain text, and a plain input gets the caret,
                   undo and screen-reader behaviour right for free. */}

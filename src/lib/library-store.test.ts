@@ -5,10 +5,13 @@ import {
   bookmarks,
   booksIn,
   createBook,
+  chapterNumberOf,
   createBookFromImport,
   createBookFromTemplate,
   createChapter,
   deleteChapterForever,
+  orderedChapters,
+  setChapterMatter,
   importIntoBook,
   restoreChapter,
   trashedChapters,
@@ -1125,4 +1128,68 @@ it("does not count trashed chapters toward the word total", () => {
   deleteChapter(bookId, two);
 
   expect(bookWordCount(findBook(getShelf(), bookId)!)).toBe(100);
+});
+
+// ---------------------------------------------------------------------------
+// Front matter, body, back matter
+// ---------------------------------------------------------------------------
+
+it("groups chapters front, body, back in reading order", () => {
+  const { bookId, chapterId } = createBook();
+  const two = createChapter(bookId, "Dedication");
+  const three = createChapter(bookId, "Epilogue");
+
+  setChapterMatter(bookId, two, "front");
+  setChapterMatter(bookId, three, "back");
+
+  // The stored array itself is regrouped, so the sidebar and export agree.
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.map((c) => c.id)).toEqual([two, chapterId, three]);
+  expect(orderedChapters(book).map((c) => c.id)).toEqual([
+    two,
+    chapterId,
+    three,
+  ]);
+});
+
+it("numbers only body chapters, never front or back matter", () => {
+  const { bookId, chapterId } = createBook();
+  const front = createChapter(bookId, "Title page");
+  const body2 = createChapter(bookId, "Chapter Two");
+  const back = createChapter(bookId, "Author bio");
+
+  setChapterMatter(bookId, front, "front");
+  setChapterMatter(bookId, back, "back");
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(chapterNumberOf(book, front)).toBeNull();
+  expect(chapterNumberOf(book, chapterId)).toBe(1);
+  expect(chapterNumberOf(book, body2)).toBe(2);
+  expect(chapterNumberOf(book, back)).toBeNull();
+});
+
+it("numbers a new chapter past the body, ignoring front matter", () => {
+  const { bookId, chapterId } = createBook();
+  // Rename the opening to a real chapter, add front matter, then a new body one.
+  renameChapter(bookId, chapterId, "Chapter 1");
+  const front = createChapter(bookId, "Copyright");
+  setChapterMatter(bookId, front, "front");
+
+  const next = createChapter(bookId);
+  // Two front-matter chapters do not push the number to 3.
+  expect(findBook(getShelf(), bookId)!.chapters.find((c) => c.id === next)!.title)
+    .toBe("Chapter 2");
+});
+
+it("moves a chapter back to the body, dropping the tag", () => {
+  const { bookId } = createBook();
+  const c = createChapter(bookId, "Preface");
+  setChapterMatter(bookId, c, "front");
+  expect(findBook(getShelf(), bookId)!.chapters.find((x) => x.id === c)!.matter)
+    .toBe("front");
+
+  setChapterMatter(bookId, c, "body");
+  const meta = findBook(getShelf(), bookId)!.chapters.find((x) => x.id === c)!;
+  // Absent rather than "body", so a plain book carries no matter field at all.
+  expect("matter" in meta).toBe(false);
 });

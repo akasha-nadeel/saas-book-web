@@ -5,14 +5,18 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   bookWordCount,
+  chapterMatterOf,
+  chapterNumberOf,
   createChapter,
   deleteChapter,
   findBook,
   importIntoBook,
   moveChapter,
   renameChapter,
+  setChapterMatter,
   setPref,
   toggleBookmark,
+  type ChapterMatter,
   type ChapterMeta,
 } from "@/lib/library-store";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
@@ -22,13 +26,52 @@ import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
+/** The three parts a chapter can be moved to, for its ⋯ menu. Icons: a bar
+ *  with an arrow to it (front/top, back/bottom) and a page (an ordinary
+ *  chapter). */
+const MATTER_MOVES: readonly {
+  matter: ChapterMatter;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    matter: "front",
+    label: "Move to front matter",
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4h12M10 16V8m0 0-3 3m3-3 3 3" />
+      </svg>
+    ),
+  },
+  {
+    matter: "body",
+    label: "Make a body chapter",
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+        <path d="M11.6 2.8H6.2a1.5 1.5 0 0 0-1.5 1.5v11.4a1.5 1.5 0 0 0 1.5 1.5h7.6a1.5 1.5 0 0 0 1.5-1.5V6.4z" />
+        <path d="M11.6 2.8v2.9a.9.9 0 0 0 .9.9h2.8" />
+      </svg>
+    ),
+  },
+  {
+    matter: "back",
+    label: "Move to back matter",
+    icon: (
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 16h12M10 4v8m0 0-3-3m3 3 3-3" />
+      </svg>
+    ),
+  },
+];
+
 /**
- * The manuscript: one ordered list of chapters.
+ * The manuscript: front matter, the body, and back matter, in one flat list.
  *
- * Deliberately flat. Sections were tried here and cost more than they returned
- * — a level to step into and back out of, a second place a new chapter could
- * land, and numbering that had to be explained. A novel is a sequence, and the
- * panel is at its most useful when it just shows the sequence.
+ * Not a drill-down. Sections you step into were tried and cost more than they
+ * returned — a level to step out of, two places a chapter could land, numbering
+ * that had to be explained twice. Here a chapter's part is just a tag set from
+ * its menu; the list stays a single sequence with a quiet label where each part
+ * begins. Body chapters are numbered; front and back matter are named.
  */
 export function ChapterSidebar({ bookId }: { bookId: string }) {
   const shelf = useShelf();
@@ -127,14 +170,32 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     }
   };
 
-  /** Drop one chapter onto another: the dragged one takes that position. */
+  /** Drop one chapter onto another: the dragged one takes that position. Only
+   *  within the same part — moving a chapter between front, body and back is
+   *  the matter menu's job, and lets the grouped order stay intact. */
   const handleDropOn = (targetId: string) => {
+    const dragged = book.chapters.find((c) => c.id === dragId);
+    const target = book.chapters.find((c) => c.id === targetId);
     const from = book.chapters.findIndex((c) => c.id === dragId);
     const to = book.chapters.findIndex((c) => c.id === targetId);
-    if (from >= 0 && to >= 0) moveChapter(bookId, from, to);
+    if (
+      dragged &&
+      target &&
+      chapterMatterOf(dragged) === chapterMatterOf(target) &&
+      from >= 0 &&
+      to >= 0
+    ) {
+      moveChapter(bookId, from, to);
+    }
 
     setDragId(null);
     setOverId(null);
+  };
+
+  const matterLabel: Record<ChapterMatter, string> = {
+    front: "Front matter",
+    body: "Body",
+    back: "Back matter",
   };
 
   const startRename = (chapter: ChapterMeta) => {
@@ -265,10 +326,28 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           <ol>
             {book.chapters.map((chapter, index) => {
               const isActive = chapter.id === activeId;
+              const matter = chapterMatterOf(chapter);
+              const prevMatter =
+                index > 0 ? chapterMatterOf(book.chapters[index - 1]) : null;
+              // A part label the first time a part begins: always for front and
+              // back, and for the body only when front matter preceded it (so a
+              // plain book of chapters shows no header at all).
+              const label =
+                matter !== prevMatter &&
+                (matter !== "body" || prevMatter === "front")
+                  ? matterLabel[matter]
+                  : null;
+              // Body chapters are numbered; front and back matter are named.
+              const number = chapterNumberOf(book, chapter.id);
 
               return (
+                <div key={chapter.id}>
+                  {label && (
+                    <p className="px-4 pt-3 pb-1 font-sans text-[0.65rem] font-semibold tracking-wider text-muted uppercase">
+                      {label}
+                    </p>
+                  )}
                 <li
-                  key={chapter.id}
                   draggable
                   onDragStart={() => setDragId(chapter.id)}
                   onDragEnd={() => {
@@ -326,12 +405,14 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                       onKeyDown={(e) => {
                         if (!e.altKey) return;
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          moveChapter(bookId, index, index - 1);
-                        } else if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          moveChapter(bookId, index, index + 1);
+                        // Only within the same part, so a nudge never lands a
+                        // chapter in the wrong matter.
+                        const step = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+                        if (!step) return;
+                        e.preventDefault();
+                        const neighbour = book.chapters[index + step];
+                        if (neighbour && chapterMatterOf(neighbour) === matter) {
+                          moveChapter(bookId, index, index + step);
                         }
                       }}
                       className={`flex items-center gap-2.5 border-l-4 py-3 pr-10
@@ -345,7 +426,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                                   }`}
                     >
                       <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-100">
-                        {index + 1}
+                        {number ?? ""}
                       </span>
                       <span className="flex-1 truncate">{chapter.title}</span>
                       {/* A starred chapter keeps its mark in the row: the menu
@@ -386,6 +467,16 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                           icon: menuIcons.rename,
                           onSelect: () => startRename(chapter),
                         },
+                        // The two parts this chapter is not in — so it can be
+                        // moved to front matter, the body, or back matter.
+                        ...MATTER_MOVES.filter(
+                          (m) => m.matter !== matter,
+                        ).map((m) => ({
+                          label: m.label,
+                          icon: m.icon,
+                          onSelect: () =>
+                            setChapterMatter(bookId, chapter.id, m.matter),
+                        })),
                         {
                           label: "Delete",
                           hint: "D",
@@ -398,6 +489,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                     </span>
                   )}
                 </li>
+                </div>
               );
             })}
           </ol>

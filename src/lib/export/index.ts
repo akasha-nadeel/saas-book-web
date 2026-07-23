@@ -1,5 +1,5 @@
 import type { JSONContent } from "@tiptap/react";
-import { getBody, type Book } from "@/lib/library-store";
+import { getBody, orderedChapters, type Book } from "@/lib/library-store";
 import { toBlocks, type LoadedChapter } from "./blocks";
 import { blocksToMarkdown } from "./markdown";
 import { DEFAULT_TYPESET, type TypesetOptions } from "./typeset";
@@ -15,9 +15,12 @@ const EMPTY_DOC: JSONContent = { type: "doc", content: [] };
  * that one module owns storage survives this feature.
  */
 export function loadChapters(book: Book, chapterId?: string): LoadedChapter[] {
+  // The whole book comes out in reading order — front matter, body, back matter
+  // — so an exported title page or epilogue lands where it belongs. A single
+  // chapter export is just that chapter.
   const wanted = chapterId
     ? book.chapters.filter((c) => c.id === chapterId)
-    : book.chapters;
+    : orderedChapters(book);
 
   return wanted.map((chapter) => {
     const raw = getBody(chapter.id);

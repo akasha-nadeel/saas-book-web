@@ -32,12 +32,86 @@ const NOTES_PREFIX = "openchapter:notes:";
 // most expensive thing the app does.
 const COVER_PREFIX = "openchapter:cover:";
 
+/**
+ * Which of a book's three parts a chapter belongs to. Absent means the body —
+ * the ordinary numbered chapters — so books made before this need no migration
+ * and the common case carries no field.
+ */
+export type ChapterMatter = "front" | "body" | "back";
+
 export interface ChapterMeta {
   id: string;
   title: string;
   words: number;
   /** Flagged for quick return. Absent rather than false when not marked. */
   bookmarked?: true;
+  /** Front or back matter. Absent means a body chapter — see ChapterMatter. */
+  matter?: "front" | "back";
+}
+
+/** A chapter's part, with the body default applied. */
+export function chapterMatterOf(chapter: ChapterMeta): ChapterMatter {
+  return chapter.matter ?? "body";
+}
+
+const MATTER_RANK: Record<ChapterMatter, number> = { front: 0, body: 1, back: 2 };
+
+/**
+ * The book's chapters in reading order: front matter, then the body, then back
+ * matter, each keeping its own order. The stored array is a flat sequence the
+ * writer reorders freely; this is the single derived order the sidebar shows
+ * and the exporters lay out, so the two never disagree.
+ */
+export function orderedChapters(book: Book): readonly ChapterMeta[] {
+  return [...book.chapters].sort(
+    (a, b) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(b)],
+  );
+}
+
+/**
+ * A body chapter's number — its position among the body chapters alone, so the
+ * count is 1, 2, 3 no matter how much front or back matter sits around it.
+ * Returns null for front and back matter, which are named, not numbered.
+ */
+export function chapterNumberOf(book: Book, chapterId: string): number | null {
+  let n = 0;
+  for (const chapter of orderedChapters(book)) {
+    if (chapterMatterOf(chapter) !== "body") continue;
+    n += 1;
+    if (chapter.id === chapterId) return n;
+  }
+  return null;
+}
+
+/**
+ * Moves a chapter into front matter, the body, or back matter.
+ *
+ * After retagging, the stored order is re-grouped front → body → back (stable
+ * within each part), so the flat array the sidebar reads is always in reading
+ * order. That keeps drag-reorder, numbering, and export in agreement without a
+ * separate sort at each read.
+ */
+export function setChapterMatter(
+  bookId: string,
+  chapterId: string,
+  matter: ChapterMatter,
+) {
+  commitBook(bookId, (book) => {
+    const retagged = book.chapters.map((c) => {
+      if (c.id !== chapterId) return c;
+      const next = { ...c };
+      // Absent is the body, so a body chapter drops the field entirely.
+      if (matter === "body") delete next.matter;
+      else next.matter = matter;
+      return next;
+    });
+    // Stable sort: JS keeps equal-ranked items in their existing order, so a
+    // chapter moved into a part lands at the end of it.
+    const grouped = [...retagged].sort(
+      (a, b) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(b)],
+    );
+    return { ...book, chapters: grouped };
+  });
 }
 
 /** A chapter that was deleted but kept, so it can be restored. Its body and
@@ -441,14 +515,16 @@ export function touchLastOpenedBook(bookId: string) {
 /**
  * The next unused "Chapter N".
  *
- * Counting the chapters is not enough. Delete the second of three and the count
- * says the next one is 3 — which is still sitting there, so the book ends up
- * with two chapters of the same name. Numbering from the highest already in use
- * collides with nothing and renames nobody's chapter.
+ * Counts the body chapters only — front and back matter are named, not
+ * numbered, so a title page or a dedication must not push the count up. And
+ * counting is not enough on its own: delete the second of three and the count
+ * says the next is 3, which is still sitting there. Numbering from the highest
+ * "Chapter N" already in use collides with nothing and renames nobody.
  */
 function nextChapterTitle(chapters: readonly ChapterMeta[]): string {
-  let highest = chapters.length;
-  for (const c of chapters) {
+  const body = chapters.filter((c) => chapterMatterOf(c) === "body");
+  let highest = body.length;
+  for (const c of body) {
     const match = /^Chapter (\d+)$/.exec(c.title);
     if (match) highest = Math.max(highest, Number(match[1]));
   }
@@ -750,12 +826,14 @@ export function restoreChapter(bookId: string, chapterId: string) {
     const item = (book.trash ?? []).find((t) => t.id === chapterId);
     if (!item) return book;
 
-    // Rebuild an ordinary chapter meta, dropping the trashedAt marker.
+    // Rebuild an ordinary chapter meta, dropping the trashedAt marker but
+    // keeping the bookmark and its front/back matter tag.
     const meta: ChapterMeta = {
       id: item.id,
       title: item.title,
       words: item.words,
       ...(item.bookmarked ? { bookmarked: true as const } : {}),
+      ...(item.matter ? { matter: item.matter } : {}),
     };
     return {
       ...book,
