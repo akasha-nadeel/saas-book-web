@@ -102,6 +102,19 @@ export function ChapterEditor({
   const book = findBook(shelf, bookId);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
+  // ⌘K / Ctrl+K opens search in the panel, wherever the caret is.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setTab("search");
+        setPref("leftPanel", true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
   useEffect(() => {
@@ -148,6 +161,7 @@ export function ChapterEditor({
           {(
             [
               ["chapters", "Manuscript", icons.chapters],
+              ["search", "Search this book", icons.search],
               ["notes", "Notes", icons.notes],
               ["bookmarks", "Bookmarks", icons.bookmarks],
               ["assistant", "Assistant", icons.assistant],

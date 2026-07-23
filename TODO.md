@@ -49,8 +49,11 @@ should either ship or lose the card.
       (only body chapters carry a numeral). *Left:* the same generated pages for
       DOCX/Markdown if wanted, and real page numbers in the print contents (the
       browser print engine cannot produce them).
-- [ ] **Search across a book.** Nothing searches chapter text; the shelf search
-      only matches titles.
+- [x] **Search across a book.** The editor's Search tab (⌘K) reads every
+      chapter's text — walked out of the Tiptap JSON in `src/lib/search.ts` —
+      matches title and prose, and shows a snippet that jumps to the chapter.
+      *Left, if wanted:* a whole-library search, and jumping to the exact match
+      inside the chapter (it opens the chapter, not the line).
 - [ ] **Per-chapter status and synopsis.** Offered early, never chosen.
 
 ## Known rough edges

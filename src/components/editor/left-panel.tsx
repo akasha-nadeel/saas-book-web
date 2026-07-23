@@ -5,6 +5,7 @@ import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
 import { NotesPanel } from "@/components/editor/notes-panel";
 import { TrashPanel } from "@/components/editor/trash-panel";
+import { SearchPanel } from "@/components/editor/search-panel";
 
 /**
  * Whatever the left rail currently points at.
@@ -16,6 +17,7 @@ import { TrashPanel } from "@/components/editor/trash-panel";
 
 export type PanelTab =
   | "chapters"
+  | "search"
   | "notes"
   | "bookmarks"
   | "assistant"
@@ -56,6 +58,7 @@ export function LeftPanel({
         aria-label="Manuscript panel"
       >
       {tab === "chapters" && <ChapterSidebar bookId={bookId} />}
+      {tab === "search" && <SearchPanel bookId={bookId} />}
       {tab === "notes" && <NotesPanel key={chapterId} chapterId={chapterId} />}
       {tab === "bookmarks" && <BookmarksPanel bookId={bookId} />}
       {tab === "trash" && <TrashPanel bookId={bookId} />}

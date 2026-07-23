@@ -49,6 +49,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Add, rename, reorder by dragging, and delete chapters. Star one to keep it in Bookmarks.",
       },
       {
+        name: "Search this book",
+        desc: "The Search tab on the editor rail (or ⌘K / Ctrl+K) finds a word anywhere in the book — every chapter’s text, not just titles — with a snippet, and jumps you to the chapter.",
+      },
+      {
         name: "Restore a deleted chapter",
         desc: "A deleted chapter is kept in the Deleted chapters tab (the trash icon on the editor rail), where you can restore it whole — or delete it for good.",
       },
