@@ -4,6 +4,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
 import { NotesPanel } from "@/components/editor/notes-panel";
+import { TrashPanel } from "@/components/editor/trash-panel";
 
 /**
  * Whatever the left rail currently points at.
@@ -13,7 +14,12 @@ import { NotesPanel } from "@/components/editor/notes-panel";
  * back for chapter titles.
  */
 
-export type PanelTab = "chapters" | "notes" | "bookmarks" | "assistant";
+export type PanelTab =
+  | "chapters"
+  | "notes"
+  | "bookmarks"
+  | "assistant"
+  | "trash";
 
 export function LeftPanel({
   tab,
@@ -52,6 +58,7 @@ export function LeftPanel({
       {tab === "chapters" && <ChapterSidebar bookId={bookId} />}
       {tab === "notes" && <NotesPanel key={chapterId} chapterId={chapterId} />}
       {tab === "bookmarks" && <BookmarksPanel bookId={bookId} />}
+      {tab === "trash" && <TrashPanel bookId={bookId} />}
       {tab === "assistant" && (
         <>
           <div className="flex h-10 shrink-0 items-center border-b border-line px-4">

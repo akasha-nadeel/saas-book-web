@@ -150,6 +150,7 @@ export function ChapterEditor({
               ["notes", "Notes", icons.notes],
               ["bookmarks", "Bookmarks", icons.bookmarks],
               ["assistant", "Assistant", icons.assistant],
+              ["trash", "Deleted chapters", icons.trash],
             ] as const
           ).map(([value, label, icon]) => (
             <RailButton

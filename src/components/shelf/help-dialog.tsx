@@ -49,6 +49,14 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Add, rename, reorder by dragging, and delete chapters. Star one to keep it in Bookmarks.",
       },
       {
+        name: "Restore a deleted chapter",
+        desc: "A deleted chapter is kept in the Deleted chapters tab (the trash icon on the editor rail), where you can restore it whole — or delete it for good.",
+      },
+      {
+        name: "Import into a book",
+        desc: "Use “Import a file” in the chapters panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after.",
+      },
+      {
         name: "Autosave",
         desc: "Everything you type is saved to this browser as you go; the header shows the status.",
       },

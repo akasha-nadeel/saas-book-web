@@ -170,15 +170,18 @@ it("does not mistake a sentence starting with 'Chapter' for a divider", () => {
   expect(book.chapters).toHaveLength(1);
 });
 
-it("keeps text that appears before the first chapter break", () => {
+it("folds text before the first chapter break into the first chapter", () => {
   const book = splitIntoChapters(
     [para("An epigraph."), para("Chapter One"), para("She left.")],
     "fallback",
   );
 
-  // Losing it would silently delete part of the manuscript.
-  expect(book.chapters).toHaveLength(2);
-  expect(book.chapters[0].title).toBe("Opening");
+  // No separate "Opening" chapter — the lead-in joins the first chapter, so no
+  // words are lost and the book reads as clean Chapter 1, 2, 3.
+  expect(book.chapters).toHaveLength(1);
+  expect(book.chapters[0].title).toBe("Chapter One");
+  // Both the epigraph and the body survived the fold.
+  expect(book.chapters[0].words).toBeGreaterThanOrEqual(4);
 });
 
 it("returns one chapter when nothing suggests a division", () => {

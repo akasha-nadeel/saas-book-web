@@ -188,4 +188,7 @@ export const icons = {
       <path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" />
     </>
   ),
+  trash: (
+    <path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.7 10a1 1 0 0 0 1 .9h5.6a1 1 0 0 0 1-.9l.7-10M8.4 8.4v5M11.6 8.4v5" />
+  ),
 };

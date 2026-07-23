@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  bookWordCount,
   createChapter,
   deleteChapter,
   findBook,
+  importIntoBook,
   moveChapter,
   renameChapter,
   setPref,
@@ -15,6 +17,10 @@ import {
 } from "@/lib/library-store";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { useShelf } from "@/lib/use-library";
+import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
+import type { ImportedChapter } from "@/lib/import/split";
+import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
+import { showImportBanner } from "@/components/editor/import-banner-host";
 
 /**
  * The manuscript: one ordered list of chapters.
@@ -35,6 +41,13 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   // The chapter whose title is being edited in place, and the text so far.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
+  // Importing a file into this book: whether a read is in flight, any error to
+  // show, the hidden file input, and a parsed file waiting on the writer to
+  // choose add-or-replace (only when the book already holds prose).
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [pending, setPending] = useState<ImportedChapter[] | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -50,13 +63,56 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     router.push(`/book/${bookId}/chapter/${id}`);
   };
 
-  const handleDelete = (chapter: ChapterMeta) => {
-    // A chapter is somebody's prose. Cheap dialog, but never silently.
-    if (!window.confirm(`Delete “${chapter.title}”? This cannot be undone.`))
-      return;
+  /**
+   * Read a file and bring its chapters into this book. If the writer has
+   * already put prose here, ask first whether to add or replace; an empty book
+   * (a fresh one, or one with only blank chapters) just takes the import in.
+   * Uses the same parser as the shelf import, so a .docx/.epub/.md/.txt/.html
+   * comes in split into chapters — but lands inside the book already open.
+   */
+  const handleImport = async (file: File) => {
+    setImporting(true);
+    setImportError(null);
+    try {
+      const parsed = await importFile(file);
+      // "Already wrote a novel here" = any chapter with words in it.
+      if (book && bookWordCount(book) > 0) {
+        setPending(parsed.chapters);
+        return;
+      }
+      // Nothing written yet: replace the empty placeholder chapters cleanly,
+      // numbered from one, with no question asked.
+      runImport(parsed.chapters, "replace");
+    } catch (err) {
+      setImportError(
+        err instanceof ImportError
+          ? err.message
+          : "That file could not be read. It may be damaged, or not the format its name suggests.",
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
 
-    // The one that takes its place, or the one before it if this was the last.
-    // Landing on the book's first chapter every time loses the writer's place.
+  const runImport = (chapters: ImportedChapter[], mode: "add" | "replace") => {
+    setPending(null);
+    const result = importIntoBook(bookId, chapters, mode);
+    if (!result) {
+      setImportError(
+        "Those chapters could not be saved — the book may be too large for this browser's storage.",
+      );
+      return;
+    }
+    // Show the banner first, then navigate — the banner lives in the book
+    // layout, so it survives the chapter change and stays up while the writer
+    // checks the order.
+    showImportBanner(bookId, result.undo, chapters.length);
+    router.push(`/book/${bookId}/chapter/${result.firstId}`);
+  };
+
+  const handleDelete = (chapter: ChapterMeta) => {
+    // No dialog: deletion goes to the book's trash now, and the deleted-chapters
+    // section below restores it — so the safety net is in the UI, not a prompt.
     const index = book.chapters.findIndex((c) => c.id === chapter.id);
     const remaining = book.chapters.filter((c) => c.id !== chapter.id);
     const target = remaining[index] ?? remaining[index - 1] ?? null;
@@ -144,6 +200,60 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         >
           New chapter
         </button>
+
+        {/* Bring an existing manuscript into this book. It reads the file and
+            appends its chapters here, rather than starting a separate book the
+            way the shelf's import does. */}
+        <button
+          type="button"
+          disabled={importing}
+          onClick={() => fileRef.current?.click()}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-md
+                     border border-muted/60 py-2.5 font-sans text-sm font-medium
+                     text-fg outline-none transition-colors
+                     hover:border-accent/60 hover:bg-raised
+                     focus-visible:ring-2 focus-visible:ring-accent/60
+                     disabled:opacity-50"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 shrink-0"
+          >
+            <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
+            <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
+          </svg>
+          {importing ? "Reading…" : "Import a file"}
+        </button>
+
+        <input
+          ref={fileRef}
+          type="file"
+          accept={IMPORT_ACCEPT}
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // Reset, or choosing the same file twice fires nothing.
+            e.target.value = "";
+            if (file) void handleImport(file);
+          }}
+        />
+
+        {importError && (
+          <p
+            role="alert"
+            className="mt-2 rounded-md border border-line bg-raised px-2.5 py-2
+                       font-sans text-xs leading-relaxed"
+            style={{ color: "var(--color-danger)" }}
+          >
+            {importError}
+          </p>
+        )}
       </div>
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-3">
@@ -207,6 +317,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                     <Link
                       href={`/book/${bookId}/chapter/${chapter.id}`}
                       aria-current={isActive ? "page" : undefined}
+                      // A link is draggable by default — the browser would drag
+                      // its URL and never fire the row's reorder drag. Turning
+                      // that off lets the row (the draggable <li>) be dragged.
+                      draggable={false}
                       // Native drag is mouse-only, so reordering also needs a
                       // keyboard path or it is unreachable for some.
                       aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
@@ -227,10 +341,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                                   focus-visible:ring-accent/60 ${
                                     isActive
                                       ? "border-accent bg-selected font-medium text-selected-fg"
-                                      : "border-transparent text-muted hover:bg-raised hover:text-fg"
+                                      : "border-transparent text-fg hover:bg-raised"
                                   }`}
                     >
-                      <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-60">
+                      <span className="w-4 shrink-0 text-right text-xs tabular-nums opacity-100">
                         {index + 1}
                       </span>
                       <span className="flex-1 truncate">{chapter.title}</span>
@@ -245,7 +359,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                         </span>
                     )}
                     {chapter.words > 0 && (
-                      <span className="shrink-0 text-xs tabular-nums opacity-50">
+                      <span className="shrink-0 text-xs tabular-nums opacity-80">
                         {chapter.words.toLocaleString()}
                       </span>
                     )}
@@ -289,6 +403,16 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           </ol>
         )}
       </div>
+
+      {pending && (
+        <ImportModeDialog
+          existingCount={book.chapters.length}
+          importCount={pending.length}
+          onAdd={() => runImport(pending, "add")}
+          onReplace={() => runImport(pending, "replace")}
+          onClose={() => setPending(null)}
+        />
+      )}
     </div>
   );
 }

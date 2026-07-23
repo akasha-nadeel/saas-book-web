@@ -89,19 +89,23 @@ function splitAt(
   isDivider: (block: Block) => boolean,
   titleOf: (block: Block) => string,
 ): ImportedChapter[] {
-  const chapters: ImportedChapter[] = [];
+  // Gather (title, blocks) sections first, then convert. Keeping the blocks
+  // around lets any lead-in — text before the first divider — be folded into
+  // the opening chapter rather than becoming a separate "Opening" one. A book
+  // reads as clean Chapter 1, 2, 3, and no words are lost.
+  const sections: { title: string; blocks: Block[] }[] = [];
+  let lead: Block[] = [];
   let title = "";
   let current: Block[] = [];
   let seenDivider = false;
 
   for (const block of blocks) {
     if (isDivider(block)) {
-      if (seenDivider || current.some((b) => !isBlank(b))) {
-        const chapter = makeChapter(
-          seenDivider ? title : "Opening",
-          current,
-        );
-        if (chapter) chapters.push(chapter);
+      if (!seenDivider) {
+        // Whatever came before the first heading is held aside to prepend.
+        lead = current;
+      } else {
+        sections.push({ title, blocks: current });
       }
       title = titleOf(block);
       current = [];
@@ -111,9 +115,18 @@ function splitAt(
     current.push(block);
   }
 
-  const last = makeChapter(seenDivider ? title : "Opening", current);
-  if (last) chapters.push(last);
+  sections.push({ title, blocks: current });
 
+  // Fold the lead-in into the first chapter, above its own text.
+  if (sections.length && lead.some((b) => !isBlank(b))) {
+    sections[0].blocks = [...lead, ...sections[0].blocks];
+  }
+
+  const chapters: ImportedChapter[] = [];
+  for (const section of sections) {
+    const chapter = makeChapter(section.title, section.blocks);
+    if (chapter) chapters.push(chapter);
+  }
   return chapters;
 }
 

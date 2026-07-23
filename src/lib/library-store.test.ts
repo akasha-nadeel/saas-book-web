@@ -8,6 +8,11 @@ import {
   createBookFromImport,
   createBookFromTemplate,
   createChapter,
+  deleteChapterForever,
+  importIntoBook,
+  restoreChapter,
+  trashedChapters,
+  undoChapterImport,
   deleteBook,
   deleteChapter,
   ensureChapter,
@@ -342,7 +347,7 @@ it("writes the body and denormalises the word count", () => {
   expect(findBook(getShelf(), bookId)!.chapters[0].words).toBe(1204);
 });
 
-it("deletes a chapter, its body, and fixes lastOpenedId", () => {
+it("removes a chapter from the list and fixes lastOpenedId", () => {
   const { bookId, chapterId } = createBook();
   const second = createChapter(bookId, "Chapter Two");
   saveBody(bookId, second, { type: "doc" }, 5);
@@ -351,7 +356,9 @@ it("deletes a chapter, its body, and fixes lastOpenedId", () => {
   deleteChapter(bookId, second);
 
   expect(titlesOf(bookId)).toEqual(["Chapter One"]);
-  expect(localStorage.getItem(`openchapter:chapter:${second}`)).toBeNull();
+  // The body is kept now — deletion is recoverable from the trash. Only
+  // deleteChapterForever erases it.
+  expect(localStorage.getItem(`openchapter:chapter:${second}`)).not.toBeNull();
   expect(findBook(getShelf(), bookId)!.lastOpenedId).toBe(chapterId);
 });
 
@@ -621,6 +628,7 @@ it("starts with both writing modes off", () => {
     typewriter: false,
     leftPanel: true,
     paper: "white",
+    theme: "light",
   });
 });
 
@@ -647,6 +655,7 @@ it("degrades to defaults when prefs are corrupt", () => {
     typewriter: false,
     leftPanel: true,
     paper: "white",
+    theme: "light",
   });
 });
 
@@ -678,11 +687,18 @@ it("keeps notes out of the shelf document", () => {
   );
 });
 
-it("deletes notes along with the chapter", () => {
-  const { bookId, chapterId } = createBook();
-  saveNotes(chapterId, "gone soon");
-  deleteChapter(bookId, chapterId);
-  expect(getNotes(chapterId)).toBeNull();
+it("keeps notes when a chapter is trashed, erases them when purged", () => {
+  const { bookId } = createBook();
+  const two = createChapter(bookId, "Two");
+  saveNotes(two, "keep for now");
+
+  // Trashing keeps the notes, so a restore brings them back.
+  deleteChapter(bookId, two);
+  expect(getNotes(two)).toBe("keep for now");
+
+  // Purging from the trash finally erases them.
+  deleteChapterForever(bookId, two);
+  expect(getNotes(two)).toBeNull();
 });
 
 it("deletes notes for every chapter of a deleted book", () => {
@@ -926,4 +942,187 @@ it("counts words across every chapter in the book", () => {
   saveBody(bookId, two, { type: "doc" }, 204);
 
   expect(bookWordCount(findBook(getShelf(), bookId)!)).toBe(704);
+});
+
+// ---------------------------------------------------------------------------
+// Importing into an existing book
+// ---------------------------------------------------------------------------
+
+const imported = (title: string, words = 10) => ({
+  title,
+  doc: { type: "doc", content: [] },
+  words,
+});
+
+it("appends imported chapters and continues the numbering", () => {
+  const { bookId, chapterId } = createBook("A");
+  renameChapter(bookId, chapterId, "Chapter 1");
+  createChapter(bookId, "Chapter 2");
+
+  const result = importIntoBook(
+    bookId,
+    [imported("Chapter 1"), imported("Chapter 2 – The Woods")],
+    "add",
+  );
+
+  const titles = findBook(getShelf(), bookId)!.chapters.map((c) => c.title);
+  // The two existing chapters keep their names; the import numbers on from 3.
+  expect(titles).toEqual([
+    "Chapter 1",
+    "Chapter 2",
+    "Chapter 3",
+    "Chapter 4 – The Woods",
+  ]);
+  expect(result).not.toBeNull();
+});
+
+it("keeps a chapter's description while renumbering it", () => {
+  const { bookId } = createBook("A");
+  // The book starts with one chapter, so an added one becomes Chapter 2.
+  importIntoBook(bookId, [imported("Chapter 8 – The Shadow's Secret")], "add");
+
+  const last = findBook(getShelf(), bookId)!.chapters.at(-1)!;
+  expect(last.title).toBe("Chapter 2 – The Shadow's Secret");
+});
+
+it("replaces every chapter and numbers the import from one", () => {
+  const { bookId, chapterId } = createBook("A");
+  saveBody(bookId, chapterId, { type: "doc" }, 40);
+  const two = createChapter(bookId, "Two");
+  saveBody(bookId, two, { type: "doc" }, 40);
+
+  importIntoBook(
+    bookId,
+    [imported("Prologue"), imported("Chapter 5 – End")],
+    "replace",
+  );
+
+  const chapters = findBook(getShelf(), bookId)!.chapters;
+  expect(chapters.map((c) => c.title)).toEqual([
+    "Chapter 1 – Prologue",
+    "Chapter 2 – End",
+  ]);
+  // The chapters that were there are gone from the shelf and from storage.
+  expect(localStorage.getItem(`openchapter:chapter:${chapterId}`)).toBeNull();
+  expect(localStorage.getItem(`openchapter:chapter:${two}`)).toBeNull();
+});
+
+it("undoes an append, leaving the original chapters", () => {
+  const { bookId, chapterId } = createBook("A");
+  renameChapter(bookId, chapterId, "Mine");
+
+  const result = importIntoBook(bookId, [imported("X"), imported("Y")], "add")!;
+  expect(findBook(getShelf(), bookId)!.chapters).toHaveLength(3);
+
+  undoChapterImport(result.undo);
+
+  const chapters = findBook(getShelf(), bookId)!.chapters;
+  expect(chapters).toHaveLength(1);
+  expect(chapters[0].title).toBe("Mine");
+});
+
+it("undoes a replace, restoring the cleared chapters and their prose", () => {
+  const { bookId, chapterId } = createBook("A");
+  renameChapter(bookId, chapterId, "Original");
+  saveBody(bookId, chapterId, { type: "doc", content: ["kept"] }, 99);
+
+  const result = importIntoBook(bookId, [imported("New")], "replace")!;
+  // The original is gone during the import.
+  expect(localStorage.getItem(`openchapter:chapter:${chapterId}`)).toBeNull();
+
+  undoChapterImport(result.undo);
+
+  const chapters = findBook(getShelf(), bookId)!.chapters;
+  expect(chapters.map((c) => c.title)).toEqual(["Original"]);
+  expect(chapters[0].words).toBe(99);
+  // The prose came back too.
+  expect(localStorage.getItem(`openchapter:chapter:${chapterId}`)).toContain(
+    "kept",
+  );
+});
+
+it("refuses an import with no chapters", () => {
+  const { bookId } = createBook("A");
+  expect(importIntoBook(bookId, [], "add")).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Chapter trash and restore
+// ---------------------------------------------------------------------------
+
+it("sends a deleted chapter to the trash, keeping its prose", () => {
+  const { bookId, chapterId } = createBook("A");
+  const two = createChapter(bookId, "Two");
+  saveBody(bookId, two, { type: "doc", content: ["hi"] }, 30);
+
+  deleteChapter(bookId, two);
+
+  const book = findBook(getShelf(), bookId)!;
+  // Gone from the active list, present in the trash.
+  expect(book.chapters.map((c) => c.id)).toEqual([chapterId]);
+  expect(trashedChapters(book).map((t) => t.id)).toEqual([two]);
+  // The prose is untouched — that is what makes a restore possible.
+  expect(localStorage.getItem(`openchapter:chapter:${two}`)).toContain("hi");
+});
+
+it("restores a trashed chapter with its words intact", () => {
+  const { bookId } = createBook("A");
+  const two = createChapter(bookId, "Two");
+  saveBody(bookId, two, { type: "doc" }, 44);
+  deleteChapter(bookId, two);
+
+  restoreChapter(bookId, two);
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.some((c) => c.id === two)).toBe(true);
+  expect(book.chapters.find((c) => c.id === two)!.words).toBe(44);
+  expect(trashedChapters(book)).toHaveLength(0);
+});
+
+it("keeps a bookmark through a delete and restore", () => {
+  const { bookId } = createBook("A");
+  const two = createChapter(bookId, "Two");
+  toggleBookmark(bookId, two);
+  deleteChapter(bookId, two);
+  restoreChapter(bookId, two);
+
+  const restored = findBook(getShelf(), bookId)!.chapters.find(
+    (c) => c.id === two,
+  )!;
+  expect(restored.bookmarked).toBe(true);
+});
+
+it("permanently deletes a trashed chapter and its prose", () => {
+  const { bookId } = createBook("A");
+  const two = createChapter(bookId, "Two");
+  saveBody(bookId, two, { type: "doc" }, 5);
+  deleteChapter(bookId, two);
+
+  deleteChapterForever(bookId, two);
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(trashedChapters(book)).toHaveLength(0);
+  expect(localStorage.getItem(`openchapter:chapter:${two}`)).toBeNull();
+});
+
+it("clears trashed chapter bodies when the whole book is deleted", () => {
+  const { bookId } = createBook("A");
+  const two = createChapter(bookId, "Two");
+  saveBody(bookId, two, { type: "doc" }, 5);
+  deleteChapter(bookId, two);
+
+  deleteBook(bookId);
+
+  expect(localStorage.getItem(`openchapter:chapter:${two}`)).toBeNull();
+});
+
+it("does not count trashed chapters toward the word total", () => {
+  const { bookId, chapterId } = createBook("A");
+  saveBody(bookId, chapterId, { type: "doc" }, 100);
+  const two = createChapter(bookId, "Two");
+  saveBody(bookId, two, { type: "doc" }, 60);
+
+  deleteChapter(bookId, two);
+
+  expect(bookWordCount(findBook(getShelf(), bookId)!)).toBe(100);
 });

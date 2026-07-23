@@ -40,6 +40,13 @@ export interface ChapterMeta {
   bookmarked?: true;
 }
 
+/** A chapter that was deleted but kept, so it can be restored. Its body and
+ *  notes stay at their own keys until it is emptied from the trash. */
+export interface TrashedChapter extends ChapterMeta {
+  /** Epoch ms it was deleted, for ordering and "deleted N ago". */
+  trashedAt: number;
+}
+
 export interface Book {
   id: string;
   title: string;
@@ -66,6 +73,8 @@ export interface Book {
   trashedAt?: number;
   /** Readonly because every snapshot handed out is shared and cached. */
   chapters: readonly ChapterMeta[];
+  /** Deleted chapters, newest first, kept until emptied. Absent means none. */
+  trash?: readonly TrashedChapter[];
   lastOpenedId: string | null;
   /** Epoch ms, so the shelf can order by recency. */
   lastOpenedAt: number;
@@ -405,7 +414,8 @@ export function deleteBook(bookId: string) {
     // Unreachable bytes, not a broken app.
   }
 
-  for (const chapter of doomed.chapters) {
+  // Active chapters and anything still sitting in the book's trash.
+  for (const chapter of [...doomed.chapters, ...(doomed.trash ?? [])]) {
     try {
       window.localStorage.removeItem(bodyKey(chapter.id));
       window.localStorage.removeItem(notesKey(chapter.id));
@@ -520,6 +530,170 @@ export function createBookFromImport(
   return { bookId, chapterId: metas[0].id };
 }
 
+/**
+ * Renames an imported chapter so the book's numbering runs on unbroken.
+ *
+ * The number comes from where the existing chapters end — a nine-chapter book
+ * takes an import in starting at Chapter 10 — while any description the writer
+ * gave the chapter is kept: "Chapter 8 – The Shadow's Secret" appended after
+ * nine chapters becomes "Chapter 10 – The Shadow's Secret". A chapter with no
+ * description of its own is simply "Chapter 10".
+ */
+function renumberTitle(original: string, number: number): string {
+  // Strip a leading "Chapter <n>" and any separator after it; what remains is
+  // the description the writer actually chose.
+  const description = original
+    .replace(/^\s*chapter\s+\d+\s*[–—:.\-]*\s*/i, "")
+    .trim();
+  return description ? `Chapter ${number} – ${description}` : `Chapter ${number}`;
+}
+
+/**
+ * What an import did, kept so it can be reversed. Held by the caller (the undo
+ * banner) rather than in storage — it only has to survive until the writer
+ * accepts or undoes.
+ */
+export interface ImportUndo {
+  bookId: string;
+  /** The chapters the import added — removed on undo. */
+  addedIds: string[];
+  /** For a replace, the chapters it cleared, with their prose and notes, to
+   *  put back on undo. Empty for an append. */
+  removed: { meta: ChapterMeta; body: string | null; notes: string | null }[];
+  /** The chapter that was open before, to return to on undo. */
+  prevLastOpenedId: string | null;
+}
+
+/**
+ * Brings imported chapters into a book that already exists.
+ *
+ * `add` appends them after what is there and continues the numbering; `replace`
+ * clears the book's chapters first and numbers the import from one. Either way
+ * bodies are written before the shelf is touched and removed if a write fails,
+ * so the book never points at prose that is not there. Returns the first new
+ * chapter's id and an undo record, or null on failure (bad book, empty import,
+ * or storage full).
+ */
+export function importIntoBook(
+  bookId: string,
+  chapters: readonly { title: string; doc: unknown; words: number }[],
+  mode: "add" | "replace",
+): { firstId: string; undo: ImportUndo } | null {
+  if (!chapters.length) return null;
+  const book = findBook(getShelf(), bookId);
+  if (!book) return null;
+
+  const startNumber = mode === "replace" ? 0 : book.chapters.length;
+  const metas: ChapterMeta[] = [];
+  const written: string[] = [];
+
+  try {
+    chapters.forEach((chapter, i) => {
+      const id = newId();
+      window.localStorage.setItem(bodyKey(id), JSON.stringify(chapter.doc));
+      written.push(id);
+      metas.push({
+        id,
+        title: renumberTitle(chapter.title, startNumber + i + 1),
+        words: chapter.words,
+      });
+    });
+  } catch (err) {
+    console.error("[store] import failed, rolling back", err);
+    for (const id of written) {
+      try {
+        window.localStorage.removeItem(bodyKey(id));
+      } catch {
+        // The shelf is untouched; these are just unreachable bytes.
+      }
+    }
+    return null;
+  }
+
+  const undo: ImportUndo = {
+    bookId,
+    addedIds: written,
+    removed: [],
+    prevLastOpenedId: book.lastOpenedId,
+  };
+
+  if (mode === "replace") {
+    // Snapshot the chapters being cleared — prose and notes — so undo restores
+    // them, then remove their stored text.
+    undo.removed = book.chapters.map((c) => ({
+      meta: c,
+      body: getBody(c.id),
+      notes: getNotes(c.id),
+    }));
+    for (const c of book.chapters) {
+      try {
+        window.localStorage.removeItem(bodyKey(c.id));
+        window.localStorage.removeItem(notesKey(c.id));
+      } catch {
+        // Unreachable bytes, not a broken book.
+      }
+    }
+    commitBook(bookId, (b) => ({
+      ...b,
+      chapters: metas,
+      lastOpenedId: metas[0].id,
+    }));
+  } else {
+    commitBook(bookId, (b) => ({
+      ...b,
+      chapters: [...b.chapters, ...metas],
+      lastOpenedId: metas[0].id,
+    }));
+  }
+
+  return { firstId: metas[0].id, undo };
+}
+
+/**
+ * Reverses an import: removes the chapters it added, and — if it was a replace
+ * — puts the cleared chapters back with their prose and notes intact.
+ */
+export function undoChapterImport(undo: ImportUndo) {
+  if (!findBook(getShelf(), undo.bookId)) return;
+
+  for (const id of undo.addedIds) {
+    try {
+      window.localStorage.removeItem(bodyKey(id));
+      window.localStorage.removeItem(notesKey(id));
+    } catch {
+      // Unreachable bytes either way.
+    }
+  }
+
+  for (const r of undo.removed) {
+    try {
+      if (r.body !== null) window.localStorage.setItem(bodyKey(r.meta.id), r.body);
+      if (r.notes !== null)
+        window.localStorage.setItem(notesKey(r.meta.id), r.notes);
+    } catch {
+      // Best effort; the shelf below is what makes the chapter visible.
+    }
+  }
+
+  const addedSet = new Set(undo.addedIds);
+  commitBook(undo.bookId, (b) => {
+    // A replace cleared everything, so restore the snapshot; an append only
+    // added, so drop those and the originals remain.
+    const chapters = undo.removed.length
+      ? undo.removed.map((r) => r.meta)
+      : b.chapters.filter((c) => !addedSet.has(c.id));
+    return {
+      ...b,
+      chapters,
+      lastOpenedId:
+        undo.prevLastOpenedId &&
+        chapters.some((c) => c.id === undo.prevLastOpenedId)
+          ? undo.prevLastOpenedId
+          : (chapters[0]?.id ?? null),
+    };
+  });
+}
+
 export function renameChapter(
   bookId: string,
   chapterId: string,
@@ -533,8 +707,18 @@ export function renameChapter(
   }));
 }
 
+/**
+ * Sends a chapter to the book's trash rather than erasing it.
+ *
+ * The meta moves to `trash` with a timestamp and its body and notes are left in
+ * storage untouched, so restoreChapter can bring it back whole. Permanent
+ * deletion is a separate, deliberate step — see deleteChapterForever.
+ */
 export function deleteChapter(bookId: string, chapterId: string) {
   commitBook(bookId, (book) => {
+    const target = book.chapters.find((c) => c.id === chapterId);
+    if (!target) return book;
+
     const index = book.chapters.findIndex((c) => c.id === chapterId);
     const chapters = book.chapters.filter((c) => c.id !== chapterId);
 
@@ -546,19 +730,54 @@ export function deleteChapter(bookId: string, chapterId: string) {
     return {
       ...book,
       chapters,
+      trash: [{ ...target, trashedAt: Date.now() }, ...(book.trash ?? [])],
       lastOpenedId:
         book.lastOpenedId === chapterId
           ? (neighbour?.id ?? null)
           : book.lastOpenedId,
     };
   });
+}
+
+/** Every deleted-but-kept chapter in a book, newest first. */
+export function trashedChapters(book: Book): readonly TrashedChapter[] {
+  return book.trash ?? [];
+}
+
+/** Puts a trashed chapter back, at the end of the book. Its prose is intact. */
+export function restoreChapter(bookId: string, chapterId: string) {
+  commitBook(bookId, (book) => {
+    const item = (book.trash ?? []).find((t) => t.id === chapterId);
+    if (!item) return book;
+
+    // Rebuild an ordinary chapter meta, dropping the trashedAt marker.
+    const meta: ChapterMeta = {
+      id: item.id,
+      title: item.title,
+      words: item.words,
+      ...(item.bookmarked ? { bookmarked: true as const } : {}),
+    };
+    return {
+      ...book,
+      chapters: [...book.chapters, meta],
+      trash: (book.trash ?? []).filter((t) => t.id !== chapterId),
+      lastOpenedId: book.lastOpenedId ?? meta.id,
+    };
+  });
+}
+
+/** Erases a trashed chapter for good, prose and all. Not recoverable. */
+export function deleteChapterForever(bookId: string, chapterId: string) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    trash: (book.trash ?? []).filter((t) => t.id !== chapterId),
+  }));
 
   try {
     window.localStorage.removeItem(bodyKey(chapterId));
     window.localStorage.removeItem(notesKey(chapterId));
   } catch {
-    // The shelf entry is gone, which is what removes it from the UI. An
-    // orphaned body is wasted bytes, not a broken app.
+    // Unreachable bytes, not a broken app.
   }
 }
 
