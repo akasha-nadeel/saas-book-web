@@ -373,6 +373,26 @@ export function ExportPage({ bookId }: { bookId: string }) {
                   </div>
                 </div>
               </Card>
+
+              {format === "pdf" && (
+                <Card
+                  title="In the print dialog"
+                  note="The PDF is made by your browser's print, so two of its settings finish the page."
+                >
+                  <ul className="flex flex-col gap-2 font-sans text-sm text-muted">
+                    <li>
+                      <span className="text-fg">Turn off “Headers and footers”</span>{" "}
+                      (under More settings) to drop the date, the address, and the
+                      page counter the browser prints around the edge.
+                    </li>
+                    <li>
+                      <span className="text-fg">Set Paper size to match your trim</span>{" "}
+                      above — otherwise a small book page is centred on a big
+                      sheet, with wide margins around it.
+                    </li>
+                  </ul>
+                </Card>
+              )}
             </>
           ) : (
             <Card title="Formatting">

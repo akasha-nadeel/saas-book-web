@@ -45,7 +45,7 @@ export const TEMPLATES: readonly Template[] = [
     face: "Georgia",
     description: "A book face at book size, for reading rather than marking up.",
     stack: "Georgia, Cambria, \"Times New Roman\", serif",
-    bodyPt: 11,
+    bodyPt: 12,
     leading: 1.5,
     headingCaps: true,
   },
@@ -103,7 +103,10 @@ export interface TypesetOptions {
 
 export const DEFAULT_TYPESET: TypesetOptions = {
   template: "classic",
-  trim: "5.5x8.5",
+  // A full sheet by default, so a browser saving to A4 or Letter fills the page
+  // rather than centring a small book page on it. A true book trim is a click
+  // away, for a writer who will set their print paper to match.
+  trim: "a4",
   hideChapterNumbers: false,
   dropCaps: false,
   // A real book opens on a title page and lists its contents; copyright needs a
@@ -149,9 +152,17 @@ h1 {
   font-size: ${(t.bodyPt * 1.6).toFixed(1)}pt;
   margin: ${forPrint ? "2.4em 0 1.6em" : "2em 0 1em"};
   ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.06em;" : ""}
-  ${forPrint ? "page-break-before: always; break-before: page;" : ""}
 }
-${forPrint ? "h1:first-of-type { page-break-before: avoid; break-before: avoid; }" : ""}
+${
+  // Each chapter (and each generated front-matter page) is its own <section>,
+  // so the page break goes on the section — not the h1, which would break every
+  // chapter's heading onto its own page and leave the number stranded. The very
+  // first section stays put, so the book does not open on a blank sheet.
+  forPrint
+    ? `section { page-break-before: always; break-before: page; }
+body > section:first-of-type { page-break-before: avoid; break-before: avoid; }`
+    : ""
+}
 .chapter-number {
   display: ${options.hideChapterNumbers ? "none" : "block"};
   text-align: center;
@@ -177,13 +188,11 @@ blockquote { margin: 1.5em; font-style: italic; text-indent: 0; }
 .figure { text-align: center; text-indent: 0; margin: 1.5em 0; }
 .figure img { max-width: 100%; height: auto; }
 
-/* Generated front matter. Each opens its own page in print; an e-reader
-   paginates as it likes. */
+/* Generated front matter. Each opens its own page in print (the section rule
+   above), and an e-reader paginates as it likes. */
 .front-page {
-  ${forPrint ? "page-break-before: always; break-before: page;" : ""}
   text-indent: 0;
 }
-${forPrint ? ".front-page:first-of-type { page-break-before: avoid; break-before: avoid; }" : ""}
 .title-page {
   text-align: center;
   ${forPrint ? "padding-top: 30%;" : "padding-top: 4em;"}

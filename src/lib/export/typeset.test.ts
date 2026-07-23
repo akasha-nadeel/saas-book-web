@@ -69,3 +69,18 @@ it("keeps margins inside the trim they sit on", () => {
     expect(Number(ends) * 2).toBeLessThan(trim.height * 0.4);
   }
 });
+
+it("breaks each chapter onto a new page in print, but not the first", () => {
+  const css = typesetCss(DEFAULT_TYPESET, true);
+  // The break is on the section, so every chapter (and front-matter page) opens
+  // a new page — the h1-only rule broke none of them, since each is the only h1
+  // in its section.
+  expect(css).toContain("section { page-break-before: always;");
+  expect(css).toContain("body > section:first-of-type { page-break-before: avoid;");
+  expect(css).not.toContain("h1:first-of-type");
+});
+
+it("adds no page rules to an EPUB, whose reader paginates", () => {
+  const css = typesetCss(DEFAULT_TYPESET, false);
+  expect(css).not.toContain("page-break-before: always");
+});

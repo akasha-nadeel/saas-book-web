@@ -251,46 +251,50 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="shrink-0 px-4 pt-3 pb-3">
-        <button
-          type="button"
-          onClick={handleCreate}
-          className="mt-3 w-full rounded-md bg-accent py-2.5 font-sans text-sm
-                     font-semibold text-white outline-none transition-colors
-                     hover:bg-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          New chapter
-        </button>
-
-        {/* Bring an existing manuscript into this book. It reads the file and
-            appends its chapters here, rather than starting a separate book the
-            way the shelf's import does. */}
-        <button
-          type="button"
-          disabled={importing}
-          onClick={() => fileRef.current?.click()}
-          className="mt-2 flex w-full items-center justify-center gap-2 rounded-md
-                     border border-muted/60 py-2.5 font-sans text-sm font-medium
-                     text-fg outline-none transition-colors
-                     hover:border-accent/60 hover:bg-raised
-                     focus-visible:ring-2 focus-visible:ring-accent/60
-                     disabled:opacity-50"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4 shrink-0"
+        {/* New chapter leads, Import sits beside it as a compact button — one
+            row rather than two stacked. */}
+        <div className="flex items-stretch gap-2">
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="flex-1 rounded-md bg-accent py-2.5 font-sans text-sm
+                       font-semibold text-white outline-none transition-colors
+                       hover:bg-accent-strong focus-visible:ring-2
+                       focus-visible:ring-accent/60"
           >
-            <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
-            <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
-          </svg>
-          {importing ? "Reading…" : "Import a file"}
-        </button>
+            New chapter
+          </button>
+
+          {/* Bring an existing manuscript into this book — reads the file and
+              appends its chapters here. Icon only, so the row stays compact. */}
+          <button
+            type="button"
+            disabled={importing}
+            onClick={() => fileRef.current?.click()}
+            aria-label={importing ? "Reading file…" : "Import a file"}
+            title="Import a file"
+            className="flex shrink-0 items-center justify-center gap-2 rounded-md
+                       border border-muted/60 px-3 font-sans text-sm font-medium
+                       text-fg outline-none transition-colors
+                       hover:border-accent/60 hover:bg-raised
+                       focus-visible:ring-2 focus-visible:ring-accent/60
+                       disabled:opacity-50"
+          >
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4 shrink-0"
+            >
+              <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
+              <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
+            </svg>
+          </button>
+        </div>
 
         <input
           ref={fileRef}
