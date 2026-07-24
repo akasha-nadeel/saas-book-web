@@ -22,6 +22,36 @@ it("reads a plain paragraph", () => {
   ]);
 });
 
+it("reads a paragraph's alignment when set", () => {
+  expect(
+    toBlocks(
+      doc({
+        type: "paragraph",
+        attrs: { textAlign: "center" },
+        content: [text("Centred.")],
+      }),
+    ),
+  ).toEqual([
+    { kind: "paragraph", depth: 0, align: "center", runs: [{ text: "Centred." }] },
+  ]);
+  // An unknown or absent alignment carries nothing, so the book default holds.
+  expect(
+    toBlocks(doc({ type: "paragraph", attrs: { textAlign: null }, content: [text("Plain.")] })),
+  ).toEqual([{ kind: "paragraph", depth: 0, runs: [{ text: "Plain." }] }]);
+});
+
+it("reads an inline font size from its mark", () => {
+  expect(
+    toBlocks(doc(para(text("big", [{ type: "fontSize", attrs: { size: 1.5 } }])))),
+  ).toEqual([
+    {
+      kind: "paragraph",
+      depth: 0,
+      runs: [{ text: "big", fontSize: "calc(var(--ms-size, 1em) * 1.5)" }],
+    },
+  ]);
+});
+
 it("reads headings with their level", () => {
   const blocks = toBlocks(
     doc({

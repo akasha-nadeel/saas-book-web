@@ -28,6 +28,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Search", desc: "Filter the shelf by book title." },
       {
+        name: "Sort",
+        desc: "Order the shelf by most recently opened, title A–Z, or word count.",
+      },
+      {
         name: "Archive",
         desc: "Set a finished or paused book aside without deleting it.",
       },
@@ -45,8 +49,16 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     title: "Writing",
     items: [
       {
+        name: "Book overview",
+        desc: "Opening a book lands on its overview — the chapter panel on the left and a short guide to how the book is put together — rather than a chapter. Pick a chapter to write, or use “Continue writing” on the shelf to jump straight back to where you left off.",
+      },
+      {
         name: "Chapters",
         desc: "Add, rename, reorder by dragging, and delete chapters. Star one to keep it in Bookmarks.",
+      },
+      {
+        name: "Read the whole book",
+        desc: "The open-book button on the editor rail opens a reading view: every chapter, in order, on one page you can scroll end to end — front matter, body, and back matter, the way the book reads. Click a chapter’s title there to jump back into editing it.",
       },
       {
         name: "Search this book",
@@ -58,7 +70,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Front & back matter",
-        desc: "From a chapter’s ⋯ menu, move it to front matter (title page, dedication, preface) or back matter (epilogue, author bio). Only body chapters are numbered; front and back are named, and export lays the book out front → body → back.",
+        desc: "Two buttons bracket the body in the chapters panel. Front matter opens a page templated with a book’s opening sections (half-title, title page, copyright, dedication, epigraph, contents, preface, prologue); Back matter opens one with its closing sections (epilogue, acknowledgements, about the author, about the book, other books). Write under the sections you want, delete the rest. These pages are named, never numbered.",
       },
       {
         name: "Import into a book",
@@ -71,6 +83,18 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       {
         name: "Formatting",
         desc: "Bold, italic, headings, quotes, bullet and numbered lists, scene breaks, links, inline code, and images.",
+      },
+      {
+        name: "Selection toolbar",
+        desc: "Highlight text and a small formatting bar appears above it: the marks (bold, italic, underline, strike, code), a link, inline size (A− / A+, ¶, H1–H3), paragraph alignment (left, centre, right, justify), and the block forms — quote (the indented, ruled passage for a letter or epigraph) and bulleted or numbered lists. Each toggles off again. You can also type “> ” for a quote or “- ” / “1. ” to start a list.",
+      },
+      {
+        name: "Images",
+        desc: "Insert a picture from the image button on the editor rail. Click it to select, then drag the handles on either side to resize, or use its floating toolbar to sit it left/centre/right, set a quick width (25%, 50%, full, or fit), or delete it. Size and placement are kept in the reader and the export.",
+      },
+      {
+        name: "Text & type",
+        desc: "The Aa button on the editor rail sets the book's body typography (font, text size, line spacing, first-line indent, paragraph spacing, page colour) and the alignment of the selected paragraphs — left, centre, right, or justify. Alignment is per paragraph, so different paragraphs can differ; select all to align the whole chapter. New books start on professional novel defaults.",
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
@@ -86,8 +110,12 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Choose the page colour: white, cream, sepia, slate, or black.",
       },
       {
+        name: "Print layout",
+        desc: "The editor sets your manuscript on real page sheets, like a word processor — text flows from one page to the next as you type, and a zoom control (bottom-right) scales the pages.",
+      },
+      {
         name: "Page setup",
-        desc: "Set the page size, margins, and number of columns.",
+        desc: "The ▤ button on the editor rail sets the page the manuscript is printed on: size (6×9 novel by default), orientation, and margins. Body text and font live under the Aa button instead.",
       },
       {
         name: "Word goal",

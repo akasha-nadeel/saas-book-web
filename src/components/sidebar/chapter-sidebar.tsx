@@ -8,15 +8,14 @@ import {
   chapterMatterOf,
   chapterNumberOf,
   createChapter,
+  createMatterSection,
   deleteChapter,
   findBook,
   importIntoBook,
   moveChapter,
   renameChapter,
-  setChapterMatter,
   setPref,
   toggleBookmark,
-  type ChapterMatter,
   type ChapterMeta,
 } from "@/lib/library-store";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
@@ -26,52 +25,14 @@ import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
-/** The three parts a chapter can be moved to, for its ⋯ menu. Icons: a bar
- *  with an arrow to it (front/top, back/bottom) and a page (an ordinary
- *  chapter). */
-const MATTER_MOVES: readonly {
-  matter: ChapterMatter;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  {
-    matter: "front",
-    label: "Move to front matter",
-    icon: (
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 4h12M10 16V8m0 0-3 3m3-3 3 3" />
-      </svg>
-    ),
-  },
-  {
-    matter: "body",
-    label: "Make a body chapter",
-    icon: (
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
-        <path d="M11.6 2.8H6.2a1.5 1.5 0 0 0-1.5 1.5v11.4a1.5 1.5 0 0 0 1.5 1.5h7.6a1.5 1.5 0 0 0 1.5-1.5V6.4z" />
-        <path d="M11.6 2.8v2.9a.9.9 0 0 0 .9.9h2.8" />
-      </svg>
-    ),
-  },
-  {
-    matter: "back",
-    label: "Move to back matter",
-    icon: (
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 16h12M10 4v8m0 0-3-3m3 3 3-3" />
-      </svg>
-    ),
-  },
-];
-
 /**
- * The manuscript: front matter, the body, and back matter, in one flat list.
+ * A book in three parts: front matter, the body, back matter.
  *
- * Not a drill-down. Sections you step into were tried and cost more than they
- * returned — a level to step out of, two places a chapter could land, numbering
- * that had to be explained twice. Here a chapter's part is just a tag set from
- * its menu; the list stays a single sequence with a quiet label where each part
- * begins. Body chapters are numbered; front and back matter are named.
+ * The body is the story — chapters the writer adds, numbered from one, reordered
+ * by dragging. Front and back matter are two buttons that bracket it: each opens
+ * a single page whose template already carries the standard sections of that part
+ * (title page, dedication, epigraph … / epilogue, acknowledgements …) as
+ * headings, for the writer to fill in. Those pages are named, never numbered.
  */
 export function ChapterSidebar({ bookId }: { bookId: string }) {
   const shelf = useShelf();
@@ -91,13 +52,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   const [importError, setImportError] = useState<string | null>(null);
   const [pending, setPending] = useState<ImportedChapter[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  // Which of the three parts are expanded. The body — the manuscript itself —
-  // is open by default; front and back matter fold away until wanted.
-  const [openParts, setOpenParts] = useState<Record<ChapterMatter, boolean>>({
-    front: false,
-    body: true,
-    back: false,
-  });
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -178,31 +132,25 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   };
 
   /** Drop one chapter onto another: the dragged one takes that position. Only
-   *  within the same part — moving a chapter between front, body and back is
-   *  the matter menu's job, and lets the grouped order stay intact. */
+   *  the body reorders this way — front and back pages keep the standard order,
+   *  and only body rows are draggable, so a drop is always body onto body. */
   const handleDropOn = (targetId: string) => {
-    const dragged = book.chapters.find((c) => c.id === dragId);
-    const target = book.chapters.find((c) => c.id === targetId);
     const from = book.chapters.findIndex((c) => c.id === dragId);
     const to = book.chapters.findIndex((c) => c.id === targetId);
+    const dragged = book.chapters[from];
+    const target = book.chapters[to];
     if (
-      dragged &&
-      target &&
-      chapterMatterOf(dragged) === chapterMatterOf(target) &&
       from >= 0 &&
-      to >= 0
+      to >= 0 &&
+      from !== to &&
+      chapterMatterOf(dragged) === "body" &&
+      chapterMatterOf(target) === "body"
     ) {
       moveChapter(bookId, from, to);
     }
 
     setDragId(null);
     setOverId(null);
-  };
-
-  const matterLabel: Record<ChapterMatter, string> = {
-    front: "Front matter",
-    body: "Body",
-    back: "Back matter",
   };
 
   const startRename = (chapter: ChapterMeta) => {
@@ -219,12 +167,36 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     setRenamingId(null);
   };
 
-  /** One chapter row, used inside whichever part it belongs to. */
+  /** The in-place rename field, shared by body chapters and matter pages. */
+  const renameForm = (chapter: ChapterMeta) => (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        commitRename();
+      }}
+      className="border-l-4 border-accent py-1.5 pr-2 pl-3"
+    >
+      <input
+        value={draftTitle}
+        onChange={(e) => setDraftTitle(e.target.value)}
+        onBlur={commitRename}
+        onKeyDown={(e) => {
+          // Escape abandons the edit; blur would otherwise commit whatever
+          // half-typed text is in the field.
+          if (e.key === "Escape") setRenamingId(null);
+        }}
+        aria-label={`Rename ${chapter.title}`}
+        autoFocus
+        className="w-full rounded-md border border-accent bg-surface px-2
+                   py-1.5 font-sans text-sm text-fg outline-none"
+      />
+    </form>
+  );
+
+  /** One body chapter row: numbered, draggable, star/rename/delete. */
   const renderChapter = (chapter: ChapterMeta) => {
     const index = book.chapters.findIndex((c) => c.id === chapter.id);
     const isActive = chapter.id === activeId;
-    const matter = chapterMatterOf(chapter);
-    // Body chapters are numbered; front and back matter are named.
     const number = chapterNumberOf(book, chapter.id);
 
     return (
@@ -251,28 +223,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         } ${overId === chapter.id ? "bg-accent-deep/40" : ""}`}
       >
         {renamingId === chapter.id ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              commitRename();
-            }}
-            className="border-l-4 border-accent py-1.5 pr-2 pl-3"
-          >
-            <input
-              value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              onBlur={commitRename}
-              onKeyDown={(e) => {
-                // Escape abandons the edit; blur would otherwise commit
-                // whatever half-typed text is in the field.
-                if (e.key === "Escape") setRenamingId(null);
-              }}
-              aria-label={`Rename ${chapter.title}`}
-              autoFocus
-              className="w-full rounded-md border border-accent bg-surface px-2
-                         py-1.5 font-sans text-sm text-fg outline-none"
-            />
-          </form>
+          renameForm(chapter)
         ) : (
           <Link
             href={`/book/${bookId}/chapter/${chapter.id}`}
@@ -286,15 +237,16 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
             onKeyDown={(e) => {
               if (!e.altKey) return;
-              // Only within the same part, so a nudge never lands a chapter in
-              // the wrong matter.
               const step =
                 e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
               if (!step) return;
               e.preventDefault();
-              const neighbour = book.chapters[index + step];
-              if (neighbour && chapterMatterOf(neighbour) === matter) {
-                moveChapter(bookId, index, index + step);
+              const target = index + step;
+              const neighbour = book.chapters[target];
+              // Stay inside the body — a nudge never carries a chapter into the
+              // front or back matter, which keep the standard order.
+              if (neighbour && chapterMatterOf(neighbour) === "body") {
+                moveChapter(bookId, index, target);
               }
             }}
             className={`flex items-center gap-2.5 border-l-4 py-3 pr-10 pl-3
@@ -343,16 +295,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   icon: menuIcons.rename,
                   onSelect: () => startRename(chapter),
                 },
-                // The two parts this chapter is not in — moving it opens that
-                // part, so it does not vanish into a folded section.
-                ...MATTER_MOVES.filter((m) => m.matter !== matter).map((m) => ({
-                  label: m.label,
-                  icon: m.icon,
-                  onSelect: () => {
-                    setChapterMatter(bookId, chapter.id, m.matter);
-                    setOpenParts((o) => ({ ...o, [m.matter]: true }));
-                  },
-                })),
                 {
                   label: "Delete",
                   hint: "D",
@@ -365,6 +307,97 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           </span>
         )}
       </li>
+    );
+  };
+
+  const bodyChapters = book.chapters.filter(
+    (c) => chapterMatterOf(c) === "body",
+  );
+
+  /**
+   * One matter part as a single button that brackets the body — front above the
+   * chapters, back below. It opens that part's page, seeding it with the standard
+   * template the first time. Once written it is a real page: the button becomes
+   * a highlight-when-open row with a ⋯ menu to rename or clear it.
+   */
+  const renderMatterButton = (matter: "front" | "back") => {
+    const existing = book.chapters.find((c) => c.matterKey === matter);
+    const label = matter === "front" ? "Front matter" : "Back matter";
+    const isActive = existing?.id === activeId;
+
+    const open = () => {
+      const id = existing?.id ?? createMatterSection(bookId, matter);
+      if (id) router.push(`/book/${bookId}/chapter/${id}`);
+    };
+
+    // The book icon — front matter opens the book, back matter closes it, so the
+    // two mirror. A single glyph reads as a section marker, not a chapter.
+    const icon = (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4 shrink-0"
+      >
+        <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H10v14H5.5A1.5 1.5 0 0 1 4 15.5z" />
+        <path d="M16 4.5A1.5 1.5 0 0 0 14.5 3H10v14h4.5a1.5 1.5 0 0 0 1.5-1.5z" />
+      </svg>
+    );
+
+    if (existing && renamingId === existing.id) {
+      return renameForm(existing);
+    }
+
+    return (
+      <div className="group relative">
+        <button
+          type="button"
+          onClick={open}
+          aria-current={isActive ? "page" : undefined}
+          title={existing ? label : `Start the ${label.toLowerCase()}`}
+          className={`flex w-full items-center gap-2.5 border-l-4 py-3 pr-10 pl-3
+                      text-left font-sans text-sm font-medium outline-none
+                      transition-colors focus-visible:ring-inset
+                      focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                        isActive
+                          ? "border-accent bg-selected text-selected-fg"
+                          : existing
+                            ? "border-transparent text-fg hover:bg-raised"
+                            : "border-transparent text-muted hover:bg-raised hover:text-fg"
+                      }`}
+        >
+          {icon}
+          <span className="flex-1 truncate">{label}</span>
+        </button>
+
+        {existing && (
+          <span className="absolute top-1/2 right-2 -translate-y-1/2">
+            <RowMenu
+              label={label}
+              active={isActive}
+              items={[
+                {
+                  label: "Rename",
+                  hint: "R",
+                  icon: menuIcons.rename,
+                  onSelect: () => startRename(existing),
+                },
+                {
+                  label: "Delete",
+                  hint: "D",
+                  icon: menuIcons.trash,
+                  onSelect: () => handleDelete(existing),
+                  danger: true,
+                },
+              ]}
+            />
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -478,69 +511,25 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-3">
-        {
-          // Front matter, body, back matter — the three parts always show, even
-          // empty, so the structure of a book is visible and a writer knows
-          // where a title page or an epilogue would go.
-          (["front", "body", "back"] as const).map((part) => {
-            const chapters = book.chapters.filter(
-              (c) => chapterMatterOf(c) === part,
-            );
-            const open = openParts[part];
+        {/* A book, top to bottom: front matter opens it, the body is the story,
+            back matter closes it. Front and back are single buttons that open a
+            templated page; the body is the chapter list itself. */}
+        <div className="border-y border-line">{renderMatterButton("front")}</div>
 
-            return (
-              <section key={part}>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setOpenParts((o) => ({ ...o, [part]: !o[part] }))
-                  }
-                  aria-expanded={open}
-                  className="flex w-full items-center gap-2 border-t border-line
-                             px-3 py-3 text-left font-sans text-sm font-semibold
-                             tracking-wide text-muted uppercase outline-none
-                             transition-colors hover:text-fg focus-visible:ring-2
-                             focus-visible:ring-accent/60"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox="0 0 20 20"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`h-4 w-4 shrink-0 transition-transform ${
-                      open ? "rotate-90" : ""
-                    }`}
-                  >
-                    <path d="m7 5 5 5-5 5" />
-                  </svg>
-                  <span className="flex-1">{matterLabel[part]}</span>
-                  <span className="tabular-nums opacity-70">
-                    {chapters.length}
-                  </span>
-                </button>
+        {bodyChapters.length > 0 ? (
+          <ol>{bodyChapters.map(renderChapter)}</ol>
+        ) : (
+          <p className="px-4 py-3 font-sans text-xs text-muted italic">
+            No chapters yet.
+          </p>
+        )}
 
-                {open &&
-                  (chapters.length > 0 ? (
-                    <ol>{chapters.map(renderChapter)}</ol>
-                  ) : (
-                    <p className="px-4 py-2.5 font-sans text-xs text-muted italic">
-                      {part === "body"
-                        ? "No chapters yet."
-                        : "Move a chapter here from its ⋯ menu."}
-                    </p>
-                  ))}
-              </section>
-            );
-          })
-        }
+        <div className="border-y border-line">{renderMatterButton("back")}</div>
       </div>
 
       {pending && (
         <ImportModeDialog
-          existingCount={book.chapters.length}
+          existingCount={bodyChapters.length}
           importCount={pending.length}
           onAdd={() => runImport(pending, "add")}
           onReplace={() => runImport(pending, "replace")}

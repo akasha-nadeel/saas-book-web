@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
@@ -27,12 +33,28 @@ import {
   type Book,
   type BookView,
 } from "@/lib/library-store";
+import { relativeTime } from "@/lib/relative-time";
 import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 
 const VIEW_LABEL: Record<BookView, string> = {
   active: "All books",
   archived: "Archived books",
   trashed: "Trashed books",
+};
+
+/** The one-line lede under the section count, per view. */
+const VIEW_LEDE: Record<BookView, string> = {
+  active: "Sort or search to find the one you want faster.",
+  archived: "Books set aside — restore one to bring it back to the shelf.",
+  trashed: "Deleted books wait here until you empty the trash.",
+};
+
+/** How the shelf is ordered. All three do real work — see the comparator. */
+type Sort = "recent" | "title" | "words";
+const SORT_LABEL: Record<Sort, string> = {
+  recent: "Recently opened",
+  title: "Title A–Z",
+  words: "Most words",
 };
 
 /**
@@ -69,9 +91,9 @@ function MaskIcon({
 // One icon apiece for the view tabs — books for the whole shelf, a case for
 // what's set aside, a bin for what's on its way out.
 const VIEW_ICON: Record<BookView, ReactNode> = {
-  active: <MaskIcon src="/icon-books.png" className="h-7 w-7" />,
-  archived: <MaskIcon src="/icon-archived.png" className="h-7 w-7" />,
-  trashed: <MaskIcon src="/icon-trashed.png" className="h-7 w-7" />,
+  active: <MaskIcon src="/icon-books.png" className="h-6 w-6" />,
+  archived: <MaskIcon src="/icon-archived.png" className="h-6 w-6" />,
+  trashed: <MaskIcon src="/icon-trashed.png" className="h-6 w-6" />,
 };
 
 export function Bookshelf() {
@@ -81,6 +103,7 @@ export function Bookshelf() {
   const [editing, setEditing] = useState<Book | null>(null);
   const [opening, setOpening] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<Sort>("recent");
   const [dialog, setDialog] = useState<
     "templates" | "upgrade" | "help" | "support" | "sounds" | "import" | null
   >(null);
@@ -97,12 +120,18 @@ export function Bookshelf() {
     migrateLegacy();
   }, [hydrated]);
 
-  // Most recently opened first — the book you were writing yesterday is the
-  // one you want today.
-  const books = useMemo(
-    () => booksIn(shelf, view).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt),
-    [shelf, view],
-  );
+  // The chosen order. Recently opened is the default — the book you were writing
+  // yesterday is the one you want today — but a big shelf is easier to scan by
+  // title, and words answers "which is my real project".
+  const books = useMemo(() => {
+    const list = booksIn(shelf, view);
+    const by: Record<Sort, (a: Book, b: Book) => number> = {
+      recent: (a, b) => b.lastOpenedAt - a.lastOpenedAt,
+      title: (a, b) => a.title.localeCompare(b.title),
+      words: (a, b) => bookWordCount(b) - bookWordCount(a),
+    };
+    return [...list].sort(by[sort]);
+  }, [shelf, view, sort]);
 
   const counts = useMemo(
     () => ({
@@ -151,129 +180,124 @@ export function Bookshelf() {
     ? shelf.lastOpenedBookId
     : (active[0]?.id ?? null);
 
+  // "Continue writing" skips the overview and reopens the last chapter itself —
+  // it is the one action that means "keep writing", so it lands on the page, not
+  // the guide. A book with no chapters falls back to its overview.
+  const continueBook = continueId
+    ? (active.find((b) => b.id === continueId) ?? null)
+    : null;
+  const continueChapterId = continueBook
+    ? continueBook.chapters.some((c) => c.id === continueBook.lastOpenedId)
+      ? continueBook.lastOpenedId
+      : (continueBook.chapters[0]?.id ?? null)
+    : null;
+  const continueHref = continueChapterId
+    ? `/book/${continueId}/chapter/${continueChapterId}`
+    : continueId
+      ? `/book/${continueId}`
+      : null;
+
   return (
-    // The bar spans the full width and both the sidebar and the panel begin
-    // below it — that stacking is what makes the panel's one rounded corner
-    // sit where it does in the reference.
-    <div className="flex h-full flex-col">
-      <ShelfTopNav
-        continueId={continueId}
+    // The light desk. The sidebar floats on it as a rounded card, the content
+    // scrolls beside it — the "dailybook" arrangement.
+    <div className="flex h-full bg-surface">
+      <ShelfSidebar
+        view={view}
+        counts={counts}
         navOpen={navOpen}
-        onImport={() => setDialog("import")}
-        onTemplates={() => setDialog("templates")}
-        onUpgrade={() => setDialog("upgrade")}
-        onToggleNav={() => setNavOpen((open) => !open)}
+        onCloseNav={() => setNavOpen(false)}
+        onView={(v) => {
+          setView(v);
+          setNavOpen(false);
+        }}
+        onImport={() => {
+          setNavOpen(false);
+          setDialog("import");
+        }}
+        onSounds={() => {
+          setNavOpen(false);
+          setDialog("sounds");
+        }}
+        onHelp={() => {
+          setNavOpen(false);
+          setDialog("help");
+        }}
+        onSupport={() => {
+          setNavOpen(false);
+          setDialog("support");
+        }}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <ShelfNav
-          view={view}
-          counts={counts}
-          navOpen={navOpen}
-          onCloseNav={() => setNavOpen(false)}
-          onView={(v) => {
-            setView(v);
-            setNavOpen(false);
-          }}
-          onImport={() => {
-            setNavOpen(false);
-            setDialog("import");
-          }}
-          onSounds={() => {
-            setNavOpen(false);
-            setDialog("sounds");
-          }}
-          onHelp={() => {
-            setNavOpen(false);
-            setDialog("help");
-          }}
-          onSupport={() => {
-            setNavOpen(false);
-            setDialog("support");
-          }}
-          onUpgrade={() => {
-            setNavOpen(false);
-            setDialog("upgrade");
-          }}
-        />
+      <main className="scroll-slim min-w-0 flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-[1440px] flex-col gap-6 px-4 py-4 md:px-8 md:py-6">
+          <ShelfTopBar
+            query={query}
+            onQuery={setQuery}
+            onToggleNav={() => setNavOpen((open) => !open)}
+            onTemplates={() => setDialog("templates")}
+            onAccount={() => setDialog("upgrade")}
+          />
 
-        {/* One rounded corner, top-left, and the panel runs off the right and
-            bottom edges. The separation from the sidebar is the shade change and
-            that single corner — no border, no floating gap on four sides. The
-            green backs this area so the rounded corner nests into the chrome
-            rather than cutting to the page behind it. */}
-        <main className="min-w-0 flex-1 overflow-hidden bg-nav">
-          <div className="scroll-slim flex h-full flex-col overflow-y-auto rounded-t-2xl bg-panel px-4 py-5 md:rounded-tr-none md:rounded-tl-2xl md:px-8 md:py-7">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-              <h1 className="font-serif text-2xl text-fg md:text-3xl">
-                {VIEW_LABEL[view]}
-              </h1>
-              <p className="shrink-0 font-sans text-sm text-muted">
-                {totalWords.toLocaleString()} words written
+          {view === "active" && (
+            <Hero
+              book={continueBook}
+              href={continueHref}
+              totalBooks={counts.active}
+              totalWords={totalWords}
+              onOpen={setOpening}
+            />
+          )}
+
+          <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+            <div className="min-w-0">
+              <h2 className="font-display text-xl font-semibold text-fg md:text-2xl">
+                {counts[view] === 1
+                  ? "1 book"
+                  : `${counts[view].toLocaleString()} books`}
+                <span className="ml-2 align-middle font-sans text-sm font-normal text-muted">
+                  {VIEW_LABEL[view].toLowerCase()}
+                </span>
+              </h2>
+              <p className="mt-1 font-sans text-sm text-muted">
+                {VIEW_LEDE[view]}
               </p>
             </div>
-
-            <label className="relative mt-6 block">
-              <span className="sr-only">Search books</span>
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                className="pointer-events-none absolute top-1/2 left-3 h-4 w-4
-                           -translate-y-1/2 text-muted"
-              >
-                <circle cx="9" cy="9" r="6" />
-                <path d="m13.5 13.5 3 3" strokeLinecap="round" />
-              </svg>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search in all books…"
-                className="w-full rounded-md border border-line bg-surface py-2.5
-                           pr-3 pl-10 font-sans text-sm text-fg
-                           placeholder:text-muted focus-visible:border-accent
-                           focus-visible:outline-none"
-              />
-            </label>
-
-            {books.length === 0 ? (
-              view === "active" ? (
-                <Empty />
-              ) : (
-                <p className="mt-10 font-sans text-sm text-muted">
-                  {view === "archived"
-                    ? "Nothing archived."
-                    : "The trash is empty."}
-                </p>
-              )
-            ) : visible.length === 0 ? (
-              <p className="mt-10 font-sans text-sm text-muted">
-                No book matches “{query.trim()}”.
-              </p>
-            ) : (
-              <BookGrid
-                books={visible}
-                view={view}
-                // Only the genuinely most-recent book, not merely the first row
-                // after a search has reordered what you can see.
-                continueId={
-                  view === "active" && !query.trim()
-                    ? (books[0]?.id ?? null)
-                    : null
-                }
-                onEdit={setEditing}
-                onOpen={setOpening}
-                onArchive={(b) => archiveBook(b.id)}
-                onRestore={(b) => restoreBook(b.id)}
-                onTrash={handleTrash}
-                onDeleteForever={handleDeleteForever}
-              />
+            {books.length > 1 && (
+              <SortMenu value={sort} onChange={setSort} />
             )}
           </div>
-        </main>
-      </div>
+
+          {books.length === 0 ? (
+            view === "active" ? (
+              <Empty />
+            ) : (
+              <p className="mt-4 font-sans text-sm text-muted">
+                {view === "archived"
+                  ? "Nothing archived."
+                  : "The trash is empty."}
+              </p>
+            )
+          ) : visible.length === 0 ? (
+            <p className="mt-4 font-sans text-sm text-muted">
+              No book matches “{query.trim()}”.
+            </p>
+          ) : (
+            <BookGrid
+              books={visible}
+              view={view}
+              // The genuine resume target, marked wherever it lands under the
+              // current sort — not merely the first card in the row.
+              continueId={view === "active" ? continueId : null}
+              onEdit={setEditing}
+              onOpen={setOpening}
+              onArchive={(b) => archiveBook(b.id)}
+              onRestore={(b) => restoreBook(b.id)}
+              onTrash={handleTrash}
+              onDeleteForever={handleDeleteForever}
+            />
+          )}
+        </div>
+      </main>
 
       {editing && (
         <CoverDialog book={editing} onClose={() => setEditing(null)} />
@@ -302,123 +326,17 @@ export function Bookshelf() {
 }
 
 /**
- * The bar across the top.
+ * The floating sidebar — the dark navy card that carries the brand, the two
+ * shelf actions, the library views and the tools.
  *
- * Templates and Upgrade sit where the reference puts its product links.
- * Templates does real work — it builds a book with its chapters laid out.
- * Upgrade cannot: there are no accounts and no billing, so it opens a dialog
- * saying so rather than pretending to sell something.
+ * Reference-faithful in shape (a rounded dark column on a light desk, primary
+ * nav up top and tools pinned to the foot) but every row does real work: the
+ * views switch the shelf, the tools open their panels, and there is no fake
+ * "log out" where the app has no accounts.
+ *
+ * Below md it slides in as a drawer; at md and up it is a static side column.
  */
-function ShelfTopNav({
-  continueId,
-  navOpen,
-  onImport,
-  onTemplates,
-  onUpgrade,
-  onToggleNav,
-}: {
-  continueId: string | null;
-  navOpen: boolean;
-  onImport: () => void;
-  onTemplates: () => void;
-  onUpgrade: () => void;
-  onToggleNav: () => void;
-}) {
-  return (
-    <header className="nav-chrome flex h-16 shrink-0 items-center gap-3 px-4 md:gap-6 md:px-6">
-      {/* Opens the sidebar sheet on small screens, where the sidebar is off the
-          page; becomes an ✕ to close while it's open. */}
-      <button
-        type="button"
-        onClick={onToggleNav}
-        aria-label={navOpen ? "Close menu" : "Open menu"}
-        aria-expanded={navOpen}
-        className="-ml-1 rounded-md p-2 text-muted outline-none transition-colors
-                   hover:bg-raised hover:text-fg focus-visible:ring-2
-                   focus-visible:ring-accent/60 md:hidden"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          className="h-5 w-5"
-        >
-          {navOpen ? (
-            <path d="M5 5l10 10M15 5L5 15" />
-          ) : (
-            <path d="M3 6h14M3 10h14M3 14h14" />
-          )}
-        </svg>
-      </button>
-
-      {/* Pure white wordmark. Hidden on phones — the brand moves into the menu
-          sheet there, freeing the bar for New book and Import. */}
-      <p className="hidden min-w-0 shrink-0 font-display text-xl font-medium tracking-tight text-white md:block md:text-2xl">
-        OpenChapter
-      </p>
-
-      <nav className="ml-auto flex items-center gap-2 font-sans text-sm">
-        {/* New book and Import ride in the top bar on phones, where the sheet no
-            longer carries them; hidden at md, where the sidebar has them. */}
-        <button
-          type="button"
-          onClick={onImport}
-          className="rounded-md border border-white/25 px-3 py-2 font-medium
-                     text-white outline-none transition-colors hover:bg-white/10
-                     focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
-        >
-          Import
-        </button>
-        <Link
-          href="/book/new"
-          className="rounded-md bg-accent px-3 py-2 font-semibold text-white
-                     outline-none transition-colors hover:bg-accent-strong
-                     focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
-        >
-          New book
-        </Link>
-
-        {/* The two quiet links fold away on small screens. */}
-        <button
-          type="button"
-          onClick={onTemplates}
-          className="hidden rounded-md px-3 py-2 text-muted outline-none
-                     transition-colors hover:bg-raised hover:text-fg
-                     focus-visible:ring-2 focus-visible:ring-accent/60 md:block"
-        >
-          Templates
-        </button>
-
-        {continueId && (
-          <Link
-            href={`/book/${continueId}`}
-            className="hidden rounded-md px-3 py-2 text-muted outline-none
-                       transition-colors hover:bg-raised hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/60 md:block"
-          >
-            Continue writing
-          </Link>
-        )}
-
-        <button
-          type="button"
-          onClick={onUpgrade}
-          className="hidden rounded-md bg-accent px-4 py-2 font-semibold
-                     text-white outline-none transition-colors
-                     hover:bg-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60 md:ml-2 md:block"
-        >
-          Upgrade
-        </button>
-      </nav>
-    </header>
-  );
-}
-
-function ShelfNav({
+function ShelfSidebar({
   view,
   counts,
   navOpen,
@@ -428,7 +346,6 @@ function ShelfNav({
   onSounds,
   onHelp,
   onSupport,
-  onUpgrade,
 }: {
   view: BookView;
   counts: Record<BookView, number>;
@@ -439,14 +356,12 @@ function ShelfNav({
   onSounds: () => void;
   onHelp: () => void;
   onSupport: () => void;
-  onUpgrade: () => void;
 }) {
   const { theme } = usePrefs();
 
   return (
     <>
-      {/* Below md the sidebar is a drawer; this dims the page behind it and
-          closes it on a tap outside. */}
+      {/* The scrim behind the drawer, below md only. */}
       {navOpen && (
         <div
           aria-hidden="true"
@@ -456,299 +371,659 @@ function ShelfNav({
       )}
 
       <aside
-        // The nav chrome; see .nav-chrome. Its shade change against the white
-        // content well, plus that panel's one rounded corner, is what separates
-        // the two — no border needed. Below md it's a bottom sheet: it slides up
-        // from the foot, full width with a rounded top and a drag handle. At md
-        // and up it resets to the static side column it has always been.
-        className={`nav-chrome fixed inset-x-0 bottom-0 z-40 flex max-h-[85vh]
-                    flex-col rounded-t-2xl px-4 pt-2 pb-3 shadow-2xl
-                    transition-transform duration-300 ease-out
-                    md:static md:z-auto md:max-h-none md:w-(--sidebar-width)
-                    md:shrink-0 md:rounded-none md:shadow-none md:transition-none
-                    ${navOpen ? "translate-y-0" : "translate-y-full"}
-                    md:translate-y-0`}
         aria-label="Library"
+        className={`shelf-sidebar scroll-slim fixed inset-y-0 left-0 z-40 flex
+                    w-72 flex-col overflow-y-auto px-3 pt-4 pb-4 shadow-2xl
+                    transition-transform duration-300 ease-out
+                    md:static md:z-auto md:w-64 md:shrink-0
+                    md:shadow-none md:transition-none
+                    ${navOpen ? "translate-x-0" : "-translate-x-full"}
+                    md:translate-x-0`}
       >
-        {/* The grabber, at the top of the sheet — a bottom-sheet convention,
-            and a second way to dismiss it. Sheet only. */}
-        <button
-          type="button"
-          onClick={onCloseNav}
-          aria-label="Close menu"
-          className="mx-auto mb-1 flex h-5 w-full items-center justify-center md:hidden"
-        >
-          <span className="h-1.5 w-10 rounded-full bg-current opacity-40" />
-        </button>
-
-      {/* The brand at the head of the sheet. Sheet only — on desktop the
-          wordmark lives in the top bar, and New book/Import sit here instead. */}
-      <div className="mb-2 flex items-center gap-2.5 px-1 md:hidden">
-        <span
-          aria-hidden="true"
-          className="h-6 w-6 bg-white"
-          style={{
-            maskImage: "url(/logo.png?v=2)",
-            WebkitMaskImage: "url(/logo.png?v=2)",
-            maskSize: "contain",
-            WebkitMaskSize: "contain",
-            maskRepeat: "no-repeat",
-            WebkitMaskRepeat: "no-repeat",
-            maskPosition: "center",
-            WebkitMaskPosition: "center",
-          }}
-        />
-        <span className="font-display text-lg font-medium tracking-tight text-white">
-          OpenChapter
-        </span>
-      </div>
-
-      {/* New book and Import live here on desktop; on the phone they move up to
-          the top bar, so they are hidden in the sheet. A link, not a button:
-          setting up a book is a place you go. */}
-      <Link
-        href="/book/new"
-        className="hidden w-full rounded-md bg-accent py-2.5 text-center
-                   font-sans text-base font-semibold text-white outline-none
-                   transition-colors hover:bg-accent-strong
-                   focus-visible:ring-2 focus-visible:ring-accent/60 md:block"
-      >
-        New book
-      </Link>
-
-      {/* Quieter than New book on purpose: most visits start something, and
-          importing is the once-per-manuscript path. Opens the import modal
-          rather than a page, so the shelf stays put behind it. */}
-      <button
-        type="button"
-        onClick={onImport}
-        className="mt-2 hidden w-full rounded-md border border-line py-2.5
-                   text-center font-sans text-base font-medium text-muted
-                   outline-none transition-colors hover:border-accent/60
-                   hover:bg-raised hover:text-fg focus-visible:ring-2
-                   focus-visible:ring-accent/60 md:block"
-      >
-        Import a book
-      </button>
-
-      <nav className="mt-2 flex flex-col gap-0.5 md:mt-4">
-        {(["active", "archived", "trashed"] as BookView[]).map((value) => (
+        {/* Brand, two-tone the way the reference sets its wordmark. */}
+        <div className="flex items-center justify-between gap-2 px-2">
+          <span className="font-display text-2xl font-semibold tracking-tight text-fg">
+            Open<span style={{ color: "#3a86d4" }}>Chapter</span>
+          </span>
+          {/* Closes the drawer on the phone; absent on desktop. */}
           <button
-            key={value}
             type="button"
-            onClick={() => onView(value)}
-            aria-current={view === value ? "page" : undefined}
-            className={`flex items-center justify-between gap-2 rounded-md px-3
-                        py-2.5 text-left font-sans text-base outline-none
-                        transition-colors focus-visible:ring-2
-                        focus-visible:ring-accent/60 ${
-                          view === value
-                            ? "bg-selected text-selected-fg"
-                            : "text-muted hover:bg-raised hover:text-fg"
-                        }`}
-          >
-            <span className="flex items-center gap-2.5">
-              {VIEW_ICON[value]}
-              {VIEW_LABEL[value]}
-            </span>
-            {counts[value] > 0 && (
-              <span className="shrink-0 text-sm tabular-nums opacity-70">
-                {counts[value]}
-              </span>
-            )}
-          </button>
-        ))}
-      </nav>
-
-      {/* A single line sets the views above apart from the tools below. */}
-      <div aria-hidden="true" className="my-2 h-px bg-line" />
-
-      {/* Sounds, help, support, and the theme toggle — the tools, under the
-          line, with Theme last. */}
-      <div className="flex flex-col gap-0.5">
-        <button
-          type="button"
-          onClick={onSounds}
-          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
-                     font-sans text-base text-muted outline-none transition-colors
-                     hover:bg-raised hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          <MaskIcon src="/icon-sounds.png" className="h-7 w-7" />
-          Sounds
-        </button>
-
-        <button
-          type="button"
-          onClick={onHelp}
-          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
-                     font-sans text-base text-muted outline-none transition-colors
-                     hover:bg-raised hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="h-6 w-7 shrink-0"
-          >
-            <circle cx="10" cy="10" r="7.5" />
-            <path
-              d="M8 7.9a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.4"
-              strokeLinecap="round"
-            />
-            <circle cx="10" cy="14.2" r="0.6" fill="currentColor" stroke="none" />
-          </svg>
-          Help
-        </button>
-
-        <button
-          type="button"
-          onClick={onSupport}
-          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
-                     font-sans text-base text-muted outline-none transition-colors
-                     hover:bg-raised hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="h-6 w-7 shrink-0"
-          >
-            <path
-              d="M4 4.5h12A1.5 1.5 0 0 1 17.5 6v6a1.5 1.5 0 0 1-1.5 1.5H8.5L5 16.5v-3H4A1.5 1.5 0 0 1 2.5 12V6A1.5 1.5 0 0 1 4 4.5z"
-              strokeLinejoin="round"
-            />
-          </svg>
-          Support
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setPref("theme", theme === "dark" ? "light" : "dark")}
-          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-          title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
-                     font-sans text-base text-muted outline-none transition-colors
-                     hover:bg-raised hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="h-6 w-7 shrink-0"
-          >
-            <circle cx="10" cy="10" r="7" />
-            {/* The right half, filled — the contrast mark. */}
-            <path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" />
-          </svg>
-          Theme
-        </button>
-
-        {/* Upgrade lives in the top bar on desktop; on the phone the bar has no
-            room for it, so it sits here in the menu instead. */}
-        <button
-          type="button"
-          onClick={onUpgrade}
-          className="flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left
-                     font-sans text-base text-muted outline-none transition-colors
-                     hover:bg-raised hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60 md:hidden"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-6 w-7 shrink-0"
-          >
-            <path d="M10 3.5 5 9h3v7.5h4V9h3z" />
-          </svg>
-          Upgrade
-        </button>
-      </div>
-
-      {/* The account, at the foot of the shelf. There is no sign-in yet — auth
-          has been left out on purpose — so this is a guest on the free tier
-          rather than a person; clicking it opens the plan note, which says as
-          much. Desktop only: the phone's sheet keeps to navigation. */}
-      <div className="mt-auto hidden border-t border-line pt-3 md:block">
-        <button
-          type="button"
-          onClick={onUpgrade}
-          aria-label="Your account and plan"
-          className="flex w-full items-center gap-3 rounded-lg px-2 py-2
-                     text-left outline-none transition-colors hover:bg-raised
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          <span
-            aria-hidden="true"
-            className="flex h-9 w-9 shrink-0 items-center justify-center
-                       rounded-full bg-accent text-white"
+            onClick={onCloseNav}
+            aria-label="Close menu"
+            className="-mr-1 rounded-md p-1.5 text-muted outline-none
+                       transition-colors hover:bg-raised hover:text-fg
+                       focus-visible:ring-2 focus-visible:ring-white/40 md:hidden"
           >
             <svg
+              aria-hidden="true"
               viewBox="0 0 20 20"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.5"
+              strokeWidth="1.6"
+              strokeLinecap="round"
               className="h-5 w-5"
             >
-              <circle cx="10" cy="7" r="3" />
-              <path d="M4.5 16a5.5 5.5 0 0 1 11 0" strokeLinecap="round" />
+              <path d="M5 5l10 10M15 5L5 15" />
             </svg>
-          </span>
+          </button>
+        </div>
 
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-sans text-sm font-medium text-fg">
-              Guest
-            </span>
-            <span className="block truncate font-sans text-xs text-muted">
-              Free plan
-            </span>
-          </span>
-
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="h-4 w-4 shrink-0 text-muted"
+        {/* The two shelf actions. New book leads; importing is the quieter,
+            once-per-manuscript path. */}
+        <div className="mt-5 flex flex-col gap-2">
+          <Link
+            href="/book/new"
+            className="flex items-center justify-center gap-2 rounded-xl bg-accent
+                       py-2.5 font-sans text-sm font-semibold text-white
+                       outline-none transition-colors hover:bg-accent-strong
+                       focus-visible:ring-2 focus-visible:ring-white/50"
           >
-            <path
-              d="m7 8 3-3 3 3M7 12l3 3 3-3"
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
               strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
+              className="h-4 w-4"
+            >
+              <path d="M10 4.5v11M4.5 10h11" />
+            </svg>
+            New book
+          </Link>
+          <button
+            type="button"
+            onClick={onImport}
+            className="flex items-center justify-center gap-2 rounded-xl border
+                       border-line py-2.5 font-sans text-sm font-medium text-muted
+                       outline-none transition-colors hover:bg-raised hover:text-fg
+                       focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            Import a book
+          </button>
+        </div>
+
+        {/* The library sections — the reference's primary nav, here switching the
+            shelf's view. Active is a lifted row with a bright edge marker. */}
+        <nav className="mt-6 flex flex-col gap-1">
+          <p className="px-3 pb-1 font-sans text-[0.7rem] font-medium tracking-wider text-muted/70 uppercase">
+            Library
+          </p>
+          {(["active", "archived", "trashed"] as BookView[]).map((value) => {
+            const current = view === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => onView(value)}
+                aria-current={current ? "page" : undefined}
+                className={`relative flex items-center justify-between gap-2
+                            rounded-xl px-3 py-3 text-left font-sans text-sm
+                            outline-none transition-colors focus-visible:ring-2
+                            focus-visible:ring-white/40 ${
+                              current
+                                ? "bg-selected font-medium text-selected-fg"
+                                : "text-muted hover:bg-raised hover:text-fg"
+                            }`}
+              >
+                {/* The active marker: a bright bar flush at the rail's edge and a
+                    brighter row, the way the reference marks Home — not a heavy
+                    filled tile. */}
+                {current && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-1/2 left-0 h-6 w-[3px] -translate-y-1/2 rounded-r-full bg-white"
+                  />
+                )}
+                <span className="flex items-center gap-3">
+                  {VIEW_ICON[value]}
+                  {VIEW_LABEL[value]}
+                </span>
+                {counts[value] > 0 && (
+                  <span className="shrink-0 text-xs tabular-nums opacity-70">
+                    {counts[value]}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* The tools, pinned to the foot the way the reference groups Settings /
+            Help away from the primary nav. */}
+        <div className="mt-auto flex flex-col gap-1 pt-6">
+          <div aria-hidden="true" className="mb-3 h-px bg-line" />
+          <ToolButton onClick={onSounds}>
+            <MaskIcon src="/icon-sounds.png" className="h-6 w-6" />
+            Sounds
+          </ToolButton>
+          <ToolButton onClick={onHelp}>
+            <HelpIcon />
+            Help
+          </ToolButton>
+          <ToolButton onClick={onSupport}>
+            <SupportIcon />
+            Support
+          </ToolButton>
+          <ToolButton
+            onClick={() =>
+              setPref("theme", theme === "dark" ? "light" : "dark")
+            }
+            label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+          >
+            <ThemeIcon />
+            Theme
+          </ToolButton>
+        </div>
       </aside>
     </>
   );
 }
 
+/** A tool row in the sidebar foot — one shape, so the four read as a set. */
+function ToolButton({
+  children,
+  onClick,
+  label,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  label?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex items-center gap-3 rounded-xl px-3 py-3 text-left
+                 font-sans text-sm text-muted outline-none transition-colors
+                 hover:bg-raised hover:text-fg focus-visible:ring-2
+                 focus-visible:ring-white/40"
+    >
+      {children}
+    </button>
+  );
+}
+
+function HelpIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-6 w-6 shrink-0"
+    >
+      <circle cx="10" cy="10" r="7.5" />
+      <path
+        d="M8 7.9a2 2 0 1 1 2.8 1.8c-.5.3-.8.7-.8 1.4"
+        strokeLinecap="round"
+      />
+      <circle cx="10" cy="14.2" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function SupportIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-6 w-6 shrink-0"
+    >
+      <path
+        d="M4 4.5h12A1.5 1.5 0 0 1 17.5 6v6a1.5 1.5 0 0 1-1.5 1.5H8.5L5 16.5v-3H4A1.5 1.5 0 0 1 2.5 12V6A1.5 1.5 0 0 1 4 4.5z"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ThemeIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-6 w-6 shrink-0"
+    >
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 3a7 7 0 0 1 0 14z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/**
+ * The search-and-account bar across the top of the content — the reference's
+ * light header. The search filters the shelf; the account chip opens the plan
+ * note (there is no sign-in yet, so it is a guest on the free tier, not a
+ * person). A menu button appears on the phone to reach the drawer.
+ */
+function ShelfTopBar({
+  query,
+  onQuery,
+  onToggleNav,
+  onTemplates,
+  onAccount,
+}: {
+  query: string;
+  onQuery: (value: string) => void;
+  onToggleNav: () => void;
+  onTemplates: () => void;
+  onAccount: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        type="button"
+        onClick={onToggleNav}
+        aria-label="Open menu"
+        className="shrink-0 rounded-lg border border-line bg-panel p-2.5 text-muted
+                   outline-none transition-colors hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/50 md:hidden"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          className="h-5 w-5"
+        >
+          <path d="M3 6h14M3 10h14M3 14h14" />
+        </svg>
+      </button>
+
+      <label className="relative min-w-0 flex-1">
+        <span className="sr-only">Search books</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          className="pointer-events-none absolute top-1/2 left-4 h-4 w-4
+                     -translate-y-1/2 text-muted"
+        >
+          <circle cx="9" cy="9" r="6" />
+          <path d="m13.5 13.5 3 3" strokeLinecap="round" />
+        </svg>
+        <input
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search a book"
+          className="w-full rounded-full border border-line bg-panel py-3 pr-4
+                     pl-11 font-sans text-sm text-fg placeholder:text-muted
+                     focus-visible:border-accent focus-visible:outline-none"
+        />
+      </label>
+
+      {/* Templates builds a book with its chapters laid out — a real "start a
+          book" path, kept reachable from the header where the old top nav had
+          it. Folds away on small screens, where the drawer carries creation. */}
+      <button
+        type="button"
+        onClick={onTemplates}
+        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
+                   font-medium text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/50 md:block"
+      >
+        Templates
+      </button>
+
+      <button
+        type="button"
+        onClick={onAccount}
+        aria-label="Your account and plan"
+        className="flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-2 pl-1
+                   text-left outline-none transition-colors hover:bg-raised
+                   focus-visible:ring-2 focus-visible:ring-accent/50"
+      >
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center
+                     rounded-full bg-accent text-sm font-semibold text-white"
+        >
+          G
+        </span>
+        <span className="hidden truncate font-sans text-sm font-medium text-fg sm:block">
+          Guest
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className="mr-1 h-4 w-4 shrink-0 text-muted"
+        >
+          <path d="m6 8 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The hero band — the reference's "most popular book this week" slot, turned to
+ * the one thing a writer actually wants on opening the app: the book they were
+ * writing, ready to resume, with the library's real figures beside it. No reader
+ * leaderboard and no invented chart — there are no readers and no such data.
+ */
+function Hero({
+  book,
+  href,
+  totalBooks,
+  totalWords,
+  onOpen,
+}: {
+  book: Book | null;
+  href: string | null;
+  totalBooks: number;
+  totalWords: number;
+  onOpen: (book: Book) => void;
+}) {
+  const cover = useCover(book?.id ?? "");
+
+  // Empty shelf: the hero becomes the welcome, not a blank frame.
+  if (!book || !href) {
+    return (
+      <section className="shelf-hero overflow-hidden rounded-3xl px-6 py-10 md:px-10 md:py-12">
+        <p className="font-sans text-xs font-medium tracking-widest text-accent uppercase">
+          Welcome
+        </p>
+        <h1 className="mt-3 max-w-xl font-display text-3xl leading-tight font-semibold text-fg md:text-4xl">
+          Start the book <span className="text-accent">only you</span> can write
+        </h1>
+        <p className="mt-3 max-w-md font-sans text-sm text-muted">
+          A calm, focused place to write your novel — chapter by chapter.
+        </p>
+        <Link
+          href="/book/new"
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-accent
+                     px-5 py-2.5 font-sans text-sm font-semibold text-white
+                     outline-none transition-colors hover:bg-accent-strong
+                     focus-visible:ring-2 focus-visible:ring-accent/50"
+        >
+          Start your first book
+        </Link>
+      </section>
+    );
+  }
+
+  const words = bookWordCount(book);
+  const chapters = book.chapters.length;
+
+  return (
+    <section className="shelf-hero overflow-hidden rounded-3xl px-6 py-7 md:px-10 md:py-9">
+      <div className="flex flex-col items-start gap-8 lg:flex-row lg:items-center lg:justify-between">
+        {/* The heading and the running total — the reference's left column. */}
+        <div className="min-w-0 flex-1">
+          <p className="font-sans text-xs font-medium tracking-widest text-accent uppercase">
+            Pick up where you left off
+          </p>
+          <h1 className="mt-3 font-display text-3xl leading-tight font-semibold text-fg md:text-4xl">
+            Keep writing
+            <br />
+            <span className="text-accent">your book</span>
+          </h1>
+          <p className="mt-4 inline-flex items-center gap-2 font-sans text-sm text-muted">
+            <span
+              aria-hidden="true"
+              className="flex h-6 w-6 items-center justify-center rounded-md bg-accent/12 text-accent"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="h-3.5 w-3.5"
+              >
+                <path
+                  d="M4 4.5h9A1.5 1.5 0 0 1 14.5 6v10l-3-2-3 2V6A1.5 1.5 0 0 1 10 4.5"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </span>
+            <span className="font-medium text-fg">
+              {totalWords.toLocaleString()}
+            </span>
+            words written across {totalBooks}{" "}
+            {totalBooks === 1 ? "book" : "books"}
+          </p>
+        </div>
+
+        {/* The featured cover — the reference's centre. */}
+        <Link
+          href={`/book/${book.id}`}
+          onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            onOpen(book);
+          }}
+          className="group block w-28 shrink-0 rounded-md outline-none
+                     focus-visible:ring-2 focus-visible:ring-accent/60
+                     focus-visible:ring-offset-4 focus-visible:ring-offset-panel
+                     md:w-32"
+        >
+          <BookCover
+            title={book.title}
+            subtitle={book.subtitle}
+            author={book.author}
+            words={words}
+            image={cover}
+            bare={book.bareCover}
+            seed={book.id}
+          />
+        </Link>
+
+        {/* The resume panel — real figures where the reference charts fake ones. */}
+        <div className="w-full rounded-2xl bg-panel/70 p-5 shadow-sm ring-1 ring-line/60 backdrop-blur-sm lg:w-72">
+          <p className="truncate font-display text-base font-semibold text-fg">
+            {book.title}
+          </p>
+          <p className="mt-0.5 truncate font-sans text-sm text-muted">
+            {book.subtitle || book.author || "Your manuscript"}
+          </p>
+
+          <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
+            <HeroStat label="Chapters" value={chapters.toLocaleString()} />
+            <HeroStat label="Words" value={words.toLocaleString()} />
+            <HeroStat label="Edited" value={relativeTimeShort(book.lastOpenedAt)} />
+          </dl>
+
+          <Link
+            href={href}
+            className="mt-4 flex items-center justify-center gap-2 rounded-full
+                       bg-accent py-2.5 font-sans text-sm font-semibold text-white
+                       outline-none transition-colors hover:bg-accent-strong
+                       focus-visible:ring-2 focus-visible:ring-accent/50"
+          >
+            Continue writing
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M4 10h11M11 6l4 4-4 4" />
+            </svg>
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function HeroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-surface/70 py-2">
+      <dd className="font-display text-sm font-semibold text-fg">{value}</dd>
+      <dt className="mt-0.5 font-sans text-[0.7rem] tracking-wide text-muted uppercase">
+        {label}
+      </dt>
+    </div>
+  );
+}
+
+/** relativeTime, trimmed to fit a stat cell ("3 days ago" → "3d"). The numeric
+ *  formatter also speaks in words at the edges ("yesterday", "last month"),
+ *  which are mapped here so the cell never carries a long phrase. */
+function relativeTimeShort(then: number): string {
+  const full = relativeTime(then);
+  const worded: Record<string, string> = {
+    "just now": "now",
+    yesterday: "1d",
+    "last week": "1w",
+    "last month": "1mo",
+    "last year": "1y",
+  };
+  if (worded[full]) return worded[full];
+  const m = full.match(/(\d+)\s*(second|minute|hour|day|week|month|year)/);
+  if (!m) return full;
+  const unit = m[2] === "month" ? "mo" : m[2][0];
+  return `${m[1]}${unit}`;
+}
+
+/**
+ * The sort control — the reference's "Filter" affordance, doing real work: it
+ * reorders the shelf by recency, title or length. A small popover rather than a
+ * native select, so it can carry the check on the chosen row and match the bar.
+ */
+function SortMenu({
+  value,
+  onChange,
+}: {
+  value: Sort;
+  onChange: (sort: Sort) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex items-center gap-2 rounded-full border border-line
+                   bg-panel py-2 pr-3 pl-4 font-sans text-sm text-muted
+                   outline-none transition-colors hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/50"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          className="h-4 w-4"
+        >
+          <path d="M4 6h12M6 10h8M8 14h4" />
+        </svg>
+        <span className="text-fg">{SORT_LABEL[value]}</span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          className="h-4 w-4"
+        >
+          <path d="m6 8 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-2 w-52 overflow-hidden rounded-xl
+                     border border-line bg-panel py-1 shadow-xl"
+        >
+          {(Object.keys(SORT_LABEL) as Sort[]).map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="menuitemradio"
+              aria-checked={value === key}
+              onClick={() => {
+                onChange(key);
+                setOpen(false);
+              }}
+              className={`flex w-full items-center justify-between gap-2 px-4 py-2.5
+                          text-left font-sans text-sm outline-none transition-colors
+                          hover:bg-raised focus-visible:bg-raised ${
+                            value === key ? "text-fg" : "text-muted"
+                          }`}
+            >
+              {SORT_LABEL[key]}
+              {value === key && (
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4 text-accent"
+                >
+                  <path d="m5 10 3.5 3.5L15 6" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Empty() {
   return (
-    <div className="mt-16 text-center">
-      <p className="font-serif text-lg text-fg">Nothing on the shelf yet.</p>
+    <div className="mt-6 rounded-2xl border border-dashed border-line bg-panel/50 py-16 text-center">
+      <p className="font-display text-lg font-medium text-fg">
+        Nothing on the shelf yet.
+      </p>
       <Link
         href="/book/new"
-        className="mt-4 inline-block rounded-md bg-accent px-4 py-2 font-sans
+        className="mt-4 inline-block rounded-full bg-accent px-5 py-2.5 font-sans
                    text-sm font-semibold text-white outline-none
                    transition-colors hover:bg-accent-strong
-                   focus-visible:ring-2 focus-visible:ring-accent/60"
+                   focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         Start your first book
       </Link>
@@ -757,16 +1032,10 @@ function Empty() {
 }
 
 /**
- * The shelf itself.
- *
- * A grid of covers rather than a table of rows. A table is the better shape for
- * comparing many books on one column — which is not what anybody does here.
- * They are looking for the one they were writing, and a spine is what they
- * recognise it by.
- *
- * The figures the table carried are not lost, only demoted: chapters, words and
- * when it was last opened sit under each cover, where they read as description
- * rather than as data to be scanned.
+ * The shelf itself — a grid of covers, the way the reference lays out its
+ * catalogue. Under each cover the figures read as description rather than as a
+ * table to scan: title, its byline, and the one number that means most here,
+ * the word count (where the reference prints a star rating it has and we do not).
  */
 function BookGrid({
   books,
@@ -791,7 +1060,7 @@ function BookGrid({
 }) {
   return (
     <ul
-      className="mt-8 grid gap-x-6 gap-y-8"
+      className="grid gap-x-5 gap-y-8"
       style={{
         gridTemplateColumns: "repeat(auto-fill, minmax(9.5rem, 1fr))",
       }}
@@ -844,6 +1113,8 @@ function BookCard({
 }) {
   const router = useRouter();
   const cover = useCover(book.id);
+  const words = bookWordCount(book);
+  const byline = book.subtitle || book.author;
 
   return (
     <li className="group relative">
@@ -859,13 +1130,13 @@ function BookCard({
         }}
         className="block rounded-md outline-none focus-visible:ring-2
                    focus-visible:ring-accent/60 focus-visible:ring-offset-4
-                   focus-visible:ring-offset-panel"
+                   focus-visible:ring-offset-surface"
       >
         <BookCover
           title={book.title}
           subtitle={book.subtitle}
           author={book.author}
-          words={bookWordCount(book)}
+          words={words}
           image={cover}
           bare={book.bareCover}
           seed={book.id}
@@ -943,20 +1214,23 @@ function BookCard({
 
       <div className="mt-3">
         <div className="flex items-baseline gap-2">
-          <p className="min-w-0 flex-1 truncate font-sans text-sm font-medium text-fg">
+          <p className="min-w-0 flex-1 truncate font-sans text-sm font-semibold text-fg">
             {book.title}
           </p>
           {book.id === continueId && (
-            <span className="shrink-0 rounded-full bg-accent-deep px-2 py-0.5 font-sans text-[0.6rem] tracking-wide text-white uppercase">
+            <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 font-sans text-[0.6rem] font-medium tracking-wide text-white uppercase">
               Continue
             </span>
           )}
         </div>
-        {book.subtitle ? (
+        {byline ? (
           <p className="mt-0.5 truncate font-sans text-xs text-muted">
-            {book.subtitle}
+            {byline}
           </p>
         ) : null}
+        <p className="mt-1 font-sans text-xs text-muted/80">
+          {words > 0 ? `${words.toLocaleString()} words` : "No words yet"}
+        </p>
       </div>
     </li>
   );

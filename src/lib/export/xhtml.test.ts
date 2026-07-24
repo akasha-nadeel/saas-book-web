@@ -47,6 +47,55 @@ it("renders emphasis", () => {
   ).toBe("<p><strong>a</strong><em>b</em><s>c</s><code>d</code><u>e</u></p>");
 });
 
+it("renders an inline font size as a styled span", () => {
+  expect(blocksToXhtml([p({ text: "big", fontSize: "1.5em" })])).toBe(
+    '<p><span style="font-size:1.5em">big</span></p>',
+  );
+});
+
+it("renders an image with its width and alignment", () => {
+  expect(
+    blocksToXhtml([
+      {
+        kind: "image",
+        depth: 0,
+        src: "data:x",
+        alt: "A boy",
+        imgWidth: "50%",
+        align: "right",
+        runs: [],
+      },
+    ]),
+  ).toBe(
+    '<p class="figure" style="text-align:right"><img src="data:x" alt="A boy" style="width:50%" /></p>',
+  );
+});
+
+it("renders a plain centred image with no extra styles", () => {
+  expect(
+    blocksToXhtml([{ kind: "image", depth: 0, src: "data:y", runs: [] }]),
+  ).toBe('<p class="figure"><img src="data:y" alt="" /></p>');
+});
+
+it("renders paragraph and heading alignment as an inline style", () => {
+  expect(
+    blocksToXhtml([
+      { kind: "paragraph", depth: 0, align: "center", runs: [{ text: "Mid." }] },
+    ]),
+  ).toBe('<p style="text-align:center">Mid.</p>');
+  expect(
+    blocksToXhtml([
+      {
+        kind: "heading",
+        depth: 0,
+        level: 2,
+        align: "right",
+        runs: [{ text: "End" }],
+      },
+    ]),
+  ).toBe('<h2 style="text-align:right">End</h2>');
+});
+
 it("renders a scene break as centred asterisks", () => {
   expect(blocksToXhtml([{ kind: "sceneBreak", depth: 0, runs: [] }])).toBe(
     '<p class="scene-break">* * *</p>',

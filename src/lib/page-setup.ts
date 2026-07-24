@@ -8,6 +8,7 @@
  */
 
 export type PageSize =
+  | "6x9"
   | "letter"
   | "tabloid"
   | "legal"
@@ -46,9 +47,11 @@ export interface PageSetup {
 }
 
 export const DEFAULT_PAGE: PageSetup = Object.freeze({
-  size: "letter",
+  // A novel's page: a 6×9 trim set with book margins. This is what a writer
+  // opening a blank book should see — a real printed page, not office Letter.
+  size: "6x9",
   orientation: "portrait",
-  margins: "normal",
+  margins: "mirrored",
   columns: 1,
   fit: true,
 });
@@ -58,6 +61,9 @@ export const PAGE_SIZES: Record<
   PageSize,
   { label: string; width: number; height: number }
 > = {
+  // The standard trade trim for a novel — the size most printed fiction is set
+  // at, and the app's default.
+  "6x9": { label: "6″ × 9″ — novel", width: 6, height: 9 },
   letter: { label: "Letter", width: 8.5, height: 11 },
   tabloid: { label: "Tabloid", width: 11, height: 17 },
   legal: { label: "Legal", width: 8.5, height: 14 },
@@ -77,10 +83,17 @@ export const MARGIN_PRESETS: Record<
   narrow: { label: "Narrow", top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 },
   moderate: { label: "Moderate", top: 1, bottom: 1, left: 0.75, right: 0.75 },
   wide: { label: "Wide", top: 1, bottom: 1, left: 2, right: 2 },
-  // Word's Mirrored is inside 1.25 / outside 1, which only differs between
-  // facing pages. This view is a continuous scroll with no verso, so it renders
-  // as the recto: inside on the left.
-  mirrored: { label: "Mirrored", top: 1, bottom: 1, left: 1.25, right: 1 },
+  // How a bound novel is actually set: a taller inside margin, because part of
+  // the page is lost into the spine, and a shorter outside one. The trade
+  // recommendation for a 6×9 book. With no verso in this continuous view it
+  // renders as the recto — inside on the left.
+  mirrored: {
+    label: "Book (mirrored)",
+    top: 0.75,
+    bottom: 0.8,
+    left: 0.9,
+    right: 0.65,
+  },
 };
 
 export interface PageMetrics {

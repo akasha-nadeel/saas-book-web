@@ -5,7 +5,49 @@ import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { PageMenu } from "@/components/editor/page-menu";
 import { ACCEPTED, importImage } from "@/lib/image-import";
-import { setPref, type Book, type PaperColor } from "@/lib/library-store";
+import {
+  setPref,
+  setTypography,
+  typographyOf,
+  type Book,
+  type PaperColor,
+} from "@/lib/library-store";
+import {
+  FONTS,
+  INDENTS,
+  LEADINGS,
+  PARA_SPACINGS,
+  TEXT_SIZES,
+} from "@/lib/typography";
+import type { TextAlignValue } from "@/lib/editor/text-align";
+
+/** The four alignments, each with a small icon of ruled lines. */
+const ALIGN_OPTIONS: {
+  value: TextAlignValue;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { value: "left", label: "Align left", icon: alignIcon("M3.5 5h13M3.5 9h8M3.5 13h13M3.5 17h8") },
+  { value: "center", label: "Align centre", icon: alignIcon("M3.5 5h13M6 9h8M3.5 13h13M6 17h8") },
+  { value: "right", label: "Align right", icon: alignIcon("M3.5 5h13M8.5 9h8M3.5 13h13M8.5 17h8") },
+  { value: "justify", label: "Justify", icon: alignIcon("M3.5 5h13M3.5 9h13M3.5 13h13M3.5 17h13") },
+];
+
+function alignIcon(d: string) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      className="h-4 w-4"
+    >
+      <path d={d} />
+    </svg>
+  );
+}
 
 /**
  * The formatting tools, as a column in the right rail.
@@ -97,6 +139,31 @@ const Icon = ({ children }: { children: React.ReactNode }) => (
   </svg>
 );
 
+/** A labelled row in the Aa flyout: a name on the left, its control on the
+ *  right. Every typography control is one row, so the panel stays a single
+ *  narrow column with no sideways overflow. */
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[5.5rem] shrink-0 font-sans text-[0.62rem] tracking-wide text-muted uppercase">
+        {label}
+      </span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
+const SELECT_CLASS = `w-full cursor-pointer truncate rounded-md border
+  border-line bg-raised px-2 py-1.5 font-sans text-xs text-fg outline-none
+  transition-colors hover:border-muted focus-visible:ring-2
+  focus-visible:ring-accent/60`;
+
 /**
  * A rail button whose tools fly out beside it.
  *
@@ -160,18 +227,25 @@ function Flyout({
         setOpen(false);
       }
     };
-    // A fixed position taken from a rect goes stale the moment anything moves.
-    const onMove = () => setOpen(false);
+    // A fixed position taken from a rect goes stale the moment the page moves,
+    // so the panel closes on resize or an outside scroll. But the panel itself
+    // scrolls now, and scrolling *inside* it must not dismiss it — its fixed
+    // position does not change, so those events are ignored.
+    const onResize = () => setOpen(false);
+    const onScroll = (e: Event) => {
+      if (panelRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
 
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
-    window.addEventListener("resize", onMove);
-    document.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onResize);
+    document.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointer);
-      window.removeEventListener("resize", onMove);
-      document.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -254,7 +328,16 @@ export function ToolRail({
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
+  // The book's body typography — changed live from the Aa flyout below.
+  const type = typographyOf(book);
+
   if (!editor) return null;
+
+  // The selected block's own alignment, or the book default when it has none —
+  // so the alignment buttons show what the paragraph is actually set to.
+  const blockAlign = (editor.getAttributes("paragraph").textAlign ??
+    editor.getAttributes("heading").textAlign) as TextAlignValue | undefined;
+  const activeAlign: TextAlignValue = blockAlign ?? type.align;
 
   const promptForLink = () => {
     const previous = editor.getAttributes("link").href as string | undefined;
@@ -276,103 +359,239 @@ export function ToolRail({
       className="flex flex-col items-center gap-1"
     >
       <Flyout
-        label="Text formatting"
+        label="Text & type"
         trigger={<span className="font-serif text-lg">Aa</span>}
       >
-        <div className="flex gap-1">
-          {([1, 2, 3] as const).map((level) => (
+        <div className="flex max-h-[78vh] w-64 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-0.5">
+          <div className="flex gap-1">
+            {/* Normal text — turns a heading back into body prose. Its own
+                button so a paragraph accidentally made a heading is one click to
+                fix, rather than guessing which H toggles it off. */}
             <ToolButton
-              key={level}
-              label={`Heading ${level}`}
-              active={editor.isActive("heading", { level })}
-              onClick={() =>
-                editor.chain().focus().toggleHeading({ level }).run()
-              }
+              label="Normal text"
+              active={editor.isActive("paragraph")}
+              onClick={() => editor.chain().focus().setParagraph().run()}
             >
-              <span className="font-serif text-sm">H{level}</span>
+              <span className="font-serif text-sm">¶</span>
             </ToolButton>
-          ))}
-        </div>
+            {([1, 2, 3] as const).map((level) => (
+              <ToolButton
+                key={level}
+                label={`Heading ${level}`}
+                active={editor.isActive("heading", { level })}
+                onClick={() =>
+                  editor.chain().focus().toggleHeading({ level }).run()
+                }
+              >
+                <span className="font-serif text-sm">H{level}</span>
+              </ToolButton>
+            ))}
+          </div>
 
-        <span aria-hidden="true" className="h-px w-full bg-line" />
+          <div className="flex gap-1">
+            <ToolButton
+              label="Bold"
+              shortcut="Ctrl+B"
+              active={editor.isActive("bold")}
+              onClick={() => editor.chain().focus().toggleBold().run()}
+            >
+              <span className="font-bold">B</span>
+            </ToolButton>
+            <ToolButton
+              label="Italic"
+              shortcut="Ctrl+I"
+              active={editor.isActive("italic")}
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+            >
+              <span className="font-serif italic">I</span>
+            </ToolButton>
+            <ToolButton
+              label="Underline"
+              shortcut="Ctrl+U"
+              active={editor.isActive("underline")}
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+            >
+              <span className="underline">U</span>
+            </ToolButton>
+            <ToolButton
+              label="Strikethrough"
+              active={editor.isActive("strike")}
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+            >
+              <span className="line-through">S</span>
+            </ToolButton>
+            <ToolButton
+              label="Inline code"
+              active={editor.isActive("code")}
+              onClick={() => editor.chain().focus().toggleCode().run()}
+            >
+              <span className="font-mono text-xs">{"</>"}</span>
+            </ToolButton>
+            <ToolButton
+              label="Link"
+              active={editor.isActive("link")}
+              onClick={promptForLink}
+            >
+              <Icon>
+                <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
+                <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
+              </Icon>
+            </ToolButton>
+          </div>
 
-        <div className="flex gap-1">
-          <ToolButton
-            label="Bold"
-            shortcut="Ctrl+B"
-            active={editor.isActive("bold")}
-            onClick={() => editor.chain().focus().toggleBold().run()}
-          >
-            <span className="font-bold">B</span>
-          </ToolButton>
-          <ToolButton
-            label="Italic"
-            shortcut="Ctrl+I"
-            active={editor.isActive("italic")}
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-          >
-            <span className="font-serif italic">I</span>
-          </ToolButton>
-          <ToolButton
-            label="Underline"
-            shortcut="Ctrl+U"
-            active={editor.isActive("underline")}
-            onClick={() => editor.chain().focus().toggleUnderline().run()}
-          >
-            <span className="underline">U</span>
-          </ToolButton>
-          <ToolButton
-            label="Strikethrough"
-            active={editor.isActive("strike")}
-            onClick={() => editor.chain().focus().toggleStrike().run()}
-          >
-            <span className="line-through">S</span>
-          </ToolButton>
-          <ToolButton
-            label="Inline code"
-            active={editor.isActive("code")}
-            onClick={() => editor.chain().focus().toggleCode().run()}
-          >
-            <span className="font-mono text-xs">{"</>"}</span>
-          </ToolButton>
-          <ToolButton
-            label="Link"
-            active={editor.isActive("link")}
-            onClick={promptForLink}
-          >
-            <Icon>
-              <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
-              <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
-            </Icon>
-          </ToolButton>
-        </div>
+          <span aria-hidden="true" className="h-px w-full bg-line" />
 
-        <span aria-hidden="true" className="h-px w-full bg-line" />
+          {/* Body typography — the whole manuscript's face, size and spacing,
+              each a compact dropdown so the panel stays one narrow column. These
+              write to the book, so the writing surface and the export change
+              together. Page geometry stays in the ▤ menu. */}
+          <div className="flex flex-col gap-2">
+            <Field label="Font">
+              <select
+                aria-label="Font"
+                value={type.font}
+                onChange={(e) =>
+                  setTypography(book.id, { font: e.target.value })
+                }
+                className={SELECT_CLASS}
+              >
+                {FONTS.map((f) => (
+                  <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
 
-        <div
-          role="radiogroup"
-          aria-label="Page colour"
-          className="flex items-center justify-center gap-1.5 py-1"
-        >
-          {PAPERS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              role="radio"
-              aria-checked={p.value === paper}
-              aria-label={p.label}
-              title={`Page colour: ${p.label}`}
-              onClick={() => setPref("paper", p.value)}
-              className={`h-5 w-5 rounded-full border-2 outline-none
-                          transition-colors focus-visible:ring-2
-                          focus-visible:ring-accent/60 ${
-                            p.value === paper
-                              ? "border-accent"
-                              : "border-line hover:border-muted"
-                          }`}
-              style={{ background: p.swatch }}
-            />
-          ))}
+            <Field label="Size (pt)">
+              <select
+                aria-label="Text size in points"
+                value={String(type.sizePt)}
+                onChange={(e) =>
+                  setTypography(book.id, { sizePt: Number(e.target.value) })
+                }
+                className={SELECT_CLASS}
+              >
+                {TEXT_SIZES.map((s) => (
+                  <option key={s} value={String(s)}>
+                    {s} pt
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Alignment">
+              {/* Per paragraph, applied to the selection — not the whole book.
+                  The book's default (type.align) shows as active on a paragraph
+                  that has no alignment of its own. */}
+              <div className="flex gap-1">
+                {ALIGN_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-label={option.label}
+                    aria-pressed={activeAlign === option.value}
+                    title={option.label}
+                    onClick={() =>
+                      editor.chain().focus().setTextAlign(option.value).run()
+                    }
+                    className={`flex h-8 flex-1 items-center justify-center
+                                rounded-md outline-none transition-colors
+                                focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                  activeAlign === option.value
+                                    ? "bg-accent text-white"
+                                    : "text-fg hover:bg-raised"
+                                }`}
+                  >
+                    {option.icon}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            <Field label="Line spacing">
+              <select
+                aria-label="Line spacing"
+                value={String(type.leading)}
+                onChange={(e) =>
+                  setTypography(book.id, { leading: Number(e.target.value) })
+                }
+                className={SELECT_CLASS}
+              >
+                {LEADINGS.map((l) => (
+                  <option key={l.value} value={String(l.value)}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Indent">
+              <select
+                aria-label="First-line indent"
+                value={String(type.indentIn)}
+                onChange={(e) =>
+                  setTypography(book.id, { indentIn: Number(e.target.value) })
+                }
+                className={SELECT_CLASS}
+              >
+                {INDENTS.map((i) => (
+                  <option key={i.value} value={String(i.value)}>
+                    {i.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Para space">
+              <select
+                aria-label="Paragraph spacing"
+                value={String(type.paraSpacingPt)}
+                onChange={(e) =>
+                  setTypography(book.id, {
+                    paraSpacingPt: Number(e.target.value),
+                  })
+                }
+                className={SELECT_CLASS}
+              >
+                {PARA_SPACINGS.map((s) => (
+                  <option key={s.value} value={String(s.value)}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+
+          <span aria-hidden="true" className="h-px w-full bg-line" />
+
+          <Field label="Page colour">
+            <div
+              role="radiogroup"
+              aria-label="Page colour"
+              className="flex items-center gap-1.5"
+            >
+              {PAPERS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={p.value === paper}
+                  aria-label={p.label}
+                  title={`Page colour: ${p.label}`}
+                  onClick={() => setPref("paper", p.value)}
+                  className={`h-5 w-5 rounded-full border-2 outline-none
+                              transition-colors focus-visible:ring-2
+                              focus-visible:ring-accent/60 ${
+                                p.value === paper
+                                  ? "border-accent"
+                                  : "border-line hover:border-muted"
+                              }`}
+                  style={{ background: p.swatch }}
+                />
+              ))}
+            </div>
+          </Field>
         </div>
       </Flyout>
 

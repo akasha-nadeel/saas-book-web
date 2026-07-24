@@ -22,6 +22,7 @@
 
 import type { BookKind } from "./book-kinds";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
+import { DEFAULT_TYPOGRAPHY, type Typography } from "./typography";
 
 const SHELF_KEY = "openchapter:shelf";
 const BODY_PREFIX = "openchapter:chapter:";
@@ -47,6 +48,12 @@ export interface ChapterMeta {
   bookmarked?: true;
   /** Front or back matter. Absent means a body chapter — see ChapterMatter. */
   matter?: "front" | "back";
+  /**
+   * Marks the one front-matter or back-matter page. "front" on the single front
+   * page, "back" on the single back page; absent on body chapters. Lets the
+   * sidebar find the template page and open it rather than adding a second copy.
+   */
+  matterKey?: "front" | "back";
 }
 
 /** A chapter's part, with the body default applied. */
@@ -55,6 +62,40 @@ export function chapterMatterOf(chapter: ChapterMeta): ChapterMatter {
 }
 
 const MATTER_RANK: Record<ChapterMatter, number> = { front: 0, body: 1, back: 2 };
+
+/**
+ * The sections that make up each matter template.
+ *
+ * Front matter opens a book; back matter closes it. Rather than list these as
+ * separate pages, OpenChapter puts each part on one page whose template already
+ * carries every section as a heading — the writer fills in under the ones they
+ * want and deletes the rest. These are the standard divisions of a printed book.
+ */
+export const MATTER_SECTIONS: Record<"front" | "back", readonly string[]> = {
+  front: [
+    "Half-title page",
+    "Title page",
+    "Copyright page",
+    "Dedication",
+    "Epigraph",
+    "Table of contents",
+    "Preface or introduction",
+    "Prologue",
+  ],
+  back: [
+    "Epilogue",
+    "Acknowledgements",
+    "About the author",
+    "About the book",
+    "Other books by the author",
+  ],
+};
+
+/** The page title shown for each matter part. */
+export const MATTER_TITLE: Record<"front" | "back", string> = {
+  front: "Front matter",
+  back: "Back matter",
+};
 
 /**
  * The book's chapters in reading order: front matter, then the body, then back
@@ -81,6 +122,50 @@ export function chapterNumberOf(book: Book, chapterId: string): number | null {
     if (chapter.id === chapterId) return n;
   }
   return null;
+}
+
+const CARDINALS = [
+  "",
+  "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+  "Eighteen", "Nineteen", "Twenty",
+];
+const TENS = [
+  "", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty",
+  "Ninety",
+];
+
+/** A number spelled out ("Five", "Twenty-One"), the way a book prints a chapter
+ *  number. Past 99 the digits are returned — spelled that far reads worse. */
+export function spellNumber(n: number): string {
+  if (!Number.isInteger(n) || n < 1 || n > 99) return String(n);
+  if (n <= 20) return CARDINALS[n];
+  const tens = Math.floor(n / 10);
+  const ones = n % 10;
+  return ones === 0 ? TENS[tens] : `${TENS[tens]}-${CARDINALS[ones]}`;
+}
+
+/** "Chapter Five" — a body chapter's number as a printed page labels it. */
+export function chapterLabel(n: number): string {
+  return `Chapter ${spellNumber(n)}`;
+}
+
+// The auto-generated titles a writer never replaced — "Chapter 7", "Chapter
+// Seven". Both the digit form (nextChapterTitle) and the spelled form
+// (ensureChapter's "Chapter One") are treated as generic.
+const GENERIC_TITLES = new Set<string>();
+for (let i = 1; i <= 99; i += 1) {
+  GENERIC_TITLES.add(`chapter ${i}`);
+  GENERIC_TITLES.add(chapterLabel(i).toLowerCase());
+}
+
+/**
+ * Whether a chapter's title is just its number, so the opener should not print
+ * the number twice — a chapter still called "Chapter 7" needs no "Chapter Seven"
+ * label above it, but one named "The Last Light" does.
+ */
+export function isGenericChapterTitle(title: string): boolean {
+  return GENERIC_TITLES.has(title.trim().toLowerCase().replace(/\s+/g, " "));
 }
 
 /**
@@ -141,6 +226,8 @@ export interface Book {
   targetWords?: number;
   /** Page geometry. Absent means the default — see pageSetupOf. */
   page?: PageSetup;
+  /** Body-text typography. Absent means the default — see typographyOf. */
+  typography?: Typography;
   /** Set aside but kept. Epoch ms. */
   archivedAt?: number;
   /** Deleted but recoverable. Epoch ms. Wins over archivedAt. */
@@ -541,6 +628,81 @@ export function createChapter(bookId: string, title?: string): string {
     ],
     lastOpenedId: id,
   }));
+  return id;
+}
+
+/**
+ * A Tiptap document seeded from a matter part's standard sections: each becomes
+ * a heading with an empty paragraph beneath it, ready to write into. Built here
+ * so the store owns the one definition of what the template contains. Typed just
+ * enough to build it — the editor reads it back as Tiptap's own JSONContent.
+ */
+type TemplateNode = {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: TemplateNode[];
+  text?: string;
+};
+
+function matterTemplateDoc(matter: "front" | "back"): TemplateNode {
+  const content: TemplateNode[] = [];
+  for (const title of MATTER_SECTIONS[matter]) {
+    content.push({
+      type: "heading",
+      attrs: { level: 2 },
+      content: [{ type: "text", text: title }],
+    });
+    content.push({ type: "paragraph" });
+  }
+  return { type: "doc", content };
+}
+
+/**
+ * Open a book's front-matter or back-matter page, creating it the first time.
+ *
+ * There is one front page and one back page per book. If it does not exist yet,
+ * it is created with its template body already in place — every standard section
+ * as a heading — so the writer starts from the shape of a real book's matter and
+ * fills it in. A second click, or another tab, returns the same page rather than
+ * a duplicate. Returns null only if the body cannot be stored.
+ */
+export function createMatterSection(
+  bookId: string,
+  matter: "front" | "back",
+): string | null {
+  const existing = findBook(getShelf(), bookId)?.chapters.find(
+    (c) => c.matterKey === matter,
+  );
+  if (existing) return existing.id;
+
+  const id = newId();
+  // The body is written before the shelf entry, so the page never appears in the
+  // list pointing at a template that is not there.
+  try {
+    window.localStorage.setItem(
+      bodyKey(id),
+      JSON.stringify(matterTemplateDoc(matter)),
+    );
+  } catch (err) {
+    console.error("[store] could not seed matter template", err);
+    return null;
+  }
+
+  commitBook(bookId, (book) => {
+    const chapter: ChapterMeta = {
+      id,
+      title: MATTER_TITLE[matter],
+      words: 0,
+      matter,
+      matterKey: matter,
+    };
+    // Regroup front → body → back so the stored array stays in reading order,
+    // as setChapterMatter does — the sidebar and export both read it that way.
+    const grouped = [...book.chapters, chapter].sort(
+      (a, b) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(b)],
+    );
+    return { ...book, chapters: grouped, lastOpenedId: id };
+  });
   return id;
 }
 
@@ -1215,6 +1377,17 @@ export function setPageSetup(bookId: string, patch: Partial<PageSetup>) {
   commitBook(bookId, (book) => ({
     ...book,
     page: { ...pageSetupOf(book), ...patch },
+  }));
+}
+
+export function typographyOf(book: Book): Typography {
+  return { ...DEFAULT_TYPOGRAPHY, ...(book.typography ?? {}) };
+}
+
+export function setTypography(bookId: string, patch: Partial<Typography>) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    typography: { ...typographyOf(book), ...patch },
   }));
 }
 

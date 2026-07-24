@@ -32,6 +32,8 @@ export interface Run {
   /** Set on a run produced by a hardBreak, whose text is a bare newline. */
   hardBreak?: true;
   href?: string;
+  /** An inline font size, as a CSS length (e.g. "1.3em"). See lib/editor/font-size. */
+  fontSize?: string;
 }
 
 /**
@@ -53,11 +55,15 @@ export interface Block {
   depth: number;
   /** Heading level 1-3. Only set on headings. */
   level?: number;
+  /** Per-paragraph alignment, when set away from the book default. */
+  align?: "left" | "center" | "right" | "justify";
   /** Only set on code blocks, when the editor recorded one. */
   language?: string;
   /** Only set on images. A data URL — see lib/image-import. */
   src?: string;
   alt?: string;
+  /** Image width as a CSS length (e.g. "50%"), when the writer sized it. */
+  imgWidth?: string;
   runs: Run[];
 }
 
@@ -92,6 +98,14 @@ function runsFrom(content: JSONContent[] | undefined): Run[] {
         case "link":
           if (typeof mark.attrs?.href === "string") run.href = mark.attrs.href;
           break;
+        case "fontSize":
+          // The mark stores a multiple of the body size; render it the same way
+          // the editor does. Kept inline rather than importing the editor module
+          // so the export layer stays free of it.
+          if (typeof mark.attrs?.size === "number") {
+            run.fontSize = `calc(var(--ms-size, 1em) * ${mark.attrs.size})`;
+          }
+          break;
       }
     }
     runs.push(run);
@@ -100,11 +114,27 @@ function runsFrom(content: JSONContent[] | undefined): Run[] {
   return runs;
 }
 
+// Node alignment as a Block field, when set to one of the four known values.
+function alignOf(node: JSONContent): Pick<Block, "align"> {
+  const align = node.attrs?.textAlign;
+  return align === "left" ||
+    align === "center" ||
+    align === "right" ||
+    align === "justify"
+    ? { align }
+    : {};
+}
+
 function walk(nodes: JSONContent[], depth: number, out: Block[]) {
   for (const node of nodes) {
     switch (node.type) {
       case "paragraph":
-        out.push({ kind: "paragraph", depth, runs: runsFrom(node.content) });
+        out.push({
+          kind: "paragraph",
+          depth,
+          runs: runsFrom(node.content),
+          ...alignOf(node),
+        });
         break;
 
       case "heading":
@@ -113,6 +143,7 @@ function walk(nodes: JSONContent[], depth: number, out: Block[]) {
           depth,
           level: Number(node.attrs?.level ?? 1),
           runs: runsFrom(node.content),
+          ...alignOf(node),
         });
         break;
 
@@ -158,11 +189,15 @@ function walk(nodes: JSONContent[], depth: number, out: Block[]) {
         // render as a broken picture in every export format.
         if (typeof src === "string" && src) {
           const alt = node.attrs?.alt;
+          const align = node.attrs?.align;
+          const imgWidth = node.attrs?.width;
           out.push({
             kind: "image",
             depth,
             src,
             ...(typeof alt === "string" && alt ? { alt } : {}),
+            ...(align === "left" || align === "right" ? { align } : {}),
+            ...(typeof imgWidth === "string" && imgWidth ? { imgWidth } : {}),
             runs: [],
           });
         }

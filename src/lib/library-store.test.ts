@@ -7,11 +7,17 @@ import {
   createBook,
   chapterNumberOf,
   createBookFromImport,
+  chapterLabel,
   createBookFromTemplate,
   createChapter,
+  createMatterSection,
   deleteChapterForever,
+  getBody,
+  isGenericChapterTitle,
+  MATTER_SECTIONS,
   orderedChapters,
   setChapterMatter,
+  spellNumber,
   importIntoBook,
   restoreChapter,
   trashedChapters,
@@ -37,6 +43,8 @@ import {
   saveNotes,
   setBookAuthor,
   setPageSetup,
+  setTypography,
+  typographyOf,
   setPref,
   touchLastOpened,
   trashBook,
@@ -44,6 +52,7 @@ import {
   touchLastOpenedBook,
   type Book,
 } from "@/lib/library-store";
+import { DEFAULT_TYPOGRAPHY } from "@/lib/typography";
 
 beforeEach(() => {
   localStorage.clear();
@@ -743,9 +752,9 @@ it("gives a book a default page setup without storing one", () => {
   // books need no migration.
   expect(book.page).toBeUndefined();
   expect(pageSetupOf(book)).toEqual({
-    size: "letter",
+    size: "6x9",
     orientation: "portrait",
-    margins: "normal",
+    margins: "mirrored",
     columns: 1,
     fit: true,
   });
@@ -761,7 +770,7 @@ it("patches one page setting without disturbing the rest", () => {
   expect(pageSetupOf(book)).toEqual({
     size: "a4",
     orientation: "landscape",
-    margins: "normal",
+    margins: "mirrored",
     columns: 1,
     fit: true,
   });
@@ -774,7 +783,28 @@ it("keeps page setup per book", () => {
   setPageSetup(a.bookId, { size: "a5", columns: 2 });
 
   expect(pageSetupOf(findBook(getShelf(), a.bookId)!).size).toBe("a5");
-  expect(pageSetupOf(findBook(getShelf(), b.bookId)!).size).toBe("letter");
+  expect(pageSetupOf(findBook(getShelf(), b.bookId)!).size).toBe("6x9");
+});
+
+it("gives a book default typography without storing one", () => {
+  const { bookId } = createBook();
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.typography).toBeUndefined();
+  expect(typographyOf(book)).toEqual(DEFAULT_TYPOGRAPHY);
+});
+
+it("patches one typography setting without disturbing the rest", () => {
+  const { bookId } = createBook();
+
+  setTypography(bookId, { font: "georgia" });
+  setTypography(bookId, { sizePt: 11 });
+
+  const type = typographyOf(findBook(getShelf(), bookId)!);
+  expect(type.font).toBe("georgia");
+  expect(type.sizePt).toBe(11);
+  // The untouched fields keep the defaults.
+  expect(type.align).toBe(DEFAULT_TYPOGRAPHY.align);
+  expect(type.leading).toBe(DEFAULT_TYPOGRAPHY.leading);
 });
 
 it("creates a book from a template's chapter list", () => {
@@ -1152,6 +1182,25 @@ it("groups chapters front, body, back in reading order", () => {
   ]);
 });
 
+it("spells a chapter's number the way a book labels it", () => {
+  expect(spellNumber(1)).toBe("One");
+  expect(spellNumber(15)).toBe("Fifteen");
+  expect(spellNumber(21)).toBe("Twenty-One");
+  expect(chapterLabel(5)).toBe("Chapter Five");
+  // Beyond spelling range, the digits stand.
+  expect(spellNumber(140)).toBe("140");
+});
+
+it("treats an unrenamed chapter title as generic, a real name as not", () => {
+  // Both the digit and spelled auto-names count as generic, so the opener does
+  // not print the number twice.
+  expect(isGenericChapterTitle("Chapter 7")).toBe(true);
+  expect(isGenericChapterTitle("Chapter Seven")).toBe(true);
+  expect(isGenericChapterTitle("chapter  7")).toBe(true);
+  expect(isGenericChapterTitle("The Last Light")).toBe(false);
+  expect(isGenericChapterTitle("Chapter of Secrets")).toBe(false);
+});
+
 it("numbers only body chapters, never front or back matter", () => {
   const { bookId, chapterId } = createBook();
   const front = createChapter(bookId, "Title page");
@@ -1192,4 +1241,49 @@ it("moves a chapter back to the body, dropping the tag", () => {
   const meta = findBook(getShelf(), bookId)!.chapters.find((x) => x.id === c)!;
   // Absent rather than "body", so a plain book carries no matter field at all.
   expect("matter" in meta).toBe(false);
+});
+
+it("creates a front-matter page seeded with the template sections", () => {
+  const { bookId } = createBook();
+  const id = createMatterSection(bookId, "front");
+  expect(id).not.toBeNull();
+
+  const meta = findBook(getShelf(), bookId)!.chapters.find((c) => c.id === id)!;
+  expect(meta.matter).toBe("front");
+  expect(meta.matterKey).toBe("front");
+  expect(meta.title).toBe("Front matter");
+
+  // The body carries every front section as a heading, in order.
+  const body = getBody(id!)!;
+  for (const section of MATTER_SECTIONS.front) {
+    expect(body).toContain(section);
+  }
+});
+
+it("orders a front page before the body and a back page after it", () => {
+  const { bookId, chapterId } = createBook();
+  const back = createMatterSection(bookId, "back");
+  const front = createMatterSection(bookId, "front");
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(orderedChapters(book).map((c) => c.id)).toEqual([
+    front,
+    chapterId,
+    back,
+  ]);
+  // A matter page is never numbered; the body chapter is Chapter 1.
+  expect(chapterNumberOf(book, front!)).toBeNull();
+  expect(chapterNumberOf(book, back!)).toBeNull();
+  expect(chapterNumberOf(book, chapterId)).toBe(1);
+});
+
+it("returns the same matter page rather than a second copy", () => {
+  const { bookId } = createBook();
+  const first = createMatterSection(bookId, "front");
+  const again = createMatterSection(bookId, "front");
+  expect(again).toBe(first);
+  expect(
+    findBook(getShelf(), bookId)!.chapters.filter((c) => c.matter === "front")
+      .length,
+  ).toBe(1);
 });

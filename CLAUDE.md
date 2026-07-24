@@ -43,14 +43,19 @@ React bindings, with nothing else changing. Keep that boundary intact.
 
 **The store is split by write-cost, not by type:**
 - **shelf** (`openchapter:shelf`) — one document holding every book with its
-  chapter list (ids, titles, order, denormalised word counts). One doc so a
-  reorder commits atomically. Parsed on every read by every screen.
+  chapter list (ids, titles, order, denormalised word counts) plus each book's
+  per-book settings: page setup, body typography, the front/back-matter tag and
+  bookmark flag per chapter, and the trash list. One doc so a reorder commits
+  atomically. Parsed on every read by every screen.
 - **bodies** (`openchapter:chapter:<id>`) — one Tiptap JSON document per chapter,
   each at its own key, so opening a 40-chapter book parses no prose.
 - **covers**, **notes**, **prefs** — likewise at their own keys, for the same
   reason: unbounded data that must not ride along in every shelf write.
 
 Book/chapter totals are summed on read, never stored, so they can't drift.
+Deleting a chapter is a soft delete: its meta moves to the book's `trash` list in
+the shelf, but its body and notes stay at their own keys until the trash is
+emptied, so a restore is lossless.
 
 **React binds via `src/lib/use-library.ts`** — kept apart from the store so the
 store stays React-free. It uses `useSyncExternalStore` with empty server
@@ -62,15 +67,30 @@ stable (see the frozen `EMPTY_SHELF`) or the store loops.
 **The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. The surface
 is keyed on `${chapterId}:${storedText}` so a save from another tab reloads it
 instead of leaving it stale. Autosave is `src/lib/use-autosave.ts`; body is
-written before word count (a stale count is cosmetic, lost prose is not).
+written before word count (a stale count is cosmetic, lost prose is not). Custom
+Tiptap extensions live in `src/lib/editor/` (font size, text align, blockquote,
+resizable images). The one to understand is `pagination.ts`: it sets the
+manuscript on real page sheets by *measuring* the rendered blocks and inserting
+spacer **decorations** at each page break — never document content, so undo,
+autosave and export see the same text. Inline images are a resizable node
+(`resizable-image.ts` + `image-node-view.tsx`) that stores width as a percentage
+of the column; `src/lib/image-import.ts` handles paste/drop, capped at 900KB.
 
-**Import and export share a format-neutral block IR** (`Block`/`Run` in
-`src/lib/export/blocks.ts`). A Tiptap doc is walked once into blocks, then each
-renderer consumes them — the tricky parts (marks, nesting, hard breaks) live in
-one tested place. Heavy libraries (`docx`, `jszip`) are dynamically imported so a
-writer who never exports never downloads them.
-- Export: `src/lib/export/` — markdown, docx, epub, pdf (browser print). `index.ts`
-  orchestrates; `typeset.ts` controls the look of the outputs that are ours (epub, pdf).
+**The reading view** (`/book/[bookId]/read`, `src/components/reader/`) renders the
+whole book on one scrolling page. It does not re-implement layout: it walks each
+chapter through the export path (`toBlocks` → `blocksToXhtml`) and sets it with
+the book's typography, so the read-through, the print PDF and the EPUB match.
+
+**Import, export and the reading view share a format-neutral block IR**
+(`Block`/`Run` in `src/lib/export/blocks.ts`). A Tiptap doc is walked once into
+blocks, then each renderer consumes them — the tricky parts (marks, nesting, hard
+breaks) live in one tested place. Heavy libraries (`docx`, `jszip`) are
+dynamically imported so a writer who never exports never downloads them.
+- Export: `src/lib/export/` — markdown, docx, epub, and PDF via the browser's
+  print engine (`print.ts`, rendered into a hidden iframe). `index.ts`
+  orchestrates; `xhtml.ts` is the shared XHTML renderer behind epub, PDF and the
+  reader; `typeset.ts` controls the look of the outputs that are ours;
+  `front-matter.ts` generates the title/copyright/contents pages.
 - Import: `src/lib/import/` — docx, epub, md, txt, html. `index.ts` dispatches by
   extension and refuses `.doc`/`.pdf` *by name* with what to do instead; `split.ts`
   breaks a flat block stream into chapters.
@@ -81,7 +101,8 @@ route returns 501 with a message saying so. Chapter text is sent only when the
 writer opens the panel and asks, and rides in the (cached) system prompt.
 
 **Routes:** `/` shelf · `/book/new` setup · `/book/import` · `/book/[bookId]`
-(resolves to a chapter) · `/book/[bookId]/chapter/[chapterId]` editor ·
+book overview (lands here, not on a chapter) ·
+`/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
 `/book/[bookId]/export`.
 
 ## Styling
@@ -91,7 +112,10 @@ are named for their *job* (`surface`, `panel`, `raised`, `line`, `fg`, `muted`,
 `accent`) so a hue change doesn't make class names lie. The writing surface has
 its own palette layer: a `[data-paper]` attribute re-points `--paper-*` CSS vars,
 and anything that should sit with the page rather than the chrome opts in via that
-attribute.
+attribute. Body type is the same shape: `src/lib/page-setup.ts` and
+`src/lib/typography.ts` turn a book's page-and-type settings into `--ms-*` custom
+properties on the manuscript container, which the editor and the reading view
+both read — so one setting styles the writing surface and the read-through alike.
 
 `<body>` is `overflow-hidden` (for the editor shell). A standalone scrolling page
 therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reach.

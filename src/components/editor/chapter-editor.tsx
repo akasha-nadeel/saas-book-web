@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import {
   EditorContent,
@@ -10,26 +10,36 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
-import Image from "@tiptap/extension-image";
 import { ToolRail } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
+import { WorkspaceRail } from "@/components/editor/workspace-rail";
+import { SelectionToolbar } from "@/components/editor/selection-toolbar";
+import { ImageToolbar } from "@/components/editor/image-toolbar";
+import { Pagination, type PageGeometry } from "@/lib/editor/pagination";
+import { FontSize } from "@/lib/editor/font-size";
+import { TextAlign } from "@/lib/editor/text-align";
+import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
   bookWordCount,
+  chapterLabel,
   chapterNumberOf,
   findBook,
+  isGenericChapterTitle,
   pageSetupOf,
   renameBook,
   renameChapter,
   saveBody,
   setPref,
   touchLastOpened,
+  typographyOf,
   type Book,
   type Prefs,
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
+import { typographyVars } from "@/lib/typography";
 import {
   useBodyReload,
   useChapterBody,
@@ -80,6 +90,10 @@ export function ChapterEditor({
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
   const [tab, setTab] = useState<PanelTab>("chapters");
+  // Page zoom. Held here rather than in the surface, which is remounted on every
+  // chapter change — so the level the writer set survives moving between
+  // chapters, the way it does in a word processor.
+  const [zoom, setZoom] = useState(1);
 
   // Opening a book is worth marking; it renders faster than the eye can catch,
   // so the loading screen is held for a beat, then faded. It plays only on the
@@ -139,68 +153,13 @@ export function ChapterEditor({
     // to sit above them now belongs to the centre column.
     <div className="flex h-full">
       <>
-        <Rail side="left">
-          {/* Shown only while the panel is hidden — the way back. When it is
-              open, the collapse control in the panel header is what hides it, so
-              there is one button, never two. */}
-          {!prefs.leftPanel && (
-            <RailButton
-              label="Show panel"
-              onClick={() => setPref("leftPanel", true)}
-            >
-              {icons.panel}
-            </RailButton>
-          )}
-
-          <RailButton label="All books" href="/">
-            {icons.home}
-          </RailButton>
-
-          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-          {(
-            [
-              ["chapters", "Manuscript", icons.chapters],
-              ["search", "Search this book", icons.search],
-              ["notes", "Notes", icons.notes],
-              ["bookmarks", "Bookmarks", icons.bookmarks],
-              ["assistant", "Assistant", icons.assistant],
-              ["trash", "Deleted chapters", icons.trash],
-            ] as const
-          ).map(([value, label, icon]) => (
-            <RailButton
-              key={value}
-              label={label}
-              // Clicking the panel you are already on closes it, so the rail
-              // doubles as the way to get the width back.
-              active={prefs.leftPanel && tab === value}
-              onClick={() => {
-                if (prefs.leftPanel && tab === value) {
-                  setPref("leftPanel", false);
-                } else {
-                  setTab(value);
-                  setPref("leftPanel", true);
-                }
-              }}
-            >
-              {icon}
-            </RailButton>
-          ))}
-
-          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-          {/* The app-wide theme toggle. A rail item rather than a footer, so the
-              dev-tools badge (and any other bottom overlay) can't sit on top of
-              it — the footer landed exactly where that badge does. */}
-          <RailButton
-            label={`Switch to ${prefs.theme === "dark" ? "light" : "dark"} theme`}
-            onClick={() =>
-              setPref("theme", prefs.theme === "dark" ? "light" : "dark")
-            }
-          >
-            {icons.theme}
-          </RailButton>
-        </Rail>
+        <WorkspaceRail
+          bookId={bookId}
+          tab={tab}
+          onSelectTab={setTab}
+          leftPanel={prefs.leftPanel}
+          theme={prefs.theme}
+        />
 
         {prefs.leftPanel && (
           <LeftPanel
@@ -226,6 +185,8 @@ export function ChapterEditor({
             book={book}
             initialContent={initialContent}
             prefs={prefs}
+            zoom={zoom}
+            onZoom={setZoom}
             onEditorReady={setEditor}
           />
         </div>
@@ -304,9 +265,11 @@ export function ChapterEditor({
 /**
  * Step to the chapter either side of this one.
  *
- * Pinned to the workspace rather than the page, so it stays put whatever paper
- * size is set, and absent at the ends rather than shown disabled — there is
- * nothing to explain about an edge that does not exist.
+ * Named, blue buttons in the top corners of the workspace — the previous chapter
+ * on the left, the next on the right. Pinned to the workspace rather than the
+ * page, so they stay put whatever paper size is set, and absent at the ends
+ * rather than shown disabled: there is nothing to explain about an edge that
+ * does not exist. On phones only the arrow shows; the label rides in from `sm`.
  */
 function ChapterStep({
   bookId,
@@ -319,22 +282,27 @@ function ChapterStep({
 }) {
   if (!chapter) return null;
 
+  const label = side === "left" ? "Previous chapter" : "Next chapter";
+
   return (
     <Link
       href={`/book/${bookId}/chapter/${chapter.id}`}
-      aria-label={`${side === "left" ? "Previous" : "Next"} chapter: ${chapter.title}`}
+      aria-label={`${label}: ${chapter.title}`}
       title={chapter.title}
       onClick={(e) => e.stopPropagation()}
-      className={`absolute top-1/2 z-10 flex h-12 w-8 -translate-y-1/2
-                  items-center justify-center text-2xl leading-none
-                  opacity-35 outline-none transition-opacity
-                  hover:opacity-90 focus-visible:opacity-100
-                  focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    side === "left" ? "left-1" : "right-1"
+      className={`chapter-step absolute top-3 z-10 flex items-center gap-1.5
+                  rounded-md px-2.5 py-2 font-sans text-xs font-medium text-white
+                  shadow-sm outline-none transition-colors
+                  focus-visible:ring-2 focus-visible:ring-accent/60 md:px-3 ${
+                    side === "left"
+                      ? "left-3 flex-row"
+                      : "right-3 flex-row-reverse"
                   }`}
-      style={{ color: "var(--paper-muted)" }}
     >
-      <span aria-hidden="true">{side === "left" ? "‹" : "›"}</span>
+      <span aria-hidden="true" className="text-base leading-none">
+        {side === "left" ? "‹" : "›"}
+      </span>
+      <span className="hidden sm:inline">{label}</span>
     </Link>
   );
 }
@@ -368,6 +336,8 @@ function EditorSurface({
   book,
   initialContent,
   prefs,
+  zoom,
+  onZoom,
   onEditorReady,
 }: {
   bookId: string;
@@ -379,6 +349,8 @@ function EditorSurface({
   book: Book;
   initialContent: JSONContent | null;
   prefs: Prefs;
+  zoom: number;
+  onZoom: (zoom: number) => void;
   onEditorReady: (editor: Editor) => void;
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
@@ -386,6 +358,36 @@ function EditorSurface({
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
   const written = bookWordCount(book);
+
+  // Page geometry in CSS pixels (96 to the inch), for the print-layout sheets.
+  const PX = 96;
+  const geom = useMemo<PageGeometry>(
+    () => ({
+      pageW: metrics.width * PX,
+      pageH: metrics.height * PX,
+      mT: metrics.top * PX,
+      mB: metrics.bottom * PX,
+      mL: metrics.left * PX,
+      mR: metrics.right * PX,
+      contentH: (metrics.height - metrics.top - metrics.bottom) * PX,
+      // The desk gap between one sheet and the next.
+      gap: 24,
+    }),
+    [
+      metrics.width,
+      metrics.height,
+      metrics.top,
+      metrics.bottom,
+      metrics.left,
+      metrics.right,
+    ],
+  );
+
+  // The pagination plugin reads geometry and reports the page count through
+  // these refs, so the one editor instance never has to be rebuilt when the
+  // page setup or the page count changes.
+  const geomRef = useRef(geom);
+  const [pageCount, setPageCount] = useState(1);
 
   // Neighbours in the book's own order, so stepping through matches the order
   // the manuscript panel shows.
@@ -412,8 +414,22 @@ function EditorSurface({
       // everything without this class dims.
       Focus.configure({ className: "has-focus", mode: "shallowest" }),
       // Images are stored inline as data URLs — see lib/image-import for why
-      // they are downscaled first.
-      Image.configure({ inline: false, allowBase64: true }),
+      // they are downscaled first. ResizableImage adds width/alignment and the
+      // drag handles, so a picture can be handled like a word processor's.
+      ResizableImage.configure({ inline: false, allowBase64: true }),
+      // Inline font sizing, so a selection can be resized without turning its
+      // whole paragraph into a heading.
+      FontSize,
+      // Per-paragraph alignment (left / centre / right / justify).
+      TextAlign,
+      // Print layout: measures the prose and lays it out on real page sheets.
+      // The closures are held by the plugin and only ever run later, from its
+      // measure loop — never during render — so reading the ref here is safe.
+      /* eslint-disable-next-line react-hooks/refs */
+      Pagination.configure({
+        getGeometry: () => geomRef.current,
+        onPages: setPageCount,
+      }),
     ],
     content: initialContent ?? "",
     editorProps: {
@@ -422,6 +438,13 @@ function EditorSurface({
         "aria-label": "Chapter text",
         spellcheck: "true",
       },
+      // Pasted text (from the web, Word, an AI chat) usually carries its own
+      // `text-align` baked into the markup — often justified — which then fights
+      // the alignment buttons. Stripping it on the way in makes pasted text land
+      // on the book default, so a writer's alignment choices are the ones that
+      // hold, exactly as they do for text typed here.
+      transformPastedHTML: (html) =>
+        html.replace(/text-align\s*:\s*[^;"']*;?/gi, ""),
     },
     onCreate: ({ editor }) => {
       onEditorReady(editor);
@@ -433,14 +456,27 @@ function EditorSurface({
         doc: editor.getJSON(),
         words: editor.storage.characterCount.words(),
       });
-      holdCaret(editor);
-    },
-    onSelectionUpdate: ({ editor }) => {
-      // Clicking or arrowing to a distant line should recentre too, not only
-      // typing.
+      // Typewriter recentring belongs to typing only. It used to run on every
+      // selection change too, which meant a plain click recentred — the page
+      // lurched under the pointer on click. Typing is the one time the caret
+      // should be held in place.
       holdCaret(editor);
     },
   });
+
+  // Keep the plugin's geometry current, and nudge it to re-measure when the page
+  // setup changes (a resize the plugin cannot otherwise see, since the document
+  // did not change).
+  useEffect(() => {
+    geomRef.current = geom;
+    if (editor) {
+      editor.view.dispatch(editor.state.tr.setMeta("repaginate", true));
+    }
+  }, [geom, editor]);
+
+  // The desk is as tall as the sheets, so the last page shows in full even when
+  // the writing does not fill it.
+  const totalHeight = pageCount * geom.pageH + (pageCount - 1) * geom.gap;
 
   return (
     <>
@@ -449,17 +485,24 @@ function EditorSurface({
           the class and both data attributes changes nothing below. */}
       <div
         data-paper={prefs.paper}
-        data-columns={page.columns}
+        // One column in print layout: the sheets flow top to bottom, so a
+        // multi-column measure would put the page breaks in the wrong place.
+        data-columns={1}
         // The workspace scrollbar (and its inputs) follow the paper, not the app
         // theme: a writer looks at a light page even when the chrome is dark, so
         // its scrollbar must be light too. Set inline so it lands cleanly on the
-        // element and cascades to the scrolling <main> inside.
-        style={{
-          colorScheme:
-            prefs.paper === "slate" || prefs.paper === "black"
-              ? "dark"
-              : "light",
-        }}
+        // element and cascades to the scrolling <main> inside. The typography
+        // variables ride here too, so the whole manuscript takes the book's face,
+        // size and spacing.
+        style={
+          {
+            colorScheme:
+              prefs.paper === "slate" || prefs.paper === "black"
+                ? "dark"
+                : "light",
+            ...typographyVars(typographyOf(book)),
+          } as CSSProperties
+        }
         className={`manuscript flex min-h-0 flex-1 flex-col ${
           prefs.focusMode ? "focus-mode" : ""
         }`}
@@ -555,68 +598,202 @@ function EditorSurface({
           ) : null}
         </header>
 
-        {/* The workspace, and the page on it. Physical dimensions in inches —
-            CSS understands `in` natively, so the numbers from pageMetrics go
-            straight into the style with no pixels-per-inch fudge. */}
+        {/* The workspace: the manuscript on real page sheets, like a word
+            processor's print layout. The sheets are drawn behind; the editable
+            flows over them, and the pagination plugin inserts the gaps so text
+            never sits across a page seam. */}
         <div className="relative flex min-h-0 flex-1">
           <main
-            className={`scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                        bg-surface ${page.fit ? "" : "px-3 py-4 md:px-8 md:py-8"}`}
-            onClick={() => editor?.chain().focus().run()}
+            className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
+                       bg-surface px-4 py-8 md:py-10"
+            onClick={(e) => {
+              // Clicking the text is handled by ProseMirror itself — only a
+              // click on the surrounding desk needs to move focus in. And the
+              // focus is placed without scrolling: focus()'s default is to
+              // scroll the selection into view, which is what jumped the page to
+              // the top or bottom on every click.
+              if (
+                editor &&
+                !(e.target as HTMLElement).closest(".ProseMirror, .tiptap")
+              ) {
+                editor.chain().focus(undefined, { scrollIntoView: false }).run();
+              }
+            }}
           >
-            {/* Fitted, the page is the column and needs no shadow — there is no
-                desk left showing for it to cast onto. A real page is a fixed
-                width; capped to the viewport so it never forces the phone to
-                scroll sideways. */}
+            {/* Zoomed with the CSS `zoom` property, not a transform: a transform
+                on the pages breaks the browser's "scroll the caret into view"
+                maths, so clicking to place the caret jumped the page to the top
+                or bottom. `zoom` reflows the layout, so the caret stays put and
+                the scrollbars still measure the real page height. */}
             <div
-              className={page.fit ? "paper min-h-full" : "paper mx-auto max-w-full shadow-lg"}
+              className="pageflow"
               style={{
-                width: page.fit ? "100%" : `${metrics.width}in`,
-                minHeight: page.fit ? undefined : `${metrics.height}in`,
-                paddingTop: `${metrics.top}in`,
-                paddingBottom: prefs.typewriter ? "60vh" : `${metrics.bottom}in`,
-                paddingLeft: `${metrics.left}in`,
-                paddingRight: `${metrics.right}in`,
+                width: `${geom.pageW}px`,
+                height: `${totalHeight}px`,
+                // Only when actually zoomed, so at 100% the property is absent
+                // and cannot affect the caret-into-view maths at all.
+                ...(zoom !== 1 ? { zoom } : {}),
               }}
             >
-              {/* Centred, with the chapter's number above it, the way the page
-                  of a printed book opens. Front and back matter carry no number
-                  — a title page or a dedication is named, not numbered. */}
-              {chapterNumber !== null && (
-                <p
-                  className="text-center font-serif text-5xl leading-none"
-                  style={{ color: "var(--paper-muted)", opacity: 0.5 }}
-                >
-                  {chapterNumber}
-                </p>
-              )}
-              {/* An input rather than a heading with contenteditable: the title is
-                  a single line of plain text, and a plain input gets the caret,
-                  undo and screen-reader behaviour right for free. */}
-              <input
-                value={chapterTitle}
-                onChange={(e) => renameChapter(bookId, chapterId, e.target.value)}
-                onBlur={(e) => {
-                  if (!e.target.value.trim()) {
-                    renameChapter(bookId, chapterId, "Untitled chapter");
-                  }
+              <div className="pageflow-sheets" aria-hidden="true">
+                {Array.from({ length: pageCount }).map((_, p) => (
+                  <div
+                    key={p}
+                    className="pageflow-sheet"
+                    style={{
+                      top: `${p * (geom.pageH + geom.gap)}px`,
+                      height: `${geom.pageH}px`,
+                    }}
+                  />
+                ))}
+              </div>
+
+              <div
+                className="paper pageflow-paper"
+                style={{
+                  paddingTop: `${geom.mT}px`,
+                  paddingBottom: `${geom.mB}px`,
+                  paddingLeft: `${geom.mL}px`,
+                  paddingRight: `${geom.mR}px`,
                 }}
-                aria-label="Chapter title"
-                spellCheck={false}
-                style={{ color: "var(--paper-fg)" }}
-                className="mt-6 mb-12 w-full rounded-sm bg-transparent text-center
-                           font-serif text-4xl outline-none focus-visible:ring-2
-                           focus-visible:ring-accent/60"
-              />
-              <EditorContent editor={editor} />
+              >
+                {/* One chapter heading, the way a printed book opens: a spelled
+                    "Chapter Five" label only when the title is a real name (a
+                    chapter still called "Chapter 5" needs no second label), then
+                    the title itself. No stray number above it. Front and back
+                    matter carry no label — a title page or a dedication is named,
+                    not numbered. */}
+                <div className="chapter-opener">
+                  {chapterNumber !== null &&
+                    !isGenericChapterTitle(chapterTitle) && (
+                      <p className="chapter-label">
+                        {chapterLabel(chapterNumber)}
+                      </p>
+                    )}
+                  {/* An input rather than a heading with contenteditable: the
+                      title is a single line of plain text, and a plain input gets
+                      the caret, undo and screen-reader behaviour right for free. */}
+                  <input
+                    value={chapterTitle}
+                    onChange={(e) =>
+                      renameChapter(bookId, chapterId, e.target.value)
+                    }
+                    onBlur={(e) => {
+                      if (!e.target.value.trim()) {
+                        renameChapter(bookId, chapterId, "Untitled chapter");
+                      }
+                    }}
+                    aria-label="Chapter title"
+                    spellCheck={false}
+                    className="reader-title w-full rounded-sm bg-transparent
+                               outline-none focus-visible:ring-2
+                               focus-visible:ring-accent/60"
+                  />
+                </div>
+                <EditorContent editor={editor} />
+                {/* The Word-style mini toolbars: one over a text selection, one
+                    over a selected image. */}
+                <SelectionToolbar editor={editor} />
+                <ImageToolbar editor={editor} />
+              </div>
             </div>
           </main>
 
           <ChapterStep bookId={bookId} chapter={previous} side="left" />
           <ChapterStep bookId={bookId} chapter={next} side="right" />
+
+          <ZoomControl zoom={zoom} onZoom={onZoom} />
         </div>
       </div>
     </>
+  );
+}
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2;
+const ZOOM_STEP = 0.1;
+
+/**
+ * The page-zoom control, pinned to the bottom-right of the workspace the way a
+ * word processor puts it in the status bar. Pinned to the workspace rather than
+ * the scrolling page, so it stays in reach as the manuscript scrolls.
+ */
+function ZoomControl({
+  zoom,
+  onZoom,
+}: {
+  zoom: number;
+  onZoom: (zoom: number) => void;
+}) {
+  const clamp = (z: number) =>
+    Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 10) / 10));
+
+  return (
+    <div
+      className="absolute right-3 bottom-3 z-10 flex items-center gap-0.5
+                 rounded-lg border border-line bg-panel/95 px-1 py-0.5 shadow-md
+                 backdrop-blur"
+    >
+      <button
+        type="button"
+        onClick={() => onZoom(clamp(zoom - ZOOM_STEP))}
+        disabled={zoom <= ZOOM_MIN}
+        aria-label="Zoom out"
+        title="Zoom out"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted
+                   outline-none transition-colors hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/60
+                   disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          className="h-4 w-4"
+        >
+          <path d="M5 10h10" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onZoom(1)}
+        aria-label="Reset zoom"
+        title="Reset zoom"
+        className="w-11 rounded-md py-1 text-center font-sans text-xs tabular-nums
+                   text-muted outline-none transition-colors hover:bg-raised
+                   hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        {Math.round(zoom * 100)}%
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onZoom(clamp(zoom + ZOOM_STEP))}
+        disabled={zoom >= ZOOM_MAX}
+        aria-label="Zoom in"
+        title="Zoom in"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted
+                   outline-none transition-colors hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/60
+                   disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          className="h-4 w-4"
+        >
+          <path d="M10 5v10M5 10h10" />
+        </svg>
+      </button>
+    </div>
   );
 }
 

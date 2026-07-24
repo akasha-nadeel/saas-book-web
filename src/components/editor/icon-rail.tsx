@@ -197,4 +197,14 @@ export const icons = {
       <path d="m12.7 12.7 4 4" />
     </>
   ),
+  // A stack of pages, with a down-arrow through it: the whole book on one
+  // scrolling page. Deliberately unlike the open-book "chapters" glyph, so the
+  // two rail buttons don't read as the same thing.
+  read: (
+    <>
+      <rect x="4.6" y="2.8" width="10.8" height="14.4" rx="1.6" />
+      <path d="M10 6.2v7.6" />
+      <path d="M7.4 11.2 10 13.8l2.6-2.6" />
+    </>
+  ),
 };

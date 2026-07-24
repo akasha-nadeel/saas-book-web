@@ -19,6 +19,7 @@ function renderRun(run: Run): string {
   if (run.underline) out = `<u>${out}</u>`;
   if (run.italic) out = `<em>${out}</em>`;
   if (run.bold) out = `<strong>${out}</strong>`;
+  if (run.fontSize) out = `<span style="font-size:${escapeXml(run.fontSize)}">${out}</span>`;
   if (run.href) out = `<a href="${escapeXml(run.href)}">${out}</a>`;
 
   return out;
@@ -90,11 +91,14 @@ export function blocksToXhtml(blocks: Block[]): string {
     }
 
     const text = renderRuns(block.runs);
+    // Alignment set away from the book default rides on the block as an inline
+    // style, so the reader and the print/EPUB output match the editor.
+    const align = block.align ? ` style="text-align:${block.align}"` : "";
 
     switch (block.kind) {
       case "heading": {
         const level = block.level ?? 1;
-        out.push(`<h${level}>${text}</h${level}>`);
+        out.push(`<h${level}${align}>${text}</h${level}>`);
         break;
       }
       case "quote":
@@ -103,18 +107,28 @@ export function blocksToXhtml(blocks: Block[]): string {
       case "sceneBreak":
         out.push('<p class="scene-break">* * *</p>');
         break;
-      case "image":
+      case "image": {
+        // The figure's alignment sits the image left/right of the column
+        // (centre is the default); the width is on the image itself.
+        const figAlign =
+          block.align === "left" || block.align === "right"
+            ? ` style="text-align:${block.align}"`
+            : "";
+        const imgWidth = block.imgWidth
+          ? ` style="width:${escapeXml(block.imgWidth)}"`
+          : "";
         out.push(
-          `<p class="figure"><img src="${escapeXml(block.src ?? "")}" alt="${escapeXml(block.alt ?? "")}" /></p>`,
+          `<p class="figure"${figAlign}><img src="${escapeXml(block.src ?? "")}" alt="${escapeXml(block.alt ?? "")}"${imgWidth} /></p>`,
         );
         break;
+      }
       case "code":
         out.push(`<pre><code>${text}</code></pre>`);
         break;
       default:
         // An empty paragraph is meaningful vertical space in a book, unlike in
         // Markdown where the blank line between blocks already separates them.
-        out.push(`<p>${text}</p>`);
+        out.push(`<p${align}>${text}</p>`);
     }
     i++;
   }

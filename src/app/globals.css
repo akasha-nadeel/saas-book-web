@@ -409,6 +409,28 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The previous/next chapter buttons in the workspace corners.
+
+   Blue in light — an action, in the app's accent. At night they take the page
+   colour itself (the deep navy the surface is in dark), so they read as part of
+   the chrome rather than a bright block floating over the page. Driven here
+   rather than by utilities so the dark override, which needs the higher
+   specificity, can win cleanly.
+   -------------------------------------------------------------------------- */
+.chapter-step {
+  background-color: var(--color-accent);
+}
+.chapter-step:hover {
+  background-color: var(--color-accent-strong);
+}
+:root[data-theme="dark"] .chapter-step {
+  background-color: var(--color-surface);
+}
+:root[data-theme="dark"] .chapter-step:hover {
+  background-color: var(--color-panel);
+}
+
+/* --------------------------------------------------------------------------
    A rail that belongs to the page.
 
    Re-points the theme variables rather than restyling each control. Tailwind
@@ -503,9 +525,9 @@ body {
 }
 
 :root:not([data-theme="dark"]) .panel-chrome {
-  background: #1c4d7a;
+  background: #1a4570;
 
-  --color-panel: #1c4d7a;
+  --color-panel: #1a4570;
   --color-surface: color-mix(in srgb, #ffffff 8%, transparent); /* fields: a subtle lift */
 
   --color-fg: #eef4fb; /* chapter titles and typed text, near white */
@@ -522,6 +544,105 @@ body {
 .paper {
   background: var(--paper-bg);
   color: var(--paper-fg);
+}
+
+/* --------------------------------------------------------------------------
+   The shelf, dressed as a book dashboard (the "dailybook" layout).
+
+   A light desk with a dark navy sidebar floating on it as a rounded card, a
+   light search-and-account bar, a hero band that resumes the book in progress,
+   then the cover grid. Only the shelf wears this — the editor keeps .nav-chrome.
+
+   Like .nav-chrome, the sidebar re-points the theme tokens rather than restyling
+   each control, so every text-muted / hover:bg-raised / bg-selected inside
+   adapts on its own. Navy in light; at night it lifts to a panel so the card
+   still reads as a card against the dark desk rather than melting into it.
+   -------------------------------------------------------------------------- */
+.shelf-sidebar {
+  background: var(--color-panel); /* dark: a lifted card on the dark desk */
+
+  /* The filled action (New book) takes the harmonised navy-blue in every theme,
+     so it never falls back to the brighter global accent on the navy. */
+  --color-accent: #2670be;
+  --color-accent-strong: #3080d2;
+}
+
+:root:not([data-theme="dark"]) .shelf-sidebar {
+  /* One flat, uniform deep navy for the rail — no gradient. */
+  background: #0a1a2f;
+
+  --color-fg: #f2f6fb; /* near-white ink for the wordmark and active items */
+  --color-muted: #9fb2c9; /* nav labels and tools — a muted blue-grey */
+  --color-line: color-mix(in srgb, #ffffff 12%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 7%, transparent);
+  --color-selected: color-mix(in srgb, #ffffff 8%, transparent);
+  --color-selected-fg: #ffffff;
+}
+
+/* The hero band. A soft lavender wash in light, the way the reference tints its
+   "popular book this week" banner; a quiet panel with an accent glow at night. */
+.shelf-hero {
+  background:
+    radial-gradient(
+      130% 150% at 100% 0%,
+      #dde3fb 0%,
+      rgba(221, 227, 251, 0) 55%
+    ),
+    linear-gradient(115deg, #e9ecfb 0%, #f2e7f1 100%);
+}
+
+:root[data-theme="dark"] .shelf-hero {
+  background:
+    radial-gradient(
+      130% 150% at 100% 0%,
+      color-mix(in srgb, var(--color-accent) 22%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--color-panel);
+}
+
+/* --------------------------------------------------------------------------
+   Print layout: the editor set on real page sheets.
+
+   The manuscript is one continuous editable that flows over a stack of page
+   frames; the pagination plugin (lib/editor/pagination.ts) inserts a gap at each
+   page's foot so no line sits across a seam. The frames are the white pages, the
+   editable is transparent on top, and the desk shows through the gaps between.
+   -------------------------------------------------------------------------- */
+.pageflow {
+  position: relative;
+  margin: 0 auto;
+}
+.pageflow-sheets {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.pageflow-sheet {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  background: var(--paper-bg);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.14),
+    0 0 0 1px var(--paper-rule);
+}
+/* The editable itself carries no paper — the sheets behind do — so it can float
+   over them and the seams between pages show the desk. */
+.pageflow-paper {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: transparent;
+  box-shadow: none;
+}
+/* A page-break gap: empty, uneditable space the plugin sizes to fill the rest of
+   a page plus the margins around the seam. */
+.pageflow-spacer {
+  width: 100%;
+  user-select: none;
 }
 
 /* Columns apply to the prose only — the chapter title spans the page, as a
@@ -553,17 +674,29 @@ body {
    here rather than with utility classes.
    -------------------------------------------------------------------------- */
 .manuscript .tiptap {
-  font-family: var(--font-serif);
-  font-size: var(--text-manuscript);
-  line-height: var(--text-manuscript--line-height);
+  /* Body typography comes from the book's settings (see lib/typography.ts),
+     which set the --ms-* variables on the manuscript container; the fallbacks
+     are the app's own defaults, used before any book overrides them. */
+  font-family: var(--ms-font, var(--font-serif));
+  font-size: var(--ms-size, var(--text-manuscript));
+  line-height: var(--ms-leading, var(--text-manuscript--line-height));
   font-variation-settings: "SOFT" 25, "WONK" 0;
   color: var(--paper-fg);
   outline: none;
 }
 
 .manuscript .tiptap p {
-  margin: 0;
-  text-indent: 1.5em;
+  margin: 0 0 var(--ms-para-gap, 0);
+  text-indent: var(--ms-indent, 1.5em);
+  text-align: var(--ms-align, left);
+}
+
+/* A centred or right-aligned paragraph drops its first-line indent — an indent
+   only reads as an indent against a left edge, and would push centred text off
+   centre. The inline style the alignment sets is matched here. */
+.manuscript .tiptap p[style*="text-align: center"],
+.manuscript .tiptap p[style*="text-align: right"] {
+  text-indent: 0;
 }
 
 /* No indent on the first paragraph, or on one that opens a scene — this is
@@ -626,14 +759,21 @@ body {
 .manuscript .tiptap ul { list-style: disc; }
 .manuscript .tiptap ol { list-style: decimal; }
 
-/* Images sit as figures: never wider than the text column, centred, and
-   selectable as a block so the caret can get past them. */
+/* Images sit as figures: never wider than the text column, and selectable as a
+   block so the caret can get past them. The node view (ImageNodeView) wraps each
+   in a frame it can align and resize; a picture inserted before that lands as a
+   bare <img>, handled by the fallback rules below. */
 .manuscript .tiptap img {
   display: block;
   max-width: 100%;
   height: auto;
-  margin: 1.5em auto;
   border-radius: 2px;
+}
+
+/* A bare <img> not wrapped by the node view (older content, or the reader). */
+.manuscript .tiptap > img,
+.manuscript .tiptap p > img {
+  margin: 1.5em auto;
 }
 
 .manuscript .tiptap img.ProseMirror-selectednode {
@@ -641,8 +781,136 @@ body {
   outline-offset: 2px;
 }
 
+/* --------------------------------------------------------------------------
+   The resizable image node view.
+
+   The wrapper is a block whose text-align places the framed image on the left,
+   centre or right of the column. The frame carries the width; the handles sit on
+   its edges and appear only when the image is selected.
+   -------------------------------------------------------------------------- */
+.image-nv {
+  margin: 1.5em 0;
+}
+.image-nv-frame {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  border-radius: 2px;
+}
+.image-nv-frame img {
+  width: 100%;
+  height: auto;
+  margin: 0;
+}
+.image-nv-frame.is-selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.image-nv-handle {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 44px;
+  max-height: 60%;
+  transform: translateY(-50%);
+  background: var(--color-accent);
+  border: 2px solid #fff;
+  border-radius: 6px;
+  cursor: ew-resize;
+  touch-action: none;
+}
+.image-nv-handle.left {
+  left: -6px;
+}
+.image-nv-handle.right {
+  right: -6px;
+}
+
 .manuscript .tiptap em { font-style: italic; }
 .manuscript .tiptap strong { font-weight: 600; }
+
+/* The reading view renders prose through the export block IR, which marks a
+   scene break and an image with these classes (the editor uses <hr> and a bare
+   <img>, so these never touch the editing surface). Centred, like a paperback. */
+.manuscript .tiptap .scene-break {
+  text-align: center;
+  text-indent: 0;
+  margin: 2em 0;
+  color: var(--paper-muted);
+  letter-spacing: 0.5em;
+}
+.manuscript .tiptap .figure {
+  text-align: center;
+  text-indent: 0;
+  margin: 1.5em 0;
+}
+
+/* --------------------------------------------------------------------------
+   The reading view's pages.
+
+   Each is a fixed sheet; content past its foot continues on the next one (the
+   break is computed in ReaderPages), so overflow is clipped rather than shown.
+   The opener — a chapter's number and title — is styled here so the same markup
+   can be measured off-screen and rendered on the page and come out identical.
+   -------------------------------------------------------------------------- */
+.reader-page {
+  overflow: hidden;
+}
+/* The chapter opener — an optional "Chapter Five" label above the title, then
+   the title — the way a printed book opens a chapter. There is one heading, not
+   a heading plus a stray number; the label appears only when the title is not
+   itself the number. Sized against the body text so the proportions hold at any
+   body size: a title near 1.7× (about 20pt on a 12pt body) and the label near
+   1.15× (about 14pt). Shared by the editor and the reader, so a chapter opens
+   the same in both. */
+.chapter-opener {
+  text-align: center;
+  padding-top: 1.2em;
+}
+.reader-opener-link {
+  display: block;
+  text-decoration: none;
+  outline: none;
+}
+.chapter-label {
+  margin: 0 0 0.5em;
+  font-family: var(--ms-font, var(--font-serif));
+  font-size: calc(var(--ms-size, 1rem) * 1.15);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-indent: 0;
+  color: var(--paper-fg);
+  opacity: 0.8;
+}
+.reader-title {
+  margin: 0 0 1.9em;
+  font-family: var(--ms-font, var(--font-serif));
+  font-weight: 500;
+  font-size: calc(var(--ms-size, 1rem) * 1.7);
+  line-height: 1.2;
+  text-indent: 0;
+  text-align: center;
+  color: var(--paper-fg);
+  transition: color 150ms ease;
+}
+.reader-opener-link:hover .reader-title,
+.reader-opener-link:focus-visible .reader-title {
+  color: var(--color-accent);
+}
+.reader-empty {
+  text-align: center;
+  text-indent: 0;
+  font-style: italic;
+  color: var(--paper-muted);
+}
+/* A page that continues a chapter opens on a full paragraph, which is indented
+   like any other — the no-indent first-child rule is only for a chapter's very
+   first line, which lives on the opening page. */
+.manuscript .reader-cont.tiptap > p:first-child {
+  text-indent: var(--ms-indent, 1.5em);
+}
 
 /* --------------------------------------------------------------------------
    Focus mode. The Focus extension marks the block holding the caret; the

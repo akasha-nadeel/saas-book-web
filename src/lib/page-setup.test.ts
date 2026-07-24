@@ -13,18 +13,19 @@ const setup = (patch: Partial<PageSetup> = {}): PageSetup => ({
   ...patch,
 });
 
-it("defaults to portrait Letter with normal margins", () => {
+it("defaults to a portrait 6×9 novel with book margins", () => {
   const m = pageMetrics(DEFAULT_PAGE);
-  expect([m.width, m.height]).toEqual([8.5, 11]);
-  expect([m.top, m.right, m.bottom, m.left]).toEqual([1, 1, 1, 1]);
+  expect([m.width, m.height]).toEqual([6, 9]);
+  // Book (mirrored): taller inside (left), shorter outside (right).
+  expect([m.top, m.right, m.bottom, m.left]).toEqual([0.75, 0.65, 0.8, 0.9]);
 });
 
 it("swaps the sheet in landscape but not the margins", () => {
-  // A 1" top margin stays at the top of the page however the paper is turned —
+  // The top margin stays at the top of the page however the paper is turned —
   // rotating the margins with the sheet is the classic mistake here.
   const m = pageMetrics(setup({ orientation: "landscape" }));
-  expect([m.width, m.height]).toEqual([11, 8.5]);
-  expect([m.top, m.bottom]).toEqual([1, 1]);
+  expect([m.width, m.height]).toEqual([9, 6]);
+  expect([m.top, m.bottom]).toEqual([0.75, 0.8]);
 });
 
 it("keeps A4 landscape consistent with A4 portrait", () => {
@@ -41,15 +42,20 @@ it("applies each margin preset", () => {
 });
 
 it("renders mirrored margins as the recto page", () => {
-  // No verso in a continuous scroll, so inside lands on the left.
+  // No verso in a continuous scroll, so the wider inside margin lands on the
+  // left.
   const m = pageMetrics(setup({ margins: "mirrored" }));
-  expect(m.left).toBe(1.25);
-  expect(m.right).toBe(1);
+  expect(m.left).toBe(0.9);
+  expect(m.right).toBe(0.65);
 });
 
 it("computes the text width inside the margins", () => {
-  expect(textWidth(DEFAULT_PAGE)).toBeCloseTo(6.5, 5);
-  expect(textWidth(setup({ margins: "wide" }))).toBeCloseTo(4.5, 5);
+  // Default 6×9 with book margins: 6 − 0.9 − 0.65.
+  expect(textWidth(DEFAULT_PAGE)).toBeCloseTo(4.45, 5);
+  expect(textWidth(setup({ size: "letter", margins: "wide" }))).toBeCloseTo(
+    4.5,
+    5,
+  );
   expect(textWidth(setup({ size: "a4", margins: "narrow" }))).toBeCloseTo(
     7.27,
     5,
@@ -80,15 +86,13 @@ it("falls back to defaults for an unknown size or margin", () => {
     size: "papyrus" as PageSetup["size"],
     margins: "enormous" as PageSetup["margins"],
   });
-  expect([m.width, m.height]).toEqual([8.5, 11]);
-  expect(m.left).toBe(1);
+  expect([m.width, m.height]).toEqual([6, 9]);
+  expect(m.left).toBe(0.9);
 });
 
-it("fits the window by default, while keeping a paper size for export", () => {
-  // The editing surface and the exported document are different questions:
-  // Letter is what leaves the app, fit is how it looks while writing.
-  expect(DEFAULT_PAGE.fit).toBe(true);
-  expect(DEFAULT_PAGE.size).toBe("letter");
+it("defaults to a 6×9 novel page", () => {
+  expect(DEFAULT_PAGE.size).toBe("6x9");
+  expect(DEFAULT_PAGE.margins).toBe("mirrored");
 });
 
 it("reports the same metrics whether or not it fits the window", () => {

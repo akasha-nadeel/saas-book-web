@@ -5,26 +5,19 @@ import { pageSetupOf, setPageSetup, type Book } from "@/lib/library-store";
 import {
   MARGIN_PRESETS,
   PAGE_SIZES,
-  type ColumnCount,
   type MarginPreset,
   type Orientation,
   type PageSize,
 } from "@/lib/page-setup";
 
 /**
- * Word's Layout tab, as one menu.
+ * Word's Layout tab, as one menu: the page the manuscript is set on.
  *
- * Word spreads size, orientation, margins and columns across four ribbon
- * dropdowns. There is one toolbar row here, so they share a panel. Page colour
- * is not among them — it lives in the nav bar, where it is one click away
- * rather than two.
+ * Size, orientation and margins — the geometry of the sheet. The writing surface
+ * is print layout, so these shape the pages you write on as well as the file you
+ * export. Body typography (font, size, spacing, alignment) lives in the Aa
+ * flyout instead, with the rest of the text formatting.
  */
-
-const COLUMNS: { value: ColumnCount; label: string }[] = [
-  { value: 1, label: "One" },
-  { value: 2, label: "Two" },
-  { value: 3, label: "Three" },
-];
 
 function Section({
   title,
@@ -126,27 +119,7 @@ export function PageMenu({ book }: { book: Book }) {
                      overflow-y-auto rounded-md border border-line bg-panel
                      shadow-lg"
         >
-          <Section title="Width">
-            <div className="grid grid-cols-2 gap-1">
-              <Choice
-                selected={page.fit}
-                onClick={() => setPageSetup(book.id, { fit: true })}
-              >
-                Fit window
-              </Choice>
-              <Choice
-                selected={!page.fit}
-                onClick={() => setPageSetup(book.id, { fit: false })}
-              >
-                Page size
-              </Choice>
-            </div>
-            <p className="mt-1.5 font-sans text-[0.68rem] leading-snug text-muted">
-              Only affects writing. Export always uses the page size below.
-            </p>
-          </Section>
-
-          <Section title="Size">
+          <Section title="Page size">
             <div className="flex flex-col">
               {(Object.keys(PAGE_SIZES) as PageSize[]).map((value) => (
                 <Choice
@@ -198,23 +171,6 @@ export function PageMenu({ book }: { book: Book }) {
                 </Choice>
               ))}
             </div>
-          </Section>
-
-          <Section title="Columns">
-            <div className="grid grid-cols-3 gap-1">
-              {COLUMNS.map((c) => (
-                <Choice
-                  key={c.value}
-                  selected={page.columns === c.value}
-                  onClick={() => setPageSetup(book.id, { columns: c.value })}
-                >
-                  {c.label}
-                </Choice>
-              ))}
-            </div>
-            {/* Word also offers Left and Right — two columns of unequal width.
-                CSS multi-column can only produce equal columns, so they are
-                absent rather than approximated. */}
           </Section>
 
         </div>
