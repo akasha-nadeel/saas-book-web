@@ -80,10 +80,10 @@ export function BookCover({
   return (
     <div
       className="book-face relative aspect-[3/4] w-full rounded-l-[3px] rounded-r-md
-                 shadow-[0_10px_24px_-12px_rgba(0,0,0,0.75)]
+                 shadow-[0_14px_30px_-10px_rgba(0,0,0,0.85)]
                  transition-[transform,box-shadow] duration-200
                  group-hover:-translate-y-1.5
-                 group-hover:shadow-[0_18px_34px_-12px_rgba(0,0,0,0.85)]"
+                 group-hover:shadow-[0_22px_40px_-10px_rgba(0,0,0,0.9)]"
       // The cloth-cover colour. Covered by artwork when a book has its own,
       // so it only shows on the typeset face — which is the point.
       style={{

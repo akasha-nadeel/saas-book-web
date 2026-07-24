@@ -408,12 +408,11 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-4 py-3">
         <Link
           href="/"
-          className="rounded-sm font-display text-xl font-medium tracking-tight
-                     text-fg outline-none transition-colors
-                     hover:text-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60"
+          className="rounded-sm font-display text-xl font-semibold tracking-tight
+                     text-fg outline-none transition-opacity hover:opacity-90
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          OpenChapter
+          Open<span style={{ color: "#3a86d4" }}>Chapter</span>
         </Link>
 
         <button

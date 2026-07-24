@@ -20,6 +20,7 @@ import { FontSize } from "@/lib/editor/font-size";
 import { TextAlign } from "@/lib/editor/text-align";
 import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
+import { BookPanel, type BookPanelMode } from "@/components/editor/book-panel";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
@@ -65,11 +66,20 @@ interface ChapterSnapshot {
   words: number;
 }
 
+/** The two page-scroll actions the surface hands up to the Book View steppers. */
+type Pager = { next: () => void; prev: () => void };
+
 // Remembers the book whose opening splash has already played, so moving from
 // chapter to chapter inside it never shows the loading screen again — only
 // entering a different book does. Module scope, so it survives the surface's
 // remounts between chapters.
 let splashedBookId: string | null = null;
+
+// The book panel's last face — Book View or the chapter list. Kept at module
+// scope so it survives the remount a chapter change triggers: without it,
+// opening a chapter from the list would snap the panel back to Book View every
+// time, which is exactly what a writer clicking through chapters does not want.
+let lastPanelMode: BookPanelMode = "book";
 
 export function ChapterEditor({
   bookId,
@@ -90,6 +100,22 @@ export function ChapterEditor({
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
   const [tab, setTab] = useState<PanelTab>("chapters");
+  // Which face the right book panel shows — the cover-and-steppers Book View, or
+  // the chapter list. Seeded from the module-scope memory so a chapter change
+  // (which remounts this component) keeps the face the writer left it on.
+  const [panelMode, setPanelMode] = useState<BookPanelMode>(lastPanelMode);
+  const changePanelMode = (mode: BookPanelMode) => {
+    lastPanelMode = mode;
+    setPanelMode(mode);
+  };
+  // The save status is lifted here so the full-width running head — which now
+  // spans the top above the columns — can show it; autosave still lives in the
+  // surface below and reports up.
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // The Book View page steppers scroll the manuscript by a page; the surface
+  // below owns the scroll and fills this in with its two scroll actions.
+  const pagerRef = useRef<Pager | null>(null);
   // Page zoom. Held here rather than in the surface, which is remounted on every
   // chapter change — so the level the writer set survives moving between
   // chapters, the way it does in a word processor.
@@ -149,19 +175,29 @@ export function ChapterEditor({
   if (!book || !chapter) return <MissingChapter />;
 
   return (
-    // Rails and panel run the full height of the window; the header that used
-    // to sit above them now belongs to the centre column.
+    // The left rail runs the full height of the window on its own; the running
+    // head is a bar across everything to its right, with the panels and
+    // manuscript in the row beneath it.
     <div className="flex h-full">
-      <>
-        <WorkspaceRail
+      <WorkspaceRail
+        bookId={bookId}
+        tab={tab}
+        onSelectTab={setTab}
+        leftPanel={prefs.leftPanel}
+        theme={prefs.theme}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <EditorHeader
           bookId={bookId}
-          tab={tab}
-          onSelectTab={setTab}
-          leftPanel={prefs.leftPanel}
-          theme={prefs.theme}
+          book={book}
+          status={saveStatus}
+          lastSavedAt={lastSavedAt}
+          paper={prefs.paper}
         />
 
-        {prefs.leftPanel && (
+        <div className="flex min-h-0 flex-1">
+          {prefs.leftPanel && (
           <LeftPanel
             tab={tab}
             bookId={bookId}
@@ -188,8 +224,21 @@ export function ChapterEditor({
             zoom={zoom}
             onZoom={setZoom}
             onEditorReady={setEditor}
+            onStatus={setSaveStatus}
+            onLastSaved={setLastSavedAt}
+            pagerRef={pagerRef}
           />
         </div>
+
+        <BookPanel
+          book={book}
+          chapterId={chapterId}
+          cover={cover}
+          mode={panelMode}
+          onMode={changePanelMode}
+          onPrevPage={() => pagerRef.current?.prev()}
+          onNextPage={() => pagerRef.current?.next()}
+        />
 
         <Rail
           side="right"
@@ -250,7 +299,8 @@ export function ChapterEditor({
             {icons.typewriter}
           </RailButton>
         </Rail>
-      </>
+        </div>
+      </div>
 
       {editingCover && (
         <CoverDialog book={book} onClose={() => setEditingCover(false)} />
@@ -259,51 +309,6 @@ export function ChapterEditor({
       {/* The opening splash, over the editor while it settles, then faded. */}
       {splash !== "gone" && <LoadingScreen leaving={splash === "leaving"} />}
     </div>
-  );
-}
-
-/**
- * Step to the chapter either side of this one.
- *
- * Named, blue buttons in the top corners of the workspace — the previous chapter
- * on the left, the next on the right. Pinned to the workspace rather than the
- * page, so they stay put whatever paper size is set, and absent at the ends
- * rather than shown disabled: there is nothing to explain about an edge that
- * does not exist. On phones only the arrow shows; the label rides in from `sm`.
- */
-function ChapterStep({
-  bookId,
-  chapter,
-  side,
-}: {
-  bookId: string;
-  chapter: { id: string; title: string } | null;
-  side: "left" | "right";
-}) {
-  if (!chapter) return null;
-
-  const label = side === "left" ? "Previous chapter" : "Next chapter";
-
-  return (
-    <Link
-      href={`/book/${bookId}/chapter/${chapter.id}`}
-      aria-label={`${label}: ${chapter.title}`}
-      title={chapter.title}
-      onClick={(e) => e.stopPropagation()}
-      className={`chapter-step absolute top-3 z-10 flex items-center gap-1.5
-                  rounded-md px-2.5 py-2 font-sans text-xs font-medium text-white
-                  shadow-sm outline-none transition-colors
-                  focus-visible:ring-2 focus-visible:ring-accent/60 md:px-3 ${
-                    side === "left"
-                      ? "left-3 flex-row"
-                      : "right-3 flex-row-reverse"
-                  }`}
-    >
-      <span aria-hidden="true" className="text-base leading-none">
-        {side === "left" ? "‹" : "›"}
-      </span>
-      <span className="hidden sm:inline">{label}</span>
-    </Link>
   );
 }
 
@@ -328,6 +333,114 @@ function MissingChapter() {
   );
 }
 
+/**
+ * The running head, a bar across the full width of the screen above the columns.
+ * It wears the paper's own colour (via data-paper) so it reads as the top of the
+ * page rather than chrome, and carries the book's editable title, the running
+ * word count and the save status. The title is editable here, and only here —
+ * autosave lives in the surface below and reports its status up to this bar.
+ */
+function EditorHeader({
+  bookId,
+  book,
+  status,
+  lastSavedAt,
+  paper,
+}: {
+  bookId: string;
+  book: Book;
+  status: SaveStatus;
+  lastSavedAt: Date | null;
+  paper: Prefs["paper"];
+}) {
+  const written = bookWordCount(book);
+
+  return (
+    <header
+      data-paper={paper}
+      className="relative shrink-0 px-4 py-3 md:px-6"
+      style={{
+        background: "var(--paper-bg)",
+        borderBottom: "1px solid var(--paper-rule)",
+        colorScheme: paper === "slate" || paper === "black" ? "dark" : "light",
+      }}
+    >
+      <div className="flex items-baseline justify-between gap-3 md:gap-4">
+        <input
+          value={book.title}
+          onChange={(e) => renameBook(bookId, e.target.value)}
+          onBlur={(e) => {
+            // A book with no name is unfindable on the shelf.
+            if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
+          }}
+          aria-label="Book title"
+          spellCheck={false}
+          className="min-w-0 flex-1 truncate rounded-sm bg-transparent
+                     font-serif text-base outline-none focus-visible:ring-2
+                     focus-visible:ring-accent/60 md:text-lg"
+          style={{ color: "var(--paper-fg)" }}
+        />
+
+        <div
+          className="flex shrink-0 items-baseline gap-3 font-sans text-xs
+                     md:gap-4 md:text-sm"
+          style={{ color: "var(--paper-muted)" }}
+        >
+          <span className="tabular-nums">
+            {written.toLocaleString()}
+            {/* The "of target" and the word "words" are dropped on phones,
+                where the header has no room to spare. */}
+            <span className="hidden sm:inline">
+              {book.targetWords
+                ? ` of ${book.targetWords.toLocaleString()}`
+                : ""}{" "}
+              words
+            </span>
+          </span>
+          {/* Polite, so a failed save is announced rather than waiting to be
+              noticed — silent data loss is what this exists to catch. */}
+          <span
+            aria-live="polite"
+            style={
+              status === "error" ? { color: "var(--color-danger)" } : undefined
+            }
+          >
+            {STATUS_LABEL[status]}
+            {status === "saved" && lastSavedAt
+              ? ` · ${lastSavedAt.toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}`
+              : null}
+          </span>
+        </div>
+      </div>
+
+      {/* Progress sits on the header's own bottom edge rather than taking a row
+          of its own. It fills to 100% and stops while the count above keeps
+          climbing: passing a target is not an error, and a bar overflowing its
+          track would read like one. */}
+      {book.targetWords ? (
+        <div
+          role="progressbar"
+          aria-valuenow={written}
+          aria-valuemin={0}
+          aria-valuemax={book.targetWords}
+          aria-label="Words written toward your target"
+          className="absolute inset-x-0 bottom-0 h-0.5"
+        >
+          <div
+            className="h-full bg-accent transition-[width] duration-500"
+            style={{
+              width: `${Math.min(100, Math.round((written / book.targetWords) * 100))}%`,
+            }}
+          />
+        </div>
+      ) : null}
+    </header>
+  );
+}
+
 function EditorSurface({
   bookId,
   chapterId,
@@ -339,6 +452,9 @@ function EditorSurface({
   zoom,
   onZoom,
   onEditorReady,
+  onStatus,
+  onLastSaved,
+  pagerRef,
 }: {
   bookId: string;
   chapterId: string;
@@ -352,12 +468,18 @@ function EditorSurface({
   zoom: number;
   onZoom: (zoom: number) => void;
   onEditorReady: (editor: Editor) => void;
+  /** The surface owns autosave, but the running head that shows the status now
+   *  sits above the columns — so the status is reported up to it. */
+  onStatus: (status: SaveStatus) => void;
+  onLastSaved: (at: Date | null) => void;
+  /** The surface owns the scrolling manuscript; it registers its page-scroll
+   *  actions here for the Book View steppers. */
+  pagerRef: { current: Pager | null };
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
 
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
-  const written = bookWordCount(book);
 
   // Page geometry in CSS pixels (96 to the inch), for the print-layout sheets.
   const PX = 96;
@@ -389,18 +511,16 @@ function EditorSurface({
   const geomRef = useRef(geom);
   const [pageCount, setPageCount] = useState(1);
 
-  // Neighbours in the book's own order, so stepping through matches the order
-  // the manuscript panel shows.
-  const index = book.chapters.findIndex((c) => c.id === chapterId);
-  const previous = index > 0 ? book.chapters[index - 1] : null;
-  const next =
-    index >= 0 && index < book.chapters.length - 1
-      ? book.chapters[index + 1]
-      : null;
+  // The scrolling manuscript element, for the Book View page steppers.
+  const scrollRef = useRef<HTMLElement>(null);
 
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
     save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
   });
+
+  // Push the save status up to the full-width running head above the columns.
+  useEffect(() => onStatus(status), [status, onStatus]);
+  useEffect(() => onLastSaved(lastSavedAt), [lastSavedAt, onLastSaved]);
 
   const editor = useEditor({
     // Required under Next's SSR — rendering immediately causes a hydration
@@ -478,6 +598,22 @@ function EditorSurface({
   // the writing does not fill it.
   const totalHeight = pageCount * geom.pageH + (pageCount - 1) * geom.gap;
 
+  // Register the page-scroll actions for the Book View steppers. One "page" is a
+  // sheet plus the desk gap; a CSS zoom scales the rendered pixels, so the scroll
+  // amount scales with it.
+  useEffect(() => {
+    const step = (geom.pageH + geom.gap) * zoom;
+    pagerRef.current = {
+      next: () =>
+        scrollRef.current?.scrollBy({ top: step, behavior: "smooth" }),
+      prev: () =>
+        scrollRef.current?.scrollBy({ top: -step, behavior: "smooth" }),
+    };
+    return () => {
+      pagerRef.current = null;
+    };
+  }, [pagerRef, geom.pageH, geom.gap, zoom]);
+
   return (
     <>
       {/* The paper palette moves up here so the running head can share it.
@@ -507,103 +643,13 @@ function EditorSurface({
           prefs.focusMode ? "focus-mode" : ""
         }`}
       >
-        {/* The running head: which book this is on the left, how it is going on
-            the right. On the paper's own colour, so it reads as the top of the
-            sheet rather than as chrome above it — and it follows the page
-            colour, since a white bar over a black page would look like a
-            rendering fault.
-
-            The title is editable here, and only here. It used to be read-only
-            because the manuscript panel carried the same field, and two live
-            inputs bound to one value fight over the caret — with the panel's
-            gone, this is the one place a book gets its name. */}
-        <header
-          className="relative shrink-0 px-4 py-3 md:px-6"
-          style={{
-            background: "var(--paper-bg)",
-            borderBottom: "1px solid var(--paper-rule)",
-          }}
-        >
-          <div className="flex items-baseline justify-between gap-3 md:gap-4">
-            <input
-              value={book.title}
-              onChange={(e) => renameBook(bookId, e.target.value)}
-              onBlur={(e) => {
-                // A book with no name is unfindable on the shelf.
-                if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
-              }}
-              aria-label="Book title"
-              spellCheck={false}
-              className="min-w-0 flex-1 truncate rounded-sm bg-transparent
-                         font-serif text-base outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/60 md:text-lg"
-              style={{ color: "var(--paper-fg)" }}
-            />
-
-            <div
-              className="flex shrink-0 items-baseline gap-3 font-sans text-xs
-                         md:gap-4 md:text-sm"
-              style={{ color: "var(--paper-muted)" }}
-            >
-              <span className="tabular-nums">
-                {written.toLocaleString()}
-                {/* The "of target" and the word "words" are dropped on phones,
-                    where the header has no room to spare. */}
-                <span className="hidden sm:inline">
-                  {book.targetWords
-                    ? ` of ${book.targetWords.toLocaleString()}`
-                    : ""}{" "}
-                  words
-                </span>
-              </span>
-              {/* Polite, so a failed save is announced rather than waiting to
-                  be noticed — silent data loss is what this exists to catch. */}
-              <span
-                aria-live="polite"
-                style={
-                  status === "error" ? { color: "var(--color-danger)" } : undefined
-                }
-              >
-                {STATUS_LABEL[status]}
-                {status === "saved" && lastSavedAt
-                  ? ` · ${lastSavedAt.toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}`
-                  : null}
-              </span>
-            </div>
-          </div>
-
-          {/* Progress sits on the header's own bottom edge rather than taking a
-              row of its own. It fills to 100% and stops while the count above
-              keeps climbing: passing a target is not an error, and a bar
-              overflowing its track would read like one. */}
-          {book.targetWords ? (
-            <div
-              role="progressbar"
-              aria-valuenow={written}
-              aria-valuemin={0}
-              aria-valuemax={book.targetWords}
-              aria-label="Words written toward your target"
-              className="absolute inset-x-0 bottom-0 h-0.5"
-            >
-              <div
-                className="h-full bg-accent transition-[width] duration-500"
-                style={{
-                  width: `${Math.min(100, Math.round((written / book.targetWords) * 100))}%`,
-                }}
-              />
-            </div>
-          ) : null}
-        </header>
-
         {/* The workspace: the manuscript on real page sheets, like a word
             processor's print layout. The sheets are drawn behind; the editable
             flows over them, and the pagination plugin inserts the gaps so text
             never sits across a page seam. */}
         <div className="relative flex min-h-0 flex-1">
           <main
+            ref={scrollRef}
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
                        bg-surface px-4 py-8 md:py-10"
             onClick={(e) => {
@@ -698,9 +744,6 @@ function EditorSurface({
               </div>
             </div>
           </main>
-
-          <ChapterStep bookId={bookId} chapter={previous} side="left" />
-          <ChapterStep bookId={bookId} chapter={next} side="right" />
 
           <ZoomControl zoom={zoom} onZoom={onZoom} />
         </div>

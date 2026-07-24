@@ -482,23 +482,18 @@ body {
 /* Light theme only — and the JS-off default, which renders light. Dark keeps
    the neutral chrome above: the shelf should not turn blue at night. */
 :root:not([data-theme="dark"]) .nav-chrome {
-  background: var(--color-nav);
+  /* The deep navy of the shelf sidebar, so the editor's rail matches it. */
+  background: #0a1a2f;
 
-  --color-surface: var(--color-nav);
-  --color-panel: var(--color-nav);
+  --color-surface: #0a1a2f;
+  --color-panel: #0a1a2f;
 
-  --color-fg: #eef4fb; /* near-white ink for the wordmark and active items */
-  /* Secondary text — the unselected view tabs, the Import button, the counts
-     and the footer. On this deep navy a soft blue-grey sinks into the ground,
-     so it is lifted to a crisp light blue-grey: clearly legible (~8:1), yet a
-     visible step below the near-white above it so the hierarchy still reads. */
-  --color-muted: #cbd8e8;
-  --color-line: color-mix(in srgb, #ffffff 15%, transparent);
-  --color-raised: color-mix(in srgb, #ffffff 10%, transparent);
+  --color-fg: #f2f6fb; /* near-white ink for the wordmark and active items */
+  --color-muted: #9fb2c9; /* icons and labels — a muted blue-grey */
+  --color-line: color-mix(in srgb, #ffffff 12%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 7%, transparent);
 
-  /* Selected nav — the chosen view tab — lifts brighter with white text, the
-     way the reference marks the page you are on. */
-  --color-selected: color-mix(in srgb, #ffffff 16%, transparent);
+  --color-selected: color-mix(in srgb, #ffffff 10%, transparent);
   --color-selected-fg: #ffffff;
 }
 
@@ -525,18 +520,21 @@ body {
 }
 
 :root:not([data-theme="dark"]) .panel-chrome {
-  background: #1a4570;
+  /* The same deep navy as the rail and the shelf sidebar, so the whole left
+     chrome reads as one surface. */
+  background: #0a1a2f;
 
-  --color-panel: #1a4570;
+  --color-panel: #0a1a2f;
   --color-surface: color-mix(in srgb, #ffffff 8%, transparent); /* fields: a subtle lift */
 
-  --color-fg: #eef4fb; /* chapter titles and typed text, near white */
-  --color-muted: #c6d8ee; /* unselected titles, numbers, labels — light and crisp */
-  --color-line: color-mix(in srgb, #ffffff 16%, transparent);
-  --color-raised: color-mix(in srgb, #ffffff 10%, transparent);
+  --color-fg: #f2f6fb; /* chapter titles and typed text, near white */
+  --color-muted: #9fb2c9; /* unselected titles, numbers, labels */
+  --color-line: color-mix(in srgb, #ffffff 12%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 7%, transparent);
 
-  /* Selected nav — the open chapter — lifts brighter with white text. */
-  --color-selected: color-mix(in srgb, #ffffff 18%, transparent);
+  /* Selected nav — the open chapter — lifts with white text. Kept a touch
+     stronger than the shelf's rows, which carry an edge bar this list does not. */
+  --color-selected: color-mix(in srgb, #ffffff 14%, transparent);
   --color-selected-fg: #ffffff;
 }
 
