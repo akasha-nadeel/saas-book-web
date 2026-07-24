@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookCover } from "@/components/shelf/book-cover";
+import { PagePreview } from "@/components/editor/page-preview";
 import { relativeTime } from "@/lib/relative-time";
 import {
   bookWordCount,
@@ -39,19 +39,17 @@ export function BookPanel({
   book,
   chapterId,
   cover,
+  paper,
   mode,
   onMode,
-  onPrevPage,
-  onNextPage,
 }: {
   book: Book;
   chapterId: string | null;
   cover: string | null;
+  /** The page-colour preference, handed to the print preview. */
+  paper: string;
   mode: BookPanelMode;
   onMode: (mode: BookPanelMode) => void;
-  /** Scroll the manuscript by a page — the steppers move pages, not chapters. */
-  onPrevPage: () => void;
-  onNextPage: () => void;
 }) {
   const router = useRouter();
   const bookId = book.id;
@@ -62,6 +60,13 @@ export function BookPanel({
   const [importError, setImportError] = useState<string | null>(null);
   const [pending, setPending] = useState<ImportedChapter[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // The Book View flip-book: page 0 is the cover, 1…N the chapter's printed
+  // pages. The preview reports its page count so the pager can clamp.
+  const [previewIndex, setPreviewIndex] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const prevPage = () => setPreviewIndex((i) => Math.max(0, i - 1));
+  const nextPage = () => setPreviewIndex((i) => Math.min(pageCount, i + 1));
 
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
@@ -118,25 +123,30 @@ export function BookPanel({
   return (
     <aside
       aria-label="Book"
-      className="hidden w-72 shrink-0 flex-col border-l border-line bg-surface lg:flex"
+      // The same soft gradient the shelf's hero band wears — lavender/pink in
+      // light, a panel with an accent glow at night (see .shelf-hero). One
+      // source of truth, so a change to the hero carries here too.
+      className="shelf-hero hidden w-72 shrink-0 flex-col border-l border-line lg:flex"
     >
       {mode === "book" ? (
         <div className="scroll-slim flex h-full flex-col items-center overflow-y-auto px-6 py-8">
-          <div className="w-44 max-w-full">
-            <BookCover
-              title={book.title}
-              subtitle={book.subtitle}
-              author={book.author}
-              words={bookWordCount(book)}
-              image={cover}
-              bare={book.bareCover}
-              seed={book.id}
-            />
-          </div>
+          {/* The cover on page 0; every page after it is the chapter as it will
+              print, so the writer can flip through the finished pages here. */}
+          <PagePreview
+            book={book}
+            cover={cover}
+            paper={paper}
+            index={previewIndex}
+            onPageCount={setPageCount}
+          />
 
-          {/* The book's details, under the cover — its name and the figures the
-              old info card carried. */}
-          <div className="mt-6 w-full">
+          <p className="mt-3 font-sans text-xs text-muted">
+            {previewIndex === 0 ? "Cover" : `Page ${previewIndex} of ${pageCount}`}
+          </p>
+
+          {/* The book's details — its name and the figures the old info card
+              carried. */}
+          <div className="mt-4 w-full">
             <p className="font-serif text-xl font-medium text-fg">{book.title}</p>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 font-sans">
               <Figure
@@ -157,8 +167,16 @@ export function BookPanel({
           </div>
 
           <div className="mt-6 grid w-full grid-cols-2 gap-2">
-            <PageStep label="Previous" onClick={onPrevPage} />
-            <PageStep label="Next Page" onClick={onNextPage} />
+            <PageStep
+              label="Previous"
+              disabled={previewIndex === 0}
+              onClick={prevPage}
+            />
+            <PageStep
+              label="Next Page"
+              disabled={previewIndex >= pageCount}
+              onClick={nextPage}
+            />
           </div>
 
           <button
@@ -310,22 +328,26 @@ export function BookPanel({
   );
 }
 
-/** One of the two page steppers under the cover in Book View — each scrolls the
- *  manuscript by a page. */
+/** One of the two page steppers under the cover in Book View — each flips the
+ *  print preview by a page. */
 function PageStep({
   label,
+  disabled,
   onClick,
 }: {
   label: string;
+  disabled: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       className="rounded-lg bg-accent/10 py-2 font-sans text-sm font-medium
                  text-accent outline-none transition-colors hover:bg-accent/20
-                 focus-visible:ring-2 focus-visible:ring-accent/50"
+                 focus-visible:ring-2 focus-visible:ring-accent/50
+                 disabled:opacity-40 disabled:hover:bg-accent/10"
     >
       {label}
     </button>

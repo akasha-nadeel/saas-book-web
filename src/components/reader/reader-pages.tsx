@@ -33,8 +33,9 @@ export interface ReaderChapter {
 }
 
 /** Split one chapter's prose into pages of block HTML, measuring in `col`. The
- *  first page leaves room for the chapter opener (its label and title). */
-function paginate(col: HTMLElement, chapter: ReaderChapter, contentH: number): string[] {
+ *  first page leaves room for the chapter opener (its label and title). Shared
+ *  with the editor's Book View page preview, so both break the pages the same. */
+export function paginate(col: HTMLElement, chapter: ReaderChapter, contentH: number): string[] {
   // The opener sits on the first page and eats into its height. Measured with
   // the very markup the page renders, so the space reserved matches the space
   // taken.

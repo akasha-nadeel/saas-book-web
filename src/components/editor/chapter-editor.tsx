@@ -30,7 +30,6 @@ import {
   findBook,
   isGenericChapterTitle,
   pageSetupOf,
-  renameBook,
   renameChapter,
   saveBody,
   setPref,
@@ -65,9 +64,6 @@ interface ChapterSnapshot {
   doc: JSONContent;
   words: number;
 }
-
-/** The two page-scroll actions the surface hands up to the Book View steppers. */
-type Pager = { next: () => void; prev: () => void };
 
 // Remembers the book whose opening splash has already played, so moving from
 // chapter to chapter inside it never shows the loading screen again — only
@@ -108,14 +104,6 @@ export function ChapterEditor({
     lastPanelMode = mode;
     setPanelMode(mode);
   };
-  // The save status is lifted here so the full-width running head — which now
-  // spans the top above the columns — can show it; autosave still lives in the
-  // surface below and reports up.
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>("saved");
-  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
-  // The Book View page steppers scroll the manuscript by a page; the surface
-  // below owns the scroll and fills this in with its two scroll actions.
-  const pagerRef = useRef<Pager | null>(null);
   // Page zoom. Held here rather than in the surface, which is remounted on every
   // chapter change — so the level the writer set survives moving between
   // chapters, the way it does in a word processor.
@@ -175,9 +163,9 @@ export function ChapterEditor({
   if (!book || !chapter) return <MissingChapter />;
 
   return (
-    // The left rail runs the full height of the window on its own; the running
-    // head is a bar across everything to its right, with the panels and
-    // manuscript in the row beneath it.
+    // No chrome bar across the top: the rail runs full height on the left, the
+    // panels and manuscript fill the rest, and the word count and save status
+    // float in the workspace's top-left corner (see EditorSurface).
     <div className="flex h-full">
       <WorkspaceRail
         bookId={bookId}
@@ -187,16 +175,7 @@ export function ChapterEditor({
         theme={prefs.theme}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <EditorHeader
-          bookId={bookId}
-          book={book}
-          status={saveStatus}
-          lastSavedAt={lastSavedAt}
-          paper={prefs.paper}
-        />
-
-        <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 min-w-0 flex-1">
           {prefs.leftPanel && (
           <LeftPanel
             tab={tab}
@@ -224,9 +203,6 @@ export function ChapterEditor({
             zoom={zoom}
             onZoom={setZoom}
             onEditorReady={setEditor}
-            onStatus={setSaveStatus}
-            onLastSaved={setLastSavedAt}
-            pagerRef={pagerRef}
           />
         </div>
 
@@ -234,10 +210,9 @@ export function ChapterEditor({
           book={book}
           chapterId={chapterId}
           cover={cover}
+          paper={prefs.paper}
           mode={panelMode}
           onMode={changePanelMode}
-          onPrevPage={() => pagerRef.current?.prev()}
-          onNextPage={() => pagerRef.current?.next()}
         />
 
         <Rail
@@ -299,7 +274,6 @@ export function ChapterEditor({
             {icons.typewriter}
           </RailButton>
         </Rail>
-        </div>
       </div>
 
       {editingCover && (
@@ -333,114 +307,6 @@ function MissingChapter() {
   );
 }
 
-/**
- * The running head, a bar across the full width of the screen above the columns.
- * It wears the paper's own colour (via data-paper) so it reads as the top of the
- * page rather than chrome, and carries the book's editable title, the running
- * word count and the save status. The title is editable here, and only here —
- * autosave lives in the surface below and reports its status up to this bar.
- */
-function EditorHeader({
-  bookId,
-  book,
-  status,
-  lastSavedAt,
-  paper,
-}: {
-  bookId: string;
-  book: Book;
-  status: SaveStatus;
-  lastSavedAt: Date | null;
-  paper: Prefs["paper"];
-}) {
-  const written = bookWordCount(book);
-
-  return (
-    <header
-      data-paper={paper}
-      className="relative shrink-0 px-4 py-3 md:px-6"
-      style={{
-        background: "var(--paper-bg)",
-        borderBottom: "1px solid var(--paper-rule)",
-        colorScheme: paper === "slate" || paper === "black" ? "dark" : "light",
-      }}
-    >
-      <div className="flex items-baseline justify-between gap-3 md:gap-4">
-        <input
-          value={book.title}
-          onChange={(e) => renameBook(bookId, e.target.value)}
-          onBlur={(e) => {
-            // A book with no name is unfindable on the shelf.
-            if (!e.target.value.trim()) renameBook(bookId, "Untitled Book");
-          }}
-          aria-label="Book title"
-          spellCheck={false}
-          className="min-w-0 flex-1 truncate rounded-sm bg-transparent
-                     font-serif text-base outline-none focus-visible:ring-2
-                     focus-visible:ring-accent/60 md:text-lg"
-          style={{ color: "var(--paper-fg)" }}
-        />
-
-        <div
-          className="flex shrink-0 items-baseline gap-3 font-sans text-xs
-                     md:gap-4 md:text-sm"
-          style={{ color: "var(--paper-muted)" }}
-        >
-          <span className="tabular-nums">
-            {written.toLocaleString()}
-            {/* The "of target" and the word "words" are dropped on phones,
-                where the header has no room to spare. */}
-            <span className="hidden sm:inline">
-              {book.targetWords
-                ? ` of ${book.targetWords.toLocaleString()}`
-                : ""}{" "}
-              words
-            </span>
-          </span>
-          {/* Polite, so a failed save is announced rather than waiting to be
-              noticed — silent data loss is what this exists to catch. */}
-          <span
-            aria-live="polite"
-            style={
-              status === "error" ? { color: "var(--color-danger)" } : undefined
-            }
-          >
-            {STATUS_LABEL[status]}
-            {status === "saved" && lastSavedAt
-              ? ` · ${lastSavedAt.toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}`
-              : null}
-          </span>
-        </div>
-      </div>
-
-      {/* Progress sits on the header's own bottom edge rather than taking a row
-          of its own. It fills to 100% and stops while the count above keeps
-          climbing: passing a target is not an error, and a bar overflowing its
-          track would read like one. */}
-      {book.targetWords ? (
-        <div
-          role="progressbar"
-          aria-valuenow={written}
-          aria-valuemin={0}
-          aria-valuemax={book.targetWords}
-          aria-label="Words written toward your target"
-          className="absolute inset-x-0 bottom-0 h-0.5"
-        >
-          <div
-            className="h-full bg-accent transition-[width] duration-500"
-            style={{
-              width: `${Math.min(100, Math.round((written / book.targetWords) * 100))}%`,
-            }}
-          />
-        </div>
-      ) : null}
-    </header>
-  );
-}
-
 function EditorSurface({
   bookId,
   chapterId,
@@ -452,9 +318,6 @@ function EditorSurface({
   zoom,
   onZoom,
   onEditorReady,
-  onStatus,
-  onLastSaved,
-  pagerRef,
 }: {
   bookId: string;
   chapterId: string;
@@ -468,18 +331,12 @@ function EditorSurface({
   zoom: number;
   onZoom: (zoom: number) => void;
   onEditorReady: (editor: Editor) => void;
-  /** The surface owns autosave, but the running head that shows the status now
-   *  sits above the columns — so the status is reported up to it. */
-  onStatus: (status: SaveStatus) => void;
-  onLastSaved: (at: Date | null) => void;
-  /** The surface owns the scrolling manuscript; it registers its page-scroll
-   *  actions here for the Book View steppers. */
-  pagerRef: { current: Pager | null };
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
 
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
+  const written = bookWordCount(book);
 
   // Page geometry in CSS pixels (96 to the inch), for the print-layout sheets.
   const PX = 96;
@@ -511,16 +368,9 @@ function EditorSurface({
   const geomRef = useRef(geom);
   const [pageCount, setPageCount] = useState(1);
 
-  // The scrolling manuscript element, for the Book View page steppers.
-  const scrollRef = useRef<HTMLElement>(null);
-
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
     save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
   });
-
-  // Push the save status up to the full-width running head above the columns.
-  useEffect(() => onStatus(status), [status, onStatus]);
-  useEffect(() => onLastSaved(lastSavedAt), [lastSavedAt, onLastSaved]);
 
   const editor = useEditor({
     // Required under Next's SSR — rendering immediately causes a hydration
@@ -598,22 +448,6 @@ function EditorSurface({
   // the writing does not fill it.
   const totalHeight = pageCount * geom.pageH + (pageCount - 1) * geom.gap;
 
-  // Register the page-scroll actions for the Book View steppers. One "page" is a
-  // sheet plus the desk gap; a CSS zoom scales the rendered pixels, so the scroll
-  // amount scales with it.
-  useEffect(() => {
-    const step = (geom.pageH + geom.gap) * zoom;
-    pagerRef.current = {
-      next: () =>
-        scrollRef.current?.scrollBy({ top: step, behavior: "smooth" }),
-      prev: () =>
-        scrollRef.current?.scrollBy({ top: -step, behavior: "smooth" }),
-    };
-    return () => {
-      pagerRef.current = null;
-    };
-  }, [pagerRef, geom.pageH, geom.gap, zoom]);
-
   return (
     <>
       {/* The paper palette moves up here so the running head can share it.
@@ -649,7 +483,6 @@ function EditorSurface({
             never sits across a page seam. */}
         <div className="relative flex min-h-0 flex-1">
           <main
-            ref={scrollRef}
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
                        bg-surface px-4 py-8 md:py-10"
             onClick={(e) => {
@@ -666,6 +499,42 @@ function EditorSurface({
               }
             }}
           >
+            {/* The running head, split to the page's two edges — the word count
+                at the paper's left, the save status at its right. It shares the
+                page's own width and centring (mx-auto), so its ends line up with
+                the sheet however wide the window is, and sticks to the top as the
+                page scrolls. aria-live so a failed save is announced rather than
+                waiting to be noticed. */}
+            <div
+              className="pointer-events-none sticky top-0 z-10 mx-auto mb-2 flex
+                         items-baseline justify-between font-sans text-xs text-muted"
+              style={{ width: `${geom.pageW * zoom}px`, maxWidth: "100%" }}
+            >
+              <span className="tabular-nums">
+                {written.toLocaleString()}
+                {book.targetWords
+                  ? ` of ${book.targetWords.toLocaleString()}`
+                  : ""}{" "}
+                words
+              </span>
+              <span
+                aria-live="polite"
+                style={
+                  status === "error"
+                    ? { color: "var(--color-danger)" }
+                    : undefined
+                }
+              >
+                {STATUS_LABEL[status]}
+                {status === "saved" && lastSavedAt
+                  ? ` · ${lastSavedAt.toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}`
+                  : null}
+              </span>
+            </div>
+
             {/* Zoomed with the CSS `zoom` property, not a transform: a transform
                 on the pages breaks the browser's "scroll the caret into view"
                 maths, so clicking to place the caret jumped the page to the top
