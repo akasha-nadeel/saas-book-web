@@ -177,12 +177,21 @@ same response and there is no sign-in flash. The proxy skips `/api` on purpose �
 redirecting a `fetch` to an HTML page yields a parse error, not a 401 — so the
 chat route checks for itself.
 
+**Password reset rides the same rails.** `/forgot-password` mails a recovery
+link pointed at `/auth/confirm?next=/reset-password`; that route exchanges it
+for a session like any other link, so `/reset-password` needs no token of its
+own and is *gated* rather than public — by the time a writer arrives they are
+signed in, and `updateUser()` knows who they are. Which also makes it a plain
+change-password screen for anyone already in. The four auth screens share
+`auth-shell.tsx` so the chrome cannot drift between them.
+
 **Auth is not persistence.** A signed-in writer still reads and writes
 `localStorage`; the account identifies them but does not yet carry their books.
 The UI says so rather than letting it be discovered. See `TODO.md`.
 
-**Routes:** `/` shelf · `/signin` · `/signup` · `/auth/confirm` (the far end of a
-confirmation email) · `/book/new` setup · `/book/import` · `/book/[bookId]` book
+**Routes:** `/` shelf · `/signin` · `/signup` · `/forgot-password` ·
+`/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
+`/book/new` setup · `/book/import` · `/book/[bookId]` book
 overview (lands here, not on a chapter) ·
 `/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
 `/book/[bookId]/export`.

@@ -21,8 +21,15 @@ import {
  * its way past.
  */
 
-/** Reachable without a session. Everything else redirects to /signin. */
-const PUBLIC_PREFIXES = ["/signin", "/signup", "/auth"];
+/**
+ * Reachable without a session. Everything else redirects to /signin.
+ *
+ * /reset-password is deliberately *not* here: the recovery link signs the
+ * writer in as it passes through /auth/confirm, so by the time they reach the
+ * reset screen they have a session like anyone else. Leaving it gated is what
+ * stops a stranger opening it directly.
+ */
+const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some(

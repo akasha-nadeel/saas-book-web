@@ -107,6 +107,69 @@ export async function signUp(
   };
 }
 
+/**
+ * Step one of a forgotten password: mail a recovery link.
+ *
+ * The link lands on /auth/confirm like any other, which exchanges it for a
+ * session and forwards to /reset-password. That is why the reset screen needs
+ * no token of its own — by the time a writer reaches it they are already
+ * signed in, and updateUser() knows who they are.
+ */
+export async function requestPasswordReset(
+  _state: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED };
+
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { error: "Enter your email." };
+
+  const origin = (await headers()).get("origin") ?? "";
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent("/reset-password")}`,
+  });
+
+  // Supabase does not error on an address it has never seen — deliberately, so
+  // this form cannot be used to discover who has an account. Errors that do
+  // arrive are worth showing: a rate limit is something the writer can act on.
+  if (error) return { error: error.message };
+
+  // Phrased so it says the same thing either way.
+  return {
+    notice: `If ${email} has an account, a reset link is on its way. The link opens in this browser only.`,
+  };
+}
+
+/**
+ * Step two: set the new password.
+ *
+ * Reachable only with a session, which the recovery link established — the
+ * proxy bounces anyone else to sign-in. Doubles as an ordinary change-password
+ * screen for someone already signed in.
+ */
+export async function updatePassword(
+  _state: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED };
+
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirm") ?? "");
+
+  if (password.length < 8) return { error: "Use at least 8 characters." };
+  if (password !== confirm) return { error: "Those two don’t match." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
 export async function signOut() {
   if (!isSupabaseConfigured()) redirect("/");
 

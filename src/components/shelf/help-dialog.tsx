@@ -188,6 +188,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Signing in identifies you; it does not yet move your manuscripts. They stay in this browser until syncing ships, so signing in on another machine shows an empty shelf rather than your library.",
       },
       {
+        name: "Forgotten password",
+        desc: "The sign-in screen can email you a link that signs you in and lets you set a new one. Open it in the same browser you asked from — the link is tied to it, and works once.",
+      },
+      {
         name: "Back up",
         desc: "Clearing your browser data erases your library, so export anything you want to keep.",
       },
