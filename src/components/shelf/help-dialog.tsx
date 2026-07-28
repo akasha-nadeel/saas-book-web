@@ -81,8 +81,20 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Everything you type is saved to this browser as you go; the header shows the status.",
       },
       {
+        name: "Clicking the page",
+        desc: "Clicking a bare part of a sheet puts the cursor at the nearest place text can go: under the last line takes you to the end of it, beside a line takes you into that line. A chapter is a sequence of paragraphs that flow, so text is never dropped at a loose spot on the page.",
+      },
+      {
+        name: "Click and type (front & back matter only)",
+        desc: "On a front- or back-matter page — a title page, dedication or epigraph, which are designed on the page rather than written in a flow — double-clicking a blank area puts the cursor there, adding the blank lines it takes to reach that spot and centring or right-aligning text started in the middle or right of the column. Body chapters deliberately do not do this: lines placed by eye slide out of position the moment the margins or type size change.",
+      },
+      {
         name: "Formatting",
         desc: "Bold, italic, headings, quotes, bullet and numbered lists, scene breaks, links, inline code, and images.",
+      },
+      {
+        name: "Text beside a picture",
+        desc: "Select an image and use the wrap button on its toolbar to let the prose run alongside it instead of starting again underneath — Word calls this square wrapping. The picture takes the left or right of the column and the words fill the rest. Drag its edge to resize, and the text reflows around it. Choosing centre alignment turns wrapping off, since a centred picture leaves no side for the words.",
       },
       {
         name: "Selection toolbar",

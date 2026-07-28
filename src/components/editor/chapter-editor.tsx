@@ -16,8 +16,11 @@ import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { SelectionToolbar } from "@/components/editor/selection-toolbar";
 import { ImageToolbar } from "@/components/editor/image-toolbar";
 import { Pagination, type PageGeometry } from "@/lib/editor/pagination";
+import { clickToType } from "@/lib/editor/click-to-type";
+import { keepCaretInView } from "@/lib/editor/caret-scroll";
 import { FontSize } from "@/lib/editor/font-size";
 import { TextAlign } from "@/lib/editor/text-align";
+import { NoIndent } from "@/lib/editor/no-indent";
 import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { BookPanel, type BookPanelMode } from "@/components/editor/book-panel";
@@ -26,6 +29,7 @@ import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
   bookWordCount,
   chapterLabel,
+  chapterMatterOf,
   chapterNumberOf,
   findBook,
   isGenericChapterTitle,
@@ -58,6 +62,44 @@ const STATUS_LABEL: Record<SaveStatus, string> = {
   saving: "Saving…",
   error: "Save failed",
 };
+
+/**
+ * The height of one line of body text, in unzoomed page pixels.
+ *
+ * Measured from the caret at the end of the prose rather than read off the CSS,
+ * so it is the line the new paragraphs will actually occupy — and so it stays
+ * right at every zoom, which a computed `line-height` cannot be trusted to be.
+ * Zero when it cannot be measured, which leaves the caret at the end of the text
+ * instead of guessing a drop and getting it wrong.
+ */
+function lineHeightAtEnd(editor: Editor, scale: number): number {
+  try {
+    const at = editor.view.coordsAtPos(
+      Math.max(0, editor.state.doc.content.size - 1),
+    );
+    const height = (at.bottom - at.top) / scale;
+    return height > 0 ? height : 0;
+  } catch {
+    // coordsAtPos throws on a position it cannot map to the screen.
+    return 0;
+  }
+}
+
+/**
+ * How large the page is actually drawn when the zoom reads 100%.
+ *
+ * A 6×9 novel page is a small sheet, and a screen pixel is nothing like a
+ * printer's dot — drawn at its literal CSS size the type comes out smaller than
+ * anyone would choose to write in. So 100% means "the size the page is meant to
+ * be worked at" rather than "one CSS pixel per page pixel", which is a number
+ * that means nothing to a writer and is not what any word processor shows
+ * either. The zoom control counts from here: 100% is this, 110% is a tenth more.
+ *
+ * Only the drawing is scaled. The page is still 6×9 inches everywhere it
+ * matters — page setup, pagination, and every export — so what is written is
+ * unaffected by how big it looks.
+ */
+const PAGE_SCALE = 1.3;
 
 /** What one autosave carries: the document, plus the count the sidebar shows. */
 interface ChapterSnapshot {
@@ -95,7 +137,14 @@ export function ChapterEditor({
   // Lifted out of the surface so the toolbar and the assistant can both reach
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [tab, setTab] = useState<PanelTab>("chapters");
+  // The left panel here is tools only — the book panel beside the manuscript is
+  // the chapter list, so offering a second one was the same list twice. With no
+  // chapter list to land on, the panel starts closed and a rail tab opens it;
+  // "search" is only the seed, never seen until a tab is picked. Local state
+  // rather than the stored leftPanel flag, which still governs the overview,
+  // where the panel *is* the chapter list and belongs open.
+  const [tab, setTab] = useState<PanelTab>("search");
+  const [panelOpen, setPanelOpen] = useState(false);
   // Which face the right book panel shows — the cover-and-steppers Book View, or
   // the chapter list. Seeded from the module-scope memory so a chapter change
   // (which remounts this component) keeps the face the writer left it on.
@@ -113,11 +162,19 @@ export function ChapterEditor({
   // so the loading screen is held for a beat, then faded. It plays only on the
   // way *into* a book — the id above is remembered across the surface's remounts
   // between chapters, so flipping chapter to chapter never replays it.
-  const [splash, setSplash] = useState<"show" | "leaving" | "gone">(() =>
-    splashedBookId === bookId ? "gone" : "show",
+  //
+  // Whether this mount is an opening is decided *here*, once, and held as state.
+  // The effect below must not be the thing that decides, because React mounts
+  // effects twice in development (run, clean up, run again): a guard the effect
+  // sets itself passes on the first run and fails on the second, so the timers
+  // it scheduled are cleared and never replaced — leaving the splash on screen
+  // for good, pulsing, with nothing left to take it down.
+  const [opening] = useState(() => splashedBookId !== bookId);
+  const [splash, setSplash] = useState<"show" | "leaving" | "gone">(
+    opening ? "show" : "gone",
   );
   useEffect(() => {
-    if (splashedBookId === bookId) return;
+    if (!opening) return;
     splashedBookId = bookId;
     const hold = setTimeout(() => setSplash("leaving"), 1000);
     const drop = setTimeout(() => setSplash("gone"), 1000 + 350);
@@ -125,7 +182,7 @@ export function ChapterEditor({
       clearTimeout(hold);
       clearTimeout(drop);
     };
-  }, [bookId]);
+  }, [opening, bookId]);
 
   const book = findBook(shelf, bookId);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
@@ -136,7 +193,7 @@ export function ChapterEditor({
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setTab("search");
-        setPref("leftPanel", true);
+        setPanelOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -171,21 +228,37 @@ export function ChapterEditor({
         bookId={bookId}
         tab={tab}
         onSelectTab={setTab}
-        leftPanel={prefs.leftPanel}
+        leftPanel={panelOpen}
+        onPanel={setPanelOpen}
+        chapters={false}
         theme={prefs.theme}
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1">
-          {prefs.leftPanel && (
+      {/* One continuous gradient wash behind the book panel and the paper — the
+          shelf hero's, in both themes — so the two read as one surface rather
+          than separate sections. The children below are transparent; only the
+          rails and the open left panel lay their own chrome over it. */}
+      <div className="shelf-hero flex min-h-0 min-w-0 flex-1">
+          {panelOpen && (
           <LeftPanel
             tab={tab}
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapter.title}
             getChapterText={() => editor?.getText() ?? ""}
-            onClose={() => setPref("leftPanel", false)}
+            onClose={() => setPanelOpen(false)}
           />
         )}
+
+        {/* The book panel sits on the left, the manuscript to its right. */}
+        <BookPanel
+          book={book}
+          chapterId={chapterId}
+          cover={cover}
+          paper={prefs.paper}
+          mode={panelMode}
+          onMode={changePanelMode}
+        />
 
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Keyed on the id and a cross-tab reload counter — not the stored
@@ -197,6 +270,10 @@ export function ChapterEditor({
             chapterId={chapterId}
             chapterTitle={chapter.title}
             chapterNumber={chapterNumberOf(book, chapterId)}
+            // Front and back matter are designed on the page — a title page, a
+            // dedication, an epigraph. Only they get click-and-type; a body
+            // chapter flows. See handleSheetDoubleClick.
+            placeable={chapterMatterOf(chapter) !== "body"}
             book={book}
             initialContent={initialContent}
             prefs={prefs}
@@ -205,15 +282,6 @@ export function ChapterEditor({
             onEditorReady={setEditor}
           />
         </div>
-
-        <BookPanel
-          book={book}
-          chapterId={chapterId}
-          cover={cover}
-          paper={prefs.paper}
-          mode={panelMode}
-          onMode={changePanelMode}
-        />
 
         <Rail
           side="right"
@@ -286,6 +354,38 @@ export function ChapterEditor({
   );
 }
 
+/**
+ * The document position nearest a click on the blank part of the page — Word's
+ * "click and type". ProseMirror's posAtCoords resolves a point over the text; a
+ * click in a side margin is retried with x pulled into the text column so it
+ * maps to the nearest line, and a click below the last line or above the first
+ * falls to the end or start of the document. Null when nothing sensible is near,
+ * so the caller just focuses at the existing caret.
+ */
+function nearestTextPos(
+  editor: Editor,
+  clientX: number,
+  clientY: number,
+): number | null {
+  const view = editor.view;
+  const direct = view.posAtCoords({ left: clientX, top: clientY });
+  if (direct) return direct.pos;
+
+  const rect = view.dom.getBoundingClientRect();
+  // A margin click: nudge x just inside the text column, keep the click's y, so
+  // the nearest line on that row is found.
+  const clampedX = Math.min(Math.max(clientX, rect.left + 1), rect.right - 1);
+  const onLine = view.posAtCoords({ left: clampedX, top: clientY });
+  if (onLine) return onLine.pos;
+
+  // Below all text → end of the document; above the first line → its start.
+  if (clientY > rect.bottom) {
+    return Math.max(0, editor.state.doc.content.size - 1);
+  }
+  if (clientY < rect.top) return 0;
+  return null;
+}
+
 function MissingChapter() {
   return (
     <main className="flex h-full items-center justify-center px-6">
@@ -312,6 +412,7 @@ function EditorSurface({
   chapterId,
   chapterTitle,
   chapterNumber,
+  placeable,
   book,
   initialContent,
   prefs,
@@ -325,6 +426,9 @@ function EditorSurface({
   /** The body-chapter number, or null for front and back matter — which are
    *  named, so no number is printed above their title. */
   chapterNumber: number | null;
+  /** Whether a double-click on blank page may place a line there. True only for
+   *  front and back matter — see handleSheetDoubleClick. */
+  placeable: boolean;
   book: Book;
   initialContent: JSONContent | null;
   prefs: Prefs;
@@ -337,6 +441,10 @@ function EditorSurface({
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
   const written = bookWordCount(book);
+
+  // The page flow — every sheet — so a click anywhere on it can be measured
+  // against the pages. See handleSheetDoubleClick.
+  const flowRef = useRef<HTMLDivElement>(null);
 
   // Page geometry in CSS pixels (96 to the inch), for the print-layout sheets.
   const PX = 96;
@@ -368,6 +476,13 @@ function EditorSurface({
   const geomRef = useRef(geom);
   const [pageCount, setPageCount] = useState(1);
 
+  // Read from inside the editor's own scroll handler, which is bound once when
+  // the editor is built and so cannot close over a changing preference.
+  const typewriterRef = useRef(prefs.typewriter);
+  useEffect(() => {
+    typewriterRef.current = prefs.typewriter;
+  }, [prefs.typewriter]);
+
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
     save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
   });
@@ -392,6 +507,9 @@ function EditorSurface({
       FontSize,
       // Per-paragraph alignment (left / centre / right / justify).
       TextAlign,
+      // The flush-at-the-margin mark a click-placed line carries, so it begins
+      // where the caret was shown rather than a first-line indent in from it.
+      NoIndent,
       // Print layout: measures the prose and lays it out on real page sheets.
       // The closures are held by the plugin and only ever run later, from its
       // measure loop — never during render — so reading the ref here is safe.
@@ -415,6 +533,18 @@ function EditorSurface({
       // hold, exactly as they do for text typed here.
       transformPastedHTML: (html) =>
         html.replace(/text-align\s*:\s*[^;"']*;?/gi, ""),
+      // Keep the page still while typing, like a word processor: it moves only
+      // when the caret would otherwise leave the window, and then by exactly the
+      // overshoot — never a screenful, never to recentre. Returning true tells
+      // ProseMirror the scroll is handled, so its own "chase the caret" pass,
+      // which jumps a whole page-gap when a seam opens, never runs.
+      //
+      // Typewriter scrolling, when on, owns the view instead: it holds the caret
+      // in a band and would fight a second correction here. See useTypewriter.
+      handleScrollToSelection: (view) => {
+        if (!typewriterRef.current) keepCaretInView(view);
+        return true;
+      },
     },
     onCreate: ({ editor }) => {
       onEditorReady(editor);
@@ -433,6 +563,106 @@ function EditorSurface({
       holdCaret(editor);
     },
   });
+
+  /**
+   * A click on a bare part of the sheet — the blank tail below the prose, or a
+   * margin beside it — puts the caret at the closest place text can actually go.
+   *
+   * This is Word's ordinary behaviour and the flowing model the whole editor is
+   * built on: a chapter is a sequence of paragraphs, and the caret always sits
+   * between two characters in one of them. Clicking under the last line takes
+   * you to the end of it; clicking level with a line takes you into that line.
+   * The alternative — letting a click drop text at an arbitrary x/y — is what
+   * turns a manuscript into a pile of positioned boxes that come apart the
+   * moment the margins or the type size change.
+   *
+   * The handler sits on the whole page flow rather than on the editable, because
+   * the editable is only as tall as its text: the blank tail of a sheet is not
+   * part of it, and a click there would otherwise reach nothing at all.
+   */
+  const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!editor || !editor.isEditable) return;
+
+    // The title, the floating toolbars, and the prose itself all handle their
+    // own clicks — the browser has already placed the caret inside the text.
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(
+        '.chapter-opener, button, input, a, [contenteditable="true"]',
+      )
+    ) {
+      return;
+    }
+
+    const prose = editor.view.dom.getBoundingClientRect();
+    if (e.clientY >= prose.bottom) {
+      editor.commands.focus("end");
+      return;
+    }
+    if (e.clientY <= prose.top) {
+      editor.commands.focus("start");
+      return;
+    }
+
+    // Level with a line but outside it: pull the pointer just inside the text
+    // column so ProseMirror resolves it to a position on that line rather than
+    // to nothing. This is what makes the margin beside a paragraph clickable.
+    const at = editor.view.posAtCoords({
+      left: Math.min(Math.max(e.clientX, prose.left + 1), prose.right - 1),
+      top: e.clientY,
+    });
+    editor.commands.focus(at ? at.pos : "end");
+  };
+
+  // Word's click-and-type, kept for the pages it belongs on. A double-click on
+  // the blank part of a sheet puts the caret where the pointer is: the blank
+  // lines it takes to get down there, and the alignment of the third of the
+  // column it landed in. Inside the prose a double-click still selects a word,
+  // so this only acts below the last line.
+  //
+  // Body chapters do not get it, and should not: placing a line by pixel breeds
+  // empty paragraphs whose count was computed from *this* page setup, so the
+  // line slides the moment the margins, the trim size or the type change — and
+  // the export, which repaginates from the text, disagrees with the screen. A
+  // title page, a dedication or an epigraph is the opposite case: it is designed
+  // on the page rather than flowed onto it, and that is exactly what front and
+  // back matter are here. So the placement stays, fenced to those pages.
+  const handleSheetDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!placeable) return;
+    const flow = flowRef.current;
+    if (!editor || !editor.isEditable || !flow) return;
+
+    const flowRect = flow.getBoundingClientRect();
+    // The sheets are laid out at geom.pageW, so anything else in their measured
+    // width is the zoom. This is the one number that turns a client pixel into a
+    // page pixel, and it is right whether the zoom is CSS `zoom` or a transform.
+    const scale = geom.pageW ? flowRect.width / geom.pageW : 1;
+    if (!(scale > 0)) return;
+
+    const prose = editor.view.dom.getBoundingClientRect();
+    if (e.clientY <= prose.bottom) return;
+
+    const { lines, align } = clickToType(
+      (e.clientX - flowRect.left) / scale,
+      (e.clientY - flowRect.top) / scale,
+      (prose.bottom - flowRect.top) / scale,
+      lineHeightAtEnd(editor, scale),
+      geom,
+    );
+
+    // Even with no lines to add this focuses the end, so a double-click on the
+    // page always does something rather than appearing to miss. The alignment is
+    // set from the third of the column clicked, as Word does; setNoIndent is
+    // what starts the words at the spot clicked rather than a first-line indent
+    // in from it, and comes last because setting an alignment clears it.
+    const chain = editor.chain().focus("end");
+    if (lines > 0) {
+      chain.insertContent(
+        Array.from({ length: lines }, () => ({ type: "paragraph" })),
+      );
+    }
+    chain.setTextAlign(align).setNoIndent().run();
+  };
 
   // Keep the plugin's geometry current, and nudge it to re-measure when the page
   // setup changes (a resize the plugin cannot otherwise see, since the document
@@ -481,22 +711,30 @@ function EditorSurface({
             processor's print layout. The sheets are drawn behind; the editable
             flows over them, and the pagination plugin inserts the gaps so text
             never sits across a page seam. */}
+        {/* Transparent, so the shared gradient on the row above shows through
+            and the page sheets float on it. */}
         <div className="relative flex min-h-0 flex-1">
           <main
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                       bg-surface px-4 py-8 md:py-10"
+                       bg-transparent px-4 py-8 md:py-10"
             onClick={(e) => {
               // Clicking the text is handled by ProseMirror itself — only a
-              // click on the surrounding desk needs to move focus in. And the
-              // focus is placed without scrolling: focus()'s default is to
-              // scroll the selection into view, which is what jumped the page to
-              // the top or bottom on every click.
+              // click on the surrounding desk or the blank part of a page needs
+              // handling. Like Word's "click and type", the caret lands at the
+              // nearest text position rather than snapping back to the old one:
+              // click below the text → caret at the end; click in a margin
+              // beside a line → caret to that line. Placed without scrolling,
+              // since focus()'s default scroll is what jumped the page on click.
               if (
-                editor &&
-                !(e.target as HTMLElement).closest(".ProseMirror, .tiptap")
+                !editor ||
+                (e.target as HTMLElement).closest(".ProseMirror, .tiptap")
               ) {
-                editor.chain().focus(undefined, { scrollIntoView: false }).run();
+                return;
               }
+              const pos = nearestTextPos(editor, e.clientX, e.clientY);
+              const chain = editor.chain();
+              if (pos !== null) chain.setTextSelection(pos);
+              chain.focus(undefined, { scrollIntoView: false }).run();
             }}
           >
             {/* The running head, split to the page's two edges — the word count
@@ -508,7 +746,10 @@ function EditorSurface({
             <div
               className="pointer-events-none sticky top-0 z-10 mx-auto mb-2 flex
                          items-baseline justify-between font-sans text-xs text-muted"
-              style={{ width: `${geom.pageW * zoom}px`, maxWidth: "100%" }}
+              style={{
+                width: `${geom.pageW * zoom * PAGE_SCALE}px`,
+                maxWidth: "100%",
+              }}
             >
               <span className="tabular-nums">
                 {written.toLocaleString()}
@@ -541,13 +782,21 @@ function EditorSurface({
                 or bottom. `zoom` reflows the layout, so the caret stays put and
                 the scrollbars still measure the real page height. */}
             <div
+              ref={flowRef}
+              onClick={handleSheetClick}
+              onDoubleClick={handleSheetDoubleClick}
               className="pageflow"
               style={{
                 width: `${geom.pageW}px`,
                 height: `${totalHeight}px`,
-                // Only when actually zoomed, so at 100% the property is absent
-                // and cannot affect the caret-into-view maths at all.
-                ...(zoom !== 1 ? { zoom } : {}),
+                // The reading on the control times the size 100% stands for.
+                // Always set now, where it used to be dropped at 100% to keep
+                // the property out of the caret-into-view maths — `zoom` reflows
+                // the layout rather than painting over it, so that was a
+                // precaution rather than a requirement, and everything that
+                // measures the page derives its scale from the rendered width
+                // (see pagination.ts) rather than assuming this value.
+                zoom: zoom * PAGE_SCALE,
               }}
             >
               <div className="pageflow-sheets" aria-hidden="true">

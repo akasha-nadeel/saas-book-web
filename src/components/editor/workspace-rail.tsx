@@ -21,27 +21,40 @@ const TABS = [
  * tab you are already on closes the panel, so there is one control, never two.
  * Both screens want this identical behaviour, so it lives here rather than being
  * copied — a change to the tabs then lands in both places at once.
+ *
+ * The one difference between them is the chapter list. In the editor the book
+ * panel beside the manuscript already is one, so the rail leaves the tab out
+ * rather than offering the same list twice. The overview has no book panel, so
+ * there the tab is the only way to choose a chapter and stays.
  */
 export function WorkspaceRail({
   bookId,
   tab,
   onSelectTab,
   leftPanel,
+  onPanel,
+  chapters = true,
   theme,
 }: {
   bookId: string;
   tab: PanelTab;
   onSelectTab: (tab: PanelTab) => void;
   leftPanel: boolean;
+  /** Open or close the panel. Which flag that sets is the screen's business. */
+  onPanel: (open: boolean) => void;
+  /** Offer the chapter-list tab. False where a book panel already shows one. */
+  chapters?: boolean;
   theme: Theme;
 }) {
+  const tabs = chapters ? TABS : TABS.filter(([value]) => value !== "chapters");
+
   return (
     <Rail side="left">
       {/* Shown only while the panel is hidden — the way back. When it is open,
           the collapse control in the panel header is what hides it, so there is
           one button, never two. */}
       {!leftPanel && (
-        <RailButton label="Show panel" onClick={() => setPref("leftPanel", true)}>
+        <RailButton label="Show panel" onClick={() => onPanel(true)}>
           {icons.panel}
         </RailButton>
       )}
@@ -58,7 +71,7 @@ export function WorkspaceRail({
 
       <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 
-      {TABS.map(([value, label, icon]) => (
+      {tabs.map(([value, label, icon]) => (
         <RailButton
           key={value}
           label={label}
@@ -67,10 +80,10 @@ export function WorkspaceRail({
           active={leftPanel && tab === value}
           onClick={() => {
             if (leftPanel && tab === value) {
-              setPref("leftPanel", false);
+              onPanel(false);
             } else {
               onSelectTab(value);
-              setPref("leftPanel", true);
+              onPanel(true);
             }
           }}
         >

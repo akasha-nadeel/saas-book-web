@@ -63,8 +63,20 @@ export const TextAlign = Extension.create({
           // simply do nothing. `some`, not `every`, so a paragraph-only
           // selection (where the heading update is a no-op) still counts as
           // applied — otherwise the command reported failure on ordinary text.
+          //
+          // Aligning a paragraph also returns it to the book's normal first-line
+          // indent. Alignment does not decide the indent — that is the whole
+          // point of keeping noIndent separate (see no-indent.ts) — but a writer
+          // reaching for these buttons is treating the paragraph as ordinary
+          // flowing prose, and this is the way back for a line that was placed
+          // flush by double-clicking the page. Harmless when NoIndent is not
+          // loaded: ProseMirror ignores attributes a node's schema has no slot
+          // for, so the key simply falls away.
           return TYPES.map((type) =>
-            commands.updateAttributes(type, { textAlign: alignment }),
+            commands.updateAttributes(type, {
+              textAlign: alignment,
+              noIndent: false,
+            }),
           ).some((applied) => applied);
         },
       unsetTextAlign:

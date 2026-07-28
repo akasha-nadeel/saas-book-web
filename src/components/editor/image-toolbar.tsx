@@ -97,9 +97,26 @@ export function ImageToolbar({ editor }: { editor: Editor | null }) {
   const attrs = editor.getAttributes("image");
   const align = (attrs.align as string) || "center";
   const width = (attrs.width as string | null) ?? null;
+  const wrap = attrs.wrap === true;
 
   const setImage = (patch: Record<string, unknown>) =>
     editor.chain().focus().updateAttributes("image", patch).run();
+
+  // Wrapping and alignment are one decision in two controls, so they are kept
+  // in step here rather than left to produce a state that cannot be drawn.
+  // Text can only run beside a picture that is over on one side; a centred one
+  // has no side for the words to take.
+  const setAlign = (value: string) =>
+    setImage({ align: value, ...(value === "center" ? { wrap: false } : null) });
+
+  const toggleWrap = () =>
+    setImage(
+      wrap
+        ? { wrap: false }
+        : // Turning it on from centre has to pick a side. Right is the one a
+          // writer means: the picture out of the way, the words leading in.
+          { wrap: true, ...(align === "center" ? { align: "right" } : null) },
+    );
 
   return (
     <BubbleMenu
@@ -115,7 +132,7 @@ export function ImageToolbar({ editor }: { editor: Editor | null }) {
           key={option.value}
           label={option.label}
           active={align === option.value}
-          onClick={() => setImage({ align: option.value })}
+          onClick={() => setAlign(option.value)}
         >
           <svg
             aria-hidden="true"
@@ -143,6 +160,31 @@ export function ImageToolbar({ editor }: { editor: Editor | null }) {
           <span className="text-xs tabular-nums">{option.label}</span>
         </Btn>
       ))}
+
+      <Sep />
+
+      {/* Word's "Wrap text": the prose runs alongside the picture rather than
+          resuming beneath it. */}
+      <Btn
+        label={wrap ? "Stop text wrapping" : "Wrap text around image"}
+        active={wrap}
+        onClick={toggleWrap}
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          className="h-4 w-4"
+        >
+          {/* Lines of text shortened around a block on the right — the shape
+              the setting makes on the page. */}
+          <rect x="11.5" y="4" width="5" height="6" rx="0.5" fill="currentColor" stroke="none" />
+          <path d="M3.5 5h6M3.5 8h6M3.5 11h13M3.5 14h13" />
+        </svg>
+      </Btn>
 
       <Sep />
 

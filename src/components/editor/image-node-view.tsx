@@ -22,6 +22,8 @@ export function ImageNodeView({
   const alt = (node.attrs.alt as string) || "";
   const width = (node.attrs.width as string) || null;
   const align = (node.attrs.align as string) || "center";
+  // Text runs beside the picture only when it has a side to sit on.
+  const wrap = node.attrs.wrap === true && (align === "left" || align === "right");
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const startResize = (side: "left" | "right") => (e: React.PointerEvent) => {
@@ -33,7 +35,12 @@ export function ImageNodeView({
     const frame = wrapper?.querySelector<HTMLElement>(".image-nv-frame");
     if (!wrapper || !frame) return;
 
-    const columnWidth = wrapper.clientWidth;
+    // A wrapping picture is floated, so it is only as wide as itself — the
+    // column has to be measured from its parent instead, or every drag would
+    // read the image's own width as 100% and it could never be made larger.
+    const columnWidth = wrap
+      ? (wrapper.parentElement?.clientWidth ?? wrapper.clientWidth)
+      : wrapper.clientWidth;
     const startX = e.clientX;
     const startWidth = frame.clientWidth;
 
@@ -58,11 +65,20 @@ export function ImageNodeView({
     <NodeViewWrapper
       ref={wrapperRef}
       className="image-nv"
-      style={{ textAlign: align as "left" | "center" | "right" }}
+      // The float is CSS, keyed off this attribute — see .image-nv[data-wrap]
+      // in globals.css — so the editor, the reading view and the exports all
+      // wrap the text the same way.
+      data-wrap={wrap ? align : undefined}
+      style={{
+        textAlign: align as "left" | "center" | "right",
+        // Floated, the wrapper shrinks to its content, so the picture's width
+        // has to move up to it from the frame or the float would be full width.
+        ...(wrap ? { width: width ?? "50%" } : null),
+      }}
     >
       <span
         className={`image-nv-frame${selected ? " is-selected" : ""}`}
-        style={{ width: width ?? undefined }}
+        style={{ width: wrap ? "100%" : (width ?? undefined) }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} draggable={false} />

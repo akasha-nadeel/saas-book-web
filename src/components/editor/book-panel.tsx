@@ -123,10 +123,10 @@ export function BookPanel({
   return (
     <aside
       aria-label="Book"
-      // The same soft gradient the shelf's hero band wears — lavender/pink in
-      // light, a panel with an accent glow at night (see .shelf-hero). One
-      // source of truth, so a change to the hero carries here too.
-      className="shelf-hero hidden w-72 shrink-0 flex-col border-l border-line lg:flex"
+      // Transparent, with no divider: the gradient wash and the seamless blend
+      // into the paper come from the shared row in the editor layout, so the
+      // book panel and the manuscript read as one surface.
+      className="hidden w-72 shrink-0 flex-col lg:flex"
     >
       {mode === "book" ? (
         <div className="scroll-slim flex h-full flex-col items-center overflow-y-auto px-6 py-8">

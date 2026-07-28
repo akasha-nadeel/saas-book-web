@@ -35,6 +35,20 @@ export const ResizableImage = Image.extend({
           "data-align": (attributes.align as string) || "center",
         }),
       },
+      /**
+       * Let the prose run alongside the picture instead of starting again
+       * beneath it — Word's "Square" wrapping, as against "In line with text".
+       *
+       * Only meaningful against a left or right alignment: a picture with text
+       * beside it has to be over on one side, and a centred one has no side for
+       * the words to take. The toolbar keeps the two in step.
+       */
+      wrap: {
+        default: false,
+        parseHTML: (element) => element.getAttribute("data-wrap") === "true",
+        renderHTML: (attributes) =>
+          attributes.wrap ? { "data-wrap": "true" } : {},
+      },
     };
   },
 

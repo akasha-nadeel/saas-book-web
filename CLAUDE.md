@@ -21,7 +21,13 @@ for the one assistant feature.
 - One test by name: `npx vitest run -t "scene break"`
 
 Tests live beside their subjects as `*.test.ts` and concentrate on the pure
-logic: the import/export pipelines, the store, page setup, relative time.
+logic: the import/export pipelines, the store, page setup, search, book kinds,
+the custom Tiptap marks, relative time. Components are not tested — jsdom is
+there for `localStorage`, not for a DOM.
+
+`docs/plans/` holds the design and implementation notes for the bigger pieces
+(the bookshelf, export). They record what was decided and why, and are worth
+reading before reworking either.
 
 ## Stack
 
@@ -55,7 +61,16 @@ React bindings, with nothing else changing. Keep that boundary intact.
 Book/chapter totals are summed on read, never stored, so they can't drift.
 Deleting a chapter is a soft delete: its meta moves to the book's `trash` list in
 the shelf, but its body and notes stay at their own keys until the trash is
-emptied, so a restore is lossless.
+emptied, so a restore is lossless. A *book* is soft-deleted differently — it
+stays in `shelf.books` and gains an `archivedAt` or `trashedAt` stamp, and
+`booksIn(shelf, view)` filters the three shelf views out of the one list.
+
+**Two subscription audiences, opposite needs.** Shelf listeners want every write
+including our own (renaming a chapter must repaint the sidebar now), so local
+fan-out is manual and shelf-only. Body listeners want *only* other tabs — echoing
+our own save back would remount the surface the writer is typing into. The
+`storage` event covers cross-tab for both, since browsers fire it only in other
+tabs. Get this backwards and you eat the caret.
 
 **React binds via `src/lib/use-library.ts`** — kept apart from the store so the
 store stays React-free. It uses `useSyncExternalStore` with empty server
@@ -70,16 +85,47 @@ instead of leaving it stale. Autosave is `src/lib/use-autosave.ts`; body is
 written before word count (a stale count is cosmetic, lost prose is not). Custom
 Tiptap extensions live in `src/lib/editor/` (font size, text align, blockquote,
 resizable images). The one to understand is `pagination.ts`: it sets the
-manuscript on real page sheets by *measuring* the rendered blocks and inserting
+manuscript on real page sheets by *measuring* the rendered text and inserting
 spacer **decorations** at each page break — never document content, so undo,
-autosave and export see the same text. Inline images are a resizable node
+autosave and export see the same text. It measures in **lines**, not blocks, so a
+long paragraph fills the page and continues over the seam the way Word's does;
+the break arithmetic is the pure, tested `pageBreaks()`. Two things hold it
+together: every measure runs with the existing spacers `display:none`, so breaks
+are always computed from the document's natural flow and can never drift pass by
+pass; and a mid-paragraph gap is a full-width **inline-block**, because a block
+box there would make the browser split the paragraph into anonymous blocks and
+the continuation would take the book's first-line indent. A paragraph whose lines
+can't be read falls back to moving whole, which is how this worked before. Inline images are a resizable node
 (`resizable-image.ts` + `image-node-view.tsx`) that stores width as a percentage
 of the column; `src/lib/image-import.ts` handles paste/drop, capped at 900KB.
 
-**The reading view** (`/book/[bookId]/read`, `src/components/reader/`) renders the
-whole book on one scrolling page. It does not re-implement layout: it walks each
-chapter through the export path (`toBlocks` → `blocksToXhtml`) and sets it with
-the book's typography, so the read-through, the print PDF and the EPUB match.
+**The editor shell is a rail plus one panel.** `workspace-rail.tsx` selects which
+panel (`PanelTab` in `left-panel.tsx`: chapters, search, notes, bookmarks,
+assistant, trash) is open, and clicking the active tab closes it — one control,
+never two. Both the chapter editor and the book overview mount the same rail, so
+a change to the tabs lands on both screens at once. They differ in one thing: the
+editor passes `chapters={false}` and keeps its panel closed until a tab is picked,
+because the book panel beside the manuscript is already the chapter list, whereas
+the overview has no book panel and its chapter tab is the only way to pick one.
+Panel visibility follows from that — the overview uses the stored `leftPanel`
+pref, the editor its own state. The panes live in
+the *pages* rather than in `book/[bookId]/layout.tsx`, because the left panel
+needs the chapter id and the assistant needs the editor instance, neither of
+which a layout can see. The import banner is the exception and does live in that
+layout — it has to survive the writer clicking chapter to chapter.
+
+**The reading view** (`/book/[bookId]/read`, `src/components/reader/`) sets the
+whole book on real page sheets at the book's trim size. Prose is not re-laid out:
+each chapter is walked through the export path (`toBlocks` → `blocksToXhtml`) and
+styled with the book's typography, so the read-through, the print PDF and the
+EPUB match. Pagination *is* ours — the browser has none on screen — so
+`paginate()` in `reader-pages.tsx` measures the rendered blocks in a hidden
+column at the page's true content width (outside any `zoom` wrapper, which would
+distort the numbers) and packs them into page-height groups, re-running once the
+manuscript font loads. **That same `paginate()` backs the editor's Book View
+preview** (`page-preview.tsx`), so both break pages identically; keep them on the
+one function. `reader-flipbook.tsx` is the same flowed pages presented as a book
+you open and turn.
 
 **Import, export and the reading view share a format-neutral block IR**
 (`Block`/`Run` in `src/lib/export/blocks.ts`). A Tiptap doc is walked once into
@@ -94,6 +140,13 @@ dynamically imported so a writer who never exports never downloads them.
 - Import: `src/lib/import/` — docx, epub, md, txt, html. `index.ts` dispatches by
   extension and refuses `.doc`/`.pdf` *by name* with what to do instead; `split.ts`
   breaks a flat block stream into chapters.
+
+**The small pure modules** are where the conventions of the trade live, kept out
+of components so they can be tested and changed in one place: `book-kinds.ts`
+(novel/novella/short story, genre word-count targets), `book-templates.ts`
+(chapter skeletons only — never boilerplate prose), `search.ts` (walks plain text
+out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
+`relative-time.ts`, `use-typewriter.ts`.
 
 **The one server surface** is `src/app/api/chat/route.ts` — the editor's assistant,
 Anthropic streaming. Needs `ANTHROPIC_API_KEY` in `.env.local`; without it the
@@ -116,6 +169,16 @@ attribute. Body type is the same shape: `src/lib/page-setup.ts` and
 `src/lib/typography.ts` turn a book's page-and-type settings into `--ms-*` custom
 properties on the manuscript container, which the editor and the reading view
 both read — so one setting styles the writing surface and the read-through alike.
+
+Three writer-facing looks are stored in `prefs` and each is applied its own way:
+`theme` (light/dark) as `data-theme` on `<html>`, `paper` as `[data-paper]` on the
+writing surface, and `focusMode` / `typewriter` as behaviour. The theme is set
+before first paint by an inline script in `src/app/layout.tsx` so a dark-mode
+writer never sees a white flash; it runs before React, so it *cannot* import
+`library-store` and instead reads the `openchapter:prefs` key literally — change
+that key or the shape of `theme` and the bootstrap goes stale silently. `<html>`
+carries `suppressHydrationWarning` for the same reason, and `ThemeSync` takes
+over every change after hydration.
 
 `<body>` is `overflow-hidden` (for the editor shell). A standalone scrolling page
 therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reach.

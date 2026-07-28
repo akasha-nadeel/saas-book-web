@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import type { Editor } from "@tiptap/react";
+import { scrollParent } from "@/lib/editor/caret-scroll";
 
 /**
  * Typewriter scrolling: hold the caret at a comfortable height instead of
@@ -18,16 +19,6 @@ const ANCHOR = 0.42;
 
 /** How far the caret may drift from the anchor before the page moves, in px. */
 const TOLERANCE = 90;
-
-function scrollParent(node: HTMLElement | null): HTMLElement | null {
-  let current = node?.parentElement ?? null;
-  while (current) {
-    const overflow = getComputedStyle(current).overflowY;
-    if (overflow === "auto" || overflow === "scroll") return current;
-    current = current.parentElement;
-  }
-  return null;
-}
 
 export function useTypewriter(enabled: boolean) {
   return useCallback(

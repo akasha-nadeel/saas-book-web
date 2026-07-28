@@ -57,6 +57,9 @@ export interface Block {
   level?: number;
   /** Per-paragraph alignment, when set away from the book default. */
   align?: "left" | "center" | "right" | "justify";
+  /** Set on a line placed flush at the margin, which takes no first-line
+   *  indent. Separate from `align` on purpose — see lib/editor/no-indent.ts. */
+  noIndent?: true;
   /** Only set on code blocks, when the editor recorded one. */
   language?: string;
   /** Only set on images. A data URL — see lib/image-import. */
@@ -64,6 +67,9 @@ export interface Block {
   alt?: string;
   /** Image width as a CSS length (e.g. "50%"), when the writer sized it. */
   imgWidth?: string;
+  /** Set on an image the prose runs alongside rather than resuming beneath —
+   *  Word's "Square" wrapping. Only ever set together with `align`. */
+  wrap?: true;
   runs: Run[];
 }
 
@@ -125,6 +131,12 @@ function alignOf(node: JSONContent): Pick<Block, "align"> {
     : {};
 }
 
+// The flush-at-the-margin mark, so a placed line reads the same in the reading
+// view and every export as it does on the page it was written on.
+function indentOf(node: JSONContent): Pick<Block, "noIndent"> {
+  return node.attrs?.noIndent === true ? { noIndent: true } : {};
+}
+
 function walk(nodes: JSONContent[], depth: number, out: Block[]) {
   for (const node of nodes) {
     switch (node.type) {
@@ -134,6 +146,7 @@ function walk(nodes: JSONContent[], depth: number, out: Block[]) {
           depth,
           runs: runsFrom(node.content),
           ...alignOf(node),
+          ...indentOf(node),
         });
         break;
 
@@ -144,6 +157,7 @@ function walk(nodes: JSONContent[], depth: number, out: Block[]) {
           level: Number(node.attrs?.level ?? 1),
           runs: runsFrom(node.content),
           ...alignOf(node),
+          ...indentOf(node),
         });
         break;
 
@@ -198,6 +212,13 @@ function walk(nodes: JSONContent[], depth: number, out: Block[]) {
             ...(typeof alt === "string" && alt ? { alt } : {}),
             ...(align === "left" || align === "right" ? { align } : {}),
             ...(typeof imgWidth === "string" && imgWidth ? { imgWidth } : {}),
+            // Only meaningful against a side — a centred picture has no side
+            // for the words to run down, so the flag is dropped with the
+            // alignment rather than carried into an export that cannot use it.
+            ...(node.attrs?.wrap === true &&
+            (align === "left" || align === "right")
+              ? { wrap: true as const }
+              : {}),
             runs: [],
           });
         }

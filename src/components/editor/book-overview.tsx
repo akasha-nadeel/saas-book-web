@@ -44,6 +44,7 @@ export function BookOverview({ bookId }: { bookId: string }) {
         tab={tab}
         onSelectTab={setTab}
         leftPanel={prefs.leftPanel}
+        onPanel={(open) => setPref("leftPanel", open)}
         theme={prefs.theme}
       />
 

@@ -96,6 +96,67 @@ it("renders paragraph and heading alignment as an inline style", () => {
   ).toBe('<h2 style="text-align:right">End</h2>');
 });
 
+it("floats a wrapped image so the prose runs alongside it", () => {
+  expect(
+    blocksToXhtml([
+      {
+        kind: "image",
+        depth: 0,
+        src: "data:x",
+        align: "right",
+        imgWidth: "40%",
+        wrap: true,
+        runs: [],
+      },
+    ]),
+  ).toBe(
+    '<p class="figure" data-wrap="right" style="text-align:right;width:40%"><img src="data:x" alt="" /></p>',
+  );
+  // Unwrapped, the width stays on the picture and the figure keeps the column.
+  expect(
+    blocksToXhtml([
+      {
+        kind: "image",
+        depth: 0,
+        src: "data:x",
+        align: "right",
+        imgWidth: "40%",
+        runs: [],
+      },
+    ]),
+  ).toBe(
+    '<p class="figure" style="text-align:right"><img src="data:x" alt="" style="width:40%" /></p>',
+  );
+});
+
+it("renders a flush line's indent, alongside any alignment", () => {
+  // On its own.
+  expect(
+    blocksToXhtml([
+      { kind: "paragraph", depth: 0, noIndent: true, runs: [{ text: "Flush." }] },
+    ]),
+  ).toBe('<p style="text-indent:0">Flush.</p>');
+  // With an alignment: one style attribute, since a second would be dropped by
+  // the parser rather than merged.
+  expect(
+    blocksToXhtml([
+      {
+        kind: "paragraph",
+        depth: 0,
+        align: "left",
+        noIndent: true,
+        runs: [{ text: "Placed." }],
+      },
+    ]),
+  ).toBe('<p style="text-align:left;text-indent:0">Placed.</p>');
+  // Left-aligned prose that was never placed keeps the book's indent.
+  expect(
+    blocksToXhtml([
+      { kind: "paragraph", depth: 0, align: "left", runs: [{ text: "Prose." }] },
+    ]),
+  ).toBe('<p style="text-align:left">Prose.</p>');
+});
+
 it("renders a scene break as centred asterisks", () => {
   expect(blocksToXhtml([{ kind: "sceneBreak", depth: 0, runs: [] }])).toBe(
     '<p class="scene-break">* * *</p>',

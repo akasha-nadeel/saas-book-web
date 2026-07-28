@@ -168,35 +168,93 @@ export function PagePreview({
   const scale = PREVIEW_W / trueW;
   const frameStyle = { width: PREVIEW_W, height: trueH * scale } as const;
 
+  // Which way the leaf turns: forward when the page went up, back when it went
+  // down. Compared against the last committed index, updated after paint — so on
+  // the render where the page changes, this still holds the old value and the
+  // direction reads true. The keyed frame below remounts each change, replaying
+  // the CSS page-turn.
+  const prevIndexRef = useRef(index);
+  const turn =
+    index > prevIndexRef.current
+      ? "oc-page-turn-next"
+      : index < prevIndexRef.current
+        ? "oc-page-turn-prev"
+        : "";
+  useEffect(() => {
+    prevIndexRef.current = index;
+  }, [index]);
+
   // The cover, page 0 — drawn on a sheet the size of a page so the frame holds.
   if (index <= 0) {
     return (
       <>
-        <div
-          style={frameStyle}
-          className="relative flex shrink-0 items-center justify-center
-                     overflow-hidden rounded-sm bg-panel shadow-lg"
-        >
-          {cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={cover}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="w-full">
-              <BookCover
-                title={book.title}
-                subtitle={book.subtitle}
-                author={book.author}
-                words={0}
-                image={null}
-                bare={book.bareCover}
-                seed={book.id}
+        {/* A real book object, not a flat image: the artwork under a spine
+            shading down the left fold, a page-block of hairlines down the right
+            fore-edge, and a grounded two-layer shadow — the same treatment the
+            shelf covers wear (see BookCover), sized to the page. Wrapped so it
+            turns like a leaf when the writer flips back to it. */}
+        <div className="oc-page-view">
+          <div
+            key={index}
+            style={frameStyle}
+            className={`relative flex shrink-0 items-center justify-center
+                       overflow-hidden rounded-l-[2px] rounded-r-md bg-panel
+                       shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35),0_20px_42px_-12px_rgba(0,0,0,0.9)]
+                       ${turn}`}
+          >
+            {cover ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={cover}
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover"
               />
-            </div>
-          )}
+            ) : (
+              <div className="w-full">
+                <BookCover
+                  title={book.title}
+                  subtitle={book.subtitle}
+                  author={book.author}
+                  words={0}
+                  image={null}
+                  bare={book.bareCover}
+                  seed={book.id}
+                />
+              </div>
+            )}
+
+            {/* Only over artwork — a typeset BookCover already draws its own. */}
+            {cover && (
+              <>
+                {/* The spine: a hard fold with the shading falling away. */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-0 w-4 bg-gradient-to-r
+                             from-black/30 via-black/[0.08] to-transparent"
+                />
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-y-0 left-[4px] w-px bg-black/20"
+                />
+                {/* The page block, edge-on: hairlines so it reads as leaves. */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-y-1 right-0 w-[5px]"
+                  style={{
+                    backgroundImage:
+                      "repeating-linear-gradient(to right, rgba(0,0,0,0.18) 0 1px, rgba(255,255,255,0.85) 1px 2px)",
+                  }}
+                />
+                {/* A soft inner vignette, so the jacket reads as a curved surface
+                    under light rather than a flat print. */}
+                <div
+                  aria-hidden="true"
+                  className="absolute inset-0 rounded-r-md"
+                  style={{ boxShadow: "inset 0 0 24px rgba(0,0,0,0.22)" }}
+                />
+              </>
+            )}
+          </div>
         </div>
         <MeasureColumn ref={measureRef} typoVars={typoVars} paper={paper} />
       </>
@@ -212,41 +270,45 @@ export function PagePreview({
       style={{ ...typoVars, colorScheme: dark ? "dark" : "light" }}
     >
       {/* The sheet at its true trim size, scaled down; the wrapper clips the
-          overflow so only this page shows. */}
-      <div
-        style={frameStyle}
-        className="relative shrink-0 overflow-hidden rounded-sm shadow-lg"
-      >
+          overflow so only this page shows. The perspective wrapper and the keyed,
+          turn-classed frame make it flip like a leaf on each page change. */}
+      <div className="oc-page-view">
         <div
-          className="paper reader-page"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: trueW,
-            height: trueH,
-            paddingTop: metrics.top * PX_PER_IN,
-            paddingBottom: metrics.bottom * PX_PER_IN,
-            paddingLeft: metrics.left * PX_PER_IN,
-            paddingRight: metrics.right * PX_PER_IN,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          }}
+          key={index}
+          style={frameStyle}
+          className={`relative shrink-0 overflow-hidden rounded-sm shadow-lg ${turn}`}
         >
-          {page?.first && !page.empty && (
-            <div className="chapter-opener">
-              {page.label && <p className="chapter-label">{page.label}</p>}
-              <h2 className="reader-title">{page.title}</h2>
-            </div>
-          )}
-          {page?.empty ? (
-            <p className="reader-empty">This chapter is empty.</p>
-          ) : (
-            <div
-              className={`tiptap${page && !page.first ? " reader-cont" : ""}`}
-              dangerouslySetInnerHTML={{ __html: page?.html ?? "" }}
-            />
-          )}
+          <div
+            className="paper reader-page"
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: trueW,
+              height: trueH,
+              paddingTop: metrics.top * PX_PER_IN,
+              paddingBottom: metrics.bottom * PX_PER_IN,
+              paddingLeft: metrics.left * PX_PER_IN,
+              paddingRight: metrics.right * PX_PER_IN,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+            }}
+          >
+            {page?.first && !page.empty && (
+              <div className="chapter-opener">
+                {page.label && <p className="chapter-label">{page.label}</p>}
+                <h2 className="reader-title">{page.title}</h2>
+              </div>
+            )}
+            {page?.empty ? (
+              <p className="reader-empty">This chapter is empty.</p>
+            ) : (
+              <div
+                className={`tiptap${page && !page.first ? " reader-cont" : ""}`}
+                dangerouslySetInnerHTML={{ __html: page?.html ?? "" }}
+              />
+            )}
+          </div>
         </div>
       </div>
 

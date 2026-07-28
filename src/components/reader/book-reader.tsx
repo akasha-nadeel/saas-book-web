@@ -17,12 +17,10 @@ import { pageMetrics } from "@/lib/page-setup";
 import { typographyVars } from "@/lib/typography";
 import { toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml } from "@/lib/export/xhtml";
-import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
+import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 import { LoadingScreen } from "@/components/loading-screen";
-import {
-  ReaderPages,
-  type ReaderChapter,
-} from "@/components/reader/reader-pages";
+import { type ReaderChapter } from "@/components/reader/reader-pages";
+import { ReaderFlipbook } from "@/components/reader/reader-flipbook";
 
 /**
  * The whole book on one scrolling page.
@@ -76,6 +74,7 @@ export function BookReader({ bookId }: { bookId: string }) {
   const shelf = useShelf();
   const prefs = usePrefs();
   const book = findBook(shelf, bookId);
+  const cover = useCover(bookId);
 
   // How large the pages are drawn. A reading-only preference, so it lives in
   // component state rather than the store — closing the view resets it.
@@ -115,7 +114,7 @@ export function BookReader({ bookId }: { bookId: string }) {
   return (
     <div className="flex h-dvh flex-col bg-surface">
       {/* App chrome above the page: the way back to editing, and the title. */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-line bg-panel px-4 py-3 md:px-6">
+      <header className="flex shrink-0 items-center gap-3 px-4 py-3 md:px-6">
         <Link
           href={backHref}
           aria-label="Back to editing"
@@ -222,10 +221,12 @@ export function BookReader({ bookId }: { bookId: string }) {
             ...typoVars,
           } as CSSProperties
         }
-        className="scroll-paper manuscript min-h-0 flex-1 overflow-auto bg-surface"
+        className="manuscript min-h-0 flex-1 overflow-hidden bg-surface"
       >
-        <ReaderPages
+        <ReaderFlipbook
           chapters={chapters}
+          book={book}
+          cover={cover}
           metrics={metrics}
           paper={prefs.paper}
           zoom={zoom}

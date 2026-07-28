@@ -92,8 +92,14 @@ export function blocksToXhtml(blocks: Block[]): string {
 
     const text = renderRuns(block.runs);
     // Alignment set away from the book default rides on the block as an inline
-    // style, so the reader and the print/EPUB output match the editor.
-    const align = block.align ? ` style="text-align:${block.align}"` : "";
+    // style, so the reader and the print/EPUB output match the editor. A line
+    // placed flush at the margin carries its indent the same way — one style
+    // attribute, since a second would overwrite the first in the markup.
+    const rules = [
+      block.align ? `text-align:${block.align}` : "",
+      block.noIndent ? "text-indent:0" : "",
+    ].filter(Boolean);
+    const align = rules.length ? ` style="${rules.join(";")}"` : "";
 
     switch (block.kind) {
       case "heading": {
@@ -110,15 +116,25 @@ export function blocksToXhtml(blocks: Block[]): string {
       case "image": {
         // The figure's alignment sits the image left/right of the column
         // (centre is the default); the width is on the image itself.
-        const figAlign =
-          block.align === "left" || block.align === "right"
-            ? ` style="text-align:${block.align}"`
+        const sided = block.align === "left" || block.align === "right";
+        const figAlign = sided ? ` style="text-align:${block.align}"` : "";
+        // A wrapped picture becomes a float, and a float has to carry its own
+        // width — the paragraph around it shrinks to fit and would otherwise
+        // take the whole column with nothing beside it.
+        const figWrap =
+          block.wrap && sided
+            ? ` data-wrap="${block.align}"${
+                block.imgWidth
+                  ? ` style="text-align:${block.align};width:${escapeXml(block.imgWidth)}"`
+                  : ""
+              }`
             : "";
-        const imgWidth = block.imgWidth
-          ? ` style="width:${escapeXml(block.imgWidth)}"`
-          : "";
+        const imgWidth =
+          block.imgWidth && !(block.wrap && sided)
+            ? ` style="width:${escapeXml(block.imgWidth)}"`
+            : "";
         out.push(
-          `<p class="figure"${figAlign}><img src="${escapeXml(block.src ?? "")}" alt="${escapeXml(block.alt ?? "")}"${imgWidth} /></p>`,
+          `<p class="figure"${figWrap || figAlign}><img src="${escapeXml(block.src ?? "")}" alt="${escapeXml(block.alt ?? "")}"${imgWidth} /></p>`,
         );
         break;
       }

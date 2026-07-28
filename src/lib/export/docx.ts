@@ -182,7 +182,10 @@ export async function buildDocx(
           out.push(
             new Paragraph({
               spacing: bodySpacing,
-              indent: opensSection ? undefined : bodyIndent,
+              // A line placed flush at the margin keeps no first-line indent,
+              // the same as one opening a section — see lib/editor/no-indent.ts.
+              indent:
+                opensSection || block.noIndent ? undefined : bodyIndent,
               children: runsFor(block.runs),
             }),
           );

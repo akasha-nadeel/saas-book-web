@@ -40,6 +40,40 @@ it("reads a paragraph's alignment when set", () => {
   ).toEqual([{ kind: "paragraph", depth: 0, runs: [{ text: "Plain." }] }]);
 });
 
+it("reads the flush-at-the-margin mark, independently of alignment", () => {
+  // A line placed by double-clicking the page: left-aligned *and* flush. The
+  // two are separate fields because aligning prose left must not un-indent it.
+  expect(
+    toBlocks(
+      doc({
+        type: "paragraph",
+        attrs: { textAlign: "left", noIndent: true },
+        content: [text("Placed.")],
+      }),
+    ),
+  ).toEqual([
+    {
+      kind: "paragraph",
+      depth: 0,
+      align: "left",
+      noIndent: true,
+      runs: [{ text: "Placed." }],
+    },
+  ]);
+  // Left-aligned ordinary prose keeps its indent, so carries no mark.
+  expect(
+    toBlocks(
+      doc({
+        type: "paragraph",
+        attrs: { textAlign: "left", noIndent: false },
+        content: [text("Flowing.")],
+      }),
+    ),
+  ).toEqual([
+    { kind: "paragraph", depth: 0, align: "left", runs: [{ text: "Flowing." }] },
+  ]);
+});
+
 it("reads an inline font size from its mark", () => {
   expect(
     toBlocks(doc(para(text("big", [{ type: "fontSize", attrs: { size: 1.5 } }])))),

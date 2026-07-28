@@ -600,6 +600,228 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   Book View page turn.
+
+   Flipping the preview turns the leaf like a real book: the incoming page is
+   hinged at the spine (its left edge for a left-bound book) and swings down flat
+   from edge-on. Going back turns the other way, hinged at the fore-edge. A
+   perspective on the wrapper gives the rotation its depth; a shadow sweeps
+   across the settling page so it reads as a physical leaf catching light.
+   -------------------------------------------------------------------------- */
+.oc-page-view {
+  perspective: 1600px;
+}
+
+.oc-page-turn-next,
+.oc-page-turn-prev {
+  position: relative;
+  animation: 480ms cubic-bezier(0.22, 0.61, 0.26, 1) both oc-page-turn;
+}
+.oc-page-turn-next {
+  transform-origin: left center;
+}
+.oc-page-turn-prev {
+  transform-origin: right center;
+  animation-name: oc-page-turn-back;
+}
+
+/* The travelling shadow of the turning leaf, over the page as it settles. */
+.oc-page-turn-next::after,
+.oc-page-turn-prev::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  animation: 480ms cubic-bezier(0.22, 0.61, 0.26, 1) both oc-page-turn-shade;
+}
+
+@keyframes oc-page-turn {
+  from {
+    transform: rotateY(-96deg);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
+@keyframes oc-page-turn-back {
+  from {
+    transform: rotateY(96deg);
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  to {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
+@keyframes oc-page-turn-shade {
+  from {
+    background: linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.45),
+      rgba(0, 0, 0, 0.12) 40%,
+      transparent 70%
+    );
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* A page-turn is decorative; skip it for anyone who would rather not watch. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-page-turn-next,
+  .oc-page-turn-prev,
+  .oc-page-turn-next::after,
+  .oc-page-turn-prev::after {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The open book — a two-page spread in Book View.
+
+   Two facing sheets side by side, bound at a centre spine, with a page block of
+   stacked leaves down each fore-edge and a grounded shadow, so the preview reads
+   as an open book lying flat. Turning a page rotates a real leaf around the
+   spine: a two-faced sheet (the outgoing page on its front, the incoming one on
+   its back) swinging from one side to the other, over a perspective.
+   -------------------------------------------------------------------------- */
+.oc-book {
+  position: relative;
+  display: flex;
+  perspective: 2000px;
+  border-radius: 2px;
+  box-shadow:
+    0 4px 12px -4px rgba(0, 0, 0, 0.4),
+    0 28px 54px -18px rgba(0, 0, 0, 0.85);
+}
+
+/* The spine gutter: a soft crease of shadow where the two pages meet. */
+.oc-book-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 26px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 4;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 0, 0, 0.16) 42%,
+    rgba(0, 0, 0, 0.2) 50%,
+    rgba(0, 0, 0, 0.16) 58%,
+    transparent
+  );
+}
+
+/* The page blocks, edge-on down each fore-edge — hairlines that read as the
+   stacked leaves of the closed halves of the book. */
+.oc-book-edge {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 6px;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to right,
+    rgba(0, 0, 0, 0.16) 0 1px,
+    rgba(255, 255, 255, 0.85) 1px 2px
+  );
+}
+.oc-book-edge-left {
+  left: -6px;
+  border-radius: 2px 0 0 2px;
+}
+.oc-book-edge-right {
+  right: -6px;
+  border-radius: 0 2px 2px 0;
+}
+
+/* The turning leaf: a two-faced sheet hinged at the spine. */
+.oc-leaf {
+  position: absolute;
+  top: 0;
+  transform-style: preserve-3d;
+  z-index: 6;
+}
+.oc-leaf-next {
+  transform-origin: left center;
+  animation: oc-leaf-turn-next 660ms cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+.oc-leaf-prev {
+  transform-origin: right center;
+  animation: oc-leaf-turn-prev 660ms cubic-bezier(0.3, 0, 0.2, 1) both;
+}
+.oc-leaf-face {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  backface-visibility: hidden;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.28);
+}
+.oc-leaf-back {
+  transform: rotateY(180deg);
+}
+
+@keyframes oc-leaf-turn-next {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(-180deg);
+  }
+}
+@keyframes oc-leaf-turn-prev {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+/* Opening from the cover: the whole book slides half a page to the right as the
+   cover leaf turns, so the closed cover (centred) and the open spread stay put
+   under it — no jump. The shift is the current half-page width, passed in as a
+   custom property since it scales with the zoom. */
+.oc-book-opening {
+  animation: oc-book-open 660ms cubic-bezier(0.3, 0, 0.2, 1) both;
+  /* While the cover is opening the left half is empty, so the book's own
+     grounded shadow (which spans both pages) would outline an empty page beside
+     the closed cover. Drop it during the open; the cover leaf carries its own
+     shadow, and the shadow returns once the spread has settled. */
+  box-shadow: none;
+}
+@keyframes oc-book-open {
+  from {
+    transform: translateX(calc(var(--open-shift) * -1));
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-leaf-next,
+  .oc-leaf-prev,
+  .oc-book-opening {
+    animation-duration: 1ms;
+  }
+}
+
+/* --------------------------------------------------------------------------
    Print layout: the editor set on real page sheets.
 
    The manuscript is one continuous editable that flows over a stack of page
@@ -641,6 +863,27 @@ body {
 .pageflow-spacer {
   width: 100%;
   user-select: none;
+}
+/* The same gap where it falls *inside* a paragraph, so a long paragraph fills
+   the page and carries on over the seam instead of being pushed down whole.
+
+   Block, not inline-block, and the difference matters more than it looks. An
+   inline-block belongs to the paragraph's inline flow, and because it is full
+   width it begins a new line — which makes the document position *in front of
+   it* a real place for the caret, at the start of that line, out in the gap
+   between two sheets. That is where the cursor kept turning up. A block box is
+   not in the inline flow at all, so it has no caret position of its own: the
+   browser wraps the text either side in anonymous blocks, and the only places
+   the caret can go are the end of the last line above the seam and the start of
+   the first line below it. Both are on the paper, which is the whole point.
+
+   Zero font-size and leading so the box is exactly the height it is given and
+   the seam gains no stray line of space. */
+.pageflow-spacer-inline {
+  display: block;
+  font-size: 0;
+  line-height: 0;
+  text-indent: 0;
 }
 
 /* Columns apply to the prose only — the chapter title spans the page, as a
@@ -691,9 +934,19 @@ body {
 
 /* A centred or right-aligned paragraph drops its first-line indent — an indent
    only reads as an indent against a left edge, and would push centred text off
-   centre. The inline style the alignment sets is matched here. */
+   centre. Left is deliberately *not* here: aligning body prose left is an
+   ordinary thing to do to a flowing paragraph and must leave its indent alone.
+   A line that should begin flush at the margin says so itself — see the
+   noIndent mark in lib/editor/no-indent.ts.
+
+   Two spellings, because two renderers write this style: the editor's TextAlign
+   extension puts a space after the colon, the export/reader XHTML does not, and
+   an attribute substring match is literal. Keep both, or the reading view and
+   the page you wrote on will disagree — as they did while only one was here. */
 .manuscript .tiptap p[style*="text-align: center"],
-.manuscript .tiptap p[style*="text-align: right"] {
+.manuscript .tiptap p[style*="text-align:center"],
+.manuscript .tiptap p[style*="text-align: right"],
+.manuscript .tiptap p[style*="text-align:right"] {
   text-indent: 0;
 }
 
@@ -705,6 +958,19 @@ body {
 .manuscript .tiptap h3 + p,
 .manuscript .tiptap hr + p,
 .manuscript .tiptap blockquote + p {
+  text-indent: 0;
+}
+
+/* An empty paragraph has no first line to indent, so its caret must sit at the
+   left margin — a blank line indented by the first-line rule reads as the caret
+   floating in from the edge. An empty block in ProseMirror renders as a lone
+   trailing <br> (so it keeps its height); `:has(...:only-child)` catches those,
+   `.is-empty` the block the caret is in, `:empty` a truly childless one. The
+   indent returns the moment the writer types, which is where the finished line
+   sits. */
+.manuscript .tiptap p.is-empty,
+.manuscript .tiptap p:empty,
+.manuscript .tiptap p:has(> br.ProseMirror-trailingBreak:only-child) {
   text-indent: 0;
 }
 
@@ -804,6 +1070,35 @@ body {
 .image-nv-frame.is-selected {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* A picture the prose runs alongside — Word's "Square" wrapping.
+   A float is what lets the paragraphs after it shorten their lines and flow up
+   beside the picture instead of starting again below it. The margin is on the
+   inner side only, so the picture stays flush with the text margin it sits
+   against and the words never touch it. */
+.image-nv[data-wrap="left"],
+.manuscript .tiptap p.figure[data-wrap="left"] {
+  float: left;
+  margin: 0.25em 1.4em 0.8em 0;
+}
+.image-nv[data-wrap="right"],
+.manuscript .tiptap p.figure[data-wrap="right"] {
+  float: right;
+  margin: 0.25em 0 0.8em 1.4em;
+}
+/* The picture is inside its float, which is already the right width. */
+.image-nv[data-wrap] .image-nv-frame,
+.manuscript .tiptap p.figure[data-wrap] img {
+  width: 100%;
+}
+/* A wrapped picture is out of the flow, so the block that closes a chapter must
+   reach past it — otherwise a short chapter ends level with the words and the
+   picture hangs below the last line, outside the text it belongs to. */
+.manuscript .tiptap::after {
+  content: "";
+  display: block;
+  clear: both;
 }
 .image-nv-handle {
   position: absolute;

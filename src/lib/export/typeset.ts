@@ -193,6 +193,12 @@ body > section:first-of-type { page-break-before: avoid; break-before: avoid; }`
 }
 p { margin: 0; text-indent: 1.5em; orphans: 2; widows: 2; }
 h1 + p, blockquote + p, .scene-break + p, .figure + p { text-indent: 0; }
+/* Centred and right-aligned paragraphs drop the indent, as they do in the
+   editor and the reading view, so the printed page matches the page it was
+   written on. Left keeps its indent: aligning prose left does not un-indent it.
+   A line placed flush carries its own inline text-indent and needs no rule. */
+p[style*="text-align:center"],
+p[style*="text-align:right"] { text-indent: 0; }
 ${
   options.dropCaps
     ? `h1 + p::first-letter {
@@ -208,6 +214,15 @@ ${
 blockquote { margin: 1.5em; font-style: italic; text-indent: 0; }
 .figure { text-align: center; text-indent: 0; margin: 1.5em 0; }
 .figure img { max-width: 100%; height: auto; }
+/* A picture the prose runs alongside, as the editor and the reading view set
+   it. The margin is on the inner side only, so the picture stays flush with the
+   text margin it sits against. */
+.figure[data-wrap="left"] { float: left; margin: 0.25em 1.4em 0.8em 0; }
+.figure[data-wrap="right"] { float: right; margin: 0.25em 0 0.8em 1.4em; }
+.figure[data-wrap] img { width: 100%; }
+/* A chapter has to reach past a picture it wraps, or a short one would end
+   level with its words and leave the picture hanging below them. */
+section::after { content: ""; display: block; clear: both; }
 
 /* Generated front matter. Each opens its own page in print (the section rule
    above), and an e-reader paginates as it likes. */
