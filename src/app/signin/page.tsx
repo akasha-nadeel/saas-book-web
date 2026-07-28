@@ -13,7 +13,7 @@ export default async function SignInPage(props: PageProps<"/signin">) {
     <AuthForm
       mode="signin"
       next={safeNext(params.next)}
-      linkError={params.error === "link"}
+      problem={typeof params.error === "string" ? params.error : undefined}
     />
   );
 }

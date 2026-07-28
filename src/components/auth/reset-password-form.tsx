@@ -3,9 +3,10 @@
 import { useActionState } from "react";
 import { type AuthState, updatePassword } from "@/app/auth/actions";
 import {
+  AuthHeading,
   AuthShell,
-  FIELD,
   FormError,
+  PasswordField,
   SUBMIT,
 } from "@/components/auth/auth-shell";
 
@@ -26,20 +27,14 @@ export function ResetPasswordForm({ email }: { email: string | null }) {
 
   return (
     <AuthShell>
-      <h1 className="font-serif text-2xl text-fg">Set a new password</h1>
-      <p className="mt-1.5 font-sans text-sm break-words text-muted">
-        {email ? (
-          <>
-            For <span className="font-medium text-fg">{email}</span>.
-          </>
-        ) : (
-          "Choose something you’ll keep."
-        )}
-      </p>
+      <AuthHeading
+        title="Set a new password"
+        lede={email ? `For ${email}.` : "Choose something you’ll keep."}
+      />
 
-      <form action={formAction} className="mt-6 flex flex-col gap-4">
-        {/* Off-screen, but present: password managers need the account this
-            new password belongs to, or they save it against nothing. */}
+      <form action={formAction} className="mt-7 flex flex-col gap-4">
+        {/* Hidden, but present: password managers need the account this new
+            password belongs to, or they save it against nothing. */}
         {email && (
           <input
             type="email"
@@ -51,36 +46,22 @@ export function ResetPasswordForm({ email }: { email: string | null }) {
           />
         )}
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-sans text-sm font-medium text-fg">
-            New password
-          </span>
-          <input
-            type="password"
-            name="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            autoFocus
-            placeholder="At least 8 characters"
-            className={FIELD}
-          />
-        </label>
+        <PasswordField
+          name="password"
+          label="New password"
+          autoComplete="new-password"
+          minLength={8}
+          autoFocus
+          placeholder="At least 8 characters"
+        />
 
-        <label className="flex flex-col gap-1.5">
-          <span className="font-sans text-sm font-medium text-fg">
-            Again, to be sure
-          </span>
-          <input
-            type="password"
-            name="confirm"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            placeholder="Repeat it"
-            className={FIELD}
-          />
-        </label>
+        <PasswordField
+          name="confirm"
+          label="Again, to be sure"
+          autoComplete="new-password"
+          minLength={8}
+          placeholder="Repeat it"
+        />
 
         {state.error && <FormError>{state.error}</FormError>}
 

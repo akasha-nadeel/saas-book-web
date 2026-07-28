@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
 import { type AuthState, requestPasswordReset } from "@/app/auth/actions";
 import {
+  AuthHeading,
+  AuthLink,
   AuthShell,
   FIELD,
+  FieldLabel,
   FormError,
   FormNotice,
   SUBMIT,
@@ -19,15 +21,21 @@ export function ForgotPasswordForm() {
   );
 
   return (
-    <AuthShell>
-      <h1 className="font-serif text-2xl text-fg">Reset your password</h1>
-      <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
-        We’ll email you a link that signs you in and lets you set a new one.
-      </p>
+    <AuthShell
+      headerAction={
+        <p className="font-sans text-sm text-muted">
+          Remembered it? <AuthLink href="/signin">Sign in</AuthLink>
+        </p>
+      }
+    >
+      <AuthHeading
+        title="Reset your password"
+        lede="We’ll email you a link that signs you in and lets you set a new one."
+      />
 
-      <form action={formAction} className="mt-6 flex flex-col gap-4">
+      <form action={formAction} className="mt-7 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="font-sans text-sm font-medium text-fg">Email</span>
+          <FieldLabel>Email</FieldLabel>
           <input
             type="email"
             name="email"
@@ -47,16 +55,8 @@ export function ForgotPasswordForm() {
         </button>
       </form>
 
-      <p className="mt-5 font-sans text-sm text-muted">
-        Remembered it?{" "}
-        <Link
-          href="/signin"
-          className="font-medium text-accent underline-offset-2 outline-none
-                     hover:underline focus-visible:ring-2
-                     focus-visible:ring-accent/50"
-        >
-          Back to sign in
-        </Link>
+      <p className="mt-8 text-center font-sans text-xs leading-relaxed text-muted">
+        The link works once, and only in this browser.
       </p>
     </AuthShell>
   );

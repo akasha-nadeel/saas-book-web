@@ -108,6 +108,39 @@ export async function signUp(
 }
 
 /**
+ * Hand off to Google.
+ *
+ * Run as a Server Action rather than from the browser so the PKCE verifier is
+ * written to an httpOnly cookie by the same request that starts the handshake.
+ * Google returns to Supabase, Supabase returns to /auth/confirm with a `code`,
+ * and that route exchanges it exactly as it does an emailed link — one place
+ * where sessions get created, whatever started them.
+ *
+ * Not wired to useActionState: this always ends in a redirect, so there is no
+ * state to hand back.
+ */
+export async function signInWithGoogle(formData: FormData) {
+  if (!isSupabaseConfigured()) redirect("/signin?error=config");
+
+  const next = safeNext(formData.get("next"));
+  const origin = (await headers()).get("origin") ?? "";
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
+    },
+  });
+
+  // The likely failure is the provider being switched off in the Supabase
+  // dashboard, which is a configuration problem, not something the writer did.
+  if (error || !data.url) redirect("/signin?error=oauth");
+
+  redirect(data.url);
+}
+
+/**
  * Step one of a forgotten password: mail a recovery link.
  *
  * The link lands on /auth/confirm like any other, which exchanges it for a

@@ -1,14 +1,25 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
-import { type AuthState, signIn, signUp } from "@/app/auth/actions";
 import {
+  type AuthState,
+  signIn,
+  signInWithGoogle,
+  signUp,
+} from "@/app/auth/actions";
+import {
+  AuthHeading,
+  AuthLink,
   AuthShell,
   FIELD,
+  FieldLabel,
   FormError,
   FormNotice,
+  GoogleButton,
+  OrDivider,
+  PasswordField,
   SUBMIT,
+  useAuthProblem,
 } from "@/components/auth/auth-shell";
 
 /**
@@ -24,11 +35,11 @@ import {
 const COPY = {
   signin: {
     heading: "Welcome back",
-    lede: "Sign in to reach your shelf.",
+    lede: "Enter your details to reach your shelf.",
     submit: "Sign in",
     working: "Signing in…",
-    switchLede: "New here?",
-    switchLabel: "Create an account",
+    switchLede: "Don’t have an account?",
+    switchLabel: "Sign up",
     switchHref: "/signup",
     autoComplete: "current-password",
   },
@@ -44,42 +55,71 @@ const COPY = {
   },
 } as const;
 
+/** What went wrong before we got here, if anything, as told by ?error=. */
+const PROBLEM: Record<string, string> = {
+  link:
+    "That link has expired or was already used — they work once, and only in " +
+    "the browser that asked for them. Sign in, or start again to get a fresh one.",
+  oauth:
+    "Google sign-in isn’t available on this deployment. Use your email and " +
+    "password below.",
+  config:
+    "Accounts aren’t configured on this deployment, so there is nothing to " +
+    "sign in to.",
+};
+
 export function AuthForm({
   mode,
   next,
-  linkError,
+  problem,
 }: {
   mode: "signin" | "signup";
   next: string;
-  /** The confirmation link was stale or already used. */
-  linkError?: boolean;
+  /** The `error` query param, if the writer arrived carrying one. */
+  problem?: string;
 }) {
   const copy = COPY[mode];
   const [state, formAction, isPending] = useActionState<AuthState, FormData>(
     mode === "signin" ? signIn : signUp,
     {},
   );
+  const problemText = useAuthProblem(problem, PROBLEM);
 
   return (
-    <AuthShell>
-      <h1 className="font-serif text-2xl text-fg">{copy.heading}</h1>
-      <p className="mt-1.5 font-sans text-sm text-muted">{copy.lede}</p>
+    <AuthShell
+      headerAction={
+        <p className="font-sans text-sm text-muted">
+          {copy.switchLede}{" "}
+          <AuthLink href={copy.switchHref}>{copy.switchLabel}</AuthLink>
+        </p>
+      }
+    >
+      <AuthHeading title={copy.heading} lede={copy.lede} />
 
-      {linkError && (
-        <div className="mt-5">
-          <FormNotice>
-            That link has expired or was already used — they work once, and only
-            in the browser that asked for them. Sign in, or start again to get a
-            fresh one.
-          </FormNotice>
+      {problemText && (
+        <div className="mt-6">
+          <FormNotice>{problemText}</FormNotice>
         </div>
       )}
 
-      <form action={formAction} className="mt-6 flex flex-col gap-4">
+      <div className="mt-7 flex flex-col gap-4">
+        <GoogleButton
+          action={signInWithGoogle}
+          next={next}
+          label={
+            mode === "signin" ? "Continue with Google" : "Sign up with Google"
+          }
+        />
+        <OrDivider>
+          {mode === "signin" ? "Or sign in with" : "Or sign up with"}
+        </OrDivider>
+      </div>
+
+      <form action={formAction} className="mt-4 flex flex-col gap-4">
         <input type="hidden" name="next" value={next} />
 
         <label className="flex flex-col gap-1.5">
-          <span className="font-sans text-sm font-medium text-fg">Email</span>
+          <FieldLabel>Email</FieldLabel>
           <input
             type="email"
             name="email"
@@ -91,54 +131,45 @@ export function AuthForm({
           />
         </label>
 
-        <label className="flex flex-col gap-1.5">
-          <span className="flex items-baseline justify-between gap-3">
-            <span className="font-sans text-sm font-medium text-fg">
-              Password
-            </span>
-            {/* Only on sign-in. Offering it during signup would be asking to
-                reset a password they are in the middle of choosing. */}
-            {mode === "signin" && (
-              <Link
-                href="/forgot-password"
-                className="font-sans text-xs text-muted underline-offset-2
-                           outline-none hover:text-fg hover:underline
-                           focus-visible:ring-2 focus-visible:ring-accent/50"
-              >
-                Forgot it?
-              </Link>
-            )}
-          </span>
-          <input
-            type="password"
-            name="password"
-            required
-            minLength={mode === "signup" ? 8 : undefined}
-            autoComplete={copy.autoComplete}
-            placeholder={mode === "signup" ? "At least 8 characters" : "••••••••"}
-            className={FIELD}
-          />
-        </label>
+        <PasswordField
+          name="password"
+          label="Password"
+          autoComplete={copy.autoComplete}
+          minLength={mode === "signup" ? 8 : undefined}
+          placeholder={
+            mode === "signup" ? "At least 8 characters" : "Your password"
+          }
+        />
 
         {state.error && <FormError>{state.error}</FormError>}
         {state.notice && <FormNotice>{state.notice}</FormNotice>}
 
         <button type="submit" disabled={isPending} className={SUBMIT}>
           {isPending ? copy.working : copy.submit}
+          {!isPending && (
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M4 10h11M11 6l4 4-4 4" />
+            </svg>
+          )}
         </button>
       </form>
 
-      <p className="mt-5 font-sans text-sm text-muted">
-        {copy.switchLede}{" "}
-        <Link
-          href={copy.switchHref}
-          className="font-medium text-accent underline-offset-2 outline-none
-                     hover:underline focus-visible:ring-2
-                     focus-visible:ring-accent/50"
-        >
-          {copy.switchLabel}
-        </Link>
-      </p>
+      {/* Under the button, where the reference puts it — a writer looks for it
+          after the password has failed, not while typing it. */}
+      {mode === "signin" && (
+        <p className="mt-5 text-center font-sans text-sm text-muted">
+          <AuthLink href="/forgot-password">Forgot password?</AuthLink>
+        </p>
+      )}
     </AuthShell>
   );
 }

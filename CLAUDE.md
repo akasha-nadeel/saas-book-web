@@ -177,13 +177,25 @@ same response and there is no sign-in flash. The proxy skips `/api` on purpose �
 redirecting a `fetch` to an HTML page yields a parse error, not a 401 — so the
 chat route checks for itself.
 
-**Password reset rides the same rails.** `/forgot-password` mails a recovery
-link pointed at `/auth/confirm?next=/reset-password`; that route exchanges it
-for a session like any other link, so `/reset-password` needs no token of its
-own and is *gated* rather than public — by the time a writer arrives they are
-signed in, and `updateUser()` knows who they are. Which also makes it a plain
-change-password screen for anyone already in. The four auth screens share
-`auth-shell.tsx` so the chrome cannot drift between them.
+**Everything funnels through `/auth/confirm`.** Password reset, email
+confirmation and Google all end there: `/forgot-password` mails a link pointed
+at `/auth/confirm?next=/reset-password`, and `signInWithGoogle` (a Server
+Action, so the PKCE verifier lands in an httpOnly cookie) sends Google → Supabase
+→ the same route. One place creates sessions, whatever started them. So
+`/reset-password` needs no token of its own and is *gated* rather than public —
+by the time a writer arrives they are signed in, and `updateUser()` knows who
+they are, which also makes it a plain change-password screen for anyone already
+in. Google's redirect URI is registered as *Supabase's* callback, never ours;
+our domains live in Supabase's Redirect URLs allowlist.
+
+**Supabase reports auth failures in the URL fragment**, which browsers never
+send to a server. `useFragmentError` in `auth-shell.tsx` reads it after
+hydration — through `useSyncExternalStore`, like `useHydrated`, with the capture
+cached at module scope so the snapshot stays stable and survives the effect that
+wipes the hash. Without it every failure reads as "that link expired", including
+a rejected OAuth secret, which is a genuinely misleading place to start
+debugging. The four auth screens share `auth-shell.tsx` so the chrome cannot
+drift between them.
 
 **Auth is not persistence.** A signed-in writer still reads and writes
 `localStorage`; the account identifies them but does not yet carry their books.

@@ -585,6 +585,30 @@ body {
   --color-selected-fg: #ffffff;
 }
 
+/* --------------------------------------------------------------------------
+   The sign-in screen: a dark ground, with the form inset on it as a card.
+
+   Two classes rather than one, and the split matters. `.auth-ground` sets only
+   a background — no token re-pointing — because the form card is *inside* it,
+   and a re-pointed --color-fg would cascade straight into the card and print
+   near-white text on white. `.auth-aside` re-points the ink, and only wraps the
+   column of copy that actually sits on the navy.
+   -------------------------------------------------------------------------- */
+.auth-ground {
+  /* Dark: the desk, so the panel-coloured card reads as lifted off it. */
+  background: var(--color-surface);
+}
+
+:root:not([data-theme="dark"]) .auth-ground {
+  /* The same deep navy the shelf rail uses, so the two screens agree. */
+  background: #0a1a2f;
+}
+
+:root:not([data-theme="dark"]) .auth-aside {
+  --color-fg: #f2f6fb; /* near-white ink for the mark and the headline */
+  --color-muted: #9fb2c9; /* the line under it — a muted blue-grey */
+}
+
 /* The hero band. A soft lavender wash in light, the way the reference tints its
    "popular book this week" banner; a quiet panel with an accent glow at night. */
 .shelf-hero {
