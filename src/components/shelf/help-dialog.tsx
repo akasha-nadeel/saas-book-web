@@ -181,7 +181,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "Local first",
-        desc: "Your books live in this browser. There is no account, and nothing is sent to a server — except the chapter text you hand the Assistant when you ask it something.",
+        desc: "Your books live in this browser. Nothing is sent to a server — except the chapter text you hand the Assistant when you ask it something.",
+      },
+      {
+        name: "Your account",
+        desc: "Signing in identifies you; it does not yet move your manuscripts. They stay in this browser until syncing ships, so signing in on another machine shows an empty shelf rather than your library.",
       },
       {
         name: "Back up",

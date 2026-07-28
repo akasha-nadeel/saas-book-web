@@ -14,7 +14,7 @@ import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { TemplatesDialog } from "@/components/shelf/templates-dialog";
-import { UpgradeDialog } from "@/components/shelf/upgrade-dialog";
+import { AccountDialog } from "@/components/auth/account-dialog";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { SoundsDialog } from "@/components/shelf/sounds-dialog";
@@ -96,7 +96,12 @@ const VIEW_ICON: Record<BookView, ReactNode> = {
   trashed: <MaskIcon src="/icon-trashed.png" className="h-6 w-6" />,
 };
 
-export function Bookshelf() {
+export function Bookshelf({
+  /** The signed-in writer, or null when signed out or accounts are off. */
+  email = null,
+}: {
+  email?: string | null;
+}) {
   const hydrated = useHydrated();
   const shelf = useShelf();
 
@@ -105,7 +110,7 @@ export function Bookshelf() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [dialog, setDialog] = useState<
-    "templates" | "upgrade" | "help" | "support" | "sounds" | "import" | null
+    "templates" | "account" | "help" | "support" | "sounds" | "import" | null
   >(null);
   const [view, setView] = useState<BookView>("active");
   // The sidebar is a slide-in drawer below md; this is whether it's open.
@@ -235,7 +240,8 @@ export function Bookshelf() {
             onQuery={setQuery}
             onToggleNav={() => setNavOpen((open) => !open)}
             onTemplates={() => setDialog("templates")}
-            onAccount={() => setDialog("upgrade")}
+            email={email}
+            onAccount={() => setDialog("account")}
           />
 
           {view === "active" && (
@@ -316,7 +322,9 @@ export function Bookshelf() {
       {dialog === "templates" && (
         <TemplatesDialog onClose={() => setDialog(null)} />
       )}
-      {dialog === "upgrade" && <UpgradeDialog onClose={() => setDialog(null)} />}
+      {dialog === "account" && (
+        <AccountDialog email={email} onClose={() => setDialog(null)} />
+      )}
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
       {dialog === "sounds" && <SoundsDialog onClose={() => setDialog(null)} />}
@@ -602,23 +610,30 @@ function ThemeIcon() {
 
 /**
  * The search-and-account bar across the top of the content — the reference's
- * light header. The search filters the shelf; the account chip opens the plan
- * note (there is no sign-in yet, so it is a guest on the free tier, not a
- * person). A menu button appears on the phone to reach the drawer.
+ * light header. The search filters the shelf; the account chip names whoever is
+ * signed in and opens their account. With no Supabase project configured there
+ * is nobody to name, so it reads "Guest" and says why when opened. A menu
+ * button appears on the phone to reach the drawer.
  */
 function ShelfTopBar({
   query,
   onQuery,
   onToggleNav,
   onTemplates,
+  email,
   onAccount,
 }: {
   query: string;
   onQuery: (value: string) => void;
   onToggleNav: () => void;
   onTemplates: () => void;
+  email: string | null;
   onAccount: () => void;
 }) {
+  // The part before the @ is what a writer recognises as themselves; the domain
+  // is noise in a 9rem chip.
+  const name = email ? email.split("@")[0] : "Guest";
+  const initial = name.charAt(0).toUpperCase() || "G";
   return (
     <div className="flex items-center gap-3">
       <button
@@ -683,7 +698,7 @@ function ShelfTopBar({
       <button
         type="button"
         onClick={onAccount}
-        aria-label="Your account and plan"
+        aria-label={email ? `Your account — ${email}` : "Your account"}
         className="flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-2 pl-1
                    text-left outline-none transition-colors hover:bg-raised
                    focus-visible:ring-2 focus-visible:ring-accent/50"
@@ -693,10 +708,10 @@ function ShelfTopBar({
           className="flex h-9 w-9 shrink-0 items-center justify-center
                      rounded-full bg-accent text-sm font-semibold text-white"
         >
-          G
+          {initial}
         </span>
-        <span className="hidden truncate font-sans text-sm font-medium text-fg sm:block">
-          Guest
+        <span className="hidden max-w-36 truncate font-sans text-sm font-medium text-fg sm:block">
+          {name}
         </span>
         <svg
           aria-hidden="true"

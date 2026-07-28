@@ -148,13 +148,42 @@ of components so they can be tested and changed in one place: `book-kinds.ts`
 out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
 `relative-time.ts`, `use-typewriter.ts`.
 
-**The one server surface** is `src/app/api/chat/route.ts` — the editor's assistant,
-Anthropic streaming. Needs `ANTHROPIC_API_KEY` in `.env.local`; without it the
-route returns 501 with a message saying so. Chapter text is sent only when the
-writer opens the panel and asks, and rides in the (cached) system prompt.
+**The assistant** is `src/app/api/chat/route.ts` — Anthropic streaming. Needs
+`ANTHROPIC_API_KEY` in `.env.local`; without it the route returns 501 with a
+message saying so. Chapter text is sent only when the writer opens the panel and
+asks, and rides in the (cached) system prompt.
 
-**Routes:** `/` shelf · `/book/new` setup · `/book/import` · `/book/[bookId]`
-book overview (lands here, not on a chapter) ·
+**Auth is Supabase, and optional.** Set `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and the app grows accounts and a sign-in
+wall; leave both unset and it runs exactly as it always did, local-only, with the
+account menu saying why — the same shape as the missing API key. Every entry
+point checks `isSupabaseConfigured()` first, because the clients throw on an
+empty URL.
+
+`src/proxy.ts` is the load-bearing file (Next 16 renamed Middleware to Proxy). A
+Server Component cannot write cookies, so something ahead of the render must
+refresh an expired token and store it — without that file, sessions die
+mid-session and writers get logged out at random. Two details are easy to get
+wrong: `setAll` must rebuild the response *after* putting the new cookies on the
+request, and it must copy the `headers` argument onto the response, or a CDN
+caches one writer's `Set-Cookie` and serves it to the next reader. A redirect out
+of the proxy has to carry those cookies too. The gate reads `getClaims()`, which
+verifies the JWT signature — never `getSession()`, which trusts the cookie.
+
+`src/lib/supabase/` holds the three clients (browser, server, and the one the
+proxy builds inline); sign-in/up/out are Server Actions in
+`src/app/auth/actions.ts`, so the session cookie and the redirect land in the
+same response and there is no sign-in flash. The proxy skips `/api` on purpose —
+redirecting a `fetch` to an HTML page yields a parse error, not a 401 — so the
+chat route checks for itself.
+
+**Auth is not persistence.** A signed-in writer still reads and writes
+`localStorage`; the account identifies them but does not yet carry their books.
+The UI says so rather than letting it be discovered. See `TODO.md`.
+
+**Routes:** `/` shelf · `/signin` · `/signup` · `/auth/confirm` (the far end of a
+confirmation email) · `/book/new` setup · `/book/import` · `/book/[bookId]` book
+overview (lands here, not on a chapter) ·
 `/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
 `/book/[bookId]/export`.
 

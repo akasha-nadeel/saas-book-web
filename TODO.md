@@ -28,9 +28,19 @@ should either ship or lose the card.
 
 ## Storage — the ceiling is close
 
-- [ ] **Supabase persistence + auth.** Deferred three times. Everything touching
-      storage is in `src/lib/library-store.ts`, so the swap is one module plus
-      its React bindings. Auth has to land with it (rows need an owner for RLS).
+- [x] **Auth.** Supabase email/password, done as its own step ahead of the
+      storage move. `src/proxy.ts` refreshes the session and holds the sign-in
+      wall; `src/lib/supabase/` has the three clients; sign-in, sign-up and
+      sign-out are Server Actions in `src/app/auth/actions.ts`, so the cookie
+      and the redirect arrive in one response. Both env vars unset means no
+      accounts at all and no wall — the app runs local-only as it always has,
+      the same shape as the assistant's missing API key.
+- [ ] **Supabase persistence.** The half that is left, and the one that matters:
+      a signed-in writer still reads and writes `localStorage`, so the account
+      identifies them but does not carry their books. Two people signing in on
+      one browser see the same shelf. Everything touching storage is in
+      `src/lib/library-store.ts`, so the swap is that one module plus its React
+      bindings — and rows now have an owner to hang RLS on.
 - [ ] **Storage pressure.** localStorage is ~5MB per origin. Covers are capped at
       250KB each and inline images at 900KB, but a library of illustrated books
       will hit the wall. There is no usage indicator and no warning before a
@@ -64,7 +74,12 @@ should either ship or lose the card.
 - [ ] Import cannot read `.doc`, `.pdf` or `.rtf`. The first two are refused by
       name with what to do instead; `.rtf` is just absent.
 - [ ] The assistant needs `ANTHROPIC_API_KEY`. Without it `/api/chat` returns 501
-      with a message saying so.
+      with a message saying so. With accounts configured it also needs a
+      session — the route checks for itself and returns 401, because the proxy
+      skips `/api` (redirecting a fetch to an HTML page is not a 401).
+- [ ] Sign-out is only reachable from the shelf's account chip. A writer deep in
+      a chapter goes back to the shelf first. Fine while the shelf is one click
+      away; revisit if the rail grows an account row.
 
 ## House rules
 
