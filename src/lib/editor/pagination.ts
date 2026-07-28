@@ -156,7 +156,15 @@ export function pageBreaks(
           breakBefore(line.top, line.pos, line.inline);
         }
       }
-      continue;
+
+      // The lines are found by measuring, and a measurement can come up short.
+      // If the block still hangs past the foot of its page once they have all
+      // been walked, they did not cover it, and falling through to move the
+      // whole block is better than leaving text in the margin. Nothing is lost
+      // by checking: when the lines did their job this is false, and when a
+      // break was made inside the block canMove below is false, so the only
+      // case that acts is the one that needs to.
+      if (!runsPast(block.top + block.height, 0)) continue;
     }
 
     if (canMove(block.top)) breakBefore(block.top, block.pos, false);
@@ -254,42 +262,41 @@ class PaginationView {
   }
 
   /**
-   * The learned correction, in page pixels, added to every seam.
+   * What is at the top of the window, and exactly where.
    *
-   * Starts at nothing and is taught by the rendered result — see the note where
-   * it is updated. Held on the view rather than recomputed, so the correction
-   * survives from one keystroke to the next instead of being rediscovered (and
-   * mis-drawn once) on each.
+   * This is the thing a word processor holds still. Not the caret — pinning
+   * that means the sheets slide whenever the writing crosses onto a new page,
+   * which is the page turning and should be left alone. What must not move is
+   * the passage being looked at: repagination anywhere in the document, above
+   * the window or below it, has to leave the visible page where it was.
+   *
+   * The anchor is the first block that reaches into the window, held by its
+   * distance below the window's top edge.
    */
-  private seam = 0;
+  private viewportAnchor(): { el: HTMLElement; offset: number } | null {
+    const scroller = scrollParent(this.view.dom as HTMLElement);
+    if (!scroller) return null;
 
-  /** The computed gaps with the learned seam correction folded in. */
-  private trim(spacers: Spacer[]): Spacer[] {
-    if (this.seam === 0) return spacers;
-    return spacers.map((s) => ({
-      ...s,
-      height: Math.max(1, Math.round(s.height + this.seam)),
-    }));
+    const top = scroller.getBoundingClientRect().top;
+    for (const el of Array.from(this.view.dom.children) as HTMLElement[]) {
+      if (el.classList.contains("pageflow-spacer")) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom > top) return { el, offset: rect.top - top };
+    }
+    return null;
   }
 
-  /**
-   * Fold the miss at the first seam into the offset carried by all of them.
-   *
-   * Only ever called with the layout at rest — see the caller. A whole pixel
-   * before anything moves, since below that it would be chasing rounding and
-   * would never settle.
-   */
-  private learnSeam(g: PageGeometry, raw: Spacer[]) {
-    const error = this.seamError(g);
-    if (error === null || Math.abs(error) < 1) return;
+  /** Put the anchor back where it was, cancelling out whatever moved above it. */
+  private holdViewport(anchor: { el: HTMLElement; offset: number } | null) {
+    if (!anchor || !anchor.el.isConnected) return;
 
-    // Clamped: a wild reading — a font swapping in, a measure caught mid-
-    // relayout — must nudge the offset, never send it somewhere it cannot come
-    // back from.
-    this.seam = Math.max(-200, Math.min(200, this.seam - error));
+    const scroller = scrollParent(this.view.dom as HTMLElement);
+    if (!scroller) return;
 
-    const corrected = this.trim(raw);
-    if (!settled(corrected, this.applied)) this.apply(corrected);
+    const top = scroller.getBoundingClientRect().top;
+    const drift = anchor.el.getBoundingClientRect().top - top - anchor.offset;
+    // A whole pixel, so rounding cannot start a scroll of its own.
+    if (Math.abs(drift) >= 1) scroller.scrollTop += drift;
   }
 
   /** Put a set of gaps on screen. Decorations only — the document is untouched. */
@@ -298,37 +305,6 @@ class PaginationView {
     const tr = this.view.state.tr.setMeta(key, spacers);
     tr.setMeta("addToHistory", false);
     this.view.dispatch(tr);
-  }
-
-  /**
-   * How far the text after a seam missed the top of its page, in page pixels.
-   *
-   * Positive means it landed too low, negative too high. Null when there is
-   * nothing to measure.
-   *
-   * A gap's job is precisely this: its bottom edge must fall on the next page's
-   * text-area top, so that the first line of that page begins exactly under the
-   * top margin — and so the caret, arriving from the foot of the page before,
-   * lands where a writer expects it. Everything else about the gap is arithmetic
-   * in service of that one edge.
-   */
-  private seamError(g: PageGeometry): number | null {
-    const view = this.view;
-    const flow = view.dom.closest(".pageflow") as HTMLElement | null;
-    if (!flow) return null;
-
-    const gap = view.dom.querySelector<HTMLElement>(".pageflow-spacer");
-    if (!gap) return null;
-
-    const flowRect = flow.getBoundingClientRect();
-    const scale = g.pageW ? flowRect.width / g.pageW : 1;
-    if (!(scale > 0)) return null;
-
-    // Page two's text begins one page and one desk gap down, plus its own top
-    // margin. The first seam is measured because every seam has the same shape;
-    // one is enough to learn the correction for all of them.
-    const wanted = flowRect.top + (g.pageH + g.gap + g.mT) * scale;
-    return (gap.getBoundingClientRect().bottom - wanted) / scale;
   }
 
   private geomKey(): string {
@@ -412,77 +388,62 @@ class PaginationView {
       view.dom.querySelectorAll<HTMLElement>(".pageflow-spacer"),
     );
 
-    // Hiding the gaps shortens the document by an inch and a half a page, which
-    // can leave the scroll position past the new, shorter end — and the browser
-    // clamps it there and then. Restoring the gaps does *not* undo that clamp,
-    // so the view would creep upward on every measure, which is to say
-    // constantly while somebody holds Enter or Backspace. The offset is put back
-    // by hand for that reason. It has to be read before the first hide and
-    // written after the last restore, with no layout read in between that could
-    // let the browser settle on the clamped value.
-    const scroller = scrollParent(view.dom as HTMLElement);
-    const scrollTop = scroller?.scrollTop ?? 0;
+    // Everything from here happens with the window held still.
+    //
+    // The anchor is taken before the first change and put back after the last,
+    // so none of it can be seen: not the gaps being hidden, which shortens the
+    // document by an inch and a half a page and can leave the scroll position
+    // past the new, shorter end for the browser to clamp; not the gaps coming
+    // back, which does not undo that clamp; and not a break moving, which
+    // shifts every line that follows it. See viewportAnchor for why it is the
+    // top of the window that is held and not the caret.
+    const anchor = this.viewportAnchor();
 
     for (const gap of gaps) gap.style.display = "none";
 
-    // The arithmetic result, kept untouched. Every trimmed set below is derived
-    // from *this*, never from an already-trimmed one — folding the correction
-    // into a value that already carries it counts it twice, so the seam
-    // overshoots by as much as it was out and then chases itself.
-    let raw: Spacer[];
+    // The gap heights are the arithmetic and nothing else.
+    //
+    // There was a correction here that measured how far the text after the
+    // *first* seam missed its top margin and added that offset to every gap. It
+    // is gone, and should not come back in that form: the first page is the one
+    // page unlike the others, because it carries the chapter's title above the
+    // prose. Whatever the first seam is out by is peculiar to it, so spreading
+    // that figure across the rest pushed every later page down past its own
+    // bottom margin — text sitting in the white, which is worse than the few
+    // pixels it was trying to save. A per-seam correction would be sound; a
+    // single global one cannot be.
+    //
+    // What it was compensating for has since been fixed at the source: the
+    // offset being counted twice, lines measured by their glyph boxes rather
+    // than their line boxes, and a paragraph that opens a page never being
+    // split. The arithmetic stands on its own now.
+    let spacers: Spacer[];
     try {
-      raw = this.breaksInNaturalFlow(paper, g);
+      spacers = this.breaksInNaturalFlow(paper, g);
     } finally {
       for (const gap of gaps) gap.style.display = "";
-      if (scroller && scroller.scrollTop !== scrollTop) {
-        scroller.scrollTop = scrollTop;
-      }
     }
 
-    const spacers = this.trim(raw);
     this.opts.onPages(spacers.length + 1);
 
-    if (!settled(spacers, this.applied)) {
-      this.apply(spacers);
+    if (!settled(spacers, this.applied)) this.apply(spacers);
 
-      // The caret moving to the next page is not something to undo.
-      //
-      // When the line being written no longer fits, it belongs on the next
-      // sheet, and the caret goes with it — that jump is the page turning, and
-      // it is what Word shows too. An earlier version pinned the caret's place
-      // on screen across the change, which cancelled the jump by scrolling the
-      // whole desk by a page-gap instead: the caret held still and the *sheets*
-      // lurched, in the middle of the window, long before the writing had
-      // reached the foot of the page.
-      //
-      // So the view is left alone, and only checked: if the caret has gone out
-      // of sight it is brought back by the smallest scroll that does it, and if
-      // it is still visible — which it usually is — nothing moves at all.
-      if (view.hasFocus()) keepCaretInView(view);
-    } else {
-      // Nothing moved this pass, so the layout has come to rest — and only now
-      // is it worth asking where the text actually landed.
-      //
-      // The gap height above is arithmetic: fill the rest of the page, then
-      // cross the seam. It is only ever as right as its assumptions, and page
-      // layout has more of those than it looks — the chapter's title block
-      // eating into the first page, a paragraph broken mid-way being wrapped in
-      // anonymous blocks by the browser, sub-pixel rounding at three zoom
-      // levels. Each lands the first line of the next page a few pixels off its
-      // top margin, and no amount of care in the formula finds them all. So the
-      // formula is an estimate, the result is measured, and the miss is carried
-      // as an offset on every seam.
-      //
-      // Doing this on *every* pass was a mistake worth spelling out: it read a
-      // layout that was still moving, shifted the offset on that reading, and
-      // then dispatched a second change resizing every gap in the document —
-      // mid-keystroke. Pressing Enter in the middle of a page would suddenly
-      // heave everything below it. A loop that corrects itself has to settle
-      // before it measures, or it chases its own tail; so the correction is
-      // learned between edits, and while the writing is moving the last good
-      // offset simply stands.
-      this.learnSeam(g, raw);
-    }
+    // The page the writer was looking at goes back exactly where it was, after
+    // every change this pass made. Word's own behaviour: repagination does not
+    // move the view, whatever it does to the text.
+    this.holdViewport(anchor);
+
+    // Only *then* is the caret considered, and only if it has been carried out
+    // of sight — by its own line moving to the next sheet, most often. That
+    // jump is the page turning and is left to happen; what is not left to
+    // happen is losing the caret off the edge of the window. Usually it is
+    // still visible and nothing moves at all.
+    //
+    // An earlier version pinned the caret's place on screen instead, which
+    // cancelled the page turn by scrolling the whole desk by a page-gap: the
+    // caret held still and the *sheets* lurched, in the middle of the window,
+    // long before the writing had reached the foot of the page.
+    if (view.hasFocus()) keepCaretInView(view);
 
     this.report(g);
 
@@ -646,9 +607,14 @@ class PaginationView {
 
     const range = document.createRange();
     range.selectNodeContents(node);
-    const rects = Array.from(range.getClientRects()).filter(
-      (r) => r.width > 0 && r.height > 0,
-    );
+    // Height only. A line can be perfectly real and have no width at all — a
+    // run of spaces held down at the end of a paragraph wraps onto lines of its
+    // own that measure nothing across. Dropping those left the lines failing to
+    // cover the paragraph they came from, so the part of it below the last
+    // visible word was invisible to the page-fill arithmetic: the caret walked
+    // down through the bottom margin and off the sheet, and no break was ever
+    // called for, because as far as this could see there was nothing there.
+    const rects = Array.from(range.getClientRects()).filter((r) => r.height > 0);
     if (rects.length === 0) return null;
 
     // One rect per run of text per line, so runs sharing a top edge are one

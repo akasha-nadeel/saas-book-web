@@ -105,6 +105,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Insert a picture from the image button on the editor rail. Click it to select, then drag the handles on either side to resize, or use its floating toolbar to sit it left/centre/right, set a quick width (25%, 50%, full, or fit), or delete it. Size and placement are kept in the reader and the export.",
       },
       {
+        name: "Where a paragraph begins",
+        desc: "“Paragraphs” under the Aa button decides how one paragraph is told from the next: Spaced, as a word processor sets it — flush openings with a space between — or Indented, as a printed novel is set, with the first line stepped in and no space. It is one or the other, never both, so the setting sets the indent and the spacing together. New books start on Spaced.",
+      },
+      {
         name: "Text & type",
         desc: "The Aa button on the editor rail sets the book's body typography (font, text size, line spacing, first-line indent, paragraph spacing, page colour) and the alignment of the selected paragraphs — left, centre, right, or justify. Alignment is per paragraph, so different paragraphs can differ; select all to align the whole chapter. New books start on professional novel defaults.",
       },
@@ -116,6 +120,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       {
         name: "Typewriter scrolling",
         desc: "Hold the line you are typing at a steady height on screen.",
+      },
+      {
+        name: "Paragraph marks",
+        desc: "The ¶ button on the editor rail marks the end of every paragraph, as Word's does. Blank space on a page is either room the page still has or empty paragraphs left behind — they look identical and behave completely differently, and this is how you tell. An empty paragraph shows as a mark on its own. Switching it on never changes where a line wraps or a page breaks.",
       },
       {
         name: "Paper",

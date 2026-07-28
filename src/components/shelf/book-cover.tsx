@@ -34,7 +34,24 @@ function coverPalette(seed: string) {
 }
 
 /**
+ * What makes a cover sit on a surface rather than float above it: a tight
+ * contact shadow at its foot, and a soft cast falling well below.
+ *
+ * Exported because the editor's Book View frames a book's artwork itself, at
+ * the page's real trim rather than through this component, and has to wear the
+ * same treatment. Its comment already claimed the two matched while they had
+ * quietly drifted a long way apart — so now they are literally the same string.
+ */
+export const BOOK_SHADOW =
+  "shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35),0_20px_42px_-12px_rgba(0,0,0,0.9)]";
+
+/**
  * A book as an object rather than a row.
+ *
+ * Two parts of three, which is a 6×9 novel — the trim the app is built around
+ * and the shape the Book View draws a real page at. It was three parts of four,
+ * a squarer card that reads as a thumbnail rather than as a book, and made a
+ * shelf disagree with the page the same book was written on.
  *
  * The depth is built from three things, none of them a 3D transform: a spine
  * darkening down the left edge, a page-block of hairlines down the right, and a
@@ -79,11 +96,11 @@ export function BookCover({
 
   return (
     <div
-      className="book-face relative aspect-[3/4] w-full rounded-l-[3px] rounded-r-md
-                 shadow-[0_14px_30px_-10px_rgba(0,0,0,0.85)]
+      className={`book-face relative aspect-[2/3] w-full rounded-l-[3px] rounded-r-md
+                 ${BOOK_SHADOW}
                  transition-[transform,box-shadow] duration-200
                  group-hover:-translate-y-1.5
-                 group-hover:shadow-[0_22px_40px_-10px_rgba(0,0,0,0.9)]"
+                 group-hover:shadow-[0_3px_8px_-2px_rgba(0,0,0,0.4),0_28px_52px_-12px_rgba(0,0,0,0.95)]`}
       // The cloth-cover colour. Covered by artwork when a book has its own,
       // so it only shows on the typeset face — which is the point.
       style={{

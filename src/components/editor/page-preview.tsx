@@ -8,7 +8,7 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { BookCover } from "@/components/shelf/book-cover";
+import { BOOK_SHADOW, BookCover } from "@/components/shelf/book-cover";
 import {
   chapterLabel,
   chapterNumberOf,
@@ -199,7 +199,7 @@ export function PagePreview({
             style={frameStyle}
             className={`relative flex shrink-0 items-center justify-center
                        overflow-hidden rounded-l-[2px] rounded-r-md bg-panel
-                       shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35),0_20px_42px_-12px_rgba(0,0,0,0.9)]
+                       ${BOOK_SHADOW}
                        ${turn}`}
           >
             {cover ? (

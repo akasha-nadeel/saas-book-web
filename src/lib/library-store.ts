@@ -1239,6 +1239,15 @@ export type Theme = "light" | "dark";
 export interface Prefs {
   /** Dim every paragraph but the one being written. */
   focusMode: boolean;
+  /**
+   * Show the paragraph marks, as Word's ¶ button does.
+   *
+   * Blank space on a page is ambiguous: it may be room the page has, or it may
+   * be empty paragraphs, which take up room while showing nothing. The two look
+   * identical and behave completely differently, and there is no way to tell
+   * them apart by looking. This is how a word processor answers that.
+   */
+  marks: boolean;
   /** Hold the caret at a fixed height instead of letting it sink. */
   typewriter: boolean;
   /** The chapters-and-notes panel. */
@@ -1252,6 +1261,9 @@ export interface Prefs {
 const DEFAULT_PREFS: Prefs = Object.freeze({
   focusMode: false,
   typewriter: false,
+  // Off, as in a word processor: shown when a writer goes looking for what is
+  // taking up the space, not while they are simply writing.
+  marks: false,
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
@@ -1298,6 +1310,7 @@ function parsePrefs(raw: string | null): Prefs {
     return {
       focusMode: parsed.focusMode === true,
       typewriter: parsed.typewriter === true,
+      marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
       paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
         ? (parsed.paper as PaperColor)

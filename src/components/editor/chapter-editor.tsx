@@ -341,6 +341,20 @@ export function ChapterEditor({
           >
             {icons.typewriter}
           </RailButton>
+          {/* Word's ¶ button: what is actually on the page, as against what can
+              be seen of it. */}
+          <RailButton
+            label="Show paragraph marks"
+            active={prefs.marks}
+            onClick={() => setPref("marks", !prefs.marks)}
+          >
+            <span
+              aria-hidden="true"
+              className="font-sans text-base leading-none"
+            >
+              ¶
+            </span>
+          </RailButton>
         </Rail>
       </div>
 
@@ -703,6 +717,9 @@ function EditorSurface({
             ...typographyVars(typographyOf(book)),
           } as CSSProperties
         }
+        // Shows the ¶ at the end of every paragraph — see the note in
+        // globals.css for why it is drawn at zero width.
+        data-marks={prefs.marks ? "" : undefined}
         className={`manuscript flex min-h-0 flex-1 flex-col ${
           prefs.focusMode ? "focus-mode" : ""
         }`}

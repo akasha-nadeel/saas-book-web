@@ -119,6 +119,40 @@ describe("pageBreaks", () => {
     expect(breaks[0].height).toBe(Math.round(630 - 300 + SEAM));
   });
 
+  it("moves a block whole when its lines fail to account for all of it", () => {
+    // The trailing-spaces case. Holding the space bar puts lines on the page
+    // that have height but no width, and a measurement that only sees glyphs
+    // reports the paragraph as ending at its last visible word. The lines then
+    // all appear to fit while the paragraph itself runs off the foot of the
+    // sheet — the caret walking down through the bottom margin with no break
+    // ever called for. Whatever the lines say, a block that still overhangs
+    // has to move.
+    const short: LineBox[] = [
+      { top: 5 * LINE, height: LINE, pos: 100, inline: false },
+      { top: 6 * LINE, height: LINE, pos: 103, inline: true },
+    ];
+    const blocks: BlockBox[] = [
+      block(0, 5, 0),
+      // Twenty lines tall, but only two of them measurable.
+      { top: 5 * LINE, height: 20 * LINE, pos: 100, splittable: true },
+    ];
+    const breaks = pageBreaks(blocks, G, () => short);
+
+    expect(breaks).toHaveLength(1);
+    expect(breaks[0].pos).toBe(100);
+    expect(breaks[0].inline).toBe(false);
+  });
+
+  it("leaves a block alone when its lines do account for all of it", () => {
+    // The guard above must not fire when the lines did their job, or every
+    // split paragraph would be moved whole straight after being split.
+    const b = block(0, 30, 0);
+    const breaks = pageBreaks([b], G, linesIn);
+
+    expect(breaks).toHaveLength(1);
+    expect(breaks[0].inline).toBe(true);
+  });
+
   it("falls back to moving a paragraph whole when its lines cannot be read", () => {
     // linesOf returning null is the safety valve: a paragraph whose lines can
     // not be trusted behaves exactly as it did before splitting existed.

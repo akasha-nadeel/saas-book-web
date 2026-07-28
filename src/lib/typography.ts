@@ -72,13 +72,27 @@ export interface Typography {
   paraSpacingPt: number;
 }
 
+/**
+ * How a new book is set.
+ *
+ * There are two ways to show where one paragraph ends and the next begins, and
+ * using both at once is the one combination that is actually wrong: a first-line
+ * indent, or a space between. Printed novels take the indent and no space, which
+ * is what this used to do. A word processor takes the space and no indent, and
+ * that is what a writer coming from Word recognises as a paragraph — so that is
+ * what the book starts on now, and the Aa panel switches to the printed-novel
+ * setting for anyone who wants the page to read as a book.
+ *
+ * Export is unaffected either way: an EPUB or PDF is set by its own template
+ * (see lib/export/typeset.ts), which sets body text as a book regardless.
+ */
 export const DEFAULT_TYPOGRAPHY: Typography = {
   font: "garamond",
   sizePt: 12,
   leading: 1.4,
   align: "justify",
-  indentIn: 0.25,
-  paraSpacingPt: 0,
+  indentIn: 0,
+  paraSpacingPt: 8,
 };
 
 // The choices offered in the menu, so the control and the model never drift.
@@ -105,6 +119,44 @@ export const PARA_SPACINGS: readonly { value: number; label: string }[] = [
   { value: 4, label: "4 pt" },
   { value: 8, label: "8 pt" },
 ];
+
+/**
+ * How a paragraph is marked off from the one before it.
+ *
+ * This is one decision, and it was being asked as two questions. A reader needs
+ * exactly one signal that a new paragraph has begun: a first line stepped in, or
+ * a space above. Both together is the combination that looks wrong — the page
+ * gains gaps it does not need and the openings stop meaning anything — and
+ * neither leaves the prose in one undifferentiated block. Offering the indent
+ * and the spacing as unrelated dropdowns let a book end up in either state
+ * without ever choosing it.
+ */
+export type ParagraphStyle = "indented" | "spaced";
+
+export const PARAGRAPH_STYLES: readonly {
+  value: ParagraphStyle;
+  label: string;
+}[] = [
+  { value: "spaced", label: "Spaced" },
+  { value: "indented", label: "Indented" },
+];
+
+/** Which of the two a book is currently set to. The indent decides it: a book
+ *  that steps its first lines in is an indented one, whatever else is set. */
+export function paragraphStyleOf(t: Typography): ParagraphStyle {
+  return t.indentIn > 0 ? "indented" : "spaced";
+}
+
+/** The pair of settings a style stands for, so the two can never disagree. */
+export function paragraphStyleSettings(
+  style: ParagraphStyle,
+): Pick<Typography, "indentIn" | "paraSpacingPt"> {
+  return style === "indented"
+    ? // As a printed novel is set: the opening line stepped in, no space.
+      { indentIn: 0.25, paraSpacingPt: 0 }
+    : // As a word processor sets it: flush openings, a space between.
+      { indentIn: 0, paraSpacingPt: 8 };
+}
 
 const PT_TO_PX = 96 / 72;
 const IN_TO_PX = 96;

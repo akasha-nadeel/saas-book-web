@@ -16,8 +16,12 @@ import {
   FONTS,
   INDENTS,
   LEADINGS,
+  PARAGRAPH_STYLES,
   PARA_SPACINGS,
   TEXT_SIZES,
+  paragraphStyleOf,
+  paragraphStyleSettings,
+  type ParagraphStyle,
 } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 
@@ -521,6 +525,30 @@ export function ToolRail({
                 {LEADINGS.map((l) => (
                   <option key={l.value} value={String(l.value)}>
                     {l.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {/* The one control that answers "where does a paragraph begin".
+                It sets the indent and the spacing together, because they are
+                one decision — see paragraphStyleSettings. The two below stay
+                for fine tuning, and follow whatever is chosen here. */}
+            <Field label="Paragraphs">
+              <select
+                aria-label="Paragraph style"
+                value={paragraphStyleOf(type)}
+                onChange={(e) =>
+                  setTypography(
+                    book.id,
+                    paragraphStyleSettings(e.target.value as ParagraphStyle),
+                  )
+                }
+                className={SELECT_CLASS}
+              >
+                {PARAGRAPH_STYLES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
                   </option>
                 ))}
               </select>

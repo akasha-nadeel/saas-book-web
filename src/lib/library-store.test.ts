@@ -634,10 +634,13 @@ it("keeps the author separate per book", () => {
   expect(findBook(getShelf(), b.bookId)!.author).toBeUndefined();
 });
 
-it("starts with both writing modes off", () => {
-  expect(getPrefs()).toEqual({
+it("starts with every writing mode off and the panel open", () => {
+  // Named rather than exhaustive, so adding a preference does not break a test
+  // about what the defaults *mean*.
+  expect(getPrefs()).toMatchObject({
     focusMode: false,
     typewriter: false,
+    marks: false,
     leftPanel: true,
     paper: "white",
     theme: "light",
@@ -661,14 +664,12 @@ it("sets one preference without disturbing the others", () => {
 });
 
 it("degrades to defaults when prefs are corrupt", () => {
+  // Compared against the defaults as actually read, not a copy of them written
+  // out here: the point is that a broken record gives back exactly what an
+  // absent one does, whatever the defaults happen to be.
+  const defaults = getPrefs();
   localStorage.setItem("openchapter:prefs", "{ not json");
-  expect(getPrefs()).toEqual({
-    focusMode: false,
-    typewriter: false,
-    leftPanel: true,
-    paper: "white",
-    theme: "light",
-  });
+  expect(getPrefs()).toEqual(defaults);
 });
 
 it("keeps prefs out of the shelf document", () => {

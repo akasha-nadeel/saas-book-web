@@ -380,6 +380,14 @@ body {
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--paper-fg) 32%, transparent)
     var(--paper-bg);
+  /* The browser keeps the view still when content above it changes size, which
+     is the right instinct and the wrong tool here: the pagination pass hides
+     every page gap to measure and puts them straight back, and the browser
+     picks its anchor somewhere in the middle of that. Two corrections chasing
+     one scroll position land nowhere in particular. Pagination holds the view
+     itself, across the whole pass rather than one step of it — see
+     viewportAnchor in lib/editor/pagination.ts. */
+  overflow-anchor: none;
 }
 
 .scroll-paper::-webkit-scrollbar {
@@ -1070,6 +1078,33 @@ body {
 .image-nv-frame.is-selected {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+/* Paragraph marks, as a word processor's ¶ button shows them.
+   Every paragraph ends in one, so an empty paragraph — which otherwise shows
+   nothing at all while taking a full line of the page — becomes a mark on its
+   own. That is the whole point of them: blank space on a page is either room
+   the page has or paragraphs someone left behind, and the two are impossible to
+   tell apart by eye.
+
+   Zero width, deliberately. The mark hangs past the end of the line rather than
+   occupying it, so switching it on cannot change where a line wraps or where a
+   page breaks. A diagnostic that moves the thing being diagnosed is worthless. */
+.manuscript[data-marks] .tiptap p::after,
+.manuscript[data-marks] .tiptap h1::after,
+.manuscript[data-marks] .tiptap h2::after,
+.manuscript[data-marks] .tiptap h3::after {
+  content: "¶";
+  display: inline-block;
+  width: 0;
+  overflow: visible;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-style: normal;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* A picture the prose runs alongside — Word's "Square" wrapping.
