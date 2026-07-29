@@ -545,6 +545,26 @@ it("does not touch another book's chapters", () => {
   expect(titlesOf(b.bookId)).toHaveLength(1);
 });
 
+it("writing in a book makes it the most recently opened one", () => {
+  // The bug this pins: touchLastOpened set the chapter and nothing else, and
+  // the function that moved the shelf pointer was called by no screen at all.
+  // So the shelf still offered whichever book was created last, however long
+  // the writer had spent in another one.
+  const first = createBook("First");
+  const second = createBook("Second");
+  expect(getShelf().lastOpenedBookId).toBe(second.bookId);
+
+  touchLastOpened(first.bookId, first.chapterId);
+
+  const shelf = getShelf();
+  expect(shelf.lastOpenedBookId).toBe(first.bookId);
+  expect(findBook(shelf, first.bookId)!.lastOpenedId).toBe(first.chapterId);
+  // And the stamp the shelf sorts and prints, which was frozen at creation.
+  expect(findBook(shelf, first.bookId)!.lastOpenedAt).toBeGreaterThanOrEqual(
+    findBook(shelf, second.bookId)!.lastOpenedAt,
+  );
+});
+
 it("ensureChapter opens the last-opened chapter", () => {
   const { bookId } = createBook();
   const second = createChapter(bookId, "Chapter Two");

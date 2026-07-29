@@ -11,7 +11,7 @@ import {
 } from "@/components/editor/book-panel";
 import { BookGuide } from "@/components/editor/book-guide";
 import { LoadingScreen } from "@/components/loading-screen";
-import { findBook, setPref } from "@/lib/library-store";
+import { findBook, setPref, touchLastOpenedBook } from "@/lib/library-store";
 import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 
 /**
@@ -44,6 +44,14 @@ export function BookOverview({ bookId }: { bookId: string }) {
     const done = setTimeout(() => setEntering(false), 1100);
     return () => clearTimeout(done);
   }, [entering]);
+
+  // Opening a book is opening it, whether or not a chapter is picked next.
+  // Without this the shelf only learns of the visit if the writer goes on into
+  // a chapter, so a book opened to look at its cover would never rise to the
+  // top of "Continue writing".
+  useEffect(() => {
+    if (hydrated) touchLastOpenedBook(bookId);
+  }, [hydrated, bookId]);
 
   // The tool panel, as in the editor: closed until a rail tab is picked, and
   // "search" only as a seed — it is never seen before a tab chooses it.

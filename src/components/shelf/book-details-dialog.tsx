@@ -131,6 +131,37 @@ export function BookDetailsDialog({
             >
               Cancel
             </button>
+
+            {/* The way to the reading view, which until now could only be
+                reached from inside the editor's rail — so seeing the book as a
+                book meant first opening it as a manuscript. Outlined rather
+                than filled: reading is the second thing you come to a book for,
+                and the primary belongs to writing. */}
+            <button
+              type="button"
+              onClick={() => router.push(`/book/${book.id}/read`)}
+              className="flex items-center gap-2 rounded-md border border-line
+                         px-3.5 py-2 font-sans text-sm font-medium text-fg
+                         outline-none transition-colors hover:border-accent/60
+                         hover:bg-raised focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M10 5.5C8.6 4.6 7 4.2 5 4.2c-.6 0-1 .4-1 1v9c0 .6.4 1 1 1 2 0 3.6.4 5 1.3" />
+                <path d="M10 5.5c1.4-.9 3-1.3 5-1.3.6 0 1 .4 1 1v9c0 .6-.4 1-1 1-2 0-3.6.4-5 1.3" />
+                <path d="M10 5.5v11" />
+              </svg>
+              Read
+            </button>
             <button
               type="button"
               autoFocus

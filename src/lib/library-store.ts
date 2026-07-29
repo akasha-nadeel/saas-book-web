@@ -1148,9 +1148,37 @@ export function saveBody(
 }
 
 export function touchLastOpened(bookId: string, chapterId: string) {
-  const book = findBook(getShelf(), bookId);
-  if (!book || book.lastOpenedId === chapterId) return;
-  commitBook(bookId, (b) => ({ ...b, lastOpenedId: chapterId }));
+  const shelf = getShelf();
+  const book = findBook(shelf, bookId);
+  if (!book) return;
+
+  // All three, in one commit.
+  //
+  // This used to set the chapter alone, and `touchLastOpenedBook` — which sets
+  // the other two — was called by nothing outside its own tests. So the shelf's
+  // idea of the most recent book was fixed at the moment a book was *created*
+  // and never moved again: a writer could spend a week in one manuscript and
+  // "Continue writing" would still offer whichever they had made last, over a
+  // figure labelled as when they opened it. Writing in a book is the strongest
+  // evidence there is of which book you are working on.
+  const current =
+    book.lastOpenedId === chapterId && shelf.lastOpenedBookId === bookId;
+  // Recency moves even when nothing else does, so an unchanged chapter is still
+  // worth a write — but not repeatedly. Every commit here is a shelf write and
+  // a push, and a stamp a few seconds old answers the same question as a fresh
+  // one.
+  if (current && Date.now() - book.lastOpenedAt < 60_000) return;
+
+  const at = Date.now();
+  commit({
+    ...shelf,
+    books: shelf.books.map((b) =>
+      b.id === bookId
+        ? { ...b, lastOpenedId: chapterId, lastOpenedAt: at }
+        : b,
+    ),
+    lastOpenedBookId: bookId,
+  });
 }
 
 /**
