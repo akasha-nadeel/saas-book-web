@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PagePreview } from "@/components/editor/page-preview";
 import { relativeTime } from "@/lib/relative-time";
@@ -73,6 +73,10 @@ const MATTER_TONE = {
             focus-visible:ring-matter-front-ink/60`,
     outline: `border-matter-front text-matter-front hover:bg-matter-front/10
               focus-visible:ring-matter-front/50`,
+    // The raw token, for the two rules that run from the selected card
+    // to the page. Those are drawn from an inline gradient rather than a
+    // utility, so they need the variable itself and not a class name.
+    cssVar: "--color-matter-front",
     inkSoft: "text-matter-front-ink/70",
     ringInk: "ring-matter-front-ink/60",
   },
@@ -85,6 +89,10 @@ const MATTER_TONE = {
             focus-visible:ring-matter-body-ink/60`,
     outline: `border-matter-body text-matter-body hover:bg-matter-body/10
               focus-visible:ring-matter-body/50`,
+    // The raw token, for the two rules that run from the selected card
+    // to the page. Those are drawn from an inline gradient rather than a
+    // utility, so they need the variable itself and not a class name.
+    cssVar: "--color-matter-body",
     inkSoft: "text-matter-body-ink/70",
     ringInk: "ring-matter-body-ink/60",
   },
@@ -97,6 +105,10 @@ const MATTER_TONE = {
             focus-visible:ring-matter-back-ink/60`,
     outline: `border-matter-back text-matter-back hover:bg-matter-back/10
               focus-visible:ring-matter-back/50`,
+    // The raw token, for the two rules that run from the selected card
+    // to the page. Those are drawn from an inline gradient rather than a
+    // utility, so they need the variable itself and not a class name.
+    cssVar: "--color-matter-back",
     inkSoft: "text-matter-back-ink/70",
     ringInk: "ring-matter-back-ink/60",
   },
@@ -188,6 +200,54 @@ export function BookPanel({
 }) {
   const router = useRouter();
   const bookId = book.id;
+
+  /**
+   * How far it is from the edge of these cards to the edge of the paper.
+   *
+   * The two rules that run out of the selected card have to *land* on the page,
+   * and that distance is not a number anyone can write down: the page is
+   * centred in whatever the window leaves and drawn at the writer's zoom, so it
+   * moves with the window, with the zoom, and with the panel's own breakpoints.
+   * Measured, then, and re-measured whenever either end moves.
+   *
+   * Zero where there is no page — the book overview shows these same cards with
+   * a guide beside them rather than a manuscript, and a rule reaching for
+   * nothing is worse than no rule.
+   */
+  const stackRef = useRef<HTMLDivElement>(null);
+  const [gapToPage, setGapToPage] = useState(0);
+
+  useEffect(() => {
+    const measure = () => {
+      const stack = stackRef.current;
+      const page = document.querySelector<HTMLElement>(".pageflow");
+      if (!stack || !page) {
+        setGapToPage(0);
+        return;
+      }
+      const from = stack.getBoundingClientRect().right;
+      const to = page.getBoundingClientRect().left;
+      setGapToPage(Math.max(0, Math.round(to - from)));
+    };
+
+    // After paint rather than during the effect: the manuscript is a sibling,
+    // and on the first commit its page has not been laid out yet.
+    const frame = requestAnimationFrame(measure);
+
+    // The page moves for more reasons than the window changing size — the zoom
+    // control resizes it in place, and the panel has its own breakpoints — so
+    // both ends are watched rather than just the window.
+    const watch = new ResizeObserver(measure);
+    watch.observe(document.body);
+    const page = document.querySelector<HTMLElement>(".pageflow");
+    if (page) watch.observe(page);
+    if (stackRef.current) watch.observe(stackRef.current);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      watch.disconnect();
+    };
+  }, []);
 
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
@@ -575,11 +635,13 @@ export function BookPanel({
               off the bottom by a forty-chapter book, which is exactly when a
               writer wants to reach them. */}
           <div
+            ref={stackRef}
             className={`mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1 ${
               entering ? "matter-stack" : ""
             }`}
           >
             <MatterCard
+              gapToPage={gapToPage}
               tone="front"
               label="Front matter"
               description="The pages before Chapter 1: title, copyright, dedication."
@@ -592,6 +654,7 @@ export function BookPanel({
             />
 
             <MatterCard
+              gapToPage={gapToPage}
               tone="body"
               label="Body matter"
               description={
@@ -675,6 +738,7 @@ export function BookPanel({
             </MatterCard>
 
             <MatterCard
+              gapToPage={gapToPage}
               tone="back"
               label="Back matter"
               description="The pages after the story: acknowledgements, notes, an epilogue."
@@ -865,6 +929,7 @@ function MatterCard({
   secondary,
   grow = false,
   compact = false,
+  gapToPage = 0,
   children,
 }: {
   tone: MatterTone;
@@ -897,10 +962,17 @@ function MatterCard({
    * from opening, but no longer spending a paragraph each on it.
    */
   compact?: boolean;
+  /** Distance from the panel to the page, measured upstream. Zero where
+   *  there is no page to reach. */
+  gapToPage?: number;
   children?: React.ReactNode;
 }) {
   const paint = MATTER_TONE[tone];
   const listOpen = grow && !!children;
+  // How far the rules run. Only the selected card draws them, and never a
+  // shrunk one — three cards each trailing rules would be a diagram of
+  // nothing, and a strip has no height to hang two of them on.
+  const reach = active && !compact ? gapToPage : 0;
 
   return (
     <section
@@ -923,7 +995,10 @@ function MatterCard({
       // Shrunk, the border takes the fill's own colour rather than going
       // transparent, so the box does not appear to lose two pixels of height at
       // the same moment it is losing the rest.
-      className={`relative flex flex-col overflow-hidden rounded-xl border-2
+      // Not overflow-hidden. It was, and the two rules below could not have
+      // left the card — the collapsing regions inside clip themselves, so
+      // nothing here needed it.
+      className={`relative flex flex-col rounded-xl border-2
                   transition-[background-color,border-color,flex-grow]
                   duration-500 ease-out
                   ${
@@ -935,6 +1010,47 @@ function MatterCard({
                   }
                   min-h-0 shrink-0 ${listOpen ? "grow" : "grow-0"}`}
     >
+      {/* Two rules running out of the selected card towards the page, in that
+          part's own colour — the page's edge is already wearing it, and these
+          say the two are the same thing rather than leaving a reader to notice
+          that they match.
+
+          They fade out rather than meeting the paper. The gap between this
+          panel and the page is not a number anyone can know: the page is
+          centred in whatever is left of the window and drawn at the writer's
+          zoom, so a rule of fixed length would fall short on one screen and lie
+          across the paper on the next. A rule that fades has no endpoint to get
+          wrong, and reads as reaching rather than as stopping short.
+
+          Only when the card is the selected one — three cards each trailing
+          rules would be a diagram of nothing. */}
+      {[25, 75].map((y, i) => (
+        <span
+          key={y}
+          aria-hidden="true"
+          // Always mounted, and grown from nothing rather than switched on. A
+          // rule that appears at its full length has nowhere to travel from,
+          // and travelling out of the card to the paper is the whole point of
+          // it — so the element is always here and its width is what changes.
+          className="pointer-events-none absolute left-full h-1.5
+                     -translate-y-1/2 rounded-r-sm transition-[width,opacity]
+                     duration-700 ease-out"
+          style={{
+            top: `${y}%`,
+            width: reach ? `${reach}px` : 0,
+            opacity: reach ? 1 : 0,
+            // A flat colour. It was a gradient fading to nothing, from back when
+            // the distance was a guess and a rule had to have no endpoint to get
+            // wrong — measured, it lands on the paper, and the fade was only ever
+            // reading as a smear.
+            backgroundColor: `var(${paint.cssVar})`,
+            // The lower one a beat behind the upper, so the pair draws itself
+            // rather than arriving.
+            transitionDelay: `${i * 110}ms`,
+          }}
+        />
+      ))}
+
       {/* The one row that survives shrinking. It restyles rather than being
           replaced: the title steps down a size and takes the fill's ink, and
           the verb the button was carrying fades in beside it. */}
