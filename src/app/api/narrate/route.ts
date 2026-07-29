@@ -97,8 +97,26 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[narrate] failed", err);
     return Response.json(
-      { error: "The narrator could not read that passage." },
+      {
+        error:
+          providerReason(err) ?? "The narrator could not read that passage.",
+      },
       { status: 502 },
     );
   }
+}
+
+/**
+ * The provider's own words, when it gave any.
+ *
+ * Worth passing through rather than replacing: "add a credit card to unlock
+ * your free credits" tells a writer exactly what to do, while "the narrator
+ * could not read that passage" sends them looking at their prose for a fault
+ * that is not there. Only messages that read as sentences are forwarded — a
+ * stack trace or a bare code helps nobody.
+ */
+function providerReason(err: unknown): string | null {
+  const message = err instanceof Error ? err.message.trim() : "";
+  if (!message || message.length > 300) return null;
+  return /\s/.test(message) ? message : null;
 }

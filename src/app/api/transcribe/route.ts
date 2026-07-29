@@ -97,8 +97,26 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error("[transcribe] failed", err);
     return Response.json(
-      { error: "The transcriber could not read that file. Try MP3, M4A, WAV or WebM." },
+      {
+        error:
+          providerReason(err) ??
+          "The transcriber could not read that file. Try MP3, M4A, WAV or WebM.",
+      },
       { status: 502 },
     );
   }
+}
+
+/**
+ * The provider's own words, when it gave any.
+ *
+ * "Add a credit card to unlock your free credits" tells a writer exactly what
+ * to do; "could not read that file" sends them re-encoding audio that was
+ * never the problem. Only sentence-shaped messages are forwarded — a bare code
+ * or a stack trace helps nobody.
+ */
+function providerReason(err: unknown): string | null {
+  const message = err instanceof Error ? err.message.trim() : "";
+  if (!message || message.length > 300) return null;
+  return /\s/.test(message) ? message : null;
 }
