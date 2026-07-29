@@ -71,6 +71,8 @@ const MATTER_TONE = {
     // and white text on it would then be white on near-white.
     strip: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
             focus-visible:ring-matter-front-ink/60`,
+    outline: `border-matter-front text-matter-front hover:bg-matter-front/10
+              focus-visible:ring-matter-front/50`,
     inkSoft: "text-matter-front-ink/70",
     ringInk: "ring-matter-front-ink/60",
   },
@@ -81,6 +83,8 @@ const MATTER_TONE = {
              focus-visible:ring-matter-body/50`,
     strip: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
             focus-visible:ring-matter-body-ink/60`,
+    outline: `border-matter-body text-matter-body hover:bg-matter-body/10
+              focus-visible:ring-matter-body/50`,
     inkSoft: "text-matter-body-ink/70",
     ringInk: "ring-matter-body-ink/60",
   },
@@ -91,6 +95,8 @@ const MATTER_TONE = {
              focus-visible:ring-matter-back/50`,
     strip: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
             focus-visible:ring-matter-back-ink/60`,
+    outline: `border-matter-back text-matter-back hover:bg-matter-back/10
+              focus-visible:ring-matter-back/50`,
     inkSoft: "text-matter-back-ink/70",
     ringInk: "ring-matter-back-ink/60",
   },
@@ -365,8 +371,8 @@ export function BookPanel({
               onClick={() => onMode("book")}
               aria-label="Back to Book View"
               title="Back to Book View"
-              className="flex shrink-0 cursor-pointer items-center justify-center
-                         rounded-lg border border-line px-3 text-fg outline-none
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center
+                         rounded-lg border border-line text-fg outline-none
                          transition-colors hover:border-accent/60 hover:bg-raised
                          focus-visible:ring-2 focus-visible:ring-accent/50"
             >
@@ -384,16 +390,9 @@ export function BookPanel({
               </svg>
             </button>
 
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="flex-1 cursor-pointer rounded-lg bg-accent py-2.5
-                         font-sans text-sm font-semibold text-white outline-none
-                         transition-colors hover:bg-accent-strong
-                         focus-visible:ring-2 focus-visible:ring-accent/50"
-            >
-              New chapter
-            </button>
+            {/* Everything after this is an action, and the step back is not, so
+                the gap between them carries the difference. */}
+            <span className="flex-1" />
 
             {/* Dictation. Hidden outright where the browser has no speech
                 engine — on Safari and Firefox this could never work, and a
@@ -409,8 +408,8 @@ export function BookPanel({
                 onClick={() =>
                   dictation.listening ? dictation.stop() : dictation.start()
                 }
-                className={`relative flex shrink-0 cursor-pointer items-center justify-center
-                            rounded-lg border px-3 outline-none
+                className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center
+                            justify-center rounded-lg border outline-none
                             transition-colors focus-visible:ring-2
                             focus-visible:ring-accent/50 ${
                               dictation.listening
@@ -452,8 +451,8 @@ export function BookPanel({
               onClick={() => fileRef.current?.click()}
               aria-label={importing ? "Reading file…" : "Import a file"}
               title="Import a file"
-              className="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border
-                         border-line px-3 text-fg outline-none transition-colors
+              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border
+                         border-line text-fg outline-none transition-colors
                          hover:border-accent/60 hover:bg-raised focus-visible:ring-2
                          focus-visible:ring-accent/50 disabled:opacity-50"
             >
@@ -555,6 +554,7 @@ export function BookPanel({
               // thing the green border says when you are in the front matter.
               active={bodyOpen || inBody}
               onAction={() => setBodyOpen(toggleBody())}
+              secondary={{ label: "New chapter", onClick: handleCreate }}
               grow={bodyOpen}
             >
               {bodyChapters.length > 0 ? (
@@ -791,6 +791,7 @@ function MatterCard({
   action,
   active,
   onAction,
+  secondary,
   grow = false,
   compact = false,
   children,
@@ -809,6 +810,12 @@ function MatterCard({
   /** True when the writer is inside this part of the book. */
   active: boolean;
   onAction: () => void;
+  /**
+   * A second button beside the first. Only the body has one — making a chapter
+   * belongs with the chapters, not up in the panel's chrome where it was
+   * competing with the way out of the panel.
+   */
+  secondary?: { label: string; onClick: () => void };
   grow?: boolean;
   /**
    * Shrink to a name and nothing else, because another card is using the room.
@@ -885,16 +892,37 @@ function MatterCard({
           <p className="mt-2 font-sans text-sm font-semibold text-fg">{meta}</p>
         )}
 
-        <button
-          type="button"
-          onClick={onAction}
-          aria-expanded={children ? !!grow : undefined}
-          className={`mt-3 w-full cursor-pointer rounded-lg py-2 font-sans
-                      text-sm font-semibold outline-none transition-colors
-                      focus-visible:ring-2 ${paint.button}`}
-        >
-          {action}
-        </button>
+        {/* Two buttons of equal width when the card has a second one, not a
+            primary with a smaller thing beside it: seeing the chapters and
+            adding one are both ordinary, frequent moves, and picking a winner
+            between them would only make the loser harder to hit. */}
+        <div className="mt-3 flex items-stretch gap-2">
+          <button
+            type="button"
+            onClick={onAction}
+            aria-expanded={children ? !!grow : undefined}
+            className={`flex-1 cursor-pointer rounded-lg py-2 font-sans text-sm
+                        font-semibold outline-none transition-colors
+                        focus-visible:ring-2 ${paint.button}`}
+          >
+            {action}
+          </button>
+
+          {secondary && (
+            <button
+              type="button"
+              onClick={secondary.onClick}
+              // Outlined in the card's own colour rather than filled: two solid
+              // blocks side by side fight, and this is the card's second thing.
+              className={`flex-1 cursor-pointer rounded-lg border-2 bg-transparent
+                          py-2 font-sans text-sm font-semibold outline-none
+                          transition-colors focus-visible:ring-2
+                          ${paint.outline}`}
+            >
+              {secondary.label}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Only the body has anything under the button, and only once opened.
