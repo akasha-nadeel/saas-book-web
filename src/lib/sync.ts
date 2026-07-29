@@ -82,31 +82,72 @@ export interface RemoteLibrary {
 // trip, or every book comes back subtly different from the one that went up.
 // ---------------------------------------------------------------------------
 
-const toIso = (ms: number | undefined): string | null =>
-  ms === undefined ? null : new Date(ms).toISOString();
+/**
+ * A timestamp the database will accept, or null.
+ *
+ * Guarded rather than trusting the number: `new Date(NaN).toISOString()` throws
+ * a RangeError, so a single corrupt stamp in localStorage would take down the
+ * whole upload with an exception rather than a rejected row.
+ */
+const toIso = (ms: unknown): string | null => {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return null;
+  const at = new Date(ms);
+  return Number.isNaN(at.getTime()) ? null : at.toISOString();
+};
 
 const toMs = (iso: string | null): number | undefined =>
   iso === null ? undefined : Date.parse(iso);
+
+/** A NOT NULL text column will refuse undefined; give it something. */
+const text = (value: unknown, fallback: string): string =>
+  typeof value === "string" && value.length > 0 ? value : fallback;
+
+/** An integer column will refuse NaN, a float, or a string. */
+const count = (value: unknown): number =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.round(value))
+    : 0;
 
 function bookToRow(book: Book, owner: string, position: number): BookRow {
   return {
     id: book.id,
     owner,
-    title: book.title,
+    title: text(book.title, "Untitled book"),
     subtitle: book.subtitle ?? null,
     author: book.author ?? null,
     kind: book.kind ?? null,
     genre: book.genre ?? null,
-    target_words: book.targetWords ?? null,
-    bare_cover: book.bareCover ?? null,
+    target_words:
+      typeof book.targetWords === "number" && Number.isFinite(book.targetWords)
+        ? Math.round(book.targetWords)
+        : null,
+    bare_cover: book.bareCover ? true : null,
     page: book.page ?? null,
     typography: book.typography ?? null,
     archived_at: toIso(book.archivedAt),
     trashed_at: toIso(book.trashedAt),
-    last_opened_id: book.lastOpenedId,
-    last_opened_at: new Date(book.lastOpenedAt).toISOString(),
+    last_opened_id: book.lastOpenedId ?? null,
+    // NOT NULL, so it needs a value even when the stored stamp is unusable.
+    last_opened_at: toIso(book.lastOpenedAt) ?? new Date().toISOString(),
     position,
   };
+}
+
+/**
+ * Anything that is not exactly "front" or "back" becomes null.
+ *
+ * The type says these can only be those two, and today's code only ever writes
+ * those two — but the type describes the code, not the data. localStorage holds
+ * whatever earlier versions of this app put there, unchecked by any compiler,
+ * and the database has a CHECK constraint that will refuse the difference. That
+ * refusal aborts the whole upload, so one odd field in one chapter written
+ * months ago is enough to stop a writer's entire library reaching the server.
+ *
+ * Narrowing on the way out is the fix: the database gets values it can accept,
+ * and a stray one is dropped rather than taking everything else down with it.
+ */
+function matterOrNull(value: unknown): "front" | "back" | null {
+  return value === "front" || value === "back" ? value : null;
 }
 
 function chapterToRow(
@@ -120,12 +161,14 @@ function chapterToRow(
     id: chapter.id,
     book_id: bookId,
     owner,
-    title: chapter.title,
-    words: chapter.words,
+    title: text(chapter.title, "Untitled chapter"),
+    words: count(chapter.words),
     position,
-    matter: chapter.matter ?? null,
-    matter_key: chapter.matterKey ?? null,
-    bookmarked: chapter.bookmarked ?? null,
+    matter: matterOrNull(chapter.matter),
+    matter_key: matterOrNull(chapter.matterKey),
+    // Coerced, not passed through: a truthy non-boolean here would be rejected
+    // by the column just as surely.
+    bookmarked: chapter.bookmarked ? true : null,
     trashed_at: toIso(trashedAt),
   };
 }
