@@ -225,7 +225,7 @@ export function ChapterEditor({
   // statement of what they are working on, so the page's edge follows the
   // selection rather than the page — press Chapters and the edge goes purple.
   const chapterPart = chapter ? chapterMatterOf(chapter) : "body";
-  const body = useBodyOpen(chapterPart === "body");
+  const body = useBodyOpen();
 
   // Book View is not one of the three parts. It shows the book whole and picks
   // out none of them, so the page takes the blue of the button it offers — the

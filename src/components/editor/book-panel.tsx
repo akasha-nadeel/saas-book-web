@@ -112,10 +112,15 @@ type MatterTone = keyof typeof MATTER_TONE;
  * clicking through a book would keep re-opening a list a writer had just shut.
  * Same reason the panel's face is held this way in the editor.
  *
+ * Shut to begin with. The panel's first face is the book's three parts, whole
+ * and equal; the list is what you ask for, not what you arrive at. It used to
+ * open itself whenever the writer was in a numbered chapter, which is nearly
+ * always — so nearly always the panel opened straight past its own front page.
+ *
  * Only the body has this. Front and back matter are one page each and are shown
  * as cards, which have nothing to expand.
  */
-let bodyOpenMemory = true;
+let bodyOpenMemory = false;
 
 function toggleBody(): boolean {
   bodyOpenMemory = !bodyOpenMemory;
@@ -128,30 +133,15 @@ function closeBody(): boolean {
 }
 
 /**
- * Opens the body list if the chapter being edited is in it.
- *
- * A writer can land inside a list they had shut — from search, from the left
- * panel, from a pasted URL — and the panel must not then be hiding the one
- * chapter they are in. This changes the remembered state rather than overriding
- * it, so shutting the list again afterwards sticks.
- */
-function revealBody(inBody: boolean): boolean {
-  if (inBody) bodyOpenMemory = true;
-  return bodyOpenMemory;
-}
-
-/**
  * The open/shut state of the chapter list, held above this panel.
  *
  * It lives up in the editor rather than in here because the manuscript needs it
  * too: the page's edge takes the colour of the part the panel says is selected,
  * and pressing Chapters selects the body. Two copies of this would be two
  * answers to the same question.
- *
- * @param inBody whether the chapter being edited is one of the numbered ones.
  */
-export function useBodyOpen(inBody: boolean) {
-  const [open, setOpen] = useState(() => revealBody(inBody));
+export function useBodyOpen() {
+  const [open, setOpen] = useState(bodyOpenMemory);
   return {
     open,
     toggle: () => setOpen(toggleBody()),
