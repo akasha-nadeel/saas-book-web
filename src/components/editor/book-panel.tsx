@@ -66,26 +66,33 @@ const MATTER_TONE = {
     borderActive: "border-matter-front",
     button: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
              focus-visible:ring-matter-front/50`,
-    // The colour carried into the shrunk strip, where there is no button left
-    // to carry it. A dot is enough to keep the card recognisable.
-    dot: "bg-matter-front",
-    ring: "focus-visible:ring-matter-front/50",
+    // Shrunk, the whole strip becomes the button, so it takes the fill the
+    // button had. Ink is a token too, because the black card inverts at night
+    // and white text on it would then be white on near-white.
+    strip: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
+            focus-visible:ring-matter-front-ink/60`,
+    inkSoft: "text-matter-front-ink/70",
+    ringInk: "ring-matter-front-ink/60",
   },
   body: {
     border: "border-matter-body/30",
     borderActive: "border-matter-body",
     button: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
              focus-visible:ring-matter-body/50`,
-    dot: "bg-matter-body",
-    ring: "focus-visible:ring-matter-body/50",
+    strip: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
+            focus-visible:ring-matter-body-ink/60`,
+    inkSoft: "text-matter-body-ink/70",
+    ringInk: "ring-matter-body-ink/60",
   },
   back: {
     border: "border-matter-back/30",
     borderActive: "border-matter-back",
     button: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
              focus-visible:ring-matter-back/50`,
-    dot: "bg-matter-back",
-    ring: "focus-visible:ring-matter-back/50",
+    strip: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
+            focus-visible:ring-matter-back-ink/60`,
+    inkSoft: "text-matter-back-ink/70",
+    ringInk: "ring-matter-back-ink/60",
   },
 } as const;
 
@@ -805,34 +812,31 @@ function MatterCard({
 
   if (compact) {
     return (
-      <section
-        aria-current={active ? "page" : undefined}
-        className={`shrink-0 overflow-hidden rounded-xl border bg-panel/60
-                    transition-colors
-                    ${active ? paint.borderActive : paint.border}`}
-      >
+      <h3 className="shrink-0">
         <button
           type="button"
           onClick={onAction}
-          className={`flex w-full cursor-pointer items-center gap-2.5 px-3.5
-                      py-2.5 text-left outline-none transition-colors
-                      hover:bg-raised focus-visible:ring-2
-                      focus-visible:ring-inset ${paint.ring}`}
+          aria-current={active ? "page" : undefined}
+          // Filled rather than outlined, so the strip is still the card it was
+          // — a writer picks these out by colour, and an outline at this height
+          // is barely a line of it. The fill also makes the strip read as one
+          // button, which it now is: there is nothing else on it to press.
+          className={`flex w-full cursor-pointer items-center gap-2.5
+                      rounded-xl px-3.5 py-2.5 text-left font-serif text-sm
+                      font-semibold outline-none transition-colors
+                      focus-visible:ring-2 focus-visible:ring-offset-2
+                      ${paint.strip}
+                      ${active ? `ring-2 ring-inset ${paint.ringInk}` : ""}`}
         >
-          <span
-            aria-hidden="true"
-            className={`h-2 w-2 shrink-0 rounded-full ${paint.dot}`}
-          />
-          <h3 className="min-w-0 flex-1 truncate font-serif text-sm font-semibold text-fg">
-            {label}
-          </h3>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+
           {/* The verb the full card's button carried, kept so the strip still
               says what pressing it does — and whether the page exists yet. */}
-          <span className="shrink-0 font-sans text-xs font-medium text-muted">
+          <span className={`shrink-0 font-sans text-xs ${paint.inkSoft}`}>
             {action}
           </span>
         </button>
-      </section>
+      </h3>
     );
   }
 
