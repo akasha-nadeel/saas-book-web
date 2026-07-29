@@ -846,6 +846,13 @@ function ChapterPill({
  * height the other two cards do not need and scrolls inside itself, so a
  * forty-chapter book cannot push the back matter off the bottom of the panel —
  * which is exactly when a writer wants to reach it.
+ *
+ * **One structure, both sizes.** The full card and the shrunk strip used to be
+ * two separate returns, and nothing can transition between two trees — pressing
+ * Chapters swapped them in the same frame, so the panel rearranged itself in a
+ * cut. Everything the strip drops now lives in one collapsing region and the
+ * header restyles in place, which is what lets the three cards resize together
+ * over half a second instead of jumping.
  */
 function MatterCard({
   tone,
@@ -893,118 +900,177 @@ function MatterCard({
   children?: React.ReactNode;
 }) {
   const paint = MATTER_TONE[tone];
-
-  if (compact) {
-    return (
-      // A <section> wrapping an <h3>, the same shape as the full card below,
-      // so React reuses this DOM node when the card shrinks rather than
-      // swapping the element type. A swap would remount it, and a remounted
-      // node replays its entrance animation — the two strips would slide in
-      // from the left again every time the chapter list was opened.
-      <section className="shrink-0">
-        <h3>
-          <button
-            type="button"
-            onClick={onAction}
-            aria-current={active ? "page" : undefined}
-            // Filled rather than outlined, so the strip is still the card it was
-            // — a writer picks these out by colour, and an outline at this height
-            // is barely a line of it. The fill also makes the strip read as one
-            // button, which it now is: there is nothing else on it to press.
-            className={`flex w-full cursor-pointer items-center gap-2.5
-                      rounded-xl px-3.5 py-2.5 text-left font-serif text-sm
-                      font-semibold outline-none transition-colors
-                      focus-visible:ring-2 focus-visible:ring-offset-2
-                      ${paint.strip}
-                      ${active ? `ring-2 ring-inset ${paint.ringInk}` : ""}`}
-          >
-            <span className="min-w-0 flex-1 truncate">{label}</span>
-
-            {/* The verb the full card's button carried, kept so the strip still
-              says what pressing it does — and whether the page exists yet. */}
-            <span className={`shrink-0 font-sans text-xs ${paint.inkSoft}`}>
-              {action}
-            </span>
-          </button>
-        </h3>
-      </section>
-    );
-  }
+  const listOpen = grow && !!children;
 
   return (
     <section
       aria-current={active ? "page" : undefined}
-      // Two pixels on every card, not only the selected one: a border that
-      // thickens on selection would move the card's contents by a pixel each
-      // time, and three cards nudging as you click between them is the kind of
-      // thing you see without being able to say what you saw.
-      className={`flex flex-col overflow-hidden rounded-xl border-2 bg-panel/60
-                  transition-colors
-                  ${active ? paint.borderActive : paint.border}
-                  ${grow ? "min-h-0 flex-1" : "shrink-0"}`}
+      // `relative` for the shrunk card's cover button, below.
+      //
+      // Two pixels of border on every card, not only the selected one: a border
+      // that thickens on selection would move the card's contents by a pixel
+      // each time, and three cards nudging as you click between them is the
+      // kind of thing you see without being able to say what you saw.
+      //
+      // Shrunk, the border takes the fill's own colour rather than going
+      // transparent, so the box does not appear to lose two pixels of height at
+      // the same moment it is losing the rest.
+      className={`relative flex flex-col overflow-hidden rounded-xl border-2
+                  transition-[background-color,border-color,flex-grow]
+                  duration-500 ease-out
+                  ${
+                    compact
+                      ? `${paint.strip} ${paint.borderActive}`
+                      : `bg-panel/60 ${
+                          active ? paint.borderActive : paint.border
+                        }`
+                  }
+                  ${grow ? "min-h-0 flex-1" : "shrink-0 grow-0"}`}
     >
-      <div className="shrink-0 p-3.5">
-        <h3 className="font-serif text-lg font-bold text-fg">{label}</h3>
+      {/* The one row that survives shrinking. It restyles rather than being
+          replaced: the title steps down a size and takes the fill's ink, and
+          the verb the button was carrying fades in beside it. */}
+      <div
+        className={`flex shrink-0 items-center gap-2.5 px-3.5
+                    transition-[padding] duration-500 ease-out ${
+                      compact ? "py-2.5" : "pt-3.5"
+                    }`}
+      >
+        <h3
+          className={`min-w-0 flex-1 truncate font-serif font-semibold
+                      transition-[font-size,color,line-height] duration-500
+                      ease-out ${compact ? "text-sm" : "text-lg font-bold text-fg"}`}
+        >
+          {label}
+        </h3>
 
-        {/* Two lines at the panel's width: long enough to say what the part is,
-            short enough that the card stays a card and not a paragraph.
+        {/* Present in both sizes, so it can fade rather than appear. Out of the
+            flow while the full card is showing — its own button says this
+            already, and a second copy of the word beside the title is noise. */}
+        <span
+          aria-hidden={!compact}
+          className={`shrink-0 font-sans text-xs transition-opacity duration-500
+                      ease-out ${
+                        compact
+                          ? `${paint.inkSoft} opacity-100`
+                          : "w-0 overflow-hidden opacity-0"
+                      }`}
+        >
+          {action}
+        </span>
+      </div>
 
-            Set in fg at three-quarters rather than in muted. Muted is the
-            weight for metadata a reader skips — timestamps, counts — and this
-            is the one line on the card that has something to teach. It should
-            read like text, not like a caption. */}
-        {description && (
-          <p className="mt-1.5 font-sans text-sm leading-relaxed font-medium text-fg/75">
-            {description}
-          </p>
-        )}
+      {/* Everything the strip drops.
+          A 1fr → 0fr grid row rather than a max-height guess: the row resolves
+          to the content's own height, so the collapse is exact at any length of
+          description and needs no number a longer sentence would break. */}
+      <div
+        className={`grid shrink-0 transition-[grid-template-rows,opacity]
+                    duration-500 ease-out ${
+                      compact
+                        ? "grid-rows-[0fr] opacity-0"
+                        : "grid-rows-[1fr] opacity-100"
+                    }`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-3.5 pt-1.5 pb-3.5">
+            {/* Two lines at the panel's width: long enough to say what the part
+                is, short enough that the card stays a card and not a paragraph.
 
-        {meta && (
-          <p className="mt-2 font-sans text-sm font-semibold text-fg">{meta}</p>
-        )}
+                Set in fg at three-quarters rather than in muted. Muted is the
+                weight for metadata a reader skips — timestamps, counts — and
+                this is the one line on the card that has something to teach. It
+                should read like text, not like a caption. */}
+            {description && (
+              <p className="font-sans text-sm leading-relaxed font-medium text-fg/75">
+                {description}
+              </p>
+            )}
 
-        {/* Two buttons of equal width when the card has a second one, not a
-            primary with a smaller thing beside it: seeing the chapters and
-            adding one are both ordinary, frequent moves, and picking a winner
-            between them would only make the loser harder to hit. */}
-        <div className="mt-3 flex items-stretch gap-2">
-          <button
-            type="button"
-            onClick={onAction}
-            aria-expanded={children ? !!grow : undefined}
-            className={`flex-1 cursor-pointer rounded-lg py-2 font-sans text-sm
-                        font-semibold outline-none transition-colors
-                        focus-visible:ring-2 ${paint.button}`}
-          >
-            {action}
-          </button>
+            {meta && (
+              <p className="mt-2 font-sans text-sm font-semibold text-fg">
+                {meta}
+              </p>
+            )}
 
-          {secondary && (
-            <button
-              type="button"
-              onClick={secondary.onClick}
-              // Outlined in the card's own colour rather than filled: two solid
-              // blocks side by side fight, and this is the card's second thing.
-              className={`flex-1 cursor-pointer rounded-lg border-2 bg-transparent
-                          py-2 font-sans text-sm font-semibold outline-none
-                          transition-colors focus-visible:ring-2
-                          ${paint.outline}`}
-            >
-              {secondary.label}
-            </button>
-          )}
+            {/* Two buttons of equal width when the card has a second one, not a
+                primary with a smaller thing beside it: seeing the chapters and
+                adding one are both ordinary, frequent moves, and picking a
+                winner between them would only make the loser harder to hit. */}
+            <div className="mt-3 flex items-stretch gap-2">
+              <button
+                type="button"
+                onClick={onAction}
+                // Out of the tab order once shrunk: the cover button is the
+                // control then, and a tab stop inside a zero-height box is a
+                // focus ring on nothing.
+                tabIndex={compact ? -1 : undefined}
+                aria-expanded={children ? listOpen : undefined}
+                className={`flex-1 cursor-pointer rounded-lg py-2 font-sans
+                            text-sm font-semibold outline-none transition-colors
+                            focus-visible:ring-2 ${paint.button}`}
+              >
+                {action}
+              </button>
+
+              {secondary && (
+                <button
+                  type="button"
+                  onClick={secondary.onClick}
+                  tabIndex={compact ? -1 : undefined}
+                  // Outlined in the card's own colour rather than filled: two
+                  // solid blocks side by side fight, and this is the card's
+                  // second thing.
+                  className={`flex-1 cursor-pointer rounded-lg border-2
+                              bg-transparent py-2 font-sans text-sm
+                              font-semibold outline-none transition-colors
+                              focus-visible:ring-2 ${paint.outline}`}
+                >
+                  {secondary.label}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Only the body has anything under the button, and only once opened.
-          The floor matters: three cards plus a list is more than a laptop's
-          panel can always hold, and a flex child with no minimum is squeezed to
-          nothing rather than scrolling. Four rows and its own scrollbar is a
-          usable list; a 2px sliver is not. */}
-      {grow && children && (
-        <ul className="scroll-slim min-h-24 flex-1 overflow-y-auto px-2 pb-2">
-          {children}
-        </ul>
+      {/* The chapter list, on the same kind of collapsing row, so the body card
+          grows into its list at the rate the other two shrink out of theirs.
+
+          The floor matters once it is open: three cards plus a list is more
+          than a laptop's panel can always hold, and a flex child with no
+          minimum is squeezed to nothing rather than scrolling. Four rows and
+          its own scrollbar is a usable list; a 2px sliver is not. */}
+      {children && (
+        <div
+          className={`grid min-h-0 transition-[grid-template-rows,opacity]
+                      duration-500 ease-out ${
+                        listOpen
+                          ? "grid-rows-[1fr] flex-1 opacity-100"
+                          : "grid-rows-[0fr] opacity-0"
+                      }`}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <ul className="scroll-slim h-full min-h-24 overflow-y-auto px-2 pb-2">
+              {children}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Shrunk, the whole card is one button — there is nothing else on it to
+          press. An overlay rather than making the header a button at both
+          sizes: the full card already has its own button, and a second control
+          doing the same job is a question the reader has to stop and answer. */}
+      {compact && (
+        <button
+          type="button"
+          onClick={onAction}
+          aria-label={`${label} — ${action}`}
+          className="absolute inset-0 cursor-pointer rounded-xl outline-none
+                     focus-visible:ring-2 focus-visible:ring-white/70
+                     focus-visible:ring-inset"
+        />
       )}
     </section>
   );
