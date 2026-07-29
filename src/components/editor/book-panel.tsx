@@ -140,6 +140,27 @@ function revealBody(inBody: boolean): boolean {
   return bodyOpenMemory;
 }
 
+/**
+ * The open/shut state of the chapter list, held above this panel.
+ *
+ * It lives up in the editor rather than in here because the manuscript needs it
+ * too: the page's edge takes the colour of the part the panel says is selected,
+ * and pressing Chapters selects the body. Two copies of this would be two
+ * answers to the same question.
+ *
+ * @param inBody whether the chapter being edited is one of the numbered ones.
+ */
+export function useBodyOpen(inBody: boolean) {
+  const [open, setOpen] = useState(() => revealBody(inBody));
+  return {
+    open,
+    toggle: () => setOpen(toggleBody()),
+    close: () => setOpen(closeBody()),
+  };
+}
+
+export type BodyOpen = ReturnType<typeof useBodyOpen>;
+
 export function BookPanel({
   book,
   chapterId,
@@ -148,6 +169,7 @@ export function BookPanel({
   mode,
   onMode,
   dictation,
+  body,
 }: {
   book: Book;
   chapterId: string | null;
@@ -161,6 +183,8 @@ export function BookPanel({
    * microphone so the two controls are two views of one session, not two.
    */
   dictation: Dictation;
+  /** The chapter list’s open state, owned by the editor — see useBodyOpen. */
+  body: BodyOpen;
 }) {
   const router = useRouter();
   const bookId = book.id;
@@ -174,11 +198,6 @@ export function BookPanel({
   // front or back matter page is, which is what "body" means here.
   const inBody =
     !!chapterId && front?.id !== chapterId && back?.id !== chapterId;
-
-  // Seeded from the remembered state, opened if the writer is in it — see
-  // revealBody. Because the panel is remounted on every chapter change, this
-  // seeding runs exactly when the question arises, so it needs no effect.
-  const [bodyOpen, setBodyOpen] = useState(() => revealBody(inBody));
 
   // Named once because it is both the tooltip and the accessible name, and a
   // toggle whose two labels disagree is a toggle screen readers misreport.
@@ -218,7 +237,7 @@ export function BookPanel({
     // Set even though the navigation remounts this panel: the writer may
     // already be on that page, in which case the push changes nothing and this
     // is the only thing that closes the list.
-    setBodyOpen(closeBody());
+    body.close();
     open(id);
   };
 
@@ -546,42 +565,42 @@ export function BookPanel({
               label="Front matter"
               description="The pages before Chapter 1: title, copyright, dedication."
               action={front ? "Open" : "Start"}
-              active={front?.id === chapterId}
+              // Yields to the body while its list is open, so exactly one part
+              // is ever marked and the page's edge always has a card to match.
+              active={!body.open && front?.id === chapterId}
               onAction={() => openMatter("front")}
-              compact={bodyOpen}
+              compact={body.open}
             />
 
             <MatterCard
               tone="body"
               label="Body matter"
               description={
-                bodyOpen
+                body.open
                   ? undefined
                   : "The story itself, chapter by chapter, in reading order."
               }
               meta={`${bodyChapters.length} ${
                 bodyChapters.length === 1 ? "chapter" : "chapters"
               }`}
-              action={bodyOpen ? "Hide chapters" : "Chapters"}
-              // Being in a chapter, and only that. Having the list open is not
-              // being in the body: a writer can open the front matter and then
-              // press Chapters to look something up, and for as long as the
-              // full border meant "open" too, two cards claimed to be the
-              // selected one while the page could only agree with one of them.
-              // The border is the answer to "where am I", nowhere else.
-              active={inBody}
-              onAction={() => setBodyOpen(toggleBody())}
+              action={body.open ? "Hide chapters" : "Chapters"}
+              // Open counts as selected, as well as being in a chapter. The
+              // page's edge is driven from the same expression upstream, so
+              // this border and that edge cannot disagree — which is the only
+              // reason "open" is allowed to mean "selected" at all.
+              active={body.open || inBody}
+              onAction={body.toggle}
               // Only once the list is open. Shut, the card has one thing to
               // offer — open me — and a second button beside it halves the
               // width of that one thing to sit next to a list nobody is looking
               // at. The new chapter appears in the list it was added to, so the
               // button belongs where the list is.
               secondary={
-                bodyOpen
+                body.open
                   ? { label: "New chapter", onClick: handleCreate }
                   : undefined
               }
-              grow={bodyOpen}
+              grow={body.open}
             >
               {bodyChapters.length > 0 ? (
                 bodyChapters.map((c) => (
@@ -641,9 +660,9 @@ export function BookPanel({
               label="Back matter"
               description="The pages after the story: acknowledgements, notes, an epilogue."
               action={back ? "Open" : "Start"}
-              active={back?.id === chapterId}
+              active={!body.open && back?.id === chapterId}
               onAction={() => openMatter("back")}
-              compact={bodyOpen}
+              compact={body.open}
             />
           </div>
         </div>

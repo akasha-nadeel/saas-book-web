@@ -24,7 +24,11 @@ import { NoIndent } from "@/lib/editor/no-indent";
 import { useDictation } from "@/lib/editor/use-dictation";
 import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
-import { BookPanel, type BookPanelMode } from "@/components/editor/book-panel";
+import {
+  BookPanel,
+  useBodyOpen,
+  type BookPanelMode,
+} from "@/components/editor/book-panel";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
@@ -215,6 +219,15 @@ export function ChapterEditor({
   const book = findBook(shelf, bookId);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
+  // The part the open page belongs to, and the part the *panel* says is
+  // selected. They are usually the same, and differ in one case: pressing
+  // Chapters while a matter page is on screen. The panel is the writer's
+  // statement of what they are working on, so the page's edge follows the
+  // selection rather than the page — press Chapters and the edge goes purple.
+  const chapterPart = chapter ? chapterMatterOf(chapter) : "body";
+  const body = useBodyOpen(chapterPart === "body");
+  const selectedPart = body.open ? "body" : chapterPart;
+
   // ⌘K / Ctrl+K opens search in the panel, wherever the caret is.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -287,6 +300,7 @@ export function ChapterEditor({
           mode={panelMode}
           onMode={changePanelMode}
           dictation={dictation}
+          body={body}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -308,6 +322,7 @@ export function ChapterEditor({
             prefs={prefs}
             zoom={zoom}
             onZoom={setZoom}
+            matter={selectedPart}
             onEditorReady={setEditor}
           />
         </div>
@@ -459,6 +474,7 @@ function EditorSurface({
   prefs,
   zoom,
   onZoom,
+  matter,
   onEditorReady,
 }: {
   bookId: string;
@@ -475,15 +491,11 @@ function EditorSurface({
   prefs: Prefs;
   zoom: number;
   onZoom: (zoom: number) => void;
+  /** The part of the book the panel has selected — the sheet takes its colour. */
+  matter: "front" | "body" | "back";
   onEditorReady: (editor: Editor) => void;
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
-
-  // Which of the book's three parts this chapter belongs to. Only the sheet's
-  // edge colour turns on it; a chapter that has somehow left the shelf is body,
-  // which is what an unmarked chapter is anyway.
-  const chapterMeta = book.chapters.find((c) => c.id === chapterId);
-  const matter = chapterMeta ? chapterMatterOf(chapterMeta) : "body";
 
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
