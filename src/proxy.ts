@@ -31,7 +31,15 @@ import {
  */
 const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
 
+/**
+ * Matched whole, not as a prefix. "/" is the landing page for a signed-out
+ * visitor and the shelf for a signed-in one — the page decides which. As a
+ * prefix it would of course make the entire app public.
+ */
+const PUBLIC_EXACT = ["/"];
+
 function isPublic(pathname: string): boolean {
+  if (PUBLIC_EXACT.includes(pathname)) return true;
   return PUBLIC_PREFIXES.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
   );

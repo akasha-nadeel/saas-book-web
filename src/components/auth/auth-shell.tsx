@@ -214,20 +214,26 @@ export function GoogleButton({
   action,
   next,
   label,
+  /** Overrides the button's own classes — the landing hero sets it inline. */
+  className,
 }: {
   action: (formData: FormData) => void;
   next: string;
   label: string;
+  className?: string;
 }) {
   return (
     <form action={action}>
       <input type="hidden" name="next" value={next} />
       <button
         type="submit"
-        className="flex w-full items-center justify-center gap-2.5 rounded-lg
-                   border border-line bg-panel py-3 font-sans text-sm font-medium
-                   text-fg outline-none transition-colors hover:bg-raised
-                   focus-visible:ring-2 focus-visible:ring-accent/50"
+        className={
+          className ??
+          `flex w-full items-center justify-center gap-2.5 rounded-lg
+           border border-line bg-panel py-3 font-sans text-sm font-medium
+           text-fg outline-none transition-colors hover:bg-raised
+           focus-visible:ring-2 focus-visible:ring-accent/50`
+        }
       >
         <GoogleMark />
         {label}

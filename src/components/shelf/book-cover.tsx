@@ -73,6 +73,7 @@ export function BookCover({
   image,
   bare,
   seed,
+  pageBlock = true,
 }: {
   title: string;
   subtitle?: string;
@@ -86,6 +87,15 @@ export function BookCover({
   /** Stable key — the book id — that fixes which muted palette an image-less
    *  cover wears. Falls back to the title when a book has no id yet. */
   seed?: string;
+  /**
+   * Draw the page block down the right edge. On by default, because on a shelf
+   * it is what gives a book thickness.
+   *
+   * The landing hero turns it off: there the books are tilted in perspective
+   * and seen nearly face-on, where a strip of hairlines reads as a white bar
+   * stuck to the edge rather than as leaves.
+   */
+  pageBlock?: boolean;
 }) {
   // Eight leaves at 40k words, which is where a novel starts. Capped, because
   // past a point more lines just turn into a grey smear.
@@ -170,15 +180,17 @@ export function BookCover({
 
       {/* The page block, edge-on. Repeating hairlines rather than one flat
           strip, so it reads as leaves instead of a border. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-y-1.5 right-0 rounded-r-md"
-        style={{
-          width: `${leaves}px`,
-          backgroundImage:
-            "repeating-linear-gradient(to right, rgba(0,0,0,0.16) 0 1px, rgba(255,255,255,0.85) 1px 2px)",
-        }}
-      />
+      {pageBlock ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-y-1.5 right-0 rounded-r-md"
+          style={{
+            width: `${leaves}px`,
+            backgroundImage:
+              "repeating-linear-gradient(to right, rgba(0,0,0,0.16) 0 1px, rgba(255,255,255,0.85) 1px 2px)",
+          }}
+        />
+      ) : null}
 
       {image ? null : (
         <div className="book-face-inner relative flex h-full flex-col">

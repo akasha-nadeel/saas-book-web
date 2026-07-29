@@ -72,11 +72,14 @@ export function AuthForm({
   mode,
   next,
   problem,
+  email,
 }: {
   mode: "signin" | "signup";
   next: string;
   /** The `error` query param, if the writer arrived carrying one. */
   problem?: string;
+  /** Typed into the landing page's hero, carried here rather than asked twice. */
+  email?: string;
 }) {
   const copy = COPY[mode];
   const [state, formAction, isPending] = useActionState<AuthState, FormData>(
@@ -125,7 +128,10 @@ export function AuthForm({
             name="email"
             required
             autoComplete="email"
-            autoFocus
+            // Uncontrolled with a default: the writer must be able to correct
+            // whatever the hero carried over.
+            defaultValue={email}
+            autoFocus={!email}
             placeholder="you@example.com"
             className={FIELD}
           />
