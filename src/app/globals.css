@@ -207,6 +207,9 @@ body {
   --paper-edge-front: #15803d;
   --paper-edge-body: #6d28d9;
   --paper-edge-back: #111827;
+  /* Book View selects no part — it shows the book whole, and its one button is
+     the app's blue. The page follows the panel, so here it is blue too. */
+  --paper-edge-book: #1c66cc;
 }
 
 [data-paper="cream"] {
@@ -235,6 +238,7 @@ body {
   --paper-edge-front: #2ea75c;
   --paper-edge-body: #9061f0;
   --paper-edge-back: #cfd8e2;
+  --paper-edge-book: #5a97f8;
 }
 
 [data-paper="black"] {
@@ -246,6 +250,7 @@ body {
   --paper-edge-front: #2ea75c;
   --paper-edge-body: #9061f0;
   --paper-edge-back: #cfd8e2;
+  --paper-edge-book: #5a97f8;
 }
 
 /* --------------------------------------------------------------------------
@@ -957,6 +962,13 @@ body {
 }
 [data-matter="back"] {
   --paper-edge: var(--paper-edge-back);
+  --paper-edge-w: 2px;
+}
+/* Not a part of the book but a state of the panel: Book View shows the book
+   whole and selects nothing, so the page takes the blue of the one button it
+   offers. Kept with the three so the rule stays in one place. */
+[data-matter="book"] {
+  --paper-edge: var(--paper-edge-book);
   --paper-edge-w: 2px;
 }
 /* The editable itself carries no paper — the sheets behind do — so it can float

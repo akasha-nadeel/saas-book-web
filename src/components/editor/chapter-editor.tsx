@@ -226,7 +226,12 @@ export function ChapterEditor({
   // selection rather than the page — press Chapters and the edge goes purple.
   const chapterPart = chapter ? chapterMatterOf(chapter) : "body";
   const body = useBodyOpen(chapterPart === "body");
-  const selectedPart = body.open ? "body" : chapterPart;
+
+  // Book View is not one of the three parts. It shows the book whole and picks
+  // out none of them, so the page takes the blue of the button it offers — the
+  // same rule as the rest, applied to a panel that has nothing selected.
+  const selectedPart =
+    panelMode === "book" ? "book" : body.open ? "body" : chapterPart;
 
   // ⌘K / Ctrl+K opens search in the panel, wherever the caret is.
   useEffect(() => {
@@ -491,8 +496,9 @@ function EditorSurface({
   prefs: Prefs;
   zoom: number;
   onZoom: (zoom: number) => void;
-  /** The part of the book the panel has selected — the sheet takes its colour. */
-  matter: "front" | "body" | "back";
+  /** What the panel has selected — the sheet's edge takes its colour. "book" is
+   *  Book View, which selects no part of the book at all. */
+  matter: "front" | "body" | "back" | "book";
   onEditorReady: (editor: Editor) => void;
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
