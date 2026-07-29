@@ -25,7 +25,14 @@ export function LandingPage() {
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
     // scrolling. min-h-dvh would put the footer out of reach.
-    <div className="h-dvh overflow-y-auto bg-surface">
+    //
+    // Always light, whatever theme the visitor's browser is carrying. This is
+    // the front of the product rather than a place to work: it is built around
+    // a photograph and a shelf of real covers, all of them made for a white
+    // page, and under the dark theme half of it inverted and half of it did
+    // not. The attribute re-points the palette for this subtree alone — see
+    // [data-theme="light"] in globals.css.
+    <div data-theme="light" className="h-dvh overflow-y-auto bg-surface">
       <Nav />
       <Hero />
       <Rows />

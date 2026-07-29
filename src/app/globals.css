@@ -134,6 +134,59 @@
   --color-matter-back-ink: #10151c;
 }
 
+/* --------------------------------------------------------------------------
+   Light, asked for by attribute rather than only by being :root.
+
+   The landing page is the one screen that does not follow the writer's theme.
+   It is the front of the product rather than a place to work: it is designed
+   around a photograph and a shelf of covers, and every one of them was made for
+   a white page. Half of it inverted and half of it did not.
+
+   Custom properties inherit from the nearest ancestor that sets them, so a
+   subtree can carry `data-theme="light"` and take these instead of the dark set
+   above, whatever <html> says.
+
+   The values are the light set from @theme, written again. They cannot be
+   aliased: an alias on :root would resolve to whatever :root currently holds,
+   which under a dark theme is the dark value. So this block has to be kept in
+   step with @theme by hand — it re-points every token the dark block does, so
+   nothing is left half-inverted.
+   -------------------------------------------------------------------------- */
+[data-theme="light"] {
+  color-scheme: light;
+
+  --color-surface: #f5f6f8;
+  --color-panel: #ffffff;
+  --color-raised: #eaedf1;
+  --color-line: #e3e7ec;
+
+  --color-fg: #1a222d;
+  --color-muted: #586573;
+
+  --color-accent: #1c66cc;
+  --color-accent-strong: #154f9f;
+  --color-accent-deep: #1f5aa8;
+
+  --color-danger: #c0362c;
+
+  --color-selected: #dbe7f7;
+  --color-selected-fg: #154f9f;
+
+  --color-nav: #123a63;
+
+  --color-matter-front: #15803d;
+  --color-matter-front-strong: #126a33;
+  --color-matter-front-ink: #ffffff;
+
+  --color-matter-body: #6d28d9;
+  --color-matter-body-strong: #5b21b6;
+  --color-matter-body-ink: #ffffff;
+
+  --color-matter-back: #111827;
+  --color-matter-back-strong: #1f2937;
+  --color-matter-back-ink: #ffffff;
+}
+
 /* App shell. Layout constants, not part of the design language.
 
    The panel scales with the window rather than taking one fixed number. The
