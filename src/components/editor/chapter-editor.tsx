@@ -564,6 +564,54 @@ function EditorSurface({
     );
   };
 
+  /**
+   * A sweep that begins on the chapter's title and carries on down the page.
+   *
+   * The title is an `<input>`, and a browser will not extend a selection out of
+   * a form field into the document around it — so a drag that started on the
+   * chapter's name selected the name and stopped dead there, however far down
+   * the page the pointer went. Nothing in our code was doing it; it is simply
+   * what a field is.
+   *
+   * So the manuscript picks the drag up where the browser drops it. The moment
+   * the pointer leaves the field with the button still down, the field lets go
+   * and the prose takes over, selecting from its first character to wherever
+   * the pointer has reached, and following it until the button comes up.
+   */
+  const dragOutOfTitle = (e: React.PointerEvent<HTMLInputElement>) => {
+    // Left button only, and only while it is actually held: a pointer merely
+    // passing over the title on its way somewhere else must do nothing.
+    if (e.buttons !== 1 || !editor || !editor.isEditable) return;
+
+    e.currentTarget.blur();
+
+    const extendTo = (x: number, y: number) => {
+      const at = editor.view.posAtCoords({ left: x, top: y });
+      // Past the last line, posAtCoords gives nothing; the end of the prose is
+      // what the pointer is over in that case.
+      const to = Math.max(1, at ? at.pos : editor.state.doc.content.size - 1);
+      editor
+        .chain()
+        // Never scrolls: the writer is dragging, and the page moving under the
+        // pointer would take the text out from under it.
+        .focus(undefined, { scrollIntoView: false })
+        .setTextSelection({ from: 1, to })
+        .run();
+    };
+
+    extendTo(e.clientX, e.clientY);
+
+    const follow = (ev: PointerEvent) => extendTo(ev.clientX, ev.clientY);
+    const release = () => {
+      window.removeEventListener("pointermove", follow);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+    };
+    window.addEventListener("pointermove", follow);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+  };
+
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
   const written = bookWordCount(book);
@@ -995,6 +1043,9 @@ function EditorSurface({
                     }}
                     aria-label="Chapter title"
                     spellCheck={false}
+                    // See dragOutOfTitle: a selection cannot leave a form field
+                    // on its own, so the manuscript takes over when it does.
+                    onPointerLeave={dragOutOfTitle}
                     className="reader-title w-full rounded-sm bg-transparent
                                outline-none focus-visible:ring-2
                                focus-visible:ring-accent/60"
