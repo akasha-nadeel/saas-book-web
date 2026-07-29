@@ -200,13 +200,24 @@ export function ChapterEditor({
   const selectedPart =
     panelMode === "book" ? "book" : body.open ? "body" : chapterPart;
 
-  // Book View shows the overview instead of the manuscript, so the surface is
-  // unmounted and the instance in state is a destroyed one. Everything that
-  // acts on the editor reads this rather than the raw state: the formatting
-  // rail, the assistant and dictation all go quiet, which is the truth — there
-  // is no page for them to act on. Derived rather than cleared in an effect, so
-  // it can never be a render behind.
-  const liveEditor = panelMode === "book" ? null : editor;
+  /**
+   * The editor, but only while there is one to act on.
+   *
+   * `editor` is state set from the surface's `onCreate`, so it outlives the
+   * surface: the instance sits there destroyed until a new one replaces it.
+   * There are two windows where that matters — Book View, which unmounts the
+   * surface for as long as it is showing, and the render between one chapter's
+   * editor being destroyed and the next one's `onCreate`. In both, anything
+   * that touches the instance reaches through a null `view`; `editor.can()` in
+   * the formatting rail throws outright.
+   *
+   * So the rail, the assistant and dictation all read this instead. Derived
+   * rather than cleared in an effect, because an effect would leave exactly the
+   * render that crashes. `isDestroyed` is safe to read on a dead editor — it
+   * answers from `editorView?.isDestroyed ?? true` rather than assuming a view.
+   */
+  const liveEditor =
+    panelMode === "book" || !editor || editor.isDestroyed ? null : editor;
 
   // ⌘K / Ctrl+K opens search in the panel, wherever the caret is.
   useEffect(() => {
