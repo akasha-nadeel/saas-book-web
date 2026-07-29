@@ -563,11 +563,13 @@ export function BookPanel({
                 bodyChapters.length === 1 ? "chapter" : "chapters"
               }`}
               action={bodyOpen ? "Hide chapters" : "Chapters"}
-              // Open counts as selected here, as well as being in a chapter.
-              // With the other two shrunk to strips, the purple border is what
-              // says the panel is currently given over to the body — the same
-              // thing the green border says when you are in the front matter.
-              active={bodyOpen || inBody}
+              // Being in a chapter, and only that. Having the list open is not
+              // being in the body: a writer can open the front matter and then
+              // press Chapters to look something up, and for as long as the
+              // full border meant "open" too, two cards claimed to be the
+              // selected one while the page could only agree with one of them.
+              // The border is the answer to "where am I", nowhere else.
+              active={inBody}
               onAction={() => setBodyOpen(toggleBody())}
               // Only once the list is open. Shut, the card has one thing to
               // offer — open me — and a second button beside it halves the
