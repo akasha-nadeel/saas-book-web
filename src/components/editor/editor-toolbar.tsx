@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
-import { PageMenu } from "@/components/editor/page-menu";
+
 import { ACCEPTED, importImage } from "@/lib/image-import";
 import {
   setPref,
@@ -745,8 +745,6 @@ export function ToolRail({
       </ToolButton>
 
       <Divider />
-
-      <PageMenu book={book} />
 
       {problem && (
         <p

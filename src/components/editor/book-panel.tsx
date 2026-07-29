@@ -126,69 +126,107 @@ export function BookPanel({
       // Transparent, with no divider: the gradient wash and the seamless blend
       // into the paper come from the shared row in the editor layout, so the
       // book panel and the manuscript read as one surface.
-      className="hidden w-72 shrink-0 flex-col lg:flex"
+      // Widens with the window rather than taking one fixed number. 18rem was
+      // set for the cover, which is the narrower of the two things this panel
+      // shows; the chapter list wants room for a title, its number and its word
+      // count without the title truncating. It only appears at lg and up, so
+      // the manuscript keeps its measure on a laptop and gains from a monitor.
+      className="hidden w-80 shrink-0 flex-col lg:flex xl:w-[22rem] 2xl:w-96"
     >
       {mode === "book" ? (
-        <div className="scroll-slim flex h-full flex-col items-center overflow-y-auto px-6 py-8">
+        /* Three bands, in the order a writer reads them: the page, what the
+           book is, and the way out of here. `gap-7` sets the rhythm once
+           instead of a different margin on each child, and the action is
+           pushed to the foot by mt-auto so it sits in the same place whether
+           the book is one chapter or forty. */
+        <div className="scroll-slim flex h-full flex-col gap-7 overflow-y-auto px-6 py-8">
           {/* The cover on page 0; every page after it is the chapter as it will
               print, so the writer can flip through the finished pages here. */}
-          <PagePreview
-            book={book}
-            cover={cover}
-            paper={paper}
-            index={previewIndex}
-            onPageCount={setPageCount}
-          />
+          <div className="flex flex-col items-center gap-3">
+            <PagePreview
+              book={book}
+              cover={cover}
+              paper={paper}
+              index={previewIndex}
+              onPageCount={setPageCount}
+            />
 
-          <p className="mt-3 font-sans text-xs text-muted">
-            {previewIndex === 0 ? "Cover" : `Page ${previewIndex} of ${pageCount}`}
-          </p>
+            {/* A pager, not two arrows over the page.
+                Laid on the preview they covered the prose — which is the one
+                thing the preview exists to show, so the controls were hiding
+                their own subject. Set beside the caption they cover nothing,
+                the page keeps its full width, and the three parts read as one
+                control: back, where you are, forward.
 
-          {/* The book's details — its name and the figures the old info card
-              carried. */}
-          <div className="mt-4 w-full">
-            <p className="font-serif text-xl font-medium text-fg">{book.title}</p>
-            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 font-sans">
-              <Figure
-                label="Chapters"
-                value={bodyChapters.length.toLocaleString()}
+                Tabular figures so the number does not jog sideways as the count
+                passes a wider digit and shifts the arrows under the cursor. */}
+            <div className="flex items-center gap-1">
+              <PageArrow
+                label="Previous page"
+                disabled={previewIndex === 0}
+                onClick={prevPage}
+                direction="left"
               />
-              <Figure
-                label="Words"
-                value={bookWordCount(book).toLocaleString()}
+              <span className="min-w-[7.5rem] text-center font-sans text-xs tabular-nums text-muted">
+                {previewIndex === 0
+                  ? "Cover"
+                  : `Page ${previewIndex} of ${pageCount}`}
+              </span>
+              <PageArrow
+                label="Next page"
+                disabled={previewIndex >= pageCount}
+                onClick={nextPage}
+                direction="right"
               />
-              <div className="col-span-2">
-                <Figure
-                  label="Last opened"
-                  value={relativeTime(book.lastOpenedAt)}
-                />
-              </div>
-            </dl>
+            </div>
           </div>
 
-          <div className="mt-6 grid w-full grid-cols-2 gap-2">
-            <PageStep
-              label="Previous"
-              disabled={previewIndex === 0}
-              onClick={prevPage}
-            />
-            <PageStep
-              label="Next Page"
-              disabled={previewIndex >= pageCount}
-              onClick={nextPage}
-            />
-          </div>
+          {/* Title, figures and the way in to the chapters, as one block on a
+              card rather than three things loose on the panel.
 
-          <button
-            type="button"
-            onClick={() => onMode("chapters")}
-            className="mt-3 w-full rounded-lg bg-accent py-2.5 font-sans text-sm
-                       font-semibold text-white outline-none transition-colors
-                       hover:bg-accent-strong focus-visible:ring-2
-                       focus-visible:ring-accent/50"
-          >
-            Chapters
-          </button>
+              They were loose, with the action pinned to the foot — which left a
+              hand's width of nothing between the last line and the button. A
+              gap that size reads as something failing to load. Grouping them
+              gives the text an edge to sit against and puts the action where
+              the reader already is, and the empty space falls below the block
+              where it looks like room rather than a hole.
+
+              The figures are one quiet line, not a grid of labelled cells:
+              three numbers do not need a table, and the labels were louder than
+              the values they described. */}
+          <div className="rounded-xl border border-line bg-panel/70 p-4">
+            <h2 className="font-serif text-lg leading-snug font-medium text-fg">
+              {book.title}
+            </h2>
+
+            <p className="mt-1.5 font-sans text-sm text-muted">
+              <span className="font-medium text-fg">
+                {bodyChapters.length.toLocaleString()}
+              </span>{" "}
+              {bodyChapters.length === 1 ? "chapter" : "chapters"}
+              <span aria-hidden="true" className="px-1.5 text-line">
+                |
+              </span>
+              <span className="font-medium text-fg">
+                {bookWordCount(book).toLocaleString()}
+              </span>{" "}
+              words
+            </p>
+            <p className="mt-0.5 font-sans text-xs text-muted">
+              Opened {relativeTime(book.lastOpenedAt)}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => onMode("chapters")}
+              className="mt-4 w-full cursor-pointer rounded-lg bg-accent py-2.5
+                         font-sans text-sm font-semibold text-white outline-none
+                         transition-colors hover:bg-accent-strong
+                         focus-visible:ring-2 focus-visible:ring-accent/50"
+            >
+              Chapters
+            </button>
+          </div>
         </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col px-5 py-6">
@@ -281,7 +319,9 @@ export function BookPanel({
 
           {/* Front matter opens the book, the body is the story, back matter
               closes it. The list scrolls so a long book stays in reach. */}
-          <ul className="scroll-slim mt-4 flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pr-1">
+          {/* gap-0.5, not gap-2.5: rows this close read as a list, and a book
+              of forty chapters is worth being able to see the shape of. */}
+          <ul className="scroll-slim mt-4 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
             <MatterPill
               label="Front matter"
               exists={!!front}
@@ -295,6 +335,7 @@ export function BookPanel({
                   key={c.id}
                   number={chapterNumberOf(book, c.id)}
                   title={c.title}
+                  words={c.words}
                   active={c.id === chapterId}
                   onClick={() => open(c.id)}
                 />
@@ -330,39 +371,91 @@ export function BookPanel({
 
 /** One of the two page steppers under the cover in Book View — each flips the
  *  print preview by a page. */
-function PageStep({
+/**
+ * One end of the pager under the page.
+ *
+ * Quiet by default and lit on hover, because a pager sits under something worth
+ * looking at and should not compete with it. Disabled it dims rather than
+ * disappearing: the pair keeps its shape, so the caption between them does not
+ * shift sideways at the first and last page.
+ *
+ * Icon-only, so it carries a label for anyone not looking at it — the arrow
+ * tells a sighted reader which way and a screen reader nothing at all.
+ */
+function PageArrow({
   label,
   disabled,
   onClick,
+  direction,
 }: {
   label: string;
   disabled: boolean;
   onClick: () => void;
+  direction: "left" | "right";
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="rounded-lg bg-accent/10 py-2 font-sans text-sm font-medium
-                 text-accent outline-none transition-colors hover:bg-accent/20
-                 focus-visible:ring-2 focus-visible:ring-accent/50
-                 disabled:opacity-40 disabled:hover:bg-accent/10"
+      aria-label={label}
+      title={label}
+      // bg-panel, not white: it is white on the light theme and the lifted
+      // slate on the dark one, so the disc stays a disc in both rather than
+      // becoming a bright hole at night.
+      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center
+                 rounded-full border border-line bg-panel text-fg shadow-sm
+                 outline-none transition-[background-color,box-shadow,color]
+                 hover:bg-raised hover:shadow focus-visible:ring-2
+                 focus-visible:ring-accent/60 disabled:pointer-events-none
+                 disabled:opacity-30"
     >
-      {label}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d={direction === "left" ? "M12 4 6 10l6 6" : "M8 4l6 6-6 6"} />
+      </svg>
     </button>
   );
 }
 
 /** A body chapter as a pill — numbered, the soft blue wash, filled when open. */
+/** 1,240 → "1.2k". A sidebar column has no room for a thousands separator. */
+function shortCount(words: number): string {
+  if (words < 1000) return String(words);
+  const thousands = words / 1000;
+  return `${thousands < 10 ? thousands.toFixed(1) : Math.round(thousands)}k`;
+}
+
+/**
+ * One chapter in the contents.
+ *
+ * These were filled pills, every row carrying a tinted block — which made the
+ * list a stack of buttons and left the open chapter competing with nine others
+ * for attention. A contents list is mostly read, not pressed: the rows are
+ * plain now, a hover shows what is under the pointer, and the fill is spent on
+ * the one row that has something to say, which is where you are.
+ *
+ * Losing the fills and the padding roughly doubles how many chapters are in
+ * view — the point of a contents list being to see the shape of the book.
+ */
 function ChapterPill({
   number,
   title,
+  words,
   active,
   onClick,
 }: {
   number: number | null;
   title: string;
+  words: number;
   active: boolean;
   onClick: () => void;
 }) {
@@ -372,24 +465,38 @@ function ChapterPill({
         type="button"
         onClick={onClick}
         aria-current={active ? "page" : undefined}
-        className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left
-                    font-sans text-sm outline-none transition-colors
-                    focus-visible:ring-2 focus-visible:ring-accent/50 ${
+        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
+                    px-2.5 py-2 text-left font-sans text-sm outline-none
+                    transition-colors focus-visible:ring-2
+                    focus-visible:ring-accent/50 ${
                       active
                         ? "bg-accent font-medium text-white"
-                        : "bg-accent/10 text-fg hover:bg-accent/20"
+                        : "text-fg hover:bg-raised"
                     }`}
       >
-        {number !== null && (
+        {/* Fixed width and right-aligned, so the titles line up whether the
+            number is 1 or 40 rather than stepping right as the book grows. */}
+        <span
+          className={`w-5 shrink-0 text-right text-xs tabular-nums ${
+            active ? "text-white/70" : "text-muted"
+          }`}
+        >
+          {number ?? ""}
+        </span>
+
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+
+        {/* Silent on an empty chapter: "0" is noise on every row of a book that
+            has only been outlined. */}
+        {words > 0 && (
           <span
-            className={`shrink-0 text-xs tabular-nums ${
-              active ? "text-white/80" : "text-muted"
+            className={`shrink-0 text-[0.7rem] tabular-nums ${
+              active ? "text-white/70" : "text-muted"
             }`}
           >
-            {number}
+            {shortCount(words)}
           </span>
         )}
-        <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
     </li>
   );
@@ -415,13 +522,17 @@ function MatterPill({
         onClick={onClick}
         aria-current={active ? "page" : undefined}
         title={exists ? label : `Start the ${label.toLowerCase()}`}
-        className={`flex w-full items-center gap-2.5 rounded-xl px-4 py-3
-                    text-left font-sans text-sm font-medium outline-none
-                    transition-colors focus-visible:ring-2 focus-visible:ring-accent/50 ${
+        // Matched to a chapter row's height and padding so the three parts of
+        // the book read as one list. It keeps the dashed outline while it does
+        // not exist yet, which is the one thing about it worth saying loudly.
+        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
+                    px-2.5 py-2 text-left font-sans text-sm font-medium
+                    outline-none transition-colors focus-visible:ring-2
+                    focus-visible:ring-accent/50 ${
                       active
                         ? "bg-accent text-white"
                         : exists
-                          ? "bg-accent/10 text-fg hover:bg-accent/20"
+                          ? "text-fg hover:bg-raised"
                           : "border border-dashed border-line text-muted hover:bg-raised hover:text-fg"
                     }`}
       >
@@ -441,15 +552,5 @@ function MatterPill({
         <span className="min-w-0 flex-1 truncate">{label}</span>
       </button>
     </li>
-  );
-}
-
-/** A labelled figure in the Book View details — a label over its value. */
-function Figure({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="font-sans text-xs text-muted">{label}</dt>
-      <dd className="font-sans text-sm font-medium text-fg">{value}</dd>
-    </div>
   );
 }

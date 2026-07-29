@@ -328,13 +328,6 @@ export function ChapterEditor({
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 
           <RailButton
-            label="Focus mode"
-            active={prefs.focusMode}
-            onClick={() => setPref("focusMode", !prefs.focusMode)}
-          >
-            {icons.focus}
-          </RailButton>
-          <RailButton
             label="Typewriter scrolling"
             active={prefs.typewriter}
             onClick={() => setPref("typewriter", !prefs.typewriter)}
