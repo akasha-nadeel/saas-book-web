@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
@@ -59,12 +59,22 @@ function Btn({
   return (
     <button
       type="button"
+      // The whole reason this bar stays on screen.
+      //
+      // Pressing a button moves focus to it, which blurs the manuscript, and a
+      // bubble menu over a blurred editor has nothing to point at — so it hid
+      // the instant a writer pressed anything on it. Refusing the mousedown
+      // means focus never leaves the prose in the first place: the click still
+      // fires, the selection is never dropped, and the bar is still there for
+      // the next button.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md
-                  text-sm outline-none transition-colors focus-visible:ring-2
+      className={`flex h-8 w-8 shrink-0 cursor-pointer items-center
+                  justify-center rounded-md text-sm outline-none
+                  transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
                     active ? "bg-accent text-white" : "text-fg hover:bg-raised"
                   }`}
@@ -236,6 +246,9 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
         >
           <span className="font-serif text-sm">¶</span>
         </Btn>
+
+        <Sep />
+
         {(
           [
             [1, 2],
@@ -402,40 +415,128 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
  * leaving it alone means.
  */
 function FontPicker({ editor }: { editor: Editor }) {
+  const [open, setOpen] = useState(false);
   const current =
-    (editor.getAttributes("fontFamily").font as string | null) ?? "";
+    (editor.getAttributes("fontFamily").font as string | null) ?? null;
+  const chosen = FONTS.find((f) => f.id === current) ?? null;
+
+  const choose = (id: string | null) => {
+    editor.chain().focus().setFontFamily(id).run();
+    setOpen(false);
+  };
 
   return (
-    <select
-      aria-label="Font"
-      title="Font of the selected text"
-      value={current}
-      // Changing a select moves focus out of the manuscript, but ProseMirror
-      // keeps the selection in its own state — so `.focus()` at the head of the
-      // chain puts the caret back exactly where it was and the mark lands on
-      // the words that were highlighted.
-      onChange={(e) =>
-        editor
-          .chain()
-          .focus()
-          .setFontFamily(e.target.value || null)
-          .run()
-      }
-      className="h-8 max-w-[8.5rem] cursor-pointer rounded-md border
-                 border-transparent bg-transparent px-1.5 font-sans text-xs
-                 text-fg outline-none transition-colors hover:bg-raised
-                 focus-visible:ring-2 focus-visible:ring-accent/50"
-    >
-      <option value="">Book default</option>
-      {FONTS.map((font) => (
-        <option
-          key={font.id}
-          value={font.id}
-          style={{ fontFamily: font.stack }}
+    <span className="relative shrink-0">
+      <button
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setOpen((was) => !was)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Font of the selected text"
+        title="Font of the selected text"
+        className={`flex h-8 cursor-pointer items-center gap-1 rounded-md pr-1
+                    pl-2 outline-none transition-colors focus-visible:ring-2
+                    focus-visible:ring-accent/60 ${
+                      open ? "bg-raised" : "hover:bg-raised"
+                    }`}
+      >
+        {/* "Aa" in the face itself rather than its name spelled out. A name
+            takes six times the width and says less — a reader picks a typeface
+            by looking at it. */}
+        <span
+          className="text-sm leading-none text-fg"
+          style={{ fontFamily: chosen ? chosen.stack : undefined }}
         >
-          {font.label}
-        </option>
-      ))}
-    </select>
+          Aa
+        </span>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3 w-3 text-muted"
+        >
+          <path d="M6 8l4 4 4-4" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          // A list of our own, not a native select. A select cannot be opened
+          // without taking focus, and taking focus out of the manuscript is
+          // what closes this whole bar — the dropdown would have been torn off
+          // its own hinge before anyone could pick from it.
+          className="absolute top-full left-0 z-20 mt-1.5 w-44 rounded-lg border
+                     border-line bg-panel p-1 shadow-xl"
+        >
+          <FontOptionRow
+            label="Book default"
+            active={current === null}
+            onSelect={() => choose(null)}
+          />
+          <span aria-hidden="true" className="my-1 block h-px bg-line" />
+          {FONTS.map((font) => (
+            <FontOptionRow
+              key={font.id}
+              label={font.label}
+              stack={font.stack}
+              active={current === font.id}
+              onSelect={() => choose(font.id)}
+            />
+          ))}
+        </div>
+      )}
+    </span>
+  );
+}
+
+function FontOptionRow({
+  label,
+  stack,
+  active,
+  onSelect,
+}: {
+  label: string;
+  /** Absent for "Book default", which is the absence of a face, not a face. */
+  stack?: string;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitemradio"
+      aria-checked={active}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onSelect}
+      style={stack ? { fontFamily: stack } : undefined}
+      className={`flex w-full cursor-pointer items-center justify-between
+                  rounded-md px-2.5 py-1.5 text-left text-sm outline-none
+                  transition-colors focus-visible:ring-2
+                  focus-visible:ring-accent/50 ${
+                    active ? "bg-accent text-white" : "text-fg hover:bg-raised"
+                  }`}
+    >
+      {label}
+      {active && (
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3.5 w-3.5"
+        >
+          <path d="M4.5 10.5l3.5 3.5 7.5-8" />
+        </svg>
+      )}
+    </button>
   );
 }
