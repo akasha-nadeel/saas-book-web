@@ -210,9 +210,10 @@ function Hero() {
             action={signInWithGoogle}
             next="/"
             label="Sign in with Google"
-            className="flex items-center gap-2 px-2 py-2 font-sans text-sm font-medium
-                       text-muted outline-none transition-colors hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/50"
+            className="flex items-center gap-2.5 px-3 py-3.5 font-sans text-base
+                       font-semibold text-fg outline-none transition-colors
+                       hover:text-accent focus-visible:ring-2
+                       focus-visible:ring-accent/50"
           />
         </div>
       </div>
@@ -261,12 +262,7 @@ function Rows() {
         id="writing"
         eyebrow="Writing"
         title="A page that behaves like a page."
-        body="The surface is set on real sheets at your book's trim size. A long paragraph fills the page and carries over the break, the way a word processor does it — so what you see while drafting is what comes out the other end."
-        points={[
-          "Focus mode dims everything but the paragraph in hand",
-          "Typewriter scrolling holds the caret at a fixed height",
-          "Paper colours that do not glare at midnight",
-        ]}
+        body="Your manuscript sits on real sheets at the trim size you chose. Long paragraphs fill the page and carry over the break, just as a word processor handles them. What you see while drafting is what comes out the other end."
         figure={<PageFigure />}
       />
       <Row
@@ -274,11 +270,6 @@ function Rows() {
         eyebrow="Library"
         title="A shelf, not a folder."
         body="Every book with its cover, its word count and where you left off. Chapters reorder by dragging, move to front or back matter, and take a bookmark for the scene you keep returning to."
-        points={[
-          "Search title and prose across a whole book",
-          "Archive what you have set aside",
-          "Deleted chapters wait in the book's own trash",
-        ]}
         figure={<ShelfFigure />}
         flip
       />
@@ -287,11 +278,6 @@ function Rows() {
         eyebrow="Formats"
         title="Hand it off in what they asked for."
         body="EPUB, DOCX, a print-ready PDF and Markdown, with a title page, copyright page and contents generated for you. Bring an existing manuscript in and it is split into chapters on the way."
-        points={[
-          "Imports .docx, .epub, .md, .txt and .html",
-          "Typesetting options that reach the file",
-          "Front and back matter laid out in order",
-        ]}
         figure={<FormatFigure />}
       />
       <Row
@@ -299,11 +285,6 @@ function Rows() {
         eyebrow="Reading"
         title="Read it before anyone else has to."
         body="The whole manuscript on real pages at your trim size, or as a book you open and turn. It is not a preview of the export — it is the same typesetting, so the read-through and the file agree."
-        points={[
-          "Page through the book as a spread",
-          "Same layout as the PDF and the EPUB",
-          "Catches what a scrolling draft hides",
-        ]}
         figure={<ReadFigure />}
         flip
       />
@@ -316,7 +297,6 @@ function Row({
   eyebrow,
   title,
   body,
-  points,
   figure,
   flip,
 }: {
@@ -324,7 +304,6 @@ function Row({
   eyebrow: string;
   title: string;
   body: string;
-  points: string[];
   figure: ReactNode;
   /** Puts the figure on the left, so the rows alternate down the page. */
   flip?: boolean;
@@ -333,36 +312,18 @@ function Row({
     <section id={id} className="border-b border-line px-5 py-16 sm:px-8 sm:py-20">
       <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-16">
         <div className={flip ? "lg:order-2" : undefined}>
-          <p className="font-sans text-xs font-semibold tracking-widest text-accent uppercase">
-            {eyebrow}
-          </p>
+          {/* Set as a small heading rather than a spaced-out label: bigger,
+              bolder, and in its own case. Uppercase with wide tracking reads as
+              a category tag, which is a quieter job than this is doing. */}
+          <p className="font-sans text-lg font-bold text-accent">{eyebrow}</p>
           <h2 className="mt-3 font-display text-3xl leading-tight font-semibold text-fg sm:text-4xl">
             {title}
           </h2>
-          <p className="mt-4 font-sans text-base leading-relaxed text-muted">
+          {/* Set exactly as the hero's sub-copy: same size, weight and
+              full-strength ink, so the two read as one voice. */}
+          <p className="mt-4 font-sans text-lg font-medium leading-relaxed text-fg sm:text-xl">
             {body}
           </p>
-          <ul className="mt-6 flex flex-col gap-2.5">
-            {points.map((point) => (
-              <li key={point} className="flex items-start gap-2.5">
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="mt-0.5 h-4 w-4 shrink-0 text-accent"
-                >
-                  <path d="m4 10.5 4 4 8-9" />
-                </svg>
-                <span className="font-sans text-sm leading-relaxed text-fg">
-                  {point}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
 
         <div className={flip ? "lg:order-1" : undefined}>{figure}</div>
