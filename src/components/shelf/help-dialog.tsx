@@ -43,10 +43,6 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         name: "Covers",
         desc: "Add your own cover art, or edit the title, subtitle, and author printed on a typeset cover.",
       },
-      {
-        name: "Background sound",
-        desc: "Rain, waves, wind, or flat brown noise to write to, from Sounds in the header. It keeps playing while you write and stops when you pick the same one again. The sound is generated in the browser rather than streamed, so it costs no download, works offline, and never loops audibly. It does not survive a reload — browsers will not start audio without a click.",
-      },
     ],
   },
   {

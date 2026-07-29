@@ -13,12 +13,10 @@ import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
-import { TemplatesDialog } from "@/components/shelf/templates-dialog";
 import { AccountDialog } from "@/components/auth/account-dialog";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
-import { SoundsDialog } from "@/components/shelf/sounds-dialog";
-import { useAmbience } from "@/lib/use-ambience";
+import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
@@ -323,15 +321,27 @@ export function Bookshelf({
           }}
         />
       )}
+      {/* Both of these are built and both are held back for now — see the note
+          on ComingSoonDialog. Point the button at TemplatesDialog or
+          SoundsDialog again and the feature is back. */}
       {dialog === "templates" && (
-        <TemplatesDialog onClose={() => setDialog(null)} />
+        <ComingSoonDialog title="Templates" onClose={() => setDialog(null)}>
+          Start from a ready-made chapter structure instead of a blank book.
+        </ComingSoonDialog>
       )}
       {dialog === "account" && (
         <AccountDialog email={email} onClose={() => setDialog(null)} />
       )}
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
-      {dialog === "sounds" && <SoundsDialog onClose={() => setDialog(null)} />}
+      {dialog === "sounds" && (
+        <ComingSoonDialog
+          title="Background sound"
+          onClose={() => setDialog(null)}
+        >
+          Rain, waves, a café or a fire, playing while you write.
+        </ComingSoonDialog>
+      )}
       {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
     </div>
   );
@@ -630,11 +640,6 @@ function ShelfTopBar({
   email: string | null;
   onAccount: () => void;
 }) {
-  // Whether anything is playing, so the button can say so. Read here rather
-  // than passed down: the sound engine is its own store, and threading its
-  // state through the shelf would tie two unrelated things together.
-  const ambience = useAmbience();
-
   // The part before the @ is what a writer recognises as themselves; the domain
   // is noise in a 9rem chip.
   const name = email ? email.split("@")[0] : "Guest";
@@ -707,29 +712,11 @@ function ShelfTopBar({
       <button
         type="button"
         onClick={onSounds}
-        // The sound keeps playing once the dialog closes, so the button has to
-        // say whether anything is on. Otherwise the only way to find out is to
-        // open the dialog, which is the thing a writer would be opening it for.
-        className={`hidden shrink-0 items-center gap-2 rounded-full px-4 py-2.5
-                    font-sans text-sm font-medium outline-none
-                    transition-colors focus-visible:ring-2
-                    focus-visible:ring-accent/50 md:flex ${
-                      ambience.scene
-                        ? "text-accent hover:bg-accent/10"
-                        : "text-muted hover:bg-raised hover:text-fg"
-                    }`}
+        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
+                   font-medium text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/50 md:block"
       >
-        {ambience.scene && (
-          <span aria-hidden="true" className="flex h-4 w-4 items-end gap-0.5">
-            {[0, 1, 2].map((bar) => (
-              <span
-                key={bar}
-                className="oc-eq w-0.5 rounded-full bg-accent"
-                style={{ animationDelay: `${bar * 160}ms` }}
-              />
-            ))}
-          </span>
-        )}
         Sounds
       </button>
 

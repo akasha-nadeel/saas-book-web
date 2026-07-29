@@ -1021,6 +1021,46 @@ body {
    ends because that is where they sit — the book down onto the panel, the card
    up from under it — and meet in the middle, which is the shape of the panel
    they are making. */
+/* --------------------------------------------------------------------------
+   The "Available soon" headline.
+
+   Cut out of a gradient rather than filled with one colour, and the gradient
+   drifts across it — so the words look lit from somewhere off to the side and
+   the light moves, which is the whole trick every teaser poster is doing.
+
+   200% wide and sliding a full width: at 100% the sweep would reach the end of
+   the text and snap back, and the snap is the one frame that gives it away.
+   -------------------------------------------------------------------------- */
+@keyframes oc-soon-sweep {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 200% 50%;
+  }
+}
+.oc-soon {
+  background-image: linear-gradient(
+    100deg,
+    #ffffff 0%,
+    #dbeafe 22%,
+    #93c5fd 38%,
+    #ffffff 52%,
+    #dbeafe 70%,
+    #ffffff 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: oc-soon-sweep 7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oc-soon {
+    animation: none;
+  }
+}
+
 /* The three bars beside the scene that is playing. Heights only, and staggered
    by a delay per bar, so it reads as a level meter without pretending to be
    one — there is nothing to measure in a loop of noise. */

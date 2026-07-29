@@ -1,6 +1,34 @@
 # OpenChapter — what's next
 
-Last updated 2026-07-22. Ordered roughly by value, not by effort.
+Last updated 2026-07-29. Ordered roughly by value, not by effort.
+
+## Built, but held back on purpose
+
+Two of the shelf header's buttons open an "Available soon" dialog. **Neither
+feature was deleted** — both are complete and still in the repo. Do not tidy
+them away: pointing the button at its own dialog again in `bookshelf.tsx` is the
+whole of switching either back on.
+
+- **Templates** — `templates-dialog.tsx` + `book-templates.ts` (tested). Starts
+  a book from a chapter skeleton. Held back pending a rethink of what the
+  templates should be.
+- **Background sound** — `ambience.ts` (tested), `use-ambience.ts`,
+  `sounds-dialog.tsx`. Four scenes, a volume slider, keeps playing while the
+  writer moves around the app.
+  Held back for one reason: every scene is *synthesised* — filtered noise, not a
+  recording. Rain, surf, wind and a flat hush are honest that way, but they are
+  an impression of weather rather than the thing itself, and a café or a lo-fi
+  bed cannot be made from noise at all.
+  *What it needs:* real recordings. CC0 from Freesound is the clean licence for
+  a commercial product — public domain, no attribution, and redistribution
+  allowed, which matters because the files get served from a URL. Pixabay is
+  free for commercial use but forbids redistributing sounds as-is, which is
+  awkward when a CDN is doing exactly that; the BBC library is
+  personal/educational only and cannot be used here at all.
+  *Then:* host them in Supabase Storage rather than `public/` (a dozen loops is
+  ~20MB on every deploy otherwise), crossfade two overlapping sources so files
+  that were not cut as loops do not click at the seam, fetch on first play, and
+  keep the synthesised scenes as the offline fallback.
 
 ## Announced but not built
 
