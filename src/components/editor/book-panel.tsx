@@ -134,6 +134,23 @@ type MatterTone = keyof typeof MATTER_TONE;
  */
 let bodyOpenMemory = false;
 
+/**
+ * A shape change that has to survive a page opening.
+ *
+ * Pressing Open or Chapters does two things at once: it changes what the cards
+ * look like, and it opens a page. Opening a page remounts this panel, and a
+ * remount is the end of any transition running through it — so the collapse
+ * began, ran for three or four frames, and was dropped into place. That is the
+ * stutter.
+ *
+ * Skipping the state change avoided the stutter by having nothing move at all,
+ * which is not a fix. So the move is *carried across* instead: the shape the
+ * writer left is recorded here, the panel mounts wearing it, and the new shape
+ * is set a frame later. The transition then runs in full, on the far side of
+ * the navigation, from exactly where it would have started.
+ */
+let arriving: { from: boolean; to: boolean } | null = null;
+
 function toggleBody(): boolean {
   bodyOpenMemory = !bodyOpenMemory;
   return bodyOpenMemory;
@@ -153,22 +170,57 @@ function closeBody(): boolean {
  * answers to the same question.
  */
 export function useBodyOpen() {
-  const [open, setOpen] = useState(bodyOpenMemory);
+  /**
+   * The move to finish, taken once and then held.
+   *
+   * Held in state rather than read from the module variable inside the effect,
+   * because React mounts effects twice in development — run, clean up, run
+   * again. An effect that took the move and cleared it found nothing on its
+   * second run, cancelled the frames the first had booked, and left the cards
+   * sitting in the shape they arrived in: press Chapters, land in Chapter One,
+   * and the list never opens.
+   *
+   * The initializer only *reads*. Clearing happens in the effect, where doing
+   * it twice costs nothing.
+   */
+  const [entrance] = useState(() => arriving);
+
+  // Mounted wearing the shape the writer left, when there is a move to finish.
+  const [open, setOpen] = useState(() =>
+    entrance && entrance.from !== entrance.to ? entrance.from : bodyOpenMemory,
+  );
+
+  useEffect(() => {
+    arriving = null;
+    if (!entrance || entrance.from === entrance.to) return;
+
+    // Two frames, not one. The from-shape has to be *painted* before the change
+    // for the browser to have anything to transition from; an effect runs after
+    // the commit but still before that paint, and so does the first frame it
+    // asks for. The second is the first one after the writer can see it.
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setOpen(entrance.to));
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
+  }, [entrance]);
+
   return {
     open,
     toggle: () => setOpen(toggleBody()),
     close: () => setOpen(closeBody()),
     /**
-     * Remember a new state without re-rendering for it.
+     * Record a shape change that a page opening is about to interrupt.
      *
-     * For the two actions that also open a page. Changing a chapter remounts
-     * this panel, so a state change here starts a half-second collapse that the
-     * remount cuts off a few frames in — cards caught mid-move and dropped into
-     * place, which is the stutter a writer sees when they press Open and
-     * Chapters in turn. Written to the memory alone nothing animates at all,
-     * and the next mount renders the shape that was asked for.
+     * Used by the two actions that navigate. Nothing moves in *this* mount —
+     * there would be no time — but the move is not lost: see `arriving`, which
+     * hands it to the next one to play out in full.
      */
     remember: (next: boolean) => {
+      arriving = { from: bodyOpenMemory, to: next };
       bodyOpenMemory = next;
     },
   };
