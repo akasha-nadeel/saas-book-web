@@ -479,6 +479,12 @@ function EditorSurface({
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
 
+  // Which of the book's three parts this chapter belongs to. Only the sheet's
+  // edge colour turns on it; a chapter that has somehow left the shelf is body,
+  // which is what an unmarked chapter is anyway.
+  const chapterMeta = book.chapters.find((c) => c.id === chapterId);
+  const matter = chapterMeta ? chapterMatterOf(chapterMeta) : "body";
+
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
   const written = bookWordCount(book);
@@ -726,6 +732,11 @@ function EditorSurface({
           the class and both data attributes changes nothing below. */}
       <div
         data-paper={prefs.paper}
+        // Which part of the book this is, so the sheet's edge takes that part's
+        // colour and the page answers the card in the panel it was opened from.
+        // Set here rather than on the sheets themselves because the pagination
+        // plugin draws those, and a decoration is not its business.
+        data-matter={matter}
         // One column in print layout: the sheets flow top to bottom, so a
         // multi-column measure would put the page breaks in the wrong place.
         data-columns={1}

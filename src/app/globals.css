@@ -194,6 +194,19 @@ body {
   --paper-fg: #16191f;
   --paper-muted: #6b7280;
   --paper-rule: #d9dde3;
+
+  /* The edge of the sheet, in the colour of the part of the book being written
+     — the same green, purple and black the chapter panel's cards carry, so the
+     page answers the panel.
+
+     Tuned to the paper rather than to the theme, because that is what the edge
+     sits on: the app can be dark while the page is white, and the black one
+     would then be a dark line on white, which is right, while the theme's
+     inverted near-white would be invisible. Only the two dark papers below
+     need the other set. */
+  --paper-edge-front: #15803d;
+  --paper-edge-body: #6d28d9;
+  --paper-edge-back: #111827;
 }
 
 [data-paper="cream"] {
@@ -215,6 +228,13 @@ body {
   --paper-fg: #e6ecf3;
   --paper-muted: #93a2b4;
   --paper-rule: #313d4c;
+
+  /* Lifted off the dark sheet. Back matter's near-black would be no edge at
+     all here, so it takes the light neutral instead — the same inversion the
+     card's fill makes in dark mode, and for the same reason. */
+  --paper-edge-front: #2ea75c;
+  --paper-edge-body: #9061f0;
+  --paper-edge-back: #cfd8e2;
 }
 
 [data-paper="black"] {
@@ -222,6 +242,10 @@ body {
   --paper-fg: #dfe5ec;
   --paper-muted: #7f8b99;
   --paper-rule: #232a33;
+
+  --paper-edge-front: #2ea75c;
+  --paper-edge-body: #9061f0;
+  --paper-edge-back: #cfd8e2;
 }
 
 /* --------------------------------------------------------------------------
@@ -912,9 +936,28 @@ body {
   width: 100%;
   background: var(--paper-bg);
   border-radius: 2px;
+  /* The ring is the sheet's edge. It takes the colour of the part of the book
+     when one is known, and the plain paper rule when it is not — the reading
+     view and the print preview draw these same sheets outside any chapter. */
   box-shadow:
     0 1px 3px rgb(0 0 0 / 0.14),
-    0 0 0 1px var(--paper-rule);
+    0 0 0 var(--paper-edge-w, 1px) var(--paper-edge, var(--paper-rule));
+}
+
+/* Set on the manuscript container by the editor, so every sheet in the chapter
+   picks it up. Two pixels, matching the border on the panel's cards: the point
+   is that the page and the card it came from are plainly the same colour. */
+[data-matter="front"] {
+  --paper-edge: var(--paper-edge-front);
+  --paper-edge-w: 2px;
+}
+[data-matter="body"] {
+  --paper-edge: var(--paper-edge-body);
+  --paper-edge-w: 2px;
+}
+[data-matter="back"] {
+  --paper-edge: var(--paper-edge-back);
+  --paper-edge-w: 2px;
 }
 /* The editable itself carries no paper — the sheets behind do — so it can float
    over them and the seams between pages show the desk. */
