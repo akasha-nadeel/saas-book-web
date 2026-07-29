@@ -19,16 +19,25 @@ import type { TextAlignValue } from "@/lib/editor/text-align";
  * toolbar a word processor pops up when you highlight text, so the common
  * formatting is under the pointer instead of across the room in the rail.
  *
- * The quick formatting under the pointer: the inline marks (weight, slant,
- * underline, strike, code, a link) and inline size, which touch only the
- * selected words; paragraph alignment; and the block forms — a quote (the
- * indented, ruled passage) and bulleted or numbered lists. Inline size uses
- * A− / A+ to step, ¶ to reset, and H1–H3 for heading-like sizes, all applied to
- * the selection rather than converting its block, because clicking a block
- * heading on one word and watching the whole paragraph grow is the surprise this
- * avoids. Real block headings live in the Aa flyout. Built on Tiptap's
- * BubbleMenu, which sits it above the selection and follows it as the page
- * scrolls.
+ * Two rows, and the split is what each one acts on. **Type** above — the face,
+ * the marks, the size steps — every one of them an inline mark that touches no
+ * character outside the highlight. **Structure** below: heading sizes,
+ * alignment, a quote and the two lists.
+ *
+ * The heading buttons size the *selection* rather than converting its block,
+ * because clicking H1 on one word and watching the whole paragraph grow is the
+ * surprise this avoids; real block headings live in the Aa flyout. They sit
+ * with structure anyway, because that is what they read as — and because eleven
+ * controls against seven left one row half the length of the other.
+ *
+ * Inline code and links were here and are not any more. Neither belongs in a
+ * novel — there is no code in a manuscript, and a link cannot be followed in
+ * print — so they were two of eighteen controls taking width from a bar that
+ * was already too wide. Both marks remain in the document model, so a chapter
+ * imported from HTML keeps them.
+ *
+ * Built on Tiptap's BubbleMenu, which sits it above the selection and follows
+ * it as the page scrolls.
  */
 
 /** Re-render on every editor change, so the active states stay in step with the
@@ -78,8 +87,8 @@ function Btn({
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`flex h-7 w-7 shrink-0 cursor-pointer items-center
-                  justify-center rounded-md text-sm outline-none
+      className={`flex h-6 w-6 shrink-0 cursor-pointer items-center
+                  justify-center rounded text-xs outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
                     active ? "bg-accent text-white" : "text-fg hover:bg-raised"
@@ -91,7 +100,7 @@ function Btn({
 }
 
 const Sep = () => (
-  <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-line" />
+  <span aria-hidden="true" className="mx-px h-3.5 w-px bg-line" />
 );
 
 /** The four alignments, each with a small icon of ruled lines. */
@@ -159,17 +168,6 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
 
   if (!editor) return null;
 
-  const promptForLink = () => {
-    const previous = editor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("Link address", previous ?? "https://");
-    if (href === null) return;
-    if (href.trim() === "") {
-      editor.chain().focus().unsetLink().run();
-      return;
-    }
-    editor.chain().focus().setLink({ href: href.trim() }).run();
-  };
-
   // The selected text's current inline size (a multiple of body), and whether
   // its block is a heading — so the size buttons can show what is active.
   const size =
@@ -208,8 +206,8 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
       // the two. Split by what each row acts on — the selected words above, the
       // paragraphs they sit in below — it is about a third the width and the
       // grouping does some of the explaining.
-      className="flex w-max max-w-[min(24rem,calc(100vw-2rem))] flex-col gap-0.5
-                 rounded-lg border border-line bg-panel p-1 shadow-xl"
+      className="flex w-max max-w-[min(21rem,calc(100vw-2rem))] flex-col gap-px
+                 rounded-lg border border-line bg-panel p-0.5 shadow-xl"
       // Entering and leaving, rather than pressing and releasing: a writer who
       // presses a button and drags a little before letting go is still on the
       // bar, and so is one moving between two of its buttons.
@@ -267,21 +265,30 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
           to body size; H1–H3 jump to heading-like sizes. (Real block headings,
           which set a whole line, live in the Aa flyout.) */}
         <Btn label="Smaller text" onClick={() => stepSize(-1)}>
-          <span className="text-[0.7rem] leading-none">A−</span>
+          <span className="text-[0.62rem] leading-none">A−</span>
         </Btn>
         <Btn label="Bigger text" onClick={() => stepSize(1)}>
-          <span className="text-sm leading-none">A+</span>
+          <span className="text-xs leading-none">A+</span>
         </Btn>
         <Btn
           label="Normal size"
           active={size === null && !isHeadingBlock}
           onClick={normalize}
         >
-          <span className="font-serif text-sm">¶</span>
+          <span className="font-serif text-xs">¶</span>
         </Btn>
+      </div>
 
-        <Sep />
-
+      {/* The paragraphs the selection sits in. These are block forms — an
+          alignment or a list belongs to a whole paragraph, and there is no
+          such thing as half a bulleted line — so unlike the row above they
+          reach the ends of the paragraphs the selection touches. That is why
+          they are on a row of their own rather than mixed in with the marks. */}
+      <div className="flex items-center gap-0.5">
+        {/* Heading sizes. Inline like the row above — they size the selection
+            rather than converting its block — but they read as structure, and
+            they balance the two rows: eleven controls against seven left one
+            row half the length of the other. */}
         {(
           [
             [1, 2],
@@ -298,14 +305,9 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             <span className="font-serif text-xs">H{level}</span>
           </Btn>
         ))}
-      </div>
 
-      {/* The paragraphs the selection sits in. These are block forms — an
-          alignment or a list belongs to a whole paragraph, and there is no
-          such thing as half a bulleted line — so unlike the row above they
-          reach the ends of the paragraphs the selection touches. That is why
-          they are on a row of their own rather than mixed in with the marks. */}
-      <div className="flex items-center gap-0.5">
+        <Sep />
+
         {/* Alignment of the paragraph(s) in the selection. */}
         {ALIGN_OPTIONS.map((option) => (
           <Btn
@@ -323,7 +325,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
-              className="h-3.5 w-3.5"
+              className="h-3 w-3"
             >
               <path d={option.d} />
             </svg>
@@ -347,7 +349,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-3.5 w-3.5"
+            className="h-3 w-3"
           >
             <path d="M4 5.5h9M4 10h12M4 14.5h9" />
             <path d="M16.5 4v5" />
@@ -366,7 +368,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-3.5 w-3.5"
+            className="h-3 w-3"
           >
             <path d="M7 5.5h9M7 10h9M7 14.5h9" />
             <circle cx="4" cy="5.5" r="0.9" fill="currentColor" stroke="none" />
@@ -393,40 +395,11 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-3.5 w-3.5"
+            className="h-3 w-3"
           >
             <path d="M8 5.5h8M8 10h8M8 14.5h8" />
             <path d="M3 4.5h1V8M3 8h2" />
             <path d="M3.2 12.4c.2-.6 1.6-.6 1.6.3 0 .6-1.6 1.1-1.6 1.9h1.7" />
-          </svg>
-        </Btn>
-
-        <Sep />
-
-        <Btn
-          label="Inline code"
-          active={editor.isActive("code")}
-          onClick={() => editor.chain().focus().toggleCode().run()}
-        >
-          <span className="font-mono text-xs">{"</>"}</span>
-        </Btn>
-        <Btn
-          label="Link"
-          active={editor.isActive("link")}
-          onClick={promptForLink}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-3.5 w-3.5"
-          >
-            <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
-            <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
           </svg>
         </Btn>
       </div>
@@ -468,7 +441,7 @@ function FontPicker({ editor }: { editor: Editor }) {
         aria-expanded={open}
         aria-label="Font of the selected text"
         title="Font of the selected text"
-        className={`flex h-7 cursor-pointer items-center gap-1 rounded-md pr-1
+        className={`flex h-6 cursor-pointer items-center gap-0.5 rounded pr-0.5
                     pl-2 outline-none transition-colors focus-visible:ring-2
                     focus-visible:ring-accent/60 ${
                       open ? "bg-raised" : "hover:bg-raised"
@@ -478,7 +451,7 @@ function FontPicker({ editor }: { editor: Editor }) {
             takes six times the width and says less — a reader picks a typeface
             by looking at it. */}
         <span
-          className="text-sm leading-none text-fg"
+          className="text-xs leading-none text-fg"
           style={{ fontFamily: chosen ? chosen.stack : undefined }}
         >
           Aa
@@ -565,7 +538,7 @@ function FontOptionRow({
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-3.5 w-3.5"
+          className="h-3 w-3"
         >
           <path d="M4.5 10.5l3.5 3.5 7.5-8" />
         </svg>
