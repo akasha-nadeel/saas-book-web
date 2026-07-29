@@ -1021,6 +1021,29 @@ body {
    ends because that is where they sit — the book down onto the panel, the card
    up from under it — and meet in the middle, which is the shape of the panel
    they are making. */
+/* The three bars beside the scene that is playing. Heights only, and staggered
+   by a delay per bar, so it reads as a level meter without pretending to be
+   one — there is nothing to measure in a loop of noise. */
+@keyframes oc-eq {
+  0%,
+  100% {
+    height: 0.35rem;
+  }
+  50% {
+    height: 1.1rem;
+  }
+}
+.oc-eq {
+  height: 0.35rem;
+  animation: oc-eq 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .oc-eq {
+    animation: none;
+    height: 0.7rem;
+  }
+}
+
 @keyframes book-cover-in {
   from {
     opacity: 0;

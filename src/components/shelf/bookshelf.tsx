@@ -18,6 +18,7 @@ import { AccountDialog } from "@/components/auth/account-dialog";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { SoundsDialog } from "@/components/shelf/sounds-dialog";
+import { useAmbience } from "@/lib/use-ambience";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
@@ -629,6 +630,11 @@ function ShelfTopBar({
   email: string | null;
   onAccount: () => void;
 }) {
+  // Whether anything is playing, so the button can say so. Read here rather
+  // than passed down: the sound engine is its own store, and threading its
+  // state through the shelf would tie two unrelated things together.
+  const ambience = useAmbience();
+
   // The part before the @ is what a writer recognises as themselves; the domain
   // is noise in a 9rem chip.
   const name = email ? email.split("@")[0] : "Guest";
@@ -701,11 +707,29 @@ function ShelfTopBar({
       <button
         type="button"
         onClick={onSounds}
-        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
-                   font-medium text-muted outline-none transition-colors
-                   hover:bg-raised hover:text-fg focus-visible:ring-2
-                   focus-visible:ring-accent/50 md:block"
+        // The sound keeps playing once the dialog closes, so the button has to
+        // say whether anything is on. Otherwise the only way to find out is to
+        // open the dialog, which is the thing a writer would be opening it for.
+        className={`hidden shrink-0 items-center gap-2 rounded-full px-4 py-2.5
+                    font-sans text-sm font-medium outline-none
+                    transition-colors focus-visible:ring-2
+                    focus-visible:ring-accent/50 md:flex ${
+                      ambience.scene
+                        ? "text-accent hover:bg-accent/10"
+                        : "text-muted hover:bg-raised hover:text-fg"
+                    }`}
       >
+        {ambience.scene && (
+          <span aria-hidden="true" className="flex h-4 w-4 items-end gap-0.5">
+            {[0, 1, 2].map((bar) => (
+              <span
+                key={bar}
+                className="oc-eq w-0.5 rounded-full bg-accent"
+                style={{ animationDelay: `${bar * 160}ms` }}
+              />
+            ))}
+          </span>
+        )}
         Sounds
       </button>
 
