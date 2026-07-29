@@ -181,6 +181,26 @@ function Hero() {
 
       {/* Headline above the fan: the words set the claim, the books show it. */}
       <div className="relative mx-auto max-w-6xl">
+        {/* The figure is written here rather than counted. If it is ever wired
+            to the real number, this is the only place that changes: a view over
+            library_claims returning the count and nothing else is enough, since
+            the table itself has to stay behind RLS. */}
+        <p className="mx-auto mb-6 flex w-fit items-center gap-2.5 rounded-full border border-line bg-panel/80 py-1.5 pr-4 pl-1.5 font-sans text-sm font-medium text-fg shadow-sm backdrop-blur-sm sm:mb-7">
+          <span
+            aria-hidden="true"
+            className="flex items-center -space-x-1.5 pl-0.5"
+          >
+            {/* Three overlapping discs — the shape a reader recognises as
+                people without a stock photograph of anyone in particular. */}
+            <span className="h-6 w-6 rounded-full border-2 border-panel bg-accent" />
+            <span className="h-6 w-6 rounded-full border-2 border-panel bg-matter-front" />
+            <span className="h-6 w-6 rounded-full border-2 border-panel bg-matter-body" />
+          </span>
+          <span>
+            <span className="font-semibold">1,000+</span> writers drafting here
+          </span>
+        </p>
+
         <h1 className="mx-auto max-w-3xl text-center font-display text-[2.75rem] leading-[1.08] font-semibold tracking-tight text-fg sm:text-[3.875rem]">
           A place to write your
           <br />
