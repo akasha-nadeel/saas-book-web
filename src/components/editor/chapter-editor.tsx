@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import Link from "next/link";
 import {
   EditorContent,
@@ -113,7 +119,6 @@ interface ChapterSnapshot {
   words: number;
 }
 
-
 export function ChapterEditor({
   bookId,
   chapterId,
@@ -172,7 +177,33 @@ export function ChapterEditor({
   // not a reload, so refreshing put a writer back on the cover having asked for
   // nothing of the sort. A reload is not a decision.
   const panelMode: BookPanelMode = prefs.bookPanel;
-  const changePanelMode = (mode: BookPanelMode) => setPref("bookPanel", mode);
+
+  /**
+   * Whether the panel and page should play their entrance.
+   *
+   * The animations used to be mount-based, which meant they replayed on every
+   * chapter click: opening a chapter remounts this editor, and a remounted node
+   * runs its CSS animation again. A writer clicking down a list of forty
+   * chapters watched the panel reassemble forty times.
+   *
+   * So it is switching the face that plays them, not mounting. False to begin
+   * with — arriving at a chapter is not opening the section — and set true by
+   * the one control that changes the face, then cleared once the longest of
+   * them has finished.
+   */
+  const [entering, setEntering] = useState(false);
+  const changePanelMode = (mode: BookPanelMode) => {
+    setEntering(true);
+    setPref("bookPanel", mode);
+  };
+  useEffect(() => {
+    if (!entering) return;
+    // Comfortably past the page's 760ms, which is the last to land. Removing
+    // the class after the fact changes nothing on screen — the element is
+    // already sitting at the animation's end state.
+    const done = setTimeout(() => setEntering(false), 1100);
+    return () => clearTimeout(done);
+  }, [entering]);
   // Page zoom. Held here rather than in the surface, which is remounted on every
   // chapter change — so the level the writer set survives moving between
   // chapters, the way it does in a word processor.
@@ -271,7 +302,7 @@ export function ChapterEditor({
           than separate sections. The children below are transparent; only the
           rails and the open left panel lay their own chrome over it. */}
       <div className="shelf-hero flex min-h-0 min-w-0 flex-1">
-          {panelOpen && (
+        {panelOpen && (
           <LeftPanel
             tab={tab}
             bookId={bookId}
@@ -292,6 +323,7 @@ export function ChapterEditor({
           onMode={changePanelMode}
           dictation={dictation}
           body={body}
+          entering={entering}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -305,7 +337,7 @@ export function ChapterEditor({
               on dispose, so nothing typed is lost, and a hidden manuscript is a
               manuscript whose pagination measures a zero-height column. */}
           {panelMode === "book" ? (
-            <BookGuide title={book.title} />
+            <BookGuide title={book.title} entering={entering} />
           ) : (
             /* Keyed on the id and a cross-tab reload counter — not the stored
                text — so a save from another tab reloads the surface, while this
@@ -326,6 +358,7 @@ export function ChapterEditor({
               zoom={zoom}
               onZoom={setZoom}
               matter={selectedPart}
+              entering={entering}
               onEditorReady={setEditor}
             />
           )}
@@ -407,8 +440,6 @@ export function ChapterEditor({
       {editingCover && (
         <CoverDialog book={book} onClose={() => setEditingCover(false)} />
       )}
-
-
     </div>
   );
 }
@@ -478,6 +509,7 @@ function EditorSurface({
   zoom,
   onZoom,
   matter,
+  entering,
   onEditorReady,
 }: {
   bookId: string;
@@ -497,6 +529,9 @@ function EditorSurface({
   /** What the panel has selected — the sheet's edge takes its colour. "book" is
    *  Book View, which selects no part of the book at all. */
   matter: "front" | "body" | "back" | "book";
+  /** Play the page's entrance. Set only when the panel's face changes, never
+   *  on the remount that opening a different chapter causes. */
+  entering: boolean;
   onEditorReady: (editor: Editor) => void;
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
@@ -777,9 +812,9 @@ function EditorSurface({
         // page-enter: this element is mounted fresh whenever the writer comes
         // back from Book View or opens a different chapter, so the entrance
         // plays exactly when a new page arrives and never on a keystroke.
-        className={`manuscript page-enter flex min-h-0 flex-1 flex-col ${
-          prefs.focusMode ? "focus-mode" : ""
-        }`}
+        className={`manuscript flex min-h-0 flex-1 flex-col ${
+          entering ? "page-enter" : ""
+        } ${prefs.focusMode ? "focus-mode" : ""}`}
       >
         {/* The workspace: the manuscript on real page sheets, like a word
             processor's print layout. The sheets are drawn behind; the editable
@@ -1031,4 +1066,3 @@ function ZoomControl({
     </div>
   );
 }
-

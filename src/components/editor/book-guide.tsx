@@ -7,13 +7,24 @@
  * short guide: pick a chapter to write, and how the three parts of a book work.
  * It reads on the page's own surface, centred like a title page.
  */
-export function BookGuide({ title }: { title: string }) {
+export function BookGuide({
+  title,
+  entering = false,
+}: {
+  title: string;
+  /** Play the entrance from the right, as the manuscript does. */
+  entering?: boolean;
+}) {
   return (
     /* page-enter: the same arrival the manuscript makes, because this is the
        manuscript's place. Book View's panel comes together vertically and its
        page comes in from the side, which is the same movement the Chapters view
        makes — the two faces differ in what they show, not in how they land. */
-    <div className="page-enter scroll-slim h-full overflow-y-auto px-4 py-8 md:py-10">
+    <div
+      className={`scroll-slim h-full overflow-y-auto px-4 py-8 md:py-10 ${
+        entering ? "page-enter" : ""
+      }`}
+    >
       {/* On a sheet with a blue edge, because that is what the page in this
           position always is. Book View selects no part of the book, so the
           manuscript's edge is the app's blue there; the overview stands in the

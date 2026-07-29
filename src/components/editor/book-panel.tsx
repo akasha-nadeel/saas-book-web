@@ -160,6 +160,7 @@ export function BookPanel({
   onMode,
   dictation,
   body,
+  entering = false,
   always = false,
 }: {
   book: Book;
@@ -179,6 +180,9 @@ export function BookPanel({
   dictation?: Dictation;
   /** The chapter list’s open state, owned by the editor — see useBodyOpen. */
   body: BodyOpen;
+  /** Play the entrance. Set only when this panel’s face changes, never on the
+   *  remount that opening a different chapter causes. */
+  entering?: boolean;
   /** Show at every width. Set by the overview, where this is the only way in. */
   always?: boolean;
 }) {
@@ -301,7 +305,11 @@ export function BookPanel({
         <div className="scroll-slim flex h-full flex-col gap-7 overflow-y-auto px-6 py-8">
           {/* The cover on page 0; every page after it is the chapter as it will
               print, so the writer can flip through the finished pages here. */}
-          <div className="book-cover-enter flex flex-col items-center gap-3">
+          <div
+            className={`flex flex-col items-center gap-3 ${
+              entering ? "book-cover-enter" : ""
+            }`}
+          >
             <PagePreview
               book={book}
               cover={cover}
@@ -353,7 +361,11 @@ export function BookPanel({
               The figures are one quiet line, not a grid of labelled cells:
               three numbers do not need a table, and the labels were louder than
               the values they described. */}
-          <div className="book-card-enter rounded-xl border border-line bg-panel/70 p-4">
+          <div
+            className={`rounded-xl border border-line bg-panel/70 p-4 ${
+              entering ? "book-card-enter" : ""
+            }`}
+          >
             <h2 className="font-serif text-lg leading-snug font-medium text-fg">
               {book.title}
             </h2>
@@ -562,7 +574,11 @@ export function BookPanel({
               scrolls inside its own card — the two short cards cannot be pushed
               off the bottom by a forty-chapter book, which is exactly when a
               writer wants to reach them. */}
-          <div className="matter-stack mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
+          <div
+            className={`mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1 ${
+              entering ? "matter-stack" : ""
+            }`}
+          >
             <MatterCard
               tone="front"
               label="Front matter"

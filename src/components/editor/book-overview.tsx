@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
@@ -34,6 +34,16 @@ export function BookOverview({ bookId }: { bookId: string }) {
   const prefs = usePrefs();
   const cover = useCover(bookId);
   const body = useBodyOpen();
+
+  // Plays the panel's entrance, and only when the face changes — the same rule
+  // the editor follows, so the two screens behave alike. Cleared once the
+  // longest of the animations has finished.
+  const [entering, setEntering] = useState(false);
+  useEffect(() => {
+    if (!entering) return;
+    const done = setTimeout(() => setEntering(false), 1100);
+    return () => clearTimeout(done);
+  }, [entering]);
 
   // The tool panel, as in the editor: closed until a rail tab is picked, and
   // "search" only as a seed — it is never seen before a tab chooses it.
@@ -96,13 +106,17 @@ export function BookOverview({ bookId }: { bookId: string }) {
         cover={cover}
         paper={prefs.paper}
         mode={prefs.bookPanel}
-        onMode={(mode: BookPanelMode) => setPref("bookPanel", mode)}
+        onMode={(mode: BookPanelMode) => {
+          setEntering(true);
+          setPref("bookPanel", mode);
+        }}
+        entering={entering}
         body={body}
         always
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <BookGuide title={book.title} />
+        <BookGuide title={book.title} entering={entering} />
       </div>
     </div>
   );
