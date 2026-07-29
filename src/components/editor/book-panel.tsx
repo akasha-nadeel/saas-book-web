@@ -346,42 +346,51 @@ export function BookPanel({
         </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col px-5 py-6">
-          {/* A small step back to the cover. */}
-          <button
-            type="button"
-            onClick={() => onMode("book")}
-            className="flex items-center gap-1 self-start rounded-md px-2 py-1
-                       font-sans text-xs font-medium text-accent outline-none
-                       transition-colors hover:bg-accent/10 focus-visible:ring-2
-                       focus-visible:ring-accent/50"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-3.5 w-3.5"
-            >
-              <path d="M12 5l-5 5 5 5" />
-            </svg>
-            Back
-          </button>
+          {/* One row: the way out, the way to make a chapter, and the two ways
+              to bring one in.
 
-          {/* The three ways prose arrives: write it, speak it, or bring it in.
-              One primary and two icon affordances of equal weight, so the row
-              reads as an action and its two shortcuts rather than three
-              competing buttons. */}
-          <div className="mt-5 flex items-stretch gap-2">
+              The step back used to sit on its own line above, which spent a
+              whole row of a narrow panel on one small link and left the row
+              below it looking like the top of the panel anyway. Four controls
+              of one height read as one bar, and the panel starts where its
+              content starts.
+
+              Back is an icon alone. Giving it its word back would take a third
+              of the row from the primary action at this width, and a chevron at
+              the left end of a bar is the one icon nobody has to be taught. Its
+              name lives in the label and the tooltip for anyone who does. */}
+          <div className="flex items-stretch gap-2">
+            <button
+              type="button"
+              onClick={() => onMode("book")}
+              aria-label="Back to Book View"
+              title="Back to Book View"
+              className="flex shrink-0 cursor-pointer items-center justify-center
+                         rounded-lg border border-line px-3 text-fg outline-none
+                         transition-colors hover:border-accent/60 hover:bg-raised
+                         focus-visible:ring-2 focus-visible:ring-accent/50"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+              >
+                <path d="M12 5l-5 5 5 5" />
+              </svg>
+            </button>
+
             <button
               type="button"
               onClick={handleCreate}
-              className="flex-1 rounded-lg bg-accent py-2.5 font-sans text-sm
-                         font-semibold text-white outline-none transition-colors
-                         hover:bg-accent-strong focus-visible:ring-2
-                         focus-visible:ring-accent/50"
+              className="flex-1 cursor-pointer rounded-lg bg-accent py-2.5
+                         font-sans text-sm font-semibold text-white outline-none
+                         transition-colors hover:bg-accent-strong
+                         focus-visible:ring-2 focus-visible:ring-accent/50"
             >
               New chapter
             </button>
@@ -400,7 +409,7 @@ export function BookPanel({
                 onClick={() =>
                   dictation.listening ? dictation.stop() : dictation.start()
                 }
-                className={`relative flex shrink-0 items-center justify-center
+                className={`relative flex shrink-0 cursor-pointer items-center justify-center
                             rounded-lg border px-3 outline-none
                             transition-colors focus-visible:ring-2
                             focus-visible:ring-accent/50 ${
@@ -443,7 +452,7 @@ export function BookPanel({
               onClick={() => fileRef.current?.click()}
               aria-label={importing ? "Reading file…" : "Import a file"}
               title="Import a file"
-              className="flex shrink-0 items-center justify-center rounded-lg border
+              className="flex shrink-0 cursor-pointer items-center justify-center rounded-lg border
                          border-line px-3 text-fg outline-none transition-colors
                          hover:border-accent/60 hover:bg-raised focus-visible:ring-2
                          focus-visible:ring-accent/50 disabled:opacity-50"
