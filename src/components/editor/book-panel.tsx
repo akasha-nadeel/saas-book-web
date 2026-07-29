@@ -857,18 +857,23 @@ function MatterCard({
                   ${grow ? "min-h-0 flex-1" : "shrink-0"}`}
     >
       <div className="shrink-0 p-3.5">
-        <h3 className="font-serif text-base font-semibold text-fg">{label}</h3>
+        <h3 className="font-serif text-lg font-bold text-fg">{label}</h3>
 
         {/* Two lines at the panel's width: long enough to say what the part is,
-            short enough that the card stays a card and not a paragraph. */}
+            short enough that the card stays a card and not a paragraph.
+
+            Set in fg at three-quarters rather than in muted. Muted is the
+            weight for metadata a reader skips — timestamps, counts — and this
+            is the one line on the card that has something to teach. It should
+            read like text, not like a caption. */}
         {description && (
-          <p className="mt-1 font-sans text-xs leading-relaxed text-muted">
+          <p className="mt-1.5 font-sans text-sm leading-relaxed font-medium text-fg/75">
             {description}
           </p>
         )}
 
         {meta && (
-          <p className="mt-1.5 font-sans text-xs font-medium text-fg">{meta}</p>
+          <p className="mt-2 font-sans text-sm font-semibold text-fg">{meta}</p>
         )}
 
         <button
