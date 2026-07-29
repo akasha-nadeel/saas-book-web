@@ -122,6 +122,11 @@ function toggleBody(): boolean {
   return bodyOpenMemory;
 }
 
+function closeBody(): boolean {
+  bodyOpenMemory = false;
+  return bodyOpenMemory;
+}
+
 /**
  * Opens the body list if the chapter being edited is in it.
  *
@@ -201,10 +206,20 @@ export function BookPanel({
 
   // Front / back matter: open the page, seeding it from the template the first
   // time it is asked for.
+  //
+  // The chapter list shuts on the way. Going to the front matter is leaving the
+  // body, and leaving it open would land the writer on a page whose card is a
+  // strip at the top of a list of somewhere else — three cards at full height
+  // is the panel's resting state, and this is a writer coming to rest.
   const openMatter = (matter: "front" | "back") => {
     const existing = matter === "front" ? front : back;
     const id = existing?.id ?? createMatterSection(bookId, matter);
-    if (id) open(id);
+    if (!id) return;
+    // Set even though the navigation remounts this panel: the writer may
+    // already be on that page, in which case the push changes nothing and this
+    // is the only thing that closes the list.
+    setBodyOpen(closeBody());
+    open(id);
   };
 
   const handleImport = async (file: File) => {
