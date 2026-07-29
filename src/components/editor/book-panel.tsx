@@ -45,44 +45,35 @@ export type BookPanelMode = "book" | "chapters";
  * cover thumbnail on the tool rail both move with it.
  */
 
-/** The three parts a book is bound in, in the order they are bound. */
-type BookPart = "front" | "body" | "back";
-
 /**
- * Which parts are open, remembered at module scope.
+ * Whether the body list is open, remembered at module scope.
  *
  * The panel is remounted every time the writer opens a different chapter, so
- * component state would put every box back to its default on each click —
- * clicking through a book would keep re-opening the front matter a writer had
- * just shut. Same reason the panel's face is held this way in the editor.
+ * component state would put the list back to its default on each click —
+ * clicking through a book would keep re-opening a list a writer had just shut.
+ * Same reason the panel's face is held this way in the editor.
  *
- * All three start open: the boxes are there to give the list shape, not to hide
- * it, and a writer who has never touched them should see their whole book.
+ * Only the body has this. Front and back matter are one page each and are shown
+ * as cards, which have nothing to expand.
  */
-let openPartsMemory: Record<BookPart, boolean> = {
-  front: true,
-  body: true,
-  back: true,
-};
+let bodyOpenMemory = true;
 
-/**
- * Opens the part holding the chapter being edited, and returns the new state.
- *
- * A writer can land inside a part they had shut — from search, from the left
- * panel's list, from a pasted URL — and the panel must not then be hiding the
- * one chapter they are in. Opening it is a change to the remembered state, not
- * an override of it: shutting the part again afterwards sticks.
- */
-function revealPart(part: BookPart | null): Record<BookPart, boolean> {
-  if (part && !openPartsMemory[part]) {
-    openPartsMemory = { ...openPartsMemory, [part]: true };
-  }
-  return openPartsMemory;
+function toggleBody(): boolean {
+  bodyOpenMemory = !bodyOpenMemory;
+  return bodyOpenMemory;
 }
 
-function togglePart(part: BookPart): Record<BookPart, boolean> {
-  openPartsMemory = { ...openPartsMemory, [part]: !openPartsMemory[part] };
-  return openPartsMemory;
+/**
+ * Opens the body list if the chapter being edited is in it.
+ *
+ * A writer can land inside a list they had shut — from search, from the left
+ * panel, from a pasted URL — and the panel must not then be hiding the one
+ * chapter they are in. This changes the remembered state rather than overriding
+ * it, so shutting the list again afterwards sticks.
+ */
+function revealBody(inBody: boolean): boolean {
+  if (inBody) bodyOpenMemory = true;
+  return bodyOpenMemory;
 }
 export function BookPanel({
   book,
@@ -114,22 +105,15 @@ export function BookPanel({
   const front = chapters.find((c) => c.matterKey === "front") ?? null;
   const back = chapters.find((c) => c.matterKey === "back") ?? null;
 
-  // Which of the three parts the open chapter belongs to. Body is the default
-  // because that is what a chapter without a matter key is.
-  const activePart: BookPart | null = !chapterId
-    ? null
-    : front?.id === chapterId
-      ? "front"
-      : back?.id === chapterId
-        ? "back"
-        : "body";
+  // Is the open chapter one of the numbered ones? Anything that is not the
+  // front or back matter page is, which is what "body" means here.
+  const inBody =
+    !!chapterId && front?.id !== chapterId && back?.id !== chapterId;
 
-  // Seeded from the remembered state, with the part holding the open chapter
-  // forced open — see revealPart. Because the panel is remounted on every
-  // chapter change, this seeding runs exactly when the question arises, which
-  // is why it needs no effect.
-  const [openParts, setOpenParts] = useState(() => revealPart(activePart));
-  const toggleParts = (part: BookPart) => setOpenParts(togglePart(part));
+  // Seeded from the remembered state, opened if the writer is in it — see
+  // revealBody. Because the panel is remounted on every chapter change, this
+  // seeding runs exactly when the question arises, so it needs no effect.
+  const [bodyOpen, setBodyOpen] = useState(() => revealBody(inBody));
 
   // Named once because it is both the tooltip and the accessible name, and a
   // toggle whose two labels disagree is a toggle screen readers misreport.
@@ -478,32 +462,19 @@ export function BookPanel({
               box — the two short sections cannot be pushed off the bottom by a
               forty-chapter book, which is exactly when they matter most. */}
           <div className="mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
-            <MatterSection
+            <MatterCard
               label="Front matter"
-              count={front ? 1 : 0}
-              open={openParts.front}
-              onToggle={() => toggleParts("front")}
-            >
-              {front ? (
-                <ChapterPill
-                  number={null}
-                  title={front.title}
-                  active={front.id === chapterId}
-                  onClick={() => open(front.id)}
-                />
-              ) : (
-                <StartPart
-                  label="Start the front matter"
-                  onClick={() => openMatter("front")}
-                />
-              )}
-            </MatterSection>
+              description="The title page, copyright and dedication — everything that comes before Chapter 1."
+              exists={!!front}
+              active={front?.id === chapterId}
+              onOpen={() => openMatter("front")}
+            />
 
             <MatterSection
               label="Body matter"
               count={bodyChapters.length}
-              open={openParts.body}
-              onToggle={() => toggleParts("body")}
+              open={bodyOpen}
+              onToggle={() => setBodyOpen(toggleBody())}
               grow
             >
               {bodyChapters.length > 0 ? (
@@ -559,26 +530,13 @@ export function BookPanel({
               )}
             </MatterSection>
 
-            <MatterSection
+            <MatterCard
               label="Back matter"
-              count={back ? 1 : 0}
-              open={openParts.back}
-              onToggle={() => toggleParts("back")}
-            >
-              {back ? (
-                <ChapterPill
-                  number={null}
-                  title={back.title}
-                  active={back.id === chapterId}
-                  onClick={() => open(back.id)}
-                />
-              ) : (
-                <StartPart
-                  label="Start the back matter"
-                  onClick={() => openMatter("back")}
-                />
-              )}
-            </MatterSection>
+              description="Acknowledgements, an author's note, an epilogue — whatever closes the book."
+              exists={!!back}
+              active={back?.id === chapterId}
+              onOpen={() => openMatter("back")}
+            />
           </div>
         </div>
       )}
@@ -677,12 +635,7 @@ function ChapterPill({
   title: string;
   active: boolean;
   onClick: () => void;
-  /**
-   * Omitted by the matter pages, which have no ⋯: renaming or deleting the
-   * front matter is not the same act as renaming a chapter, and offering the
-   * chapter menu on them would promise three things that do not belong there.
-   */
-  menu?: RowMenuItem[];
+  menu: RowMenuItem[];
 }) {
   return (
     /* `group` and `relative` for the ⋯: it is laid over the row's right end
@@ -694,9 +647,9 @@ function ChapterPill({
         onClick={onClick}
         aria-current={active ? "page" : undefined}
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
-                    py-2 pl-2.5 text-left font-sans text-sm outline-none
+                    py-2 pr-9 pl-2.5 text-left font-sans text-sm outline-none
                     transition-colors focus-visible:ring-2
-                    focus-visible:ring-accent/50 ${menu ? "pr-9" : "pr-2.5"} ${
+                    focus-visible:ring-accent/50 ${
                       active
                         ? "bg-accent font-medium text-white"
                         : "text-fg hover:bg-raised"
@@ -715,14 +668,12 @@ function ChapterPill({
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
 
-      {menu && (
-        <span className="absolute top-1/2 right-1 -translate-y-1/2">
-          {/* `active` keeps the trigger shown on the open chapter: its actions
-              should be one click away rather than one hover, and it is the row
-              a touch user cannot hover to find at all. */}
-          <RowMenu label={title} items={menu} active={active} />
-        </span>
-      )}
+      <span className="absolute top-1/2 right-1 -translate-y-1/2">
+        {/* `active` keeps the trigger shown on the open chapter: its actions
+            should be one click away rather than one hover, and it is the row a
+            touch user cannot hover to find at all. */}
+        <RowMenu label={title} items={menu} active={active} />
+      </span>
     </li>
   );
 }
@@ -807,32 +758,58 @@ function MatterSection({
   );
 }
 
-/** A part that has no page yet: the way to start one, saying so plainly. */
-function StartPart({ label, onClick }: { label: string; onClick: () => void }) {
+/**
+ * Front or back matter as a card: what the part is, and the one way in.
+ *
+ * Not a disclosure, because there is nothing to disclose — each of these is a
+ * single page, and an arrow that opens to reveal exactly one row is a click
+ * spent on nothing. What a writer actually needs here is to know what the part
+ * is *for*: "front matter" is a printer's term, and most people writing a first
+ * novel have never had to name the pages before Chapter 1. So the card spends
+ * its space on a sentence rather than on a count of one.
+ */
+function MatterCard({
+  label,
+  description,
+  exists,
+  active,
+  onOpen,
+}: {
+  label: string;
+  description: string;
+  /** Whether the page has been started. Only the button's wording turns on it —
+   *  the card is the same either way, because the part exists in the book
+   *  whether or not a page has been made for it yet. */
+  exists: boolean;
+  active: boolean;
+  onOpen: () => void;
+}) {
   return (
-    <li>
+    <section
+      aria-current={active ? "page" : undefined}
+      className={`shrink-0 rounded-xl border bg-panel/60 p-3.5 transition-colors
+                  ${active ? "border-accent" : "border-line"}`}
+    >
+      <h3 className="font-serif text-base font-semibold text-fg">{label}</h3>
+
+      {/* Two lines at the panel's width. Long enough to say what the part is,
+          short enough that the card stays a card and not a paragraph. */}
+      <p className="mt-1 font-sans text-xs leading-relaxed text-muted">
+        {description}
+      </p>
+
       <button
         type="button"
-        onClick={onClick}
-        className="flex w-full cursor-pointer items-center gap-2 rounded-lg
-                   border border-dashed border-line px-2.5 py-2 text-left
-                   font-sans text-sm text-muted outline-none transition-colors
-                   hover:border-accent/60 hover:bg-raised hover:text-fg
-                   focus-visible:ring-2 focus-visible:ring-accent/50"
+        onClick={onOpen}
+        className="mt-3 w-full cursor-pointer rounded-lg bg-accent py-2
+                   font-sans text-sm font-semibold text-white outline-none
+                   transition-colors hover:bg-accent-strong focus-visible:ring-2
+                   focus-visible:ring-accent/50"
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          className="h-4 w-4 shrink-0"
-        >
-          <path d="M10 5v10M5 10h10" />
-        </svg>
-        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {/* "Start" is the honest word before the page exists: the click makes
+            something. Afterwards it only opens what is already there. */}
+        {exists ? "Open" : "Start"}
       </button>
-    </li>
+    </section>
   );
 }
