@@ -22,6 +22,19 @@
 
 import type { BookKind } from "./book-kinds";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
+import {
+  fetchLibrary,
+  hasClaimed,
+  currentOwner,
+  pushBody,
+  pushBook,
+  pushBookDeleted,
+  pushChapterDeleted,
+  pushCover,
+  pushNotes,
+  pushPrefs,
+  uploadLibrary,
+} from "./sync";
 import { DEFAULT_TYPOGRAPHY, type Typography } from "./typography";
 
 const SHELF_KEY = "openchapter:shelf";
@@ -446,6 +459,7 @@ export function setCover(bookId: string, dataUrl: string | null): boolean {
   }
   // The shelf did not change, but what the shelf *renders* did.
   emitShelf();
+  pushCover(bookId, dataUrl);
   return true;
 }
 
@@ -476,6 +490,58 @@ function commit(next: Shelf) {
     return;
   }
   emitShelf();
+  pushShelfDiff(next);
+}
+
+/**
+ * What changed since the last commit, sent to Supabase.
+ *
+ * Diffing here rather than at each of the twenty-odd call sites is deliberate.
+ * Every shelf mutation funnels through commit(), and the writes are immutable —
+ * commitBook() replaces one book and leaves the rest as the same objects — so
+ * reference inequality is an exact test for "this book changed". A per-call-site
+ * approach would have to be remembered every time a new mutation is added, and
+ * would eventually be forgotten.
+ *
+ * Deletions matter as much as edits and are easier to miss: pushBook upserts a
+ * book's chapters but has no way to know one was removed. Comparing the id sets
+ * catches every path — emptying the trash, undoing an import, a chapter deleted
+ * for good — without any of them having to say so.
+ */
+let pushedBooks: readonly Book[] = [];
+
+function chapterIdsOf(book: Book): Set<string> {
+  const ids = new Set<string>();
+  for (const c of book.chapters) ids.add(c.id);
+  for (const c of book.trash ?? []) ids.add(c.id);
+  return ids;
+}
+
+function pushShelfDiff(next: Shelf) {
+  const before = new Map(pushedBooks.map((b) => [b.id, b]));
+
+  next.books.forEach((book, position) => {
+    const previous = before.get(book.id);
+    before.delete(book.id);
+
+    if (previous === book) return;
+
+    if (previous) {
+      const survives = chapterIdsOf(book);
+      for (const id of chapterIdsOf(previous)) {
+        // Deleting the chapter row cascades to its body and notes, so the
+        // cascade stays declared in the schema rather than repeated here.
+        if (!survives.has(id)) pushChapterDeleted(id);
+      }
+    }
+
+    pushBook(book, position);
+  });
+
+  // Whatever is left never made it into the new shelf.
+  for (const id of before.keys()) pushBookDeleted(id);
+
+  pushedBooks = next.books;
 }
 
 /** Replaces one book in place, leaving shelf order untouched. */
@@ -1051,7 +1117,9 @@ export function saveBody(
   doc: unknown,
   words: number,
 ) {
-  window.localStorage.setItem(bodyKey(chapterId), JSON.stringify(doc));
+  const raw = JSON.stringify(doc);
+  window.localStorage.setItem(bodyKey(chapterId), raw);
+  pushBody(chapterId, raw);
 
   const book = findBook(getShelf(), bookId);
   const current = book?.chapters.find((c) => c.id === chapterId);
@@ -1335,6 +1403,7 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
     return;
   }
   for (const listener of prefsListeners) listener();
+  pushPrefs(next);
 }
 
 // ---------------------------------------------------------------------------
@@ -1368,7 +1437,9 @@ export function saveNotes(id: string, text: string) {
     else window.localStorage.removeItem(notesKey(id));
   } catch (err) {
     console.error("[store] could not write notes", err);
+    return;
   }
+  pushNotes(id, text);
 }
 
 // ---------------------------------------------------------------------------
@@ -1541,4 +1612,140 @@ export function bookmarks(shelf: Shelf): Bookmark[] {
     }
   }
   return found;
+}
+
+// ---------------------------------------------------------------------------
+// Syncing with Supabase
+//
+// Reads never come from here — localStorage stays the read path, so getShelf()
+// stays synchronous and every screen keeps rendering from the first paint. This
+// is the once-per-load reconciliation: work out whether this browser's library
+// belongs on the server or the server's belongs here, and make them agree.
+//
+// See docs/plans/2026-07-29-supabase-persistence-design.md.
+// ---------------------------------------------------------------------------
+
+/** Whose library is currently cached in this browser. */
+const OWNER_KEY = "openchapter:owner";
+
+/**
+ * Every key this app owns, wiped.
+ *
+ * Needed because a browser is shared. Without it the second writer to sign in
+ * on a machine inherits the first one's shelf — and now with a server behind
+ * it, would push those books up under their own account.
+ */
+export function clearLocalLibrary() {
+  const doomed: string[] = [];
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (key?.startsWith("openchapter:")) doomed.push(key);
+  }
+  for (const key of doomed) window.localStorage.removeItem(key);
+
+  cachedRaw = null;
+  cachedShelf = EMPTY_SHELF;
+  pushedBooks = [];
+  emitShelf();
+  for (const listener of prefsListeners) listener();
+}
+
+/** Writes a downloaded library over the local one. */
+function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
+  if (!remote) return;
+  try {
+    window.localStorage.setItem(SHELF_KEY, JSON.stringify(remote.shelf));
+    for (const [id, raw] of remote.bodies) {
+      window.localStorage.setItem(bodyKey(id), raw);
+    }
+    for (const [id, text] of remote.notes) {
+      window.localStorage.setItem(notesKey(id), text);
+    }
+    for (const [id, dataUrl] of remote.covers) {
+      window.localStorage.setItem(coverKey(id), dataUrl);
+    }
+    if (remote.prefs) {
+      window.localStorage.setItem(
+        PREFS_KEY,
+        JSON.stringify({ ...DEFAULT_PREFS, ...remote.prefs }),
+      );
+    }
+  } catch (err) {
+    // Quota. The library on the server is larger than this browser can hold —
+    // possible once a writer has worked on more than one machine. Partial is
+    // better than nothing and the shelf was written first, so what landed is
+    // coherent; TODO.md tracks giving this a proper warning.
+    console.error("[store] could not cache the downloaded library", err);
+  }
+
+  // Seed the diff baseline from what we just wrote, or the next edit would
+  // push every book back up as though it were new.
+  cachedRaw = null;
+  pushedBooks = getShelf().books;
+
+  emitShelf();
+  for (const listener of prefsListeners) listener();
+}
+
+/** The whole local library, in the shape uploadLibrary wants. */
+function collectLocal() {
+  const bodies = new Map<string, string>();
+  const notes = new Map<string, string>();
+  const covers = new Map<string, string>();
+
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (!key) continue;
+    const value = window.localStorage.getItem(key);
+    if (value === null) continue;
+
+    if (key.startsWith(BODY_PREFIX)) bodies.set(key.slice(BODY_PREFIX.length), value);
+    else if (key.startsWith(NOTES_PREFIX)) notes.set(key.slice(NOTES_PREFIX.length), value);
+    else if (key.startsWith(COVER_PREFIX)) covers.set(key.slice(COVER_PREFIX.length), value);
+  }
+
+  return { bodies, notes, covers };
+}
+
+/**
+ * Reconcile this browser with the server. Safe to call more than once.
+ *
+ * Three cases, and the order they are tested in is what keeps manuscripts safe:
+ *
+ *   1. A different writer is signed in from the one whose books are cached
+ *      here. Wipe first — their library is not ours to upload.
+ *   2. Nothing has ever been uploaded for this writer and this browser holds
+ *      books. That is a writer who wrote before they had an account: send it
+ *      up, and let the claim record that it has been done.
+ *   3. Otherwise the server is the truth and this browser takes a copy.
+ *
+ * Case 2 is checked before case 3 because getting them the wrong way round
+ * downloads an empty library over a real one.
+ */
+export async function syncWithServer(): Promise<void> {
+  const owner = await currentOwner();
+  if (!owner) return;
+
+  if (window.localStorage.getItem(OWNER_KEY) !== owner) {
+    if (window.localStorage.getItem(OWNER_KEY) !== null) clearLocalLibrary();
+    window.localStorage.setItem(OWNER_KEY, owner);
+  }
+
+  if (!(await hasClaimed())) {
+    const shelf = getShelf();
+    if (shelf.books.length > 0) {
+      const { bodies, notes, covers } = collectLocal();
+      const uploaded = await uploadLibrary(shelf, bodies, notes, covers, getPrefs());
+      // Claimed and already correct locally — nothing to download.
+      if (uploaded) {
+        pushedBooks = shelf.books;
+        return;
+      }
+      // Upload failed. Do *not* fall through and overwrite this browser's
+      // books with an empty server library; leave them be and try next load.
+      return;
+    }
+  }
+
+  applyRemote(await fetchLibrary());
 }

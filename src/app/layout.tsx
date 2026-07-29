@@ -3,6 +3,7 @@ import { Fraunces, Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { ThemeSync } from "@/components/theme/theme-sync";
 import { AppLoader } from "@/components/app-loader";
+import { LibrarySync } from "@/components/library-sync";
 
 /**
  * Sets the theme on <html> before the first paint, so a writer who chose dark
@@ -72,6 +73,7 @@ export default function RootLayout({
           shelf can render full-width without one. */}
       <body className="h-full overflow-hidden bg-surface text-fg">
         <ThemeSync />
+        <LibrarySync />
         <AppLoader />
         {children}
       </body>
