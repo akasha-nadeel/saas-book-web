@@ -7,9 +7,19 @@ Last updated 2026-07-22. Ordered roughly by value, not by effort.
 These have UI on screen that says "Coming soon". They are promises now, so they
 should either ship or lose the card.
 
-- [ ] **Audiobook: text → audio.** Card on `/book/[bookId]/export`. Needs a TTS
-      service — a server and a running bill. Decide hosted vs. browser
-      `speechSynthesis` (free, robotic, cannot be exported to a file).
+- [x] **Audiobook: text → audio.** Done, and with it the last "Coming soon" card
+      in the app. The export page's Audiobook card reads the book aloud and
+      downloads a zip, one MP3 per chapter — that shape rather than one file
+      because it is how audiobooks are listened to, and because it keeps the
+      audio joins inside a chapter where the voice is unchanged.
+      The work is the chunking (`narrate.ts`, tested): a speech model takes a
+      few thousand characters, so the text is cut at the largest boundary that
+      fits — paragraph, then sentence, then word, never mid-word, because a
+      break mid-clause is audible. Markdown is stripped first or the narrator
+      reads the syntax aloud.
+      *Needs `AI_GATEWAY_API_KEY`*, same key as the transcriber; 501 without it.
+      *Left:* one voice (`onyx`) with no way to choose another, and no way to
+      stop a run once it has started.
 - [x] **Audiobook: audio → text.** Done. The Audiobook button in the shelf
       header opens a picker; `/api/transcribe` sends the file to a transcription
       model through the Vercel AI Gateway, and the transcript then takes the

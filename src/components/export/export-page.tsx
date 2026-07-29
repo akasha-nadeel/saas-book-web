@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { BookCover } from "@/components/shelf/book-cover";
-import { runExport, type Format } from "@/lib/export";
+import { loadChapters, runExport, type Format } from "@/lib/export";
 import {
   DEFAULT_TYPESET,
   TEMPLATES,
@@ -66,6 +66,13 @@ export function ExportPage({ bookId }: { bookId: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Narration keeps its own state rather than sharing the export flags: it runs
+  // for minutes, reports progress as it goes, and a writer should still be able
+  // to see what the other formats say while it does.
+  const [narrating, setNarrating] = useState(false);
+  const [narrationLabel, setNarrationLabel] = useState("");
+  const [narrationError, setNarrationError] = useState<string | null>(null);
+
   if (!hydrated) return null;
 
   const book = findBook(shelf, bookId);
@@ -102,6 +109,38 @@ export function ExportPage({ bookId }: { bookId: string }) {
       );
     } finally {
       setBusy(false);
+    }
+  };
+
+  const narrate = async () => {
+    setNarrating(true);
+    setNarrationError(null);
+    setNarrationLabel("Starting…");
+    try {
+      const { exportAudiobook } = await import("@/lib/export/audiobook");
+      await exportAudiobook(
+        book.title,
+        loadChapters(book),
+        "onyx",
+        ({ chapter, chapters, chapterTitle, chunk, chunks }) => {
+          setNarrationLabel(
+            `Chapter ${chapter} of ${chapters} — ${chapterTitle} (part ${chunk} of ${chunks})`,
+          );
+        },
+      );
+      setNarrationLabel("");
+    } catch (err) {
+      console.error("[narrate] failed", err);
+      // The route's own message when it has one — "no key", "sign in", "too
+      // long" are all things the writer can act on, unlike a generic failure.
+      setNarrationError(
+        err instanceof Error && err.message
+          ? err.message
+          : "The audiobook could not be produced.",
+      );
+      setNarrationLabel("");
+    } finally {
+      setNarrating(false);
     }
   };
 
@@ -432,21 +471,27 @@ export function ExportPage({ bookId }: { bookId: string }) {
                   Audiobook
                 </h2>
                 <p className="mt-1 font-sans text-xs text-muted">
-                  Read your manuscript aloud and export it as audio. Not built
-                  yet — this is here so you know it is planned, not because it
-                  works.
+                  {narrating
+                    ? narrationLabel
+                    : "Read aloud and downloaded as a zip, one MP3 per chapter."}
                 </p>
+                {narrationError && (
+                  <p role="alert" className="mt-1.5 font-sans text-xs text-danger">
+                    {narrationError}
+                  </p>
+                )}
               </div>
 
               <button
                 type="button"
-                disabled
-                title="Not available yet"
-                className="shrink-0 cursor-not-allowed rounded-md border
-                           border-line px-3 py-2 font-sans text-sm text-muted
-                           opacity-60"
+                onClick={narrate}
+                disabled={narrating || busy}
+                className="shrink-0 rounded-md border border-line px-3 py-2
+                           font-sans text-sm font-medium text-fg outline-none
+                           transition-colors hover:bg-raised focus-visible:ring-2
+                           focus-visible:ring-accent/50 disabled:opacity-60"
               >
-                Coming soon
+                {narrating ? "Reading…" : "Read aloud"}
               </button>
             </div>
           </section>
