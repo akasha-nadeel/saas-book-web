@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
@@ -72,7 +78,7 @@ function Btn({
       aria-label={label}
       aria-pressed={active}
       title={shortcut ? `${label} (${shortcut})` : label}
-      className={`flex h-8 w-8 shrink-0 cursor-pointer items-center
+      className={`flex h-7 w-7 shrink-0 cursor-pointer items-center
                   justify-center rounded-md text-sm outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
@@ -85,7 +91,7 @@ function Btn({
 }
 
 const Sep = () => (
-  <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-line" />
+  <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-line" />
 );
 
 /** The four alignments, each with a small icon of ruled lines. */
@@ -119,12 +125,30 @@ const ALIGN_OPTIONS: {
 export function SelectionToolbar({ editor }: { editor: Editor | null }) {
   useEditorTick(editor);
 
+  /**
+   * Whether the pointer is on the bar.
+   *
+   * The bar kept vanishing the moment a writer pressed anything on it, and
+   * refusing the mousedown so the manuscript never blurs was not enough on its
+   * own — several paths inside the menu plugin end at `hide()`, and chasing
+   * which one fired is chasing a library's private business. This answers the
+   * question the plugin is really asking. A writer with the pointer on the bar
+   * is using the bar; nothing it does to the document is a reason to take it
+   * away from them.
+   *
+   * A ref rather than state on purpose: it must not re-render the toolbar,
+   * because a render here is what makes new props for the menu, and the whole
+   * reason the values below are memoised is that new props start a loop.
+   */
+  const pointerOnBar = useRef(false);
+
   // Stable references, or the BubbleMenu re-dispatches an "updateOptions"
   // transaction on every render — which re-renders this toolbar, which makes
   // new props, and so on without end. Memoising breaks that loop.
   const shouldShow = useCallback(
     ({ state, from, to }: { state: EditorState; from: number; to: number }) => {
       if (!editor?.isEditable) return false;
+      if (pointerOnBar.current) return true;
       if (from === to) return false;
       if (!(state.selection instanceof TextSelection)) return false;
       return state.doc.textBetween(from, to).trim().length > 0;
@@ -184,8 +208,17 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
       // the two. Split by what each row acts on — the selected words above, the
       // paragraphs they sit in below — it is about a third the width and the
       // grouping does some of the explaining.
-      className="flex w-max max-w-[min(28rem,calc(100vw-2rem))] flex-col gap-1
-                 rounded-xl border border-line bg-panel p-1.5 shadow-xl"
+      className="flex w-max max-w-[min(24rem,calc(100vw-2rem))] flex-col gap-0.5
+                 rounded-lg border border-line bg-panel p-1 shadow-xl"
+      // Entering and leaving, rather than pressing and releasing: a writer who
+      // presses a button and drags a little before letting go is still on the
+      // bar, and so is one moving between two of its buttons.
+      onMouseEnter={() => {
+        pointerOnBar.current = true;
+      }}
+      onMouseLeave={() => {
+        pointerOnBar.current = false;
+      }}
     >
       {/* The selected words: their face, their weight and slant, their size.
           Every control on this row is an inline mark — none of them touches a
@@ -290,7 +323,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
               stroke="currentColor"
               strokeWidth="1.5"
               strokeLinecap="round"
-              className="h-4 w-4"
+              className="h-3.5 w-3.5"
             >
               <path d={option.d} />
             </svg>
@@ -314,7 +347,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-4 w-4"
+            className="h-3.5 w-3.5"
           >
             <path d="M4 5.5h9M4 10h12M4 14.5h9" />
             <path d="M16.5 4v5" />
@@ -333,7 +366,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-4 w-4"
+            className="h-3.5 w-3.5"
           >
             <path d="M7 5.5h9M7 10h9M7 14.5h9" />
             <circle cx="4" cy="5.5" r="0.9" fill="currentColor" stroke="none" />
@@ -360,7 +393,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-4 w-4"
+            className="h-3.5 w-3.5"
           >
             <path d="M8 5.5h8M8 10h8M8 14.5h8" />
             <path d="M3 4.5h1V8M3 8h2" />
@@ -390,7 +423,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
             strokeWidth="1.6"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-4 w-4"
+            className="h-3.5 w-3.5"
           >
             <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
             <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
@@ -435,7 +468,7 @@ function FontPicker({ editor }: { editor: Editor }) {
         aria-expanded={open}
         aria-label="Font of the selected text"
         title="Font of the selected text"
-        className={`flex h-8 cursor-pointer items-center gap-1 rounded-md pr-1
+        className={`flex h-7 cursor-pointer items-center gap-1 rounded-md pr-1
                     pl-2 outline-none transition-colors focus-visible:ring-2
                     focus-visible:ring-accent/60 ${
                       open ? "bg-raised" : "hover:bg-raised"
