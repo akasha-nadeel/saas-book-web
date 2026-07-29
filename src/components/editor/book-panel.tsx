@@ -10,10 +10,19 @@ import {
   chapterNumberOf,
   createChapter,
   createMatterSection,
+  deleteChapter,
   importIntoBook,
+  renameChapter,
+  toggleBookmark,
   type Book,
 } from "@/lib/library-store";
+import type { Dictation } from "@/lib/editor/use-dictation";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
+import {
+  RowMenu,
+  menuIcons,
+  type RowMenuItem,
+} from "@/components/sidebar/row-menu";
 import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
@@ -42,6 +51,7 @@ export function BookPanel({
   paper,
   mode,
   onMode,
+  dictation,
 }: {
   book: Book;
   chapterId: string | null;
@@ -50,9 +60,20 @@ export function BookPanel({
   paper: string;
   mode: BookPanelMode;
   onMode: (mode: BookPanelMode) => void;
+  /**
+   * The editor's live dictation, started upstream. Shared with the tool rail's
+   * microphone so the two controls are two views of one session, not two.
+   */
+  dictation: Dictation;
 }) {
   const router = useRouter();
   const bookId = book.id;
+
+  // Named once because it is both the tooltip and the accessible name, and a
+  // toggle whose two labels disagree is a toggle screen readers misreport.
+  const dictationLabel = dictation.listening
+    ? "Stop dictating"
+    : "Dictate — speak and the words are typed";
 
   // Importing a file into this book — mirrors the left panel: a read in flight,
   // any error, the hidden input, and a parsed file waiting on add-or-replace.
@@ -254,8 +275,10 @@ export function BookPanel({
             Back
           </button>
 
-          {/* Make a chapter, or bring a manuscript in — the same pair the left
-              panel carries, kept here so the panel is a complete navigator. */}
+          {/* The three ways prose arrives: write it, speak it, or bring it in.
+              One primary and two icon affordances of equal weight, so the row
+              reads as an action and its two shortcuts rather than three
+              competing buttons. */}
           <div className="mt-5 flex items-stretch gap-2">
             <button
               type="button"
@@ -267,6 +290,58 @@ export function BookPanel({
             >
               New chapter
             </button>
+
+            {/* Dictation. Hidden outright where the browser has no speech
+                engine — on Safari and Firefox this could never work, and a
+                control that is permanently dead is worse than one that was
+                never offered. It keeps the import button's exact footprint so
+                turning the microphone on cannot shift the row. */}
+            {dictation.supported && (
+              <button
+                type="button"
+                aria-pressed={dictation.listening}
+                aria-label={dictationLabel}
+                title={dictationLabel}
+                onClick={() =>
+                  dictation.listening ? dictation.stop() : dictation.start()
+                }
+                className={`relative flex shrink-0 items-center justify-center
+                            rounded-lg border px-3 outline-none
+                            transition-colors focus-visible:ring-2
+                            focus-visible:ring-accent/50 ${
+                              dictation.listening
+                                ? "border-danger bg-danger text-white"
+                                : `border-line text-fg hover:border-accent/60
+                                   hover:bg-raised`
+                            }`}
+              >
+                {/* A ring that keeps pulsing while the microphone is live. This
+                    is a control a writer switches on and then stops looking at,
+                    so the state has to carry from the corner of the eye. */}
+                {dictation.listening && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-0 animate-ping rounded-lg
+                               bg-danger/40"
+                  />
+                )}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="relative h-4 w-4"
+                >
+                  <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
+                  <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
+                  <path d="M10 15v2.4" />
+                </svg>
+              </button>
+            )}
+
             <button
               type="button"
               disabled={importing}
@@ -294,6 +369,22 @@ export function BookPanel({
             </button>
           </div>
 
+          {/* While the microphone is live, say so in words as well as colour —
+              and say where the words are going, since the writer is looking at
+              the chapter list rather than at the page they are dictating into.
+              A refused microphone reports itself here too; nothing else would
+              tell the writer why speaking is doing nothing. */}
+          {dictation.supported && (dictation.listening || dictation.error) && (
+            <p
+              className={`mt-2 font-sans text-xs ${
+                dictation.error ? "text-danger" : "text-muted"
+              }`}
+              role={dictation.error ? "alert" : "status"}
+            >
+              {dictation.error ?? "Listening — speak and the words are typed."}
+            </p>
+          )}
+
           <input
             ref={fileRef}
             type="file"
@@ -319,9 +410,17 @@ export function BookPanel({
 
           {/* Front matter opens the book, the body is the story, back matter
               closes it. The list scrolls so a long book stays in reach. */}
-          {/* gap-0.5, not gap-2.5: rows this close read as a list, and a book
-              of forty chapters is worth being able to see the shape of. */}
-          <ul className="scroll-slim mt-4 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+          {/* justify-evenly, but only while everything fits.
+              The list already owned the full height; the rows simply did not
+              fill it, which left a short book sitting in the top half of a tall
+              panel. Spreading them uses the height a writer actually has.
+
+              It has to stop once the book outgrows the panel: spacing a
+              scrolling list evenly would push rows apart *and* off the bottom.
+              min-h-0 with overflow-y-auto means the flex box never grows past
+              its track, so past that point the even spacing collapses on its
+              own and it goes back to being a scrolling list. */}
+          <ul className="scroll-slim mt-4 flex min-h-0 flex-1 flex-col justify-evenly gap-0.5 overflow-y-auto pr-1">
             <MatterPill
               label="Front matter"
               exists={!!front}
@@ -335,9 +434,42 @@ export function BookPanel({
                   key={c.id}
                   number={chapterNumberOf(book, c.id)}
                   title={c.title}
-                  words={c.words}
                   active={c.id === chapterId}
                   onClick={() => open(c.id)}
+                  menu={[
+                    {
+                      label: c.bookmarked ? "Unstar" : "Star",
+                      icon: c.bookmarked ? menuIcons.starFilled : menuIcons.star,
+                      onSelect: () => toggleBookmark(bookId, c.id),
+                    },
+                    {
+                      label: "Rename",
+                      icon: menuIcons.rename,
+                      onSelect: () => {
+                        // A prompt rather than the sidebar's edit-in-place: the
+                        // same three actions, without a second copy of the
+                        // rename state to keep in step with it.
+                        const next = window.prompt("Chapter title", c.title);
+                        if (next === null) return;
+                        const trimmed = next.trim();
+                        if (trimmed) renameChapter(bookId, c.id, trimmed);
+                      },
+                    },
+                    {
+                      label: "Delete",
+                      icon: menuIcons.trash,
+                      danger: true,
+                      onSelect: () => {
+                        if (
+                          window.confirm(
+                            `Move “${c.title}” to this book's trash? You can restore it from there.`,
+                          )
+                        ) {
+                          deleteChapter(bookId, c.id);
+                        }
+                      },
+                    },
+                  ]}
                 />
               ))
             ) : (
@@ -427,13 +559,6 @@ function PageArrow({
 }
 
 /** A body chapter as a pill — numbered, the soft blue wash, filled when open. */
-/** 1,240 → "1.2k". A sidebar column has no room for a thousands separator. */
-function shortCount(words: number): string {
-  if (words < 1000) return String(words);
-  const thousands = words / 1000;
-  return `${thousands < 10 ? thousands.toFixed(1) : Math.round(thousands)}k`;
-}
-
 /**
  * One chapter in the contents.
  *
@@ -449,24 +574,27 @@ function shortCount(words: number): string {
 function ChapterPill({
   number,
   title,
-  words,
   active,
   onClick,
+  menu,
 }: {
   number: number | null;
   title: string;
-  words: number;
   active: boolean;
   onClick: () => void;
+  menu: RowMenuItem[];
 }) {
   return (
-    <li>
+    /* `group` and `relative` for the ⋯: it is laid over the row's right end
+       rather than sitting in the flow, so the title has the row's full width
+       and does not reflow when the menu appears under the pointer. */
+    <li className="group relative">
       <button
         type="button"
         onClick={onClick}
         aria-current={active ? "page" : undefined}
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
-                    px-2.5 py-2 text-left font-sans text-sm outline-none
+                    py-2 pr-9 pl-2.5 text-left font-sans text-sm outline-none
                     transition-colors focus-visible:ring-2
                     focus-visible:ring-accent/50 ${
                       active
@@ -485,19 +613,14 @@ function ChapterPill({
         </span>
 
         <span className="min-w-0 flex-1 truncate">{title}</span>
-
-        {/* Silent on an empty chapter: "0" is noise on every row of a book that
-            has only been outlined. */}
-        {words > 0 && (
-          <span
-            className={`shrink-0 text-[0.7rem] tabular-nums ${
-              active ? "text-white/70" : "text-muted"
-            }`}
-          >
-            {shortCount(words)}
-          </span>
-        )}
       </button>
+
+      <span className="absolute top-1/2 right-1 -translate-y-1/2">
+        {/* `active` keeps the trigger shown on the open chapter: its actions
+            should be one click away rather than one hover, and it is the row a
+            touch user cannot hover to find at all. */}
+        <RowMenu label={title} items={menu} active={active} />
+      </span>
     </li>
   );
 }

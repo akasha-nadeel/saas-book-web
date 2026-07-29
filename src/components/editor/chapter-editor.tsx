@@ -21,6 +21,7 @@ import { keepCaretInView } from "@/lib/editor/caret-scroll";
 import { FontSize } from "@/lib/editor/font-size";
 import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
+import { useDictation } from "@/lib/editor/use-dictation";
 import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import { BookPanel, type BookPanelMode } from "@/components/editor/book-panel";
@@ -137,6 +138,33 @@ export function ChapterEditor({
   // Lifted out of the surface so the toolbar and the assistant can both reach
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
+
+  /**
+   * Dictation lives here rather than in either button, because there are two of
+   * them — one in the tool rail, one in the chapter list — and they must drive
+   * the same engine. A hook per button would start two SpeechRecognition
+   * sessions competing for one microphone, and each button would show only its
+   * own half of the state.
+   *
+   * Words go in through the editor's own command, so dictated prose is
+   * undoable, autosaved and counted like anything typed. The leading space is
+   * what stops phrases running together: the recogniser returns "she opened the
+   * door" with no trailing space, and the next phrase would begin against it.
+   */
+  const dictation = useDictation((text) => {
+    // A phrase can arrive after the surface has gone — the writer navigating
+    // away while still speaking. There is nowhere to put it, so it is dropped.
+    if (!editor) return;
+
+    const at = editor.state.selection.from;
+    const before = editor.state.doc.textBetween(Math.max(0, at - 1), at, " ");
+    const needsSpace = before !== "" && before !== " " && before !== "\n";
+    editor
+      .chain()
+      .focus()
+      .insertContent(`${needsSpace ? " " : ""}${text}`)
+      .run();
+  });
   // The left panel here is tools only — the book panel beside the manuscript is
   // the chapter list, so offering a second one was the same list twice. With no
   // chapter list to land on, the panel starts closed and a rail tab opens it;
@@ -258,6 +286,7 @@ export function ChapterEditor({
           paper={prefs.paper}
           mode={panelMode}
           onMode={changePanelMode}
+          dictation={dictation}
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
@@ -323,7 +352,12 @@ export function ChapterEditor({
 
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 
-          <ToolRail editor={editor} book={book} paper={prefs.paper} />
+          <ToolRail
+            editor={editor}
+            book={book}
+            paper={prefs.paper}
+            dictation={dictation}
+          />
 
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 

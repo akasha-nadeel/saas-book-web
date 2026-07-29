@@ -24,7 +24,7 @@ import {
   type ParagraphStyle,
 } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
-import { useDictation } from "@/lib/editor/use-dictation";
+import type { Dictation } from "@/lib/editor/use-dictation";
 
 /** The four alignments, each with a small icon of ruled lines. */
 const ALIGN_OPTIONS: {
@@ -323,38 +323,20 @@ export function ToolRail({
   editor,
   book,
   paper,
+  dictation,
 }: {
   editor: Editor | null;
   book: Book;
   paper: PaperColor;
+  /**
+   * Passed in rather than started here, because the chapter list carries a
+   * second microphone button. One engine, two controls that agree.
+   */
+  dictation: Dictation;
 }) {
   useEditorState(editor);
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
-
-  /**
-   * Dictated words are inserted at the caret through the editor's own command,
-   * so they join the document as ordinary typing — undoable, autosaved, and
-   * counted — rather than being pushed into the DOM behind Tiptap's back.
-   *
-   * The leading space is what stops phrases running together: the recogniser
-   * hands back "she opened the door" with no trailing space, and the next
-   * phrase would otherwise begin against it.
-   */
-  const dictation = useDictation((text) => {
-    // A phrase can arrive after the surface has gone — the writer navigating
-    // away while still speaking. There is nowhere to put it, so it is dropped.
-    if (!editor) return;
-
-    const at = editor.state.selection.from;
-    const before = editor.state.doc.textBetween(Math.max(0, at - 1), at, " ");
-    const needsSpace = before !== "" && before !== " " && before !== "\n";
-    editor
-      .chain()
-      .focus()
-      .insertContent(`${needsSpace ? " " : ""}${text}`)
-      .run();
-  });
   const [problem, setProblem] = useState<string | null>(null);
 
   // The book's body typography — changed live from the Aa flyout below.
