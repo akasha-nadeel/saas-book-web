@@ -18,7 +18,6 @@ import { AccountDialog } from "@/components/auth/account-dialog";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { SoundsDialog } from "@/components/shelf/sounds-dialog";
-import { AudiobookDialog } from "@/components/shelf/audiobook-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
@@ -117,7 +116,6 @@ export function Bookshelf({
     | "support"
     | "sounds"
     | "import"
-    | "audiobook"
     | null
   >(null);
   const [view, setView] = useState<BookView>("active");
@@ -245,7 +243,6 @@ export function Bookshelf({
             onToggleNav={() => setNavOpen((open) => !open)}
             onTemplates={() => setDialog("templates")}
             onSounds={() => setDialog("sounds")}
-            onAudiobook={() => setDialog("audiobook")}
             email={email}
             onAccount={() => setDialog("account")}
           />
@@ -334,9 +331,6 @@ export function Bookshelf({
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
       {dialog === "sounds" && <SoundsDialog onClose={() => setDialog(null)} />}
-      {dialog === "audiobook" && (
-        <AudiobookDialog onClose={() => setDialog(null)} />
-      )}
       {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
     </div>
   );
@@ -624,7 +618,6 @@ function ShelfTopBar({
   onToggleNav,
   onTemplates,
   onSounds,
-  onAudiobook,
   email,
   onAccount,
 }: {
@@ -633,7 +626,6 @@ function ShelfTopBar({
   onToggleNav: () => void;
   onTemplates: () => void;
   onSounds: () => void;
-  onAudiobook: () => void;
   email: string | null;
   onAccount: () => void;
 }) {
@@ -717,19 +709,6 @@ function ShelfTopBar({
         Sounds
       </button>
 
-      {/* Set like its neighbours, and real: with no AI_GATEWAY_API_KEY the
-          route answers 501 and the dialog says so, the same way the assistant
-          behaves without its key. */}
-      <button
-        type="button"
-        onClick={onAudiobook}
-        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
-                   font-medium text-muted outline-none transition-colors
-                   hover:bg-raised hover:text-fg focus-visible:ring-2
-                   focus-visible:ring-accent/50 md:block"
-      >
-        Audiobook
-      </button>
 
       <button
         type="button"

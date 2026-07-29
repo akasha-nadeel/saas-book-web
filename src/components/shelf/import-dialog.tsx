@@ -29,7 +29,10 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [tab, setTab] = useState<"file" | "paste">("file");
+  const [tab, setTab] = useState<"file" | "paste" | "audio">("file");
+  // Transcription runs for minutes, so it gets its own flag and a label saying
+  // what is happening. The shared `busy` covers reads that take a moment.
+  const [transcribing, setTranscribing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +60,44 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       setProposal(null);
     } finally {
       setBusy(false);
+    }
+  };
+
+  /**
+   * A recording, transcribed and then read as if it were a text file.
+   *
+   * The transcript is handed to the same reader every other import uses, as a
+   * .txt so it is parsed as prose rather than markdown — a narrator saying
+   * "hash" means the word, not a heading. Everything after that is shared: the
+   * chapter split, the proposal, the title field, the confirm step. An
+   * audiobook arrives looking exactly like a manuscript, because by then it is
+   * one.
+   */
+  const readAudio = async (file: File) => {
+    setTranscribing(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("audio", file);
+      const response = await fetch("/api/transcribe", { method: "POST", body });
+      const payload = (await response.json()) as {
+        text?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.text) {
+        setError(payload.error ?? "That recording could not be transcribed.");
+        return;
+      }
+
+      const base = file.name.replace(/\.[^.]+$/, "") || "Audiobook";
+      await read(
+        new File([payload.text], `${base}.txt`, { type: "text/plain" }),
+      );
+    } catch {
+      setError("Could not reach the transcriber. Check your connection.");
+    } finally {
+      setTranscribing(false);
     }
   };
 
@@ -125,6 +166,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                 [
                   ["file", "Local file"],
                   ["paste", "Paste text"],
+                  ["audio", "Audiobook"],
                 ] as const
               ).map(([value, label]) => (
                 <button
@@ -240,6 +282,75 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                     Text, headings, bold and italic come through; images,
                     footnotes and comments do not. PDF and old .doc files cannot
                     be read here — save your manuscript as .docx first.
+                  </p>
+                </>
+              ) : tab === "audio" ? (
+                <>
+                  <div
+                    className="flex flex-col items-center rounded-xl border border-dashed
+                               border-line bg-surface px-6 py-10 text-center"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex h-12 w-12 items-center justify-center rounded-xl
+                                 bg-accent/10 text-accent"
+                    >
+                      <svg
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-6 w-6"
+                      >
+                        <path d="M10 2.5a2 2 0 0 1 2 2v5a2 2 0 0 1-4 0v-5a2 2 0 0 1 2-2Z" />
+                        <path d="M5 9a5 5 0 0 0 10 0M10 14v3.5" />
+                      </svg>
+                    </span>
+
+                    <p className="mt-4 font-sans text-sm font-semibold text-fg">
+                      {transcribing
+                        ? "Listening to your recording…"
+                        : "Turn a recording into a book"}
+                    </p>
+                    <p className="mt-1 font-sans text-xs leading-relaxed text-muted">
+                      {transcribing
+                        ? "A long recording takes a few minutes. Leave this open."
+                        : "It is transcribed, then split wherever the reader announces a chapter."}
+                    </p>
+
+                    <label className="mt-5">
+                      <input
+                        type="file"
+                        accept="audio/*,.mp3,.m4a,.wav,.webm,.ogg,.flac"
+                        hidden
+                        disabled={transcribing || busy}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          // Cleared so the same file can be chosen twice.
+                          e.target.value = "";
+                          if (file) void readAudio(file);
+                        }}
+                      />
+                      <span
+                        className={`inline-block rounded-lg bg-accent px-4 py-2 font-sans
+                                    text-sm font-semibold text-white transition-colors
+                                    ${
+                                      transcribing || busy
+                                        ? "opacity-40"
+                                        : "cursor-pointer hover:bg-accent-strong"
+                                    }`}
+                      >
+                        {transcribing ? "Transcribing…" : "Select a recording"}
+                      </span>
+                    </label>
+                  </div>
+
+                  <p className="mt-3 font-sans text-xs leading-relaxed text-muted">
+                    MP3, M4A, WAV, WebM, OGG or FLAC, up to 25MB. Unlike the
+                    other two, this one <em>is</em> uploaded — a recording has to
+                    reach a transcriber to become words.
                   </p>
                 </>
               ) : (
