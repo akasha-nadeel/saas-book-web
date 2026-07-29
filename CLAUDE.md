@@ -197,9 +197,31 @@ a rejected OAuth secret, which is a genuinely misleading place to start
 debugging. The four auth screens share `auth-shell.tsx` so the chrome cannot
 drift between them.
 
-**Auth is not persistence.** A signed-in writer still reads and writes
-`localStorage`; the account identifies them but does not yet carry their books.
-The UI says so rather than letting it be discovered. See `TODO.md`.
+**Persistence is Supabase behind localStorage, not instead of it.**
+`library-store.ts` still reads and writes `localStorage` synchronously — that is
+what lets `useSyncExternalStore` read a snapshot during render, and why none of
+the 37 files that read the store changed. `src/lib/sync.ts` is the async half:
+`commit()` diffs the shelf and pushes what moved, and `syncWithServer()`
+reconciles once per load. Reading through Supabase directly would make
+`getShelf()` async, which unpicks all of it — and would cost offline, which for a
+drafting tool is not a nice-to-have. The price is last-write-wins per chapter
+between two machines. See `docs/plans/2026-07-29-supabase-persistence-design.md`.
+
+Two things in there are load-bearing. **Pushes are diffed in `commit()`**, not
+added at each of the twenty-odd mutation sites: every shelf write funnels
+through it and the writes are immutable, so reference inequality is an exact
+test for "this book changed" — and a new mutation cannot forget to push.
+Deletions are found by comparing chapter id sets before and after, because
+`pushBook` upserts a book's chapters but cannot know one was removed.
+
+**The mapping narrows values on the way out** (`matterOrNull`, `count`, `text`,
+the guard in `toIso`). The types describe today's code; `localStorage` holds
+whatever older versions left there, unchecked by any compiler, and the database
+has CHECK constraints and NOT NULLs that will refuse the difference — one stale
+field in one chapter is otherwise enough to abort a whole library upload.
+`uploadLibrary` also drops bodies and covers whose chapter or book is not going
+up: after enough versions some keys belong to nothing, and a dangling foreign
+key takes the batch with it.
 
 **Routes:** `/` shelf · `/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·

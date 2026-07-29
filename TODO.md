@@ -44,12 +44,16 @@ should either ship or lose the card.
       and the redirect arrive in one response. Both env vars unset means no
       accounts at all and no wall — the app runs local-only as it always has,
       the same shape as the assistant's missing API key.
-- [ ] **Supabase persistence.** The half that is left, and the one that matters:
-      a signed-in writer still reads and writes `localStorage`, so the account
-      identifies them but does not carry their books. Two people signing in on
-      one browser see the same shelf. Everything touching storage is in
-      `src/lib/library-store.ts`, so the swap is that one module plus its React
-      bindings — and rows now have an owner to hang RLS on.
+- [x] **Supabase persistence.** Done, and verified against a real library:
+      10 books, 56 chapters, 23 bodies and 9 covers uploaded, and no chapter
+      with a word count left without its prose. Supabase sits *behind*
+      localStorage rather than replacing it, so reads stay synchronous and
+      offline still works — see the design note for why that decision shapes
+      everything else. `sync.ts` pushes on write and reconciles once per load.
+      *Left:* pull is once per load, so a second machine's edits arrive on
+      refresh rather than live; and two machines editing one chapter resolve
+      last-write-wins by the server clock, which is honest for one author and
+      wrong for two.
 - [ ] **Storage pressure.** localStorage is ~5MB per origin. Covers are capped at
       250KB each and inline images at 900KB, but a library of illustrated books
       will hit the wall. There is no usage indicator and no warning before a

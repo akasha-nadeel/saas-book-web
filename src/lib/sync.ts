@@ -384,71 +384,81 @@ export async function uploadLibrary(
     });
   });
 
-  const bodyRows = [...bodies].map(([chapter_id, raw]) => ({
-    chapter_id,
-    owner,
-    doc: safeParse(raw),
-  }));
-  const noteRows = [...notes].map(([chapter_id, text]) => ({
-    chapter_id,
-    owner,
-    text,
-  }));
-  const coverRows = [...covers].map(([book_id, data_url]) => ({
-    book_id,
-    owner,
-    data_url,
-  }));
+  /**
+   * Only prose whose chapter is actually going up.
+   *
+   * collectLocal() sweeps every openchapter:chapter: key in the browser, and
+   * after enough versions of an app some of those belong to nothing — a book
+   * deleted before its bodies were cleaned up, a chapter from a schema two
+   * rewrites ago. Each is a foreign key the database will refuse, and one
+   * refusal takes the whole batch with it. They are dropped rather than
+   * repaired: a body with no chapter has nothing to be attached to.
+   */
+  const liveChapters = new Set<string>();
+  for (const book of shelf.books) {
+    for (const c of book.chapters) liveChapters.add(c.id);
+    for (const c of book.trash ?? []) liveChapters.add(c.id);
+  }
+  const liveBooks = new Set(shelf.books.map((b) => b.id));
 
-  // Books before chapters, chapters before their bodies: the foreign keys make
-  // any other order fail, and failing halfway would leave prose with no chapter
-  // to hang from. Empty batches are skipped rather than sent — an upsert of
-  // nothing is a wasted round trip at best.
-  const steps: { what: string; rows: unknown[]; run: () => Promise<void> }[] = [
-    {
-      what: "books",
-      rows: bookRows,
-      run: async () => void (await db.from("books").upsert(bookRows).throwOnError()),
-    },
-    {
-      what: "chapters",
-      rows: chapterRows,
-      run: async () =>
-        void (await db.from("chapters").upsert(chapterRows).throwOnError()),
-    },
-    {
-      what: "bodies",
-      rows: bodyRows,
-      run: async () =>
-        void (await db.from("chapter_bodies").upsert(bodyRows).throwOnError()),
-    },
-    {
-      what: "notes",
-      rows: noteRows,
-      run: async () =>
-        void (await db.from("chapter_notes").upsert(noteRows).throwOnError()),
-    },
-    {
-      what: "covers",
-      rows: coverRows,
-      run: async () =>
-        void (await db.from("book_covers").upsert(coverRows).throwOnError()),
-    },
-    {
-      what: "prefs",
-      rows: [prefs],
-      run: async () =>
-        void (await db.from("prefs").upsert({ owner, data: prefs }).throwOnError()),
-    },
-  ];
+  const bodyRows = [...bodies]
+    .filter(([chapterId]) => liveChapters.has(chapterId))
+    .map(([chapter_id, raw]) => ({ chapter_id, owner, doc: safeParse(raw) }))
+    // doc is NOT NULL, and safeParse yields null on text that will not parse.
+    // A body that cannot be read is skipped so the rest still land.
+    .filter((row) => row.doc !== null);
+
+  const noteRows = [...notes]
+    .filter(([chapterId]) => liveChapters.has(chapterId))
+    .map(([chapter_id, text]) => ({ chapter_id, owner, text }));
+
+  const coverRows = [...covers]
+    .filter(([bookId]) => liveBooks.has(bookId))
+    .map(([book_id, data_url]) => ({ book_id, owner, data_url }));
+
+  /**
+   * Books before chapters, chapters before their bodies: the foreign keys make
+   * any other order fail, and failing halfway would leave prose with no chapter
+   * to hang from.
+   *
+   * Sent in batches rather than one request apiece. A library of forty chapters
+   * carrying inline images, plus a cover of up to 250KB per book, adds up to a
+   * payload large enough to be refused whole — and a refusal loses everything,
+   * not the row that caused it. The sizes differ because the rows do: a cover
+   * is a quarter-megabyte data URL, a chapter row is a few hundred bytes.
+   */
+  const steps: { what: string; rows: object[]; table: string; size: number }[] =
+    [
+      { what: "books", rows: bookRows, table: "books", size: 100 },
+      { what: "chapters", rows: chapterRows, table: "chapters", size: 200 },
+      { what: "bodies", rows: bodyRows, table: "chapter_bodies", size: 10 },
+      { what: "notes", rows: noteRows, table: "chapter_notes", size: 50 },
+      { what: "covers", rows: coverRows, table: "book_covers", size: 4 },
+      {
+        what: "prefs",
+        rows: [{ owner, data: prefs }],
+        table: "prefs",
+        size: 1,
+      },
+    ];
 
   for (const step of steps) {
     if (step.rows.length === 0) continue;
-    try {
-      await step.run();
-    } catch (err) {
-      console.error(`[sync] could not upload ${step.what}`, err);
-      return false;
+    for (let i = 0; i < step.rows.length; i += step.size) {
+      const batch = step.rows.slice(i, i + step.size);
+      try {
+        await db.from(step.table).upsert(batch).throwOnError();
+      } catch (err) {
+        // Which rows, not just which table. A rejected batch otherwise leaves
+        // nothing to go on but the constraint's name, and hunting the offending
+        // chapter through a library by hand is the slow way to find it.
+        console.error(
+          `[sync] could not upload ${step.what} (rows ${i}–${i + batch.length - 1} of ${step.rows.length})`,
+          err,
+        );
+        console.error("[sync] rows in the rejected batch:", batch.map(identify));
+        return false;
+      }
     }
   }
 
@@ -458,6 +468,28 @@ export async function uploadLibrary(
     return false;
   }
   return true;
+}
+
+/**
+ * Enough of a row to find it again, and no more. Printing a whole one would
+ * dump a chapter's prose or a quarter-megabyte cover into the console.
+ */
+function identify(row: object): Record<string, unknown> {
+  const r = row as Record<string, unknown>;
+  const shown: Record<string, unknown> = {};
+  for (const key of [
+    "id",
+    "book_id",
+    "chapter_id",
+    "title",
+    "matter",
+    "matter_key",
+    "words",
+    "position",
+  ]) {
+    if (key in r) shown[key] = r[key];
+  }
+  return shown;
 }
 
 function safeParse(raw: string): unknown {
