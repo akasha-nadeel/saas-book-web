@@ -1,4 +1,5 @@
 import type { JSONContent } from "@tiptap/react";
+import { fontStack } from "@/lib/typography";
 
 /**
  * A format-neutral view of a Tiptap document.
@@ -34,6 +35,8 @@ export interface Run {
   href?: string;
   /** An inline font size, as a CSS length (e.g. "1.3em"). See lib/editor/font-size. */
   fontSize?: string;
+  /** An inline font family, as a CSS stack. See lib/editor/font-family. */
+  fontFamily?: string;
 }
 
 /**
@@ -103,6 +106,16 @@ function runsFrom(content: JSONContent[] | undefined): Run[] {
           break;
         case "link":
           if (typeof mark.attrs?.href === "string") run.href = mark.attrs.href;
+          break;
+        case "fontFamily":
+          // The mark stores a face id from the book’s own list; the stack is
+          // resolved here so the renderers only ever see CSS. An id this
+          // build does not know is dropped rather than written out as a
+          // font-family nothing can match.
+          if (typeof mark.attrs?.font === "string") {
+            const stack = fontStack(mark.attrs.font);
+            if (stack) run.fontFamily = stack;
+          }
           break;
         case "fontSize":
           // The mark stores a multiple of the body size; render it the same way

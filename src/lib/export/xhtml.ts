@@ -19,7 +19,10 @@ function renderRun(run: Run): string {
   if (run.underline) out = `<u>${out}</u>`;
   if (run.italic) out = `<em>${out}</em>`;
   if (run.bold) out = `<strong>${out}</strong>`;
-  if (run.fontSize) out = `<span style="font-size:${escapeXml(run.fontSize)}">${out}</span>`;
+  if (run.fontSize)
+    out = `<span style="font-size:${escapeXml(run.fontSize)}">${out}</span>`;
+  if (run.fontFamily)
+    out = `<span style="font-family:${escapeXml(run.fontFamily)}">${out}</span>`;
   if (run.href) out = `<a href="${escapeXml(run.href)}">${out}</a>`;
 
   return out;

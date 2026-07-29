@@ -25,6 +25,7 @@ import { Pagination, type PageGeometry } from "@/lib/editor/pagination";
 import { clickToType } from "@/lib/editor/click-to-type";
 import { keepCaretInView } from "@/lib/editor/caret-scroll";
 import { FontSize } from "@/lib/editor/font-size";
+import { FontFamily } from "@/lib/editor/font-family";
 import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
 import { useDictation } from "@/lib/editor/use-dictation";
@@ -603,6 +604,7 @@ function EditorSurface({
       // Inline font sizing, so a selection can be resized without turning its
       // whole paragraph into a heading.
       FontSize,
+      FontFamily,
       // Per-paragraph alignment (left / centre / right / justify).
       TextAlign,
       // The flush-at-the-margin mark a click-placed line carries, so it begins
