@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import {
   archiveBook,
+  bookChapterCount,
   bookWordCount,
   bookmarks,
   booksIn,
@@ -232,6 +233,40 @@ it("sums word counts across a book's chapters", () => {
     lastOpenedAt: 0,
   };
   expect(bookWordCount(book)).toBe(2012);
+});
+
+it("counts the body chapters, not the matter pages", () => {
+  // The shelf said 16 and the editor said 12 for the same book, because one
+  // counted the front and back matter as chapters and the other did not. They
+  // are named rather than numbered — chapterNumberOf returns null for them —
+  // so the body is the answer, and now there is only one place that decides.
+  const book: Book = {
+    id: "b",
+    title: "T",
+    chapters: [
+      { id: "f", title: "Front matter", words: 40, matter: "front", matterKey: "front" },
+      { id: "1", title: "One", words: 1200 },
+      { id: "2", title: "Two", words: 812 },
+      { id: "k", title: "Back matter", words: 20, matter: "back", matterKey: "back" },
+    ],
+    lastOpenedId: null,
+    lastOpenedAt: 0,
+  };
+
+  expect(bookChapterCount(book)).toBe(2);
+  // Words are the whole book, matter included: those pages are printed.
+  expect(bookWordCount(book)).toBe(2072);
+});
+
+it("counts a book with no chapters at all as none", () => {
+  const book: Book = {
+    id: "b",
+    title: "T",
+    chapters: [],
+    lastOpenedId: null,
+    lastOpenedAt: 0,
+  };
+  expect(bookChapterCount(book)).toBe(0);
 });
 
 it("renames a book without disturbing its chapters", () => {

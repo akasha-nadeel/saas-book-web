@@ -21,10 +21,13 @@ import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
   archiveBook,
+  bookChapterCount,
   bookWordCount,
   booksIn,
+  chapterMatterOf,
   deleteBook,
   migrateLegacy,
+  orderedChapters,
   setBareCover,
   setPref,
   restoreBook,
@@ -183,23 +186,37 @@ export function Bookshelf({
 
   if (!hydrated) return <LoadingScreen />;
 
-  // Where "Continue writing" goes: the last book opened, or the most recent
-  // active one. Never an archived or trashed book.
+  // Where "Continue writing" goes: the last book opened, or failing that the
+  // most recent one. Never an archived or trashed book — the id the shelf
+  // remembers can point at either, or at a book deleted since.
+  //
+  // Sorted before the fallback is taken. It used to be `active[0]`, which is
+  // whichever book happens to sit first in the stored array — insertion order,
+  // not recency — so the one case this is for, a remembered book that is no
+  // longer on the shelf, sent the writer to an arbitrary one.
   const active = booksIn(shelf, "active");
-  const continueId = active.some((b) => b.id === shelf.lastOpenedBookId)
-    ? shelf.lastOpenedBookId
-    : (active[0]?.id ?? null);
+  const byRecent = [...active].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+  const continueBook =
+    byRecent.find((b) => b.id === shelf.lastOpenedBookId) ??
+    byRecent[0] ??
+    null;
+  const continueId = continueBook?.id ?? null;
 
-  // "Continue writing" skips the overview and reopens the last chapter itself —
-  // it is the one action that means "keep writing", so it lands on the page, not
-  // the guide. A book with no chapters falls back to its overview.
-  const continueBook = continueId
-    ? (active.find((b) => b.id === continueId) ?? null)
-    : null;
+  // It skips the overview and reopens the chapter itself — this is the one
+  // action that means "keep writing", so it lands on the page rather than the
+  // guide.
+  //
+  // The fallback walks the book in reading order and takes the first *body*
+  // chapter, not `chapters[0]`: the stored array leads with the front matter
+  // when a book has one, so "continue" was offering to reopen the title page.
+  // A book of nothing but matter pages still opens one, and a book with no
+  // chapters at all falls back to its overview.
+  const ordered = continueBook ? orderedChapters(continueBook) : [];
   const continueChapterId = continueBook
-    ? continueBook.chapters.some((c) => c.id === continueBook.lastOpenedId)
-      ? continueBook.lastOpenedId
-      : (continueBook.chapters[0]?.id ?? null)
+    ? (ordered.find((c) => c.id === continueBook.lastOpenedId)?.id ??
+      ordered.find((c) => chapterMatterOf(c) === "body")?.id ??
+      ordered[0]?.id ??
+      null)
     : null;
   const continueHref = continueChapterId
     ? `/book/${continueId}/chapter/${continueChapterId}`
@@ -802,7 +819,7 @@ function Hero({
   }
 
   const words = bookWordCount(book);
-  const chapters = book.chapters.length;
+  const chapters = bookChapterCount(book);
 
   return (
     <section className="shelf-hero overflow-hidden rounded-3xl px-6 py-7 md:px-10 md:py-9">
@@ -879,7 +896,12 @@ function Hero({
           <dl className="mt-4 grid grid-cols-3 gap-2 text-center">
             <HeroStat label="Chapters" value={chapters.toLocaleString()} />
             <HeroStat label="Words" value={words.toLocaleString()} />
-            <HeroStat label="Edited" value={relativeTimeShort(book.lastOpenedAt)} />
+            {/* Opened, not edited: lastOpenedAt is the only stamp the store
+                keeps, and it moves when a book is merely looked at. */}
+            <HeroStat
+              label="Opened"
+              value={relativeTimeShort(book.lastOpenedAt)}
+            />
           </dl>
 
           <Link

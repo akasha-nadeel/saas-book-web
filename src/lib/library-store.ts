@@ -475,6 +475,22 @@ export function bookWordCount(book: Book): number {
   return book.chapters.reduce((total, c) => total + c.words, 0);
 }
 
+/**
+ * How many chapters a book has — the body alone.
+ *
+ * `chapters.length` counts the front-matter and back-matter pages too, and they
+ * are not chapters: they are named rather than numbered, `chapterNumberOf`
+ * returns null for them, and the editor's panel has always counted this way. A
+ * book showing 16 on the shelf and 12 in the panel is one of them being wrong,
+ * so the answer lives here and both ask it.
+ */
+export function bookChapterCount(book: Book): number {
+  return book.chapters.reduce(
+    (total, c) => (chapterMatterOf(c) === "body" ? total + 1 : total),
+    0,
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 //

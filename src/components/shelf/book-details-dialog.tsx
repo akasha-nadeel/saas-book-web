@@ -3,7 +3,11 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
-import { bookWordCount, type Book } from "@/lib/library-store";
+import {
+  bookChapterCount,
+  bookWordCount,
+  type Book,
+} from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
 import { useCover } from "@/lib/use-library";
 
@@ -32,7 +36,7 @@ export function BookDetailsDialog({
   }, []);
 
   const words = bookWordCount(book);
-  const chapters = book.chapters.length;
+  const chapters = bookChapterCount(book);
 
   return (
     <dialog
