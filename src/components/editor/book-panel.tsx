@@ -554,7 +554,16 @@ export function BookPanel({
               // thing the green border says when you are in the front matter.
               active={bodyOpen || inBody}
               onAction={() => setBodyOpen(toggleBody())}
-              secondary={{ label: "New chapter", onClick: handleCreate }}
+              // Only once the list is open. Shut, the card has one thing to
+              // offer — open me — and a second button beside it halves the
+              // width of that one thing to sit next to a list nobody is looking
+              // at. The new chapter appears in the list it was added to, so the
+              // button belongs where the list is.
+              secondary={
+                bodyOpen
+                  ? { label: "New chapter", onClick: handleCreate }
+                  : undefined
+              }
               grow={bodyOpen}
             >
               {bodyChapters.length > 0 ? (
