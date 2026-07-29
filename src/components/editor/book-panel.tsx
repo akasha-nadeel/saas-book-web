@@ -907,6 +907,14 @@ function MatterCard({
       aria-current={active ? "page" : undefined}
       // `relative` for the shrunk card's cover button, below.
       //
+      // Height is `grow` alone, never `flex-1`. `flex-1` sets a basis of 0%,
+      // and switching a basis between 0% and auto is a discrete change no
+      // transition can smooth — the card jumped to its new size and then eased
+      // the leftovers, which is what made the collapse look broken. With the
+      // basis left at auto, flex-grow 0 is the card's own content height and
+      // flex-grow 1 is that plus the free space, and the number between them is
+      // a real intermediate size.
+      //
       // Two pixels of border on every card, not only the selected one: a border
       // that thickens on selection would move the card's contents by a pixel
       // each time, and three cards nudging as you click between them is the
@@ -925,7 +933,7 @@ function MatterCard({
                           active ? paint.borderActive : paint.border
                         }`
                   }
-                  ${grow ? "min-h-0 flex-1" : "shrink-0 grow-0"}`}
+                  min-h-0 shrink-0 ${listOpen ? "grow" : "grow-0"}`}
     >
       {/* The one row that survives shrinking. It restyles rather than being
           replaced: the title steps down a size and takes the fill's ink, and
@@ -1043,18 +1051,19 @@ function MatterCard({
           its own scrollbar is a usable list; a 2px sliver is not. */}
       {children && (
         <div
-          className={`grid min-h-0 transition-[grid-template-rows,opacity]
+          // `flex-1` here and nowhere else: a basis of 0% is exactly right for
+          // this one, because the list should contribute nothing to the card's
+          // own height and take whatever the card is given beyond it. So the
+          // card shrinking to its content height is the same motion as the list
+          // closing — one animated number, not two racing each other.
+          className={`min-h-0 flex-1 overflow-hidden transition-opacity
                       duration-500 ease-out ${
-                        listOpen
-                          ? "grid-rows-[1fr] flex-1 opacity-100"
-                          : "grid-rows-[0fr] opacity-0"
+                        listOpen ? "opacity-100" : "opacity-0"
                       }`}
         >
-          <div className="min-h-0 overflow-hidden">
-            <ul className="scroll-slim h-full min-h-24 overflow-y-auto px-2 pb-2">
-              {children}
-            </ul>
-          </div>
+          <ul className="scroll-slim h-full overflow-y-auto px-2 pb-2">
+            {children}
+          </ul>
         </div>
       )}
 
@@ -1062,16 +1071,23 @@ function MatterCard({
           press. An overlay rather than making the header a button at both
           sizes: the full card already has its own button, and a second control
           doing the same job is a question the reader has to stop and answer. */}
-      {compact && (
-        <button
-          type="button"
-          onClick={onAction}
-          aria-label={`${label} — ${action}`}
-          className="absolute inset-0 cursor-pointer rounded-xl outline-none
-                     focus-visible:ring-2 focus-visible:ring-white/70
-                     focus-visible:ring-inset"
-        />
-      )}
+      <button
+        type="button"
+        onClick={onAction}
+        aria-label={`${label} — ${action}`}
+        // Mounted at both sizes and switched off with pointer-events rather
+        // than added and removed. Shrinking and growing take half a second, and
+        // a control that appears or vanishes partway through that is a control
+        // a writer can press at the moment it stops existing — which is exactly
+        // the click that seems to do nothing.
+        aria-hidden={!compact}
+        tabIndex={compact ? undefined : -1}
+        className={`absolute inset-0 rounded-xl outline-none
+                    focus-visible:ring-2 focus-visible:ring-white/70
+                    focus-visible:ring-inset ${
+                      compact ? "cursor-pointer" : "pointer-events-none"
+                    }`}
+      />
     </section>
   );
 }
