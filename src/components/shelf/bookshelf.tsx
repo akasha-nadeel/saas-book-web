@@ -18,6 +18,7 @@ import { AccountDialog } from "@/components/auth/account-dialog";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { SoundsDialog } from "@/components/shelf/sounds-dialog";
+import { AudiobookDialog } from "@/components/shelf/audiobook-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import {
@@ -110,7 +111,14 @@ export function Bookshelf({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [dialog, setDialog] = useState<
-    "templates" | "account" | "help" | "support" | "sounds" | "import" | null
+    | "templates"
+    | "account"
+    | "help"
+    | "support"
+    | "sounds"
+    | "import"
+    | "audiobook"
+    | null
   >(null);
   const [view, setView] = useState<BookView>("active");
   // The sidebar is a slide-in drawer below md; this is whether it's open.
@@ -219,10 +227,6 @@ export function Bookshelf({
           setNavOpen(false);
           setDialog("import");
         }}
-        onSounds={() => {
-          setNavOpen(false);
-          setDialog("sounds");
-        }}
         onHelp={() => {
           setNavOpen(false);
           setDialog("help");
@@ -240,6 +244,8 @@ export function Bookshelf({
             onQuery={setQuery}
             onToggleNav={() => setNavOpen((open) => !open)}
             onTemplates={() => setDialog("templates")}
+            onSounds={() => setDialog("sounds")}
+            onAudiobook={() => setDialog("audiobook")}
             email={email}
             onAccount={() => setDialog("account")}
           />
@@ -328,6 +334,9 @@ export function Bookshelf({
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
       {dialog === "sounds" && <SoundsDialog onClose={() => setDialog(null)} />}
+      {dialog === "audiobook" && (
+        <AudiobookDialog onClose={() => setDialog(null)} />
+      )}
       {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
     </div>
   );
@@ -351,7 +360,6 @@ function ShelfSidebar({
   onCloseNav,
   onView,
   onImport,
-  onSounds,
   onHelp,
   onSupport,
 }: {
@@ -361,7 +369,6 @@ function ShelfSidebar({
   onCloseNav: () => void;
   onView: (view: BookView) => void;
   onImport: () => void;
-  onSounds: () => void;
   onHelp: () => void;
   onSupport: () => void;
 }) {
@@ -501,10 +508,6 @@ function ShelfSidebar({
             Help away from the primary nav. */}
         <div className="mt-auto flex flex-col gap-1 pt-6">
           <div aria-hidden="true" className="mb-3 h-px bg-line" />
-          <ToolButton onClick={onSounds}>
-            <MaskIcon src="/icon-sounds.png" className="h-6 w-6" />
-            Sounds
-          </ToolButton>
           <ToolButton onClick={onHelp}>
             <HelpIcon />
             Help
@@ -620,6 +623,8 @@ function ShelfTopBar({
   onQuery,
   onToggleNav,
   onTemplates,
+  onSounds,
+  onAudiobook,
   email,
   onAccount,
 }: {
@@ -627,6 +632,8 @@ function ShelfTopBar({
   onQuery: (value: string) => void;
   onToggleNav: () => void;
   onTemplates: () => void;
+  onSounds: () => void;
+  onAudiobook: () => void;
   email: string | null;
   onAccount: () => void;
 }) {
@@ -693,6 +700,35 @@ function ShelfTopBar({
                    focus-visible:ring-accent/50 md:block"
       >
         Templates
+      </button>
+
+      {/* Moved up from the sidebar's tool group, and set exactly as Templates
+          is: the two sit together in the header and reading as a pair is worth
+          more than marking out what each one does. Folds away on small screens
+          alongside it, where the drawer carries the tools. */}
+      <button
+        type="button"
+        onClick={onSounds}
+        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
+                   font-medium text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/50 md:block"
+      >
+        Sounds
+      </button>
+
+      {/* Set like its neighbours, and real: with no AI_GATEWAY_API_KEY the
+          route answers 501 and the dialog says so, the same way the assistant
+          behaves without its key. */}
+      <button
+        type="button"
+        onClick={onAudiobook}
+        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
+                   font-medium text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/50 md:block"
+      >
+        Audiobook
       </button>
 
       <button

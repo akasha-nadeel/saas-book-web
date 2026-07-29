@@ -10,9 +10,18 @@ should either ship or lose the card.
 - [ ] **Audiobook: text → audio.** Card on `/book/[bookId]/export`. Needs a TTS
       service — a server and a running bill. Decide hosted vs. browser
       `speechSynthesis` (free, robotic, cannot be exported to a file).
-- [ ] **Audiobook: audio → text.** Card on `/book/import`. Needs a speech model;
-      same server/bill question. Transcription then has to be split into
-      chapters, which the existing `src/lib/import/split.ts` can do.
+- [x] **Audiobook: audio → text.** Done. The Audiobook button in the shelf
+      header opens a picker; `/api/transcribe` sends the file to a transcription
+      model through the Vercel AI Gateway, and the transcript then takes the
+      *existing* import path — `parseText` → `splitIntoChapters` →
+      `createBookFromImport` — so it lands as an ordinary book. A spoken
+      "Chapter Four" is just a paragraph to the splitter, which already
+      recognises those lines.
+      *Needs `AI_GATEWAY_API_KEY`;* without it the route answers 501 with a
+      message, as `/api/chat` does. Billed per minute of audio. Capped at 25MB,
+      which is the transcriber's limit rather than ours.
+      *Left:* recordings longer than 25MB have to be split by hand first —
+      chunking on the client and stitching the transcripts would lift that.
 
 ## Export
 
