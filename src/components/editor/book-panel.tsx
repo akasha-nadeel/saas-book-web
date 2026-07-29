@@ -562,7 +562,7 @@ export function BookPanel({
               scrolls inside its own card — the two short cards cannot be pushed
               off the bottom by a forty-chapter book, which is exactly when a
               writer wants to reach them. */}
-          <div className="mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
+          <div className="matter-stack mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
             <MatterCard
               tone="front"
               label="Front matter"
@@ -880,31 +880,38 @@ function MatterCard({
 
   if (compact) {
     return (
-      <h3 className="shrink-0">
-        <button
-          type="button"
-          onClick={onAction}
-          aria-current={active ? "page" : undefined}
-          // Filled rather than outlined, so the strip is still the card it was
-          // — a writer picks these out by colour, and an outline at this height
-          // is barely a line of it. The fill also makes the strip read as one
-          // button, which it now is: there is nothing else on it to press.
-          className={`flex w-full cursor-pointer items-center gap-2.5
+      // A <section> wrapping an <h3>, the same shape as the full card below,
+      // so React reuses this DOM node when the card shrinks rather than
+      // swapping the element type. A swap would remount it, and a remounted
+      // node replays its entrance animation — the two strips would slide in
+      // from the left again every time the chapter list was opened.
+      <section className="shrink-0">
+        <h3>
+          <button
+            type="button"
+            onClick={onAction}
+            aria-current={active ? "page" : undefined}
+            // Filled rather than outlined, so the strip is still the card it was
+            // — a writer picks these out by colour, and an outline at this height
+            // is barely a line of it. The fill also makes the strip read as one
+            // button, which it now is: there is nothing else on it to press.
+            className={`flex w-full cursor-pointer items-center gap-2.5
                       rounded-xl px-3.5 py-2.5 text-left font-serif text-sm
                       font-semibold outline-none transition-colors
                       focus-visible:ring-2 focus-visible:ring-offset-2
                       ${paint.strip}
                       ${active ? `ring-2 ring-inset ${paint.ringInk}` : ""}`}
-        >
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+          >
+            <span className="min-w-0 flex-1 truncate">{label}</span>
 
-          {/* The verb the full card's button carried, kept so the strip still
+            {/* The verb the full card's button carried, kept so the strip still
               says what pressing it does — and whether the page exists yet. */}
-          <span className={`shrink-0 font-sans text-xs ${paint.inkSoft}`}>
-            {action}
-          </span>
-        </button>
-      </h3>
+            <span className={`shrink-0 font-sans text-xs ${paint.inkSoft}`}>
+              {action}
+            </span>
+          </button>
+        </h3>
+      </section>
     );
   }
 

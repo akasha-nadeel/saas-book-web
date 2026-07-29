@@ -113,11 +113,6 @@ interface ChapterSnapshot {
   words: number;
 }
 
-// Remembers the book whose opening splash has already played, so moving from
-// chapter to chapter inside it never shows the loading screen again — only
-// entering a different book does. Module scope, so it survives the surface's
-// remounts between chapters.
-let splashedBookId: string | null = null;
 
 export function ChapterEditor({
   bookId,
@@ -188,27 +183,6 @@ export function ChapterEditor({
   // way *into* a book — the id above is remembered across the surface's remounts
   // between chapters, so flipping chapter to chapter never replays it.
   //
-  // Whether this mount is an opening is decided *here*, once, and held as state.
-  // The effect below must not be the thing that decides, because React mounts
-  // effects twice in development (run, clean up, run again): a guard the effect
-  // sets itself passes on the first run and fails on the second, so the timers
-  // it scheduled are cleared and never replaced — leaving the splash on screen
-  // for good, pulsing, with nothing left to take it down.
-  const [opening] = useState(() => splashedBookId !== bookId);
-  const [splash, setSplash] = useState<"show" | "leaving" | "gone">(
-    opening ? "show" : "gone",
-  );
-  useEffect(() => {
-    if (!opening) return;
-    splashedBookId = bookId;
-    const hold = setTimeout(() => setSplash("leaving"), 1000);
-    const drop = setTimeout(() => setSplash("gone"), 1000 + 350);
-    return () => {
-      clearTimeout(hold);
-      clearTimeout(drop);
-    };
-  }, [opening, bookId]);
-
   const book = findBook(shelf, bookId);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
@@ -423,8 +397,7 @@ export function ChapterEditor({
         <CoverDialog book={book} onClose={() => setEditingCover(false)} />
       )}
 
-      {/* The opening splash, over the editor while it settles, then faded. */}
-      {splash !== "gone" && <LoadingScreen leaving={splash === "leaving"} />}
+
     </div>
   );
 }
@@ -790,7 +763,10 @@ function EditorSurface({
         // Shows the ¶ at the end of every paragraph — see the note in
         // globals.css for why it is drawn at zero width.
         data-marks={prefs.marks ? "" : undefined}
-        className={`manuscript flex min-h-0 flex-1 flex-col ${
+        // page-enter: this element is mounted fresh whenever the writer comes
+        // back from Book View or opens a different chapter, so the entrance
+        // plays exactly when a new page arrives and never on a keystroke.
+        className={`manuscript page-enter flex min-h-0 flex-1 flex-col ${
           prefs.focusMode ? "focus-mode" : ""
         }`}
       >
