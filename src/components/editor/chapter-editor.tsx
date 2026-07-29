@@ -537,6 +537,33 @@ function EditorSurface({
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
 
+  /**
+   * Where the pointer went down, so a click can tell itself apart from a drag.
+   *
+   * Both handlers below place the caret, which *collapses* whatever is
+   * selected — and a browser fires `click` at the end of a drag as well as at
+   * the end of a press. So sweeping a selection that began anywhere but inside
+   * the prose ended with the selection thrown away the instant the button came
+   * up: the writer had to click into a paragraph first and only then drag,
+   * because a drag starting in a margin or on the blank foot of a sheet undid
+   * itself.
+   *
+   * Refreshed on every press rather than cleared on read: a click on the page
+   * bubbles through both handlers, and a getter that consumed the value would
+   * answer honestly the first time and wrongly the second.
+   */
+  const pressAt = useRef<{ x: number; y: number } | null>(null);
+
+  /** Three pixels of travel is a drag, not a click — enough to forgive the
+   *  shake in a press, far less than the smallest deliberate sweep. */
+  const draggedHere = (e: { clientX: number; clientY: number }) => {
+    const start = pressAt.current;
+    if (!start) return false;
+    return (
+      Math.abs(e.clientX - start.x) > 3 || Math.abs(e.clientY - start.y) > 3
+    );
+  };
+
   const page = pageSetupOf(book);
   const metrics = pageMetrics(page);
   const written = bookWordCount(book);
@@ -682,6 +709,7 @@ function EditorSurface({
    */
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!editor || !editor.isEditable) return;
+    if (draggedHere(e)) return;
 
     // The title, the floating toolbars, and the prose itself all handle their
     // own clicks — the browser has already placed the caret inside the text.
@@ -828,6 +856,12 @@ function EditorSurface({
           <main
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
                        bg-transparent px-4 py-8 md:py-10"
+            // Where the press began. Everything below the desk is inside this
+            // element, so one listener here sees the start of every drag on the
+            // page — see draggedHere.
+            onPointerDown={(e) => {
+              pressAt.current = { x: e.clientX, y: e.clientY };
+            }}
             onClick={(e) => {
               // Clicking the text is handled by ProseMirror itself — only a
               // click on the surrounding desk or the blank part of a page needs
@@ -838,6 +872,7 @@ function EditorSurface({
               // since focus()'s default scroll is what jumped the page on click.
               if (
                 !editor ||
+                draggedHere(e) ||
                 (e.target as HTMLElement).closest(".ProseMirror, .tiptap")
               ) {
                 return;
