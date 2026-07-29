@@ -158,6 +158,19 @@ export function useBodyOpen() {
     open,
     toggle: () => setOpen(toggleBody()),
     close: () => setOpen(closeBody()),
+    /**
+     * Remember a new state without re-rendering for it.
+     *
+     * For the two actions that also open a page. Changing a chapter remounts
+     * this panel, so a state change here starts a half-second collapse that the
+     * remount cuts off a few frames in — cards caught mid-move and dropped into
+     * place, which is the stutter a writer sees when they press Open and
+     * Chapters in turn. Written to the memory alone nothing animates at all,
+     * and the next mount renders the shape that was asked for.
+     */
+    remember: (next: boolean) => {
+      bodyOpenMemory = next;
+    },
   };
 }
 
@@ -218,36 +231,55 @@ export function BookPanel({
   const [gapToPage, setGapToPage] = useState(0);
 
   useEffect(() => {
+    if (mode !== "chapters") return;
+
+    let frame = 0;
+    let last = -1;
+
     const measure = () => {
-      const stack = stackRef.current;
+      // The card's own right edge, not the column's: the stack carries a
+      // right padding, and measuring from outside it left every rule short by
+      // exactly that much.
+      const card = stackRef.current?.firstElementChild;
       const page = document.querySelector<HTMLElement>(".pageflow");
-      if (!stack || !page) {
-        setGapToPage(0);
-        return;
+
+      // Three pixels past the paper's left edge, so the rule finishes *under*
+      // the page's border instead of against it. Butted up, a hairline of
+      // background shows between the two and the join looks like a near miss.
+      const next =
+        card && page
+          ? Math.max(
+              0,
+              Math.round(
+                page.getBoundingClientRect().left -
+                  card.getBoundingClientRect().right +
+                  3,
+              ),
+            )
+          : 0;
+
+      if (next !== last) {
+        last = next;
+        setGapToPage(next);
       }
-      const from = stack.getBoundingClientRect().right;
-      const to = page.getBoundingClientRect().left;
-      setGapToPage(Math.max(0, Math.round(to - from)));
+      frame = requestAnimationFrame(measure);
     };
 
-    // After paint rather than during the effect: the manuscript is a sibling,
-    // and on the first commit its page has not been laid out yet.
-    const frame = requestAnimationFrame(measure);
-
-    // The page moves for more reasons than the window changing size — the zoom
-    // control resizes it in place, and the panel has its own breakpoints — so
-    // both ends are watched rather than just the window.
-    const watch = new ResizeObserver(measure);
-    watch.observe(document.body);
-    const page = document.querySelector<HTMLElement>(".pageflow");
-    if (page) watch.observe(page);
-    if (stackRef.current) watch.observe(stackRef.current);
-
-    return () => {
-      cancelAnimationFrame(frame);
-      watch.disconnect();
-    };
-  }, []);
+    // Measured every frame rather than watched.
+    //
+    // A ResizeObserver was the obvious answer and it is the wrong one: it
+    // reports a box changing *size*, and most of what moves this page changes
+    // only its *position*. The zoom control scales the page with CSS `zoom`,
+    // which leaves its CSS box exactly as it was; opening the tool panel slides
+    // the page sideways without resizing it at all. Both left the rules pointing
+    // at where the paper used to be.
+    //
+    // Two getBoundingClientRect calls a frame is nothing, state is set only when
+    // the number actually changes so React almost never re-renders, and the loop
+    // runs only on this face of the panel — Book View has no page to reach.
+    frame = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(frame);
+  }, [mode]);
 
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
@@ -290,14 +322,47 @@ export function BookPanel({
   // body, and leaving it open would land the writer on a page whose card is a
   // strip at the top of a list of somewhere else — three cards at full height
   // is the panel's resting state, and this is a writer coming to rest.
+  /**
+   * Opening the body: the list, and a chapter to go with it.
+   *
+   * Pressing Chapters used to reveal the list and leave the writer looking at
+   * whatever page they were already on — usually the front matter, since that
+   * is what the card above it opens. The panel said body and the page said
+   * title page, which is exactly the disagreement the coloured edge exists to
+   * prevent.
+   *
+   * Only when they are not already in a chapter. A writer on Chapter Five who
+   * opens the list wants the list, not to be sent back to the beginning of the
+   * book — and shutting the list is never a reason to go anywhere.
+   */
+  const openBody = () => {
+    const first = bodyChapters[0];
+    const goingToChapter = !body.open && !inBody && !!first;
+
+    // Remembered rather than set when a chapter is about to open: the remount
+    // that follows would cut the collapse off mid-move. See `remember`.
+    if (goingToChapter) {
+      body.remember(true);
+      open(first.id);
+      return;
+    }
+    body.toggle();
+  };
+
   const openMatter = (matter: "front" | "back") => {
     const existing = matter === "front" ? front : back;
     const id = existing?.id ?? createMatterSection(bookId, matter);
     if (!id) return;
-    // Set even though the navigation remounts this panel: the writer may
-    // already be on that page, in which case the push changes nothing and this
-    // is the only thing that closes the list.
-    body.close();
+
+    // Already on that page? Then nothing is going to remount, and setting the
+    // state is the only thing that shuts the list — with a proper animation,
+    // because it has the time to finish. Otherwise the shape is remembered and
+    // the chapter opened, and the next mount draws it. See `remember`.
+    if (id === chapterId) {
+      body.close();
+      return;
+    }
+    body.remember(false);
     open(id);
   };
 
@@ -671,7 +736,7 @@ export function BookPanel({
               // this border and that edge cannot disagree — which is the only
               // reason "open" is allowed to mean "selected" at all.
               active={body.open || inBody}
-              onAction={body.toggle}
+              onAction={openBody}
               // Only once the list is open. Shut, the card has one thing to
               // offer — open me — and a second button beside it halves the
               // width of that one thing to sit next to a list nobody is looking
@@ -979,6 +1044,14 @@ function MatterCard({
       aria-current={active ? "page" : undefined}
       // `relative` for the shrunk card's cover button, below.
       //
+      // Shrinkable only while its list is open, and that is what stops a long
+      // book running off the bottom of the panel. A flex item's natural size is
+      // its content, and with the list open that content is every chapter row —
+      // so `shrink-0` set a floor at the height of the whole list and the back
+      // matter was pushed off the screen. Allowed to shrink, the card takes what
+      // the panel has and the list scrolls inside it. The other two keep
+      // `shrink-0`: they hold two lines of text, and squeezing those clips them.
+      //
       // Height is `grow` alone, never `flex-1`. `flex-1` sets a basis of 0%,
       // and switching a basis between 0% and auto is a discrete change no
       // transition can smooth — the card jumped to its new size and then eased
@@ -1008,7 +1081,8 @@ function MatterCard({
                           active ? paint.borderActive : paint.border
                         }`
                   }
-                  min-h-0 shrink-0 ${listOpen ? "grow" : "grow-0"}`}
+                  min-h-0
+                  ${listOpen ? "shrink grow" : "shrink-0 grow-0"}`}
     >
       {/* Two rules running out of the selected card towards the page, in that
           part's own colour — the page's edge is already wearing it, and these
@@ -1130,8 +1204,8 @@ function MatterCard({
                 // focus ring on nothing.
                 tabIndex={compact ? -1 : undefined}
                 aria-expanded={children ? listOpen : undefined}
-                className={`flex-1 cursor-pointer rounded-lg py-2 font-sans
-                            text-sm font-semibold outline-none transition-colors
+                className={`flex-1 cursor-pointer rounded-lg py-1.5 font-sans
+                            text-xs font-semibold outline-none transition-colors
                             focus-visible:ring-2 ${paint.button}`}
               >
                 {action}
@@ -1146,7 +1220,7 @@ function MatterCard({
                   // solid blocks side by side fight, and this is the card's
                   // second thing.
                   className={`flex-1 cursor-pointer rounded-lg border-2
-                              bg-transparent py-2 font-sans text-sm
+                              bg-transparent py-1.5 font-sans text-xs
                               font-semibold outline-none transition-colors
                               focus-visible:ring-2 ${paint.outline}`}
                 >
