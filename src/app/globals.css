@@ -50,6 +50,26 @@
      neutral. See .nav-chrome. */
   --color-nav: #123a63;
 
+  /* The three parts a book is bound in, each with its own colour, so the
+     chapter panel is read by hue before it is read by word. They are all
+     button fills, so each needs a hover and the ink that sits on it.
+
+     These are the one place in the palette where the colour *is* the meaning —
+     green front, purple body, black back — so unlike the tokens above, the
+     names say the part rather than the job. There is nothing else they could
+     be renamed to. */
+  --color-matter-front: #15803d;
+  --color-matter-front-strong: #126a33;
+  --color-matter-front-ink: #ffffff;
+
+  --color-matter-body: #6d28d9;
+  --color-matter-body-strong: #5b21b6;
+  --color-matter-body-ink: #ffffff;
+
+  --color-matter-back: #111827;
+  --color-matter-back-strong: #1f2937; /* lightens on hover — it is already ink */
+  --color-matter-back-ink: #ffffff;
+
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
@@ -97,6 +117,21 @@
   /* No blue chrome at night: the nav backdrop is just the page colour, so the
      shelf's header and sidebar read as ordinary dark chrome. */
   --color-nav: var(--color-surface);
+
+  /* Green and purple only need lifting off the darker ground. */
+  --color-matter-front: #16a34a;
+  --color-matter-front-strong: #22c55e;
+
+  --color-matter-body: #7c3aed;
+  --color-matter-body-strong: #8b5cf6;
+
+  /* Black inverts. A near-black button on a near-black page is a hole, so at
+     night the back matter takes the other end of the same idea — the neutral
+     one, furthest from the page — and its ink flips with it. It still reads as
+     the odd one out beside the green and the purple, which is the whole job. */
+  --color-matter-back: #e5eaf0;
+  --color-matter-back-strong: #f2f5f8;
+  --color-matter-back-ink: #10151c;
 }
 
 /* App shell. Layout constants, not part of the design language.

@@ -43,7 +43,45 @@ export type BookPanelMode = "book" | "chapters";
  * Previous / Next Page step to the page either side of the open one — front
  * matter, body, back matter, in the book's own order — so the centre and the
  * cover thumbnail on the tool rail both move with it.
+ *
+ * (The module-scope pieces below belong to the Chapters face; the component
+ * itself follows them.)
  */
+
+/**
+ * The three parts, each in its own colour, so the panel is read by hue before
+ * it is read by word — the writer who has learnt that the purple one holds the
+ * chapters stops reading the headings at all.
+ *
+ * Written out as whole class names rather than built from a part name, because
+ * Tailwind finds its utilities by reading the source: `bg-matter-${part}` is a
+ * string at runtime and an empty stylesheet at build time.
+ *
+ * The border is a wash of the same colour so a card is placeable even when it
+ * is not the one you are in; being *in* it takes the colour to full.
+ */
+const MATTER_TONE = {
+  front: {
+    border: "border-matter-front/30",
+    borderActive: "border-matter-front",
+    button: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
+             focus-visible:ring-matter-front/50`,
+  },
+  body: {
+    border: "border-matter-body/30",
+    borderActive: "border-matter-body",
+    button: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
+             focus-visible:ring-matter-body/50`,
+  },
+  back: {
+    border: "border-matter-back/30",
+    borderActive: "border-matter-back",
+    button: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
+             focus-visible:ring-matter-back/50`,
+  },
+} as const;
+
+type MatterTone = keyof typeof MATTER_TONE;
 
 /**
  * Whether the body list is open, remembered at module scope.
@@ -75,6 +113,7 @@ function revealBody(inBody: boolean): boolean {
   if (inBody) bodyOpenMemory = true;
   return bodyOpenMemory;
 }
+
 export function BookPanel({
   book,
   chapterId,
@@ -465,6 +504,7 @@ export function BookPanel({
               writer wants to reach them. */}
           <div className="mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
             <MatterCard
+              tone="front"
               label="Front matter"
               description="The title page, copyright and dedication — everything that comes before Chapter 1."
               action={front ? "Open" : "Start"}
@@ -473,6 +513,7 @@ export function BookPanel({
             />
 
             <MatterCard
+              tone="body"
               label="Body matter"
               description={
                 bodyOpen
@@ -541,6 +582,7 @@ export function BookPanel({
             </MatterCard>
 
             <MatterCard
+              tone="back"
               label="Back matter"
               description="Acknowledgements, an author's note, an epilogue — whatever closes the book."
               action={back ? "Open" : "Start"}
@@ -659,9 +701,12 @@ function ChapterPill({
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
                     py-2 pr-9 pl-2.5 text-left font-sans text-sm outline-none
                     transition-colors focus-visible:ring-2
-                    focus-visible:ring-accent/50 ${
+                    focus-visible:ring-matter-body/50 ${
                       active
-                        ? "bg-accent font-medium text-white"
+                        ? // The body's own colour, not the app accent: this row
+                          // sits inside the purple card, and a blue fill there
+                          // would read as belonging to something else.
+                          "bg-matter-body font-medium text-matter-body-ink"
                         : "text-fg hover:bg-raised"
                     }`}
       >
@@ -709,6 +754,7 @@ function ChapterPill({
  * which is exactly when a writer wants to reach it.
  */
 function MatterCard({
+  tone,
   label,
   description,
   meta,
@@ -718,6 +764,7 @@ function MatterCard({
   grow = false,
   children,
 }: {
+  tone: MatterTone;
   label: string;
   /** Dropped once the card has been opened: a sentence explaining what body
    *  matter is has done its work the moment the chapters are on screen, and the
@@ -734,11 +781,13 @@ function MatterCard({
   grow?: boolean;
   children?: React.ReactNode;
 }) {
+  const paint = MATTER_TONE[tone];
   return (
     <section
       aria-current={active ? "page" : undefined}
       className={`flex flex-col overflow-hidden rounded-xl border bg-panel/60
-                  transition-colors ${active ? "border-accent" : "border-line"}
+                  transition-colors
+                  ${active ? paint.borderActive : paint.border}
                   ${grow ? "min-h-0 flex-1" : "shrink-0"}`}
     >
       <div className="shrink-0 p-3.5">
@@ -760,10 +809,9 @@ function MatterCard({
           type="button"
           onClick={onAction}
           aria-expanded={children ? !!grow : undefined}
-          className="mt-3 w-full cursor-pointer rounded-lg bg-accent py-2
-                     font-sans text-sm font-semibold text-white outline-none
-                     transition-colors hover:bg-accent-strong
-                     focus-visible:ring-2 focus-visible:ring-accent/50"
+          className={`mt-3 w-full cursor-pointer rounded-lg py-2 font-sans
+                      text-sm font-semibold outline-none transition-colors
+                      focus-visible:ring-2 ${paint.button}`}
         >
           {action}
         </button>
