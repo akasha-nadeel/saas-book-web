@@ -1051,19 +1051,30 @@ function MatterCard({
           its own scrollbar is a usable list; a 2px sliver is not. */}
       {children && (
         <div
-          // `flex-1` here and nowhere else: a basis of 0% is exactly right for
-          // this one, because the list should contribute nothing to the card's
-          // own height and take whatever the card is given beyond it. So the
-          // card shrinking to its content height is the same motion as the list
-          // closing — one animated number, not two racing each other.
-          className={`min-h-0 flex-1 overflow-hidden transition-opacity
+          // Two things, and both are needed.
+          //
+          // `flex-1` is what fills the card once it is open — a basis of 0% so
+          // the list takes whatever the card is given beyond its own content
+          // and nothing before that.
+          //
+          // The 1fr → 0fr row is what makes "nothing before that" true. A
+          // flex item with a basis of 0% still contributes its *content* to the
+          // container's intrinsic height, so with the row left at 1fr the shut
+          // list was silently making the card as tall as the chapters it was
+          // hiding — which is what pushed the back matter off the panel. At 0fr
+          // the row is genuinely zero and the card is its own content again.
+          className={`grid min-h-0 flex-1 transition-[grid-template-rows,opacity]
                       duration-500 ease-out ${
-                        listOpen ? "opacity-100" : "opacity-0"
+                        listOpen
+                          ? "grid-rows-[1fr] opacity-100"
+                          : "grid-rows-[0fr] opacity-0"
                       }`}
         >
-          <ul className="scroll-slim h-full overflow-y-auto px-2 pb-2">
-            {children}
-          </ul>
+          <div className="min-h-0 overflow-hidden">
+            <ul className="scroll-slim h-full overflow-y-auto px-2 pb-2">
+              {children}
+            </ul>
+          </div>
         </div>
       )}
 
