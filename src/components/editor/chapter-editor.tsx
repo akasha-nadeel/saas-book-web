@@ -28,7 +28,7 @@ import { FontSize } from "@/lib/editor/font-size";
 import { FontFamily } from "@/lib/editor/font-family";
 import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
-import { useDictation } from "@/lib/editor/use-dictation";
+import { useDictation, type Dictation } from "@/lib/editor/use-dictation";
 import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import {
@@ -360,6 +360,7 @@ export function ChapterEditor({
               onZoom={setZoom}
               matter={selectedPart}
               entering={entering}
+              dictation={dictation}
               onEditorReady={setEditor}
             />
           )}
@@ -511,6 +512,7 @@ function EditorSurface({
   onZoom,
   matter,
   entering,
+  dictation,
   onEditorReady,
 }: {
   bookId: string;
@@ -533,6 +535,8 @@ function EditorSurface({
   /** Play the page's entrance. Set only when the panel's face changes, never
    *  on the remount that opening a different chapter causes. */
   entering: boolean;
+  /** The one dictation session, for the button at the foot of the page. */
+  dictation: Dictation;
   onEditorReady: (editor: Editor) => void;
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
@@ -1087,6 +1091,70 @@ function EditorSurface({
               </div>
             </div>
           </main>
+
+          {/* Dictation, where a hand already is.
+              There are two other ways to start it — the tool rail and the
+              chapter panel — and both are chrome at the edge of the screen, so
+              a writer mid-sentence has to leave the page to reach one. This one
+              sits over the desk beside the paper, in the corner a thumb falls
+              to, and it is the same session as the other two: start it here and
+              all three light up.
+
+              Hidden outright where the browser has no speech engine. On Safari
+              and Firefox it could never work, and a permanently dead button in
+              the corner of every page is worse than none. */}
+          {dictation.supported && (
+            <button
+              type="button"
+              onClick={() =>
+                dictation.listening ? dictation.stop() : dictation.start()
+              }
+              aria-pressed={dictation.listening}
+              aria-label={
+                dictation.listening
+                  ? "Stop dictating"
+                  : "Dictate — speak and the words are typed"
+              }
+              title={
+                dictation.listening
+                  ? "Stop dictating"
+                  : "Dictate — speak and the words are typed"
+              }
+              className={`absolute right-5 bottom-5 z-20 flex h-13 w-13
+                          cursor-pointer items-center justify-center
+                          rounded-full text-white shadow-lg outline-none
+                          transition-colors focus-visible:ring-2
+                          focus-visible:ring-offset-2 ${
+                            dictation.listening
+                              ? "bg-danger focus-visible:ring-danger/60"
+                              : "bg-accent hover:bg-accent-strong focus-visible:ring-accent/60"
+                          }`}
+            >
+              {/* The ring keeps pulsing while the microphone is live. This is a
+                  control a writer switches on and then stops looking at, so the
+                  state has to carry from the corner of the eye. */}
+              {dictation.listening && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-0 animate-ping rounded-full bg-danger/40"
+                />
+              )}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="relative h-5 w-5"
+              >
+                <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
+                <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
+                <path d="M10 15v2.4" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </>
