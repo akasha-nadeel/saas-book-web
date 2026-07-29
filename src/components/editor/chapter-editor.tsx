@@ -29,6 +29,7 @@ import {
   useBodyOpen,
   type BookPanelMode,
 } from "@/components/editor/book-panel";
+import { BookGuide } from "@/components/editor/book-guide";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
@@ -151,8 +152,9 @@ export function ChapterEditor({
    */
   const dictation = useDictation((text) => {
     // A phrase can arrive after the surface has gone — the writer navigating
-    // away while still speaking. There is nowhere to put it, so it is dropped.
-    if (!editor) return;
+    // away, or switching to Book View, while still speaking. There is nowhere
+    // to put it, so it is dropped rather than pushed into a dead instance.
+    if (!editor || editor.isDestroyed) return;
 
     const at = editor.state.selection.from;
     const before = editor.state.doc.textBetween(Math.max(0, at - 1), at, " ");
@@ -166,9 +168,7 @@ export function ChapterEditor({
   // The left panel here is tools only — the book panel beside the manuscript is
   // the chapter list, so offering a second one was the same list twice. With no
   // chapter list to land on, the panel starts closed and a rail tab opens it;
-  // "search" is only the seed, never seen until a tab is picked. Local state
-  // rather than the stored leftPanel flag, which still governs the overview,
-  // where the panel *is* the chapter list and belongs open.
+  // "search" is only the seed, never seen until a tab is picked.
   const [tab, setTab] = useState<PanelTab>("search");
   const [panelOpen, setPanelOpen] = useState(false);
   // Which face the right book panel shows — the cover-and-steppers Book View, or
@@ -225,6 +225,14 @@ export function ChapterEditor({
   // same rule as the rest, applied to a panel that has nothing selected.
   const selectedPart =
     panelMode === "book" ? "book" : body.open ? "body" : chapterPart;
+
+  // Book View shows the overview instead of the manuscript, so the surface is
+  // unmounted and the instance in state is a destroyed one. Everything that
+  // acts on the editor reads this rather than the raw state: the formatting
+  // rail, the assistant and dictation all go quiet, which is the truth — there
+  // is no page for them to act on. Derived rather than cleared in an effect, so
+  // it can never be a render behind.
+  const liveEditor = panelMode === "book" ? null : editor;
 
   // ⌘K / Ctrl+K opens search in the panel, wherever the caret is.
   useEffect(() => {
@@ -284,7 +292,7 @@ export function ChapterEditor({
             bookId={bookId}
             chapterId={chapterId}
             chapterTitle={chapter.title}
-            getChapterText={() => editor?.getText() ?? ""}
+            getChapterText={() => liveEditor?.getText() ?? ""}
             onClose={() => setPanelOpen(false)}
           />
         )}
@@ -302,27 +310,40 @@ export function ChapterEditor({
         />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Keyed on the id and a cross-tab reload counter — not the stored
-              text — so a save from another tab reloads the surface, while this
-              tab's own autosaves never remount it mid-keystroke. */}
-          <EditorSurface
-            key={`${chapterId}:${reload}`}
-            bookId={bookId}
-            chapterId={chapterId}
-            chapterTitle={chapter.title}
-            chapterNumber={chapterNumberOf(book, chapterId)}
-            // Front and back matter are designed on the page — a title page, a
-            // dedication, an epigraph. Only they get click-and-type; a body
-            // chapter flows. See handleSheetDoubleClick.
-            placeable={chapterMatterOf(chapter) !== "body"}
-            book={book}
-            initialContent={initialContent}
-            prefs={prefs}
-            zoom={zoom}
-            onZoom={setZoom}
-            matter={selectedPart}
-            onEditorReady={setEditor}
-          />
+          {/* Book View selects no part of the book, so there is no page to
+              show; the overview stands in its place. The panel and the middle
+              of the window are one statement — the book as an object, or a page
+              of it — rather than a panel that can describe one thing while the
+              page shows another.
+
+              The surface is unmounted rather than hidden. Its autosave flushes
+              on dispose, so nothing typed is lost, and a hidden manuscript is a
+              manuscript whose pagination measures a zero-height column. */}
+          {panelMode === "book" ? (
+            <BookGuide title={book.title} />
+          ) : (
+            /* Keyed on the id and a cross-tab reload counter — not the stored
+               text — so a save from another tab reloads the surface, while this
+               tab's own autosaves never remount it mid-keystroke. */
+            <EditorSurface
+              key={`${chapterId}:${reload}`}
+              bookId={bookId}
+              chapterId={chapterId}
+              chapterTitle={chapter.title}
+              chapterNumber={chapterNumberOf(book, chapterId)}
+              // Front and back matter are designed on the page — a title page, a
+              // dedication, an epigraph. Only they get click-and-type; a body
+              // chapter flows. See handleSheetDoubleClick.
+              placeable={chapterMatterOf(chapter) !== "body"}
+              book={book}
+              initialContent={initialContent}
+              prefs={prefs}
+              zoom={zoom}
+              onZoom={setZoom}
+              matter={selectedPart}
+              onEditorReady={setEditor}
+            />
+          )}
         </div>
 
         <Rail
@@ -366,7 +387,7 @@ export function ChapterEditor({
           <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
 
           <ToolRail
-            editor={editor}
+            editor={liveEditor}
             book={book}
             paper={prefs.paper}
             dictation={dictation}
