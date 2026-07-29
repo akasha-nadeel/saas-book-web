@@ -160,6 +160,7 @@ export function BookPanel({
   onMode,
   dictation,
   body,
+  always = false,
 }: {
   book: Book;
   chapterId: string | null;
@@ -171,10 +172,15 @@ export function BookPanel({
   /**
    * The editor's live dictation, started upstream. Shared with the tool rail's
    * microphone so the two controls are two views of one session, not two.
+   *
+   * Absent on the book overview, which has no manuscript: the microphone hides
+   * rather than appearing with nowhere to put the words.
    */
-  dictation: Dictation;
+  dictation?: Dictation;
   /** The chapter list’s open state, owned by the editor — see useBodyOpen. */
   body: BodyOpen;
+  /** Show at every width. Set by the overview, where this is the only way in. */
+  always?: boolean;
 }) {
   const router = useRouter();
   const bookId = book.id;
@@ -191,7 +197,7 @@ export function BookPanel({
 
   // Named once because it is both the tooltip and the accessible name, and a
   // toggle whose two labels disagree is a toggle screen readers misreport.
-  const dictationLabel = dictation.listening
+  const dictationLabel = dictation?.listening
     ? "Stop dictating"
     : "Dictate — speak and the words are typed";
 
@@ -275,9 +281,16 @@ export function BookPanel({
       // Widens with the window rather than taking one fixed number. 18rem was
       // set for the cover, which is the narrower of the two things this panel
       // shows; the chapter list wants room for a title, its number and its word
-      // count without the title truncating. It only appears at lg and up, so
-      // the manuscript keeps its measure on a laptop and gains from a monitor.
-      className="hidden w-80 shrink-0 flex-col lg:flex xl:w-[22rem] 2xl:w-96"
+      // count without the title truncating.
+      //
+      // Beside a manuscript it appears only at lg and up, so the page keeps its
+      // measure on a laptop and gains from a monitor. On the overview there is
+      // no manuscript to protect and this panel is the only way into the book,
+      // so it is always shown — hiding it there would leave that screen a guide
+      // with no navigation at all.
+      className={`w-80 shrink-0 flex-col xl:w-[22rem] 2xl:w-96 ${
+        always ? "flex" : "hidden lg:flex"
+      }`}
     >
       {mode === "book" ? (
         /* Three bands, in the order a writer reads them: the page, what the
@@ -423,7 +436,7 @@ export function BookPanel({
                 control that is permanently dead is worse than one that was
                 never offered. It keeps the import button's exact footprint so
                 turning the microphone on cannot shift the row. */}
-            {dictation.supported && (
+            {dictation?.supported && (
               <button
                 type="button"
                 aria-pressed={dictation.listening}
@@ -501,7 +514,7 @@ export function BookPanel({
               the chapter list rather than at the page they are dictating into.
               A refused microphone reports itself here too; nothing else would
               tell the writer why speaking is doing nothing. */}
-          {dictation.supported && (dictation.listening || dictation.error) && (
+          {dictation?.supported && (dictation.listening || dictation.error) && (
             <p
               className={`mt-2 font-sans text-xs ${
                 dictation.error ? "text-danger" : "text-muted"

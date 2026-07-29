@@ -4,24 +4,41 @@ import { useState } from "react";
 import Link from "next/link";
 import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
+import {
+  BookPanel,
+  useBodyOpen,
+  type BookPanelMode,
+} from "@/components/editor/book-panel";
 import { BookGuide } from "@/components/editor/book-guide";
 import { LoadingScreen } from "@/components/loading-screen";
 import { findBook, setPref } from "@/lib/library-store";
-import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
+import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 
 /**
  * A book with no chapter open.
  *
- * Opening a book used to jump straight into a chapter; now it lands here, on the
- * book's own overview. The chapter panel is on the left to choose where to
- * write, and the workspace shows a short guide rather than a chapter — there is
- * no manuscript to show until one is picked.
+ * Opening a book lands here rather than jumping into a chapter. It is the editor
+ * with the manuscript taken out: the same rail, the same tool panel, and the
+ * same book panel on the right — three cards for the parts of the book, and the
+ * chapter list inside the middle one. Where the page would be there is a short
+ * guide instead, because there is no page until a chapter is picked.
+ *
+ * It used to carry its own chapter list on the left, from before the book panel
+ * existed. Two navigators for one book meant two things to keep in step and two
+ * different answers to "where are my chapters", so the older one is gone and
+ * this screen and the editor navigate the same way.
  */
 export function BookOverview({ bookId }: { bookId: string }) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const prefs = usePrefs();
-  const [tab, setTab] = useState<PanelTab>("chapters");
+  const cover = useCover(bookId);
+  const body = useBodyOpen();
+
+  // The tool panel, as in the editor: closed until a rail tab is picked, and
+  // "search" only as a seed — it is never seen before a tab chooses it.
+  const [tab, setTab] = useState<PanelTab>("search");
+  const [panelOpen, setPanelOpen] = useState(false);
 
   // Nothing to render until storage has been read — see useHydrated.
   if (!hydrated) return <LoadingScreen />;
@@ -42,26 +59,46 @@ export function BookOverview({ bookId }: { bookId: string }) {
       <WorkspaceRail
         bookId={bookId}
         tab={tab}
-        onSelectTab={setTab}
-        leftPanel={prefs.leftPanel}
-        onPanel={(open) => setPref("leftPanel", open)}
+        onSelectTab={(next) => {
+          setTab(next);
+          setPanelOpen(true);
+        }}
+        leftPanel={panelOpen}
+        onPanel={setPanelOpen}
+        // The book panel already carries the chapter list, so the rail offering
+        // a second one would be the same list twice — the editor's reasoning,
+        // now that this screen has the same panel.
+        chapters={false}
         theme={prefs.theme}
       />
 
-      {prefs.leftPanel && (
+      {panelOpen && (
         <LeftPanel
           tab={tab}
           bookId={bookId}
           chapterId={anchor?.id ?? ""}
           chapterTitle={anchor?.title ?? ""}
           getChapterText={() => ""}
-          onClose={() => setPref("leftPanel", false)}
+          onClose={() => setPanelOpen(false)}
         />
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         <BookGuide title={book.title} />
       </div>
+
+      {/* No chapter is open, so nothing is selected and no microphone is
+          offered — there is no manuscript here to dictate into. */}
+      <BookPanel
+        book={book}
+        chapterId={null}
+        cover={cover}
+        paper={prefs.paper}
+        mode={prefs.bookPanel}
+        onMode={(mode: BookPanelMode) => setPref("bookPanel", mode)}
+        body={body}
+        always
+      />
     </div>
   );
 }

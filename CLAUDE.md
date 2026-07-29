@@ -99,20 +99,33 @@ can't be read falls back to moving whole, which is how this worked before. Inlin
 (`resizable-image.ts` + `image-node-view.tsx`) that stores width as a percentage
 of the column; `src/lib/image-import.ts` handles paste/drop, capped at 900KB.
 
-**The editor shell is a rail plus one panel.** `workspace-rail.tsx` selects which
-panel (`PanelTab` in `left-panel.tsx`: chapters, search, notes, bookmarks,
-assistant, trash) is open, and clicking the active tab closes it — one control,
-never two. Both the chapter editor and the book overview mount the same rail, so
-a change to the tabs lands on both screens at once. They differ in one thing: the
-editor passes `chapters={false}` and keeps its panel closed until a tab is picked,
-because the book panel beside the manuscript is already the chapter list, whereas
-the overview has no book panel and its chapter tab is the only way to pick one.
-Panel visibility follows from that — the overview uses the stored `leftPanel`
-pref, the editor its own state. The panes live in
-the *pages* rather than in `book/[bookId]/layout.tsx`, because the left panel
-needs the chapter id and the assistant needs the editor instance, neither of
-which a layout can see. The import banner is the exception and does live in that
-layout — it has to survive the writer clicking chapter to chapter.
+**The editor shell is a rail, a tool panel, and the book panel.**
+`workspace-rail.tsx` selects which tool panel (`PanelTab` in `left-panel.tsx`:
+chapters, search, notes, bookmarks, assistant, trash) is open, and clicking the
+active tab closes it — one control, never two. The chapter editor and the book
+overview now mount the *same three*, so a change lands on both screens at once:
+both pass `chapters={false}` and keep the tool panel closed until a tab is
+picked, because `book-panel.tsx` on the right is already the chapter list. The
+overview used to carry its own list on the left instead; two navigators for one
+book meant two things to keep in step, so the older one is gone. The overview
+differs only in having no manuscript — it shows `book-guide.tsx` where the page
+would be, and passes no `dictation`, so the panel's microphone hides rather than
+appearing with nowhere to put the words.
+
+`book-panel.tsx` is the navigator proper: the book's three parts as cards
+(front/body/back), each in its own colour, the chapter list inside the body one.
+Its face is the stored `bookPanel` pref rather than component state, so a reload
+does not put the writer back on the cover; the list's own open/shut lives in
+`useBodyOpen`, exported from that file and called by the *screen* rather than the
+panel, because the manuscript needs the same answer — the page sheet's edge takes
+the colour of whichever part the panel has selected (`data-matter`, and the
+`--paper-edge-*` tokens in `globals.css`), and pressing Chapters selects the body.
+Two copies of that state would be two answers to one question.
+
+The panes live in the *pages* rather than in `book/[bookId]/layout.tsx`, because
+the left panel needs the chapter id and the assistant needs the editor instance,
+neither of which a layout can see. The import banner is the exception and does
+live in that layout — it has to survive the writer clicking chapter to chapter.
 
 **The reading view** (`/book/[bookId]/read`, `src/components/reader/`) sets the
 whole book on real page sheets at the book's trim size. Prose is not re-laid out:

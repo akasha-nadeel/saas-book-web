@@ -50,7 +50,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "Book overview",
-        desc: "Opening a book lands on its overview — the chapter panel on the left and a short guide to how the book is put together — rather than a chapter. Pick a chapter to write, or use “Continue writing” on the shelf to jump straight back to where you left off.",
+        desc: "Opening a book lands on its overview — the book panel on the right and a short guide to how the book is put together — rather than a chapter. Pick a chapter to write, or use “Continue writing” on the shelf to jump straight back to where you left off.",
       },
       {
         name: "Chapters",
@@ -70,11 +70,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Front & back matter",
-        desc: "Two buttons bracket the body in the chapters panel. Front matter opens a page templated with a book’s opening sections (half-title, title page, copyright, dedication, epigraph, contents, preface, prologue); Back matter opens one with its closing sections (epilogue, acknowledgements, about the author, about the book, other books). Write under the sections you want, delete the rest. These pages are named, never numbered.",
+        desc: "The book panel holds a card for each of a book’s three parts, in the order they are bound, each in its own colour — and the page you write on takes the colour of the part it belongs to. Front matter opens a page templated with a book’s opening sections (half-title, title page, copyright, dedication, epigraph, contents, preface, prologue); Back matter opens one with its closing sections (epilogue, acknowledgements, about the author, about the book, other books). Write under the sections you want, delete the rest. These pages are named, never numbered.",
       },
       {
         name: "Import into a book",
-        desc: "Use “Import a file” in the chapters panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after.",
+        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after.",
       },
       {
         name: "Autosave",
