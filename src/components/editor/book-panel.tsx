@@ -36,7 +36,7 @@ export type BookPanelMode = "book" | "chapters";
  * - **Book View** — the cover, large, with the two page steppers and the way in
  *   to the chapter list. The book as an object.
  * - **Chapters** — the cover small beside its figures, the make-and-import
- *   controls, then front matter, every chapter as a pill, and back matter — a
+ *   controls, then the book's three parts as boxes that open and shut — a
  *   table of contents you scroll and click. The book as its parts.
  *
  * The mode changes only this panel; the manuscript in the centre is untouched.
@@ -44,6 +44,46 @@ export type BookPanelMode = "book" | "chapters";
  * matter, body, back matter, in the book's own order — so the centre and the
  * cover thumbnail on the tool rail both move with it.
  */
+
+/** The three parts a book is bound in, in the order they are bound. */
+type BookPart = "front" | "body" | "back";
+
+/**
+ * Which parts are open, remembered at module scope.
+ *
+ * The panel is remounted every time the writer opens a different chapter, so
+ * component state would put every box back to its default on each click —
+ * clicking through a book would keep re-opening the front matter a writer had
+ * just shut. Same reason the panel's face is held this way in the editor.
+ *
+ * All three start open: the boxes are there to give the list shape, not to hide
+ * it, and a writer who has never touched them should see their whole book.
+ */
+let openPartsMemory: Record<BookPart, boolean> = {
+  front: true,
+  body: true,
+  back: true,
+};
+
+/**
+ * Opens the part holding the chapter being edited, and returns the new state.
+ *
+ * A writer can land inside a part they had shut — from search, from the left
+ * panel's list, from a pasted URL — and the panel must not then be hiding the
+ * one chapter they are in. Opening it is a change to the remembered state, not
+ * an override of it: shutting the part again afterwards sticks.
+ */
+function revealPart(part: BookPart | null): Record<BookPart, boolean> {
+  if (part && !openPartsMemory[part]) {
+    openPartsMemory = { ...openPartsMemory, [part]: true };
+  }
+  return openPartsMemory;
+}
+
+function togglePart(part: BookPart): Record<BookPart, boolean> {
+  openPartsMemory = { ...openPartsMemory, [part]: !openPartsMemory[part] };
+  return openPartsMemory;
+}
 export function BookPanel({
   book,
   chapterId,
@@ -69,6 +109,28 @@ export function BookPanel({
   const router = useRouter();
   const bookId = book.id;
 
+  const chapters = book.chapters;
+  const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
+  const front = chapters.find((c) => c.matterKey === "front") ?? null;
+  const back = chapters.find((c) => c.matterKey === "back") ?? null;
+
+  // Which of the three parts the open chapter belongs to. Body is the default
+  // because that is what a chapter without a matter key is.
+  const activePart: BookPart | null = !chapterId
+    ? null
+    : front?.id === chapterId
+      ? "front"
+      : back?.id === chapterId
+        ? "back"
+        : "body";
+
+  // Seeded from the remembered state, with the part holding the open chapter
+  // forced open — see revealPart. Because the panel is remounted on every
+  // chapter change, this seeding runs exactly when the question arises, which
+  // is why it needs no effect.
+  const [openParts, setOpenParts] = useState(() => revealPart(activePart));
+  const toggleParts = (part: BookPart) => setOpenParts(togglePart(part));
+
   // Named once because it is both the tooltip and the accessible name, and a
   // toggle whose two labels disagree is a toggle screen readers misreport.
   const dictationLabel = dictation.listening
@@ -88,11 +150,6 @@ export function BookPanel({
   const [pageCount, setPageCount] = useState(1);
   const prevPage = () => setPreviewIndex((i) => Math.max(0, i - 1));
   const nextPage = () => setPreviewIndex((i) => Math.min(pageCount, i + 1));
-
-  const chapters = book.chapters;
-  const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
-  const front = chapters.find((c) => c.matterKey === "front") ?? null;
-  const back = chapters.find((c) => c.matterKey === "back") ?? null;
 
   const open = (id: string) => router.push(`/book/${bookId}/chapter/${id}`);
 
@@ -408,83 +465,121 @@ export function BookPanel({
             </p>
           )}
 
-          {/* Front matter opens the book, the body is the story, back matter
-              closes it. The list scrolls so a long book stays in reach. */}
-          {/* justify-evenly, but only while everything fits.
-              The list already owned the full height; the rows simply did not
-              fill it, which left a short book sitting in the top half of a tall
-              panel. Spreading them uses the height a writer actually has.
+          {/* The book's three parts, each its own box that opens and shuts.
+              Front matter opens the book, the body is the story, back matter
+              closes it — the order they are bound in.
 
-              It has to stop once the book outgrows the panel: spacing a
-              scrolling list evenly would push rows apart *and* off the bottom.
-              min-h-0 with overflow-y-auto means the flex box never grows past
-              its track, so past that point the even spacing collapses on its
-              own and it goes back to being a scrolling list. */}
-          <ul className="scroll-slim mt-4 flex min-h-0 flex-1 flex-col justify-evenly gap-0.5 overflow-y-auto pr-1">
-            <MatterPill
+              Boxes rather than a flat list because the list had no shape: nine
+              chapters ran between two markers with nothing saying where the
+              story started and stopped. A box per part says it without a word.
+
+              Front and back keep their natural height and the body takes what
+              is left, so the story fills the panel and scrolls inside its own
+              box — the two short sections cannot be pushed off the bottom by a
+              forty-chapter book, which is exactly when they matter most. */}
+          <div className="mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
+            <MatterSection
               label="Front matter"
-              exists={!!front}
-              active={front?.id === chapterId}
-              onClick={() => openMatter("front")}
-            />
-
-            {bodyChapters.length > 0 ? (
-              bodyChapters.map((c) => (
+              count={front ? 1 : 0}
+              open={openParts.front}
+              onToggle={() => toggleParts("front")}
+            >
+              {front ? (
                 <ChapterPill
-                  key={c.id}
-                  number={chapterNumberOf(book, c.id)}
-                  title={c.title}
-                  active={c.id === chapterId}
-                  onClick={() => open(c.id)}
-                  menu={[
-                    {
-                      label: c.bookmarked ? "Unstar" : "Star",
-                      icon: c.bookmarked ? menuIcons.starFilled : menuIcons.star,
-                      onSelect: () => toggleBookmark(bookId, c.id),
-                    },
-                    {
-                      label: "Rename",
-                      icon: menuIcons.rename,
-                      onSelect: () => {
-                        // A prompt rather than the sidebar's edit-in-place: the
-                        // same three actions, without a second copy of the
-                        // rename state to keep in step with it.
-                        const next = window.prompt("Chapter title", c.title);
-                        if (next === null) return;
-                        const trimmed = next.trim();
-                        if (trimmed) renameChapter(bookId, c.id, trimmed);
-                      },
-                    },
-                    {
-                      label: "Delete",
-                      icon: menuIcons.trash,
-                      danger: true,
-                      onSelect: () => {
-                        if (
-                          window.confirm(
-                            `Move “${c.title}” to this book's trash? You can restore it from there.`,
-                          )
-                        ) {
-                          deleteChapter(bookId, c.id);
-                        }
-                      },
-                    },
-                  ]}
+                  number={null}
+                  title={front.title}
+                  active={front.id === chapterId}
+                  onClick={() => open(front.id)}
                 />
-              ))
-            ) : (
-              <li className="px-1 py-2 font-sans text-xs text-muted italic">
-                No chapters yet.
-              </li>
-            )}
+              ) : (
+                <StartPart
+                  label="Start the front matter"
+                  onClick={() => openMatter("front")}
+                />
+              )}
+            </MatterSection>
 
-            <MatterPill
+            <MatterSection
+              label="Body matter"
+              count={bodyChapters.length}
+              open={openParts.body}
+              onToggle={() => toggleParts("body")}
+              grow
+            >
+              {bodyChapters.length > 0 ? (
+                bodyChapters.map((c) => (
+                  <ChapterPill
+                    key={c.id}
+                    number={chapterNumberOf(book, c.id)}
+                    title={c.title}
+                    active={c.id === chapterId}
+                    onClick={() => open(c.id)}
+                    menu={[
+                      {
+                        label: c.bookmarked ? "Unstar" : "Star",
+                        icon: c.bookmarked
+                          ? menuIcons.starFilled
+                          : menuIcons.star,
+                        onSelect: () => toggleBookmark(bookId, c.id),
+                      },
+                      {
+                        label: "Rename",
+                        icon: menuIcons.rename,
+                        onSelect: () => {
+                          // A prompt rather than the sidebar's edit-in-place:
+                          // the same three actions, without a second copy of
+                          // the rename state to keep in step with it.
+                          const next = window.prompt("Chapter title", c.title);
+                          if (next === null) return;
+                          const trimmed = next.trim();
+                          if (trimmed) renameChapter(bookId, c.id, trimmed);
+                        },
+                      },
+                      {
+                        label: "Delete",
+                        icon: menuIcons.trash,
+                        danger: true,
+                        onSelect: () => {
+                          if (
+                            window.confirm(
+                              `Move “${c.title}” to this book's trash? You can restore it from there.`,
+                            )
+                          ) {
+                            deleteChapter(bookId, c.id);
+                          }
+                        },
+                      },
+                    ]}
+                  />
+                ))
+              ) : (
+                <li className="px-1 py-2 font-sans text-xs text-muted italic">
+                  No chapters yet.
+                </li>
+              )}
+            </MatterSection>
+
+            <MatterSection
               label="Back matter"
-              exists={!!back}
-              active={back?.id === chapterId}
-              onClick={() => openMatter("back")}
-            />
-          </ul>
+              count={back ? 1 : 0}
+              open={openParts.back}
+              onToggle={() => toggleParts("back")}
+            >
+              {back ? (
+                <ChapterPill
+                  number={null}
+                  title={back.title}
+                  active={back.id === chapterId}
+                  onClick={() => open(back.id)}
+                />
+              ) : (
+                <StartPart
+                  label="Start the back matter"
+                  onClick={() => openMatter("back")}
+                />
+              )}
+            </MatterSection>
+          </div>
         </div>
       )}
 
@@ -582,7 +677,12 @@ function ChapterPill({
   title: string;
   active: boolean;
   onClick: () => void;
-  menu: RowMenuItem[];
+  /**
+   * Omitted by the matter pages, which have no ⋯: renaming or deleting the
+   * front matter is not the same act as renaming a chapter, and offering the
+   * chapter menu on them would promise three things that do not belong there.
+   */
+  menu?: RowMenuItem[];
 }) {
   return (
     /* `group` and `relative` for the ⋯: it is laid over the row's right end
@@ -594,9 +694,9 @@ function ChapterPill({
         onClick={onClick}
         aria-current={active ? "page" : undefined}
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
-                    py-2 pr-9 pl-2.5 text-left font-sans text-sm outline-none
+                    py-2 pl-2.5 text-left font-sans text-sm outline-none
                     transition-colors focus-visible:ring-2
-                    focus-visible:ring-accent/50 ${
+                    focus-visible:ring-accent/50 ${menu ? "pr-9" : "pr-2.5"} ${
                       active
                         ? "bg-accent font-medium text-white"
                         : "text-fg hover:bg-raised"
@@ -615,49 +715,110 @@ function ChapterPill({
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
 
-      <span className="absolute top-1/2 right-1 -translate-y-1/2">
-        {/* `active` keeps the trigger shown on the open chapter: its actions
-            should be one click away rather than one hover, and it is the row a
-            touch user cannot hover to find at all. */}
-        <RowMenu label={title} items={menu} active={active} />
-      </span>
+      {menu && (
+        <span className="absolute top-1/2 right-1 -translate-y-1/2">
+          {/* `active` keeps the trigger shown on the open chapter: its actions
+              should be one click away rather than one hover, and it is the row
+              a touch user cannot hover to find at all. */}
+          <RowMenu label={title} items={menu} active={active} />
+        </span>
+      )}
     </li>
   );
 }
 
-/** Front or back matter as a bracketing pill — a section marker, not numbered;
- *  muted until it has been started. */
-function MatterPill({
+/**
+ * One part of the book as a box you can shut.
+ *
+ * A card rather than a heading with rows under it, because the whole point is
+ * to show where one part of the book ends and the next begins — an outline
+ * around the pages does that at a glance, where a heading only labels the row
+ * it sits on and leaves the reader to guess how far its list runs.
+ *
+ * `grow` is for the body: it takes the height the other two do not need and
+ * scrolls inside itself, so a forty-chapter book cannot push the back matter
+ * off the bottom of the panel.
+ */
+function MatterSection({
   label,
-  exists,
-  active,
-  onClick,
+  count,
+  open,
+  onToggle,
+  grow = false,
+  children,
 }: {
   label: string;
-  exists: boolean;
-  active: boolean;
-  onClick: () => void;
+  /** Pages in this part — the thing a shut box would otherwise hide. */
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+  grow?: boolean;
+  children: React.ReactNode;
 }) {
+  return (
+    <section
+      className={`flex flex-col overflow-hidden rounded-xl border border-line
+                  bg-panel/60 ${grow && open ? "min-h-0 flex-1" : "shrink-0"}`}
+    >
+      <h3 className="shrink-0">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          className="flex w-full cursor-pointer items-center gap-2 px-2.5 py-2.5
+                     text-left font-sans text-sm font-semibold text-fg
+                     outline-none transition-colors hover:bg-raised
+                     focus-visible:ring-2 focus-visible:ring-accent/50
+                     focus-visible:ring-inset"
+        >
+          {/* One triangle that turns, rather than two icons swapped: the turn
+              is what reads as "this is opening", and it survives the writer
+              not having looked at the panel before. */}
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform
+                        ${open ? "rotate-90" : ""}`}
+          >
+            <path d="M7.5 4.5l6 5.5-6 5.5" />
+          </svg>
+
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+
+          {/* The count is what makes a shut box safe to leave shut — it says
+              how much is inside without opening it. */}
+          <span className="shrink-0 font-sans text-xs tabular-nums text-muted">
+            {count}
+          </span>
+        </button>
+      </h3>
+
+      {open && (
+        <ul className="scroll-slim min-h-0 flex-1 overflow-y-auto px-1.5 pb-1.5">
+          {children}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** A part that has no page yet: the way to start one, saying so plainly. */
+function StartPart({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <li>
       <button
         type="button"
         onClick={onClick}
-        aria-current={active ? "page" : undefined}
-        title={exists ? label : `Start the ${label.toLowerCase()}`}
-        // Matched to a chapter row's height and padding so the three parts of
-        // the book read as one list. It keeps the dashed outline while it does
-        // not exist yet, which is the one thing about it worth saying loudly.
-        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
-                    px-2.5 py-2 text-left font-sans text-sm font-medium
-                    outline-none transition-colors focus-visible:ring-2
-                    focus-visible:ring-accent/50 ${
-                      active
-                        ? "bg-accent text-white"
-                        : exists
-                          ? "text-fg hover:bg-raised"
-                          : "border border-dashed border-line text-muted hover:bg-raised hover:text-fg"
-                    }`}
+        className="flex w-full cursor-pointer items-center gap-2 rounded-lg
+                   border border-dashed border-line px-2.5 py-2 text-left
+                   font-sans text-sm text-muted outline-none transition-colors
+                   hover:border-accent/60 hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/50"
       >
         <svg
           aria-hidden="true"
@@ -666,11 +827,9 @@ function MatterPill({
           stroke="currentColor"
           strokeWidth="1.6"
           strokeLinecap="round"
-          strokeLinejoin="round"
           className="h-4 w-4 shrink-0"
         >
-          <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H10v14H5.5A1.5 1.5 0 0 1 4 15.5z" />
-          <path d="M16 4.5A1.5 1.5 0 0 0 14.5 3H10v14h4.5a1.5 1.5 0 0 0 1.5-1.5z" />
+          <path d="M10 5v10M5 10h10" />
         </svg>
         <span className="min-w-0 flex-1 truncate">{label}</span>
       </button>
