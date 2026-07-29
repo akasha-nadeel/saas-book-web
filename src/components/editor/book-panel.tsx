@@ -529,7 +529,7 @@ export function BookPanel({
             <MatterCard
               tone="front"
               label="Front matter"
-              description="Everything before Chapter 1. Your title page, copyright and dedication."
+              description="The pages before Chapter 1: title, copyright, dedication."
               action={front ? "Open" : "Start"}
               active={front?.id === chapterId}
               onAction={() => openMatter("front")}
@@ -542,7 +542,7 @@ export function BookPanel({
               description={
                 bodyOpen
                   ? undefined
-                  : "The story itself. Every numbered chapter, in the order they are read."
+                  : "The story itself, chapter by chapter, in reading order."
               }
               meta={`${bodyChapters.length} ${
                 bodyChapters.length === 1 ? "chapter" : "chapters"
@@ -622,7 +622,7 @@ export function BookPanel({
             <MatterCard
               tone="back"
               label="Back matter"
-              description="What closes the book. Acknowledgements, an author's note, an epilogue."
+              description="The pages after the story: acknowledgements, notes, an epilogue."
               action={back ? "Open" : "Start"}
               active={back?.id === chapterId}
               onAction={() => openMatter("back")}
