@@ -540,7 +540,11 @@ export function BookPanel({
                 bodyChapters.length === 1 ? "chapter" : "chapters"
               }`}
               action={bodyOpen ? "Hide chapters" : "Chapters"}
-              active={inBody}
+              // Open counts as selected here, as well as being in a chapter.
+              // With the other two shrunk to strips, the purple border is what
+              // says the panel is currently given over to the body — the same
+              // thing the green border says when you are in the front matter.
+              active={bodyOpen || inBody}
               onAction={() => setBodyOpen(toggleBody())}
               grow={bodyOpen}
             >
@@ -843,7 +847,11 @@ function MatterCard({
   return (
     <section
       aria-current={active ? "page" : undefined}
-      className={`flex flex-col overflow-hidden rounded-xl border bg-panel/60
+      // Two pixels on every card, not only the selected one: a border that
+      // thickens on selection would move the card's contents by a pixel each
+      // time, and three cards nudging as you click between them is the kind of
+      // thing you see without being able to say what you saw.
+      className={`flex flex-col overflow-hidden rounded-xl border-2 bg-panel/60
                   transition-colors
                   ${active ? paint.borderActive : paint.border}
                   ${grow ? "min-h-0 flex-1" : "shrink-0"}`}
