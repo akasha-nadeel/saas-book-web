@@ -1320,6 +1320,14 @@ export interface Prefs {
   typewriter: boolean;
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
+  /**
+   * Which face the editor's book panel shows — the cover, or the three parts.
+   *
+   * Stored rather than held in memory because a reload is not a decision. A
+   * writer who moved the panel to the parts and then refreshed was put back on
+   * the cover, having asked for nothing of the sort.
+   */
+  bookPanel: "book" | "chapters";
   /** The colour of the page under the prose. */
   paper: PaperColor;
   /** The chrome's colour scheme — light or dark. */
@@ -1335,6 +1343,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
+  // The cover: the panel opens on the book as an object, and the writer
+  // steps into its parts from there.
+  bookPanel: "book",
   // White by default, and now on a light chrome to match. Long-form prose is
   // what most people still read most comfortably on a light surface.
   paper: "white",
@@ -1380,6 +1391,7 @@ function parsePrefs(raw: string | null): Prefs {
       typewriter: parsed.typewriter === true,
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
+      bookPanel: parsed.bookPanel === "chapters" ? "chapters" : "book",
       paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
         ? (parsed.paper as PaperColor)
         : DEFAULT_PREFS.paper,

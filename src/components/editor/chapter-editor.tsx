@@ -118,12 +118,6 @@ interface ChapterSnapshot {
 // remounts between chapters.
 let splashedBookId: string | null = null;
 
-// The book panel's last face — Book View or the chapter list. Kept at module
-// scope so it survives the remount a chapter change triggers: without it,
-// opening a chapter from the list would snap the panel back to Book View every
-// time, which is exactly what a writer clicking through chapters does not want.
-let lastPanelMode: BookPanelMode = "book";
-
 export function ChapterEditor({
   bookId,
   chapterId,
@@ -178,13 +172,12 @@ export function ChapterEditor({
   const [tab, setTab] = useState<PanelTab>("search");
   const [panelOpen, setPanelOpen] = useState(false);
   // Which face the right book panel shows — the cover-and-steppers Book View, or
-  // the chapter list. Seeded from the module-scope memory so a chapter change
-  // (which remounts this component) keeps the face the writer left it on.
-  const [panelMode, setPanelMode] = useState<BookPanelMode>(lastPanelMode);
-  const changePanelMode = (mode: BookPanelMode) => {
-    lastPanelMode = mode;
-    setPanelMode(mode);
-  };
+  // the book's three parts. Stored rather than held in memory: it used to be a
+  // module variable, which survived the remount a chapter change triggers but
+  // not a reload, so refreshing put a writer back on the cover having asked for
+  // nothing of the sort. A reload is not a decision.
+  const panelMode: BookPanelMode = prefs.bookPanel;
+  const changePanelMode = (mode: BookPanelMode) => setPref("bookPanel", mode);
   // Page zoom. Held here rather than in the surface, which is remounted on every
   // chapter change — so the level the writer set survives moving between
   // chapters, the way it does in a word processor.
