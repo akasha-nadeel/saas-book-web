@@ -449,33 +449,43 @@ export function BookPanel({
             </p>
           )}
 
-          {/* The book's three parts, each its own box that opens and shuts.
-              Front matter opens the book, the body is the story, back matter
-              closes it — the order they are bound in.
+          {/* The book's three parts, one card each. Front matter opens the
+              book, the body is the story, back matter closes it — the order
+              they are bound in.
 
-              Boxes rather than a flat list because the list had no shape: nine
+              Cards rather than a flat list because the list had no shape: nine
               chapters ran between two markers with nothing saying where the
-              story started and stopped. A box per part says it without a word.
+              story started and stopped, and nothing at all saying what "front
+              matter" means to someone who has not published before.
 
               Front and back keep their natural height and the body takes what
-              is left, so the story fills the panel and scrolls inside its own
-              box — the two short sections cannot be pushed off the bottom by a
-              forty-chapter book, which is exactly when they matter most. */}
+              is left once its list is open, so the story fills the panel and
+              scrolls inside its own card — the two short cards cannot be pushed
+              off the bottom by a forty-chapter book, which is exactly when a
+              writer wants to reach them. */}
           <div className="mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1">
             <MatterCard
               label="Front matter"
               description="The title page, copyright and dedication — everything that comes before Chapter 1."
-              exists={!!front}
+              action={front ? "Open" : "Start"}
               active={front?.id === chapterId}
-              onOpen={() => openMatter("front")}
+              onAction={() => openMatter("front")}
             />
 
-            <MatterSection
+            <MatterCard
               label="Body matter"
-              count={bodyChapters.length}
-              open={bodyOpen}
-              onToggle={() => setBodyOpen(toggleBody())}
-              grow
+              description={
+                bodyOpen
+                  ? undefined
+                  : "The story itself — every numbered chapter, in the order they are read."
+              }
+              meta={`${bodyChapters.length} ${
+                bodyChapters.length === 1 ? "chapter" : "chapters"
+              }`}
+              action={bodyOpen ? "Hide chapters" : "Chapters"}
+              active={inBody}
+              onAction={() => setBodyOpen(toggleBody())}
+              grow={bodyOpen}
             >
               {bodyChapters.length > 0 ? (
                 bodyChapters.map((c) => (
@@ -528,14 +538,14 @@ export function BookPanel({
                   No chapters yet.
                 </li>
               )}
-            </MatterSection>
+            </MatterCard>
 
             <MatterCard
               label="Back matter"
               description="Acknowledgements, an author's note, an epilogue — whatever closes the book."
-              exists={!!back}
+              action={back ? "Open" : "Start"}
               active={back?.id === chapterId}
-              onOpen={() => openMatter("back")}
+              onAction={() => openMatter("back")}
             />
           </div>
         </div>
@@ -679,137 +689,96 @@ function ChapterPill({
 }
 
 /**
- * One part of the book as a box you can shut.
+ * One part of the book as a card: what the part is, and the one way in.
  *
- * A card rather than a heading with rows under it, because the whole point is
- * to show where one part of the book ends and the next begins — an outline
- * around the pages does that at a glance, where a heading only labels the row
- * it sits on and leaves the reader to guess how far its list runs.
+ * The three parts are unequal — front and back matter are a single page each,
+ * the body is the whole novel — and the first design showed that by giving them
+ * different chrome, two disclosures and a list. It read as three unrelated
+ * controls. They are three parts of one book and they look like it now: same
+ * card, same sentence explaining what belongs there, same button.
  *
- * `grow` is for the body: it takes the height the other two do not need and
- * scrolls inside itself, so a forty-chapter book cannot push the back matter
- * off the bottom of the panel.
- */
-function MatterSection({
-  label,
-  count,
-  open,
-  onToggle,
-  grow = false,
-  children,
-}: {
-  label: string;
-  /** Pages in this part — the thing a shut box would otherwise hide. */
-  count: number;
-  open: boolean;
-  onToggle: () => void;
-  grow?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      className={`flex flex-col overflow-hidden rounded-xl border border-line
-                  bg-panel/60 ${grow && open ? "min-h-0 flex-1" : "shrink-0"}`}
-    >
-      <h3 className="shrink-0">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
-          className="flex w-full cursor-pointer items-center gap-2 px-2.5 py-2.5
-                     text-left font-sans text-sm font-semibold text-fg
-                     outline-none transition-colors hover:bg-raised
-                     focus-visible:ring-2 focus-visible:ring-accent/50
-                     focus-visible:ring-inset"
-        >
-          {/* One triangle that turns, rather than two icons swapped: the turn
-              is what reads as "this is opening", and it survives the writer
-              not having looked at the panel before. */}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`h-3.5 w-3.5 shrink-0 text-muted transition-transform
-                        ${open ? "rotate-90" : ""}`}
-          >
-            <path d="M7.5 4.5l6 5.5-6 5.5" />
-          </svg>
-
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-
-          {/* The count is what makes a shut box safe to leave shut — it says
-              how much is inside without opening it. */}
-          <span className="shrink-0 font-sans text-xs tabular-nums text-muted">
-            {count}
-          </span>
-        </button>
-      </h3>
-
-      {open && (
-        <ul className="scroll-slim min-h-0 flex-1 overflow-y-auto px-1.5 pb-1.5">
-          {children}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-/**
- * Front or back matter as a card: what the part is, and the one way in.
+ * The sentence is the part worth keeping. "Front matter" is a printer's term,
+ * and someone writing a first novel has had no reason to learn which pages go
+ * before Chapter 1 — a card that spends its space saying so is worth more than
+ * one that spends it on a count of one.
  *
- * Not a disclosure, because there is nothing to disclose — each of these is a
- * single page, and an arrow that opens to reveal exactly one row is a click
- * spent on nothing. What a writer actually needs here is to know what the part
- * is *for*: "front matter" is a printer's term, and most people writing a first
- * novel have never had to name the pages before Chapter 1. So the card spends
- * its space on a sentence rather than on a count of one.
+ * `children` is how the body differs: its button reveals the chapter list
+ * inside the card rather than opening a page. With `grow` set it then takes the
+ * height the other two cards do not need and scrolls inside itself, so a
+ * forty-chapter book cannot push the back matter off the bottom of the panel —
+ * which is exactly when a writer wants to reach it.
  */
 function MatterCard({
   label,
   description,
-  exists,
+  meta,
+  action,
   active,
-  onOpen,
+  onAction,
+  grow = false,
+  children,
 }: {
   label: string;
-  description: string;
-  /** Whether the page has been started. Only the button's wording turns on it —
-   *  the card is the same either way, because the part exists in the book
-   *  whether or not a page has been made for it yet. */
-  exists: boolean;
+  /** Dropped once the card has been opened: a sentence explaining what body
+   *  matter is has done its work the moment the chapters are on screen, and the
+   *  room it was using is room the list can have. */
+  description?: string;
+  /** A figure under the description — the body's chapter count. */
+  meta?: string;
+  /** The button's words. It is the only control on the card, so this is the
+   *  whole of what the card offers and is worth saying exactly. */
+  action: string;
+  /** True when the writer is inside this part of the book. */
   active: boolean;
-  onOpen: () => void;
+  onAction: () => void;
+  grow?: boolean;
+  children?: React.ReactNode;
 }) {
   return (
     <section
       aria-current={active ? "page" : undefined}
-      className={`shrink-0 rounded-xl border bg-panel/60 p-3.5 transition-colors
-                  ${active ? "border-accent" : "border-line"}`}
+      className={`flex flex-col overflow-hidden rounded-xl border bg-panel/60
+                  transition-colors ${active ? "border-accent" : "border-line"}
+                  ${grow ? "min-h-0 flex-1" : "shrink-0"}`}
     >
-      <h3 className="font-serif text-base font-semibold text-fg">{label}</h3>
+      <div className="shrink-0 p-3.5">
+        <h3 className="font-serif text-base font-semibold text-fg">{label}</h3>
 
-      {/* Two lines at the panel's width. Long enough to say what the part is,
-          short enough that the card stays a card and not a paragraph. */}
-      <p className="mt-1 font-sans text-xs leading-relaxed text-muted">
-        {description}
-      </p>
+        {/* Two lines at the panel's width: long enough to say what the part is,
+            short enough that the card stays a card and not a paragraph. */}
+        {description && (
+          <p className="mt-1 font-sans text-xs leading-relaxed text-muted">
+            {description}
+          </p>
+        )}
 
-      <button
-        type="button"
-        onClick={onOpen}
-        className="mt-3 w-full cursor-pointer rounded-lg bg-accent py-2
-                   font-sans text-sm font-semibold text-white outline-none
-                   transition-colors hover:bg-accent-strong focus-visible:ring-2
-                   focus-visible:ring-accent/50"
-      >
-        {/* "Start" is the honest word before the page exists: the click makes
-            something. Afterwards it only opens what is already there. */}
-        {exists ? "Open" : "Start"}
-      </button>
+        {meta && (
+          <p className="mt-1.5 font-sans text-xs font-medium text-fg">{meta}</p>
+        )}
+
+        <button
+          type="button"
+          onClick={onAction}
+          aria-expanded={children ? !!grow : undefined}
+          className="mt-3 w-full cursor-pointer rounded-lg bg-accent py-2
+                     font-sans text-sm font-semibold text-white outline-none
+                     transition-colors hover:bg-accent-strong
+                     focus-visible:ring-2 focus-visible:ring-accent/50"
+        >
+          {action}
+        </button>
+      </div>
+
+      {/* Only the body has anything under the button, and only once opened.
+          The floor matters: three cards plus a list is more than a laptop's
+          panel can always hold, and a flex child with no minimum is squeezed to
+          nothing rather than scrolling. Four rows and its own scrollbar is a
+          usable list; a 2px sliver is not. */}
+      {grow && children && (
+        <ul className="scroll-slim min-h-24 flex-1 overflow-y-auto px-2 pb-2">
+          {children}
+        </ul>
+      )}
     </section>
   );
 }
