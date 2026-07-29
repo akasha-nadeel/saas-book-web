@@ -900,10 +900,70 @@ function EditorSurface({
             never sits across a page seam. */}
         {/* Transparent, so the shared gradient on the row above shows through
             and the page sheets float on it. */}
-        <div className="relative flex min-h-0 flex-1">
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {/* The strip of desk above the sheet, doing the work of a bar.
+
+              Outside the scroller, not stuck to the top of it. Sticky, it stayed
+              put while the page slid up underneath — so it ended up lying across
+              the paper with the sheet's own top border above it, which reads as
+              a band drawn *on* the page rather than a bar above it. Out here the
+              page cannot reach it: the manuscript scrolls in the box below, and
+              this keeps its own line of desk however far down a writer goes.
+
+              No rule and no panel behind it either. The desk that was already
+              there is the bar; an edge would only have drawn a second one. */}
+          <div className="shrink-0 px-4 pt-3 pb-2">
+            <div
+              className="mx-auto flex items-center justify-between gap-3
+                         font-sans text-xs text-muted"
+              style={{
+                width: `${geom.pageW * zoom * PAGE_SCALE}px`,
+                maxWidth: "100%",
+              }}
+            >
+              {/* The two readings take equal, fixed shares of the bar, so the
+                  control between them sits on the middle of the sheet rather
+                  than wherever a word count of four digits happens to leave
+                  it — the number changes as a writer types, and a control that
+                  drifts while they work is a control they have to look for. */}
+              <span className="pointer-events-none flex-1 truncate tabular-nums">
+                {written.toLocaleString()}
+                {book.targetWords
+                  ? ` of ${book.targetWords.toLocaleString()}`
+                  : ""}{" "}
+                words
+              </span>
+
+              <ZoomControl zoom={zoom} onZoom={onZoom} />
+
+              <span
+                aria-live="polite"
+                className="pointer-events-none flex-1 truncate text-right"
+                style={
+                  status === "error"
+                    ? { color: "var(--color-danger)" }
+                    : undefined
+                }
+              >
+                {STATUS_LABEL[status]}
+                {status === "saved" && lastSavedAt
+                  ? ` · ${lastSavedAt.toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}`
+                  : null}
+              </span>
+            </div>
+          </div>
+
           <main
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                       bg-transparent px-4 py-8 md:py-10"
+                       bg-transparent px-4 pt-3 pb-8 md:pb-10"
+            // Both edges reserved for the scrollbar, so the page is centred in
+            // the same box the bar above it is. Without it the scrollbar takes
+            // its width off one side only, the page shifts left by half of it,
+            // and the bar's ends no longer line up with the sheet's.
+            style={{ scrollbarGutter: "stable both-edges" }}
             // Where the press began. Everything below the desk is inside this
             // element, so one listener here sees the start of every drag on the
             // page — see draggedHere.
@@ -937,38 +997,6 @@ function EditorSurface({
                 the sheet however wide the window is, and sticks to the top as the
                 page scrolls. aria-live so a failed save is announced rather than
                 waiting to be noticed. */}
-            <div
-              className="pointer-events-none sticky top-0 z-10 mx-auto mb-2 flex
-                         items-baseline justify-between font-sans text-xs text-muted"
-              style={{
-                width: `${geom.pageW * zoom * PAGE_SCALE}px`,
-                maxWidth: "100%",
-              }}
-            >
-              <span className="tabular-nums">
-                {written.toLocaleString()}
-                {book.targetWords
-                  ? ` of ${book.targetWords.toLocaleString()}`
-                  : ""}{" "}
-                words
-              </span>
-              <span
-                aria-live="polite"
-                style={
-                  status === "error"
-                    ? { color: "var(--color-danger)" }
-                    : undefined
-                }
-              >
-                {STATUS_LABEL[status]}
-                {status === "saved" && lastSavedAt
-                  ? ` · ${lastSavedAt.toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}`
-                  : null}
-              </span>
-            </div>
 
             {/* Zoomed with the CSS `zoom` property, not a transform: a transform
                 on the pages breaks the browser's "scroll the caret into view"
@@ -1059,8 +1087,6 @@ function EditorSurface({
               </div>
             </div>
           </main>
-
-          <ZoomControl zoom={zoom} onZoom={onZoom} />
         </div>
       </div>
     </>
@@ -1088,9 +1114,15 @@ function ZoomControl({
 
   return (
     <div
-      className="absolute right-3 bottom-3 z-10 flex items-center gap-0.5
-                 rounded-lg border border-line bg-panel/95 px-1 py-0.5 shadow-md
-                 backdrop-blur"
+      // In the bar now rather than floating at the foot of the page. It sat
+      // over the bottom-right corner of the paper, which is where the last
+      // lines of a chapter are — the one part of the page a writer is looking
+      // at. Up here it is on the bar's own ground, centred over the sheet, and
+      // never over the words.
+      //
+      // No card of its own any more: the bar is the ground, and a bordered box
+      // inside a bordered bar is one border too many.
+      className="flex shrink-0 items-center gap-0.5"
     >
       <button
         type="button"
