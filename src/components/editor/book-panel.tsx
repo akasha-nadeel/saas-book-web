@@ -66,18 +66,26 @@ const MATTER_TONE = {
     borderActive: "border-matter-front",
     button: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
              focus-visible:ring-matter-front/50`,
+    // The colour carried into the shrunk strip, where there is no button left
+    // to carry it. A dot is enough to keep the card recognisable.
+    dot: "bg-matter-front",
+    ring: "focus-visible:ring-matter-front/50",
   },
   body: {
     border: "border-matter-body/30",
     borderActive: "border-matter-body",
     button: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
              focus-visible:ring-matter-body/50`,
+    dot: "bg-matter-body",
+    ring: "focus-visible:ring-matter-body/50",
   },
   back: {
     border: "border-matter-back/30",
     borderActive: "border-matter-back",
     button: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
              focus-visible:ring-matter-back/50`,
+    dot: "bg-matter-back",
+    ring: "focus-visible:ring-matter-back/50",
   },
 } as const;
 
@@ -510,6 +518,7 @@ export function BookPanel({
               action={front ? "Open" : "Start"}
               active={front?.id === chapterId}
               onAction={() => openMatter("front")}
+              compact={bodyOpen}
             />
 
             <MatterCard
@@ -588,6 +597,7 @@ export function BookPanel({
               action={back ? "Open" : "Start"}
               active={back?.id === chapterId}
               onAction={() => openMatter("back")}
+              compact={bodyOpen}
             />
           </div>
         </div>
@@ -762,6 +772,7 @@ function MatterCard({
   active,
   onAction,
   grow = false,
+  compact = false,
   children,
 }: {
   tone: MatterTone;
@@ -779,9 +790,52 @@ function MatterCard({
   active: boolean;
   onAction: () => void;
   grow?: boolean;
+  /**
+   * Shrink to a name and nothing else, because another card is using the room.
+   *
+   * The chapter list is the thing the panel exists for, and it was getting
+   * whatever two explanatory cards left over. So when it opens, the other two
+   * stand down to a strip — still there, still in their colour, still one click
+   * from opening, but no longer spending a paragraph each on it.
+   */
+  compact?: boolean;
   children?: React.ReactNode;
 }) {
   const paint = MATTER_TONE[tone];
+
+  if (compact) {
+    return (
+      <section
+        aria-current={active ? "page" : undefined}
+        className={`shrink-0 overflow-hidden rounded-xl border bg-panel/60
+                    transition-colors
+                    ${active ? paint.borderActive : paint.border}`}
+      >
+        <button
+          type="button"
+          onClick={onAction}
+          className={`flex w-full cursor-pointer items-center gap-2.5 px-3.5
+                      py-2.5 text-left outline-none transition-colors
+                      hover:bg-raised focus-visible:ring-2
+                      focus-visible:ring-inset ${paint.ring}`}
+        >
+          <span
+            aria-hidden="true"
+            className={`h-2 w-2 shrink-0 rounded-full ${paint.dot}`}
+          />
+          <h3 className="min-w-0 flex-1 truncate font-serif text-sm font-semibold text-fg">
+            {label}
+          </h3>
+          {/* The verb the full card's button carried, kept so the strip still
+              says what pressing it does — and whether the page exists yet. */}
+          <span className="shrink-0 font-sans text-xs font-medium text-muted">
+            {action}
+          </span>
+        </button>
+      </section>
+    );
+  }
+
   return (
     <section
       aria-current={active ? "page" : undefined}
