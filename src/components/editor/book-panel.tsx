@@ -1204,9 +1204,15 @@ function MatterCard({
                 // focus ring on nothing.
                 tabIndex={compact ? -1 : undefined}
                 aria-expanded={children ? listOpen : undefined}
-                className={`flex-1 cursor-pointer rounded-lg py-1.5 font-sans
-                            text-xs font-semibold outline-none transition-colors
-                            focus-visible:ring-2 ${paint.button}`}
+                // Smaller only when it is sharing the row. Alone it is the
+                // card's one action and takes the card's full width, so it is
+                // set at full size; beside a second button each has half the
+                // room and the pair reads better a step down.
+                className={`flex-1 cursor-pointer rounded-lg font-sans
+                            font-semibold outline-none transition-colors
+                            focus-visible:ring-2 ${paint.button} ${
+                              secondary ? "py-1.5 text-xs" : "py-2 text-sm"
+                            }`}
               >
                 {action}
               </button>
