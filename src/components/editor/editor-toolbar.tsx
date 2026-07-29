@@ -24,6 +24,7 @@ import {
   type ParagraphStyle,
 } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
+import { useDictation } from "@/lib/editor/use-dictation";
 
 /** The four alignments, each with a small icon of ruled lines. */
 const ALIGN_OPTIONS: {
@@ -330,6 +331,30 @@ export function ToolRail({
   useEditorState(editor);
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * Dictated words are inserted at the caret through the editor's own command,
+   * so they join the document as ordinary typing — undoable, autosaved, and
+   * counted — rather than being pushed into the DOM behind Tiptap's back.
+   *
+   * The leading space is what stops phrases running together: the recogniser
+   * hands back "she opened the door" with no trailing space, and the next
+   * phrase would otherwise begin against it.
+   */
+  const dictation = useDictation((text) => {
+    // A phrase can arrive after the surface has gone — the writer navigating
+    // away while still speaking. There is nowhere to put it, so it is dropped.
+    if (!editor) return;
+
+    const at = editor.state.selection.from;
+    const before = editor.state.doc.textBetween(Math.max(0, at - 1), at, " ");
+    const needsSpace = before !== "" && before !== " " && before !== "\n";
+    editor
+      .chain()
+      .focus()
+      .insertContent(`${needsSpace ? " " : ""}${text}`)
+      .run();
+  });
   const [problem, setProblem] = useState<string | null>(null);
 
   // The book's body typography — changed live from the Aa flyout below.
@@ -661,6 +686,40 @@ export function ToolRail({
       />
 
       <Divider />
+
+      {/* Dictation. Hidden entirely where the browser has no speech engine,
+          rather than shown disabled: a control that can never work on this
+          machine is worse than one that is not there. */}
+      {dictation.supported && (
+        <ToolButton
+          label={
+            dictation.listening
+              ? "Stop dictating"
+              : "Dictate — speak and the words are typed"
+          }
+          active={dictation.listening}
+          onClick={() =>
+            dictation.listening ? dictation.stop() : dictation.start()
+          }
+        >
+          {/* The microphone gains a ring while it is live, so the state is
+              visible from across the room — this is a control a writer turns on
+              and then stops looking at. */}
+          <span className="relative flex items-center justify-center">
+            {dictation.listening && (
+              <span
+                aria-hidden="true"
+                className="absolute -inset-1.5 animate-ping rounded-full bg-danger/40"
+              />
+            )}
+            <Icon>
+              <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
+              <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
+              <path d="M10 15v2.4" />
+            </Icon>
+          </span>
+        </ToolButton>
+      )}
 
       <ToolButton
         label="Undo"
