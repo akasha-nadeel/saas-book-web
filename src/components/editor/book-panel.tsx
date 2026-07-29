@@ -301,7 +301,7 @@ export function BookPanel({
         <div className="scroll-slim flex h-full flex-col gap-7 overflow-y-auto px-6 py-8">
           {/* The cover on page 0; every page after it is the chapter as it will
               print, so the writer can flip through the finished pages here. */}
-          <div className="flex flex-col items-center gap-3">
+          <div className="book-cover-enter flex flex-col items-center gap-3">
             <PagePreview
               book={book}
               cover={cover}
@@ -353,7 +353,7 @@ export function BookPanel({
               The figures are one quiet line, not a grid of labelled cells:
               three numbers do not need a table, and the labels were louder than
               the values they described. */}
-          <div className="rounded-xl border border-line bg-panel/70 p-4">
+          <div className="book-card-enter rounded-xl border border-line bg-panel/70 p-4">
             <h2 className="font-serif text-lg leading-snug font-medium text-fg">
               {book.title}
             </h2>

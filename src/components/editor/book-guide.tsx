@@ -9,7 +9,11 @@
  */
 export function BookGuide({ title }: { title: string }) {
   return (
-    <div className="scroll-slim h-full overflow-y-auto px-4 py-8 md:py-10">
+    /* page-enter: the same arrival the manuscript makes, because this is the
+       manuscript's place. Book View's panel comes together vertically and its
+       page comes in from the side, which is the same movement the Chapters view
+       makes — the two faces differ in what they show, not in how they land. */
+    <div className="page-enter scroll-slim h-full overflow-y-auto px-4 py-8 md:py-10">
       {/* On a sheet with a blue edge, because that is what the page in this
           position always is. Book View selects no part of the book, so the
           manuscript's edge is the app's blue there; the overview stands in the
