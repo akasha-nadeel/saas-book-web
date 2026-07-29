@@ -16,7 +16,7 @@ export function BookGuide({ title }: { title: string }) {
         </p>
         <h1 className="mt-2 font-serif text-3xl text-fg">{title}</h1>
         <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
-          Choose a chapter from the panel on the right to start writing. Here is
+          Choose a chapter from the panel on the left to start writing. Here is
           how the panel is laid out.
         </p>
 

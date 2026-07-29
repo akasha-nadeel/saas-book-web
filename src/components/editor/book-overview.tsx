@@ -19,7 +19,7 @@ import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
  *
  * Opening a book lands here rather than jumping into a chapter. It is the editor
  * with the manuscript taken out: the same rail, the same tool panel, and the
- * same book panel on the right — three cards for the parts of the book, and the
+ * same book panel beside it — three cards for the parts of the book, and the
  * chapter list inside the middle one. Where the page would be there is a short
  * guide instead, because there is no page until a chapter is picked.
  *
@@ -83,12 +83,13 @@ export function BookOverview({ bookId }: { bookId: string }) {
         />
       )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        <BookGuide title={book.title} />
-      </div>
+      {/* Left of the guide, exactly where it sits beside the manuscript in the
+          editor. This screen is that one with the page taken out, so the panel
+          cannot swap sides on the way — a writer opening a book and then a
+          chapter would watch the whole book move across the window.
 
-      {/* No chapter is open, so nothing is selected and no microphone is
-          offered — there is no manuscript here to dictate into. */}
+          No chapter is open, so nothing is selected and no microphone is
+          offered: there is no manuscript here to dictate into. */}
       <BookPanel
         book={book}
         chapterId={null}
@@ -99,6 +100,10 @@ export function BookOverview({ bookId }: { bookId: string }) {
         body={body}
         always
       />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <BookGuide title={book.title} />
+      </div>
     </div>
   );
 }

@@ -30,8 +30,8 @@ import { showImportBanner } from "@/components/editor/import-banner-host";
 export type BookPanelMode = "book" | "chapters";
 
 /**
- * The book navigator, on the right of the editor between the manuscript and the
- * tool rail. Two faces of the same thing:
+ * The book navigator, between the workspace rail and the manuscript. Two faces
+ * of the same thing:
  *
  * - **Book View** — the cover, large, with the two page steppers and the way in
  *   to the chapter list. The book as an object.

@@ -50,7 +50,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "Book overview",
-        desc: "Opening a book lands on its overview — the book panel on the right and a short guide to how the book is put together — rather than a chapter. Pick a chapter to write, or use “Continue writing” on the shelf to jump straight back to where you left off.",
+        desc: "Opening a book lands on its overview — the book panel on the left and a short guide to how the book is put together — rather than a chapter. Pick a chapter to write, or use “Continue writing” on the shelf to jump straight back to where you left off.",
       },
       {
         name: "Chapters",
