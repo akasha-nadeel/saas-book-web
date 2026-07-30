@@ -13,12 +13,13 @@ import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
-import { AccountDialog } from "@/components/auth/account-dialog";
+import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
+import { type Account } from "@/lib/account";
 import {
   archiveBook,
   bookChapterCount,
@@ -100,9 +101,9 @@ const VIEW_ICON: Record<BookView, ReactNode> = {
 
 export function Bookshelf({
   /** The signed-in writer, or null when signed out or accounts are off. */
-  email = null,
+  account = null,
 }: {
-  email?: string | null;
+  account?: Account | null;
 }) {
   const hydrated = useHydrated();
   const shelf = useShelf();
@@ -113,7 +114,6 @@ export function Bookshelf({
   const [sort, setSort] = useState<Sort>("recent");
   const [dialog, setDialog] = useState<
     | "templates"
-    | "account"
     | "help"
     | "support"
     | "sounds"
@@ -259,8 +259,7 @@ export function Bookshelf({
             onToggleNav={() => setNavOpen((open) => !open)}
             onTemplates={() => setDialog("templates")}
             onSounds={() => setDialog("sounds")}
-            email={email}
-            onAccount={() => setDialog("account")}
+            account={account}
           />
 
           {view === "active" && (
@@ -345,9 +344,6 @@ export function Bookshelf({
         <ComingSoonDialog title="Templates" onClose={() => setDialog(null)}>
           Start from a ready-made chapter structure instead of a blank book.
         </ComingSoonDialog>
-      )}
-      {dialog === "account" && (
-        <AccountDialog email={email} onClose={() => setDialog(null)} />
       )}
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
@@ -687,21 +683,15 @@ function ShelfTopBar({
   onToggleNav,
   onTemplates,
   onSounds,
-  email,
-  onAccount,
+  account,
 }: {
   query: string;
   onQuery: (value: string) => void;
   onToggleNav: () => void;
   onTemplates: () => void;
   onSounds: () => void;
-  email: string | null;
-  onAccount: () => void;
+  account: Account | null;
 }) {
-  // The part before the @ is what a writer recognises as themselves; the domain
-  // is noise in a 9rem chip.
-  const name = email ? email.split("@")[0] : "Guest";
-  const initial = name.charAt(0).toUpperCase() || "G";
   return (
     <div className="flex items-center gap-3">
       <button
@@ -792,40 +782,9 @@ function ShelfTopBar({
       </Link>
 
 
-      <button
-        type="button"
-        onClick={onAccount}
-        aria-label={email ? `Your account — ${email}` : "Your account"}
-        className="flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-1 pl-2
-                   text-left outline-none transition-colors hover:bg-raised
-                   focus-visible:ring-2 focus-visible:ring-accent/50 sm:pl-3"
-      >
-        {/* Name, then the caret, then the avatar last — so the one round, solid
-            thing in the bar is what finishes it, and the row of grey words
-            leading up to it ends on the writer rather than on a control. The
-            name is what folds away first, which leaves the caret and the mark
-            on a phone. */}
-        <span className="hidden max-w-36 truncate font-sans text-sm font-medium text-fg sm:block">
-          {name}
-        </span>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="h-4 w-4 shrink-0 text-muted"
-        >
-          <path d="m6 8 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center
-                     rounded-full bg-accent text-sm font-semibold text-white"
-        >
-          {initial}
-        </span>
-      </button>
+      {/* Owns its own trigger: the menu is positioned from the chip's rect, and
+          the two cannot live apart without passing a ref through the header. */}
+      <AccountMenu account={account} />
     </div>
   );
 }
