@@ -150,6 +150,80 @@ should either ship or lose the card.
       bleed, no crop marks, no CMYK, and the page says so. A true printer's file
       needs a real PDF library and is a project of its own.
 
+## Billing
+
+- [x] **PayHere.** Done 2026-07-31. Recurring checkout, the notification
+      webhook, cancelling, and the plan gate in front of the three metered
+      routes. Optional like everything else: with `PAYHERE_MERCHANT_ID` and
+      `PAYHERE_MERCHANT_SECRET` unset there are no plans **and nothing is held
+      back**, so a self-hosted copy on its owner's own API keys is unchanged.
+      Pure and tested: `plans.ts` (prices, cycle arithmetic), `signature.ts`
+      (the two MD5s), `subscription.ts` (`isPro()`).
+      The design decision worth knowing: only `/api/billing/notify` grants Pro.
+      PayHere's return_url is a URL a writer can type, so `/upgrade/done` polls
+      instead of trusting it — and `authenticated` has no write grant on
+      `subscriptions` at all.
+
+      **Tested end-to-end against PayHere's sandbox, 2026-07-31.** A real USD
+      5.00 recurring authorisation, PayHere's own signed notifications, and the
+      database rows they produced. What was verified:
+      - The checkout hash — PayHere refuses a wrongly-signed checkout outright,
+        so its payment page rendering at all is the proof.
+      - A forged notification → 403. A correctly-signed one naming an order we
+        never started → 200 and **no grant**, which is the forged-`custom_1`
+        case: PayHere's md5sig covers only merchant/order/amount/currency/
+        status, so the echoed writer id is attacker-shaped and ownership comes
+        from our own order row instead.
+      - First payment → order `paid`, `payment_events` row, `subscriptions`
+        active, `/upgrade/done` flipping to "You're on Pro", the pricing page
+        turning into "You're on Pro" and the account dialog naming the date.
+      - The same `payment_id` replayed → period **unchanged**, still one event
+        row. That is the `payment_id` primary key doing its job.
+      - PayHere's second installment (`RECURRING_INSTALLMENT_SUCCESS`) →
+        extended from the *old* period end, not from now, and left the order's
+        own status alone.
+
+      One bug found and fixed by that test, worth remembering because it fails
+      silently: the migration granted table privileges to `authenticated` but
+      not to **`service_role`**. The secret key bypasses row-level *security*,
+      not privileges — so the webhook verified PayHere's signature, read back
+      nothing, concluded the order did not exist, and answered 200. A payment
+      taken and not granted, with nothing in the response to say so.
+
+      Still unverified: **cancelling.** It needs `PAYHERE_APP_ID` /
+      `PAYHERE_APP_SECRET` for the Subscription Manager API, which are not set,
+      so the account dialog correctly shows no Cancel button. Set them, cancel,
+      then confirm PayHere's Subscriptions page shows it cancelled *and* Pro
+      still runs to the paid-up date.
+
+- [ ] **A root domain, before any of this can take real money.** PayHere's
+      Domains & Credentials refuses subdomains outright — "Sub Domains not
+      allowed or Invalid Domain name". That rules out every ngrok URL and, more
+      importantly, `openchapter.vercel.app` too. Sandbox testing works because
+      PayHere accepts the literal `localhost`, which production obviously
+      cannot. So a root domain is not a launch nicety here, it is a hard
+      dependency of taking a single payment.
+
+- [ ] **The two rows the pricing page still promises.** "Books 50" and
+      "Imports 10 files" on the Starter card are not enforced anywhere —
+      nothing counts a shelf or an import. Every other row on that page is now
+      real. Either wire the counters (they need a home: the shelf count is
+      local and cheap, the import count needs somewhere durable to live) or
+      change the two rows to what the app actually does. Leaving them is the
+      one bit of that page still ahead of the code.
+
+- [ ] **A receipt of their own.** PayHere emails one, and that is what a writer
+      is told to trust. A payments list in the account dialog — read straight
+      off `payment_events`, which already holds every charge — would mean not
+      having to go and find that email.
+
+- [ ] **Changing cycle.** Monthly to annual means cancelling and starting
+      again, and the checkout says so rather than quietly making a second
+      authorisation. One writer, one live PayHere subscription, one row. A
+      proper switch would cancel the old one and pro-rate the new; PayHere has
+      no upgrade call, so it is genuinely two steps and wants designing before
+      it is built.
+
 ## Storage — the ceiling is close
 
 - [x] **Auth.** Supabase email/password, done as its own step ahead of the

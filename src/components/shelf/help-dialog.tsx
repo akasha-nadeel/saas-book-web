@@ -197,7 +197,15 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Plans",
-        desc: "Writing, syncing and the four file formats are free, up to fifty books. The Assistant and the audiobook spend a model's time per use, so they are what the paid plan covers — see Pricing in the header.",
+        desc: "Writing, syncing and the four file formats are free. The Assistant, the audiobook and the Bookmarks panel are what Pro covers — the first two spend a model's time per use. See Pricing in the header.",
+      },
+      {
+        name: "Paying",
+        desc: "Card details are entered on PayHere and never reach OpenChapter. Pro starts the moment PayHere confirms, usually a few seconds after you pay, and renews on the same date each cycle until you cancel.",
+      },
+      {
+        name: "Cancelling",
+        desc: "In your account, from the chip in the shelf header. You keep Pro until the period you have already paid for runs out, and nothing is deleted — your books are yours on either plan.",
       },
       {
         name: "Forgotten password",

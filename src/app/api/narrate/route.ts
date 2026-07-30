@@ -1,7 +1,6 @@
 import { gateway, generateSpeech } from "ai";
 import { MAX_SPEECH_CHARS } from "@/lib/export/narrate";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { requirePro } from "@/lib/billing/server";
 
 /**
  * Words in, a voice out. The other half of the audiobook pair.
@@ -43,17 +42,15 @@ export async function POST(request: Request) {
   }
 
   // Billed by the character, so it is gated like the assistant and the
-  // transcriber. The proxy skips /api, so the route checks for itself.
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getClaims();
-    if (!data?.claims) {
-      return Response.json(
-        { error: "Sign in to export an audiobook." },
-        { status: 401 },
-      );
-    }
-  }
+  // transcriber. The proxy skips /api, so the route checks for itself. This
+  // runs once per chunk, which is once per few thousand characters rather than
+  // once per book — a plan cancelled halfway through a forty-chapter export
+  // stops it, which is the behaviour you want from a metered call.
+  const denied = await requirePro({
+    signIn: "Sign in to export an audiobook.",
+    upgrade: "Audiobooks are part of Pro. Upgrade to switch them on.",
+  });
+  if (denied) return denied;
 
   let text: string;
   let voice: string;

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
+import { startCheckout, type CheckoutState } from "@/app/upgrade/actions";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
+import { displayPrice, perMonthOf, priceOf } from "@/lib/billing/plans";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -19,26 +21,18 @@ import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
  * dark one — the same reasoning as the landing page's pill and the back-matter
  * colour: a near-black card on the night palette's near-black page is a hole.
  *
- * Four of the lines below are the plan the app intends rather than the app as
- * it stands: nothing counts a shelf to fifty or an eleventh import, the
- * bookmark panel is open to everyone, and the audiobook runs for anyone with a
- * gateway key rather than for Pro. All four are the billing work, not this
- * page — but until that lands, this page is ahead of the code, and the dialog
- * behind the Upgrade button says so outright rather than leaving a writer to
- * find it.
+ * Two of the lines below are still the plan the app intends rather than the app
+ * as it stands: nothing counts a shelf to fifty or an eleventh import. The
+ * other six are real — the assistant and the audiobook check the subscription
+ * server-side, and the bookmark panel checks it in the browser. Where a row is
+ * ahead of the code it is a promise, and TODO.md records which two.
+ *
+ * The figures are not written here. They come from lib/billing/plans.ts, which
+ * is also what signs the amount into the PayHere checkout, so the number on the
+ * card and the number on the card statement cannot drift apart.
  */
 
 type Period = "monthly" | "annual";
-
-/**
- * What Pro costs on each cycle, as a monthly figure both ways so the switch
- * changes one number and not the unit under it. The annual rate is the monthly
- * one less a fifth, which is what "two months free" comes to.
- */
-const PRO_PRICE: Record<Period, { price: string; note?: string }> = {
-  monthly: { price: "$6.56" },
-  annual: { price: "$5.25", note: "billed annually" },
-};
 
 /**
  * The one value that means "no". Named, because the mark in front of a row is
@@ -46,6 +40,22 @@ const PRO_PRICE: Record<Period, { price: string; note?: string }> = {
  * yes and a no in the same line.
  */
 const NOT_INCLUDED = "Not included";
+
+/**
+ * The Pro card's button, in whichever of its three forms.
+ *
+ * Written once because it is a link in one state and a submit in two others,
+ * and the three have to be indistinguishable — a button that changes shape as
+ * the page learns what plan you are on reads as a glitch.
+ *
+ * The ring is offset onto the card's own ground rather than drawn against the
+ * button: the pill is bg-surface, and a surface ring touching it would only
+ * make it look bigger. Both colours are tokens, so it inverts with the card.
+ */
+const PRO_BUTTON = `block rounded-xl bg-surface px-5 py-3 text-center font-sans
+  text-sm font-semibold text-fg outline-none transition-opacity
+  hover:opacity-90 focus-visible:ring-2 focus-visible:ring-surface
+  focus-visible:ring-offset-2 focus-visible:ring-offset-fg`;
 
 /** The comparison, read across a line: label, what Starter gives, what Pro does. */
 const ROWS: { label: string; starter: string; pro: string }[] = [
@@ -67,17 +77,35 @@ const ROWS: { label: string; starter: string; pro: string }[] = [
 export function Plans({
   /** Decides where the starter card's button goes — the shelf, or the way in. */
   signedIn,
+  /** Is there a PayHere merchant behind the Upgrade button? */
+  billing,
+  /** Already paying. The card stops selling and starts confirming. */
+  pro: alreadyPro,
+  /** Set when PayHere sent the writer back without taking anything. */
+  cancelled = false,
 }: {
   signedIn: boolean;
+  billing: boolean;
+  pro: boolean;
+  cancelled?: boolean;
 }) {
   const [period, setPeriod] = useState<Period>("monthly");
 
-  // Nothing sells a plan yet. The house rule is that a control either works or
-  // plainly says it does not, and this is the app's existing answer to that:
-  // the button sits where it will always sit, and pressing it explains itself.
+  // With no merchant configured there is nothing to sell. The house rule is
+  // that a control either works or plainly says it does not, so the button
+  // stays where it will always be and pressing it explains itself.
   const [soon, setSoon] = useState(false);
 
-  const pro = PRO_PRICE[period];
+  const [state, checkout, pending] = useActionState<CheckoutState, FormData>(
+    startCheckout,
+    {},
+  );
+
+  const perMonth = displayPrice(perMonthOf(period));
+  const note =
+    period === "annual"
+      ? `${displayPrice(priceOf("annual"))} billed annually`
+      : undefined;
 
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
@@ -123,6 +151,19 @@ export function Plans({
 
         <PeriodToggle period={period} onChange={setPeriod} />
 
+        {cancelled && (
+          // PayHere's cancel_url lands back here. Said out loud, because a
+          // writer who abandoned a card form wants to know nothing was taken —
+          // silence on that reads as "did it go through?"
+          <p
+            role="status"
+            className="mx-auto mt-8 max-w-md rounded-xl border border-line
+                       bg-panel px-4 py-3 font-sans text-sm text-muted"
+          >
+            That checkout was cancelled and nothing was charged.
+          </p>
+        )}
+
         {/* items-start so the raised card grows upward on its own rather than
             stretching its neighbour to match. */}
         <div className="mt-12 grid gap-6 text-left sm:grid-cols-2 sm:items-start">
@@ -154,25 +195,50 @@ export function Plans({
             mark={<StackIcon className="h-6 w-6" />}
             name="Pro"
             blurb="For the assistant, the bookmarks and the book read aloud."
-            price={pro.price}
-            note={pro.note}
+            price={perMonth}
+            note={note}
             rows={ROWS.map((r) => ({ label: r.label, value: r.pro }))}
             action={
-              <button
-                type="button"
-                onClick={() => setSoon(true)}
-                // The ring is offset onto the card's own ground rather than
-                // drawn against the button: the pill is bg-surface and a
-                // surface ring touching it would only make it look bigger.
-                // Both colours are tokens, so the mark inverts with the card.
-                className="w-full cursor-pointer rounded-xl bg-surface px-5 py-3
-                           font-sans text-sm font-semibold text-fg outline-none
-                           transition-opacity hover:opacity-90
-                           focus-visible:ring-2 focus-visible:ring-surface
-                           focus-visible:ring-offset-2 focus-visible:ring-offset-fg"
-              >
-                Upgrade
-              </button>
+              alreadyPro ? (
+                // Nothing to sell someone who has already bought it. A disabled
+                // "current plan" chip would be a dead control on the one card
+                // that most needs to say something useful.
+                <Link href="/" className={PRO_BUTTON}>
+                  You&rsquo;re on Pro — keep writing
+                </Link>
+              ) : billing ? (
+                <form action={checkout}>
+                  {/* The cycle is read from the toggle at submit time rather
+                      than from a second piece of state on the server. */}
+                  <input type="hidden" name="period" value={period} />
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className={`w-full cursor-pointer disabled:cursor-default
+                                disabled:opacity-70 ${PRO_BUTTON}`}
+                  >
+                    {pending ? "Starting checkout…" : "Upgrade"}
+                  </button>
+                  {state.error && (
+                    // On the card's own ink, not text-red: the ground here is
+                    // bg-fg, and a red that reads on paper disappears on it.
+                    <p
+                      role="alert"
+                      className="mt-3 font-sans text-xs leading-relaxed text-surface/75"
+                    >
+                      {state.error}
+                    </p>
+                  )}
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSoon(true)}
+                  className={`w-full cursor-pointer ${PRO_BUTTON}`}
+                >
+                  Upgrade
+                </button>
+              )
             }
           />
         </div>
@@ -186,10 +252,11 @@ export function Plans({
 
       {soon && (
         <ComingSoonDialog title="Pro" onClose={() => setSoon(false)}>
-          There is nothing to buy yet — billing isn&rsquo;t switched on, and
-          until it is, no shelf is counted and no feature is held back. The
-          assistant and the audiobook already work for anyone running their own
-          API keys; Pro is those same two without a key to keep.
+          There is no payment gateway configured on this copy of OpenChapter, so
+          there is nothing to buy — and nothing is held back either. The
+          assistant, the bookmarks and the audiobook all work here for anyone
+          running their own API keys; Pro is those same three without a key to
+          keep.
         </ComingSoonDialog>
       )}
     </main>

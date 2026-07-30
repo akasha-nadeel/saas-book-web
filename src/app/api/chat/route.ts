@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { requirePro } from "@/lib/billing/server";
 
 /**
  * The assistant behind the editor's right-hand panel.
@@ -47,15 +46,17 @@ export async function POST(request: Request) {
 
   // The proxy's sign-in wall skips /api on purpose — redirecting a fetch to an
   // HTML page yields a parse error, not a 401 — so this route checks for
-  // itself. It is the one billed endpoint in the app; an open one is somebody
-  // else's Anthropic bill.
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getClaims();
-    if (!data?.claims) {
-      return Response.json({ error: "Sign in to use the assistant." }, { status: 401 });
-    }
-  }
+  // itself. A billed endpoint left open is somebody else's Anthropic bill, and
+  // the plan check has to be here rather than in the panel for the same reason:
+  // a control hidden in the browser is a control a reader can unhide.
+  //
+  // With no accounts or no payment gateway configured this passes everyone, so
+  // a self-hosted copy running on its owner's key works as it always did.
+  const denied = await requirePro({
+    signIn: "Sign in to use the assistant.",
+    upgrade: "The assistant is part of Pro. Upgrade to switch it on.",
+  });
+  if (denied) return denied;
 
   let body: { messages?: IncomingMessage[]; chapter?: string };
   try {

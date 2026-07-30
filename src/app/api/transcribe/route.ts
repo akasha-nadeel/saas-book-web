@@ -1,7 +1,6 @@
 import { gateway, transcribe } from "ai";
 import { transcriptToProse } from "@/lib/import/transcript";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { requirePro } from "@/lib/billing/server";
 
 /**
  * Audio in, words out. The far end of "import an audiobook".
@@ -42,17 +41,14 @@ export async function POST(request: Request) {
 
   // The proxy's sign-in wall skips /api, so this route checks for itself — the
   // same reasoning as the assistant. Transcription is billed by the minute; an
-  // open endpoint is somebody else's invoice.
-  if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getClaims();
-    if (!data?.claims) {
-      return Response.json(
-        { error: "Sign in to import an audiobook." },
-        { status: 401 },
-      );
-    }
-  }
+  // open endpoint is somebody else's invoice. Both directions of the audiobook
+  // sit behind the plan's one Audiobook line, which is how the app talks about
+  // them everywhere else.
+  const denied = await requirePro({
+    signIn: "Sign in to import an audiobook.",
+    upgrade: "Audiobooks are part of Pro. Upgrade to switch them on.",
+  });
+  if (denied) return denied;
 
   let audio: File | null = null;
   try {

@@ -294,6 +294,56 @@ key takes the batch with it.
 The SQL behind all that is checked in: `supabase/migrations/`. Schema changes
 belong there, not only in the dashboard.
 
+**Payments are PayHere, and optional in the same way everything else is.** Set
+`PAYHERE_MERCHANT_ID` and `PAYHERE_MERCHANT_SECRET` and the app grows plans;
+leave them unset and there are no plans *and nothing is held back* — the
+assistant, the audiobook and the bookmarks panel all work, and the Upgrade
+button says why there is nothing to buy. `isBillingConfigured()` is checked
+first everywhere, and `requirePro()` passes everyone when it is false, so a
+self-hosted copy running on its owner's API keys behaves exactly as it did
+before billing existed.
+
+`src/lib/billing/` is the pure half — `plans.ts` (the price table, the cycle
+arithmetic), `signature.ts` (PayHere's two MD5s), `subscription.ts` (`isPro()`,
+the status codes) — all tested. `payhere.ts` holds the credentials and is
+server-only by naming: none of it carries a `NEXT_PUBLIC_` prefix, so an
+accidental client import reads empty strings and `isBillingConfigured()`
+answers false rather than leaking a secret. `server.ts` is `requirePro()`, the
+gate in front of `/api/chat`, `/api/narrate` and `/api/transcribe` — 401 when
+signed out, **402** when signed in and unpaid, and the three are different
+messages because "sign in" shown to someone already signed in is a loop.
+
+Four things in there are load-bearing.
+
+**Only the webhook grants Pro.** `/api/billing/notify` is a POST from PayHere's
+*servers*, with no session and no cookies, and it is the one caller that writes
+`subscriptions` — which is why `authenticated` has no insert or update grant on
+that table at all and the route uses the secret key
+(`src/lib/supabase/admin.ts`). The return_url is not proof of anything: a writer
+can type it. `/upgrade/done` therefore polls rather than assumes, because the
+browser's redirect and PayHere's notification race and are not ordered.
+
+**The notification is verified before it is believed.** The URL is public and
+the body is entirely attacker-shaped; `verifyNotification()` against the
+merchant secret is the only thing standing between that and a stranger writing
+"paid" into the table. A bad signature is refused with 403 and never retried.
+
+**It is idempotent on `payment_id`,** which is the primary key of
+`payment_events`. PayHere retries anything it did not get a 200 for, and a
+subscription charges again on the *same* order id every cycle — so an order
+cannot be the key, and a retry that re-ran would extend the period twice.
+Anything the route cannot act on answers 200 and logs; only a storage failure
+answers 500, because that one *should* come back.
+
+**A cancel goes to PayHere first and our table second.** The other order leaves
+a writer who has been told they are cancelled with a card still being charged.
+Cancelling takes a second credential pair (`PAYHERE_APP_ID` / `_APP_SECRET`) for
+the Subscription Manager API; without it the account dialog shows no Cancel
+button rather than one that cannot work. Cancelled is not gone — `isPro()` runs
+a cancelled plan to its paid-up date with no grace, and an active or past_due
+one three days past it, because a renewal that needs one retry is a normal
+Tuesday and PayHere's queue is not instant.
+
 **The root layout carries three things no screen owns.** `ThemeSync` (above),
 `LibrarySync` — which runs `syncWithServer()` once per mount, enough because
 every way of signing in ends in a redirect or full navigation, and flushes
@@ -308,6 +358,8 @@ first; with no Supabase configured everyone gets the shelf ·
 `/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
 `/upgrade` plans (public — a price is read before an account exists) ·
+`/upgrade/checkout/[orderId]` billing details, then a form POST straight to
+PayHere · `/upgrade/done` PayHere's return_url, which polls ·
 `/book/new` setup · `/book/import` · `/book/[bookId]` book
 overview (lands here, not on a chapter) ·
 `/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
