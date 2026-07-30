@@ -25,6 +25,7 @@ import type {
   TrashedChapter,
 } from "./library-store";
 import type { PageSetup } from "./page-setup";
+import type { PublishingMeta } from "./publishing";
 import type { Typography } from "./typography";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,7 @@ interface BookRow {
   bare_cover: boolean | null;
   page: PageSetup | null;
   typography: Typography | null;
+  publishing: PublishingMeta | null;
   archived_at: string | null;
   trashed_at: string | null;
   last_opened_id: string | null;
@@ -124,6 +126,7 @@ function bookToRow(book: Book, owner: string, position: number): BookRow {
     bare_cover: book.bareCover ? true : null,
     page: book.page ?? null,
     typography: book.typography ?? null,
+    publishing: book.publishing ?? null,
     archived_at: toIso(book.archivedAt),
     trashed_at: toIso(book.trashedAt),
     last_opened_id: book.lastOpenedId ?? null,
@@ -214,6 +217,7 @@ function rowsToBook(row: BookRow, chapters: ChapterRow[]): Book {
   if (row.bare_cover) book.bareCover = true;
   if (row.page) book.page = row.page;
   if (row.typography) book.typography = row.typography;
+  if (row.publishing) book.publishing = row.publishing;
 
   const archivedAt = toMs(row.archived_at);
   if (archivedAt !== undefined) book.archivedAt = archivedAt;
@@ -531,7 +535,18 @@ async function flush() {
     try {
       await job();
     } catch (err) {
-      console.error("[sync] push failed", err);
+      // Supabase rejects with a PostgrestError — a plain object, not an Error —
+      // and both the dev overlay and console.error render one of those as `{}`.
+      // A sync that is failing then looks exactly like a sync that is fine, so
+      // the fields are pulled out by name rather than handed over as an object.
+      const e = err as Partial<Record<"message" | "code" | "details" | "hint", string>>;
+      console.error(
+        `[sync] push failed${e?.code ? ` [${e.code}]` : ""}: ${
+          e?.message ?? String(err)
+        }`,
+        e?.details ?? "",
+        e?.hint ?? "",
+      );
     }
   }
 }
@@ -545,14 +560,46 @@ export function flushNow() {
   void flush();
 }
 
+/** So a whole library's worth of books does not each say the same thing. */
+let warnedMissingPublishing = false;
+
 export function pushBook(book: Book, position: number) {
   enqueue(`book:${book.id}`, async () => {
     const owner = await currentOwner();
     if (!owner) return;
     const db = createClient();
 
-    const { error } = await db.from("books").upsert(bookToRow(book, owner, position));
-    if (error) throw error;
+    const row = bookToRow(book, owner, position);
+    const { error } = await db.from("books").upsert(row);
+    if (error) {
+      // PostgREST refuses a row carrying a column the table does not have, and
+      // refuses the *whole* row — so a database that has not had migration
+      // 20260730000000 applied stops syncing books, chapters, and everything
+      // that rides along with them. That is a catastrophic answer to an
+      // optional field being unavailable.
+      //
+      // So the row goes up again without it. The writer keeps their sync; only
+      // the listing details wait for the column. It heals itself the moment the
+      // migration lands, and says so once in the meantime rather than once per
+      // book per load.
+      const missingPublishing =
+        error.code === "PGRST204" && /'publishing'/.test(error.message ?? "");
+      if (!missingPublishing) throw error;
+
+      if (!warnedMissingPublishing) {
+        warnedMissingPublishing = true;
+        console.warn(
+          "[sync] the books table has no `publishing` column, so store-listing " +
+            "details are not being saved to the server. Everything else is " +
+            "syncing normally. Apply supabase/migrations/20260730000000_book_publishing.sql.",
+        );
+      }
+
+      const withoutPublishing = { ...row };
+      delete (withoutPublishing as Partial<BookRow>).publishing;
+      const retry = await db.from("books").upsert(withoutPublishing);
+      if (retry.error) throw retry.error;
+    }
 
     // The chapter list is part of the book as far as the store is concerned —
     // a reorder is a change to the book, not to each chapter — so it goes up

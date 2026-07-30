@@ -22,6 +22,9 @@
 
 import type { BookKind } from "./book-kinds";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
+// Type-only, and publishing.ts imports Book the same way — a cycle that exists
+// for the compiler and never at runtime.
+import type { PublishingMeta } from "./publishing";
 import {
   fetchLibrary,
   hasClaimed,
@@ -241,6 +244,12 @@ export interface Book {
   page?: PageSetup;
   /** Body-text typography. Absent means the default — see typographyOf. */
   typography?: Typography;
+  /**
+   * What a shop asks for and a manuscript does not: ISBN, language, blurb,
+   * categories. Absent on every book until someone sets out to publish it —
+   * see lib/export/publishing.ts.
+   */
+  publishing?: PublishingMeta;
   /** Set aside but kept. Epoch ms. */
   archivedAt?: number;
   /** Deleted but recoverable. Epoch ms. Wins over archivedAt. */
@@ -1529,6 +1538,38 @@ export function setTypography(bookId: string, patch: Partial<Typography>) {
     ...book,
     typography: { ...typographyOf(book), ...patch },
   }));
+}
+
+/**
+ * The listing details, patched field by field.
+ *
+ * There is no `publishingOf` counterpart with defaults, because there are none
+ * to give: an unset ISBN is not a default ISBN, and inventing a publisher for a
+ * writer who has not named one is how a book goes to a shop under a name nobody
+ * chose. Absent stays absent, and an empty string clears the field rather than
+ * storing a blank.
+ */
+export function setPublishing(bookId: string, patch: Partial<PublishingMeta>) {
+  commitBook(bookId, (book) => {
+    const next: PublishingMeta = { ...(book.publishing ?? {}) };
+    for (const [key, value] of Object.entries(patch)) {
+      const empty =
+        value === undefined ||
+        value === null ||
+        (typeof value === "string" && value.trim() === "") ||
+        (Array.isArray(value) && value.length === 0);
+      if (empty) delete next[key as keyof PublishingMeta];
+      else Object.assign(next, { [key]: value });
+    }
+    // An object with nothing in it is not a setting; drop it so the shelf does
+    // not grow an empty `publishing: {}` on every book somebody opened once.
+    if (Object.keys(next).length === 0) {
+      const cleared = { ...book };
+      delete cleared.publishing;
+      return cleared;
+    }
+    return { ...book, publishing: next };
+  });
 }
 
 /**

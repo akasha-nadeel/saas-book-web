@@ -22,7 +22,8 @@ for the one assistant feature.
 
 Tests live beside their subjects as `*.test.ts` and concentrate on the pure
 logic: the import/export pipelines, the store, page setup, search, book kinds,
-the custom Tiptap marks, relative time. Components are not tested — jsdom is
+the custom Tiptap marks, pagination arithmetic, narration chunking, transcript
+paragraphing, ambience, relative time. Components are not tested — jsdom is
 there for `localStorage`, not for a DOM.
 
 `docs/plans/` holds the design and implementation notes for the bigger pieces
@@ -32,7 +33,8 @@ reading before reworking either.
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 ·
-Tiptap 3 editor · `@anthropic-ai/sdk` · `docx` + `jszip` for exports. Path alias
+Tiptap 3 editor · `@anthropic-ai/sdk` (the assistant) · `ai` v7 through Vercel AI
+Gateway (speech and transcription) · `docx` + `jszip` for exports. Path alias
 `@/*` → `src/*`.
 
 This is a newer Next.js than your training data (see AGENTS.md). Two things that
@@ -150,9 +152,38 @@ dynamically imported so a writer who never exports never downloads them.
   orchestrates; `xhtml.ts` is the shared XHTML renderer behind epub, PDF and the
   reader; `typeset.ts` controls the look of the outputs that are ours;
   `front-matter.ts` generates the title/copyright/contents pages.
-- Import: `src/lib/import/` — docx, epub, md, txt, html. `index.ts` dispatches by
-  extension and refuses `.doc`/`.pdf` *by name* with what to do instead; `split.ts`
-  breaks a flat block stream into chapters.
+
+**The EPUB is built to be sold, not just opened**, and it is **verified against
+EPUBCheck 5.3 (EPUB 3.3): 0 errors, 0 warnings**, for both a fully-specified book
+and a bare one with no cover and nothing filled in. Re-check after changing
+anything in `epub.ts` — the suite tests the strings, not the spec.
+
+Three things in there are load-bearing and none of them are visible in a working
+file. The cover is declared *twice*, under `properties="cover-image"` and the
+legacy `<meta name="cover">`, because which one a given shop reads is not
+knowable in advance. The identifier comes from `bookIdentifier()` and is derived
+from the book's id, never minted fresh: a random UUID per export makes a
+corrected file read as a second, unrelated title, which is how one book becomes
+two listings. And the `schema:access*` metadata is written from what the book
+actually contains — claiming `alternativeText` for undescribed pictures is a
+false accessibility claim, which is worse than an absent one.
+
+`epub-images.ts` lifts inline images out of their `data:` URLs into real
+`OEBPS/images/` entries, de-duplicated across the book. Note what this is *not*
+for: a `data:` src passes EPUBCheck fine (checked, not assumed). It is for size —
+base64 is a third larger than the bytes and compresses badly inside XHTML, and a
+repeated ornament is one file instead of one copy per use.
+
+`src/lib/publishing.ts` holds the listing details (ISBN with a checked digit,
+language, publisher, blurb, categories, series) as `Book.publishing`, and
+`storeReadiness()` is the honest half of a Publish button: it reports what a shop
+would refuse and never vetoes the export, because a writer is allowed to want the
+file for their own reader. `checkStoreReadiness()` in `export/index.ts` is the
+half that has to read the manuscript, which is why it is not in the pure module.
+- Import: `src/lib/import/` — docx, epub, md, txt, html, plus audio via the
+  transcriber. `index.ts` dispatches by extension and refuses `.doc`/`.pdf` *by
+  name* with what to do instead; `split.ts` breaks a flat block stream into
+  chapters.
 
 **The small pure modules** are where the conventions of the trade live, kept out
 of components so they can be tested and changed in one place: `book-kinds.ts`
@@ -165,6 +196,30 @@ out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
 `ANTHROPIC_API_KEY` in `.env.local`; without it the route returns 501 with a
 message saying so. Chapter text is sent only when the writer opens the panel and
 asks, and rides in the (cached) system prompt.
+
+**Audio is three separate things, and they are not interchangeable.** All three
+degrade the way the assistant does — no key, 501 with a message saying so — and
+the two paid ones need `AI_GATEWAY_API_KEY` (not the Anthropic one) and check
+auth themselves, because the proxy skips `/api` and a minute of speech is
+somebody else's invoice.
+- **Text → audio** (`/api/narrate` + `src/lib/export/narrate.ts`,
+  `export/audiobook.ts`): the export page's Audiobook card, one MP3 per chapter
+  in a zip. The route does *one chunk per request* and is stateless; the loop is
+  driven from the client so a 40-chapter book is 40 visible steps rather than one
+  request that fails having produced nothing. The tested part is `speechChunks()`
+  — cut at the largest boundary that fits (paragraph, then sentence, then word,
+  never mid-word), because a break mid-clause is audible.
+- **Audio → text** (`/api/transcribe` + `src/lib/import/transcript.ts`):
+  importing an audiobook. Only the transcript is made server-side; chaptering and
+  book creation go through the same `parseText → splitIntoChapters →
+  createBookFromImport` path as a `.docx`. `transcriptToProse()` rebuilds
+  paragraphs from the *segment timings* — a narrator's pause between paragraphs
+  is longer than between sentences — because otherwise the whole book arrives as
+  one paragraph and `splitIntoChapters` finds nothing to split on.
+- **Dictation** (`src/lib/editor/use-dictation.ts`) is the browser's own
+  `SpeechRecognition`: live, free, no key, Chrome/Edge only. `supported` is false
+  elsewhere and the button hides. Don't "unify" it with the transcriber — that
+  one bills per minute and takes finished files.
 
 **Auth is Supabase, and optional.** Set `NEXT_PUBLIC_SUPABASE_URL` and
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and the app grows accounts and a sign-in
@@ -236,8 +291,23 @@ field in one chapter is otherwise enough to abort a whole library upload.
 up: after enough versions some keys belong to nothing, and a dangling foreign
 key takes the batch with it.
 
-**Routes:** `/` shelf · `/signin` · `/signup` · `/forgot-password` ·
+The SQL behind all that is checked in: `supabase/migrations/`. Schema changes
+belong there, not only in the dashboard.
+
+**The root layout carries three things no screen owns.** `ThemeSync` (above),
+`LibrarySync` — which runs `syncWithServer()` once per mount, enough because
+every way of signing in ends in a redirect or full navigation, and flushes
+queued pushes on `visibilitychange` so a closed tab doesn't take the last save
+with it — and `AppLoader`, the held splash. `AppLoader` skips `/` deliberately
+and is *seeded* to "gone" there rather than switched off in an effect, or it
+paints and is taken away, which is the flash it exists to prevent.
+
+**Routes:** `/` — landing page for a signed-out visitor, shelf for a writer,
+decided on the server off `getClaims()` so neither sees the other's screen
+first; with no Supabase configured everyone gets the shelf ·
+`/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
+`/upgrade` plans (public — a price is read before an account exists) ·
 `/book/new` setup · `/book/import` · `/book/[bookId]` book
 overview (lands here, not on a chapter) ·
 `/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
@@ -272,6 +342,12 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
 
 - **No dead UI.** A control either works or plainly says it isn't built. Don't
   copy chrome from a reference and leave it inert.
+- **Two shelf buttons are complete features pointed at an "Available soon"
+  dialog on purpose** — Templates (`templates-dialog.tsx` + `book-templates.ts`)
+  and Background sound (`ambience.ts`, `use-ambience.ts`, `sounds-dialog.tsx`,
+  all tested). They are not leftovers; do not tidy them away. `TODO.md` says
+  what each is waiting on, and re-pointing the button in `bookshelf.tsx` is the
+  whole of switching either back on.
 - Storage limits are real: covers capped at 250KB, inline images at 900KB, import
   at 8MB — localStorage is ~5MB per origin. `setCover` and `createBookFromImport`
   fail cleanly and return a signal; honour it.

@@ -2,10 +2,20 @@ import type { JSONContent } from "@tiptap/react";
 import {
   chapterNumberOf,
   getBody,
+  getCover,
   orderedChapters,
   type Book,
 } from "@/lib/library-store";
+import {
+  storeReadiness,
+  type ReadinessIssue,
+} from "@/lib/publishing";
 import { toBlocks, type LoadedChapter } from "./blocks";
+import {
+  extractImages,
+  packageCover,
+  undecodableImages,
+} from "./epub-images";
 import { blocksToMarkdown } from "./markdown";
 import { DEFAULT_TYPESET, type TypesetOptions } from "./typeset";
 
@@ -40,6 +50,43 @@ export function loadChapters(book: Book, chapterId?: string): LoadedChapter[] {
       }
     }
     return { title: chapter.title, doc, number: chapterNumberOf(book, chapter.id) };
+  });
+}
+
+/**
+ * Everything standing between this book and a shop.
+ *
+ * Lives here rather than in publishing.ts because answering it means reading the
+ * manuscript — how many chapters have prose in them, how many pictures will
+ * survive packaging, how many carry a description — and publishing.ts is meant
+ * to stay a pure module that knows nothing about storage. It walks the whole
+ * book, so call it for the EPUB screen and not on every render.
+ */
+export function checkStoreReadiness(
+  book: Book,
+  cover: string | null,
+): ReadinessIssue[] {
+  const chapters = loadChapters(book);
+  const { blocks } = extractImages(chapters.map((c) => toBlocks(c.doc)));
+
+  const undescribedImages = blocks
+    .flat()
+    .filter((b) => b.kind === "image" && !b.alt?.trim()).length;
+
+  // A chapter that is only a title is not yet a chapter to publish.
+  const written = blocks.filter((chapterBlocks) =>
+    chapterBlocks.some(
+      (b) => b.kind === "image" || b.runs.some((r) => r.text.trim()),
+    ),
+  ).length;
+
+  return storeReadiness({
+    book,
+    meta: book.publishing,
+    hasCover: Boolean(packageCover(cover)),
+    chapterCount: written,
+    brokenImages: undecodableImages(blocks),
+    undescribedImages,
   });
 }
 
@@ -127,5 +174,10 @@ export async function runExport({
   }
 
   const { buildEpub } = await import("./epub");
-  download(await buildEpub(book, chapters, typeset), `${base}.epub`);
+  // Read here rather than inside the builder: covers live at their own storage
+  // key, and epub.ts is meant to stay a builder that touches no storage.
+  download(
+    await buildEpub(book, chapters, typeset, { cover: getCover(book.id) }),
+    `${base}.epub`,
+  );
 }

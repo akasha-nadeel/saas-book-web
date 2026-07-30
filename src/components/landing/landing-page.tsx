@@ -9,6 +9,7 @@ import {
   ReadFigure,
   ShelfFigure,
 } from "./landing-figures";
+import { WorksWith } from "./works-with";
 
 /**
  * What a signed-out visitor sees at `/`.
@@ -35,6 +36,7 @@ export function LandingPage() {
     <div data-theme="light" className="h-dvh overflow-y-auto bg-surface">
       <Nav />
       <Hero />
+      <WorksWith />
       <Rows />
       <Faq />
       <Closing />

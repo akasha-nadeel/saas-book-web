@@ -171,6 +171,14 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "For EPUB and PDF, switch on a title page, a copyright page, and a contents list — built from your book and placed at the front.",
       },
       {
+        name: "Store listing",
+        desc: "Choosing EPUB adds the details a shop asks for — ISBN, language, publisher, categories, blurb, series. They are saved to the book, so you fill them in once.",
+      },
+      {
+        name: "Ready for the shops",
+        desc: "The EPUB panel tells you what would stop a shop taking the file — a missing cover or author, an ISBN whose check digit is wrong, images that cannot be packaged — before you upload rather than after.",
+      },
+      {
         name: "Scope",
         desc: "Export a whole book, or just the chapter you are in.",
       },
@@ -185,7 +193,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Your account",
-        desc: "Signing in identifies you; it does not yet move your manuscripts. They stay in this browser until syncing ships, so signing in on another machine shows an empty shelf rather than your library.",
+        desc: "Signing in syncs your books to your account, so opening OpenChapter on another machine brings your library with it. They are still written to this browser first, which is why the app keeps working with no connection.",
+      },
+      {
+        name: "Plans",
+        desc: "Writing, syncing and the four file formats are free, up to fifty books. The Assistant and the audiobook spend a model's time per use, so they are what the paid plan covers — see Pricing in the header.",
       },
       {
         name: "Forgotten password",

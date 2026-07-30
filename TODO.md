@@ -63,6 +63,83 @@ should either ship or lose the card.
 
 ## Export
 
+- [x] **Store-ready EPUB.** Done 2026-07-30, and **verified with EPUBCheck 5.3
+      (EPUB 3.3): 0 errors, 0 warnings**, on both a fully-specified book (cover,
+      ISBN, series, images with and without alt text, marks, lists, blockquote,
+      generated front matter) and a bare one with nothing filled in. Worth
+      re-running after any change to `epub.ts`; the unit tests check our strings,
+      not the spec. Grab it from the w3c/epubcheck releases and
+      `java -jar epubcheck.jar book.epub`.
+      What was actually missing: the cover was never embedded at all, metadata
+      was three fields, and the identifier was re-randomised on every export — so
+      a corrected upload read as a second, unrelated title rather than a new
+      edition. Now: the cover is embedded and declared under both the
+      EPUB 3 and the legacy hook with a cover page first in the spine; the
+      identifier is derived from the book id instead of being minted fresh each
+      export (a random one made a corrected file read as a different title);
+      full `dc:` metadata, `marc:relators` role and file-as sort form, a
+      `belongs-to-collection` series, `schema:access*` accessibility metadata
+      written from what the book actually contains, `lang`/`xml:lang` on every
+      document, nav landmarks, and a `toc.ncx` fallback for the older ingestion
+      paths some shops still run.
+      `src/lib/publishing.ts` holds the listing details as `Book.publishing`
+      (jsonb column, migration `20260730000000`), and `storeReadiness()` reports
+      what would stop a shop taking the file — it never disables the export.
+      `epub-images.ts` moves inline images out of their `data:` URLs into real
+      package entries. This is a *size* fix, not a validity one — a `data:` src
+      passes EPUBCheck; it was checked. base64 is a third larger than the bytes,
+      compresses badly inside XHTML, and is copied in full at every use, so a
+      repeated scene-break ornament was one copy per chapter.
+      *Left:* the EPUBCheck run is manual — in CI it would catch a regression the
+      unit tests cannot; the categories field takes free text rather than a real
+      BISAC picker; and the readiness check walks the whole book on the export
+      screen, fine at 40 chapters and wanting memoising past that.
+      *Unverified:* whether KDP's or Apple's own converters are stricter than
+      EPUBCheck anywhere. Nothing here assumes they are.
+
+- [ ] **Test the store-ready EPUB by hand.** Written down 2026-07-30 because it
+      has not been done: everything above was verified against generated books
+      and a validator, never against a real manuscript in a real shop. In rough
+      order of what would hurt most if it were wrong:
+
+  - [ ] **Apply the migration.** `supabase/migrations/20260730000000_book_publishing.sql`
+        adds the `publishing` jsonb column and has *not* been run. Until it is,
+        listing details save locally and silently fail to sync — the push
+        rejects the unknown column. Do this one first or the rest tests nothing.
+  - [ ] **Round-trip the metadata.** Fill in the Store listing card, reload, and
+        confirm it survives. Then check it on a second device, which is what
+        proves the column is really there.
+  - [ ] **Export a real book with a real cover.** Not a generated one — a
+        250KB-ish JPEG in the actual trim ratio. Confirm the cover appears as
+        the first page, not just as a thumbnail.
+  - [ ] **Run EPUBCheck on that file.** `java -jar epubcheck.jar yourbook.epub`,
+        from the w3c/epubcheck releases. Generated books passing is not the same
+        as a book with forty chapters and real punctuation passing.
+  - [ ] **Open it in two readers.** Calibre and Apple Books, or Kindle
+        Previewer — they disagree about cover handling more than about anything
+        else, which is exactly why the cover is declared twice.
+  - [ ] **Try one real upload.** Draft2Digital or KDP, as a draft that is never
+        published. This is the only step that answers the open question above:
+        whether a shop's own converter is fussier than EPUBCheck.
+  - [ ] **Check the readiness panel tells the truth.** Against a real book:
+        remove the cover and confirm it says so, mistype an ISBN digit and
+        confirm it catches it.
+
+- [ ] **Direct upload to the shops.** Asked for, and only partly possible —
+      worth writing down so it is not re-investigated from scratch.
+      **Amazon KDP has no public API**, and automating the dashboard breaks
+      their terms with the writer's publishing account, not ours, carrying the
+      risk. Apple, Kobo and Google all run *publisher* ingestion programmes
+      rather than per-user APIs: using them means becoming the publisher of
+      record for every book on the site, taking the royalties, paying writers
+      out, and carrying the liability — a different company than this one.
+      The only realistic route is **one aggregator** with a partner API
+      (Draft2Digital, PublishDrive, Lulu), where the writer keeps their own
+      account and their own money and we just hand the file across.
+      Note the tension to resolve first: the landing page and the FAQ both
+      promise the manuscript never leaves the machine, and an upload means it
+      does. The wording has to change before the feature does.
+
 - [ ] **Previous exports.** The reference has a history tab. Would need export
       records in storage: format, options, timestamp. Cheap and genuinely
       useful — a writer wants to know what they last sent an agent.

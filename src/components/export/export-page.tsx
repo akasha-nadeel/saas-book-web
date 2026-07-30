@@ -1,66 +1,201 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { BookCover } from "@/components/shelf/book-cover";
+import {
+  FormatMark,
+  FormatPreview,
+  OPENING,
+  SECOND,
+  type PreviewBook,
+} from "@/components/export/format-previews";
+import {
+  ListingBlurb,
+  ListingDetails,
+  Note,
+  StoreReadiness,
+} from "@/components/export/publishing-card";
 import { loadChapters, runExport, type Format } from "@/lib/export";
 import {
   DEFAULT_TYPESET,
   TEMPLATES,
   TRIMS,
   templateById,
+  trimById,
   type TypesetOptions,
 } from "@/lib/export/typeset";
-import { findBook } from "@/lib/library-store";
+import { findBook, type Book } from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 /**
- * Getting the book out.
+ * Getting the book out, as a sequence rather than a wall.
  *
  * Every control here changes the file that is produced. Options that only moved
  * a preview would be worse than none at all, because the writer would find out
- * at the printer — so the typesetting choices are shown only for the two
- * formats whose look is ours to decide, and hidden for the two where it is not.
+ * at the printer — so the typesetting choices are shown only for the formats
+ * whose look is ours to decide, and hidden for the ones where it is not.
+ *
+ * **The page is a wizard because the work genuinely is one.** The old screen
+ * stacked every card at once, which meant a writer exporting Markdown scrolled
+ * past trim sizes and drop caps that could not apply to their file, and a writer
+ * exporting EPUB met eight listing fields in one go. The steps are built from
+ * the chosen format (`stepsFor`), so the rail is a truthful table of contents:
+ * what is on it is what this export will actually ask you.
+ *
+ * Nothing here gates. Every step is reachable at any time and no answer is
+ * required — the Export button sits on the last step and works whatever is left
+ * blank. A wizard that refuses to let a writer reach the end of their own export
+ * would be a worse screen than the wall it replaced.
  */
 
-const FORMATS: {
-  value: Format;
-  label: string;
-  hint: string;
-  typeset: boolean;
-}[] = [
+/** The four export formats plus the audiobook, which is one more way out. */
+type Output = Format | "audiobook";
+
+const FORMATS: { value: Output; label: string; hint: string }[] = [
   {
     value: "pdf",
     label: "PDF",
-    hint: "Typeset to your trim size, through your browser's print dialog",
-    typeset: true,
+    hint: "Typeset to your trim size, through your browser’s print dialog",
   },
-  {
-    value: "epub",
-    label: "EPUB",
-    hint: "For e-readers and the ebook stores",
-    typeset: true,
-  },
-  {
-    value: "docx",
-    label: "Word",
-    hint: "What agents and editors ask for",
-    typeset: false,
-  },
+  { value: "epub", label: "EPUB", hint: "For e-readers and the ebook stores" },
+  { value: "docx", label: "Word", hint: "What agents and editors ask for" },
   {
     value: "markdown",
     label: "Markdown",
     hint: "Plain text that reads anywhere",
-    typeset: false,
+  },
+  {
+    value: "audiobook",
+    label: "Audiobook",
+    hint: "Read aloud — one MP3 per chapter, in a zip",
   },
 ];
+
+/** The two whose look is ours, and therefore the two with a Formatting step. */
+const isTypeset = (output: Output | null) =>
+  output === "pdf" || output === "epub";
+
+type StepId =
+  | "format"
+  | "template"
+  | "layout"
+  | "frontmatter"
+  | "listing"
+  | "blurb"
+  | "export";
+
+interface Step {
+  id: StepId;
+  /** The heading on the rail. Consecutive steps sharing one become a group. */
+  group: string;
+  /** Shown as a sub-item under the group, when the group has more than one. */
+  label?: string;
+  title: string;
+  blurb: string;
+}
+
+/**
+ * The steps this export actually has.
+ *
+ * Derived rather than filtered at render, so the rail, the Next button and the
+ * "step 3 of 5" counter can never disagree about how long the road is.
+ */
+function stepsFor(output: Output | null): Step[] {
+  const steps: Step[] = [
+    {
+      id: "format",
+      group: "Format",
+      title: "How do you want it?",
+      blurb: "What comes next depends on this, so it is the first question.",
+    },
+  ];
+
+  // Nothing chosen, nothing to promise. The road genuinely is not known yet —
+  // Markdown is two steps and EPUB is seven — so the rail shows the one question
+  // that has been asked rather than a route that might not be taken.
+  if (output === null) return steps;
+
+  if (isTypeset(output)) {
+    steps.push(
+      {
+        id: "template",
+        group: "Formatting",
+        label: "Template",
+        title: "How the book is set",
+        blurb: "The face your prose is printed in, shown in its own type.",
+      },
+      {
+        id: "layout",
+        group: "Formatting",
+        label: "Page and chapters",
+        title: "The page and the chapters",
+        blurb: "How a chapter opens, and how big the page it opens on is.",
+      },
+      {
+        id: "frontmatter",
+        group: "Front matter",
+        title: "The pages before the story",
+        blurb:
+          "Built from what the book already knows, and placed at the front for you.",
+      },
+    );
+  }
+
+  if (output === "epub") {
+    steps.push(
+      {
+        id: "listing",
+        group: "Store listing",
+        label: "Book details",
+        title: "What a shop asks for",
+        blurb:
+          "Saved to the book, so you answer these once rather than once per export.",
+      },
+      {
+        id: "blurb",
+        group: "Store listing",
+        label: "Blurb and shelves",
+        title: "How it gets found",
+        blurb: "The text under the cover, and the shelves it sits on.",
+      },
+    );
+  }
+
+  steps.push({
+    id: "export",
+    group: "Export",
+    title:
+      output === "audiobook" ? "Read it aloud" : "Take it out of here",
+    blurb:
+      output === "audiobook"
+        ? "One chapter at a time, so a long book is visible progress rather than one long wait."
+        : "Everything is set. Here is what you are about to get.",
+  });
+
+  return steps;
+}
+
+/** Consecutive steps sharing a group name, for the rail. */
+function groupsOf(steps: Step[]) {
+  const groups: { name: string; steps: Step[] }[] = [];
+  for (const step of steps) {
+    const last = groups[groups.length - 1];
+    if (last?.name === step.group) last.steps.push(step);
+    else groups.push({ name: step.group, steps: [step] });
+  }
+  return groups;
+}
 
 export function ExportPage({ bookId }: { bookId: string }) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const cover = useCover(bookId);
 
-  const [format, setFormat] = useState<Format>("pdf");
+  // Nothing chosen to begin with. A card that arrives already ticked is the app
+  // answering its own first question, and a writer who wanted that format never
+  // finds out they had a choice.
+  const [output, setOutput] = useState<Output | null>(null);
+  const [stepId, setStepId] = useState<StepId>("format");
   const [manuscript, setManuscript] = useState(true);
   const [typeset, setTypeset] = useState<TypesetOptions>(DEFAULT_TYPESET);
   const [busy, setBusy] = useState(false);
@@ -68,11 +203,15 @@ export function ExportPage({ bookId }: { bookId: string }) {
 
   // Narration keeps its own state rather than sharing the export flags: it runs
   // for minutes, reports progress as it goes, and a writer should still be able
-  // to see what the other formats say while it does.
+  // to move around the wizard while it does.
   const [narrating, setNarrating] = useState(false);
   const [narrationLabel, setNarrationLabel] = useState("");
   const [narrationError, setNarrationError] = useState<string | null>(null);
 
+  const steps = useMemo(() => stepsFor(output), [output]);
+
+  // Every hook is above the early returns on purpose — a book that is not there
+  // must not change how many hooks this component runs.
   if (!hydrated) return null;
 
   const book = findBook(shelf, bookId);
@@ -94,14 +233,47 @@ export function ExportPage({ bookId }: { bookId: string }) {
     );
   }
 
-  const active = FORMATS.find((f) => f.value === format)!;
-  const template = templateById(typeset.template);
+  // A format change can retire the step we are standing on (EPUB → Markdown
+  // takes the listing away). Falling back to the first step is the only answer
+  // that is always valid.
+  const found = steps.findIndex((s) => s.id === stepId);
+  const index = found === -1 ? 0 : found;
+  const step = steps[index];
+  const groups = groupsOf(steps);
+  const active = FORMATS.find((f) => f.value === output) ?? null;
+
+  // The first *body* chapter, not the first stored one. This book opens on a
+  // chapter tagged as front matter, and the specimen prints a chapter number
+  // above whatever it is given — so the untagged one is the only honest sample.
+  const sampleTitle =
+    book.chapters.find((c) => !c.matter)?.title ??
+    book.chapters[0]?.title ??
+    "Chapter One";
+
+  // With no format chosen there is only the one step, and it is not an ending —
+  // it is a question waiting for an answer.
+  const last = output !== null && index === steps.length - 1;
+
+  const go = (next: number) => {
+    setStepId(steps[Math.min(steps.length - 1, Math.max(0, next))].id);
+    // A step change is a new screen; the old one's scroll position is not it.
+    document.getElementById("export-scroll")?.scrollTo({ top: 0 });
+  };
+
+  const pick = (value: Output) => {
+    setOutput(value);
+    setError(null);
+    // Standing on "format" already, so the step id stays valid whatever the new
+    // format's road looks like.
+    setStepId("format");
+  };
 
   const run = async () => {
+    if (output === null || output === "audiobook") return;
     setBusy(true);
     setError(null);
     try {
-      await runExport({ book, format, manuscript, typeset });
+      await runExport({ book, format: output, manuscript, typeset });
     } catch (err) {
       console.error("[export] failed", err);
       setError(
@@ -150,135 +322,134 @@ export function ExportPage({ bookId }: { bookId: string }) {
   ) => setTypeset((prev) => ({ ...prev, [key]: value }));
 
   return (
-    <main className="scroll-slim h-dvh overflow-y-auto bg-surface">
-      <header className="border-b border-line bg-panel px-4 py-5 md:px-6 md:py-6">
-        <div className="mx-auto flex max-w-5xl items-center gap-4 md:gap-5">
-          <div className="w-14 shrink-0 md:w-20">
-            <BookCover
-              title={book.title}
-              subtitle={book.subtitle}
-              author={book.author}
-              words={0}
-              image={cover}
-              bare={book.bareCover}
-              seed={book.id}
-            />
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate font-serif text-xl text-fg md:text-2xl">
-              {book.title}
-            </h1>
-            <p className="mt-1 font-sans text-sm text-muted">
-              Typeset your manuscript and take it out of here.
-            </p>
-          </div>
+    // The shell owns the height and does not scroll; the content column does.
+    // <body> is overflow-hidden, so a scrolling region has to be declared.
+    //
+    // The rail takes the tint and the content takes the white, which is the way
+    // round this pattern wants: the form is the subject, so it gets the clean
+    // ground, and the navigation sits back on a wash.
+    <main className="flex h-dvh overflow-hidden bg-panel">
+      <Rail
+        book={book}
+        bookId={bookId}
+        groups={groups}
+        currentId={step.id}
+        currentIndex={index}
+        steps={steps}
+        onGo={(id) => go(steps.findIndex((s) => s.id === id))}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex shrink-0 items-center gap-4 px-5 pt-5 md:px-12 md:pt-7">
+          {/* Back sits at the top, where you came in, rather than at the bottom
+              where it would compete with the step's own action. Absent on the
+              first step rather than disabled — there is nothing behind it. */}
+          {index > 0 ? (
+            <button
+              type="button"
+              onClick={() => go(index - 1)}
+              className="group flex items-center gap-2.5 rounded-full outline-none
+                         focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 items-center justify-center rounded-full
+                           bg-surface text-muted transition-colors
+                           group-hover:bg-raised group-hover:text-fg"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5"
+                >
+                  <path d="M12 5l-5 5 5 5" />
+                </svg>
+              </span>
+              <span className="font-sans text-sm text-muted transition-colors group-hover:text-fg">
+                Previous
+              </span>
+            </button>
+          ) : (
+            <span className="font-sans text-sm text-muted lg:hidden">
+              Step {index + 1} of {steps.length}
+            </span>
+          )}
+
+          {/* The rail carries this where the rail exists. */}
           <Link
             href={`/book/${bookId}`}
-            aria-label="Back to writing"
-            className="ml-auto shrink-0 rounded-md px-3 py-2 font-sans text-sm
-                       text-muted outline-none transition-colors
-                       hover:bg-raised hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
+            className="ml-auto shrink-0 rounded-sm font-sans text-sm text-muted
+                       outline-none transition-colors hover:text-fg
+                       focus-visible:ring-2 focus-visible:ring-accent/60 lg:hidden"
           >
-            {/* An arrow on phones, the words where there's room. */}
-            <span className="md:hidden" aria-hidden="true">←</span>
-            <span className="hidden md:inline">Back to writing</span>
+            Back to writing
           </Link>
-        </div>
-      </header>
+        </header>
 
-      <div className="mx-auto grid max-w-5xl gap-6 px-6 py-8 lg:grid-cols-[1fr_18rem]">
-        <div className="min-w-0 space-y-6">
-          <Card title="Format">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {FORMATS.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={format === f.value}
-                  onClick={() => setFormat(f.value)}
-                  className={`rounded-md border px-4 py-3 text-left outline-none
-                              transition-colors focus-visible:ring-2
-                              focus-visible:ring-accent/60 ${
-                                format === f.value
-                                  ? "border-accent bg-accent/10"
-                                  : "border-line hover:border-accent/50 hover:bg-raised"
-                              }`}
-                >
-                  <span className="block font-sans text-sm font-medium text-fg">
-                    {f.label}
-                  </span>
-                  <span className="mt-0.5 block font-sans text-xs text-muted">
-                    {f.hint}
-                  </span>
-                </button>
-              ))}
-            </div>
+        <div
+          id="export-scroll"
+          className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-8 md:px-12 md:py-10"
+        >
+          <div className="mx-auto w-full max-w-2xl">
+            <h1 className="font-serif text-2xl text-fg md:text-[1.75rem]">
+              {step.title}
+            </h1>
+            <p className="mt-2 font-sans text-sm leading-relaxed text-muted">
+              {step.blurb}
+            </p>
 
-            {format === "pdf" && (
-              <p className="mt-4 rounded-md border border-line bg-surface px-3 py-2.5 font-sans text-xs text-muted">
-                This opens your browser’s print dialog — choose “Save as PDF”.
-                It sets the interior at your trim size. It does not add bleed or
-                crop marks, so a printer may ask you for those separately.
-              </p>
-            )}
-
-            {format === "docx" && (
-              <label className="mt-4 flex items-start gap-2.5 font-sans text-sm">
-                <input
-                  type="checkbox"
-                  checked={manuscript}
-                  onChange={(e) => setManuscript(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+            <div className="mt-8">
+              {step.id === "format" && (
+                <FormatStep
+                  output={output}
+                  // The previews are set with this book's own title and first
+                  // chapter rather than a stand-in. It costs nothing and it is
+                  // the difference between a picture of a format and a picture
+                  // of *your book* in that format. Same body chapter the
+                  // specimen uses — these pages carry a chapter number too.
+                  book={{
+                    title: book.title,
+                    chapter: sampleTitle,
+                    author: book.author,
+                  }}
+                  onPick={pick}
+                  manuscript={manuscript}
+                  onManuscript={setManuscript}
                 />
-                <span>
-                  <span className="text-fg">Standard manuscript format</span>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    Double-spaced, 12pt, with a byline block — what submission
-                    guidelines mean.
-                  </span>
-                </span>
-              </label>
-            )}
-          </Card>
+              )}
 
-          {active.typeset ? (
-            <>
-              <Card
-                title="Formatting"
-                note="These change the file, not just the preview."
-              >
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Toggle
-                    label="Hide chapter numbers"
-                    hint="Titles only, with no numeral above them"
-                    on={typeset.hideChapterNumbers}
-                    onChange={(v) => set("hideChapterNumbers", v)}
-                  />
-                  <Toggle
-                    label="Drop caps"
-                    hint="A raised initial opening each chapter"
-                    on={typeset.dropCaps}
-                    onChange={(v) => set("dropCaps", v)}
-                  />
-                </div>
-              </Card>
+              {step.id === "template" && (
+                <TemplateStep
+                  typeset={typeset}
+                  onPick={(id) => set("template", id)}
+                  sampleTitle={sampleTitle}
+                />
+              )}
 
-              <Card
-                title="Front matter"
-                note="Pages generated for you, placed at the front of the book."
-              >
+              {step.id === "layout" && (
+                <LayoutStep
+                  typeset={typeset}
+                  output={output}
+                  sampleTitle={sampleTitle}
+                  onSet={set}
+                />
+              )}
+
+              {step.id === "frontmatter" && (
                 <div className="grid gap-3 sm:grid-cols-3">
                   <Toggle
                     label="Title page"
-                    hint="The book's title and author"
+                    hint="The book’s title and author"
                     on={typeset.titlePage}
                     onChange={(v) => set("titlePage", v)}
                   />
                   <Toggle
                     label="Copyright page"
-                    hint="© this year, in the author's name"
+                    hint="© this year, in the author’s name"
                     on={typeset.copyright}
                     onChange={(v) => set("copyright", v)}
                   />
@@ -289,265 +460,886 @@ export function ExportPage({ bookId }: { bookId: string }) {
                     onChange={(v) => set("contents", v)}
                   />
                 </div>
-              </Card>
-
-              <Card
-                title="Trim size"
-                note={
-                  format === "epub"
-                    ? "Used for the PDF. An e-reader chooses its own page, so EPUB ignores this."
-                    : "The finished page size, before binding."
-                }
-              >
-                <select
-                  value={typeset.trim}
-                  onChange={(e) => set("trim", e.target.value)}
-                  disabled={format === "epub"}
-                  className="w-full rounded-md border border-line bg-surface
-                             px-3 py-2.5 font-sans text-sm text-fg
-                             focus-visible:border-accent
-                             focus-visible:outline-none disabled:opacity-50"
-                >
-                  {TRIMS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </Card>
-
-              <Card title="Template" note="How the book is set.">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  {TEMPLATES.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={typeset.template === t.id}
-                      onClick={() => set("template", t.id)}
-                      className={`rounded-md border px-3 py-3 text-left
-                                  outline-none transition-colors
-                                  focus-visible:ring-2
-                                  focus-visible:ring-accent/60 ${
-                                    typeset.template === t.id
-                                      ? "border-accent bg-accent/10"
-                                      : "border-line hover:border-accent/50 hover:bg-raised"
-                                  }`}
-                    >
-                      <span className="block font-sans text-sm font-medium text-fg">
-                        {t.name}
-                      </span>
-                      <span
-                        className="mt-0.5 block text-xs text-muted"
-                        style={{ fontFamily: t.stack }}
-                      >
-                        {t.face}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Set in the template's own face at its own size, so what is
-                    shown is the setting rather than a picture of one. */}
-                <div className="mt-4 rounded-md bg-white p-6">
-                  <div
-                    className="mx-auto max-w-sm text-[#16191f]"
-                    style={{
-                      fontFamily: template.stack,
-                      fontSize: `${template.bodyPt}pt`,
-                      lineHeight: template.leading,
-                    }}
-                  >
-                    {!typeset.hideChapterNumbers && (
-                      <p
-                        className="text-center text-[#555]"
-                        style={{ fontSize: `${template.bodyPt * 1.4}pt` }}
-                      >
-                        1
-                      </p>
-                    )}
-                    <p
-                      className="mt-1 text-center"
-                      style={{
-                        fontSize: `${template.bodyPt * 1.6}pt`,
-                        fontVariant: template.headingCaps
-                          ? "small-caps"
-                          : "normal",
-                        letterSpacing: template.headingCaps ? "0.06em" : "0",
-                      }}
-                    >
-                      {book.chapters[0]?.title ?? "Chapter One"}
-                    </p>
-                    <p
-                      className="mt-6 text-justify"
-                      style={
-                        typeset.dropCaps
-                          ? ({
-                              ["--drop" as string]: "1",
-                            } as React.CSSProperties)
-                          : undefined
-                      }
-                    >
-                      {typeset.dropCaps && (
-                        <span
-                          style={{
-                            float: "left",
-                            fontSize: `${template.bodyPt * 3.2}pt`,
-                            lineHeight: 0.82,
-                            padding: "0.06em 0.08em 0 0",
-                          }}
-                        >
-                          T
-                        </span>
-                      )}
-                      {typeset.dropCaps
-                        ? "he road ran west, and the salt began before she had counted a mile of it."
-                        : "The road ran west, and the salt began before she had counted a mile of it."}
-                    </p>
-                    <p className="text-justify" style={{ textIndent: "1.5em" }}>
-                      She did not look back, and afterwards could never say
-                      whether that had been courage or the simple want of a
-                      reason to.
-                    </p>
-                  </div>
-                </div>
-              </Card>
-
-              {format === "pdf" && (
-                <Card
-                  title="In the print dialog"
-                  note="The PDF is made by your browser's print, so two of its settings finish the page."
-                >
-                  <ul className="flex flex-col gap-2 font-sans text-sm text-muted">
-                    <li>
-                      <span className="text-fg">Turn off “Headers and footers”</span>{" "}
-                      (under More settings) to drop the date, the address, and the
-                      page counter the browser prints around the edge.
-                    </li>
-                    <li>
-                      <span className="text-fg">Set Paper size to match your trim</span>{" "}
-                      above — otherwise a small book page is centred on a big
-                      sheet, with wide margins around it.
-                    </li>
-                  </ul>
-                </Card>
               )}
-            </>
-          ) : (
-            <Card title="Formatting">
-              <p className="font-sans text-sm text-muted">
-                {format === "docx"
-                  ? "Word carries its own styles, so the template and trim size below do not apply — your editor will set the book their way."
-                  : "Markdown is plain text with no typesetting, so there is nothing here to choose."}
-              </p>
-            </Card>
-          )}
 
-          {/* Announced, not pretended. A live-looking button that does nothing
-              is worse than one that says plainly it is not built yet. */}
-          <section className="rounded-lg border border-dashed border-line p-5">
-            <div className="flex items-start gap-3">
-              <span
-                aria-hidden="true"
-                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-line text-muted"
-              >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-4 w-4"
+              {step.id === "listing" && <ListingDetails book={book} />}
+              {step.id === "blurb" && <ListingBlurb book={book} />}
+
+              {/* Only reachable once a format is chosen, which is what builds
+                  this step in the first place. */}
+              {step.id === "export" && output !== null && (
+                <ExportStep
+                  book={book}
+                  cover={cover}
+                  output={output}
+                  label={active?.label ?? ""}
+                  typeset={typeset}
+                  manuscript={manuscript}
+                  busy={busy}
+                  error={error}
+                  narrating={narrating}
+                  narrationLabel={narrationLabel}
+                  narrationError={narrationError}
+                  onRun={run}
+                  onNarrate={narrate}
+                />
+              )}
+            </div>
+
+            {/* The step's own action, full width at the end of the form. The
+                last step has no Continue because its action *is* the export,
+                which ExportStep renders in this same shape — one button per
+                screen, always in the same place. */}
+            {!last && (
+              <div className="mt-9 space-y-4">
+                <button
+                  type="button"
+                  onClick={() => go(index + 1)}
+                  // The one place in this wizard where a control is genuinely
+                  // unavailable: there is no next step until a format is picked,
+                  // because which steps exist is what the pick decides.
+                  disabled={output === null}
+                  className="w-full rounded-lg bg-accent py-3 font-sans text-sm
+                             font-semibold text-white outline-none
+                             transition-colors hover:bg-accent-strong
+                             focus-visible:ring-2 focus-visible:ring-accent/60
+                             disabled:cursor-not-allowed disabled:bg-raised
+                             disabled:text-muted"
                 >
-                  <path d="M4 11V9.6a6 6 0 0 1 12 0V11" />
-                  <path d="M4.2 11h1.4a1 1 0 0 1 1 1v2.6a1 1 0 0 1-1 1h-.8A1.8 1.8 0 0 1 3 13.8V12.2a1.2 1.2 0 0 1 1.2-1.2z" />
-                  <path d="M15.8 11h-1.4a1 1 0 0 0-1 1v2.6a1 1 0 0 0 1 1h.8a1.8 1.8 0 0 0 1.8-1.8V12.2a1.2 1.2 0 0 0-1.2-1.2z" />
-                </svg>
-              </span>
+                  {output === null ? "Choose a format to continue" : "Continue"}
+                </button>
 
-              <div className="min-w-0 flex-1">
-                <h2 className="font-sans text-sm font-semibold text-fg">
-                  Audiobook
-                </h2>
-                <p className="mt-1 font-sans text-xs text-muted">
-                  {narrating
-                    ? narrationLabel
-                    : "Read aloud and downloaded as a zip, one MP3 per chapter."}
-                </p>
-                {narrationError && (
-                  <p role="alert" className="mt-1.5 font-sans text-xs text-danger">
-                    {narrationError}
-                  </p>
+                {/* Only where it is true. The listing steps are genuinely
+                    optional — the export runs without any of it — so saying so
+                    is honest. Offering it on the format step would be a lie,
+                    since something has to be chosen. */}
+                {(step.id === "listing" || step.id === "blurb") && (
+                  <button
+                    type="button"
+                    onClick={() => go(steps.length - 1)}
+                    className="mx-auto block rounded-sm font-sans text-sm
+                               font-medium text-accent underline-offset-4
+                               outline-none transition-colors
+                               hover:text-accent-strong hover:underline
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    Skip — you can add this later
+                  </button>
                 )}
               </div>
-
-              <button
-                type="button"
-                onClick={narrate}
-                disabled={narrating || busy}
-                className="shrink-0 rounded-md border border-line px-3 py-2
-                           font-sans text-sm font-medium text-fg outline-none
-                           transition-colors hover:bg-raised focus-visible:ring-2
-                           focus-visible:ring-accent/50 disabled:opacity-60"
-              >
-                {narrating ? "Reading…" : "Read aloud"}
-              </button>
-            </div>
-          </section>
-        </div>
-
-        <aside className="lg:sticky lg:top-8 lg:self-start">
-          <div className="rounded-lg border border-line bg-panel p-5">
-            <p className="font-serif text-lg text-fg">
-              {active.label} of {book.chapters.length}{" "}
-              {book.chapters.length === 1 ? "chapter" : "chapters"}
-            </p>
-            <p className="mt-1 font-sans text-sm text-muted">{active.hint}</p>
-
-            {error && (
-              <p
-                role="alert"
-                className="mt-4 rounded-md border border-accent/50 bg-accent-deep/30 px-3 py-2.5 font-sans text-sm text-fg"
-              >
-                {error}
-              </p>
             )}
-
-            <button
-              type="button"
-              onClick={run}
-              disabled={busy}
-              className="mt-5 w-full rounded-md bg-accent py-2.5 font-sans
-                         text-sm font-semibold text-white outline-none
-                         transition-colors hover:bg-accent-strong
-                         focus-visible:ring-2 focus-visible:ring-accent/60
-                         disabled:opacity-50"
-            >
-              {busy ? "Working…" : `Export ${active.label}`}
-            </button>
           </div>
-        </aside>
+        </div>
       </div>
     </main>
   );
 }
 
-function Card({
-  title,
-  note,
-  children,
+// ---------------------------------------------------------------------------
+// The rail
+// ---------------------------------------------------------------------------
+
+/**
+ * The stepper, and the book it is about.
+ *
+ * Every step is clickable, including ones ahead: nothing here is required, so
+ * refusing to let a writer skip forward would be inventing a gate to guard an
+ * empty room. "Done" therefore means *behind you*, not *answered*.
+ *
+ * Blue throughout rather than the usual green tick. Green already means
+ * something in this app — it is the colour of front matter, in the book panel
+ * and on the page edge — and a second meaning for it here would be a collision
+ * a reader has to learn their way out of.
+ */
+function Rail({
+  book,
+  bookId,
+  groups,
+  steps,
+  currentId,
+  currentIndex,
+  onGo,
 }: {
-  title: string;
-  note?: string;
-  children: React.ReactNode;
+  book: Book;
+  bookId: string;
+  groups: { name: string; steps: Step[] }[];
+  steps: Step[];
+  currentId: StepId;
+  currentIndex: number;
+  onGo: (id: StepId) => void;
 }) {
   return (
-    <section className="rounded-lg border border-line bg-panel p-5">
-      <h2 className="font-sans text-sm font-semibold text-fg">{title}</h2>
-      {note && <p className="mt-1 font-sans text-xs text-muted">{note}</p>}
-      <div className="mt-4">{children}</div>
-    </section>
+    <aside className="hidden w-72 shrink-0 flex-col border-r border-line bg-surface lg:flex">
+      <div className="shrink-0 px-8 pt-9">
+        <p className="font-sans text-base font-semibold text-fg">
+          Take it out of here
+        </p>
+        <p className="mt-1 truncate font-sans text-sm text-muted">
+          {book.title} · {book.chapters.length}{" "}
+          {book.chapters.length === 1 ? "chapter" : "chapters"}
+        </p>
+      </div>
+
+      {/* Scrolls rather than clips. On a short laptop the steps are taller than
+          the rail, and the thing that must never be cut off is the
+          navigation. */}
+      <nav className="scroll-slim mt-9 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-8 pb-6">
+        {groups.map((group, i) => {
+          const indices = group.steps.map((s) => steps.indexOf(s));
+          const isCurrent = group.steps.some((s) => s.id === currentId);
+          const isDone = Math.max(...indices) < currentIndex;
+          const isLast = i === groups.length - 1;
+
+          return (
+            <div key={group.name} className="relative">
+              {/* The thread through the steps. Absolutely positioned from under
+                  this circle into the gap below, so it reaches the next circle
+                  whatever height this row grew to — a group showing its
+                  sub-steps is twice as tall as one that is not. */}
+              {!isLast && (
+                <span
+                  aria-hidden="true"
+                  className={`absolute top-7 -bottom-6 left-[11px] w-0.5 rounded-full ${
+                    isDone ? "bg-accent" : "bg-line"
+                  }`}
+                />
+              )}
+
+              <button
+                type="button"
+                onClick={() => onGo(group.steps[0].id)}
+                className="relative flex w-full items-center gap-3.5 rounded-sm
+                           text-left outline-none focus-visible:ring-2
+                           focus-visible:ring-accent/60"
+              >
+                {/* Filled for both done and current, outlined only for what is
+                    still ahead: the circle answers "have I been here", and
+                    where you are standing is somewhere you have been. */}
+                <span
+                  aria-hidden="true"
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center
+                              rounded-full font-sans text-[11px] font-semibold
+                              transition-colors ${
+                                isDone || isCurrent
+                                  ? "bg-accent text-white"
+                                  : "border border-line bg-panel text-muted"
+                              }`}
+                >
+                  {isDone ? <Check /> : i + 1}
+                </span>
+                <span
+                  className={`font-sans text-sm ${
+                    isCurrent
+                      ? "font-semibold text-fg"
+                      : "text-muted hover:text-fg"
+                  }`}
+                >
+                  {group.name}
+                </span>
+              </button>
+
+              {/* Sub-steps only for the group you are standing in — listing them
+                  everywhere would make the rail a table of contents for a book
+                  nobody asked to read. */}
+              {isCurrent && group.steps.length > 1 && (
+                <div className="mt-3 ml-[2.4rem] flex flex-col gap-2.5">
+                  {group.steps.map((sub) => {
+                    const here = sub.id === currentId;
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => onGo(sub.id)}
+                        className={`flex items-center gap-2 rounded-sm text-left
+                                    font-sans text-sm outline-none
+                                    transition-colors focus-visible:ring-2
+                                    focus-visible:ring-accent/60 ${
+                                      here
+                                        ? "font-medium text-fg"
+                                        : "text-muted hover:text-fg"
+                                    }`}
+                      >
+                        {sub.label}
+                        {here && <Arrow className="ml-auto text-muted" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+
+      {/* The way out, where the reference puts Log out: bottom of the rail,
+          quiet, and never mistakable for a step. */}
+      <div className="shrink-0 px-8 pb-8">
+        <Link
+          href={`/book/${bookId}`}
+          className="rounded-sm font-sans text-sm text-muted underline
+                     underline-offset-4 outline-none transition-colors
+                     hover:text-fg focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          Back to writing
+        </Link>
+      </div>
+    </aside>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Steps
+// ---------------------------------------------------------------------------
+
+function FormatStep({
+  output,
+  book,
+  onPick,
+  manuscript,
+  onManuscript,
+}: {
+  output: Output | null;
+  book: PreviewBook;
+  onPick: (value: Output) => void;
+  manuscript: boolean;
+  onManuscript: (on: boolean) => void;
+}) {
+  // EPUB leads, and the other four sit under it. Not a styling whim: it is the
+  // only one of the five a shop will take, and the only one the store-listing
+  // steps exist for. A grid of equals would say the choice does not matter,
+  // which is the opposite of what this screen knows.
+  const featured = FORMATS.find((f) => f.value === "epub")!;
+  const rest = FORMATS.filter((f) => f.value !== "epub");
+
+  return (
+    <div role="radiogroup" aria-label="Format" className="space-y-3">
+      <FormatCard
+        format={featured}
+        book={book}
+        selected={output === featured.value}
+        onPick={onPick}
+        featured
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {rest.map((f) => (
+          <FormatCard
+            key={f.value}
+            format={f}
+            book={book}
+            selected={output === f.value}
+            onPick={onPick}
+          />
+        ))}
+      </div>
+
+      {output === "pdf" && (
+        <Note>
+          This opens your browser’s print dialog — choose “Save as PDF”. It sets
+          the interior at your trim size. It does not add bleed or crop marks, so
+          a printer may ask you for those separately.
+        </Note>
+      )}
+
+      {output === "audiobook" && (
+        <Note>
+          Read by a speech model, one chapter at a time, and downloaded as a zip.
+          It needs a connection and is billed per minute of audio.
+        </Note>
+      )}
+
+      {output === "markdown" && (
+        <Note>
+          Markdown is plain text with no typesetting, so there is nothing to set
+          — the next step is the export itself.
+        </Note>
+      )}
+
+      {output === "docx" && (
+        <div className="space-y-3">
+          <label className="flex items-start gap-2.5 rounded-lg border border-line bg-panel px-4 py-3.5 font-sans text-sm">
+            <input
+              type="checkbox"
+              checked={manuscript}
+              onChange={(e) => onManuscript(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-accent)]"
+            />
+            <span>
+              <span className="font-semibold text-fg">
+                Standard manuscript format
+              </span>
+              <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+                Double-spaced, 12pt, with a byline block — what submission
+                guidelines mean.
+              </span>
+            </span>
+          </label>
+          <Note>
+            Word carries its own styles, so the template and trim size do not
+            apply — your editor will set the book their way.
+          </Note>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One format, with a picture of the file it makes.
+ *
+ * `featured` is the same card given the room to be read first: full width,
+ * taller, its name at heading size and a badge saying what it is for. The
+ * construction underneath is identical, so the two can never drift apart.
+ */
+function FormatCard({
+  format,
+  book,
+  selected,
+  onPick,
+  featured,
+}: {
+  format: (typeof FORMATS)[number];
+  book: PreviewBook;
+  selected: boolean;
+  onPick: (value: Output) => void;
+  featured?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={() => onPick(format.value)}
+      // h-* and overflow-hidden are load-bearing, not styling: they are what
+      // crops the preview at the corner. See .oc-tilt-card.
+      //
+      // flex-col is load-bearing too, for a duller reason: a <button> centres
+      // its content vertically, so at a fixed height the title floats into the
+      // middle of the card instead of sitting at the top.
+      className={`oc-tilt-card relative flex w-full flex-col items-start
+                  overflow-hidden rounded-xl border px-4 pt-4
+                  text-left outline-none transition-colors focus-visible:ring-2
+                  focus-visible:ring-accent/60 ${
+                    featured ? "h-[250px] sm:px-6 sm:pt-5" : "h-[200px]"
+                  } ${
+                    selected
+                      ? "border-accent bg-accent/8"
+                      : // A hairline at --color-line vanishes on white at this
+                        // corner radius; the card needs an edge you can find
+                        // before you can decide to click it.
+                        "border-fg/20 bg-panel hover:border-fg/45"
+                  }`}
+    >
+      {/* Above the preview, which passes under the text on its way out of the
+          corner. */}
+      <span className="relative z-10 flex items-center gap-2.5">
+        <FormatMark
+          format={format.value}
+          className={featured ? "h-7 w-7" : "h-5 w-5"}
+        />
+        <span
+          className={`font-sans font-semibold text-fg ${
+            featured ? "text-xl" : "text-base"
+          }`}
+        >
+          {format.label}
+        </span>
+        {featured && (
+          <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-sans text-[11px] font-semibold tracking-[0.06em] text-accent uppercase">
+            Store-ready
+          </span>
+        )}
+      </span>
+
+      <span
+        className={`relative z-10 mt-1.5 block font-sans leading-relaxed text-muted ${
+          featured ? "max-w-[28rem] text-[0.9375rem]" : "max-w-[92%] text-sm"
+        }`}
+      >
+        {featured
+          ? "For e-readers and every ebook shop. The only format here a store will take — and the one the listing steps are for."
+          : format.hint}
+      </span>
+
+      {/* The chosen one says so in the corner as well as in its border — colour
+          alone is not an answer for a reader who cannot see it. */}
+      {selected && (
+        <span
+          aria-hidden="true"
+          className="absolute top-3.5 right-3.5 z-10 flex h-5 w-5 items-center
+                     justify-center rounded-full bg-accent text-white"
+        >
+          <Check />
+        </span>
+      )}
+
+      <span
+        aria-hidden="true"
+        className={`oc-tilt absolute h-full w-full overflow-hidden rounded-lg
+                    border border-line bg-panel shadow-sm ${
+                      // The wider the card, the more a large left offset turns
+                      // into dead space under the text rather than a preview
+                      // entering from the corner.
+                      featured ? "top-[52%] left-[13%]" : "top-[55%] left-[15%]"
+                    }`}
+      >
+        <FormatPreview format={format.value} book={book} wide={featured} />
+      </span>
+    </button>
+  );
+}
+
+function TemplateStep({
+  typeset,
+  onPick,
+  sampleTitle,
+}: {
+  typeset: TypesetOptions;
+  onPick: (id: TypesetOptions["template"]) => void;
+  sampleTitle: string;
+}) {
+  return (
+    <div className="space-y-5">
+      <div role="radiogroup" aria-label="Template" className="grid gap-3 sm:grid-cols-3">
+        {TEMPLATES.map((t) => (
+          <TemplateCard
+            key={t.id}
+            template={t}
+            typeset={typeset}
+            sampleTitle={sampleTitle}
+            checked={typeset.template === t.id}
+            onClick={() => onPick(t.id)}
+          />
+        ))}
+      </div>
+
+      <Specimen typeset={typeset} sampleTitle={sampleTitle} />
+    </div>
+  );
+}
+
+/**
+ * A template, with a page already set in it.
+ *
+ * The three faces are a comparison, and a comparison you have to click through
+ * one at a time is not one — you are remembering the last card rather than
+ * seeing it. So each carries its own tilted page, set in its own type, and the
+ * three can be read side by side. The big specimen below is still there for
+ * judging the chosen one at a readable size; this is for choosing it.
+ */
+function TemplateCard({
+  template,
+  typeset,
+  sampleTitle,
+  checked,
+  onClick,
+}: {
+  template: (typeof TEMPLATES)[number];
+  typeset: TypesetOptions;
+  sampleTitle: string;
+  checked: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={checked}
+      onClick={onClick}
+      className={`oc-tilt-card relative flex h-[190px] w-full
+                  flex-col items-start overflow-hidden rounded-lg border px-3.5
+                  pt-3.5 text-left outline-none transition-colors
+                  focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                    checked
+                      ? "border-accent bg-accent/8"
+                      : "border-fg/20 bg-panel hover:border-fg/45"
+                  }`}
+    >
+      <span className="relative z-10 block font-sans text-base font-semibold text-fg">
+        {template.name}
+      </span>
+      {/* Named in its own face, so the line under the name is a specimen of the
+          thing it names rather than a description of it. */}
+      <span
+        className="relative z-10 mt-0.5 block text-sm text-muted"
+        style={{ fontFamily: template.stack }}
+      >
+        {template.face}
+      </span>
+
+      <span
+        aria-hidden="true"
+        className="oc-tilt absolute top-[47%] left-[12%] h-full w-full
+                   overflow-hidden rounded-md border border-line bg-panel
+                   shadow-sm"
+      >
+        <span
+          className="block h-full w-full px-4 pt-3 text-[#1a222d]"
+          style={{ fontFamily: template.stack }}
+        >
+          {!typeset.hideChapterNumbers && (
+            <span className="block text-center text-[7px] text-[#1a222d]/40">
+              1
+            </span>
+          )}
+          <span
+            className="mt-1 block truncate text-center text-[9px] text-[#1a222d]/75"
+            style={{
+              fontVariant: template.headingCaps ? "small-caps" : "normal",
+              letterSpacing: template.headingCaps ? "0.06em" : "0",
+            }}
+          >
+            {sampleTitle}
+          </span>
+          <span
+            className="mt-2 block text-justify text-[6.5px] text-[#1a222d]/55"
+            style={{ lineHeight: template.leading }}
+          >
+            {typeset.dropCaps && (
+              <span
+                style={{
+                  float: "left",
+                  fontSize: "20px",
+                  lineHeight: 0.82,
+                  padding: "0.06em 0.08em 0 0",
+                }}
+              >
+                T
+              </span>
+            )}
+            {typeset.dropCaps ? OPENING.slice(1) : OPENING} {SECOND}
+          </span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
+/**
+ * The specimen page.
+ *
+ * Rendered on *both* typesetting steps, not just the one that picks the face.
+ * Template, chapter numbers and drop caps are three settings for one outcome, so
+ * a step that changes the outcome and shows nothing is a switch with the lamp in
+ * the next room — which is what "Page and chapters" was until this was pulled
+ * out of TemplateStep.
+ */
+function Specimen({
+  typeset,
+  sampleTitle,
+}: {
+  typeset: TypesetOptions;
+  sampleTitle: string;
+}) {
+  const template = templateById(typeset.template);
+
+  return (
+    // Set in the template's own face at its own size, so what is shown is the
+    // setting rather than a picture of one.
+    <div className="rounded-lg border border-line bg-white p-6">
+      <div
+        className="mx-auto max-w-sm text-[#16191f]"
+        style={{
+          fontFamily: template.stack,
+          fontSize: `${template.bodyPt}pt`,
+          lineHeight: template.leading,
+        }}
+      >
+        {!typeset.hideChapterNumbers && (
+          <p
+            className="text-center text-[#555]"
+            style={{ fontSize: `${template.bodyPt * 1.4}pt` }}
+          >
+            1
+          </p>
+        )}
+        <p
+          className="mt-1 text-center"
+          style={{
+            fontSize: `${template.bodyPt * 1.6}pt`,
+            fontVariant: template.headingCaps ? "small-caps" : "normal",
+            letterSpacing: template.headingCaps ? "0.06em" : "0",
+          }}
+        >
+          {sampleTitle}
+        </p>
+        <p className="mt-6 text-justify">
+          {typeset.dropCaps && (
+            <span
+              style={{
+                float: "left",
+                fontSize: `${template.bodyPt * 3.2}pt`,
+                lineHeight: 0.82,
+                padding: "0.06em 0.08em 0 0",
+              }}
+            >
+              T
+            </span>
+          )}
+          {typeset.dropCaps
+            ? "he road ran west, and the salt began before she had counted a mile of it."
+            : "The road ran west, and the salt began before she had counted a mile of it."}
+        </p>
+        <p className="text-justify" style={{ textIndent: "1.5em" }}>
+          She did not look back, and afterwards could never say whether that had
+          been courage or the simple want of a reason to.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function LayoutStep({
+  typeset,
+  output,
+  sampleTitle,
+  onSet,
+}: {
+  typeset: TypesetOptions;
+  // Only ever pdf or epub in practice — this step does not exist otherwise —
+  // but typed as the caller has it rather than asserted at the call site.
+  output: Output | null;
+  sampleTitle: string;
+  onSet: <K extends keyof TypesetOptions>(
+    key: K,
+    value: TypesetOptions[K],
+  ) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Toggle
+          label="Hide chapter numbers"
+          hint="Titles only, with no numeral above them"
+          on={typeset.hideChapterNumbers}
+          onChange={(v) => onSet("hideChapterNumbers", v)}
+        />
+        <Toggle
+          label="Drop caps"
+          hint="A raised initial opening each chapter"
+          on={typeset.dropCaps}
+          onChange={(v) => onSet("dropCaps", v)}
+        />
+      </div>
+
+      {/* Both toggles above change this and nothing else on the screen. Without
+          it they are switches with the lamp in the next room. */}
+      <Specimen typeset={typeset} sampleTitle={sampleTitle} />
+
+      <label className="block">
+        <span className="block font-sans text-xs font-medium text-fg">
+          Trim size
+        </span>
+        <select
+          value={typeset.trim}
+          onChange={(e) => onSet("trim", e.target.value)}
+          disabled={output === "epub"}
+          className="mt-1.5 w-full rounded-md border border-line bg-panel px-3
+                     py-2.5 font-sans text-sm text-fg outline-none
+                     focus-visible:border-accent focus-visible:ring-2
+                     focus-visible:ring-accent/20 disabled:opacity-50"
+        >
+          {TRIMS.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block font-sans text-xs text-muted">
+          {output === "epub"
+            ? "An e-reader chooses its own page, so EPUB ignores this."
+            : "The finished page size, before binding."}
+        </span>
+      </label>
+
+      {output === "pdf" && (
+        <Note>
+          The PDF is made by your browser’s print, so two of its settings finish
+          the page. Turn off “Headers and footers” to drop the date and page
+          counter it prints around the edge, and set Paper size to match your
+          trim — otherwise a small book page is centred on a big sheet.
+        </Note>
+      )}
+    </div>
+  );
+}
+
+function ExportStep({
+  book,
+  cover,
+  output,
+  label,
+  typeset,
+  manuscript,
+  busy,
+  error,
+  narrating,
+  narrationLabel,
+  narrationError,
+  onRun,
+  onNarrate,
+}: {
+  book: Book;
+  cover: string | null;
+  output: Output;
+  label: string;
+  typeset: TypesetOptions;
+  manuscript: boolean;
+  busy: boolean;
+  error: string | null;
+  narrating: boolean;
+  narrationLabel: string;
+  narrationError: string | null;
+  onRun: () => void;
+  onNarrate: () => void;
+}) {
+  // What the file will contain, said back in one place. A writer who clicked
+  // through four screens should not have to click back to check what they set.
+  const summary: [string, string][] = [
+    ["Format", label],
+    [
+      "Chapters",
+      `${book.chapters.length} ${book.chapters.length === 1 ? "chapter" : "chapters"}`,
+    ],
+  ];
+  if (isTypeset(output)) {
+    summary.push(["Template", templateById(typeset.template).name]);
+    if (output === "pdf") summary.push(["Trim", trimById(typeset.trim).label]);
+    const front = [
+      typeset.titlePage && "title page",
+      typeset.copyright && "copyright",
+      typeset.contents && "contents",
+    ].filter(Boolean) as string[];
+    summary.push(["Front matter", front.length ? front.join(", ") : "none"]);
+  }
+  if (output === "docx") {
+    summary.push(["Layout", manuscript ? "Standard manuscript" : "Clean document"]);
+  }
+
+  return (
+    <div className="space-y-5">
+      <dl className="divide-y divide-line rounded-lg border border-line bg-panel">
+        {summary.map(([term, value]) => (
+          <div key={term} className="flex items-baseline gap-4 px-4 py-3">
+            <dt className="font-sans text-xs tracking-wide text-muted uppercase">
+              {term}
+            </dt>
+            <dd className="ml-auto text-right font-sans text-sm text-fg">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* The honest half of "publish": what a shop would say about this file,
+          said here instead — before the upload rather than after it. */}
+      {output === "epub" && <StoreReadiness book={book} cover={cover} />}
+
+      {output === "audiobook" ? (
+        <>
+          {narrating && (
+            <p className="font-sans text-sm text-muted">{narrationLabel}</p>
+          )}
+          {narrationError && (
+            <p role="alert" className="font-sans text-sm text-danger">
+              {narrationError}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onNarrate}
+            disabled={narrating}
+            className="flex w-full items-center justify-center gap-2 rounded-md
+                       bg-accent py-3 font-sans text-sm font-semibold text-white
+                       outline-none transition-colors hover:bg-accent-strong
+                       focus-visible:ring-2 focus-visible:ring-accent/60
+                       disabled:opacity-50"
+          >
+            {narrating ? "Reading…" : "Read aloud"}
+            {!narrating && <Arrow />}
+          </button>
+        </>
+      ) : (
+        <>
+          {error && (
+            <p
+              role="alert"
+              className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2.5 font-sans text-sm text-fg"
+            >
+              {error}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onRun}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-md
+                       bg-accent py-3 font-sans text-sm font-semibold text-white
+                       outline-none transition-colors hover:bg-accent-strong
+                       focus-visible:ring-2 focus-visible:ring-accent/60
+                       disabled:opacity-50"
+          >
+            {busy ? "Working…" : `Export ${label}`}
+            {!busy && <Arrow />}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+/**
+ * One choosable card — a template, a switch, anything the writer picks.
+ *
+ * The format cards are the loud version of this and the only reason they are
+ * their own component is the tilted preview inside them. Everything else that
+ * gets chosen on this screen is this: same border, same radius, same weight,
+ * same pointer. Two near-identical card styles in one wizard is two things to
+ * keep in step, and they would not stay in step.
+ */
+function OptionCard({
+  role,
+  checked,
+  onClick,
+  label,
+  hint,
+  hintStyle,
+}: {
+  role: "radio" | "switch";
+  checked: boolean;
+  onClick: () => void;
+  label: string;
+  hint: string;
+  /** The template picker sets its own face here, so the name is its specimen. */
+  hintStyle?: React.CSSProperties;
+}) {
+  return (
+    <button
+      type="button"
+      role={role}
+      aria-checked={checked}
+      onClick={onClick}
+      className={`rounded-lg border px-3.5 py-3 text-left
+                  outline-none transition-colors focus-visible:ring-2
+                  focus-visible:ring-accent/60 ${
+                    checked
+                      ? "border-accent bg-accent/8"
+                      : "border-fg/20 bg-panel hover:border-fg/45 hover:bg-raised"
+                  }`}
+    >
+      <span className="block font-sans text-base font-semibold text-fg">
+        {label}
+      </span>
+      <span
+        className="mt-0.5 block font-sans text-sm leading-relaxed text-muted"
+        style={hintStyle}
+      >
+        {hint}
+      </span>
+    </button>
   );
 }
 
@@ -563,23 +1355,46 @@ function Toggle({
   onChange: (on: boolean) => void;
 }) {
   return (
-    <button
-      type="button"
+    <OptionCard
       role="switch"
-      aria-checked={on}
+      checked={on}
       onClick={() => onChange(!on)}
-      className={`rounded-md border px-3 py-3 text-left outline-none
-                  transition-colors focus-visible:ring-2
-                  focus-visible:ring-accent/60 ${
-                    on
-                      ? "border-accent bg-accent/10"
-                      : "border-line hover:border-accent/50 hover:bg-raised"
-                  }`}
+      label={label}
+      hint={hint}
+    />
+  );
+}
+
+function Arrow({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`h-3.5 w-3.5 ${className}`}
     >
-      <span className="block font-sans text-sm font-medium text-fg">
-        {label}
-      </span>
-      <span className="mt-0.5 block font-sans text-xs text-muted">{hint}</span>
-    </button>
+      <path d="M4 10h11M11 6l4 4-4 4" />
+    </svg>
+  );
+}
+
+function Check() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3 w-3"
+    >
+      <path d="M4.5 10.5l3.5 3.5 7-7.5" />
+    </svg>
   );
 }

@@ -1,6 +1,43 @@
 @import "tailwindcss";
 
 /* --------------------------------------------------------------------------
+   Pointers on things you press.
+
+   Tailwind v4 changed its reset to give buttons `cursor: default`, matching the
+   native control. That is defensible for a browser and wrong for this app:
+   almost nothing here looks like an OS button. They are cards, tabs, chapter
+   rows, toolbar icons — surfaces that only announce themselves as pressable by
+   the cursor changing. Without this, a hundred-odd controls read as decoration.
+
+   Put here rather than as `cursor-pointer` on each one because it is a fact
+   about the app, not a decision per control, and a class per button is a class
+   somebody forgets on the next one.
+
+   Disabled keeps the refusal visible: `not-allowed` says the control exists and
+   is not available, which is the honest answer and the one the export wizard's
+   Continue button already gives while no format is chosen.
+   -------------------------------------------------------------------------- */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="radio"]:not(:disabled),
+  [role="switch"]:not(:disabled),
+  [role="tab"]:not(:disabled),
+  label:has(> input[type="checkbox"]:not(:disabled)),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  select:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+}
+
+/* --------------------------------------------------------------------------
    The OpenChapter palette.
 
    Named for the job each colour does rather than the colour it is, so a later
@@ -1683,5 +1720,85 @@ body {
 
   .oc-book-lift {
     transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Export — the format cards' preview, tilted off the corner.
+
+   The preview is laid out at the card's full size and pushed down and right, so
+   most of it hangs past the corner and the card's own overflow-hidden slices it.
+   Hovering straightens it, and *only* that: `rotate` is the single animated
+   property, which is why this stays on the compositor and why 120ms is enough.
+
+   It reads as the preview growing and sharpening, and nothing scales — un-
+   rotating a rectangle that is being clipped simply exposes more of it, and its
+   edges stop being anti-aliased diagonals. A real scale would cost a repaint to
+   buy the same impression.
+
+   Written here rather than as utilities because it is a parent-hover rule with
+   a transition on one longhand property, which is more than a class list should
+   be asked to say.
+   -------------------------------------------------------------------------- */
+.oc-tilt-card .oc-tilt {
+  rotate: -6deg;
+  transition: rotate 120ms ease-in-out;
+}
+
+/* Straight under the pointer, and straight for good once the card is the chosen
+   one. The tilt is what "not this one" looks like: a card you have picked has
+   stopped being one of five options and should sit square, rather than
+   collapsing back to an angle the moment the pointer leaves it. */
+.oc-tilt-card:hover .oc-tilt,
+.oc-tilt-card:focus-visible .oc-tilt,
+.oc-tilt-card[aria-checked="true"] .oc-tilt {
+  rotate: 0deg;
+}
+
+/* The tilt and the white are the resting arrangement and stay; it is the
+   *travel* between the two states that someone asking for less motion has asked
+   not to see. The colour still arrives, it just arrives at once. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-tilt-card .oc-tilt {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Landing — the strip of destinations travelling under the hero.
+
+   The track holds the same row several times over and moves exactly half its
+   own width, so the instant the front half has left the back half is standing
+   where it started: the loop closes on itself and there is no jump to hide. A
+   percentage of the track rather than a pixel distance, so adding a name to the
+   row does not need the travel re-measured — but the half that is *not* moving
+   through must stay wider than the viewport, which is what COPIES in
+   works-with.tsx is for.
+   -------------------------------------------------------------------------- */
+@keyframes oc-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.oc-marquee-track {
+  /* Paced against the distance, not the clock: -50% of a four-copy track is two
+     rows, so this is ~40s a row — slow enough to read a name in passing. */
+  animation: oc-marquee 80s linear infinite;
+}
+
+/* Stops under the pointer, so a name someone is reaching for stays reachable. */
+.oc-marquee:hover .oc-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Nothing here is read by moving, so someone who asked for less motion gets the
+   row standing still — clipped at the window's edge like any wide row. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-marquee-track {
+    animation: none;
   }
 }
