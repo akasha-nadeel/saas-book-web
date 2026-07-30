@@ -61,42 +61,69 @@ const SORT_LABEL: Record<Sort, string> = {
 };
 
 /**
- * A supplied icon shown through a mask, so it takes the button's own text colour
- * (currentColor) and follows the theme and hover. The source PNGs arrive in
- * mixed colours; masking them from their shape makes them one. See
- * public/icon-*.png.
+ * The frame every sidebar icon is drawn in.
+ *
+ * These were three PNGs shown through a CSS mask, which was a way of making
+ * artwork in mixed colours take the button's own ink. Drawing them instead
+ * removes the indirection and three network requests, and — the actual reason —
+ * puts them in the same hand as every other icon in the app: one viewBox, one
+ * stroke weight, round caps. A masked bitmap could match the colour but never
+ * the line.
  */
-function MaskIcon({
-  src,
-  className = "h-6 w-6",
-}: {
-  src: string;
-  className?: string;
-}) {
+function ViewIcon({ children }: { children: ReactNode }) {
   return (
-    <span
+    <svg
       aria-hidden="true"
-      className={`${className} shrink-0 bg-current`}
-      style={{
-        maskImage: `url(${src})`,
-        WebkitMaskImage: `url(${src})`,
-        maskSize: "contain",
-        WebkitMaskSize: "contain",
-        maskRepeat: "no-repeat",
-        WebkitMaskRepeat: "no-repeat",
-        maskPosition: "center",
-        WebkitMaskPosition: "center",
-      }}
-    />
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-6 w-6 shrink-0"
+    >
+      {children}
+    </svg>
   );
 }
 
-// One icon apiece for the view tabs — books for the whole shelf, a case for
-// what's set aside, a bin for what's on its way out.
+/**
+ * One icon apiece for the view tabs — books for the whole shelf, a case for
+ * what's set aside, a bin for what's on its way out.
+ *
+ * The last two are the same shapes `menuIcons` uses in the row menu, on
+ * purpose: archiving a book from its row and looking at what has been archived
+ * are the same idea, and a reader should not have to learn two marks for it.
+ */
 const VIEW_ICON: Record<BookView, ReactNode> = {
-  active: <MaskIcon src="/icon-books.png" className="h-6 w-6" />,
-  archived: <MaskIcon src="/icon-archived.png" className="h-6 w-6" />,
-  trashed: <MaskIcon src="/icon-trashed.png" className="h-6 w-6" />,
+  // Three spines on a shelf, the third leaning as they do. A single open book
+  // would read as *a* book; this view is the whole library.
+  active: (
+    <ViewIcon>
+      <rect x="3" y="4.4" width="3.4" height="11.2" rx="0.9" />
+      <rect x="7.7" y="4.4" width="3.4" height="11.2" rx="0.9" />
+      <rect
+        x="12.5"
+        y="5"
+        width="3.4"
+        height="11.2"
+        rx="0.9"
+        transform="rotate(12 14.2 10.6)"
+      />
+    </ViewIcon>
+  ),
+  archived: (
+    <ViewIcon>
+      <rect x="2.8" y="4" width="14.4" height="3.6" rx="1" />
+      <path d="M4.4 7.6v7a1.4 1.4 0 0 0 1.4 1.4h8.4a1.4 1.4 0 0 0 1.4-1.4v-7" />
+      <path d="M8.2 10.8h3.6" />
+    </ViewIcon>
+  ),
+  trashed: (
+    <ViewIcon>
+      <path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.7 10a1 1 0 0 0 1 .9h5.6a1 1 0 0 0 1-.9l.7-10" />
+    </ViewIcon>
+  ),
 };
 
 export function Bookshelf({
