@@ -128,6 +128,7 @@ export function ImportBook() {
                 ref={inputRef}
                 type="file"
                 accept={IMPORT_ACCEPT}
+                aria-label="Choose a manuscript file to import"
                 className="sr-only"
                 onChange={(e) => {
                   const file = e.target.files?.[0];

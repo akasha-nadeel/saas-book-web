@@ -35,8 +35,11 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
  * Matched whole, not as a prefix. "/" is the landing page for a signed-out
  * visitor and the shelf for a signed-in one — the page decides which. As a
  * prefix it would of course make the entire app public.
+ *
+ * "/upgrade" is public because a price is read before an account is made. It
+ * holds no manuscript and no account detail — only what each plan costs.
  */
-const PUBLIC_EXACT = ["/"];
+const PUBLIC_EXACT = ["/", "/upgrade"];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.includes(pathname)) return true;

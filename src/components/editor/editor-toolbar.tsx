@@ -647,6 +647,7 @@ export function ToolRail({
         ref={fileRef}
         type="file"
         accept={ACCEPTED}
+        aria-label="Insert an image"
         className="sr-only"
         onChange={async (e) => {
           const file = e.target.files?.[0];

@@ -139,7 +139,11 @@ export function BookDetailsDialog({
                 and the primary belongs to writing. */}
             <button
               type="button"
-              onClick={() => router.push(`/book/${book.id}/read`)}
+              // ?from=shelf so the reader's back arrow returns here rather than
+              // dropping the reader into an editor they never opened. Carried in
+              // the URL rather than in history, so it survives a reload and a
+              // shared link behaves the same way.
+              onClick={() => router.push(`/book/${book.id}/read?from=shelf`)}
               className="flex items-center gap-2 rounded-md border border-line
                          px-3.5 py-2 font-sans text-sm font-medium text-fg
                          outline-none transition-colors hover:border-accent/60

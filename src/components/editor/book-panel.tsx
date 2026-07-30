@@ -718,6 +718,9 @@ export function BookPanel({
             ref={fileRef}
             type="file"
             accept={IMPORT_ACCEPT}
+            // sr-only hides it from the eye but *not* from a screen reader, so
+            // without a name it is an unexplained file control in the tab order.
+            aria-label="Import a chapter file"
             className="sr-only"
             onChange={(e) => {
               const file = e.target.files?.[0];

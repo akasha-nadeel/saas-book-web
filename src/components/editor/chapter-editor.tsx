@@ -270,6 +270,23 @@ export function ChapterEditor({
     if (hydrated) touchLastOpened(bookId, chapterId);
   }, [hydrated, bookId, chapterId]);
 
+  // Opening a chapter shows the chapter.
+  //
+  // The panel's face is one preference shared with the book overview, and the
+  // overview resets it to "book" on arrival — which is right there and wrong
+  // here, because in this screen "book" means the manuscript is unmounted and
+  // the guide stands in its place. Without this, opening a chapter from the
+  // overview lands the writer on a page with no page on it.
+  //
+  // The pair is the whole rule: the overview always opens on the book, a
+  // chapter always opens on the chapter, and switching faces afterwards is the
+  // writer's and sticks until they leave.
+  useEffect(() => {
+    if (hydrated) setPref("bookPanel", "chapters");
+    // Per chapter arrival. Not watching prefs.bookPanel, which would undo
+    // "Back to Book View" the instant it was pressed.
+  }, [hydrated, bookId, chapterId]);
+
   const initialContent = useMemo<JSONContent | null>(() => {
     if (!raw) return null;
     try {
@@ -366,77 +383,87 @@ export function ChapterEditor({
           )}
         </div>
 
-        <Rail
-          side="right"
-          paper={prefs.paper}
-          // Hidden on phones: the formatting tools want a pointer and room, and
-          // the screen has neither to spare next to the page. Export moves to the
-          // manuscript header there instead.
-          className="hidden md:flex"
-          footer={
-            <RailButton label="Export" href={`/book/${bookId}/export`}>
-              {icons.export}
-            </RailButton>
-          }
-        >
-          {/* Which book these tools act on, as the object rather than another
+        {/* The right rail belongs to the manuscript, so it leaves with it.
+            Book View unmounts the surface and sets `liveEditor` to null, and the
+            rail was still being rendered around that null — so what stayed on
+            screen was a stump: the cover, print and export, with every text
+            control that needs an editor silently gone. A rail of absent controls
+            is worse than no rail, and it is the dead UI the house rules forbid.
+            The book panel is the navigator in this mode; the page's tools have
+            nothing to act on. */}
+        {panelMode !== "book" && (
+          <Rail
+            side="right"
+            paper={prefs.paper}
+            // Hidden on phones: the formatting tools want a pointer and room, and
+            // the screen has neither to spare next to the page. Export moves to the
+            // manuscript header there instead.
+            className="hidden md:flex"
+            footer={
+              <RailButton label="Export" href={`/book/${bookId}/export`}>
+                {icons.export}
+              </RailButton>
+            }
+          >
+            {/* Which book these tools act on, as the object rather than another
               copy of its title — the running head already carries the words.
 
               It is also the way in to changing it. A cover is the one thing
               here you would click expecting to edit it, and there was nowhere
               else in the editor to reach the title page from. */}
-          <button
-            type="button"
-            onClick={() => setEditingCover(true)}
-            aria-label={`Edit the cover of ${book.title}`}
-            title="Edit cover"
-            className="block w-10 shrink-0 rounded-md outline-none
+            <button
+              type="button"
+              onClick={() => setEditingCover(true)}
+              aria-label={`Edit the cover of ${book.title}`}
+              title="Edit cover"
+              className="block w-10 shrink-0 rounded-md outline-none
                        transition-transform hover:-translate-y-0.5
                        focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            <BookCover
-              title={book.title}
-              subtitle={book.subtitle}
-              author={book.author}
-              words={bookWordCount(book)}
-              image={cover}
-              seed={book.id}
-            />
-          </button>
-
-          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-          <ToolRail
-            editor={liveEditor}
-            book={book}
-            paper={prefs.paper}
-            dictation={dictation}
-          />
-
-          <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-          <RailButton
-            label="Typewriter scrolling"
-            active={prefs.typewriter}
-            onClick={() => setPref("typewriter", !prefs.typewriter)}
-          >
-            {icons.typewriter}
-          </RailButton>
-          {/* Word's ¶ button: what is actually on the page, as against what can
-              be seen of it. */}
-          <RailButton
-            label="Show paragraph marks"
-            active={prefs.marks}
-            onClick={() => setPref("marks", !prefs.marks)}
-          >
-            <span
-              aria-hidden="true"
-              className="font-sans text-base leading-none"
             >
-              ¶
-            </span>
-          </RailButton>
-        </Rail>
+              <BookCover
+                title={book.title}
+                subtitle={book.subtitle}
+                author={book.author}
+                words={bookWordCount(book)}
+                image={cover}
+                seed={book.id}
+              />
+            </button>
+
+            <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
+            <ToolRail
+              editor={liveEditor}
+              book={book}
+              paper={prefs.paper}
+              dictation={dictation}
+            />
+
+            <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
+            <RailButton
+              label="Typewriter scrolling"
+              active={prefs.typewriter}
+              onClick={() => setPref("typewriter", !prefs.typewriter)}
+            >
+              {icons.typewriter}
+            </RailButton>
+            {/* Word's ¶ button: what is actually on the page, as against what can
+              be seen of it. */}
+            <RailButton
+              label="Show paragraph marks"
+              active={prefs.marks}
+              onClick={() => setPref("marks", !prefs.marks)}
+            >
+              <span
+                aria-hidden="true"
+                className="font-sans text-base leading-none"
+              >
+                ¶
+              </span>
+            </RailButton>
+          </Rail>
+        )}
       </div>
 
       {editingCover && (

@@ -69,7 +69,14 @@ const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 const ZOOM_STEP = 0.1;
 
-export function BookReader({ bookId }: { bookId: string }) {
+export function BookReader({
+  bookId,
+  from,
+}: {
+  bookId: string;
+  /** Which door the reader was opened by — see backHref below. */
+  from?: string;
+}) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const prefs = usePrefs();
@@ -91,13 +98,23 @@ export function BookReader({ bookId }: { bookId: string }) {
   if (!hydrated) return <LoadingScreen />;
   if (!book) return <MissingBook />;
 
-  // Back into the editor at the chapter last open, or the first one.
+  // Where back goes depends on where you came in from. The reader has two
+  // doors: the editor's rail, and Read on the shelf's book dialog. Sending a
+  // reader who arrived from the shelf "back" into an editor they never opened
+  // is not a return, it is a new place — so the shelf marks its own door with
+  // ?from=shelf and this honours it.
+  const cameFromShelf = from === "shelf";
+
+  // Otherwise: back into the editor at the chapter last open, or the first one.
   const resumeId = book.chapters.some((c) => c.id === book.lastOpenedId)
     ? book.lastOpenedId
     : (book.chapters[0]?.id ?? null);
-  const backHref = resumeId
-    ? `/book/${bookId}/chapter/${resumeId}`
-    : `/book/${bookId}`;
+  const backHref = cameFromShelf
+    ? "/"
+    : resumeId
+      ? `/book/${bookId}/chapter/${resumeId}`
+      : `/book/${bookId}`;
+  const backLabel = cameFromShelf ? "Back to your books" : "Back to editing";
 
   const dark = prefs.paper === "slate" || prefs.paper === "black";
 
@@ -117,8 +134,8 @@ export function BookReader({ bookId }: { bookId: string }) {
       <header className="flex shrink-0 items-center gap-3 px-4 py-3 md:px-6">
         <Link
           href={backHref}
-          aria-label="Back to editing"
-          title="Back to editing"
+          aria-label={backLabel}
+          title={backLabel}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md
                      text-muted outline-none transition-colors hover:bg-raised
                      hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"

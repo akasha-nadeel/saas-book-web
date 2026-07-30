@@ -45,10 +45,14 @@ export function LandingPage() {
   );
 }
 
+// In the order the page presents them. Every feature row below has an id so it
+// can be reached from here — leaving one out makes the nav a table of contents
+// that is missing a chapter, and it feeds the footer's column too.
 const SECTIONS = [
   ["Writing", "#writing"],
   ["Library", "#library"],
   ["Formats", "#formats"],
+  ["Reading", "#reading"],
   ["Questions", "#questions"],
 ] as const;
 

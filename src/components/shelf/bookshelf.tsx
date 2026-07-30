@@ -530,6 +530,13 @@ function ShelfSidebar({
             Help away from the primary nav. */}
         <div className="mt-auto flex flex-col gap-1 pt-6">
           <div aria-hidden="true" className="mb-3 h-px bg-line" />
+          {/* The header's Pricing link folds away below md, and this drawer is
+              where the header's controls go when it does — without this row a
+              phone could only reach the plans through the account dialog. */}
+          <ToolLink href="/upgrade">
+            <PriceIcon />
+            Pricing
+          </ToolLink>
           <ToolButton onClick={onHelp}>
             <HelpIcon />
             Help
@@ -553,6 +560,19 @@ function ShelfSidebar({
   );
 }
 
+/**
+ * The same row as a link. Kept beside ToolButton, sharing its classes, because
+ * the foot is read as one set and a row that went somewhere would otherwise
+ * have to be styled twice and drift.
+ */
+function ToolLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} className={TOOL_ROW}>
+      {children}
+    </Link>
+  );
+}
+
 /** A tool row in the sidebar foot — one shape, so the four read as a set. */
 function ToolButton({
   children,
@@ -569,13 +589,34 @@ function ToolButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="flex items-center gap-3 rounded-xl px-3 py-3 text-left
-                 font-sans text-sm text-muted outline-none transition-colors
-                 hover:bg-raised hover:text-fg focus-visible:ring-2
-                 focus-visible:ring-white/40"
+      className={TOOL_ROW}
     >
       {children}
     </button>
+  );
+}
+
+/** The one shape both tool rows take. */
+const TOOL_ROW = `flex items-center gap-3 rounded-xl px-3 py-3 text-left
+                  font-sans text-sm text-muted outline-none transition-colors
+                  hover:bg-raised hover:text-fg focus-visible:ring-2
+                  focus-visible:ring-white/40`;
+
+function PriceIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-6 w-6 shrink-0"
+    >
+      <path d="M10.4 2.5H16a1.5 1.5 0 0 1 1.5 1.5v5.6a1.5 1.5 0 0 1-.44 1.06l-6 6a1.5 1.5 0 0 1-2.12 0l-5.16-5.16a1.5 1.5 0 0 1 0-2.12l6-6a1.5 1.5 0 0 1 1.06-.44z" />
+      <path d="M13.5 6.5h.01" />
+    </svg>
   );
 }
 
@@ -737,22 +778,33 @@ function ShelfTopBar({
         Sounds
       </button>
 
+      {/* A link, not a button: pricing is a page of its own that people open in
+          a tab and come back to. Set exactly as its two neighbours so the three
+          read as one row rather than as a promotion wedged among the tools. */}
+      <Link
+        href="/upgrade"
+        className="hidden shrink-0 rounded-full px-4 py-2.5 font-sans text-sm
+                   font-medium text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/50 md:block"
+      >
+        Pricing
+      </Link>
+
 
       <button
         type="button"
         onClick={onAccount}
         aria-label={email ? `Your account — ${email}` : "Your account"}
-        className="flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-2 pl-1
+        className="flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-1 pl-2
                    text-left outline-none transition-colors hover:bg-raised
-                   focus-visible:ring-2 focus-visible:ring-accent/50"
+                   focus-visible:ring-2 focus-visible:ring-accent/50 sm:pl-3"
       >
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 shrink-0 items-center justify-center
-                     rounded-full bg-accent text-sm font-semibold text-white"
-        >
-          {initial}
-        </span>
+        {/* Name, then the caret, then the avatar last — so the one round, solid
+            thing in the bar is what finishes it, and the row of grey words
+            leading up to it ends on the writer rather than on a control. The
+            name is what folds away first, which leaves the caret and the mark
+            on a phone. */}
         <span className="hidden max-w-36 truncate font-sans text-sm font-medium text-fg sm:block">
           {name}
         </span>
@@ -762,10 +814,17 @@ function ShelfTopBar({
           fill="none"
           stroke="currentColor"
           strokeWidth="1.5"
-          className="mr-1 h-4 w-4 shrink-0 text-muted"
+          className="h-4 w-4 shrink-0 text-muted"
         >
           <path d="m6 8 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 shrink-0 items-center justify-center
+                     rounded-full bg-accent text-sm font-semibold text-white"
+        >
+          {initial}
+        </span>
       </button>
     </div>
   );
@@ -863,6 +922,10 @@ function Hero({
         {/* The featured cover — the reference's centre. */}
         <Link
           href={`/book/${book.id}`}
+          // The cover is artwork and carries no text, so without this the link
+          // has no accessible name at all — a whole shelf of them announces as
+          // "link, link, link".
+          aria-label={book.title}
           onClick={(e) => {
             if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
             e.preventDefault();
@@ -1186,6 +1249,9 @@ function BookCard({
           straight to the manuscript, which is what those mean. */}
       <Link
         href={`/book/${book.id}`}
+        // Same as the featured cover: the artwork is all there is inside, so
+        // the name has to be said here or the link has none.
+        aria-label={book.title}
         onClick={(e) => {
           if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
           e.preventDefault();

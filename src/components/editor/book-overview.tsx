@@ -53,6 +53,23 @@ export function BookOverview({ bookId }: { bookId: string }) {
     if (hydrated) touchLastOpenedBook(bookId);
   }, [hydrated, bookId]);
 
+  // The overview always opens on the book itself.
+  //
+  // The panel's face is a stored preference so the *editor* keeps whichever one
+  // the writer left it on across a reload — that is what the pref is for. But
+  // arriving here is arriving at the book, and this screen is the one place the
+  // whole book is the subject. Coming back from a chapter should show the book
+  // again, not the parts list that chapter happened to leave behind.
+  //
+  // Written rather than merely overridden in the render, so switching faces from
+  // here still persists into the editor; it is the *arrival* that is fixed, not
+  // the choice.
+  useEffect(() => {
+    if (hydrated) setPref("bookPanel", "book");
+    // Once per book opened. Deliberately not watching prefs.bookPanel — that
+    // would snap the panel back the instant the writer pressed Chapters.
+  }, [hydrated, bookId]);
+
   // The tool panel, as in the editor: closed until a rail tab is picked, and
   // "search" only as a seed — it is never seen before a tab chooses it.
   const [tab, setTab] = useState<PanelTab>("search");

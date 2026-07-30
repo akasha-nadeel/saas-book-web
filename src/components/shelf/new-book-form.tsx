@@ -185,6 +185,7 @@ export function NewBookForm() {
               ref={coverInput}
               type="file"
               accept="image/png,image/jpeg,image/webp"
+              aria-label="Choose a cover image"
               className="sr-only"
               onChange={async (e) => {
                 const file = e.target.files?.[0];

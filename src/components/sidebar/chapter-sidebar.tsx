@@ -488,6 +488,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           ref={fileRef}
           type="file"
           accept={IMPORT_ACCEPT}
+          aria-label="Import a chapter file"
           className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0];

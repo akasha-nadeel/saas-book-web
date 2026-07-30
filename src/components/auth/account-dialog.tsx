@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
 
 /**
@@ -45,9 +46,21 @@ export function AccountDialog({
               <span className="font-medium text-fg">{email}</span>.
             </p>
             <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
-              Your manuscripts are still stored in this browser, not on the
-              account. Signing out leaves them exactly where they are — syncing
-              arrives with the next release, and paid plans with it.
+              Your manuscripts are stored in this browser and synced to your
+              account. Signing out leaves them exactly where they are.
+            </p>
+            <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
+              You are on the free plan.{" "}
+              <Link
+                href="/upgrade"
+                onClick={onClose}
+                className="font-medium text-accent underline underline-offset-2
+                           outline-none hover:text-accent-strong
+                           focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                See what Pro adds
+              </Link>
+              .
             </p>
 
             <div className="mt-6 flex justify-end gap-2">
