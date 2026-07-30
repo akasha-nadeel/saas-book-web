@@ -16,9 +16,9 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
-import { ToolRail } from "@/components/editor/editor-toolbar";
+import { ToolRail, useEditorState } from "@/components/editor/editor-toolbar";
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
-import { WorkspaceRail } from "@/components/editor/workspace-rail";
+import { WorkspaceRail, selectPanel } from "@/components/editor/workspace-rail";
 import { SelectionToolbar } from "@/components/editor/selection-toolbar";
 import { ImageToolbar } from "@/components/editor/image-toolbar";
 import { Pagination, type PageGeometry } from "@/lib/editor/pagination";
@@ -461,6 +461,29 @@ export function ChapterEditor({
               >
                 ¶
               </span>
+            </RailButton>
+
+            <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+
+            {/* Its own group at the foot of the rail, because it is not a
+                formatting tool: everything above acts on the page directly,
+                and this opens a panel to talk about it. Reachable from the
+                manuscript's own rail as well as the left one, the way dictation
+                already has two controls — the rule for a second press is shared
+                (`selectPanel`), so both stay lit together and both close what
+                the other opened. */}
+            <RailButton
+              label="Assistant"
+              active={panelOpen && tab === "assistant"}
+              onClick={() =>
+                selectPanel(
+                  "assistant",
+                  { tab, open: panelOpen },
+                  { onSelectTab: setTab, onPanel: setPanelOpen },
+                )
+              }
+            >
+              {icons.assistant}
             </RailButton>
           </Rail>
         )}
@@ -965,7 +988,16 @@ function EditorSurface({
                 words
               </span>
 
-              <ZoomControl zoom={zoom} onZoom={onZoom} />
+              {/* The centre is where the bar's controls live and the flanks
+                  are readings, so history joins the zoom here rather than
+                  crowding one of the two numbers. A hairline between the pair
+                  keeps them as two groups: what has happened to the document,
+                  and how large it is drawn. */}
+              <div className="flex shrink-0 items-center gap-1">
+                <HistoryControls editor={editor} />
+                <span aria-hidden="true" className="mx-1 h-4 w-px bg-line" />
+                <ZoomControl zoom={zoom} onZoom={onZoom} />
+              </div>
 
               <span
                 aria-live="polite"
@@ -1191,6 +1223,93 @@ function EditorSurface({
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 const ZOOM_STEP = 0.1;
+
+/**
+ * Undo and redo, in the desk bar.
+ *
+ * Moved out of the right rail, where they sat among the formatting tools. Those
+ * act on the page — type, alignment, images; these act on the document's
+ * history, which is the same family as the two readings already in this bar:
+ * how much has been written, and whether it is saved. The bar is also nearer
+ * the text than the far edge of the window is.
+ *
+ * `useEditorState` is what keeps the disabled state honest. Both flags are read
+ * at render time, so without a subscription to the editor's transactions the
+ * buttons would show whatever was true the last time something else happened to
+ * re-render this component — greyed out with plenty to undo, or lit with
+ * nothing.
+ */
+function HistoryControls({ editor }: { editor: Editor | null }) {
+  useEditorState(editor);
+  if (!editor) return null;
+
+  return (
+    <>
+      <HistoryButton
+        label="Undo"
+        shortcut="Ctrl+Z"
+        disabled={!editor.can().undo()}
+        onClick={() => editor.chain().focus().undo().run()}
+      >
+        <path d="M3.2 4.4v3.9h3.9" />
+        <path d="M3.9 8.3a6.4 6.4 0 1 1-.5 5.3" />
+      </HistoryButton>
+      <HistoryButton
+        label="Redo"
+        shortcut="Ctrl+Shift+Z"
+        disabled={!editor.can().redo()}
+        onClick={() => editor.chain().focus().redo().run()}
+      >
+        <path d="M16.8 4.4v3.9h-3.9" />
+        <path d="M16.1 8.3a6.4 6.4 0 1 0 .5 5.3" />
+      </HistoryButton>
+    </>
+  );
+}
+
+/** Set exactly as the zoom buttons beside it — one bar, one kind of button. */
+function HistoryButton({
+  label,
+  shortcut,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  shortcut: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      // The shortcut in the tooltip rather than on the bar: it is worth
+      // learning once and worth no space at all afterwards.
+      title={`${label} (${shortcut})`}
+      className="flex h-7 w-7 items-center justify-center rounded-md text-muted
+                 outline-none transition-colors hover:bg-raised hover:text-fg
+                 focus-visible:ring-2 focus-visible:ring-accent/60
+                 disabled:opacity-40 disabled:hover:bg-transparent"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        {children}
+      </svg>
+    </button>
+  );
+}
 
 /**
  * The page-zoom control, pinned to the bottom-right of the workspace the way a

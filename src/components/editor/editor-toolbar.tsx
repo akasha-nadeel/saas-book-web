@@ -67,7 +67,15 @@ function alignIcon(d: string) {
  * "---", so a button would duplicate a path rather than provide one.
  */
 
-function useEditorState(editor: Editor | null) {
+/**
+ * Re-render on anything the editor does.
+ *
+ * Exported for the desk bar's undo and redo, which have to grey out the moment
+ * there is nothing left to undo — `editor.can().undo()` is read at render time,
+ * so without a subscription the buttons would answer whatever was true when
+ * their component last happened to render.
+ */
+export function useEditorState(editor: Editor | null) {
   return useSyncExternalStore(
     (onChange) => {
       if (!editor) return () => {};
@@ -704,30 +712,12 @@ export function ToolRail({
         </ToolButton>
       )}
 
-      <ToolButton
-        label="Undo"
-        shortcut="Ctrl+Z"
-        disabled={!editor.can().undo()}
-        onClick={() => editor.chain().focus().undo().run()}
-      >
-        <Icon>
-          <path d="M3.2 4.4v3.9h3.9" />
-          <path d="M3.9 8.3a6.4 6.4 0 1 1-.5 5.3" />
-        </Icon>
-      </ToolButton>
-      <ToolButton
-        label="Redo"
-        shortcut="Ctrl+Shift+Z"
-        disabled={!editor.can().redo()}
-        onClick={() => editor.chain().focus().redo().run()}
-      >
-        <Icon>
-          <path d="M16.8 4.4v3.9h-3.9" />
-          <path d="M16.1 8.3a6.4 6.4 0 1 0 .5 5.3" />
-        </Icon>
-      </ToolButton>
-
-      <Divider />
+      {/* Undo and redo used to sit here. They are in the desk bar above the
+          sheet now: everything left in this rail acts on the *page* — type,
+          alignment, images — where those two act on the document's history,
+          which is what the bar already reports with the word count and the save
+          status. It also puts them a short reach from the text instead of at
+          the far edge of the window. See HistoryControls in chapter-editor. */}
 
       {problem && (
         <p

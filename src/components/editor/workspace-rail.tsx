@@ -4,6 +4,29 @@ import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import type { PanelTab } from "@/components/editor/left-panel";
 import { setPref, type Theme } from "@/lib/library-store";
 
+/**
+ * Picking a panel, from whichever control is asking.
+ *
+ * Clicking the tab you are already on closes the panel — one control, never
+ * two. Exported because the right rail's Assistant button has to obey the
+ * same rule as this rail's Assistant tab: they are two controls over one piece
+ * of state, and if they disagreed about what a second click does, a writer
+ * would learn that the same button behaves differently depending on which edge
+ * of the screen they pressed it from.
+ */
+export function selectPanel(
+  value: PanelTab,
+  now: { tab: PanelTab; open: boolean },
+  set: { onSelectTab: (tab: PanelTab) => void; onPanel: (open: boolean) => void },
+) {
+  if (now.open && now.tab === value) {
+    set.onPanel(false);
+    return;
+  }
+  set.onSelectTab(value);
+  set.onPanel(true);
+}
+
 /** The rail's tab buttons — the same order the editor and the overview show. */
 const TABS = [
   ["chapters", "Manuscript", icons.chapters],
@@ -78,14 +101,13 @@ export function WorkspaceRail({
           // Clicking the panel you are already on closes it, so the rail
           // doubles as the way to get the width back.
           active={leftPanel && tab === value}
-          onClick={() => {
-            if (leftPanel && tab === value) {
-              onPanel(false);
-            } else {
-              onSelectTab(value);
-              onPanel(true);
-            }
-          }}
+          onClick={() =>
+            selectPanel(
+              value,
+              { tab, open: leftPanel },
+              { onSelectTab, onPanel },
+            )
+          }
         >
           {icon}
         </RailButton>
