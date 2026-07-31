@@ -6,6 +6,16 @@ import { displayPrice, perMonthOf } from "@/lib/billing/plans";
 import { BookFan } from "./book-fan";
 import { FormatsFlow } from "./formats-flow";
 import {
+  BookmarksFigure,
+  DevicesFigure,
+  DictationFigure,
+  MatterFigure,
+  NotesFigure,
+  SearchFigure,
+  SpreadFigure,
+  TargetFigure,
+} from "./toolkit-figures";
+import {
   AssistantFigure,
   FormatFigure,
   PageFigure,
@@ -631,37 +641,33 @@ function Toolkit() {
           {TOOLKIT.map(([icon, title, body]) => (
             <li
               key={title}
-              // The export page's card chrome, brought over: a `border-fg/20`
-              // edge rather than `border-line`, because a hairline at the line
-              // token vanishes on white at this radius and the card needs an
-              // edge you can find. It darkens under the pointer, as those do.
-              //
-              // The motion is a lift rather than the tilt those cards use, and
-              // that is a deliberate difference. What tilts on an export card
-              // is a picture of the file you are about to get — the repo's own
-              // note in format-previews.tsx is that tilting a *decoration* is a
-              // trick, and these cards have no artifact to tilt. A lift is
-              // honest: it says the surface noticed the pointer and claims
-              // nothing else. `cursor` is left alone for the same reason —
-              // these describe features, they do not navigate.
-              //
-              // motion-reduce keeps the border change and drops the travel,
-              // which is the half somebody asking for less motion asked about.
-              className="rounded-xl border border-fg/20 bg-panel p-5 shadow-sm
-                         transition duration-150 ease-out hover:-translate-y-1
-                         hover:border-fg/45 hover:shadow-lg
-                         motion-reduce:transition-none
-                         motion-reduce:hover:translate-y-0"
+              // The export page's format card, brought over whole: a fixed
+              // height with overflow-hidden, which is what crops the preview at
+              // the corner, and `oc-tilt-card` for the straightening. The edge
+              // is `border-fg/20` for the reason FormatCard gives — a hairline
+              // at the line token vanishes on white at this radius.
+              className="oc-tilt-card relative h-[190px] overflow-hidden rounded-xl
+                         border border-fg/20 bg-panel px-4 pt-4 transition-colors
+                         hover:border-fg/45"
             >
-              <h3 className="flex items-center gap-2.5 font-sans text-sm font-semibold text-fg">
-                <span className="shrink-0 text-accent">
-                  {TOOL_ICON[icon]}
-                </span>
+              {/* Above the preview, which passes under the text on its way out
+                  of the corner. */}
+              <h3 className="relative z-10 flex items-center gap-2.5 font-sans text-sm font-semibold text-fg">
+                <span className="shrink-0 text-accent">{TOOL_ICON[icon]}</span>
                 {title}
               </h3>
-              <p className="mt-2 font-sans text-sm leading-relaxed text-muted">
+              <p className="relative z-10 mt-1.5 max-w-[92%] font-sans text-sm leading-relaxed text-muted">
                 {body}
               </p>
+
+              <span
+                aria-hidden="true"
+                className="oc-tilt absolute top-[57%] left-[15%] h-full w-full
+                           overflow-hidden rounded-lg border border-line bg-panel
+                           shadow-sm"
+              >
+                {TOOL_FIGURE[icon]}
+              </span>
             </li>
           ))}
         </ul>
@@ -729,6 +735,18 @@ const TOOL_ICON: Record<string, ReactNode> = {
       <path d="M15 2.6v3h-3M5 17.4v-3h3" />
     </ToolGlyph>
   ),
+};
+
+/** One figure per card, keyed the same way the icons are. */
+const TOOL_FIGURE: Record<string, ReactNode> = {
+  search: <SearchFigure />,
+  notes: <NotesFigure />,
+  bookmark: <BookmarksFigure />,
+  mic: <DictationFigure />,
+  read: <SpreadFigure />,
+  target: <TargetFigure />,
+  matter: <MatterFigure />,
+  sync: <DevicesFigure />,
 };
 
 function ToolGlyph({ children }: { children: ReactNode }) {
