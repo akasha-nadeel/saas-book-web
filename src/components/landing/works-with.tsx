@@ -31,20 +31,20 @@
  * Trademarks belong to their respective owners.
  */
 
-type Mark = {
+export type Mark = {
   /** The brand's own artboard. Simple Icons draw on 24, Font Awesome on 448×512. */
   viewBox: string;
   paths: { d: string; fill: string }[];
 };
 
-type Destination = {
+export type Destination = {
   name: string;
   /** The export that opens there — kept beside the name so the claim is checkable. */
   format: string;
   mark: Mark;
 };
 
-const DESTINATIONS: Destination[] = [
+export const DESTINATIONS: Destination[] = [
   {
     name: "Microsoft Word",
     format: "DOCX",

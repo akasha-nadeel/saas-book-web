@@ -7,9 +7,9 @@
  * tilts a decoration is a trick, and a card that tilts *the thing it is
  * describing* is an answer to the question the card is asking. So each of
  * these is drawn to the shape of the panel it names — the search panel has a
- * field and hits, the notes panel has a pad, the reader has a spread — and a
- * writer who has used the app should recognise which is which before reading
- * the title above it.
+ * field and hits, the reader has a spread with its folios, dictation has the
+ * meter and the words it is hearing — and a writer who has used the app should
+ * recognise which is which before reading the title above it.
  *
  * Drawn from the app's own tokens rather than screenshotted, for the reason
  * landing-figures.tsx gives: a screenshot is an asset that goes stale silently
@@ -98,20 +98,6 @@ export function SearchFigure() {
   );
 }
 
-/** The notes panel: a pad beside the manuscript. */
-export function NotesFigure() {
-  return (
-    <div className="p-3">
-      <span className="block h-1.5 w-12 rounded bg-fg/25" />
-      <div className="mt-2.5 rounded-md border border-line p-2.5">
-        <Lines widths={["100%", "88%", "96%", "54%"]} />
-      </div>
-      <div className="mt-2 rounded-md border border-line p-2.5">
-        <Lines widths={["92%", "70%"]} />
-      </div>
-    </div>
-  );
-}
 
 /** The bookmarks panel: starred chapters from more than one book. */
 export function BookmarksFigure() {
@@ -212,25 +198,3 @@ export function MatterFigure() {
   );
 }
 
-/** The same shelf on a laptop and a phone. */
-export function DevicesFigure() {
-  return (
-    <div className="flex h-full items-end justify-center gap-2 p-3">
-      <div className="w-[68%] rounded-md border border-line p-1.5">
-        <div className="grid grid-cols-4 gap-1">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="h-8 rounded-sm bg-accent/20" />
-          ))}
-        </div>
-        <span className="mx-auto mt-1.5 block h-1 w-1/3 rounded bg-fg/15" />
-      </div>
-      <div className="w-[22%] rounded-md border border-line p-1.5">
-        <div className="grid grid-cols-2 gap-1">
-          {[0, 1].map((i) => (
-            <span key={i} className="h-6 rounded-sm bg-accent/20" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}

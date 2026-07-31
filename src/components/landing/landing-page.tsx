@@ -7,10 +7,8 @@ import { BookFan } from "./book-fan";
 import { FormatsFlow } from "./formats-flow";
 import {
   BookmarksFigure,
-  DevicesFigure,
   DictationFigure,
   MatterFigure,
-  NotesFigure,
   SearchFigure,
   SpreadFigure,
   TargetFigure,
@@ -534,46 +532,40 @@ function FeatureCard({
  * is to round it up to a nice even number with something that is nearly true,
  * and the honest limit is however many there are.
  */
+// Each line is written to fit the two the card allows at this width — about
+// thirty characters a line. The clamp below is the guarantee, not the
+// mechanism: a description that ends in an ellipsis is a claim about the
+// product cut in half, which is a worse card than a tall one.
 const TOOLKIT = [
   [
     "search",
     "Search the whole book",
-    "Every chapter at once, matched on the words rather than the file.",
-  ],
-  [
-    "notes",
-    "Notes beside the page",
-    "A note per chapter, kept out of the manuscript and next to it.",
+    "Every chapter at once, matched on the words.",
   ],
   [
     "bookmark",
     "Bookmarks across the shelf",
-    "Star the scene you keep coming back to, in any book, and find it in one list.",
+    "Star a scene in any book, and find it in one list.",
   ],
   [
     "mic",
     "Dictate a paragraph",
-    "Speak and the words are typed. Chrome and Edge, using the browser's own engine.",
+    "Speak and the words are typed. Chrome and Edge.",
   ],
   [
     "read",
     "Read it through",
-    "The whole manuscript on real pages at your trim size, or as a book you turn.",
+    "The whole book on real pages, or as one you turn.",
   ],
   [
     "target",
     "A word target",
-    "Set when you start the book and measured against every chapter as you go.",
+    "Set when you start, measured chapter by chapter.",
   ],
   [
     "matter",
     "Front and back matter",
-    "Title, copyright and contents pages generated, and your own pages either end.",
-  ],
-  [
-    "sync",
-    "On every device",
-    "Your shelf follows your account, and the browser keeps a copy so it works offline.",
+    "Title, copyright and contents pages, generated.",
   ],
 ] as const;
 
@@ -610,8 +602,8 @@ function Toolkit() {
           </h2>
 
           <p className="mt-5 max-w-md font-sans text-base leading-relaxed text-muted">
-            Six formats in, four back out. Nothing is converted on a server —
-            the file is built in your browser and saved straight to disk.
+            Six formats in, and out to the readers people actually use. Nothing
+            is converted on a server — the file is built in your browser.
           </p>
 
           <Link
@@ -656,7 +648,7 @@ function Toolkit() {
                 <span className="shrink-0 text-accent">{TOOL_ICON[icon]}</span>
                 {title}
               </h3>
-              <p className="relative z-10 mt-1.5 max-w-[92%] font-sans text-sm leading-relaxed text-muted">
+              <p className="relative z-10 mt-1.5 line-clamp-2 max-w-[92%] font-sans text-sm leading-relaxed text-muted">
                 {body}
               </p>
 
@@ -687,13 +679,6 @@ const TOOL_ICON: Record<string, ReactNode> = {
     <ToolGlyph>
       <circle cx="8.8" cy="8.8" r="5.3" />
       <path d="m12.7 12.7 4 4" />
-    </ToolGlyph>
-  ),
-  notes: (
-    <ToolGlyph>
-      <path d="M11.6 2.8H6.2a1.5 1.5 0 0 0-1.5 1.5v11.4a1.5 1.5 0 0 0 1.5 1.5h7.6a1.5 1.5 0 0 0 1.5-1.5V6.4z" />
-      <path d="M11.6 2.8v2.9a.9.9 0 0 0 .9.9h2.8" />
-      <path d="M7.5 10.6h5M7.5 13.4h3.2" />
     </ToolGlyph>
   ),
   bookmark: (
@@ -728,25 +713,16 @@ const TOOL_ICON: Record<string, ReactNode> = {
       <path d="M3.4 7.4h13.2M3.4 12.6h13.2" />
     </ToolGlyph>
   ),
-  sync: (
-    <ToolGlyph>
-      <path d="M3.4 9.6a6.6 6.6 0 0 1 11.3-4.6" />
-      <path d="M16.6 10.4a6.6 6.6 0 0 1-11.3 4.6" />
-      <path d="M15 2.6v3h-3M5 17.4v-3h3" />
-    </ToolGlyph>
-  ),
 };
 
 /** One figure per card, keyed the same way the icons are. */
 const TOOL_FIGURE: Record<string, ReactNode> = {
   search: <SearchFigure />,
-  notes: <NotesFigure />,
   bookmark: <BookmarksFigure />,
   mic: <DictationFigure />,
   read: <SpreadFigure />,
   target: <TargetFigure />,
   matter: <MatterFigure />,
-  sync: <DevicesFigure />,
 };
 
 function ToolGlyph({ children }: { children: ReactNode }) {
