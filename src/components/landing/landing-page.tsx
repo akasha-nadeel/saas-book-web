@@ -312,14 +312,24 @@ function SectionHead({
   eyebrow,
   title,
   body,
+  align = "center",
 }: {
   /** Omitted where the heading is doing the work on its own. */
   eyebrow?: string;
   title: ReactNode;
-  body: string;
+  /** Omitted where the heading needs no second sentence. */
+  body?: ReactNode;
+  /**
+   * Centred over its section, or set to the left margin. Only the alignment
+   * changes — the type does not, which is the whole point of this component:
+   * two sections whose headings differ in size or weight read as two pages.
+   */
+  align?: "center" | "start";
 }) {
+  const centred = align === "center";
+
   return (
-    <div className="mx-auto max-w-2xl text-center">
+    <div className={centred ? "mx-auto max-w-2xl text-center" : "max-w-xl"}>
       {eyebrow && (
         <p
           className="inline-flex items-center gap-2 rounded-full border border-line
@@ -332,9 +342,18 @@ function SectionHead({
       <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-fg not-first:mt-5 sm:text-4xl">
         {title}
       </h2>
-      <p className="mx-auto mt-4 max-w-xl font-sans text-base leading-relaxed text-muted">
-        {body}
-      </p>
+      {body && (
+        // Larger, a little heavier, and on the page's own ink held slightly
+        // back rather than on the muted token. This is the sentence the heading
+        // is asking to be read, not a caption under it.
+        <p
+          className={`mt-4 font-sans text-lg leading-relaxed font-medium text-fg/80 ${
+            centred ? "mx-auto max-w-xl" : "max-w-md"
+          }`}
+        >
+          {body}
+        </p>
+      )}
     </div>
   );
 }
@@ -378,7 +397,7 @@ function Features() {
             <br className="hidden sm:block" /> and nothing it doesn&rsquo;t.
           </>
         }
-        body="The parts of a writing app you actually use, built to the standard a shop checks — and quiet about everything else."
+        body="The parts of a writing app you actually use, built to the standard a shop checks, and quiet about everything else."
       />
 
       {/*
@@ -419,7 +438,7 @@ function Features() {
           className="lg:col-start-1 lg:row-start-2 lg:col-span-2"
           wide
           title="Hand it off in what they asked for"
-          body="EPUB, DOCX, a print-ready PDF and Markdown — with the front matter generated for you."
+          body="EPUB, DOCX, a print-ready PDF and Markdown, with the front matter generated for you."
           figure={<FormatFigure />}
         />
       </div>
@@ -592,19 +611,21 @@ function Toolkit() {
         <div>
           <FormatsFlow />
 
-          {/* Two lines, the second in the accent — the reference's treatment,
-              and it works here because the sentence genuinely has two halves:
-              what arrives, and what leaves. */}
-          <h2 className="mt-12 font-display text-3xl leading-tight font-bold tracking-tight text-fg sm:text-4xl">
-            Bring anything in.
-            <br />
-            <span className="text-accent">Hand off anything.</span>
-          </h2>
-
-          <p className="mt-5 max-w-md font-sans text-base leading-relaxed text-muted">
-            Six formats in, and out to the readers people actually use. Nothing
-            is converted on a server — the file is built in your browser.
-          </p>
+          {/* Two lines, the second in the accent — it works here because the
+              sentence genuinely has two halves: what arrives, and what leaves. */}
+          <div className="mt-12">
+            <SectionHead
+              align="start"
+              title={
+                <>
+                  Bring anything in.
+                  <br />
+                  <span className="text-accent">Hand off anything.</span>
+                </>
+              }
+              body="Six formats in, and out to the readers people actually use. Your file is built in this browser, never on a server."
+            />
+          </div>
 
           <Link
             href="/signup"
@@ -732,10 +753,14 @@ function ToolGlyph({ children }: { children: ReactNode }) {
       viewBox="0 0 20 20"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      // Heavier and larger than the rails' icons, which sit at 1.5 on 20px.
+      // These are the only mark on the card and they carry the title beside
+      // them; at the rail's weight they read as a faint smudge next to
+      // semibold text rather than as its companion.
+      strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="h-4 w-4"
+      className="h-5 w-5"
     >
       {children}
     </svg>
@@ -760,17 +785,17 @@ const NUMBERS = [
   [
     "4",
     "Export formats",
-    "EPUB, DOCX, a print-ready PDF and Markdown — with the front matter generated for you.",
+    "EPUB, DOCX, a print-ready PDF and Markdown, with the front matter generated for you.",
   ],
   [
     "6",
     "Import formats",
-    "DOCX, EPUB, Markdown, plain text and HTML — plus an audiobook, transcribed and split into chapters.",
+    "DOCX, EPUB, Markdown, plain text and HTML, plus an audiobook, transcribed and split into chapters.",
   ],
   [
     "0",
     "EPUBCheck errors",
-    "Verified against EPUBCheck 5.3 for EPUB 3.3 — warnings included — on a fully specified book and a bare one.",
+    "Verified against EPUBCheck 5.3 for EPUB 3.3, warnings included, on a fully specified book and a bare one.",
   ],
   [
     "100%",
@@ -787,8 +812,16 @@ function Numbers() {
     >
       <SectionHead
         eyebrow="In numbers"
-        title="Why writers choose OpenChapter"
-        body="Nothing here about how many people use it — only figures you can check yourself."
+        title={
+          <>
+            {/* The name in the accent, as the Toolkit heading's second line is.
+                `text-accent` rather than the wordmark's fixed hex: this is a
+                heading on a themed page, not the logo, and the token follows
+                the palette where the hex would not. */}
+            Why writers choose <span className="text-accent">OpenChapter</span>
+          </>
+        }
+        body="Nothing here about how many people use it. Only figures you can check yourself."
       />
 
       <div className="mx-auto mt-14 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -855,7 +888,7 @@ function Numbers() {
 const STEPS = [
   [
     "Start a book",
-    "Name it, choose a trim size and set a word target. Or bring a manuscript you already have — it arrives split into chapters.",
+    "Name it, choose a trim size and set a word target. Or bring a manuscript you already have, and it arrives split into chapters.",
   ],
   [
     "Write it",
@@ -872,7 +905,12 @@ function Steps() {
     <section id="start" className="border-t border-line px-5 py-20 sm:px-8 sm:py-24">
       <SectionHead
         eyebrow="Getting started"
-        title="Blank page to finished file, in three"
+        title={
+          <>
+            Blank page to <span className="text-accent">finished file</span>, in
+            three
+          </>
+        }
         body="No import wizard to survive, and no template to choose before you can begin."
       />
 
@@ -921,9 +959,10 @@ function Faq() {
   return (
     <section id="questions" className="bg-panel px-5 py-20 sm:px-8">
       <div className="mx-auto max-w-3xl">
-        <h2 className="font-display text-3xl leading-tight font-semibold text-fg sm:text-4xl">
-          The questions people actually ask.
-        </h2>
+        <SectionHead
+          align="start"
+          title="The questions people actually ask."
+        />
 
         <dl className="mt-10 flex flex-col divide-y divide-line border-t border-line">
           {QUESTIONS.map(({ q, a }) => (
@@ -955,7 +994,7 @@ const QUESTIONS = [
   },
   {
     q: "Can I get my work out again?",
-    a: "Any time, in EPUB, DOCX, PDF or Markdown. There is no export queue and no waiting — the file is built in your browser and saved straight to disk.",
+    a: "Any time, in EPUB, DOCX, PDF or Markdown. There is no export queue and no waiting. The file is built in your browser and saved straight to disk.",
   },
   {
     q: "What does it cost?",
@@ -973,12 +1012,10 @@ function Closing() {
   return (
     <section className="border-t border-line px-5 py-20 sm:px-8">
       <div className="mx-auto max-w-2xl text-center">
-        <h2 className="font-display text-3xl leading-tight font-semibold text-fg sm:text-4xl">
-          Start the first chapter.
-        </h2>
-        <p className="mt-3 font-sans text-base leading-relaxed text-muted">
-          An account keeps your shelf. The writing starts the moment you are in.
-        </p>
+        <SectionHead
+          title="Start the first chapter."
+          body="An account keeps your shelf. The writing starts the moment you are in."
+        />
         <Link
           href="/signup"
           className="mt-7 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3
