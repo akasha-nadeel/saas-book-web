@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
+import { displayPrice, perMonthOf } from "@/lib/billing/plans";
 import { BookFan } from "./book-fan";
 import {
   AssistantFigure,
@@ -702,7 +703,13 @@ const QUESTIONS = [
   },
   {
     q: "What does it cost?",
-    a: "Nothing while it is being built. There is no card to add and no trial running down.",
+    // The figure comes from the price table rather than being typed here, so
+    // this answer cannot drift from what the plans page quotes and the
+    // checkout charges. This was the stalest line on the page: it read
+    // "nothing while it is being built" long after there was something to buy.
+    a: `Writing, the shelf, syncing and all four export formats are free, and stay free. The assistant, the audiobook and the bookmarks panel are what Pro pays for, at ${displayPrice(
+      perMonthOf("monthly"),
+    )} a month.`,
   },
 ];
 
@@ -742,37 +749,111 @@ function Closing() {
   );
 }
 
+/**
+ * The footer, with the wordmark set as large as the page will hold.
+ *
+ * Three bands: a line and the link columns, the name at display size, then the
+ * fine print under a rule.
+ *
+ * The giant wordmark is the whole idea, and it is decorative — `aria-hidden`,
+ * because the name is already read out by the copyright line below it and
+ * nobody needs to hear it twice. It is sized in container units so that it
+ * fills the measure at any width; see the note at the element itself for why
+ * viewport units do not work here.
+ *
+ * Its descenders are clipped by a hair. That is deliberate — it is what makes
+ * the name read as set into the page rather than placed on it — but it is kept
+ * to a hair on purpose, because a deep crop reads as a bug rather than as
+ * typography.
+ */
 function Footer() {
   return (
-    <footer className="border-t border-line bg-panel px-5 py-12 sm:px-8">
-      <div className="mx-auto grid max-w-6xl gap-10 sm:grid-cols-3">
-        <div>
-          <span className="font-display text-lg font-semibold text-fg">
-            Open<span style={{ color: "#3a86d4" }}>Chapter</span>
-          </span>
-          <p className="mt-2 max-w-xs font-sans text-sm leading-relaxed text-muted">
-            A calm place to write your novel, chapter by chapter.
+    <footer className="border-t border-line bg-panel">
+      <div className="mx-auto max-w-6xl px-5 pt-14 sm:px-8 sm:pt-16">
+        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] lg:gap-20">
+          {/* The one sentence the product would give if it only had one. Set
+              at heading size and in the page's own ink, not as the small grey
+              blurb it replaced — at this scale it is the thing being said, and
+              the columns beside it are the navigation. */}
+          <p className="max-w-sm font-display text-2xl leading-snug font-semibold text-fg sm:text-3xl">
+            A calm place to write your novel.
           </p>
+
+          <FooterColumn
+            heading="The app"
+            links={[
+              ...SECTIONS.map(([label, href]) => ({ label, href })),
+              { label: "Pricing", href: "/upgrade" },
+            ]}
+          />
+          <FooterColumn
+            heading="Your account"
+            links={[
+              { label: "Create an account", href: "/signup" },
+              { label: "Sign in", href: "/signin" },
+              { label: "Reset your password", href: "/forgot-password" },
+            ]}
+          />
         </div>
 
-        <FooterColumn
-          heading="The app"
-          links={SECTIONS.map(([label, href]) => ({ label, href }))}
-        />
-        <FooterColumn
-          heading="Your account"
-          links={[
-            { label: "Sign in", href: "/signin" },
-            { label: "Create an account", href: "/signup" },
-            { label: "Reset your password", href: "/forgot-password" },
-          ]}
-        />
+        {/*
+          Every link above goes somewhere that exists. The reference this is
+          drawn from carries Docs, Changelog, Press, Releases, Blog and Use
+          Cases, and OpenChapter has none of those — a footer column of links
+          to pages nobody has written is the same dead UI as a button that does
+          nothing, and it is worse here because a visitor only finds out after
+          the click.
+        */}
+
+        {/*
+          Sized in `cqw`, not `vw`. The container stops at max-w-6xl while the
+          viewport does not, so a viewport-relative size fits at one width and
+          then runs the last letter off the edge at every width past it.
+          Container units measure the box the word actually has to fit in, so
+          it fills the measure and stays inside it at any screen size — the
+          same reason the book covers set their titles that way.
+
+          The coefficient is the font's own, measured rather than reasoned:
+          this display face runs about 6.6 times the point size across the
+          eleven characters of the name, so a shade over a seventh of the
+          container is what fills it from margin to margin. Change the wordmark
+          or the face and this number has to be re-measured — there is no
+          arithmetic that finds it.
+        */}
+        <div
+          aria-hidden="true"
+          style={{ containerType: "inline-size" }}
+          className="mt-14 overflow-hidden sm:mt-16"
+        >
+          <span
+            className="block font-display font-bold tracking-tight
+                       whitespace-nowrap text-fg"
+            // A tight line box crops the descenders a little, which is what
+            // sets the name into the page. Only a little: at 0.85 it ate the
+            // baseline as well and the word read as broken rather than as set.
+            style={{ fontSize: "15.1cqw", lineHeight: 0.92 }}
+          >
+            Open<span style={{ color: "#3a86d4" }}>Chapter</span>
+          </span>
+        </div>
       </div>
 
-      <div className="mx-auto mt-10 max-w-6xl border-t border-line pt-6">
-        <span className="font-sans text-xs text-muted">
-          © {new Date().getFullYear()} OpenChapter
-        </span>
+      <div className="border-t border-line">
+        <div
+          className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-6 sm:flex-row
+                     sm:items-center sm:justify-between sm:px-8"
+        >
+          <span className="font-sans text-xs text-muted">
+            © {new Date().getFullYear()} OpenChapter
+          </span>
+
+          {/* Where a footer usually puts Privacy and Terms. Neither exists yet,
+              so this says something true instead of linking to two pages that
+              are not there. */}
+          <span className="font-sans text-xs text-muted">
+            Your books stay in your browser.
+          </span>
+        </div>
       </div>
     </footer>
   );
