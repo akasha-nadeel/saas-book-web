@@ -15,7 +15,7 @@ export function LaptopMockup() {
       {/* Lid. The bezel is the shelf navy, so the mockup reads as this app. */}
       <div className="rounded-t-2xl bg-[#0a1a2f] p-2.5 pb-0 shadow-2xl sm:p-3 sm:pb-0">
         <div className="aspect-[16/10] overflow-hidden rounded-lg bg-surface">
-          <Screen />
+          <EditorScreen />
         </div>
       </div>
 
@@ -28,7 +28,15 @@ export function LaptopMockup() {
   );
 }
 
-function Screen() {
+/**
+ * The editor's layout on its own, without the laptop around it.
+ *
+ * Exported because the landing hero sets it in a browser window rather than a
+ * laptop lid — it is a web app, and the chrome that frames it should say so.
+ * Drawing a second copy for that frame would give the page two mockups to keep
+ * in step with one app.
+ */
+export function EditorScreen() {
   return (
     <div className="flex h-full">
       {/* The rail and chapter list, as the editor arranges them. */}

@@ -1,261 +1,380 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { signInWithGoogle } from "@/app/auth/actions";
-import { GoogleButton } from "@/components/auth/auth-shell";
 import { displayPrice, perMonthOf } from "@/lib/billing/plans";
-import { BookFan } from "./book-fan";
-import { FormatsFlow } from "./formats-flow";
-import {
-  BookmarksFigure,
-  DictationFigure,
-  MatterFigure,
-  SearchFigure,
-  SpreadFigure,
-  TargetFigure,
-} from "./toolkit-figures";
-import {
-  AssistantFigure,
-  FormatFigure,
-  PageFigure,
-  ShelfFigure,
-} from "./landing-figures";
-import { LaptopMockup } from "./laptop-mockup";
-import { WorksWith } from "./works-with";
+import { LandingNav } from "./landing-nav";
+import { EditorScreen } from "./laptop-mockup";
+import { PublishingCheck } from "./publishing-check";
+// Not from landing-nav.tsx — that module is "use client", and a Server
+// Component importing a value from one gets a client reference rather than the
+// array. See the note in sections.ts.
+import { SECTIONS } from "./sections";
+import { DESTINATIONS } from "./works-with";
 
 /**
  * What a signed-out visitor sees at `/`.
  *
- * Laid out the way a writing-app landing page usually is: a hero that offers
- * the account immediately, alternating feature rows rather than a grid of
- * cards, then the questions people actually ask, then one more way in.
+ * Built from the "OpenChapter Landing v2" design, and built to its palette and
+ * type rather than to the app's: the hexes below are the design's own, and the
+ * face is Plus Jakarta Sans (`font-brand`), which is why they are written
+ * literally instead of taken from the `@theme` tokens. Those tokens describe the
+ * *product* — a writing surface that has to work in light and dark — and this is
+ * the shop front, which is one fixed light composition. Bending the app's
+ * palette to cover both would have made every token lie a little.
  *
- * Every claim here is one the app keeps and every link goes somewhere that
- * exists. The FAQ is the part worth guarding — it is where a landing page is
- * most tempted to be vague, and where being exact is worth the most.
+ * The page is `data-theme="light"` for that reason, as the previous version was.
+ *
+ * **Where this departs from the source design, it is because a claim was not
+ * true.** The design is a picture of a product and had no way to know which
+ * parts of ours exist; those are marked at each site with what the code actually
+ * does. The list, so it is not lost:
+ *
+ * - The print PDF is not "print-ready" in the trade sense and does not do bleed.
+ *   `print.ts` says so in its own header, and so does the export screen.
+ * - Four of the eight publishing checks were invented. See `publishing-check.tsx`.
+ * - "Free" needed to name what Pro actually costs money for.
+ * - The import list was four formats; it is six.
+ * - The footer's Terms / Privacy / Contact links pointed at `#`.
+ *
+ * That is not pedantry about a mockup. The visitor this page is written for has
+ * already been sold a course that taught nothing and a cover that turned out to
+ * be AI, and the FAQ below stakes the whole pitch on being checkable in an
+ * afternoon. One decorative overclaim and that sentence is worth nothing.
  */
 export function LandingPage() {
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
     // scrolling. min-h-dvh would put the footer out of reach.
-    //
-    // Always light, whatever theme the visitor's browser is carrying. This is
-    // the front of the product rather than a place to work: it is built around
-    // a photograph and a shelf of real covers, all of them made for a white
-    // page, and under the dark theme half of it inverted and half of it did
-    // not. The attribute re-points the palette for this subtree alone — see
-    // [data-theme="light"] in globals.css.
-    <div data-theme="light" className="h-dvh overflow-y-auto bg-surface">
-      <Nav />
+    <div
+      data-theme="light"
+      // `scroll-mt-20` on everything with an id, set once here rather than
+      // repeated on six sections: the header is sticky now, so an anchor jump
+      // that lands flush with the top of the container puts the heading
+      // *behind* the bar. 5rem is its 4rem plus a little air.
+      className="h-dvh overflow-x-hidden overflow-y-auto bg-white font-brand
+                 text-[#5A6170] [scroll-behavior:smooth] [&_[id]]:scroll-mt-20"
+    >
+      {/* Sticky, and the scroll listener inside it reads this div's scrollTop —
+          see the note in landing-nav.tsx for why it cannot read the window's. */}
+      <LandingNav />
       <Hero />
-      <WorksWith />
+      <OpensIn />
       <Features />
-      <Toolkit />
-      <Numbers />
-      <Steps />
+      <Formats />
+      <Path />
+      <Publishing />
       <Faq />
-      <Closing />
       <Footer />
     </div>
   );
 }
 
-// In the order the page presents them. Every section below has an id so it can
-// be reached from here — leaving one out makes the nav a table of contents that
-// is missing a chapter, and it feeds the footer's column too.
-const SECTIONS = [
-  ["Features", "#features"],
-  ["Formats", "#toolkit"],
-  ["In numbers", "#numbers"],
-  ["Getting started", "#start"],
-  ["Questions", "#questions"],
-] as const;
+// The design's palette, named once. Written out rather than tokenised because
+// they are used inside `style` as often as in classes — a gradient stop and a
+// chip background cannot both come from a Tailwind colour utility.
+const INK = "#0E1116";
+const BLUE = "#1B63F5";
+
+// ---------------------------------------------------------------------------
+// Chrome
+// ---------------------------------------------------------------------------
 
 /**
- * Mark, wordmark, links down the middle, one filled pill at the end.
+ * The design's pill button: label, then an arrow in a translucent disc.
  *
- * The pill takes `bg-fg`/`text-surface` rather than a fixed near-black. Those
- * tokens invert with the theme, so it is a dark pill with light text on the
- * light chrome and a light pill with dark text on the dark one — a fixed black
- * would vanish into the dark theme's page.
+ * Written once because the page uses it four times and they must not drift —
+ * the disc's size is what makes it read as a button rather than as a link with
+ * a character stuck on the end.
  */
-function Nav() {
+function PillLink({
+  href,
+  children,
+  size = "lg",
+}: {
+  href: string;
+  children: ReactNode;
+  size?: "lg" | "md";
+}) {
+  const lg = size === "lg";
   return (
-    // Transparent, and therefore *not* sticky. A bar with no ground of its own
-    // only works while it sits on the hero photograph; carried down the page it
-    // would put white type on the light sections and disappear. Static keeps it
-    // where its contrast comes from, and the hero is pulled up underneath so the
-    // photograph runs behind it.
-    <header className="relative z-30 px-5 pt-5 sm:px-8 sm:pt-6">
-      <div className="mx-auto flex max-w-6xl items-center gap-6">
-        <Link
-          href="/"
-          className="flex shrink-0 items-center gap-2.5 outline-none
-                     focus-visible:ring-2 focus-visible:ring-accent/50"
-        >
-          <BookMark />
-          <span className="font-display text-xl font-semibold tracking-tight text-fg">
-            Open<span style={{ color: "#3a86d4" }}>Chapter</span>
-          </span>
-        </Link>
-
-        {/* Centred in the bar, not merely between its neighbours: flex-1 on the
-            nav plus justify-center keeps the links on the midline whatever the
-            wordmark and the button happen to measure. */}
-        <nav className="hidden flex-1 items-center justify-center gap-9 lg:flex">
-          {SECTIONS.map(([label, href]) => (
-            <a
-              key={href}
-              href={href}
-              // Matched to the Get started pill: same size, same weight, same
-              // full-strength ink. Hover moves to the accent rather than to a
-              // darker grey, because at full opacity there is nowhere darker.
-              className="font-sans text-base font-semibold text-fg outline-none
-                         transition-colors hover:text-accent focus-visible:ring-2
-                         focus-visible:ring-accent/50"
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
-
-        <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
-          {/* Same size and weight as the section links — it is one more way
-              through the nav, not a second button competing with the pill. */}
-          <Link
-            href="/signin"
-            className="hidden px-2 font-sans text-base font-semibold text-fg
-                       outline-none transition-colors hover:text-accent
-                       focus-visible:ring-2 focus-visible:ring-accent/50 sm:block"
-          >
-            Sign in
-          </Link>
-          {/* bg-fg/text-surface rather than a fixed near-black: those invert
-              with the theme, so it stays a dark pill on the light chrome and a
-              light one on the dark chrome. */}
-          <Link
-            href="/signup"
-            className="flex items-center gap-2 rounded-xl bg-fg px-5 py-2.5 font-sans
-                       text-base font-semibold text-surface outline-none
-                       transition-opacity hover:opacity-85 focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
-            Get started
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-3.5 w-3.5"
-            >
-              <path d="M4 10h11M11 6l4 4-4 4" />
-            </svg>
-          </Link>
-        </div>
-      </div>
-    </header>
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-3 rounded-full bg-[#1B63F5] font-brand
+                  font-semibold text-white outline-none transition-colors
+                  hover:bg-[#1147C9] focus-visible:ring-2 focus-visible:ring-[#1B63F5]/60
+                  ${
+                    lg
+                      ? "py-[15px] pr-4 pl-7 text-base"
+                      : "py-[13px] pr-4 pl-6 text-[15px]"
+                  }`}
+    >
+      {children}
+      <span
+        aria-hidden="true"
+        className={`inline-flex shrink-0 items-center justify-center rounded-full
+                    bg-white/[0.22] ${lg ? "h-7 w-7 text-sm" : "h-[26px] w-[26px] text-[13px]"}`}
+      >
+        →
+      </span>
+    </Link>
   );
 }
 
-/** The open-book mark, masked so it takes the current text colour. */
-function BookMark() {
+/** The outlined uppercase eyebrow above most headings. */
+function Eyebrow({
+  children,
+  tone = "light",
+}: {
+  children: ReactNode;
+  tone?: "light" | "dark";
+}) {
   return (
     <span
-      aria-hidden="true"
-      className="h-7 w-7 shrink-0 bg-accent"
-      style={{
-        maskImage: "url(/logo.png)",
-        WebkitMaskImage: "url(/logo.png)",
-        maskSize: "contain",
-        WebkitMaskSize: "contain",
-        maskRepeat: "no-repeat",
-        WebkitMaskRepeat: "no-repeat",
-        maskPosition: "center",
-        WebkitMaskPosition: "center",
-      }}
-    />
+      className={`inline-block rounded-full border px-4 py-2 font-brand text-[11px]
+                  font-semibold tracking-[0.14em] uppercase ${
+                    tone === "dark"
+                      ? "border-white/[0.18] text-[#7FA8FF]"
+                      : "border-[#E5E8EF] text-[#5A6170]"
+                  }`}
+    >
+      {children}
+    </span>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Hero
+// ---------------------------------------------------------------------------
 
 function Hero() {
   return (
-    // -mt-* pulls the section up under the floating nav, which keeps its space
-    // in the flow above. The matching pt-* puts the headline back below it, so
-    // the illustration reaches the top of the page and nothing is covered.
-    // Exactly one screen, and no more. min-h-dvh with the content centred means
-    // the whole pitch — headline, books, sub, buttons — is visible without
-    // scrolling on any viewport tall enough to hold it, and the page below is
-    // something you choose to scroll to rather than something you must.
-    // The negative margin has to track the header's height: it pulls the section
-    // up under a header that still holds its own space in the flow. Shrink the
-    // header's padding without shrinking this by the same amount and the section
-    // starts above the top of the page.
+    // Pulled up by the header's exact height (`h-16`, 4rem) so the pale blue
+    // runs behind a transparent bar rather than starting under it — without
+    // this there is a white strip across the top of the page. The top padding
+    // then puts the content back: 4rem for the bar it now sits behind, plus the
+    // 4rem/5.5rem of air the hero wants under it.
     //
-    // pt is then the header's height *plus* the gap wanted under it, since the
-    // section begins behind the nav rather than below it — pt-28 against a
-    // ~4.5rem header leaves about 3rem of air, and pt-40 at sm leaves ~5.5rem.
-    <section className="relative -mt-[4.75rem] flex min-h-dvh flex-col justify-center overflow-hidden px-5 pt-28 pb-12 sm:-mt-[5.25rem] sm:px-8 sm:pt-40">
-      <Backdrop />
-
-      {/* Headline above the fan: the words set the claim, the books show it. */}
-      <div className="relative mx-auto max-w-6xl">
-        {/* The figure is written here rather than counted. If it is ever wired
-            to the real number, this is the only place that changes: a view over
-            library_claims returning the count and nothing else is enough, since
-            the table itself has to stay behind RLS. */}
-        <p className="mb-6 text-center font-sans text-xl font-medium text-fg sm:mb-7 sm:text-2xl">
-          {/* The figure carries the line, so it is set larger and in the
-              display face — the same one the headline below uses, which keeps
-              the two as one voice rather than a number borrowed from
-              elsewhere. */}
-          <span className="font-display text-3xl font-bold sm:text-4xl">
-            1,000+
-          </span>{" "}
-          writers drafting here
-        </p>
-
-        <h1 className="mx-auto max-w-3xl text-center font-display text-[2.75rem] leading-[1.08] font-semibold tracking-tight text-fg sm:text-[3.875rem]">
-          A place to write your
-          <br />
-          masterpiece.
-        </h1>
-      </div>
-
-      {/* Outside the max-w wrapper on purpose: the arc runs the full width of
-          the window, and the section's overflow-hidden trims the two books that
-          overhang each edge — which is what makes it read as continuing past
-          the screen rather than stopping neatly inside it. */}
-      <div className="relative mt-8 sm:mt-10">
-        <BookFan />
-      </div>
-
-      <div className="relative mx-auto -mt-2 max-w-6xl text-center sm:-mt-4">
-        <p className="mx-auto max-w-2xl font-sans text-lg font-medium leading-relaxed text-fg sm:text-xl">
-          Draft on real pages, and hand it off in the formats they ask for.
-        </p>
-
-        <div className="mt-7 flex flex-wrap items-center justify-center gap-4">
-          <Link
-            href="/signup"
-            className="flex items-center gap-2 rounded-full bg-fg px-7 py-3.5 font-sans
-                       text-sm font-semibold text-surface outline-none
-                       transition-opacity hover:opacity-85 focus-visible:ring-2
-                       focus-visible:ring-accent/60"
+    // Both numbers track `h-16` in landing-nav.tsx. Change the bar's height and
+    // these move with it.
+    <section
+      id="top"
+      className="-mt-16 bg-[#F1F5FF] px-5 pt-32 pb-16 sm:px-10 sm:pt-[152px] sm:pb-[88px]"
+    >
+      <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-12 lg:gap-16">
+        <div className="min-w-[300px] flex-1 basis-[480px]">
+          <span
+            className="inline-block rounded-full border border-[#DCE7FD] bg-white px-4 py-2
+                       font-brand text-[11px] font-semibold tracking-[0.14em] uppercase"
+            style={{ color: BLUE }}
           >
-            Start writing free
-          </Link>
-          {/* The quiet second action the reference sets beside its pill —
-              still a real one: Google is wired. */}
-          <GoogleButton
-            action={signInWithGoogle}
-            next="/"
-            label="Sign in with Google"
-            className="flex items-center gap-2.5 px-3 py-3.5 font-sans text-base
-                       font-semibold text-fg outline-none transition-colors
-                       hover:text-accent focus-visible:ring-2
-                       focus-visible:ring-accent/50"
+            Write · Check · Export
+          </span>
+
+          <h1
+            className="mt-6 max-w-[640px] font-brand text-[clamp(38px,4.6vw,62px)]
+                       leading-[1.06] font-extrabold tracking-[-0.03em] text-balance"
+            style={{ color: INK }}
+          >
+            Write your novel. Export what the stores accept.
+          </h1>
+
+          <p className="mt-[22px] max-w-[520px] font-brand text-lg leading-[1.65] text-pretty">
+            One app to draft a book and turn it into EPUB, DOCX, PDF at your trim
+            size, and Markdown. No plugin chain, no conversion website, no seven
+            open tabs.
+          </p>
+
+          <div className="mt-[34px] flex flex-wrap items-center gap-7">
+            <PillLink href="/signup">Start writing free</PillLink>
+            {/* Points at the FAQ's first row, which is open by default. The
+                design made this the hero's second action, and it is the right
+                one: to somebody who has been oversold, "here is what we don't
+                do" is a stronger invitation than a second Get Started. */}
+            <a
+              href="#faq-limits"
+              className="border-b border-[#C9D6F5] pb-[3px] font-brand text-[15.5px]
+                         font-medium outline-none transition-colors hover:text-[#1B63F5]
+                         focus-visible:ring-2 focus-visible:ring-[#1B63F5]/50"
+              style={{ color: INK }}
+            >
+              See what it doesn&rsquo;t do
+            </a>
+          </div>
+
+          {/* The design's line read "Writing, your shelf, syncing and all four
+              export formats are free, and stay free" — true, and kept. What it
+              could not know is that three things are *not* in that list, so the
+              FAQ below names them rather than leaving the reader to find out at
+              a paywall. */}
+          <p className="mt-[26px] font-brand text-[14.5px] leading-[1.6]">
+            Writing, your shelf, syncing and all four export formats are free,
+            and stay free.
+          </p>
+        </div>
+
+        <div className="min-w-[300px] flex-1 basis-[520px]">
+          {/* The browser window the design frames the product in. Inside it is
+              the editor drawn from the app's own tokens — see `EditorScreen` —
+              rather than a screenshot, which would go stale silently and needs
+              re-taking every time the rail changes. */}
+          <div
+            className="rounded-[20px] border border-[#E5E8EF] bg-white p-2.5"
+            style={{ boxShadow: "0 18px 50px rgba(14,17,22,.08)" }}
+          >
+            <div aria-hidden="true" className="flex items-center gap-[7px] px-2.5 pt-2 pb-3">
+              <span className="h-[9px] w-[9px] rounded-full bg-[#E5E8EF]" />
+              <span className="h-[9px] w-[9px] rounded-full bg-[#E5E8EF]" />
+              <span className="h-[9px] w-[9px] rounded-full bg-[#E5E8EF]" />
+            </div>
+            <div
+              aria-hidden="true"
+              className="h-[300px] overflow-hidden rounded-xl sm:h-[420px]"
+            >
+              <EditorScreen />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Where the exports open, with the real brand marks.
+ *
+ * The design set these as four names in bold type. `works-with.tsx` already
+ * carries the actual logos in their official colours — with the licensing
+ * worked out, which is the expensive part — so they are used instead. A row of
+ * marks is what makes the claim land at a glance; four words in Jakarta Bold
+ * read as four assertions.
+ *
+ * Four of the seven, matching the design's lineup.
+ */
+const OPENS_IN = ["Microsoft Word", "Apple Books", "Google Play Books", "Obsidian"];
+
+function OpensIn() {
+  const shown = OPENS_IN.map((name) => {
+    const found = DESTINATIONS.find((d) => d.name === name);
+    if (!found) throw new Error(`Unknown destination: ${name}`);
+    return found;
+  });
+
+  return (
+    <section className="bg-white px-5 pt-16 pb-2 sm:px-10">
+      <div className="mx-auto max-w-[1240px] text-center">
+        <p className="mb-7 font-brand text-[11px] font-semibold tracking-[0.14em] text-[#8A919E] uppercase">
+          Your exported files open in
+        </p>
+        <ul className="flex flex-wrap items-center justify-center gap-x-10 gap-y-5 sm:gap-x-14">
+          {shown.map(({ name, mark }) => (
+            <li key={name} className="flex items-center gap-3">
+              <svg
+                aria-hidden="true"
+                viewBox={mark.viewBox}
+                className="h-6 w-6 shrink-0"
+              >
+                {mark.paths.map((p, i) => (
+                  <path key={i} d={p.d} fill={p.fill} />
+                ))}
+              </svg>
+              <span
+                className="font-brand text-lg font-bold tracking-[-0.02em] sm:text-xl"
+                style={{ color: INK }}
+              >
+                {name}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-7 font-brand text-[14.5px] leading-[1.6]">
+          We make standard files. We don&rsquo;t upload anything on your behalf.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Features
+// ---------------------------------------------------------------------------
+
+/** The tools this replaces, struck through. The design's own list. */
+const REPLACES = [
+  "a word processor",
+  "a converter site",
+  "an epub formatter",
+  "a validator",
+  "cloud storage",
+  "a spreadsheet",
+];
+
+function Features() {
+  return (
+    <section id="features" className="bg-white px-5 pt-[88px] sm:px-10">
+      <div className="mx-auto flex max-w-[1240px] flex-wrap items-start gap-12 lg:gap-16">
+        <div className="min-w-[300px] flex-1 basis-[380px] pt-3">
+          <Eyebrow>Features</Eyebrow>
+          <h2
+            className="mt-[22px] max-w-[420px] font-brand text-[clamp(30px,3.2vw,42px)]
+                       leading-[1.12] font-extrabold tracking-[-0.028em] text-balance"
+            style={{ color: INK }}
+          >
+            Four things, done properly
+          </h2>
+          <p className="mt-5 max-w-[400px] font-brand text-[16.5px] leading-[1.7] text-pretty">
+            Publishing one book usually means seven tools and a spreadsheet to
+            remember which version is current. Every hand-off between them is a
+            chance for the file to come out wrong — and you find out after the
+            upload.
+          </p>
+
+          <ul className="mt-[26px] flex max-w-[420px] flex-wrap gap-2">
+            {REPLACES.map((tool) => (
+              <li
+                key={tool}
+                className="rounded-full bg-[#F3F5F9] px-3.5 py-[7px] font-brand text-[13px]
+                           font-medium text-[#8A919E] line-through"
+              >
+                {tool}
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-[34px]">
+            <PillLink href="/signup" size="md">
+              Get started
+            </PillLink>
+          </div>
+        </div>
+
+        <div className="grid min-w-[300px] flex-1 basis-[560px] grid-cols-1 gap-[18px] rounded-[26px] bg-[#F3F5F9] p-[18px] sm:grid-cols-2">
+          <FeatureCard
+            filled
+            glyph={<span className="block h-3.5 w-3.5 rounded-[3px] bg-white" />}
+            title="One app instead of seven"
+            body="Draft, manuscript, metadata and export live in one file tree."
+          />
+          <FeatureCard
+            glyph={
+              <span className="block h-3.5 w-3.5 rounded-full border-2 border-white" />
+            }
+            title="A shelf, not a folder"
+            body="Books, chapters and drafts stay in order and sync as you type."
+          />
+          <FeatureCard
+            glyph={<span className="block h-3 w-3 rotate-45 bg-white" />}
+            title="Checked before you upload"
+            body="We name what would get your book rejected, in plain words."
+            link={{ href: "#publishing", label: "See the check →" }}
+          />
+          <FeatureCard
+            glyph={
+              <span
+                className="block h-[3px] w-4 rounded-sm bg-white"
+                style={{ boxShadow: "0 6px 0 #FFFFFF" }}
+              />
+            }
+            title="An assistant that can’t touch your book"
+            body="No write access at all. It reads one chapter, only when you ask."
           />
         </div>
       </div>
@@ -263,689 +382,440 @@ function Hero() {
   );
 }
 
-
-/** The faint ruled ground and wash the fan sits on. */
-function Backdrop() {
-  return (
-    <>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-40"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, var(--color-line) 1px, transparent 1px), linear-gradient(to bottom, var(--color-line) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          maskImage:
-            "radial-gradient(ellipse 70% 55% at 50% 20%, black, transparent)",
-          WebkitMaskImage:
-            "radial-gradient(ellipse 70% 55% at 50% 20%, black, transparent)",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 -top-24 mx-auto h-[30rem] w-[min(60rem,95%)] rounded-full opacity-50 blur-3xl"
-        style={{
-          background:
-            "linear-gradient(110deg, color-mix(in srgb, var(--color-accent) 22%, transparent), color-mix(in srgb, #a78bfa 26%, transparent))",
-        }}
-      />
-    </>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Feature rows
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
-// Features
-// ---------------------------------------------------------------------------
-
-/**
- * The heading block the three sections below share.
- *
- * A small pill, a centred headline, a line of sub-copy. Written once because
- * three sections use it, and a page whose headings drift in size and spacing
- * reads as three pages stapled together.
- */
-function SectionHead({
-  eyebrow,
-  title,
-  body,
-  align = "center",
-}: {
-  /** Omitted where the heading is doing the work on its own. */
-  eyebrow?: string;
-  title: ReactNode;
-  /** Omitted where the heading needs no second sentence. */
-  body?: ReactNode;
-  /**
-   * Centred over its section, or set to the left margin. Only the alignment
-   * changes — the type does not, which is the whole point of this component:
-   * two sections whose headings differ in size or weight read as two pages.
-   */
-  align?: "center" | "start";
-}) {
-  const centred = align === "center";
-
-  return (
-    <div className={centred ? "mx-auto max-w-2xl text-center" : "max-w-xl"}>
-      {eyebrow && (
-        <p
-          className="inline-flex items-center gap-2 rounded-full border border-line
-                     bg-panel px-3.5 py-1.5 font-sans text-xs font-semibold text-muted"
-        >
-          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
-          {eyebrow}
-        </p>
-      )}
-      <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-fg not-first:mt-5 sm:text-4xl">
-        {title}
-      </h2>
-      {body && (
-        // Larger, a little heavier, and on the page's own ink held slightly
-        // back rather than on the muted token. This is the sentence the heading
-        // is asking to be read, not a caption under it.
-        <p
-          className={`mt-4 font-sans text-lg leading-relaxed font-medium text-fg/80 ${
-            centred ? "mx-auto max-w-xl" : "max-w-md"
-          }`}
-        >
-          {body}
-        </p>
-      )}
-    </div>
-  );
-}
-
-/**
- * The features, as a bento of cards that each show the thing they describe.
- *
- * This replaced four full-width alternating rows. Those gave every feature the
- * same enormous weight and took four screens to say four things; somebody
- * deciding whether to sign up wants to take them in at a glance and stop at
- * whichever one is theirs.
- *
- * The arrangement is four cards on a three-by-two grid: two small ones on the
- * top left, one tall down the right spanning both rows, one wide across the
- * bottom. Not a uniform grid — a grid of identical tiles has no reading order,
- * the eye is offered four equal things and settles on none. Three shapes give
- * it somewhere to start and somewhere to finish.
- *
- * Each figure is deliberately larger than the space it is given and is clipped
- * by the card's own edge. A widget drawn to fit inside its card reads as an
- * icon; one running off the bottom reads as a piece of a screen that carries
- * on past the frame, which is the whole point — these are the app, not
- * decoration about the app.
- *
- * Every figure is drawn from the app's own tokens rather than screenshotted,
- * for the reason landing-figures.tsx gives. They are illustrations and are
- * marked as such — decorative to assistive technology, with nothing clickable
- * inside them. That is not the no-dead-UI rule being bent: there is no control
- * here to be dead, and each one depicts something the app genuinely does.
- */
-function Features() {
-  return (
-    <section
-      id="features"
-      className="border-t border-line px-5 py-20 sm:px-8 sm:py-24"
-    >
-      <SectionHead
-        title={
-          <>
-            Everything a manuscript needs,
-            <br className="hidden sm:block" /> and nothing it doesn&rsquo;t.
-          </>
-        }
-        body="The parts of a writing app you actually use, built to the standard a shop checks, and quiet about everything else."
-      />
-
-      {/*
-        A B C
-        D D C
-
-        Placed explicitly rather than left to auto-flow. The tall card is third
-        in the source, and auto-placement would try to fit it in the gap under
-        A — the row-span only lands where it is meant to once both the column
-        and the row are named.
-      */}
-      <div className="mx-auto mt-14 grid max-w-6xl gap-5 lg:grid-cols-3 lg:grid-rows-2">
-        <FeatureCard
-          title="A page that behaves like a page"
-          body="Real sheets at your trim size, with paragraphs that carry over the break."
-          figure={<PageFigure />}
-        />
-
-        <FeatureCard
-          title="A shelf, not a folder"
-          body="Every book with its cover, its word count, and where you left off."
-          figure={<ShelfFigure />}
-        />
-
-        {/* The tall one. A conversation is the only figure here that is taller
-            than it is wide, so it is the one that earns the double row. */}
-        <FeatureCard
-          className="lg:col-start-3 lg:row-start-1 lg:row-span-2"
-          title="An assistant that has read the chapter"
-          body="Ask what isn't landing. Your chapter is sent only when you ask, and never to train anything."
-          figure={<AssistantFigure fill tall />}
-          inset
-        />
-
-        {/* The wide one, text beside the figure rather than above it: across
-            two columns a stacked figure would be a letterbox. */}
-        <FeatureCard
-          className="lg:col-start-1 lg:row-start-2 lg:col-span-2"
-          wide
-          title="Hand it off in what they asked for"
-          body="EPUB, DOCX, a print-ready PDF and Markdown, with the front matter generated for you."
-          figure={<FormatFigure />}
-        />
-      </div>
-    </section>
-  );
-}
-
-/**
- * One card: a title, a couple of lines, and a figure that runs off the edge.
- *
- * The bleed is the whole look and it is done with negative margins against the
- * card's `overflow-hidden` rather than by sizing the figure to fit. Sized to
- * fit, every card would need its own height guess and they would disagree the
- * moment a paragraph wrapped differently; clipped, the card decides and the
- * figure simply continues past it.
- */
 function FeatureCard({
+  glyph,
   title,
   body,
-  figure,
-  wide,
-  inset,
-  className = "",
+  link,
+  filled,
 }: {
+  glyph: ReactNode;
   title: string;
   body: string;
-  figure: ReactNode;
-  /** Figure beside the words instead of below them, for the two-column card. */
-  wide?: boolean;
-  /** Hold the figure off the left edge too, as the tall card wants. */
-  inset?: boolean;
-  className?: string;
+  link?: { href: string; label: string };
+  /** The blue card. One per grid, top left, as the design has it. */
+  filled?: boolean;
 }) {
   return (
     <article
-      className={`relative flex overflow-hidden rounded-3xl bg-panel p-6 sm:p-7
-                  ${wide ? "flex-col sm:flex-row sm:items-center sm:gap-8" : "flex-col"}
-                  ${className}`}
+      className={`flex min-h-[230px] flex-col rounded-[18px] px-6 pt-[26px] pb-7 ${
+        filled ? "bg-[#1B63F5]" : "bg-white"
+      }`}
     >
-      {/* The faint wash the reference cards carry, strongest at the top right.
-          Pointer-events-none and behind everything: it is light, not a
-          surface. */}
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-bl
-                   from-accent/8 via-transparent to-transparent"
-      />
-
-      <div className={`relative ${wide ? "sm:w-[45%] sm:shrink-0" : ""}`}>
-        <h3 className="font-display text-lg font-semibold text-fg sm:text-xl">
-          {title}
-        </h3>
-        {/* Two lines, and the copy above is written to fit in two — the clamp
-            is the guarantee, not the mechanism. Relying on it alone would mean
-            shipping sentences that end in an ellipsis at whatever width the
-            third line appears, which is a worse card than a tall one. */}
-        <p className="mt-2 line-clamp-2 font-sans text-sm leading-relaxed text-muted">
-          {body}
-        </p>
-      </div>
-
-      {/* Negative margins pull the figure past the card's padding on the edges
-          it should run off. `mt-auto` pins it to the bottom, so cards of
-          different text lengths still line their figures up. */}
-      <div
-        className={`relative ${
-          wide
-            ? "mt-6 -mr-6 -mb-6 sm:mt-0 sm:-mr-7 sm:-mb-7 sm:flex-1"
-            : // mt-auto, not a fixed gap: the titles are one line on some cards
-              // and two on others, and a fixed gap carries that difference down
-              // into the figures, so one starts a line higher than its
-              // neighbours. Pinned to the bottom of a stretched grid row they
-              // all begin together whatever the text above them did. pt keeps a
-              // floor under it for the narrow layout, where the cards are not
-              // in a row and have no common height to align to.
-              //
-              // min-h-0 alongside flex-1 on the tall card, or the figure's own
-              // contents set a floor and the card grows to fit rather than the
-              // figure shrinking to the row.
-              `mt-auto pt-6 -mb-10 ${
-                inset ? "ml-4 sm:ml-6 lg:min-h-0 lg:flex-1" : ""
-              }`
+        className={`mb-auto flex h-[42px] w-[42px] items-center justify-center rounded-full ${
+          filled ? "bg-white/[0.18]" : "bg-[#1B63F5]"
         }`}
       >
-        {figure}
-      </div>
+        {glyph}
+      </span>
+      <h3
+        className="mt-7 mb-2 font-brand text-[19px] leading-[1.3] font-bold tracking-[-0.015em]"
+        style={{ color: filled ? "#FFFFFF" : INK }}
+      >
+        {title}
+      </h3>
+      <p
+        className={`font-brand text-[14.5px] leading-[1.6] text-pretty ${
+          filled ? "text-white/[0.86]" : "text-[#5A6170]"
+        } ${link ? "mb-3" : ""}`}
+      >
+        {body}
+      </p>
+      {link && (
+        <a
+          href={link.href}
+          className="font-brand text-sm font-semibold outline-none transition-colors
+                     hover:text-[#1147C9] focus-visible:ring-2 focus-visible:ring-[#1B63F5]/50"
+          style={{ color: BLUE }}
+        >
+          {link.label}
+        </a>
+      )}
     </article>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Everything else
+// Formats
 // ---------------------------------------------------------------------------
 
 /**
- * The rest of it: eight smaller things, beside the picture of what comes in and
- * goes out.
+ * What the importer actually reads — `IMPORT_FORMATS` in `src/lib/import/index.ts`,
+ * plus the audiobook route.
  *
- * The bento above holds four features and no more — that is what the shape can
- * carry without turning into a list. This is where the rest live, at a size
- * that suits them: none of these needs a picture of its own, and eight cards
- * with eight illustrations would be a second bento competing with the first.
- *
- * Two of them, the read-through and the word target, had figures in an earlier
- * version of the features grid and lost their place when it went to four cards.
- * They are real features and this is a better home for them than a card the
- * size of the page.
- *
- * Every one is a thing the app does today. The temptation in a grid this size
- * is to round it up to a nice even number with something that is nearly true,
- * and the honest limit is however many there are.
+ * The design listed four and one of them was "paste". Import is file-based and
+ * dispatches on extension; there is no paste-a-manuscript path, and the two it
+ * left out (EPUB and HTML) are real. Six is also the more impressive number, so
+ * this is a correction that costs nothing.
  */
-// Each line is written to fit the two the card allows at this width — about
-// thirty characters a line. The clamp below is the guarantee, not the
-// mechanism: a description that ends in an ellipsis is a claim about the
-// product cut in half, which is a worse card than a tall one.
-const TOOLKIT = [
-  [
-    "search",
-    "Search the whole book",
-    "Every chapter at once, matched on the words.",
-  ],
-  [
-    "bookmark",
-    "Bookmarks across the shelf",
-    "Star a scene in any book, and find it in one list.",
-  ],
-  [
-    "mic",
-    "Dictate a paragraph",
-    "Speak and the words are typed. Chrome and Edge.",
-  ],
-  [
-    "read",
-    "Read it through",
-    "The whole book on real pages, or as one you turn.",
-  ],
-  [
-    "target",
-    "A word target",
-    "Set when you start, measured chapter by chapter.",
-  ],
-  [
-    "matter",
-    "Front and back matter",
-    "Title, copyright and contents pages, generated.",
-  ],
+const BRING_IN = [
+  [".docx", "Word, or a Pages export"],
+  [".epub", "An ebook you already published"],
+  [".md", "Markdown, headings intact"],
+  [".txt", "Plain text"],
+  [".html", "A web page or a Docs export"],
+  ["audio", "An audiobook, transcribed and split into chapters"],
 ] as const;
 
-function Toolkit() {
+/**
+ * The four exports.
+ *
+ * **The PDF line is the one that was changed.** The design promised
+ * "Print-ready: your trim size, fonts embedded", and the FAQ under it promised
+ * bleed. `print.ts` renders through the browser's print engine and says in its
+ * own header: no bleed, no crop marks, no CMYK. The export screen tells writers
+ * the same thing. A landing page contradicting the product's own disclosure is
+ * exactly the trick this audience has learned to look for.
+ */
+const TAKE_OUT = [
+  [".epub", "EPUB 3, checked against EPUBCheck 5.3"],
+  [".docx", "For anyone who asks for Word"],
+  [".pdf", "Your trim size, fonts embedded, ready to proof"],
+  [".md", "Markdown, so the text is never trapped"],
+] as const;
+
+/**
+ * What comes in and what goes out, on ink.
+ *
+ * The section is a dark band rather than the design's white one. It gives the
+ * page a second dark ground between the hero and the publishing section, and it
+ * suits what is being said: the two cards are the *product's* edges — what it
+ * will swallow and what it will hand back — and on white they read as two more
+ * panels among the six above them.
+ *
+ * The band is self-contained: its own padding top and bottom, rather than the
+ * shared `pt-24` the white sections use to space themselves off each other. A
+ * coloured section that inherits a white section's spacing gets its colour
+ * clipped against the next heading.
+ */
+function Formats() {
   return (
     <section
-      id="toolkit"
-      // A light wash of the accent for the whole section, so the white cards
-      // sit *on* something. It was the other way round — grey cards on white —
-      // which reads as wells sunk into the page rather than cards laid on it,
-      // and left the section indistinguishable from its neighbours.
-      className="relative overflow-hidden border-t border-line bg-accent/6 px-5
-                 py-20 sm:px-8 sm:py-24"
+      id="formats"
+      className="mt-24 px-5 py-20 sm:px-10 sm:py-24"
+      style={{ background: INK }}
     >
-      {/* A little more of it at the corner the diagram sits in, so the ground
-          is not perfectly flat. Behind everything and unclickable. */}
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-gradient-to-br
-                   from-accent/8 via-transparent to-transparent"
-      />
-
-      <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2 lg:gap-16">
-        <div>
-          <FormatsFlow />
-
-          {/* Two lines, the second in the accent — it works here because the
-              sentence genuinely has two halves: what arrives, and what leaves. */}
-          <div className="mt-12">
-            <SectionHead
-              align="start"
-              title={
-                <>
-                  Bring anything in.
-                  <br />
-                  <span className="text-accent">Hand off anything.</span>
-                </>
-              }
-              body="Six formats in, and out to the readers people actually use. Your file is built in this browser, never on a server."
-            />
-          </div>
-
-          <Link
-            href="/signup"
-            className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent
-                       px-6 py-3 font-sans text-sm font-semibold text-white
-                       outline-none transition-colors hover:bg-accent-strong
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            Start writing
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-4 w-4"
+      <div className="mx-auto max-w-[1240px]">
+        <div className="mb-9 flex flex-wrap items-end gap-x-14 gap-y-6">
+          <div className="flex-1 basis-[480px]">
+            <Eyebrow tone="dark">Formats</Eyebrow>
+            <h2
+              className="mt-[22px] max-w-[520px] font-brand text-[clamp(30px,3.2vw,42px)]
+                         leading-[1.12] font-extrabold tracking-[-0.028em] text-white"
             >
-              <path d="M4 10h11M11 6l4 4-4 4" />
-            </svg>
-          </Link>
+              What goes in, what comes out
+            </h2>
+          </div>
+          <p className="max-w-[440px] flex-1 basis-[360px] font-brand text-base leading-[1.7] text-pretty text-white/[0.72]">
+            Every export is a real file on your disk, not a preview. No
+            watermark, no export limit. If you leave, your book leaves with you.
+          </p>
         </div>
 
-        <ul className="grid gap-4 sm:grid-cols-2">
-          {TOOLKIT.map(([icon, title, body]) => (
-            <li
-              key={title}
-              // The export page's format card, brought over whole: a fixed
-              // height with overflow-hidden, which is what crops the preview at
-              // the corner, and `oc-tilt-card` for the straightening. The edge
-              // is `border-fg/20` for the reason FormatCard gives — a hairline
-              // at the line token vanishes on white at this radius.
-              className="oc-tilt-card relative h-[190px] overflow-hidden rounded-xl
-                         border border-fg/20 bg-panel px-4 pt-4 transition-colors
-                         hover:border-fg/45"
-            >
-              {/* Above the preview, which passes under the text on its way out
-                  of the corner. */}
-              <h3 className="relative z-10 flex items-center gap-2.5 font-sans text-sm font-semibold text-fg">
-                <span className="shrink-0 text-accent">{TOOL_ICON[icon]}</span>
-                {title}
-              </h3>
-              <p className="relative z-10 mt-1.5 line-clamp-2 max-w-[92%] font-sans text-sm leading-relaxed text-muted">
-                {body}
-              </p>
-
-              <span
-                aria-hidden="true"
-                className="oc-tilt absolute top-[57%] left-[15%] h-full w-full
-                           overflow-hidden rounded-lg border border-line bg-panel
-                           shadow-sm"
-              >
-                {TOOL_FIGURE[icon]}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <div className="grid grid-cols-1 gap-[18px] lg:grid-cols-2">
+          <FormatColumn label="Bring in" rows={BRING_IN} />
+          <FormatColumn label="Take out" rows={TAKE_OUT} filled />
+        </div>
       </div>
     </section>
   );
 }
 
-/**
- * One mark per card, at the same weight as the rails' icons so the page and the
- * app are drawn in one hand. Several are the app's own: the star is the
- * bookmark, the microphone is the dictation button, the magnifier is the search
- * tab.
- */
-const TOOL_ICON: Record<string, ReactNode> = {
-  search: (
-    <ToolGlyph>
-      <circle cx="8.8" cy="8.8" r="5.3" />
-      <path d="m12.7 12.7 4 4" />
-    </ToolGlyph>
-  ),
-  bookmark: (
-    <ToolGlyph>
-      <path d="M5.6 4.1a1.4 1.4 0 0 1 1.4-1.3h6a1.4 1.4 0 0 1 1.4 1.3v13L10 13.7 5.6 17.1z" />
-    </ToolGlyph>
-  ),
-  mic: (
-    <ToolGlyph>
-      <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
-      <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
-      <path d="M10 15v2.4" />
-    </ToolGlyph>
-  ),
-  read: (
-    <ToolGlyph>
-      <rect x="4.6" y="2.8" width="10.8" height="14.4" rx="1.6" />
-      <path d="M10 6.2v7.6" />
-      <path d="M7.4 11.2 10 13.8l2.6-2.6" />
-    </ToolGlyph>
-  ),
-  target: (
-    <ToolGlyph>
-      <circle cx="10" cy="10" r="7" />
-      <circle cx="10" cy="10" r="3.2" />
-      <circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none" />
-    </ToolGlyph>
-  ),
-  matter: (
-    <ToolGlyph>
-      <rect x="3.4" y="3.4" width="13.2" height="13.2" rx="1.8" />
-      <path d="M3.4 7.4h13.2M3.4 12.6h13.2" />
-    </ToolGlyph>
-  ),
-};
-
-/** One figure per card, keyed the same way the icons are. */
-const TOOL_FIGURE: Record<string, ReactNode> = {
-  search: <SearchFigure />,
-  bookmark: <BookmarksFigure />,
-  mic: <DictationFigure />,
-  read: <SpreadFigure />,
-  target: <TargetFigure />,
-  matter: <MatterFigure />,
-};
-
-function ToolGlyph({ children }: { children: ReactNode }) {
+function FormatColumn({
+  label,
+  rows,
+  filled,
+}: {
+  label: string;
+  rows: readonly (readonly [string, string])[];
+  /** The blue column — "Take out", as the design has it. */
+  filled?: boolean;
+}) {
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      // Heavier and larger than the rails' icons, which sit at 1.5 on 20px.
-      // These are the only mark on the card and they carry the title beside
-      // them; at the rail's weight they read as a faint smudge next to
-      // semibold text rather than as its companion.
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
+    <div
+      className={`rounded-[22px] px-6 pt-8 pb-9 sm:px-[34px] ${
+        filled ? "bg-[#1B63F5]" : "bg-[#F3F5F9]"
+      }`}
     >
-      {children}
-    </svg>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// In numbers
-// ---------------------------------------------------------------------------
-
-/**
- * Four figures, every one of them checkable.
- *
- * The pattern this is drawn from puts traction here — active users, teams
- * onboarded, hours saved. OpenChapter has no such numbers, and inventing them
- * is the one thing a landing page must not do: a made-up user count is a lie
- * told to the exact person deciding whether to trust you with a manuscript. So
- * these are facts about the product instead, each of which can be checked by
- * using it for ten minutes.
- */
-const NUMBERS = [
-  [
-    "4",
-    "Export formats",
-    "EPUB, DOCX, a print-ready PDF and Markdown, with the front matter generated for you.",
-  ],
-  [
-    "6",
-    "Import formats",
-    "DOCX, EPUB, Markdown, plain text and HTML, plus an audiobook, transcribed and split into chapters.",
-  ],
-  [
-    "0",
-    "EPUBCheck errors",
-    "Verified against EPUBCheck 5.3 for EPUB 3.3, warnings included, on a fully specified book and a bare one.",
-  ],
-  [
-    "100%",
-    "Written here first",
-    "Every keystroke lands in this browser before anywhere else. Lose the connection and the book is still yours.",
-  ],
-] as const;
-
-function Numbers() {
-  return (
-    <section
-      id="numbers"
-      className="border-t border-line bg-panel px-5 py-20 sm:px-8 sm:py-24"
-    >
-      <SectionHead
-        eyebrow="In numbers"
-        title={
-          <>
-            {/* The name in the accent, as the Toolkit heading's second line is.
-                `text-accent` rather than the wordmark's fixed hex: this is a
-                heading on a themed page, not the logo, and the token follows
-                the palette where the hex would not. */}
-            Why writers choose <span className="text-accent">OpenChapter</span>
-          </>
-        }
-        body="Nothing here about how many people use it. Only figures you can check yourself."
-      />
-
-      <div className="mx-auto mt-14 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {NUMBERS.map(([figure, label, note], i) => (
-          <article
-            key={label}
-            // Every other card sits lower, so the row reads as a rhythm rather
-            // than a table. Only from lg up, where there is a row to stagger.
-            //
-            // White with a soft wash rather than a flat grey fill: on this
-            // section's own white ground a grey card reads as a well sunk into
-            // the page, where the reference's cards sit on top of it. The
-            // border and the shadow do the separating, and the wash gives the
-            // row somewhere to catch the light.
-            className={`relative flex flex-col overflow-hidden rounded-2xl border
-                        border-line bg-panel p-6 shadow-sm ${
-                          i % 2 === 1 ? "lg:mt-8" : ""
-                        }`}
-          >
+      <p
+        className={`mb-6 font-brand text-[11px] font-semibold tracking-[0.14em] uppercase ${
+          filled ? "text-white/70" : "text-[#8A919E]"
+        }`}
+      >
+        {label}
+      </p>
+      <ul className="flex flex-col gap-4">
+        {rows.map(([code, note]) => (
+          <li key={code} className="flex flex-wrap items-baseline gap-x-[18px] gap-y-1">
+            {/* `audio` is not a file extension, so it is set in the muted grey
+                rather than dressed up as one. */}
             <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-0 bg-gradient-to-tr
-                         from-transparent via-transparent to-accent/14"
-            />
-
-            <div className="relative flex items-start justify-between gap-3">
-              <span className="font-display text-4xl font-bold tracking-tight text-fg">
-                {figure}
-              </span>
-              {/* A dot in a ring, not the arrow that was here. An arrow is a
-                  promise that something happens when you press it, and nothing
-                  does — these are readings, not links. */}
-              <span
-                aria-hidden="true"
-                className="flex h-6 w-6 shrink-0 items-center justify-center
-                           rounded-full bg-accent/15"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-              </span>
-            </div>
-
-            {/* mt-auto: the figure sits at the top of the card and the words at
-                the bottom, with the gap between them carrying the height. The
-                cards share a height already — grid items stretch — so this is
-                what lines all four labels up on one line however long the note
-                above them ran. */}
-            <div className="relative mt-auto pt-12">
-              <h3 className="font-sans text-sm font-semibold text-fg">{label}</h3>
-              <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
-                {note}
-              </p>
-            </div>
-          </article>
+              className={`min-w-[62px] font-code text-[13px] font-medium ${
+                filled
+                  ? "text-white"
+                  : code === "audio"
+                    ? "text-[#8A919E]"
+                    : "text-[#1B63F5]"
+              }`}
+            >
+              {code}
+            </span>
+            <span
+              className={`font-brand text-base ${
+                filled ? "text-white/[0.88]" : "text-[#5A6170]"
+              }`}
+            >
+              {note}
+            </span>
+          </li>
         ))}
-      </div>
-    </section>
+      </ul>
+    </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Getting started
+// The path
 // ---------------------------------------------------------------------------
 
-const STEPS = [
+/**
+ * The four stages, absorbing what used to be a separate "Three steps, no setup
+ * wizard" section further down the page.
+ *
+ * They were the same journey told twice — start, write, check, export — and a
+ * landing page that walks a visitor through its own process two ways invites
+ * the question of which one is real. The three-card version had the better
+ * specifics and this has the better shape, so the specifics moved here: no
+ * template to choose (was step 01), the list of importable formats (step 02),
+ * and fixing what the check names before exporting (step 03).
+ */
+const STAGES = [
   [
-    "Start a book",
-    "Name it, choose a trim size and set a word target. Or bring a manuscript you already have, and it arrives split into chapters.",
+    "Draft",
+    "No template to choose and nothing to fill in first. Start typing, name the book later, and it saves and syncs as you go.",
   ],
   [
-    "Write it",
-    "Chapters down one side, the page down the middle. Nothing to set up, and nothing asking to be configured before the first sentence.",
+    "Manuscript",
+    "Bring in a DOCX, EPUB, Markdown, text or HTML file and your headings become chapters. Metadata, trim size and blurb live with the book.",
   ],
   [
-    "Hand it off",
-    "Read the whole thing through at your trim size, then export the file your shop, agent or printer asked for.",
+    "Check",
+    "The pre-upload check names what a store would reject, in plain words, and which problems would actually stop the upload.",
+  ],
+  [
+    "Files",
+    "Export EPUB, DOCX, PDF at your trim size and Markdown, ready to upload wherever you sell.",
   ],
 ] as const;
 
-function Steps() {
+/**
+ * The four stages, on the design's rising and falling line.
+ *
+ * The source positions each node absolutely against a hand-drawn SVG path and
+ * sets a 1080px minimum width with a horizontal scrollbar under it. That works
+ * on a desktop and is miserable on a phone — a landing page that has to be
+ * dragged sideways to be read is one a phone visitor leaves.
+ *
+ * So the line and its scroller are the *large* layout only, and below that the
+ * same four stages stack as a plain numbered column. Same content, same order,
+ * no horizontal scroll. The curve is decoration; the sequence is the point.
+ */
+function Path() {
   return (
-    <section id="start" className="border-t border-line px-5 py-20 sm:px-8 sm:py-24">
-      <SectionHead
-        eyebrow="Getting started"
-        title={
-          <>
-            Blank page to <span className="text-accent">finished file</span>, in
-            three
-          </>
-        }
-        body="No import wizard to survive, and no template to choose before you can begin."
-      />
+    // Pale blue, sitting between the two black bands — Formats above and
+    // Publishing below — so the page alternates rather than running two dark
+    // sections together. It is the hero's own tint, which makes the journey
+    // read as a return to where the page started.
+    <section
+      id="path"
+      className="px-5 py-20 sm:px-10 sm:py-24"
+      style={{ background: "#F1F5FF" }}
+    >
+      <div className="mx-auto max-w-[1240px]">
+        <Eyebrow>The path</Eyebrow>
+        <h2
+          className="mt-[22px] max-w-[560px] font-brand text-[clamp(30px,3.2vw,42px)]
+                     leading-[1.12] font-extrabold tracking-[-0.028em]"
+          style={{ color: INK }}
+        >
+          Blank page to finished file
+        </h2>
+        <p className="mt-[18px] max-w-[620px] font-brand text-base leading-[1.7] text-pretty">
+          Four stages, one app. No setup wizard, no hand-off, no export chain,
+          and no second subscription.
+        </p>
 
-      <div className="mx-auto mt-14 grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
-        {/* The editor itself, drawn rather than screenshotted — the same
-            reasoning as every other figure here. It answers "what does it
-            actually look like", which the steps beside it can only describe. */}
-        <LaptopMockup />
-
-        <ol className="flex flex-col gap-4">
-          {STEPS.map(([title, body], i) => (
-            <li
-              key={title}
-              className="flex gap-4 rounded-2xl border border-line bg-panel p-5"
+        {/* Large screens: the curve. */}
+        <div className="mt-2 hidden lg:block">
+          <div className="relative h-[420px]">
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 1200 260"
+              preserveAspectRatio="none"
+              className="absolute top-0 left-0 h-[260px] w-full"
             >
-              {/* The number carries the order, so the list needs no bullet and
-                  no rule between items. */}
+              <path
+                d="M 0 150 H 200 C 285 150 285 205 370 205 H 530 C 615 205 615 70 700 70 H 840 C 925 70 925 140 1010 140 H 1200"
+                fill="none"
+                stroke="#C6D8FA"
+                strokeWidth="2"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+            {/* left% and top px are the design's, node by node — they are where
+                the curve actually passes, so they cannot be derived. */}
+            {(
+              [
+                ["10.83%", 104],
+                ["37.5%", 159],
+                ["64.17%", 24],
+                ["85.83%", 94],
+              ] as const
+            ).map(([left, top], i) => (
+              <div key={STAGES[i][0]}>
+                <span
+                  aria-hidden="true"
+                  className="absolute flex h-[92px] w-[92px] -translate-x-1/2 items-center
+                             justify-center rounded-full bg-[#EAF1FE]"
+                  style={{ left, top }}
+                >
+                  <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full bg-[#1B63F5] font-brand text-[13px] font-bold text-white">
+                    #{i + 1}
+                  </span>
+                </span>
+                <div
+                  className="absolute w-[240px] -translate-x-1/2 text-center"
+                  style={{ left, top: top + 104 }}
+                >
+                  <p
+                    className="mb-2.5 font-brand text-lg font-bold tracking-[-0.015em]"
+                    style={{ color: INK }}
+                  >
+                    {STAGES[i][0]}
+                  </p>
+                  <p className="font-brand text-sm leading-[1.6] text-pretty">
+                    {STAGES[i][1]}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Everything narrower: the same four, stacked. */}
+        <ol className="mt-10 flex flex-col gap-5 lg:hidden">
+          {STAGES.map(([title, body], i) => (
+            <li key={title} className="flex gap-4">
               <span
                 aria-hidden="true"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl
-                           bg-accent font-sans text-sm font-bold text-white"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full
+                           bg-[#EAF1FE] font-brand text-[13px] font-bold"
+                style={{ color: BLUE }}
               >
-                {String(i + 1).padStart(2, "0")}
+                #{i + 1}
               </span>
               <div>
-                <h3 className="font-display text-lg font-semibold text-fg">
+                <p
+                  className="mb-1.5 font-brand text-lg font-bold tracking-[-0.015em]"
+                  style={{ color: INK }}
+                >
                   {title}
-                </h3>
-                <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
-                  {body}
                 </p>
+                <p className="font-brand text-sm leading-[1.6] text-pretty">{body}</p>
               </div>
             </li>
           ))}
         </ol>
+
+        {/* The border is `#C9D6F5` rather than the white sections' `#EDEFF4`:
+            a near-white hairline disappears on this tint. */}
+        <div className="mt-10 flex flex-wrap gap-x-10 gap-y-3 border-t border-[#C9D6F5] pt-[22px] lg:mt-2">
+          {[
+            "Nothing in this path needs a second tool",
+            "Nothing in it costs money",
+            "You keep every file at every stage",
+          ].map((line) => (
+            <p
+              key={line}
+              className="font-brand text-[13.5px] font-medium"
+              style={{ color: BLUE }}
+            >
+              {line}
+            </p>
+          ))}
+        </div>
+
+        {/* The call to action the three-step section used to carry. It belongs
+            at the end of the journey rather than at the end of a second
+            description of it. */}
+        <div className="mt-11">
+          <PillLink href="/signup">Start writing free</PillLink>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Publishing checks
+// ---------------------------------------------------------------------------
+
+function Publishing() {
+  return (
+    // No top margin: this follows the pale-blue path section directly, so the
+    // page runs black (formats) → pale blue (the path) → black (the checks) on
+    // hard edges. A gap between any two of them would show a white strip and
+    // read as a section that failed to reach its neighbour.
+    <section
+      id="publishing"
+      className="px-5 py-20 sm:px-10 sm:py-24"
+      style={{ background: INK }}
+    >
+      <div className="mx-auto max-w-[1240px]">
+        <div className="mb-10 flex flex-wrap items-end gap-x-14 gap-y-6">
+          <div className="flex-1 basis-[520px]">
+            <Eyebrow tone="dark">Publishing checks</Eyebrow>
+            <h2 className="mt-[22px] max-w-[600px] font-brand text-[clamp(30px,3.6vw,46px)] leading-[1.1] font-extrabold tracking-[-0.03em] text-balance text-white">
+              The store says no, and doesn&rsquo;t say why
+            </h2>
+          </div>
+          <p className="max-w-[460px] flex-1 basis-[380px] font-brand text-[16.5px] leading-[1.7] text-pretty text-white/[0.72]">
+            You upload, you wait, and three days later an email arrives naming no
+            cause. The reason is usually small and mechanical: a missing file, a
+            digit, a field left empty. We look for those before you upload, and
+            we say which one it is.
+          </p>
+        </div>
+
+        <PublishingCheck />
+
+        <div className="mt-11 grid grid-cols-1 gap-7 sm:grid-cols-3">
+          {[
+            [
+              "Plain words, not error codes",
+              "“Cut 212 characters from the blurb” instead of a validation ID and a help-centre link.",
+            ],
+            [
+              "It runs while you write",
+              "Part of the export screen, not a paid add-on. Fix one thing and the list answers again.",
+            ],
+            [
+              "We tell you what we can’t see",
+              "Mechanical problems we catch. A store’s editorial judgement we can’t, and we say so.",
+            ],
+          ].map(([title, body]) => (
+            <div key={title}>
+              <p className="mb-2.5 font-brand text-base font-semibold text-white">
+                {title}
+              </p>
+              <p className="font-brand text-[14.5px] leading-[1.65] text-pretty text-white/[0.66]">
+                {body}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
@@ -955,197 +825,188 @@ function Steps() {
 // Questions
 // ---------------------------------------------------------------------------
 
-function Faq() {
-  return (
-    <section id="questions" className="bg-panel px-5 py-20 sm:px-8">
-      <div className="mx-auto max-w-3xl">
-        <SectionHead
-          align="start"
-          title="The questions people actually ask."
-        />
-
-        <dl className="mt-10 flex flex-col divide-y divide-line border-t border-line">
-          {QUESTIONS.map(({ q, a }) => (
-            <div key={q} className="py-6">
-              <dt className="font-sans text-base font-semibold text-fg">{q}</dt>
-              <dd className="mt-2 font-sans text-sm leading-relaxed text-muted">
-                {a}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
-  );
-}
-
-const QUESTIONS = [
+/**
+ * The FAQ, and the part of this page worth guarding hardest.
+ *
+ * Three answers differ materially from the design's, and each is marked below.
+ * The section's own promise — that nothing here needs more than an afternoon to
+ * disprove — is what makes the rest of the page worth reading, and it is void
+ * the moment one of these is written to flatter.
+ */
+const QUESTIONS: { id?: string; q: string; a: string }[] = [
   {
-    q: "Is my writing used to train anything?",
-    a: "No. The one feature that leaves your machine is the assistant, and it only sees the chapter you have open, only when you open the panel and ask it something. Close the panel and nothing is sent.",
+    id: "faq-limits",
+    q: "What doesn’t it do?",
+    a: "A fair amount. It does not design covers, edit or proofread your prose, write your blurb, market your book, buy ads, upload to any store, or introduce you to other writers. It is a writing app with an export pipeline and a pre-upload check. Everything else on your list is still yours.",
+  },
+  {
+    // CHANGED. The design answered this as though nothing is ever charged for,
+    // which would have been read as a promise and broken at the first paywall.
+    // Pro exists today and gates three things; the price is read from the same
+    // table the checkout charges from, so this line cannot drift from it.
+    q: "Is it really free, or free until it isn’t?",
+    a: `Writing, your shelf, syncing and all four export formats are free, and they stay free — no watermark, no export cap, nothing to unlock before you can export a finished book. Three things are not free: the assistant, the audiobook narration and the bookmarks panel are Pro, at ${displayPrice(
+      perMonthOf("monthly"),
+    )} a month. You never need any of them to write a book and publish it.`,
   },
   {
     q: "Who owns what I write?",
-    a: "You do, entirely. Nothing here takes a licence to your manuscript, and every format you can export in is one you can open somewhere else.",
+    a: "You do. We claim no rights over your manuscript, and we take no cut of anything you sell.",
   },
   {
-    q: "Does it work without a connection?",
-    a: "Yes. The app runs in your browser and keeps your books there, so a dropped connection does not stop you writing.",
+    q: "Do you train AI on my manuscript?",
+    a: "No. Your book is not training data. The assistant only ever receives the single chapter you hand it, at the moment you ask, and it is not used to train a model afterwards. It also has no way to edit your document — it answers in its own panel, and anything you take from it you copy across yourself.",
   },
   {
-    q: "Can I get my work out again?",
-    a: "Any time, in EPUB, DOCX, PDF or Markdown. There is no export queue and no waiting. The file is built in your browser and saved straight to disk.",
+    q: "Will the checks guarantee my book is accepted?",
+    a: "No, and anyone promising that is selling you something. We catch mechanical problems: a missing cover, a malformed ISBN, a blurb over the length limit, required fields left empty. A store can still reject a book for reasons we cannot see. The panel tells you what it checked and which problems would actually stop an upload, as against the ones that only cost you readers.",
   },
   {
-    q: "What does it cost?",
-    // The figure comes from the price table rather than being typed here, so
-    // this answer cannot drift from what the plans page quotes and the
-    // checkout charges. This was the stalest line on the page: it read
-    // "nothing while it is being built" long after there was something to buy.
-    a: `Writing, the shelf, syncing and all four export formats are free, and stay free. The assistant, the audiobook and the bookmarks panel are what Pro pays for, at ${displayPrice(
-      perMonthOf("monthly"),
-    )} a month.`,
+    q: "Can I get my work out if I stop using it?",
+    a: "Yes, and without asking us for permission or filing a data request. Export EPUB, DOCX, PDF and Markdown whenever you want. Markdown is plain text — it opens in any editor, including one written thirty years ago.",
+  },
+  {
+    // CHANGED, and this is the important one. The design promised bleed and
+    // called the file print-ready. `print.ts` renders through the browser's
+    // print engine, which cannot produce bleed, crop marks or CMYK — its own
+    // header says so, and so does the export screen. Shipping the design's
+    // wording would have put the landing page in direct contradiction with the
+    // product two clicks later.
+    q: "Is the PDF ready for a printer?",
+    a: "It is a clean interior PDF at the trim size you choose, with fonts embedded — right for proofing, for readers, and for print-on-demand services that accept an interior file. It is not a full pre-press file: there is no bleed, no crop marks and no CMYK conversion, because it is produced by your browser's print engine rather than a pre-press tool. The export screen says the same thing. If your printer asks for bleed, that step still needs another tool.",
+  },
+  {
+    q: "I’ve paid for tools that did none of this. Why is this different?",
+    a: "You can test the whole claim in an afternoon without paying: write a page, import a draft, run the check, export all four files, and open them in Word and an e-reader. If any of it doesn’t work, you have lost an afternoon rather than a thousand pounds.",
   },
 ];
 
-function Closing() {
+function Faq() {
   return (
-    <section className="border-t border-line px-5 py-20 sm:px-8">
-      <div className="mx-auto max-w-2xl text-center">
-        <SectionHead
-          title="Start the first chapter."
-          body="An account keeps your shelf. The writing starts the moment you are in."
-        />
-        <Link
-          href="/signup"
-          className="mt-7 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3
-                     font-sans text-sm font-semibold text-white outline-none
-                     transition-colors hover:bg-accent-strong focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          Create your account
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-4 w-4"
-          >
-            <path d="M4 10h11M11 6l4 4-4 4" />
-          </svg>
-        </Link>
+    <section id="faq" className="bg-white px-5 pt-24 sm:px-10">
+      <div className="mx-auto max-w-[1240px]">
+        <div className="mb-9 flex flex-wrap items-end gap-x-14 gap-y-6">
+          <div className="flex-1 basis-[480px]">
+            <Eyebrow>Questions</Eyebrow>
+            <h2
+              className="mt-[22px] max-w-[520px] font-brand text-[clamp(30px,3.2vw,42px)]
+                         leading-[1.12] font-extrabold tracking-[-0.028em]"
+              style={{ color: INK }}
+            >
+              Reasonable suspicion, answered
+            </h2>
+          </div>
+          <p className="max-w-[440px] flex-1 basis-[360px] font-brand text-base leading-[1.7] text-pretty">
+            If a claim here can&rsquo;t be tested in an afternoon without paying,
+            it shouldn&rsquo;t be on the page.
+          </p>
+        </div>
+
+        <div className="flex flex-col gap-2.5">
+          {QUESTIONS.map(({ id, q, a }, i) => (
+            // `group` + `open:` rather than the design's !important CSS block —
+            // the same effect with nothing to keep in step in globals.css.
+            // The first row is open on load, as the design has it, because the
+            // hero links straight at it.
+            <details key={q} id={id} open={i === 0} className="group">
+              <summary
+                className="flex cursor-pointer list-none items-center justify-between gap-6
+                           rounded-[18px] bg-[#F3F5F9] py-5 pr-5 pl-7 transition-colors
+                           outline-none group-open:rounded-b-none group-open:bg-[#1B63F5]
+                           focus-visible:ring-2 focus-visible:ring-[#1B63F5]/50
+                           [&::-webkit-details-marker]:hidden"
+              >
+                <span
+                  className="font-brand text-[17px] leading-[1.4] font-bold tracking-[-0.015em]
+                             group-open:text-white sm:text-[19px]"
+                  style={{ color: INK }}
+                >
+                  {q}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="flex h-[38px] w-[38px] shrink-0 items-center justify-center
+                             rounded-full bg-[#1B63F5] font-brand text-[15px] text-white
+                             transition-colors group-open:bg-white group-open:text-[#1B63F5]"
+                >
+                  <span className="block transition-transform group-open:rotate-90">
+                    →
+                  </span>
+                </span>
+              </summary>
+              {/* Two elements, and it has to be two. The measure belongs on the
+                  paragraph; put it on the blue panel instead and the panel
+                  stops short of the summary bar above it, leaving a step cut
+                  out of the right-hand side of the open row. */}
+              <div className="rounded-b-[18px] bg-[#1B63F5] px-7 pt-1 pb-[26px]">
+                <p className="max-w-[820px] font-brand text-base leading-[1.7] text-pretty text-white/[0.92]">
+                  {a}
+                </p>
+              </div>
+            </details>
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
-/**
- * The footer, with the wordmark set as large as the page will hold.
- *
- * Three bands: a line and the link columns, the name at display size, then the
- * fine print under a rule.
- *
- * The giant wordmark is the whole idea, and it is decorative — `aria-hidden`,
- * because the name is already read out by the copyright line below it and
- * nobody needs to hear it twice. It is sized in container units so that it
- * fills the measure at any width; see the note at the element itself for why
- * viewport units do not work here.
- *
- * Its descenders are clipped by a hair. That is deliberate — it is what makes
- * the name read as set into the page rather than placed on it — but it is kept
- * to a hair on purpose, because a deep crop reads as a bug rather than as
- * typography.
- */
+// ---------------------------------------------------------------------------
+// Footer
+// ---------------------------------------------------------------------------
+
 function Footer() {
   return (
-    <footer className="border-t border-line bg-panel">
-      <div className="mx-auto max-w-6xl px-5 pt-14 sm:px-8 sm:pt-16">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1fr_auto_auto] lg:gap-20">
-          {/* The one sentence the product would give if it only had one. Set
-              at heading size and in the page's own ink, not as the small grey
-              blurb it replaced — at this scale it is the thing being said, and
-              the columns beside it are the navigation. */}
-          <p className="max-w-sm font-display text-2xl leading-snug font-semibold text-fg sm:text-3xl">
-            A calm place to write your novel.
-          </p>
+    <footer className="mt-24 px-5 pt-[72px] pb-11 sm:px-10" style={{ background: INK }}>
+      <div className="mx-auto max-w-[1240px]">
+        <div className="flex flex-wrap justify-between gap-x-14 gap-y-12 border-b border-white/[0.12] pb-13">
+          <div className="basis-[340px]">
+            <p className="mb-3.5 font-display text-[22px] font-bold tracking-[-0.02em] text-white">
+              Open<span style={{ color: "#4B87FF" }}>Chapter</span>
+            </p>
+            <p className="mb-[26px] max-w-[290px] font-brand text-[15px] leading-[1.65] text-white/60">
+              One app, blank page to finished file.
+            </p>
+            <PillLink href="/signup" size="md">
+              Start writing free
+            </PillLink>
+          </div>
 
-          <FooterColumn
-            heading="The app"
-            links={[
-              ...SECTIONS.map(([label, href]) => ({ label, href })),
-              { label: "Pricing", href: "/upgrade" },
-            ]}
-          />
-          <FooterColumn
-            heading="Your account"
-            links={[
-              { label: "Create an account", href: "/signup" },
-              { label: "Sign in", href: "/signin" },
-              { label: "Reset your password", href: "/forgot-password" },
-            ]}
-          />
+          <div className="flex flex-wrap gap-x-16 gap-y-10">
+            <FooterColumn
+              heading="Product"
+              links={SECTIONS.map(([label, href]) => ({ label, href }))}
+            />
+            {/*
+              The design's third column was Terms, Privacy and "Contact a human",
+              all pointing at `#`. None of those pages exists, and a footer link
+              that goes nowhere is the same dead control the house rules forbid —
+              worse here, because a visitor only finds out after clicking, on the
+              page whose whole argument is that we do not overstate.
+              These are the account routes, which are real.
+            */}
+            <FooterColumn
+              heading="Your account"
+              links={[
+                { label: "Create an account", href: "/signup" },
+                { label: "Log in", href: "/signin" },
+                { label: "Reset your password", href: "/forgot-password" },
+                { label: "Pricing", href: "/upgrade" },
+              ]}
+            />
+          </div>
         </div>
 
-        {/*
-          Every link above goes somewhere that exists. The reference this is
-          drawn from carries Docs, Changelog, Press, Releases, Blog and Use
-          Cases, and OpenChapter has none of those — a footer column of links
-          to pages nobody has written is the same dead UI as a button that does
-          nothing, and it is worse here because a visitor only finds out after
-          the click.
-        */}
-
-        {/*
-          Sized in `cqw`, not `vw`. The container stops at max-w-6xl while the
-          viewport does not, so a viewport-relative size fits at one width and
-          then runs the last letter off the edge at every width past it.
-          Container units measure the box the word actually has to fit in, so
-          it fills the measure and stays inside it at any screen size — the
-          same reason the book covers set their titles that way.
-
-          The coefficient is the font's own, measured rather than reasoned:
-          this display face runs about 6.6 times the point size across the
-          eleven characters of the name, so a shade over a seventh of the
-          container is what fills it from margin to margin. Change the wordmark
-          or the face and this number has to be re-measured — there is no
-          arithmetic that finds it.
-        */}
-        <div
-          aria-hidden="true"
-          style={{ containerType: "inline-size" }}
-          className="mt-14 overflow-hidden sm:mt-16"
-        >
-          <span
-            className="block font-display font-bold tracking-tight
-                       whitespace-nowrap text-fg"
-            // A tight line box crops the descenders a little, which is what
-            // sets the name into the page. Only a little: at 0.85 it ate the
-            // baseline as well and the word read as broken rather than as set.
-            style={{ fontSize: "15.1cqw", lineHeight: 0.92 }}
-          >
-            Open<span style={{ color: "#3a86d4" }}>Chapter</span>
-          </span>
-        </div>
-      </div>
-
-      <div className="border-t border-line">
-        <div
-          className="mx-auto flex max-w-6xl flex-col gap-3 px-5 py-6 sm:flex-row
-                     sm:items-center sm:justify-between sm:px-8"
-        >
-          <span className="font-sans text-xs text-muted">
+        <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
+          <p className="font-brand text-[13px] text-white/45">
             © {new Date().getFullYear()} OpenChapter
-          </span>
-
+          </p>
           {/* Where a footer usually puts Privacy and Terms. Neither exists yet,
               so this says something true instead of linking to two pages that
               are not there. */}
-          <span className="font-sans text-xs text-muted">
+          <p className="font-brand text-[13px] text-white/45">
             Your books stay in your browser.
-          </span>
+          </p>
         </div>
       </div>
     </footer>
@@ -1160,22 +1021,31 @@ function FooterColumn({
   links: { label: string; href: string }[];
 }) {
   return (
-    <div>
-      <p className="font-sans text-sm font-semibold text-fg">{heading}</p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {links.map(({ label, href }) => (
-          <li key={href}>
-            <Link
-              href={href}
-              className="font-sans text-sm text-muted underline-offset-2 outline-none
-                         transition-colors hover:text-fg hover:underline
-                         focus-visible:ring-2 focus-visible:ring-accent/50"
-            >
-              {label}
-            </Link>
-          </li>
-        ))}
-      </ul>
+    <div className="flex flex-col gap-3.5">
+      <p className="mb-0.5 font-brand text-[11px] font-semibold tracking-[0.14em] text-white/45 uppercase">
+        {heading}
+      </p>
+      {links.map(({ label, href }) =>
+        href.startsWith("#") ? (
+          <a
+            key={href}
+            href={href}
+            className="font-brand text-[15px] text-white/[0.78] outline-none transition-colors
+                       hover:text-white focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            {label}
+          </a>
+        ) : (
+          <Link
+            key={href}
+            href={href}
+            className="font-brand text-[15px] text-white/[0.78] outline-none transition-colors
+                       hover:text-white focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            {label}
+          </Link>
+        ),
+      )}
     </div>
   );
 }

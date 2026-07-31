@@ -111,6 +111,14 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 
+  /* The landing page only — see the note in layout.tsx. `font-brand` is the
+     marketing face and `font-code` the format codes in its in/out lists.
+     Nothing behind the sign-in wall should reference either: the app writes in
+     serif/sans/display above, and mixing the two vocabularies is how a product
+     ends up looking like two products. */
+  --font-brand: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-code: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
   /* The writing surface. The line measure used to live here too; the page now
      fills its column, so the window sets the line length. */
   --text-manuscript: 1.1875rem; /* 19px */
