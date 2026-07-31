@@ -22,16 +22,25 @@
 function Frame({
   children,
   ratio = "4/3",
+  fill,
 }: {
   children: React.ReactNode;
   ratio?: string;
+  /**
+   * Take the height offered instead of holding a ratio. For the tall card,
+   * whose height is set by the grid row it spans rather than by its own
+   * contents — a ratio there leaves the figure short of the card's bottom edge
+   * and a band of empty grey under it.
+   */
+  fill?: boolean;
 }) {
   return (
     <div
       aria-hidden="true"
-      style={{ aspectRatio: ratio }}
-      className="relative w-full select-none overflow-hidden rounded-2xl
-                 border border-line bg-surface p-5 shadow-sm sm:p-6"
+      style={fill ? undefined : { aspectRatio: ratio }}
+      className={`relative w-full select-none overflow-hidden rounded-2xl
+                  border border-line bg-surface p-5 shadow-sm sm:p-6
+                  ${fill ? "h-full" : ""}`}
     >
       {children}
     </div>
@@ -184,9 +193,22 @@ export function ReadFigure() {
  * real word is the mark — a writer who has seen the sparkle in the rail should
  * recognise what this card is about before reading its title.
  */
-export function AssistantFigure() {
+export function AssistantFigure({
+  ratio = "4/3",
+  fill,
+  tall,
+}: {
+  ratio?: string;
+  fill?: boolean;
+  /**
+   * A second exchange. Two bubbles in a portrait frame leave a hole in the
+   * middle of it — the panel this depicts fills as a conversation goes on, and
+   * a tall card is showing one that has.
+   */
+  tall?: boolean;
+}) {
   return (
-    <Frame ratio="4/3">
+    <Frame ratio={ratio} fill={fill}>
       <div className="flex h-full flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-accent/12">
@@ -230,6 +252,26 @@ export function AssistantFigure() {
             ))}
           </div>
         </div>
+
+        {tall && (
+          <>
+            <div className="ml-auto w-3/5 rounded-xl rounded-br-sm bg-accent px-3 py-2.5">
+              <span className="block h-1.5 w-full rounded bg-white/70" />
+            </div>
+
+            <div className="w-[92%] rounded-xl rounded-bl-sm border border-line bg-panel px-3 py-2.5">
+              <div className="flex flex-col gap-1.5">
+                {["100%", "88%", "100%", "96%", "40%"].map((w, i) => (
+                  <span
+                    key={i}
+                    className="h-1.5 rounded bg-fg/15"
+                    style={{ width: w }}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         <div className="mt-auto flex items-center gap-2 rounded-lg border border-line px-3 py-2">
           <span className="h-1.5 flex-1 rounded bg-fg/10" />

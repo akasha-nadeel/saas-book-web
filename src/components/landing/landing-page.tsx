@@ -7,8 +7,6 @@ import {
   AssistantFigure,
   FormatFigure,
   PageFigure,
-  ProgressFigure,
-  ReadFigure,
   ShelfFigure,
 } from "./landing-figures";
 import { LaptopMockup } from "./laptop-mockup";
@@ -303,20 +301,23 @@ function SectionHead({
   title,
   body,
 }: {
-  eyebrow: string;
+  /** Omitted where the heading is doing the work on its own. */
+  eyebrow?: string;
   title: ReactNode;
   body: string;
 }) {
   return (
     <div className="mx-auto max-w-2xl text-center">
-      <p
-        className="inline-flex items-center gap-2 rounded-full border border-line
-                   bg-panel px-3.5 py-1.5 font-sans text-xs font-semibold text-muted"
-      >
-        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
-        {eyebrow}
-      </p>
-      <h2 className="mt-5 font-display text-3xl leading-tight font-bold tracking-tight text-fg sm:text-4xl">
+      {eyebrow && (
+        <p
+          className="inline-flex items-center gap-2 rounded-full border border-line
+                     bg-panel px-3.5 py-1.5 font-sans text-xs font-semibold text-muted"
+        >
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+          {eyebrow}
+        </p>
+      )}
+      <h2 className="font-display text-3xl leading-tight font-bold tracking-tight text-fg not-first:mt-5 sm:text-4xl">
         {title}
       </h2>
       <p className="mx-auto mt-4 max-w-xl font-sans text-base leading-relaxed text-muted">
@@ -334,11 +335,17 @@ function SectionHead({
  * deciding whether to sign up wants to take them in at a glance and stop at
  * whichever one is theirs.
  *
- * Three portrait cards, then two landscape ones, rather than a uniform grid. A
- * grid of identical tiles has no reading order — the eye is offered six equal
- * things and settles on none. The change of shape at the second row is what
- * says "these two are larger", which is true: the formats and the count are
- * what a finished book is judged by.
+ * The arrangement is four cards on a three-by-two grid: two small ones on the
+ * top left, one tall down the right spanning both rows, one wide across the
+ * bottom. Not a uniform grid — a grid of identical tiles has no reading order,
+ * the eye is offered four equal things and settles on none. Three shapes give
+ * it somewhere to start and somewhere to finish.
+ *
+ * Each figure is deliberately larger than the space it is given and is clipped
+ * by the card's own edge. A widget drawn to fit inside its card reads as an
+ * icon; one running off the bottom reads as a piece of a screen that carries
+ * on past the frame, which is the whole point — these are the app, not
+ * decoration about the app.
  *
  * Every figure is drawn from the app's own tokens rather than screenshotted,
  * for the reason landing-figures.tsx gives. They are illustrations and are
@@ -353,7 +360,6 @@ function Features() {
       className="border-t border-line px-5 py-20 sm:px-8 sm:py-24"
     >
       <SectionHead
-        eyebrow="Features"
         title={
           <>
             Everything a manuscript needs,
@@ -363,84 +369,114 @@ function Features() {
         body="The parts of a writing app you actually use, built to the standard a shop checks — and quiet about everything else."
       />
 
-      <div className="mx-auto mt-14 grid max-w-6xl gap-5 lg:grid-cols-6">
+      {/*
+        A B C
+        D D C
+
+        Placed explicitly rather than left to auto-flow. The tall card is third
+        in the source, and auto-placement would try to fit it in the gap under
+        A — the row-span only lands where it is meant to once both the column
+        and the row are named.
+      */}
+      <div className="mx-auto mt-14 grid max-w-6xl gap-5 lg:grid-cols-3 lg:grid-rows-2">
         <FeatureCard
-          className="lg:col-span-2"
           title="A page that behaves like a page"
-          body="Your manuscript sits on real sheets at the trim size you chose. Long paragraphs fill the page and carry over the break, the way a word processor handles them."
+          body="Real sheets at the trim size you chose. Long paragraphs fill the page and carry over the break, the way a word processor handles them."
           figure={<PageFigure />}
         />
+
         <FeatureCard
-          className="lg:col-span-2"
           title="A shelf, not a folder"
-          body="Every book with its cover, its word count and where you left off. Chapters reorder by dragging and take a bookmark for the scene you keep returning to."
+          body="Every book with its cover, its word count and where you left off. Chapters reorder by dragging and take a bookmark."
           figure={<ShelfFigure />}
         />
+
+        {/* The tall one. A conversation is the only figure here that is taller
+            than it is wide, so it is the one that earns the double row. */}
         <FeatureCard
-          className="lg:col-span-2"
+          className="lg:col-start-3 lg:row-start-1 lg:row-span-2"
           title="An assistant that has read the chapter"
-          body="Ask about the scene you are in — what isn't landing, what to tighten, what happens next. The chapter text is sent only when you ask."
-          figure={<AssistantFigure />}
+          body="Ask about the scene you are in — what isn't landing, what to tighten, what happens next. The chapter text is sent only when you ask, and never to train anything."
+          figure={<AssistantFigure fill tall />}
+          inset
         />
 
-        {/* The wide ones put the figure beside the words rather than above
-            them: at this width a stacked figure would be a letterbox. */}
+        {/* The wide one, text beside the figure rather than above it: across
+            two columns a stacked figure would be a letterbox. */}
         <FeatureCard
+          className="lg:col-start-1 lg:row-start-2 lg:col-span-2"
           wide
-          className="lg:col-span-3"
           title="Hand it off in what they asked for"
           body="EPUB, DOCX, a print-ready PDF and Markdown, with a title page, copyright page and contents generated for you."
           figure={<FormatFigure />}
-        />
-        <FeatureCard
-          wide
-          className="lg:col-span-3"
-          title="Read it before anyone else has to"
-          body="The whole manuscript on real pages, or as a book you open and turn. Not a preview of the export — the same typesetting, so the read-through and the file agree."
-          figure={<ReadFigure />}
-        />
-
-        {/* Full width, and last on purpose. It is the one card about the book
-            as a whole rather than about a part of the app, so it closes the
-            section rather than sitting in the middle of it. */}
-        <FeatureCard
-          wide
-          className="lg:col-span-6"
-          title="Watch the book fill up"
-          body="A target set when you start the book, and every chapter measured against it. Totals are summed as they are read, so they cannot drift from what is on the page."
-          // Wider than the portrait cards' figures. At half of six columns a
-          // 4:3 chart is taller than the paragraph beside it, which leaves the
-          // words stranded in a column of air.
-          figure={<ProgressFigure ratio="16/7" />}
         />
       </div>
     </section>
   );
 }
 
+/**
+ * One card: a title, a couple of lines, and a figure that runs off the edge.
+ *
+ * The bleed is the whole look and it is done with negative margins against the
+ * card's `overflow-hidden` rather than by sizing the figure to fit. Sized to
+ * fit, every card would need its own height guess and they would disagree the
+ * moment a paragraph wrapped differently; clipped, the card decides and the
+ * figure simply continues past it.
+ */
 function FeatureCard({
   title,
   body,
   figure,
   wide,
+  inset,
   className = "",
 }: {
   title: string;
   body: string;
   figure: ReactNode;
-  /** Figure beside the words instead of above them. */
+  /** Figure beside the words instead of below them, for the two-column card. */
   wide?: boolean;
+  /** Hold the figure off the left edge too, as the tall card wants. */
+  inset?: boolean;
   className?: string;
 }) {
   return (
     <article
-      className={`flex flex-col gap-5 rounded-3xl border border-line bg-panel p-5
-                  sm:p-6 ${wide ? "sm:flex-row sm:items-center" : ""} ${className}`}
+      className={`relative flex overflow-hidden rounded-3xl bg-panel p-6 sm:p-7
+                  ${wide ? "flex-col sm:flex-row sm:items-center sm:gap-8" : "flex-col"}
+                  ${className}`}
     >
-      <div className={wide ? "shrink-0 sm:order-2 sm:w-1/2" : ""}>{figure}</div>
-      <div className={wide ? "sm:order-1 sm:flex-1" : ""}>
-        <h3 className="font-display text-lg font-semibold text-fg">{title}</h3>
+      {/* The faint wash the reference cards carry, strongest at the top right.
+          Pointer-events-none and behind everything: it is light, not a
+          surface. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-bl
+                   from-accent/8 via-transparent to-transparent"
+      />
+
+      <div className={`relative ${wide ? "sm:w-[45%] sm:shrink-0" : ""}`}>
+        <h3 className="font-display text-lg font-semibold text-fg sm:text-xl">
+          {title}
+        </h3>
         <p className="mt-2 font-sans text-sm leading-relaxed text-muted">{body}</p>
+      </div>
+
+      {/* Negative margins pull the figure past the card's padding on the edges
+          it should run off. `mt-auto` pins it to the bottom, so cards of
+          different text lengths still line their figures up. */}
+      <div
+        className={`relative ${
+          wide
+            ? "mt-6 -mr-6 -mb-6 sm:mt-0 sm:-mr-7 sm:-mb-7 sm:flex-1"
+            : // min-h-0 alongside flex-1, or the figure's own contents set a
+              // floor and the card grows to fit rather than the figure
+              // shrinking to the row.
+              `mt-6 -mb-10 ${inset ? "ml-4 sm:ml-6 lg:min-h-0 lg:flex-1" : ""}`
+        }`}
+      >
+        {figure}
       </div>
     </article>
   );
