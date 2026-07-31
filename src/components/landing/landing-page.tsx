@@ -4,6 +4,7 @@ import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { displayPrice, perMonthOf } from "@/lib/billing/plans";
 import { BookFan } from "./book-fan";
+import { FormatsFlow } from "./formats-flow";
 import {
   AssistantFigure,
   FormatFigure,
@@ -40,6 +41,7 @@ export function LandingPage() {
       <Hero />
       <WorksWith />
       <Features />
+      <Toolkit />
       <Numbers />
       <Steps />
       <Faq />
@@ -54,6 +56,7 @@ export function LandingPage() {
 // is missing a chapter, and it feeds the footer's column too.
 const SECTIONS = [
   ["Features", "#features"],
+  ["Formats", "#toolkit"],
   ["In numbers", "#numbers"],
   ["Getting started", "#start"],
   ["Questions", "#questions"],
@@ -496,6 +499,234 @@ function FeatureCard({
         {figure}
       </div>
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Everything else
+// ---------------------------------------------------------------------------
+
+/**
+ * The rest of it: eight smaller things, beside the picture of what comes in and
+ * goes out.
+ *
+ * The bento above holds four features and no more — that is what the shape can
+ * carry without turning into a list. This is where the rest live, at a size
+ * that suits them: none of these needs a picture of its own, and eight cards
+ * with eight illustrations would be a second bento competing with the first.
+ *
+ * Two of them, the read-through and the word target, had figures in an earlier
+ * version of the features grid and lost their place when it went to four cards.
+ * They are real features and this is a better home for them than a card the
+ * size of the page.
+ *
+ * Every one is a thing the app does today. The temptation in a grid this size
+ * is to round it up to a nice even number with something that is nearly true,
+ * and the honest limit is however many there are.
+ */
+const TOOLKIT = [
+  [
+    "search",
+    "Search the whole book",
+    "Every chapter at once, matched on the words rather than the file.",
+  ],
+  [
+    "notes",
+    "Notes beside the page",
+    "A note per chapter, kept out of the manuscript and next to it.",
+  ],
+  [
+    "bookmark",
+    "Bookmarks across the shelf",
+    "Star the scene you keep coming back to, in any book, and find it in one list.",
+  ],
+  [
+    "mic",
+    "Dictate a paragraph",
+    "Speak and the words are typed. Chrome and Edge, using the browser's own engine.",
+  ],
+  [
+    "read",
+    "Read it through",
+    "The whole manuscript on real pages at your trim size, or as a book you turn.",
+  ],
+  [
+    "target",
+    "A word target",
+    "Set when you start the book and measured against every chapter as you go.",
+  ],
+  [
+    "matter",
+    "Front and back matter",
+    "Title, copyright and contents pages generated, and your own pages either end.",
+  ],
+  [
+    "sync",
+    "On every device",
+    "Your shelf follows your account, and the browser keeps a copy so it works offline.",
+  ],
+] as const;
+
+function Toolkit() {
+  return (
+    <section
+      id="toolkit"
+      className="relative overflow-hidden border-t border-line bg-panel px-5
+                 py-20 sm:px-8 sm:py-24"
+    >
+      {/* The wash the reference carries behind this section, at the corner the
+          diagram sits in. Behind everything and unclickable — light, not a
+          surface. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-gradient-to-br
+                   from-accent/8 via-transparent to-transparent"
+      />
+
+      <div className="relative mx-auto grid max-w-6xl items-center gap-14 lg:grid-cols-2 lg:gap-16">
+        <div>
+          <FormatsFlow />
+
+          {/* Two lines, the second in the accent — the reference's treatment,
+              and it works here because the sentence genuinely has two halves:
+              what arrives, and what leaves. */}
+          <h2 className="mt-12 font-display text-3xl leading-tight font-bold tracking-tight text-fg sm:text-4xl">
+            Bring anything in.
+            <br />
+            <span className="text-accent">Hand off anything.</span>
+          </h2>
+
+          <p className="mt-5 max-w-md font-sans text-base leading-relaxed text-muted">
+            Six formats in, four back out. A manuscript you already have arrives
+            split into chapters, and an audiobook arrives transcribed and split
+            the same way.
+          </p>
+          <p className="mt-3 max-w-md font-sans text-base leading-relaxed text-muted">
+            Nothing is converted on a server and nothing waits in a queue — the
+            file is built in your browser and saved straight to disk.
+          </p>
+
+          <Link
+            href="/signup"
+            className="mt-8 inline-flex items-center gap-2 rounded-full bg-accent
+                       px-6 py-3 font-sans text-sm font-semibold text-white
+                       outline-none transition-colors hover:bg-accent-strong
+                       focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            Start writing
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-4 w-4"
+            >
+              <path d="M4 10h11M11 6l4 4-4 4" />
+            </svg>
+          </Link>
+        </div>
+
+        <ul className="grid gap-4 sm:grid-cols-2">
+          {TOOLKIT.map(([icon, title, body]) => (
+            <li
+              key={title}
+              className="rounded-2xl border border-line bg-surface p-5"
+            >
+              <h3 className="flex items-center gap-2.5 font-sans text-sm font-semibold text-fg">
+                <span className="shrink-0 text-accent">
+                  {TOOL_ICON[icon]}
+                </span>
+                {title}
+              </h3>
+              <p className="mt-2 font-sans text-sm leading-relaxed text-muted">
+                {body}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * One mark per card, at the same weight as the rails' icons so the page and the
+ * app are drawn in one hand. Several are the app's own: the star is the
+ * bookmark, the microphone is the dictation button, the magnifier is the search
+ * tab.
+ */
+const TOOL_ICON: Record<string, ReactNode> = {
+  search: (
+    <ToolGlyph>
+      <circle cx="8.8" cy="8.8" r="5.3" />
+      <path d="m12.7 12.7 4 4" />
+    </ToolGlyph>
+  ),
+  notes: (
+    <ToolGlyph>
+      <path d="M11.6 2.8H6.2a1.5 1.5 0 0 0-1.5 1.5v11.4a1.5 1.5 0 0 0 1.5 1.5h7.6a1.5 1.5 0 0 0 1.5-1.5V6.4z" />
+      <path d="M11.6 2.8v2.9a.9.9 0 0 0 .9.9h2.8" />
+      <path d="M7.5 10.6h5M7.5 13.4h3.2" />
+    </ToolGlyph>
+  ),
+  bookmark: (
+    <ToolGlyph>
+      <path d="M5.6 4.1a1.4 1.4 0 0 1 1.4-1.3h6a1.4 1.4 0 0 1 1.4 1.3v13L10 13.7 5.6 17.1z" />
+    </ToolGlyph>
+  ),
+  mic: (
+    <ToolGlyph>
+      <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
+      <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
+      <path d="M10 15v2.4" />
+    </ToolGlyph>
+  ),
+  read: (
+    <ToolGlyph>
+      <rect x="4.6" y="2.8" width="10.8" height="14.4" rx="1.6" />
+      <path d="M10 6.2v7.6" />
+      <path d="M7.4 11.2 10 13.8l2.6-2.6" />
+    </ToolGlyph>
+  ),
+  target: (
+    <ToolGlyph>
+      <circle cx="10" cy="10" r="7" />
+      <circle cx="10" cy="10" r="3.2" />
+      <circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none" />
+    </ToolGlyph>
+  ),
+  matter: (
+    <ToolGlyph>
+      <rect x="3.4" y="3.4" width="13.2" height="13.2" rx="1.8" />
+      <path d="M3.4 7.4h13.2M3.4 12.6h13.2" />
+    </ToolGlyph>
+  ),
+  sync: (
+    <ToolGlyph>
+      <path d="M3.4 9.6a6.6 6.6 0 0 1 11.3-4.6" />
+      <path d="M16.6 10.4a6.6 6.6 0 0 1-11.3 4.6" />
+      <path d="M15 2.6v3h-3M5 17.4v-3h3" />
+    </ToolGlyph>
+  ),
+};
+
+function ToolGlyph({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      {children}
+    </svg>
   );
 }
 
