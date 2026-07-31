@@ -381,13 +381,13 @@ function Features() {
       <div className="mx-auto mt-14 grid max-w-6xl gap-5 lg:grid-cols-3 lg:grid-rows-2">
         <FeatureCard
           title="A page that behaves like a page"
-          body="Real sheets at the trim size you chose. Long paragraphs fill the page and carry over the break, the way a word processor handles them."
+          body="Real sheets at your trim size, with paragraphs that carry over the break."
           figure={<PageFigure />}
         />
 
         <FeatureCard
           title="A shelf, not a folder"
-          body="Every book with its cover, its word count and where you left off. Chapters reorder by dragging and take a bookmark."
+          body="Every book with its cover, its word count, and where you left off."
           figure={<ShelfFigure />}
         />
 
@@ -396,7 +396,7 @@ function Features() {
         <FeatureCard
           className="lg:col-start-3 lg:row-start-1 lg:row-span-2"
           title="An assistant that has read the chapter"
-          body="Ask about the scene you are in — what isn't landing, what to tighten, what happens next. The chapter text is sent only when you ask, and never to train anything."
+          body="Ask what isn't landing. Your chapter is sent only when you ask, and never to train anything."
           figure={<AssistantFigure fill tall />}
           inset
         />
@@ -407,7 +407,7 @@ function Features() {
           className="lg:col-start-1 lg:row-start-2 lg:col-span-2"
           wide
           title="Hand it off in what they asked for"
-          body="EPUB, DOCX, a print-ready PDF and Markdown, with a title page, copyright page and contents generated for you."
+          body="EPUB, DOCX, a print-ready PDF and Markdown — with the front matter generated for you."
           figure={<FormatFigure />}
         />
       </div>
@@ -460,7 +460,13 @@ function FeatureCard({
         <h3 className="font-display text-lg font-semibold text-fg sm:text-xl">
           {title}
         </h3>
-        <p className="mt-2 font-sans text-sm leading-relaxed text-muted">{body}</p>
+        {/* Two lines, and the copy above is written to fit in two — the clamp
+            is the guarantee, not the mechanism. Relying on it alone would mean
+            shipping sentences that end in an ellipsis at whatever width the
+            third line appears, which is a worse card than a tall one. */}
+        <p className="mt-2 line-clamp-2 font-sans text-sm leading-relaxed text-muted">
+          {body}
+        </p>
       </div>
 
       {/* Negative margins pull the figure past the card's padding on the edges
@@ -470,10 +476,20 @@ function FeatureCard({
         className={`relative ${
           wide
             ? "mt-6 -mr-6 -mb-6 sm:mt-0 sm:-mr-7 sm:-mb-7 sm:flex-1"
-            : // min-h-0 alongside flex-1, or the figure's own contents set a
-              // floor and the card grows to fit rather than the figure
-              // shrinking to the row.
-              `mt-6 -mb-10 ${inset ? "ml-4 sm:ml-6 lg:min-h-0 lg:flex-1" : ""}`
+            : // mt-auto, not a fixed gap: the titles are one line on some cards
+              // and two on others, and a fixed gap carries that difference down
+              // into the figures, so one starts a line higher than its
+              // neighbours. Pinned to the bottom of a stretched grid row they
+              // all begin together whatever the text above them did. pt keeps a
+              // floor under it for the narrow layout, where the cards are not
+              // in a row and have no common height to align to.
+              //
+              // min-h-0 alongside flex-1 on the tall card, or the figure's own
+              // contents set a floor and the card grows to fit rather than the
+              // figure shrinking to the row.
+              `mt-auto pt-6 -mb-10 ${
+                inset ? "ml-4 sm:ml-6 lg:min-h-0 lg:flex-1" : ""
+              }`
         }`}
       >
         {figure}
