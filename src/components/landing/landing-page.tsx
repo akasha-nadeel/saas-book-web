@@ -631,8 +631,27 @@ function Toolkit() {
           {TOOLKIT.map(([icon, title, body]) => (
             <li
               key={title}
-              // White on the tinted ground, as the reference has them.
-              className="rounded-2xl border border-line bg-panel p-5 shadow-sm"
+              // The export page's card chrome, brought over: a `border-fg/20`
+              // edge rather than `border-line`, because a hairline at the line
+              // token vanishes on white at this radius and the card needs an
+              // edge you can find. It darkens under the pointer, as those do.
+              //
+              // The motion is a lift rather than the tilt those cards use, and
+              // that is a deliberate difference. What tilts on an export card
+              // is a picture of the file you are about to get — the repo's own
+              // note in format-previews.tsx is that tilting a *decoration* is a
+              // trick, and these cards have no artifact to tilt. A lift is
+              // honest: it says the surface noticed the pointer and claims
+              // nothing else. `cursor` is left alone for the same reason —
+              // these describe features, they do not navigate.
+              //
+              // motion-reduce keeps the border change and drops the travel,
+              // which is the half somebody asking for less motion asked about.
+              className="rounded-xl border border-fg/20 bg-panel p-5 shadow-sm
+                         transition duration-150 ease-out hover:-translate-y-1
+                         hover:border-fg/45 hover:shadow-lg
+                         motion-reduce:transition-none
+                         motion-reduce:hover:translate-y-0"
             >
               <h3 className="flex items-center gap-2.5 font-sans text-sm font-semibold text-fg">
                 <span className="shrink-0 text-accent">
