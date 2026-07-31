@@ -45,10 +45,16 @@ const TABS = [
  * Both screens want this identical behaviour, so it lives here rather than being
  * copied — a change to the tabs then lands in both places at once.
  *
- * The one difference between them is the chapter list. In the editor the book
- * panel beside the manuscript already is one, so the rail leaves the tab out
- * rather than offering the same list twice. The overview has no book panel, so
- * there the tab is the only way to choose a chapter and stays.
+ * Two tabs are left out where something else already carries them, and both
+ * for the same reason — one control, never two:
+ *
+ * - **Chapters.** In the editor the book panel beside the manuscript already is
+ *   a chapter list. The overview has no book panel, so there the tab is the
+ *   only way to choose a chapter and stays.
+ * - **Assistant.** In the editor the manuscript's own right rail carries it,
+ *   next to the tools that act on the page it talks about. The overview has no
+ *   right rail — it has no manuscript for one to belong to — so there this tab
+ *   is the only way to reach the assistant and stays.
  */
 export function WorkspaceRail({
   bookId,
@@ -57,6 +63,7 @@ export function WorkspaceRail({
   leftPanel,
   onPanel,
   chapters = true,
+  assistant = true,
   theme,
 }: {
   bookId: string;
@@ -67,9 +74,15 @@ export function WorkspaceRail({
   onPanel: (open: boolean) => void;
   /** Offer the chapter-list tab. False where a book panel already shows one. */
   chapters?: boolean;
+  /** Offer the assistant tab. False where the right rail already carries it. */
+  assistant?: boolean;
   theme: Theme;
 }) {
-  const tabs = chapters ? TABS : TABS.filter(([value]) => value !== "chapters");
+  const tabs = TABS.filter(
+    ([value]) =>
+      (chapters || value !== "chapters") &&
+      (assistant || value !== "assistant"),
+  );
 
   return (
     <Rail side="left">

@@ -28,7 +28,11 @@ import { FontSize } from "@/lib/editor/font-size";
 import { FontFamily } from "@/lib/editor/font-family";
 import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
-import { useDictation, type Dictation } from "@/lib/editor/use-dictation";
+import {
+  useDictation,
+  useDictationLive,
+  type Dictation,
+} from "@/lib/editor/use-dictation";
 import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import {
@@ -312,6 +316,11 @@ export function ChapterEditor({
         leftPanel={panelOpen}
         onPanel={setPanelOpen}
         chapters={false}
+        // The manuscript's own right rail carries it now, beside the tools
+        // that act on the page it talks about. Two sparkles on two edges of
+        // one screen is the duplication the book panel already taught us to
+        // avoid — and the panel it opens is the same panel either way.
+        assistant={false}
         theme={prefs.theme}
       />
 
@@ -585,7 +594,7 @@ function EditorSurface({
   /** Play the page's entrance. Set only when the panel's face changes, never
    *  on the remount that opening a different chapter causes. */
   entering: boolean;
-  /** The one dictation session, for the button at the foot of the page. */
+  /** The one session, for the listening bar in the desk strip. */
   dictation: Dictation;
   onEditorReady: (editor: Editor) => void;
 }) {
@@ -1017,6 +1026,18 @@ function EditorSurface({
                   : null}
               </span>
             </div>
+
+            {/* Only while the microphone is live, and on its own line under the
+                readings rather than squeezed among them: this is a mode, not a
+                measurement, and it has a sentence to show. It appears inside
+                the desk strip, so it never covers the page — the reason the
+                floating microphone that used to do this job is gone. */}
+            {dictation.listening && (
+              <DictationBar
+                dictation={dictation}
+                width={geom.pageW * zoom * PAGE_SCALE}
+              />
+            )}
           </div>
 
           <main
@@ -1151,69 +1172,12 @@ function EditorSurface({
             </div>
           </main>
 
-          {/* Dictation, where a hand already is.
-              There are two other ways to start it — the tool rail and the
-              chapter panel — and both are chrome at the edge of the screen, so
-              a writer mid-sentence has to leave the page to reach one. This one
-              sits over the desk beside the paper, in the corner a thumb falls
-              to, and it is the same session as the other two: start it here and
-              all three light up.
-
-              Hidden outright where the browser has no speech engine. On Safari
-              and Firefox it could never work, and a permanently dead button in
-              the corner of every page is worse than none. */}
-          {dictation.supported && (
-            <button
-              type="button"
-              onClick={() =>
-                dictation.listening ? dictation.stop() : dictation.start()
-              }
-              aria-pressed={dictation.listening}
-              aria-label={
-                dictation.listening
-                  ? "Stop dictating"
-                  : "Dictate — speak and the words are typed"
-              }
-              title={
-                dictation.listening
-                  ? "Stop dictating"
-                  : "Dictate — speak and the words are typed"
-              }
-              className={`absolute right-5 bottom-5 z-20 flex h-13 w-13
-                          cursor-pointer items-center justify-center
-                          rounded-full text-white shadow-lg outline-none
-                          transition-colors focus-visible:ring-2
-                          focus-visible:ring-offset-2 ${
-                            dictation.listening
-                              ? "bg-danger focus-visible:ring-danger/60"
-                              : "bg-accent hover:bg-accent-strong focus-visible:ring-accent/60"
-                          }`}
-            >
-              {/* The ring keeps pulsing while the microphone is live. This is a
-                  control a writer switches on and then stops looking at, so the
-                  state has to carry from the corner of the eye. */}
-              {dictation.listening && (
-                <span
-                  aria-hidden="true"
-                  className="absolute inset-0 animate-ping rounded-full bg-danger/40"
-                />
-              )}
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="relative h-5 w-5"
-              >
-                <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
-                <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
-                <path d="M10 15v2.4" />
-              </svg>
-            </button>
-          )}
+          {/* A floating microphone used to sit here, over the corner of the
+              desk. It is gone: dictation is still one press away from the tool
+              rail and from the chapter panel, both of which show the same live
+              session, so nothing has been lost but the thing covering the page.
+              A button pinned over the manuscript is in the way of the one part
+              of the screen a writer is actually looking at. */}
         </div>
       </div>
     </>
@@ -1223,6 +1187,95 @@ function EditorSurface({
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
 const ZOOM_STEP = 0.1;
+
+/**
+ * What the microphone is hearing, while it is on.
+ *
+ * Dictation used to signal itself with a coloured button and a pulsing ring at
+ * the edge of the screen, which answers "it is on" and nothing else. The
+ * question a writer actually has is the next one — *is it hearing me* — and a
+ * ring that pulses on a timer cannot answer it: it looks identical whether you
+ * are talking, silent, or muted at the operating system.
+ *
+ * So this shows the two things that are real. The meter moves only while the
+ * engine reports a voice, so stillness means silence rather than a broken
+ * animation. And the interim words are the engine's own guess, printed as it
+ * revises them — which is proof of hearing that no indicator light can fake.
+ * They are shown and never inserted; only finished phrases reach the page, for
+ * the reason use-dictation.ts gives.
+ */
+function DictationBar({
+  dictation,
+  width,
+}: {
+  dictation: Dictation;
+  width: number;
+}) {
+  const { interim, hearing } = useDictationLive(dictation);
+
+  return (
+    <div
+      className="mx-auto mt-2 flex items-center gap-2.5 rounded-lg border
+                 border-accent/30 bg-accent/8 px-3 py-1.5"
+      style={{ width: `${width}px`, maxWidth: "100%" }}
+    >
+      <Meter hearing={hearing} />
+
+      {/* aria-live, because the whole point is a state a writer is not looking
+          straight at — and a screen-reader user has no meter to glance at. */}
+      <span
+        role="status"
+        aria-live="polite"
+        className="min-w-0 flex-1 truncate font-sans text-xs"
+      >
+        {interim ? (
+          <span className="text-fg italic">{interim}</span>
+        ) : (
+          <span className="text-muted">
+            {hearing ? "Listening…" : "Listening — go ahead"}
+          </span>
+        )}
+      </span>
+
+      <button
+        type="button"
+        onClick={dictation.stop}
+        className="shrink-0 rounded-md px-2 py-0.5 font-sans text-xs font-medium
+                   text-muted outline-none transition-colors hover:bg-raised
+                   hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        Stop
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Three bars that rise only while a voice is being heard.
+ *
+ * `oc-eq` is the shelf's own level meter, reused rather than redrawn — the same
+ * mark should mean the same thing in both places. Standing still they are three
+ * short dashes, which is a state of its own: the microphone is open and nothing
+ * is reaching it. The class already stands down under prefers-reduced-motion.
+ */
+function Meter({ hearing }: { hearing: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-4 shrink-0 items-center gap-[3px]"
+    >
+      {[0, 0.18, 0.36].map((delay) => (
+        <span
+          key={delay}
+          style={hearing ? { animationDelay: `${delay}s` } : undefined}
+          className={`w-[3px] rounded-full bg-accent ${
+            hearing ? "oc-eq" : "h-1"
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
 
 /**
  * Undo and redo, in the desk bar.
