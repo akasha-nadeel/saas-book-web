@@ -571,12 +571,15 @@ function Toolkit() {
   return (
     <section
       id="toolkit"
-      className="relative overflow-hidden border-t border-line bg-panel px-5
+      // A light wash of the accent for the whole section, so the white cards
+      // sit *on* something. It was the other way round — grey cards on white —
+      // which reads as wells sunk into the page rather than cards laid on it,
+      // and left the section indistinguishable from its neighbours.
+      className="relative overflow-hidden border-t border-line bg-accent/6 px-5
                  py-20 sm:px-8 sm:py-24"
     >
-      {/* The wash the reference carries behind this section, at the corner the
-          diagram sits in. Behind everything and unclickable — light, not a
-          surface. */}
+      {/* A little more of it at the corner the diagram sits in, so the ground
+          is not perfectly flat. Behind everything and unclickable. */}
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 bg-gradient-to-br
@@ -597,13 +600,8 @@ function Toolkit() {
           </h2>
 
           <p className="mt-5 max-w-md font-sans text-base leading-relaxed text-muted">
-            Six formats in, four back out. A manuscript you already have arrives
-            split into chapters, and an audiobook arrives transcribed and split
-            the same way.
-          </p>
-          <p className="mt-3 max-w-md font-sans text-base leading-relaxed text-muted">
-            Nothing is converted on a server and nothing waits in a queue — the
-            file is built in your browser and saved straight to disk.
+            Six formats in, four back out. Nothing is converted on a server —
+            the file is built in your browser and saved straight to disk.
           </p>
 
           <Link
@@ -633,7 +631,8 @@ function Toolkit() {
           {TOOLKIT.map(([icon, title, body]) => (
             <li
               key={title}
-              className="rounded-2xl border border-line bg-surface p-5"
+              // White on the tinted ground, as the reference has them.
+              className="rounded-2xl border border-line bg-panel p-5 shadow-sm"
             >
               <h3 className="flex items-center gap-2.5 font-sans text-sm font-semibold text-fg">
                 <span className="shrink-0 text-accent">
