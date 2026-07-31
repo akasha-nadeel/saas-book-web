@@ -554,37 +554,50 @@ function Numbers() {
             key={label}
             // Every other card sits lower, so the row reads as a rhythm rather
             // than a table. Only from lg up, where there is a row to stagger.
-            className={`flex flex-col rounded-3xl border border-line bg-surface p-6 ${
-              i % 2 === 1 ? "lg:mt-8" : ""
-            }`}
+            //
+            // White with a soft wash rather than a flat grey fill: on this
+            // section's own white ground a grey card reads as a well sunk into
+            // the page, where the reference's cards sit on top of it. The
+            // border and the shadow do the separating, and the wash gives the
+            // row somewhere to catch the light.
+            className={`relative flex flex-col overflow-hidden rounded-2xl border
+                        border-line bg-panel p-6 shadow-sm ${
+                          i % 2 === 1 ? "lg:mt-8" : ""
+                        }`}
           >
-            <div className="flex items-start justify-between gap-3">
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 bg-gradient-to-tr
+                         from-transparent via-transparent to-accent/14"
+            />
+
+            <div className="relative flex items-start justify-between gap-3">
               <span className="font-display text-4xl font-bold tracking-tight text-fg">
                 {figure}
               </span>
+              {/* A dot in a ring, not the arrow that was here. An arrow is a
+                  promise that something happens when you press it, and nothing
+                  does — these are readings, not links. */}
               <span
                 aria-hidden="true"
-                className="flex h-7 w-7 shrink-0 items-center justify-center
-                           rounded-full bg-accent/12"
+                className="flex h-6 w-6 shrink-0 items-center justify-center
+                           rounded-full bg-accent/15"
               >
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-3.5 w-3.5 text-accent"
-                >
-                  <path d="M6 14 14 6M8 6h6v6" />
-                </svg>
+                <span className="h-1.5 w-1.5 rounded-full bg-accent" />
               </span>
             </div>
 
-            <h3 className="mt-6 font-sans text-sm font-semibold text-fg">{label}</h3>
-            <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
-              {note}
-            </p>
+            {/* mt-auto: the figure sits at the top of the card and the words at
+                the bottom, with the gap between them carrying the height. The
+                cards share a height already — grid items stretch — so this is
+                what lines all four labels up on one line however long the note
+                above them ran. */}
+            <div className="relative mt-auto pt-12">
+              <h3 className="font-sans text-sm font-semibold text-fg">{label}</h3>
+              <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
+                {note}
+              </p>
+            </div>
           </article>
         ))}
       </div>
