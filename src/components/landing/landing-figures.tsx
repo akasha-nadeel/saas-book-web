@@ -7,11 +7,30 @@
  * so they are hidden from assistive technology rather than described badly.
  */
 
-function Frame({ children }: { children: React.ReactNode }) {
+/**
+ * The white surface a figure is drawn on.
+ *
+ * It sits *inside* a feature card, which carries the grey ground — the same
+ * two-layer arrangement the app itself uses for panel-on-surface, and what
+ * makes each of these read as a piece of the product rather than as clip art
+ * glued to a page.
+ *
+ * `ratio` because a bento is not a column: the three-across cards want a taller
+ * figure than the two wide ones, and forcing one shape on both leaves either
+ * whitespace or a squashed drawing.
+ */
+function Frame({
+  children,
+  ratio = "4/3",
+}: {
+  children: React.ReactNode;
+  ratio?: string;
+}) {
   return (
     <div
       aria-hidden="true"
-      className="relative aspect-[4/3] w-full select-none overflow-hidden rounded-2xl
+      style={{ aspectRatio: ratio }}
+      className="relative w-full select-none overflow-hidden rounded-2xl
                  border border-line bg-surface p-5 shadow-sm sm:p-6"
     >
       {children}
@@ -152,6 +171,125 @@ export function ReadFigure() {
               </span>
             </div>
           ))}
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/**
+ * The assistant panel: a question about the open chapter, and an answer.
+ *
+ * Written as bars rather than lorem text, like every other figure here. The one
+ * real word is the mark — a writer who has seen the sparkle in the rail should
+ * recognise what this card is about before reading its title.
+ */
+export function AssistantFigure() {
+  return (
+    <Frame ratio="4/3">
+      <div className="flex h-full flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-accent/12">
+            <svg
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinejoin="round"
+              className="h-3.5 w-3.5 text-accent"
+            >
+              <path d="M9.6 2.6c.9 3.4 1.7 4.2 5.1 5.1-3.4.9-4.2 1.7-5.1 5.1-.9-3.4-1.7-4.2-5.1-5.1 3.4-.9 4.2-1.7 5.1-5.1z" />
+              <path d="M15 12.4c.45 1.7.85 2.1 2.55 2.55-1.7.45-2.1.85-2.55 2.55-.45-1.7-.85-2.1-2.55-2.55 1.7-.45 2.1-.85 2.55-2.55z" />
+            </svg>
+          </span>
+          <span className="h-2 w-16 rounded bg-fg/25" />
+        </div>
+
+        {/* The writer's question, on the accent; the answer on the page's own
+            ground. Two speakers, told apart by ground rather than by a label. */}
+        <div className="ml-auto w-4/5 rounded-xl rounded-br-sm bg-accent px-3 py-2.5">
+          <div className="flex flex-col gap-1.5">
+            {["100%", "72%"].map((w, i) => (
+              <span
+                key={i}
+                className="h-1.5 rounded bg-white/70"
+                style={{ width: w }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="w-[88%] rounded-xl rounded-bl-sm border border-line bg-panel px-3 py-2.5">
+          <div className="flex flex-col gap-1.5">
+            {["100%", "94%", "100%", "58%"].map((w, i) => (
+              <span
+                key={i}
+                className="h-1.5 rounded bg-fg/15"
+                style={{ width: w }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-auto flex items-center gap-2 rounded-lg border border-line px-3 py-2">
+          <span className="h-1.5 flex-1 rounded bg-fg/10" />
+          <span className="h-5 w-10 rounded-md bg-accent/15" />
+        </div>
+      </div>
+    </Frame>
+  );
+}
+
+/**
+ * Words per chapter, against the target the book was started with.
+ *
+ * The one figure here that shows a number, because it is the one thing on this
+ * page a writer measures themselves by — and a bar chart with its axis label
+ * blanked out would be a chart pretending to have data. The chapter that is
+ * open takes the accent; the rest are the same grey the other figures use.
+ */
+export function ProgressFigure({ ratio = "4/3" }: { ratio?: string }) {
+  // Heights as a share of the plot, and a deliberately uneven run: chapters are
+  // not the same length, and a smooth ramp would read as a stock illustration.
+  const bars = [46, 62, 38, 74, 55, 88, 41, 67];
+  const open = 5;
+
+  return (
+    <Frame ratio={ratio}>
+      <div className="flex h-full flex-col">
+        <span className="font-sans text-[10px] text-muted">Words written</span>
+        <span className="mt-0.5 font-display text-xl font-semibold text-fg">
+          41,208
+        </span>
+
+        <div className="relative mt-4 flex flex-1 items-end gap-1.5">
+          {/* The target, drawn across the bars rather than beside them — a line
+              a writer is over or under, which is the only question it answers. */}
+          <span
+            aria-hidden="true"
+            className="absolute inset-x-0 border-t border-dashed border-line"
+            style={{ bottom: "72%" }}
+          />
+          {bars.map((h, i) => (
+            <span
+              key={i}
+              style={{ height: `${h}%` }}
+              className={`flex-1 rounded-t-sm ${
+                i === open ? "bg-accent" : "bg-accent/15"
+              }`}
+            />
+          ))}
+        </div>
+
+        <div className="mt-2 flex items-center gap-3">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+            <span className="h-1.5 w-10 rounded bg-fg/12" />
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent/25" />
+            <span className="h-1.5 w-8 rounded bg-fg/12" />
+          </span>
         </div>
       </div>
     </Frame>

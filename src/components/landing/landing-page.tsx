@@ -4,11 +4,14 @@ import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { BookFan } from "./book-fan";
 import {
+  AssistantFigure,
   FormatFigure,
   PageFigure,
+  ProgressFigure,
   ReadFigure,
   ShelfFigure,
 } from "./landing-figures";
+import { LaptopMockup } from "./laptop-mockup";
 import { WorksWith } from "./works-with";
 
 /**
@@ -37,7 +40,9 @@ export function LandingPage() {
       <Nav />
       <Hero />
       <WorksWith />
-      <Rows />
+      <Features />
+      <Numbers />
+      <Steps />
       <Faq />
       <Closing />
       <Footer />
@@ -45,14 +50,13 @@ export function LandingPage() {
   );
 }
 
-// In the order the page presents them. Every feature row below has an id so it
-// can be reached from here — leaving one out makes the nav a table of contents
-// that is missing a chapter, and it feeds the footer's column too.
+// In the order the page presents them. Every section below has an id so it can
+// be reached from here — leaving one out makes the nav a table of contents that
+// is missing a chapter, and it feeds the footer's column too.
 const SECTIONS = [
-  ["Writing", "#writing"],
-  ["Library", "#library"],
-  ["Formats", "#formats"],
-  ["Reading", "#reading"],
+  ["Features", "#features"],
+  ["In numbers", "#numbers"],
+  ["Getting started", "#start"],
   ["Questions", "#questions"],
 ] as const;
 
@@ -283,78 +287,318 @@ function Backdrop() {
 // Feature rows
 // ---------------------------------------------------------------------------
 
-function Rows() {
+// ---------------------------------------------------------------------------
+// Features
+// ---------------------------------------------------------------------------
+
+/**
+ * The heading block the three sections below share.
+ *
+ * A small pill, a centred headline, a line of sub-copy. Written once because
+ * three sections use it, and a page whose headings drift in size and spacing
+ * reads as three pages stapled together.
+ */
+function SectionHead({
+  eyebrow,
+  title,
+  body,
+}: {
+  eyebrow: string;
+  title: ReactNode;
+  body: string;
+}) {
   return (
-    <div className="border-t border-line">
-      <Row
-        id="writing"
-        eyebrow="Writing"
-        title="A page that behaves like a page."
-        body="Your manuscript sits on real sheets at the trim size you chose. Long paragraphs fill the page and carry over the break, just as a word processor handles them. What you see while drafting is what comes out the other end."
-        figure={<PageFigure />}
-      />
-      <Row
-        id="library"
-        eyebrow="Library"
-        title="A shelf, not a folder."
-        body="Every book with its cover, its word count and where you left off. Chapters reorder by dragging, move to front or back matter, and take a bookmark for the scene you keep returning to."
-        figure={<ShelfFigure />}
-        flip
-      />
-      <Row
-        id="formats"
-        eyebrow="Formats"
-        title="Hand it off in what they asked for."
-        body="EPUB, DOCX, a print-ready PDF and Markdown, with a title page, copyright page and contents generated for you. Bring an existing manuscript in and it is split into chapters on the way."
-        figure={<FormatFigure />}
-      />
-      <Row
-        id="reading"
-        eyebrow="Reading"
-        title="Read it before anyone else has to."
-        body="The whole manuscript on real pages at your trim size, or as a book you open and turn. It is not a preview of the export — it is the same typesetting, so the read-through and the file agree."
-        figure={<ReadFigure />}
-        flip
-      />
+    <div className="mx-auto max-w-2xl text-center">
+      <p
+        className="inline-flex items-center gap-2 rounded-full border border-line
+                   bg-panel px-3.5 py-1.5 font-sans text-xs font-semibold text-muted"
+      >
+        <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+        {eyebrow}
+      </p>
+      <h2 className="mt-5 font-display text-3xl leading-tight font-bold tracking-tight text-fg sm:text-4xl">
+        {title}
+      </h2>
+      <p className="mx-auto mt-4 max-w-xl font-sans text-base leading-relaxed text-muted">
+        {body}
+      </p>
     </div>
   );
 }
 
-function Row({
-  id,
-  eyebrow,
+/**
+ * The features, as a bento of cards that each show the thing they describe.
+ *
+ * This replaced four full-width alternating rows. Those gave every feature the
+ * same enormous weight and took four screens to say four things; somebody
+ * deciding whether to sign up wants to take them in at a glance and stop at
+ * whichever one is theirs.
+ *
+ * Three portrait cards, then two landscape ones, rather than a uniform grid. A
+ * grid of identical tiles has no reading order — the eye is offered six equal
+ * things and settles on none. The change of shape at the second row is what
+ * says "these two are larger", which is true: the formats and the count are
+ * what a finished book is judged by.
+ *
+ * Every figure is drawn from the app's own tokens rather than screenshotted,
+ * for the reason landing-figures.tsx gives. They are illustrations and are
+ * marked as such — decorative to assistive technology, with nothing clickable
+ * inside them. That is not the no-dead-UI rule being bent: there is no control
+ * here to be dead, and each one depicts something the app genuinely does.
+ */
+function Features() {
+  return (
+    <section
+      id="features"
+      className="border-t border-line px-5 py-20 sm:px-8 sm:py-24"
+    >
+      <SectionHead
+        eyebrow="Features"
+        title={
+          <>
+            Everything a manuscript needs,
+            <br className="hidden sm:block" /> and nothing it doesn&rsquo;t.
+          </>
+        }
+        body="The parts of a writing app you actually use, built to the standard a shop checks — and quiet about everything else."
+      />
+
+      <div className="mx-auto mt-14 grid max-w-6xl gap-5 lg:grid-cols-6">
+        <FeatureCard
+          className="lg:col-span-2"
+          title="A page that behaves like a page"
+          body="Your manuscript sits on real sheets at the trim size you chose. Long paragraphs fill the page and carry over the break, the way a word processor handles them."
+          figure={<PageFigure />}
+        />
+        <FeatureCard
+          className="lg:col-span-2"
+          title="A shelf, not a folder"
+          body="Every book with its cover, its word count and where you left off. Chapters reorder by dragging and take a bookmark for the scene you keep returning to."
+          figure={<ShelfFigure />}
+        />
+        <FeatureCard
+          className="lg:col-span-2"
+          title="An assistant that has read the chapter"
+          body="Ask about the scene you are in — what isn't landing, what to tighten, what happens next. The chapter text is sent only when you ask."
+          figure={<AssistantFigure />}
+        />
+
+        {/* The wide ones put the figure beside the words rather than above
+            them: at this width a stacked figure would be a letterbox. */}
+        <FeatureCard
+          wide
+          className="lg:col-span-3"
+          title="Hand it off in what they asked for"
+          body="EPUB, DOCX, a print-ready PDF and Markdown, with a title page, copyright page and contents generated for you."
+          figure={<FormatFigure />}
+        />
+        <FeatureCard
+          wide
+          className="lg:col-span-3"
+          title="Read it before anyone else has to"
+          body="The whole manuscript on real pages, or as a book you open and turn. Not a preview of the export — the same typesetting, so the read-through and the file agree."
+          figure={<ReadFigure />}
+        />
+
+        {/* Full width, and last on purpose. It is the one card about the book
+            as a whole rather than about a part of the app, so it closes the
+            section rather than sitting in the middle of it. */}
+        <FeatureCard
+          wide
+          className="lg:col-span-6"
+          title="Watch the book fill up"
+          body="A target set when you start the book, and every chapter measured against it. Totals are summed as they are read, so they cannot drift from what is on the page."
+          // Wider than the portrait cards' figures. At half of six columns a
+          // 4:3 chart is taller than the paragraph beside it, which leaves the
+          // words stranded in a column of air.
+          figure={<ProgressFigure ratio="16/7" />}
+        />
+      </div>
+    </section>
+  );
+}
+
+function FeatureCard({
   title,
   body,
   figure,
-  flip,
+  wide,
+  className = "",
 }: {
-  id: string;
-  eyebrow: string;
   title: string;
   body: string;
   figure: ReactNode;
-  /** Puts the figure on the left, so the rows alternate down the page. */
-  flip?: boolean;
+  /** Figure beside the words instead of above them. */
+  wide?: boolean;
+  className?: string;
 }) {
   return (
-    <section id={id} className="border-b border-line px-5 py-16 sm:px-8 sm:py-20">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-16">
-        <div className={flip ? "lg:order-2" : undefined}>
-          {/* Set as a small heading rather than a spaced-out label: bigger,
-              bolder, and in its own case. Uppercase with wide tracking reads as
-              a category tag, which is a quieter job than this is doing. */}
-          <p className="font-sans text-lg font-bold text-accent">{eyebrow}</p>
-          <h2 className="mt-3 font-display text-3xl leading-tight font-semibold text-fg sm:text-4xl">
-            {title}
-          </h2>
-          {/* Set exactly as the hero's sub-copy: same size, weight and
-              full-strength ink, so the two read as one voice. */}
-          <p className="mt-4 font-sans text-lg font-medium leading-relaxed text-fg sm:text-xl">
-            {body}
-          </p>
-        </div>
+    <article
+      className={`flex flex-col gap-5 rounded-3xl border border-line bg-panel p-5
+                  sm:p-6 ${wide ? "sm:flex-row sm:items-center" : ""} ${className}`}
+    >
+      <div className={wide ? "shrink-0 sm:order-2 sm:w-1/2" : ""}>{figure}</div>
+      <div className={wide ? "sm:order-1 sm:flex-1" : ""}>
+        <h3 className="font-display text-lg font-semibold text-fg">{title}</h3>
+        <p className="mt-2 font-sans text-sm leading-relaxed text-muted">{body}</p>
+      </div>
+    </article>
+  );
+}
 
-        <div className={flip ? "lg:order-1" : undefined}>{figure}</div>
+// ---------------------------------------------------------------------------
+// In numbers
+// ---------------------------------------------------------------------------
+
+/**
+ * Four figures, every one of them checkable.
+ *
+ * The pattern this is drawn from puts traction here — active users, teams
+ * onboarded, hours saved. OpenChapter has no such numbers, and inventing them
+ * is the one thing a landing page must not do: a made-up user count is a lie
+ * told to the exact person deciding whether to trust you with a manuscript. So
+ * these are facts about the product instead, each of which can be checked by
+ * using it for ten minutes.
+ */
+const NUMBERS = [
+  [
+    "4",
+    "Export formats",
+    "EPUB, DOCX, a print-ready PDF and Markdown — with the front matter generated for you.",
+  ],
+  [
+    "6",
+    "Import formats",
+    "DOCX, EPUB, Markdown, plain text and HTML — plus an audiobook, transcribed and split into chapters.",
+  ],
+  [
+    "0",
+    "EPUBCheck errors",
+    "Verified against EPUBCheck 5.3 for EPUB 3.3 — warnings included — on a fully specified book and a bare one.",
+  ],
+  [
+    "100%",
+    "Written here first",
+    "Every keystroke lands in this browser before anywhere else. Lose the connection and the book is still yours.",
+  ],
+] as const;
+
+function Numbers() {
+  return (
+    <section
+      id="numbers"
+      className="border-t border-line bg-panel px-5 py-20 sm:px-8 sm:py-24"
+    >
+      <SectionHead
+        eyebrow="In numbers"
+        title="Why writers choose OpenChapter"
+        body="Nothing here about how many people use it — only figures you can check yourself."
+      />
+
+      <div className="mx-auto mt-14 grid max-w-6xl gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        {NUMBERS.map(([figure, label, note], i) => (
+          <article
+            key={label}
+            // Every other card sits lower, so the row reads as a rhythm rather
+            // than a table. Only from lg up, where there is a row to stagger.
+            className={`flex flex-col rounded-3xl border border-line bg-surface p-6 ${
+              i % 2 === 1 ? "lg:mt-8" : ""
+            }`}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <span className="font-display text-4xl font-bold tracking-tight text-fg">
+                {figure}
+              </span>
+              <span
+                aria-hidden="true"
+                className="flex h-7 w-7 shrink-0 items-center justify-center
+                           rounded-full bg-accent/12"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5 text-accent"
+                >
+                  <path d="M6 14 14 6M8 6h6v6" />
+                </svg>
+              </span>
+            </div>
+
+            <h3 className="mt-6 font-sans text-sm font-semibold text-fg">{label}</h3>
+            <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
+              {note}
+            </p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Getting started
+// ---------------------------------------------------------------------------
+
+const STEPS = [
+  [
+    "Start a book",
+    "Name it, choose a trim size and set a word target. Or bring a manuscript you already have — it arrives split into chapters.",
+  ],
+  [
+    "Write it",
+    "Chapters down one side, the page down the middle. Nothing to set up, and nothing asking to be configured before the first sentence.",
+  ],
+  [
+    "Hand it off",
+    "Read the whole thing through at your trim size, then export the file your shop, agent or printer asked for.",
+  ],
+] as const;
+
+function Steps() {
+  return (
+    <section id="start" className="border-t border-line px-5 py-20 sm:px-8 sm:py-24">
+      <SectionHead
+        eyebrow="Getting started"
+        title="Blank page to finished file, in three"
+        body="No import wizard to survive, and no template to choose before you can begin."
+      />
+
+      <div className="mx-auto mt-14 grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-14">
+        {/* The editor itself, drawn rather than screenshotted — the same
+            reasoning as every other figure here. It answers "what does it
+            actually look like", which the steps beside it can only describe. */}
+        <LaptopMockup />
+
+        <ol className="flex flex-col gap-4">
+          {STEPS.map(([title, body], i) => (
+            <li
+              key={title}
+              className="flex gap-4 rounded-2xl border border-line bg-panel p-5"
+            >
+              {/* The number carries the order, so the list needs no bullet and
+                  no rule between items. */}
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl
+                           bg-accent font-sans text-sm font-bold text-white"
+              >
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <div>
+                <h3 className="font-display text-lg font-semibold text-fg">
+                  {title}
+                </h3>
+                <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
+                  {body}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );
