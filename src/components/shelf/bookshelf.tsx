@@ -43,7 +43,7 @@ import {
 } from "@/lib/arc";
 import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
-import { progressOf, roadmapFor } from "@/lib/roadmap";
+import { progressOf, roadmapFor, type Progress } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
 import {
   Menu,
@@ -1400,59 +1400,167 @@ function Tools({ books }: { books: Book[] }) {
 /**
  * Learn — the order to do things in.
  *
- * One real thing so far, and it is the one three separate research threads
- * pointed at: writers do not lack tools, they lack the order. Most sharply the
- * writer who found out advance copies were essential *after* publishing.
+ * Three research threads pointed the same way: writers do not lack tools, they
+ * lack the order. Most sharply, the one who found out advance copies were
+ * essential *after* publishing.
+ *
+ * The area used to answer that with a paragraph naming five tools and then five
+ * identical buttons on every book row — thirty-five buttons for seven books,
+ * and the same five words read over and over. It also showed nothing at all
+ * about *where each book actually was*, which is the only question the area's
+ * own subtitle promises to answer.
+ *
+ * So the roadmap is the area now. `roadmapFor` works most of the steps out from
+ * the book itself, so each row can show how far along it is and name the next
+ * thing to do. The four tools that were buttons moved behind a ⋯ menu, the same
+ * shape the book cards use.
  */
 function Learn({ books }: { books: Book[] }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <Panel title="Blank page to published">
-        <p className="mb-4 text-muted">
-          <strong className="text-fg">Roadmap</strong> — every step in the order
-          it has to happen, so you do not find out about advance copies after
-          the book is already out; most of it ticks itself from what is in your
-          book. <strong className="text-fg">Structure</strong> — the shape most
-          novels share, with your word count on it, for when the middle has run
-          out of road. <strong className="text-fg">Prose</strong> — what is in a
-          chapter, counted, with no score and no rewriting.{" "}
-          <strong className="text-fg">Progress</strong> — whether the writing is
-          moving. <strong className="text-fg">Before you spend</strong> — what a
-          book usually earns, and what to establish before paying anybody.
-        </p>
-        {books.length === 0 ? (
-          <p className="text-muted">No books yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {books.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3
-                           rounded-lg border border-line bg-surface px-4 py-3"
-              >
-                <span className="truncate font-medium text-fg">{b.title}</span>
-                <span className="flex gap-2">
-                  <Go href={`/book/${b.id}/roadmap`}>Roadmap</Go>
-                  <Go href={`/book/${b.id}/structure`}>Structure</Go>
-                  <Go href={`/book/${b.id}/prose`}>Prose</Go>
-                  <Go href={`/book/${b.id}/progress`}>Progress</Go>
-                  <Go href={`/book/${b.id}/money`}>Before you spend</Go>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+  const rows = useMemo(
+    () =>
+      books.map((book) => ({
+        book,
+        progress: progressOf(roadmapFor(book, book.roadmapDone ?? [])),
+      })),
+    [books],
+  );
 
-      {/* Only while there is something left to come. An empty "Coming to this
-          area" panel is a heading promising a list and then not having one,
-          which is the dead UI the house rule is about. */}
+  const finished = rows.filter((r) => r.progress.next === null).length;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <h2 className="font-bold text-fg">Blank page to published</h2>
+        <p className="mt-1 text-muted">
+          Every step in the order it has to happen, so you do not find out about
+          advance copies after the book is already out. Most of it ticks itself
+          from what is in your book — the steps you have to claim by hand are
+          the ones that happen somewhere else.
+        </p>
+
+        {books.length === 0 ? (
+          <p className="mt-4 text-muted">No books yet.</p>
+        ) : (
+          <>
+            {finished > 0 && (
+              <p className="mt-3 text-sm text-muted">
+                {finished} of {books.length} through every step.
+              </p>
+            )}
+            <ul className="mt-4 flex flex-col gap-2">
+              {rows.map(({ book, progress }) => (
+                <LearnRow key={book.id} book={book} progress={progress} />
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
       {PLANNED.learn.length > 0 && (
         <Panel title="Coming to this area">
           <PlannedGrid items={PLANNED.learn} />
         </Panel>
       )}
     </div>
+  );
+}
+
+/**
+ * One book's place in the sequence.
+ *
+ * It names the next step rather than counting the remaining ones, for the same
+ * reason the Prepare rows name their worst problem: "Write the blurb" is
+ * something a writer can go and do, and "12 steps left" is a mood.
+ */
+function LearnRow({ book, progress }: { book: Book; progress: Progress }) {
+  const share = Math.round((progress.done / progress.total) * 100);
+
+  return (
+    <li
+      className="flex flex-wrap items-center gap-3 rounded-xl border border-line
+                   bg-surface px-4 py-3"
+    >
+      <Link
+        href={`/book/${book.id}/roadmap`}
+        className="flex min-w-0 flex-1 items-center gap-3"
+      >
+        <span className="w-8 shrink-0">
+          <CoverOf book={book} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-fg">
+            {book.title}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted">
+            {progress.next ? (
+              <>
+                <span className="font-semibold text-accent">Next</span>{" "}
+                {progress.next.title}
+              </>
+            ) : (
+              "Every step done."
+            )}
+          </span>
+        </span>
+      </Link>
+
+      <span className="flex shrink-0 items-center gap-2.5">
+        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
+          <span
+            className="block h-full rounded-full bg-accent"
+            style={{ width: `${share}%` }}
+          />
+        </span>
+        <span className="w-16 text-right text-xs text-muted tabular-nums">
+          {progress.done} of {progress.total}
+        </span>
+
+        {/* The four that were buttons on every row. Behind a menu here for the
+            same reason they are on the book cards: five identical words down a
+            column is five words to read and one to want. */}
+        <Menu
+          label={`More for ${book.title}`}
+          align="end"
+          width={244}
+          triggerClassName="flex items-center rounded-lg border border-line
+                            bg-panel px-2 py-1.5 text-fg"
+          trigger={shelfIcons.more}
+        >
+          {(close) => (
+            <>
+              <MenuLink
+                href={`/book/${book.id}/structure`}
+                icon={shelfIcons.learn}
+                onNavigate={close}
+              >
+                Structure
+              </MenuLink>
+              <MenuLink
+                href={`/book/${book.id}/prose`}
+                icon={shelfIcons.write}
+                onNavigate={close}
+              >
+                Prose report
+              </MenuLink>
+              <MenuLink
+                href={`/book/${book.id}/progress`}
+                icon={shelfIcons.target}
+                onNavigate={close}
+              >
+                Progress
+              </MenuLink>
+              <MenuLink
+                href={`/book/${book.id}/money`}
+                icon={shelfIcons.pricing}
+                onNavigate={close}
+              >
+                Before you spend
+              </MenuLink>
+            </>
+          )}
+        </Menu>
+      </span>
+    </li>
   );
 }
 
