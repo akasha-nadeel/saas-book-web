@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Prose report",
+        desc: "What is in a chapter, counted: dialogue tags that are not “said”, words ending in -ly, filter words, runs of sentences that start the same way, and very long sentences. There is no score and it never changes a word — none of these is a fault, and the only useful service is showing you where yours are.",
+      },
+      {
         name: "Paperback setup",
         desc: "Spine width, inside margin and the full cover wrap, worked out from your page count and trim size — four numbers that all depend on the page count, which is why setting a paperback up takes people an evening. Type in the page count from your exported PDF; an estimate from your word count stands in until you have one. These are Amazon KDP's published figures and they do not replace the shop's own template.",
       },

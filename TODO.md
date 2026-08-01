@@ -233,13 +233,33 @@ than replacing it.
 
 ### Later
 
-- [ ] **Prose report — and never a prose editor.** Dialogue tags, filter words,
-      adverb density, plot-hole notes. Report it; never rewrite it. This is the
-      `storeReadiness()` pattern pointed at prose instead of metadata, and the
+- [x] **Prose report — and never a prose editor.** Done 2026-08-01.
+      `/book/[bookId]/prose`, backed by `src/lib/prose.ts` (pure, 18 tests).
+      Five things counted per chapter: dialogue tags other than "said", words
+      ending in -ly, filter words, runs of three sentences starting the same
+      way, and sentences over 45 words.
+
+      This is `storeReadiness()` pointed at prose instead of metadata, and the
       distinction is load-bearing: writers in this research are sick of
-      Grammarly, and the product's strongest claim is that the assistant has no
-      write access to the manuscript. A report keeps both promises. An AI
-      rewrite breaks both.
+      Grammarly and describe Word's AI making 150 corrections that *"caused the
+      writing to be more bland"*. A report keeps both standing promises — the
+      assistant has no write access, and we do not blandify anyone. A rewrite
+      button would break both.
+
+      **There is no score, and a test asserts there is no score.** No grade, no
+      rating, no number out of a hundred. Every one of those is invented to look
+      like an answer, and prose is the last place a made-up number belongs.
+
+      **Every convention is named as a convention.** Adverbs are not a fault,
+      filter words are not a fault, a long sentence is a style. The page says so
+      at the foot, and each finding says why anyone mentions the thing rather
+      than what to do about it. The "said" count is reported *beside* the
+      alternatives, because two exclaims in a chapter of four hundred saids is a
+      different fact from two in a chapter of six.
+
+      *Left:* plot holes, which were in the original note and are not here.
+      Finding one needs to understand the story, which is the assistant's job
+      and not a regular expression's.
 - [ ] **"Why isn't it selling" diagnostic.** A structured self-audit — cover,
       blurb, categories, price, sample. Extends `storeReadiness()`.
 - [ ] **Cover checker.** Not a designer: is the title legible at thumbnail

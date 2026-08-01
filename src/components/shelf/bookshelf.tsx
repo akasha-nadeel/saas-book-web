@@ -631,6 +631,7 @@ function Write({
                     <Chip href={`/book/${book.id}/paperback`}>Paperback</Chip>
                     <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
                     <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
+                    <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -770,7 +771,8 @@ function Learn({ books }: { books: Book[] }) {
           the book is already out; most of it ticks itself from what is in your
           book. <strong className="text-fg">Structure</strong> — the shape most
           novels share, with your word count on it, for when the middle has run
-          out of road.
+          out of road. <strong className="text-fg">Prose</strong> — what is in a
+          chapter, counted. No score, and it never changes a word.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -786,6 +788,7 @@ function Learn({ books }: { books: Book[] }) {
                 <span className="flex gap-2">
                   <Go href={`/book/${b.id}/roadmap`}>Roadmap</Go>
                   <Go href={`/book/${b.id}/structure`}>Structure</Go>
+                  <Go href={`/book/${b.id}/prose`}>Prose</Go>
                 </span>
               </li>
             ))}
