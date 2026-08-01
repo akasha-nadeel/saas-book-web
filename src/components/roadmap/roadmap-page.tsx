@@ -72,7 +72,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
       {/* Which book this is. Shared by every tool screen, because they all open
           full-window with none of the dashboard around them, and the Tools area
           lets a writer change book before opening one. */}
-      <ToolHeader book={book} tool="Roadmap">
+      <ToolHeader book={book} tool="Roadmap" title="Blank page to published">
         The order it actually has to happen in — including the step almost
         everybody finds out about too late.
       </ToolHeader>
