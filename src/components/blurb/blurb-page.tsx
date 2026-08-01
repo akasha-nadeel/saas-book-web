@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { blurbReport } from "@/lib/blurb";
 import { buildQuery, type CompTitle } from "@/lib/comps/comps";
 import { findBook, setPublishing } from "@/lib/library-store";
@@ -100,50 +101,75 @@ export function BlurbPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Blurb</h1>
-        <p className="mt-3 max-w-2xl text-muted">
-          The two hundred words that decide whether anybody opens the book. We
-          do not write it — we count it, and we show you what books like yours
-          did.
-        </p>
+      <ToolHeader book={book} tool="Blurb">
+        The two hundred words that decide whether anybody opens the book. We do
+        not write it — we count it, and we show you what books like yours did.
+      </ToolHeader>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* ---- The blurb itself -------------------------------------- */}
           <div>
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              // Saved on blur rather than on every keystroke: the shelf is one
-              // document and a write per character is a write per character.
-              onBlur={() => setPublishing(book.id, { description: draft })}
-              rows={14}
-              placeholder="What happens, who it happens to, and what is at stake."
-              aria-label="Your blurb"
-              className="w-full rounded-xl border border-line bg-panel p-4 leading-relaxed
-                         text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-            />
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm">
-              <span className={over ? "font-bold text-red-600" : "text-muted"}>
-                {report.stats.characters.toLocaleString()} /{" "}
-                {BLURB_MAX.toLocaleString()} characters
-              </span>
-              <span className="text-muted">
-                {report.stats.words} words · {report.stats.paragraphs}{" "}
-                paragraph{report.stats.paragraphs === 1 ? "" : "s"}
-              </span>
+            {/* The counters live inside the box's frame rather than under it.
+                They were fourteen rows down, which on this screen meant below
+                the fold — and a character count nobody can see while typing is
+                a character count that does its job after the fact. */}
+            <div className="overflow-hidden rounded-xl border border-line bg-panel focus-within:ring-2 focus-within:ring-accent/50">
+              <textarea
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                // Saved on blur rather than on every keystroke: the shelf is one
+                // document and a write per character is a write per character.
+                onBlur={() => setPublishing(book.id, { description: draft })}
+                rows={10}
+                placeholder="What happens, who it happens to, and what is at stake."
+                aria-label="Your blurb"
+                className="w-full resize-y bg-transparent p-4 leading-relaxed text-fg
+                           outline-none"
+              />
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line bg-surface px-4 py-2 text-xs">
+                <span
+                  className={over ? "font-bold text-red-600" : "text-muted"}
+                >
+                  {report.stats.characters.toLocaleString()} /{" "}
+                  {BLURB_MAX.toLocaleString()} characters · {report.stats.words}{" "}
+                  words · {report.stats.paragraphs} paragraph
+                  {report.stats.paragraphs === 1 ? "" : "s"}
+                </span>
+                <span className="text-muted">Saved when you click away</span>
+              </div>
             </div>
 
-            {/* Saved when the box loses focus. Said out loud, because a writer
-                who has typed into a box and navigated away deserves to know
-                whether it kept. */}
-            <p className="mt-1 text-xs text-muted">
-              Saved to this book when you click away.
-            </p>
+            {/* What books like this one actually run to, once the examples
+                have been fetched. A number on its own does not tell a writer
+                whether four hundred characters is short; a mark on a line
+                does. */}
+            {benchmark !== undefined && report.stats.characters > 0 && (
+              <div className="mt-3">
+                <div className="relative h-1.5 rounded-full bg-raised">
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{
+                      width: `${Math.min(100, (report.stats.characters / (benchmark * 2)) * 100)}%`,
+                    }}
+                  />
+                  {/* The median sits at the halfway mark, so the bar reads as
+                      "about right in the middle" rather than as a target to
+                      fill. There is no correct length and the scale should not
+                      imply one. */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded bg-fg/50"
+                    style={{ left: "50%" }}
+                  />
+                </div>
+                <p className="mt-1.5 text-xs text-muted">
+                  Books like yours run about {benchmark.toLocaleString()}{" "}
+                  characters, which is the mark in the middle. Yours is{" "}
+                  {report.stats.characters.toLocaleString()}.
+                </p>
+              </div>
+            )}
 
             {report.issues.length > 0 && (
               <ul className="mt-6 flex flex-col gap-2">
@@ -190,8 +216,10 @@ export function BlurbPage({ bookId }: { bookId: string }) {
               type="button"
               onClick={loadExamples}
               disabled={state === "loading"}
-              className="mt-4 w-full rounded-lg border border-line bg-panel px-4 py-2.5
-                         text-sm font-semibold text-fg disabled:opacity-50"
+              // Filled. It is the only action in this column and it was a
+              // white box on a white panel, which reads as disabled.
+              className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm
+                         font-semibold text-white disabled:opacity-50"
             >
               {state === "loading" ? "Looking…" : "Show me five"}
             </button>

@@ -3,14 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
-import { buildQuery, type CompSummary, type CompTitle } from "@/lib/comps/comps";
+import { ToolHeader } from "@/components/tool-header";
+import {
+  buildQuery,
+  type CompSummary,
+  type CompTitle,
+} from "@/lib/comps/comps";
 import {
   compareLength,
   lengthFromPages,
   WORDS_PER_PAGE,
 } from "@/lib/comps/length";
 import { bookWordCount, findBook, setTargetWords } from "@/lib/library-store";
-import { suggestTarget } from "@/lib/book-kinds";
+import { GENRES, suggestTarget } from "@/lib/book-kinds";
 import { useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -41,8 +46,13 @@ export function CompsPage({ bookId }: { bookId: string }) {
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
   const [summary, setSummary] = useState<CompSummary | null>(null);
-  const [sources, setSources] = useState<{ google: boolean; openLibrary: boolean } | null>(null);
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [sources, setSources] = useState<{
+    google: boolean;
+    openLibrary: boolean;
+  } | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
+    "idle",
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Seed the box once the shelf has been read, and never again — a writer who
@@ -98,20 +108,15 @@ export function CompsPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-4xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
+      <ToolHeader book={book} tool="Comp titles">
+        The published books yours sits beside — what every listing form and
+        every query letter asks for. Edit the search; you know what your book is
+        like better than we do.
+      </ToolHeader>
 
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Comp titles</h1>
-        <p className="mt-3 max-w-2xl text-muted">
-          The published books yours sits beside. Every listing form and every
-          query letter asks for these. Edit the search — you know what your book
-          is like better than we do.
-        </p>
-
+      <div className="mx-auto max-w-4xl px-6 pt-6 pb-16">
         <form
-          className="mt-6 flex flex-wrap gap-2"
+          className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void search(query);
@@ -134,17 +139,70 @@ export function CompsPage({ bookId }: { bookId: string }) {
           </button>
         </form>
 
-        {book.genre && (
+        {book.genre ? (
           <p className="mt-2 text-xs text-muted">
             Seeded from this book&rsquo;s genre
             {book.publishing?.description ? " and blurb" : ""}.
           </p>
+        ) : (
+          /* A book with no genre and no blurb seeds an empty box, which left
+             this screen telling the writer to "edit the search" with nothing
+             to edit and the button disabled. The genres are the app's own
+             list, and pressing one is only a search — nothing is written to
+             the book, which is why they read as starting points rather than
+             as a form. */
+          <div className="mt-3">
+            <p className="text-xs text-muted">
+              This book has no genre set, so there was nothing to seed the box
+              with. Start from one of these, or describe the story in your own
+              words above.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {GENRES.filter((g) => g !== "Other").map((genre) => (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => {
+                    const seed = `subject:"${genre}"`;
+                    setQuery(seed);
+                    void search(seed);
+                  }}
+                  className="rounded-full border border-line bg-panel px-3 py-1 text-xs
+                             font-medium text-fg hover:border-accent/40"
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
           </p>
+        )}
+
+        {/* Before the first search the page was blank below the box, which on
+            a screen most writers have never used before reads as broken rather
+            than as waiting. */}
+        {state === "idle" && (
+          <section className="mt-8 rounded-xl border border-line bg-panel p-5">
+            <h2 className="font-bold text-fg">What a comp is for</h2>
+            <p className="mt-1.5 text-sm text-muted">
+              A comparable title is a published book a reader who liked yours
+              would also have bought — recent, in your genre, and roughly your
+              size. It is not a book you admire, and it is not a bestseller: an
+              agent or a shop reads &ldquo;like Tolkien&rdquo; as someone who
+              has not looked.
+            </p>
+            <p className="mt-3 text-sm text-muted">
+              Search, then take the five that are genuinely close. What comes
+              back is what these two catalogues hold for those words, in their
+              order — the page does not rank them, because deciding which are
+              really like yours is a judgement it cannot make.
+            </p>
+          </section>
         )}
 
         {/* Said plainly rather than left as a short list. A writer who sees ten
@@ -199,7 +257,10 @@ export function CompsPage({ bookId }: { bookId: string }) {
             from={summary.pagesFrom}
             words={bookWordCount(book)}
             target={book.targetWords}
-            folklore={suggestTarget(book.kind ?? "novel", book.genre ?? "Other")}
+            folklore={suggestTarget(
+              book.kind ?? "novel",
+              book.genre ?? "Other",
+            )}
             onUseTarget={(words) => setTargetWords(book.id, words)}
           />
         )}
@@ -301,7 +362,9 @@ function LengthPanel({
   if (!range) {
     return (
       <section className="mt-4 rounded-xl border border-line bg-panel px-5 py-4">
-        <p className="text-sm font-bold text-fg">How long is a book like this?</p>
+        <p className="text-sm font-bold text-fg">
+          How long is a book like this?
+        </p>
         <p className="mt-1.5 text-sm text-muted">
           Not enough of these results carried a page count to say. Your setup
           suggests {folklore.toLocaleString()} words, which is the figure
@@ -339,8 +402,8 @@ function LengthPanel({
       </p>
 
       <p className="mt-3 text-sm text-muted">
-        The suggested target for this genre is {folklore.toLocaleString()} —
-        the number everybody repeats, from books nobody can name.
+        The suggested target for this genre is {folklore.toLocaleString()} — the
+        number everybody repeats, from books nobody can name.
         {target ? ` Yours is set to ${target.toLocaleString()}.` : ""}
       </p>
 
