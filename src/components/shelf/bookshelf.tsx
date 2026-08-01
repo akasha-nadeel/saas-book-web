@@ -116,14 +116,8 @@ const PLANNED: Record<string, [string, string][]> = {
   learn: [
     // The publishing roadmap and the beat sheets have moved out of this
     // list — both are built.
-    [
-      "Honest numbers",
-      "97% of books sell under 5,000 copies. Shown before you spend, not after.",
-    ],
-    [
-      "Before you pay",
-      "What to verify before hiring a publisher, a designer or a promotion service.",
-    ],
+    // Honest numbers and the before-you-pay checks have moved out of this
+    // list — both are built, on one "Before you spend" page.
     // Real length targets, the cover wall and the beat sheets have all moved
     // out of this list — they are built.
   ],
@@ -633,6 +627,7 @@ function Write({
                     <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
                     <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
                     <Chip href={`/book/${book.id}/progress`}>Progress</Chip>
+                    <Chip href={`/book/${book.id}/money`}>Money</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -773,7 +768,10 @@ function Learn({ books }: { books: Book[] }) {
           book. <strong className="text-fg">Structure</strong> — the shape most
           novels share, with your word count on it, for when the middle has run
           out of road. <strong className="text-fg">Prose</strong> — what is in a
-          chapter, counted. No score, and it never changes a word.
+          chapter, counted, with no score and no rewriting.{" "}
+          <strong className="text-fg">Progress</strong> — whether the writing is
+          moving. <strong className="text-fg">Before you spend</strong> — what a
+          book usually earns, and what to establish before paying anybody.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -791,6 +789,7 @@ function Learn({ books }: { books: Book[] }) {
                   <Go href={`/book/${b.id}/structure`}>Structure</Go>
                   <Go href={`/book/${b.id}/prose`}>Prose</Go>
                   <Go href={`/book/${b.id}/progress`}>Progress</Go>
+                  <Go href={`/book/${b.id}/money`}>Before you spend</Go>
                 </span>
               </li>
             ))}
@@ -798,9 +797,14 @@ function Learn({ books }: { books: Book[] }) {
         )}
       </Panel>
 
-      <Panel title="Coming to this area">
-        <PlannedGrid items={PLANNED.learn} />
-      </Panel>
+      {/* Only while there is something left to come. An empty "Coming to this
+          area" panel is a heading promising a list and then not having one,
+          which is the dead UI the house rule is about. */}
+      {PLANNED.learn.length > 0 && (
+        <Panel title="Coming to this area">
+          <PlannedGrid items={PLANNED.learn} />
+        </Panel>
+      )}
     </div>
   );
 }

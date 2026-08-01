@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Before you spend",
+        desc: "What a book usually earns, what covers, editing, promotion and courses cost, and what to establish before the money moves — plus how many copies a given spend has to sell to get back to nothing. Every figure says where it came from and how much weight it can carry. No company is named: the checks describe the shape of the thing, which is more use, because next year it will have a different name.",
+      },
+      {
         name: "Progress",
         desc: "Whether the writing is moving: days written in the last month, words on a day you write, and — if the book has a target — roughly when it finishes at that pace. Counted across every book, because the question is about you rather than one manuscript. A day of cutting counts as a day of writing, and nothing here is a target you have missed.",
       },

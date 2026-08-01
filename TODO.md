@@ -222,14 +222,27 @@ than replacing it.
 - [ ] **Categories and comp titles.** A real BISAC picker, replacing today's
       free-text field in `publishing.ts` — which is already noted further down
       this file as a gap.
-- [ ] **Honest numbers.** The real medians — 97% of books sell under 5,000
-      copies, most under 100 — shown *before* somebody spends a thousand pounds
-      on a cover. Content only, and it is the most on-brand thing on this list:
-      everyone else in this market sells hope.
-- [ ] **Before-you-pay checklist.** What to verify before hiring a publisher,
-      a cover designer or a promotion service. Content only. **Do not name
-      specific companies as scams**, however often they come up by name in the
-      research — that is a legal problem, not a feature.
+- [x] **Honest numbers and the before-you-pay checks.** Done 2026-08-01, as one
+      page — they are the same conversation. `/book/[bookId]/money`, backed by
+      `src/lib/money.ts` (9 tests): four figures about what a book usually
+      earns, five things writers pay for with the checks to make first, and a
+      break-even sum.
+
+      **Every figure carries its own provenance, and a test enforces it.** They
+      are directional — repeated across industry summaries and author posts
+      rather than audited — and a page presenting them as hard data would be
+      doing the exact thing it warns about. Writing it this way also caught the
+      landing page stating the 97% figure flat, which is now attributed too.
+
+      **No company is named, and a test enforces that as well.** Several come
+      up by name in the research; calling a named business a scam is a legal
+      matter rather than a feature, and it is unnecessary — the checks describe
+      the *shape* of the thing, which is more use anyway, because next year it
+      will have a different name. The one that matters most is the whole test
+      for a publisher: **if they ask you for money, they are not a publisher.**
+
+      Free, and the page says why that is unusual: everyone else in this market
+      is paid when a writer spends.
 
 ### Later
 

@@ -304,7 +304,12 @@ export function LandingPage() {
           <div className="grid gap-5 md:grid-cols-3">
             <Stat n="7 tools" s="A word processor, a converter site, an EPUB formatter, a validator, cloud storage, a spreadsheet. Most bill monthly." />
             <Stat n="£1,000+" s="Spent on covers and ads before anyone finds out whether the book had a chance." />
-            <Stat n="97%" s="Of books sell fewer than 5,000 copies. Most sell fewer than 100. You should know that before you spend." />
+            {/* Attributed rather than asserted. The figure is widely repeated
+                and rarely sourced — including by people selling courses — and
+                a page whose whole pitch is being checkable cannot state a
+                number it cannot check. The in-app version carries the same
+                caveat under every figure. */}
+            <Stat n="97%" s="The much-repeated share of books said to sell under 5,000 copies. Nobody publishes an audited figure — but no writer we found was told any number at all before they spent." />
           </div>
           <p className="mt-8 text-center text-lg">
             You learn ARC readers matter <em>after</em> you publish. You find out
