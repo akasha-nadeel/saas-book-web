@@ -38,13 +38,14 @@ import {
 } from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
 import {
+  isOverdue,
   parseArc,
   summarise as summariseArc,
   type ArcSummary,
 } from "@/lib/arc";
 import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
-import { progressOf, roadmapFor } from "@/lib/roadmap";
+import { PHASES, progressOf, roadmapFor } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
 import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
@@ -68,6 +69,12 @@ import {
  * and **Write is one of them**. The arrangement is the argument: a writer
  * opening this should see immediately that the app has an opinion about the
  * whole job, not just the manuscript.
+ *
+ * **Overview carries only what no other area answers.** It used to end with a
+ * grid of cards, one per area, which was four buttons duplicating four rail
+ * items that are on screen at the same time — and whose caption had already
+ * gone stale twice. Every block on it now answers a question nothing else does:
+ * where was I, what is actually late, and am I moving.
  *
  * There were six. **Learn is gone**: it had become a per-book list of roadmap
  * progress with a menu of four tools hanging off it, which is the roadmap page
@@ -518,10 +525,10 @@ export function Bookshelf({
           {area === "overview" && (
             <Overview
               current={current}
+              all={active}
               books={active.length}
               words={totals.words}
               chapters={totals.chapters}
-              onGo={setArea}
               onDetails={setEditing}
               onCover={setCovering}
             />
@@ -584,22 +591,53 @@ export function Bookshelf({
 
 function Overview({
   current,
+  all,
   books,
   words,
   chapters,
-  onGo,
   onDetails,
   onCover,
 }: {
   current: Book | null;
+  /** Every active book, for the things that are only true across the shelf. */
+  all: Book[];
   books: number;
   words: number;
   chapters: number;
-  onGo: (a: Area) => void;
   onDetails: (b: Book) => void;
   onCover: (b: Book) => void;
 }) {
   const activity = useActivity();
+
+  /**
+   * Advance readers whose date has gone, across every book.
+   *
+   * The one thing on this screen that is *urgent* rather than merely true. A
+   * date that has passed is unambiguous — no judgement, no threshold, nothing
+   * inferred — which is what makes it safe to raise here. Readiness problems
+   * are deliberately not raised: a writer on chapter three has no ISBN and
+   * that is not a problem, and a dashboard that says so every morning is the
+   * scold the research warned about.
+   *
+   * Read straight from the store rather than through `useArc`, because a hook
+   * cannot be called in a loop and there is one list per book. They are names
+   * and dates, so this is nothing like reading covers.
+   */
+  // Read once when the screen opens, not in the memo: `Date.now()` during
+  // render is a different answer every pass, so whether a reader is late would
+  // depend on which unrelated state change last re-rendered the dashboard.
+  // Once per visit is also the right cadence — lateness turns over at midnight.
+  const [now] = useState(() => Date.now());
+
+  const late = useMemo(() => {
+    return all
+      .map((book) => ({
+        book,
+        count: parseArc(getArcRaw(book.id)).filter((r) => isOverdue(r, now))
+          .length,
+      }))
+      .filter((row) => row.count > 0);
+  }, [all, now]);
 
   /**
    * Momentum, not totals.
@@ -634,12 +672,13 @@ function Overview({
    * checklist somebody has to maintain — it is the same answer the roadmap
    * page gives, surfaced where the writer already is.
    */
-  const next = useMemo(
-    () =>
-      current
-        ? progressOf(roadmapFor(current, current.roadmapDone ?? []))
-        : null,
+  const steps = useMemo(
+    () => (current ? roadmapFor(current, current.roadmapDone ?? []) : []),
     [current],
+  );
+  const next = useMemo(
+    () => (steps.length > 0 ? progressOf(steps) : null),
+    [steps],
   );
 
   return (
@@ -748,19 +787,53 @@ function Overview({
             </div>
           </div>
 
-          {/* The next step, on the rail of the card that asked "what now?".
-              It is the roadmap's own answer rather than a second opinion. */}
-          {next?.next && (
+          {/* Where this book is across the whole job, and the next thing to
+              do — both the roadmap's own answers rather than second opinions.
+
+              The phases are the point, and they are this product's argument
+              rendered: writing is one of five, and a writer who has finished
+              drafting can see they are a fifth of the way rather than done.
+              "2 of 18" said the same thing in a way nobody can picture. */}
+          {steps.length > 0 && (
             <Link
               href={`/book/${current.id}/roadmap`}
-              className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line
-                         bg-surface px-5 py-3 text-sm"
+              className="block border-t border-line bg-surface px-5 py-3.5"
             >
-              <span className="font-semibold text-accent">Next</span>
-              <span className="text-fg">{next.next.title}</span>
-              <span className="ml-auto text-xs text-muted">
-                {next.done} of {next.total} done
-              </span>
+              <div className="flex gap-1.5">
+                {PHASES.map((phase) => {
+                  const inPhase = steps.filter((st) => st.phase === phase.id);
+                  const done = inPhase.filter((st) => st.done).length;
+                  return (
+                    <div key={phase.id} className="min-w-0 flex-1">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-raised">
+                        <div
+                          className="h-full rounded-full bg-accent"
+                          style={{
+                            width: `${(done / inPhase.length) * 100}%`,
+                          }}
+                        />
+                      </div>
+                      <p className="mt-1.5 truncate text-[11px] text-muted">
+                        {phase.label}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {next?.next ? (
+                <p className="mt-2.5 flex flex-wrap items-center gap-x-2 text-sm">
+                  <span className="font-semibold text-accent">Next</span>
+                  <span className="text-fg">{next.next.title}</span>
+                  <span className="ml-auto text-xs text-muted">
+                    {next.done} of {next.total}
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-2.5 text-sm font-semibold text-fg">
+                  Every step done. That is the whole list.
+                </p>
+              )}
             </Link>
           )}
         </section>
@@ -785,6 +858,35 @@ function Overview({
               Import a file
             </Link>
           </div>
+        </section>
+      )}
+
+      {/* Nothing when nothing is late, which is most days. A panel that has
+          to explain that it is empty is a panel earning its place by being
+          there rather than by saying anything. */}
+      {late.length > 0 && (
+        <section className="rounded-2xl border border-amber-500/40 bg-amber-500/8 p-5">
+          <p className="font-bold text-fg">
+            {late.reduce((n, row) => n + row.count, 0)} advance{" "}
+            {late.reduce((n, row) => n + row.count, 0) === 1
+              ? "reader is"
+              : "readers are"}{" "}
+            past their date
+          </p>
+          <ul className="mt-2.5 flex flex-col gap-1.5">
+            {late.map(({ book, count }) => (
+              <li key={book.id}>
+                <Link
+                  href={`/book/${book.id}/arc`}
+                  className="flex flex-wrap items-center gap-x-2 text-sm"
+                >
+                  <span className="font-semibold text-fg">{book.title}</span>
+                  <span className="text-muted">{count} to chase</span>
+                  <span className="text-accent">→</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
@@ -849,37 +951,6 @@ function Overview({
           note={`${words.toLocaleString()} words · ${chapters} chapters`}
         />
       </div>
-
-      <section className="rounded-2xl border border-line bg-panel p-5">
-        <h2 className="font-bold text-fg">The rest of the job</h2>
-        {/* Was "Two work today; three are what we are building" — untrue since
-            the last five features shipped, and exactly the kind of stale claim
-            the house rules exist to catch. All five areas work. */}
-        <p className="mt-1 mb-4 text-muted">
-          Writing is one part. These are the others, and all five of them work
-          today.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {AREAS.filter((a) => a.id !== "overview").map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onGo(a.id)}
-              className="group rounded-xl border border-line bg-surface p-4 text-left
-                         transition-colors hover:border-accent/40"
-            >
-              <span className="flex items-center gap-2">
-                <span className="text-muted group-hover:text-accent">
-                  {a.icon}
-                </span>
-                <span className="font-bold text-fg">{a.label}</span>
-                {!a.live && <Badge>Planned</Badge>}
-              </span>
-              <span className="mt-1.5 block text-sm text-muted">{a.blurb}</span>
-            </button>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
