@@ -228,11 +228,22 @@ export function PublishingCheck() {
                     background: shown ? chip.bg : "#F3F5F9",
                   }}
                 >
-                  {shown ? chip.label : "—"}
+                  {/* "waiting" rather than an em dash. The dash was the
+                      conventional no-value glyph, but the page has had every
+                      dash taken out of its copy, and this is the state the
+                      server renders for all eight rows, so it is what a visitor
+                      sees for the moment before the reveal begins. */}
+                  {shown ? chip.label : "waiting"}
                 </span>
+                {/* Darker than the page's body grey, and deliberately so. The
+                    rows already sit inside a white card on a black band, which
+                    costs them contrast against everything around them, and this
+                    is the one place on the page where the *sentence* is the
+                    product rather than a caption under it. It stays short of
+                    full ink so the field name beside it still leads. */}
                 <span
-                  className="col-span-2 font-brand text-[15px] leading-[1.55] text-[#5A6170]
-                             transition-opacity duration-200 sm:col-span-1"
+                  className="col-span-2 font-brand text-[15px] leading-[1.55] font-medium
+                             text-[#39414D] transition-opacity duration-200 sm:col-span-1"
                   style={{ opacity: shown ? 1 : 0 }}
                 >
                   {note}

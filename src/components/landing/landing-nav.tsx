@@ -86,12 +86,13 @@ export function LandingNav() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-4 sm:gap-5">
+          {/* Ink as a class, not an inline style: inline wins over any class,
+              so `style={{ color: INK }}` here meant the hover never fired. */}
           <Link
             href="/signin"
-            className="font-brand text-[15px] font-medium outline-none transition-colors
-                       hover:text-[#1B63F5] focus-visible:ring-2
+            className="font-brand text-[15px] font-medium text-[#0E1116] outline-none
+                       transition-colors hover:text-[#1B63F5] focus-visible:ring-2
                        focus-visible:ring-[#1B63F5]/50"
-            style={{ color: INK }}
           >
             Log in
           </Link>
