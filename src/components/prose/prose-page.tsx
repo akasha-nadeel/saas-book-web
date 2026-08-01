@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { findBook, getBody, orderedChapters } from "@/lib/library-store";
 import { proseReport } from "@/lib/prose";
 import { chapterText } from "@/lib/search";
@@ -63,16 +64,12 @@ export function ProsePage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Prose report</h1>
-        <p className="mt-3 text-muted">
-          What is in the chapter, counted. Nothing here is a fault and nothing
-          here changes a word — the decisions are all yours.
-        </p>
+      <ToolHeader book={book} tool="Prose report">
+        What is in the chapter, counted. Nothing here is a fault and nothing
+        here changes a word — the decisions are all yours.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {chapters.length === 0 ? (
           <p className="mt-8 text-muted">
             Nothing written yet. There is nothing to count.
@@ -152,9 +149,9 @@ export function ProsePage({ bookId }: { bookId: string }) {
         <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
           There is no score here, and there will not be one. A number out of a
           hundred for prose is invented to look like an answer. Adverbs are not
-          a fault, filter words are not a fault, and a long sentence is a style —
-          these are things writers are widely advised about, and the only useful
-          service is showing you where yours are.
+          a fault, filter words are not a fault, and a long sentence is a style
+          — these are things writers are widely advised about, and the only
+          useful service is showing you where yours are.
         </p>
       </div>
     </div>

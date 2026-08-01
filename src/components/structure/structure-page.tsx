@@ -5,6 +5,7 @@ import { GENRE_NOTES, placeBeats, whereYouAre } from "@/lib/beats";
 import { suggestTarget } from "@/lib/book-kinds";
 import { bookWordCount, findBook, setTargetWords } from "@/lib/library-store";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -53,16 +54,12 @@ export function StructurePage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Structure</h1>
-        <p className="mt-3 text-muted">
-          The shape most novels share, in plain words, with your word count on
-          it. A convention, not a rule — good novels break every line below.
-        </p>
+      <ToolHeader book={book} tool="Structure">
+        The shape most novels share, in plain words, with your word count on it.
+        A convention, not a rule — good novels break every line below.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {!placements ? (
           <section className="mt-8 rounded-xl border border-line bg-panel p-5">
             <p className="font-bold text-fg">This book has no target length</p>

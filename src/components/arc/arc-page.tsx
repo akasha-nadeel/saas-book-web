@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import {
   fromDay,
   isOverdue,
@@ -123,16 +124,12 @@ export function ArcPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Advance copies</h1>
-        <p className="mt-3 text-muted">
-          Who has the book, who read it, and who is late. One list instead of
-          six sites and a spreadsheet.
-        </p>
+      <ToolHeader book={book} tool="Advance copies">
+        Who has the book, who read it, and who is late. One list instead of six
+        sites and a spreadsheet.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
@@ -348,9 +345,7 @@ function Row({
 
         <select
           value={reader.status}
-          onChange={(e) =>
-            onChange({ status: e.target.value as ArcStatus })
-          }
+          onChange={(e) => onChange({ status: e.target.value as ArcStatus })}
           className="rounded-lg border border-line bg-surface px-2.5 py-1.5 text-sm text-fg"
         >
           {STATUSES.map((s) => (
@@ -384,7 +379,8 @@ function Row({
 
         {late && (
           <span className="text-xs font-bold text-accent">
-            {Math.floor((now - (reader.dueAt as number)) / 86_400_000)} days late
+            {Math.floor((now - (reader.dueAt as number)) / 86_400_000)} days
+            late
           </span>
         )}
 

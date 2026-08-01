@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import {
   finishesOn,
   pace,
@@ -58,22 +59,16 @@ export function ProgressPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Progress</h1>
-        <p className="mt-3 text-muted">
-          Whether the writing is moving. Counted across every book, because the
-          question is about you rather than about one manuscript.
-        </p>
+      <ToolHeader book={book} tool="Progress">
+        Whether the writing is moving. Counted across every book, because the
+        question is about you rather than about one manuscript.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         <section className="mt-8 grid gap-3 sm:grid-cols-3">
           <Stat
             value={stats.streak === 0 ? "—" : String(stats.streak)}
-            label={
-              stats.streak === 1 ? "day in a row" : "days in a row"
-            }
+            label={stats.streak === 1 ? "day in a row" : "days in a row"}
           />
           <Stat
             value={`${stats.month.daysWritten}/${stats.month.windowDays}`}

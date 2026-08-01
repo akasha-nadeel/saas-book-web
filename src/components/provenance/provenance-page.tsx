@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { parseHistory } from "@/lib/history";
 import {
   findBook,
@@ -124,19 +125,15 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Writing record</h1>
-        <p className="mt-3 text-muted">
-          If someone accuses you of not having written your own book, there is
-          no test that settles it — and the detectors sold for the job are known
-          to misfire on plain prose and on writers whose first language is not
-          English. What people actually reach for is the trail the work left
-          while it was being done. This is yours, in a document you can send.
-        </p>
+      <ToolHeader book={book} tool="Writing record">
+        If someone accuses you of not having written your own book, there is no
+        test that settles it — and the detectors sold for the job are known to
+        misfire on plain prose and on writers whose first language is not
+        English. What people actually reach for is the trail the work left while
+        it was being done. This is yours, in a document you can send.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}

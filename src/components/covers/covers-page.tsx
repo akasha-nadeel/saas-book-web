@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BookCover } from "@/components/shelf/book-cover";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { buildQuery, coversOf, type CompTitle } from "@/lib/comps/comps";
 import { checkCover, contrastOf, type CoverFacts } from "@/lib/cover-check";
 import { bookWordCount, findBook } from "@/lib/library-store";
@@ -263,17 +264,13 @@ export function CoversPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-5xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Covers</h1>
-        <p className="mt-3 max-w-2xl text-muted">
-          Your cover, next to the shelf it has to sit on. We do not design
-          covers and we will not generate one — this is the thing you would do
-          yourself in a bookshop, if you had the afternoon.
-        </p>
+      <ToolHeader book={book} tool="Covers" width="5xl">
+        Your cover, next to the shelf it has to sit on. We do not design covers
+        and we will not generate one — this is the thing you would do yourself
+        in a bookshop, if you had the afternoon.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         <form
           className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {
@@ -324,8 +321,7 @@ export function CoversPage({ bookId }: { bookId: string }) {
                 ))}
               </div>
               <p className="text-sm text-muted">
-                {SIZES.find((s) => s.id === size)!.note} ·{" "}
-                {wall.length} covers
+                {SIZES.find((s) => s.id === size)!.note} · {wall.length} covers
               </p>
             </div>
 

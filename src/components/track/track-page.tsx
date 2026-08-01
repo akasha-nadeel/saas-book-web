@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import {
   copiesToLevel,
   guessColumns,
@@ -144,16 +145,12 @@ export function TrackPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Track</h1>
-        <p className="mt-3 text-muted">
-          What this book cost against what it earned. Nobody keeps this, which
-          is why the total is always a shock.
-        </p>
+      <ToolHeader book={book} tool="Track">
+        What this book cost against what it earned. Nobody keeps this, which is
+        why the total is always a shock.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
@@ -337,9 +334,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
         {/* ---- The lines ---------------------------------------------- */}
         {mine.length > 0 && (
           <>
-            <h2 className="mt-10 text-xl font-extrabold text-fg">
-              Every line
-            </h2>
+            <h2 className="mt-10 text-xl font-extrabold text-fg">Every line</h2>
             <ul className="mt-4 flex flex-col gap-2">
               {mine.map((entry) => (
                 <li

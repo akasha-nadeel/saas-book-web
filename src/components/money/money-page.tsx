@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { findBook } from "@/lib/library-store";
 import { copiesToBreakEven, REALITIES, SPENDS } from "@/lib/money";
 import { useHydrated, useShelf } from "@/lib/use-library";
@@ -54,19 +55,13 @@ export function MoneyPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">
-          Before you spend
-        </h1>
-        <p className="mt-3 text-muted">
-          What a book usually earns, what the things cost, and what to establish
-          before the money moves. Everyone else in this market is paid when you
-          spend; we are not, which is the only reason you are reading this.
-        </p>
+      <ToolHeader book={book} tool="Before you spend">
+        What a book usually earns, what the things cost, and what to establish
+        before the money moves. Everyone else in this market is paid when you
+        spend; we are not, which is the only reason you are reading this.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {/* ---- The numbers -------------------------------------------- */}
         <h2 className="mt-10 text-xl font-extrabold text-fg">
           What usually happens

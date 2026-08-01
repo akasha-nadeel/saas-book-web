@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import type { CompTitle } from "@/lib/comps/comps";
 import { findClashes, type TitleClash } from "@/lib/comps/title-check";
 import { findBook } from "@/lib/library-store";
@@ -87,19 +88,13 @@ export function TitleCheckPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">
-          Is this title taken?
-        </h1>
-        <p className="mt-3 text-muted">
-          Strictly, no title is taken — titles are not trademarks and cannot be
-          copyrighted. The useful question is whether somebody else&rsquo;s book
-          turns up first when a reader searches for yours.
-        </p>
+      <ToolHeader book={book} tool="Title check" title="Is this title taken?">
+        Strictly, no title is taken — titles are not trademarks and cannot be
+        copyrighted. The useful question is whether somebody else&rsquo;s book
+        turns up first when a reader searches for yours.
+      </ToolHeader>
 
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         <form
           className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {
