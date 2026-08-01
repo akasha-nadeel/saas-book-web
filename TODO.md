@@ -265,8 +265,38 @@ than replacing it.
 - [ ] **Cover checker.** Not a designer: is the title legible at thumbnail
       size, is the resolution enough, does it match the trim ratio. Honest,
       useful, and nobody offers it.
-- [ ] **Sprints, streaks and session history.** Supports finishing; does not
-      promise it.
+- [x] **Streaks, pace and a finish date.** Done 2026-08-01.
+      `/book/[bookId]/progress`, backed by `src/lib/activity.ts` (pure, 22
+      tests) and an `openchapter:activity` key — one number per day, so a year
+      is a few kilobytes.
+
+      Behind it is the largest and least tractable pain in the research: *"12
+      years to finish my novel"*, *"14 years"*. Nothing here fixes that. What it
+      does is make the question answerable — a writer with seventeen minutes a
+      day cannot tell from the inside whether they are getting anywhere, and
+      being unable to tell is its own discouragement.
+
+      **Facts, never verdicts.** "You wrote on 12 of the last 30 days" is a
+      fact; "you should write more" is a stick, and the people selling sticks
+      are pain point #17 in the same research. Three decisions follow from that:
+
+      - **Net words, not words typed.** Cutting 800 words is work, and a counter
+        that only went up would call that a wasted day.
+      - **Yesterday keeps a streak alive.** A writer who has not sat down *yet
+        today* has not broken anything, and a counter resetting at midnight
+        would tell them they had.
+      - **The finish date refuses to appear rather than say something cruel.**
+        No target, already there, a shrinking manuscript, or a date more than
+        two years out, and it says nothing. A projection off a revision reads as
+        "never" — true arithmetic, and a terrible thing to print at somebody in
+        the middle of a hard month.
+
+      Logged across the whole library rather than per book: the question is
+      about the writer, and somebody who spent March on book two did not have a
+      bad March.
+
+      *Left:* not synced, like the other own-key stores. Sprints — a timer for a
+      single sitting — are a different feature and not built.
 - [ ] **ARC tracker.** Who holds the ARC, who reviewed, when it is due. A
       tracker, not a marketplace — the distinction is the whole point.
 - [ ] **Writing provenance.** Evidence a human wrote the book, over time, built

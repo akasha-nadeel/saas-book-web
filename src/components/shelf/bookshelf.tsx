@@ -632,6 +632,7 @@ function Write({
                     <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
                     <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
                     <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
+                    <Chip href={`/book/${book.id}/progress`}>Progress</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -789,6 +790,7 @@ function Learn({ books }: { books: Book[] }) {
                   <Go href={`/book/${b.id}/roadmap`}>Roadmap</Go>
                   <Go href={`/book/${b.id}/structure`}>Structure</Go>
                   <Go href={`/book/${b.id}/prose`}>Prose</Go>
+                  <Go href={`/book/${b.id}/progress`}>Progress</Go>
                 </span>
               </li>
             ))}

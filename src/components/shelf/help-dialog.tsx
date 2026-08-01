@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Progress",
+        desc: "Whether the writing is moving: days written in the last month, words on a day you write, and — if the book has a target — roughly when it finishes at that pace. Counted across every book, because the question is about you rather than one manuscript. A day of cutting counts as a day of writing, and nothing here is a target you have missed.",
+      },
+      {
         name: "Prose report",
         desc: "What is in a chapter, counted: dialogue tags that are not “said”, words ending in -ly, filter words, runs of sentences that start the same way, and very long sentences. There is no score and it never changes a word — none of these is a fault, and the only useful service is showing you where yours are.",
       },

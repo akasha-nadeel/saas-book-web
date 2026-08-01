@@ -21,6 +21,11 @@
  */
 
 import type { BookKind } from "./book-kinds";
+import {
+  parseActivity,
+  record as recordActivity,
+  trim as trimActivity,
+} from "./activity";
 import { addSnapshot, parseHistory, shouldSnapshot } from "./history";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
@@ -1166,6 +1171,10 @@ export function saveBody(
   const current = book?.chapters.find((c) => c.id === chapterId);
   if (!current || current.words === words) return;
 
+  // The day's log, before the shelf is updated — `current.words` is still the
+  // previous count at this point, and the difference is the day's work.
+  rememberActivity(words - current.words);
+
   commitBook(bookId, (b) => ({
     ...b,
     chapters: b.chapters.map((c) => (c.id === chapterId ? { ...c, words } : c)),
@@ -1535,6 +1544,56 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 // unbounded text a writer types into, and putting them in the shelf would make
 // every keystroke rewrite the document the sidebar reads.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// The writing log
+//
+// A number per day and nothing else, at its own key — a year of it is a few
+// kilobytes. Deliberately *not* per book: it answers "am I writing", which is a
+// question about the writer rather than about any one manuscript, and a writer
+// who spent March on book two did not have a bad March.
+// ---------------------------------------------------------------------------
+
+const ACTIVITY_KEY = "openchapter:activity";
+const activityListeners = new Set<() => void>();
+
+export function subscribeToActivity(onStoreChange: () => void) {
+  activityListeners.add(onStoreChange);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === ACTIVITY_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    activityListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getActivityRaw(): string | null {
+  return readRaw(ACTIVITY_KEY);
+}
+
+export function getServerActivityRaw(): string | null {
+  return null;
+}
+
+/**
+ * Add a save's change to today's total. Never throws, for the reason a snapshot
+ * never throws: the manuscript is already saved, and a log is not worth a lost
+ * chapter.
+ */
+function rememberActivity(delta: number) {
+  if (delta === 0) return;
+  try {
+    const next = trimActivity(
+      recordActivity(parseActivity(getActivityRaw()), delta),
+    );
+    window.localStorage.setItem(ACTIVITY_KEY, JSON.stringify(next));
+    for (const listener of activityListeners) listener();
+  } catch {
+    // Deliberately silent, as above.
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Chapter history

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { parseActivity, type Activity } from "./activity";
 import { parseHistory, type Snapshot } from "./history";
 import { parseIdeas, type Idea } from "./ideas";
 import {
@@ -10,6 +11,9 @@ import {
   getServerCover,
   getServerBody,
   getServerBodyReload,
+  getActivityRaw,
+  getServerActivityRaw,
+  subscribeToActivity,
   getHistoryRaw,
   getServerHistoryRaw,
   subscribeToHistory,
@@ -101,6 +105,16 @@ export function useCover(bookId: string): string | null {
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */
 export function usePrefs(): Prefs {
   return useSyncExternalStore(subscribeToPrefs, getPrefs, getServerPrefs);
+}
+
+/** The writing log — net words per day, across the whole library. */
+export function useActivity(): Activity {
+  const raw = useSyncExternalStore(
+    subscribeToActivity,
+    getActivityRaw,
+    getServerActivityRaw,
+  );
+  return useMemo(() => parseActivity(raw), [raw]);
 }
 
 /**
