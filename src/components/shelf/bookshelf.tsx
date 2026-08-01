@@ -138,10 +138,7 @@ const PLANNED: Record<string, [string, string][]> = {
     // Tools area, which links to it per book.
     // Category suggestions has moved out of this list — it is built.
     // The title check has moved out of this list — it is built.
-    [
-      "Paperback setup",
-      "Spine width, margins, gutter and bleed, worked out instead of guessed at.",
-    ],
+    // Paperback setup has moved out of this list — it is built.
     ["ARC tracker", "Who holds it, who reviewed, when it is due."],
     [
       "Story bible",
@@ -631,6 +628,7 @@ function Write({
                     <Chip href={`/book/${book.id}/categories`}>Categories</Chip>
                     <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
                     <Chip href={`/book/${book.id}/title-check`}>Title</Chip>
+                    <Chip href={`/book/${book.id}/paperback`}>Paperback</Chip>
                     <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
                     <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
@@ -740,6 +738,7 @@ function Tools({ books }: { books: Book[] }) {
                   <Go href={`/book/${b.id}/categories`}>Categories</Go>
                   <Go href={`/book/${b.id}/covers`}>Covers</Go>
                   <Go href={`/book/${b.id}/title-check`}>Title</Go>
+                  <Go href={`/book/${b.id}/paperback`}>Paperback</Go>
                 </span>
               </li>
             ))}

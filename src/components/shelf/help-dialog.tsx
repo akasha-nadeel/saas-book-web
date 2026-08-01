@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Paperback setup",
+        desc: "Spine width, inside margin and the full cover wrap, worked out from your page count and trim size — four numbers that all depend on the page count, which is why setting a paperback up takes people an evening. Type in the page count from your exported PDF; an estimate from your word count stands in until you have one. These are Amazon KDP's published figures and they do not replace the shop's own template.",
+      },
+      {
         name: "Structure",
         desc: "The shape most novels share, in plain words, with your own word count placed on it — for when the middle has run out of road. It needs a target length, because every position is a share of a finished book, and it will not guess one. A convention, not a rule.",
       },

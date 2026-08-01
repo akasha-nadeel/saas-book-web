@@ -194,10 +194,31 @@ than replacing it.
       Blurbs come from Google Books only; Open Library's search results carry
       none. When Google is rate-limited that half of the screen is empty and
       says why, rather than implying the genre has no blurbs in it.
-- [ ] **Paperback setup.** Spine width (page count × paper thickness), margins,
-      gutter, bleed. *"I'm just cursed when it comes to setting up paperbacks —
-      it always takes ten times as long as it should."* Extends `page-setup.ts`,
-      and it is the kind of arithmetic nobody else bothers to do properly.
+- [x] **Paperback setup.** Done 2026-08-01. `/book/[bookId]/paperback`, backed
+      by `src/lib/paperback.ts` (pure, 13 tests). Spine width, inside margin,
+      and the full cover wrap in inches and millimetres.
+
+      *"I'm just cursed when it comes to setting up paperbacks — it always takes
+      ten times as long as it should."* It takes ten times as long because four
+      numbers all depend on the page count and the page count is the last thing
+      a writer learns. None of it is hard; all of it is fiddly, and one wrong
+      figure means a rejected upload or a title printed off the spine.
+
+      **The page count is an input with an estimate offered**, because the real
+      figure comes out of the exported PDF — it depends on trim, type size,
+      leading and where every chapter breaks. The estimate rounds up to an even
+      number, since a leaf has two sides.
+
+      **Every constant is a published KDP figure held in a named constant**, so
+      when a shop changes one there is a single line to change and a test that
+      fails. The gutter table is the part writers most often leave at a default
+      and most often regret: a thick book does not open flat, and text near the
+      spine curves out of sight.
+
+      **It says twice that it does not replace the shop's template.** A
+      printer's file is the one place where approximately right is worth
+      nothing. This is for knowing the numbers before you get there, and for
+      checking that the template you were sent is the one you asked for.
 - [ ] **Categories and comp titles.** A real BISAC picker, replacing today's
       free-text field in `publishing.ts` — which is already noted further down
       this file as a gap.
