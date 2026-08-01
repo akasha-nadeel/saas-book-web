@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { mentionedIn } from "@/lib/bible";
 import { lastParagraph, noteHint, tail } from "@/lib/resume";
+import { chapterText } from "@/lib/search";
 import { orderedChapters, type Book } from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
-import { useChapterBody, useNotes } from "@/lib/use-library";
+import { useBible, useChapterBody, useNotes } from "@/lib/use-library";
 
 /**
  * Where you left off.
@@ -15,14 +17,18 @@ import { useChapterBody, useNotes } from "@/lib/use-library";
  * remembering, not writing**, and nothing on the market addresses it because
  * every writing app is built for somebody with two clear hours.
  *
- * So the card shows the last paragraph of the chapter they were in, and the
- * first line of the note they left themselves, before they have to go looking
- * for either.
+ * So the card shows three things before the writer has to go looking for any of
+ * them: the last paragraph of the chapter they were in, the first line of the
+ * note they left themselves, and who is in the scene.
  *
- * **Nothing here is new data.** The paragraph is read back out of the
- * manuscript and the note is the chapter notes panel that already exists — the
- * feature is entirely in putting the two on the screen a writer lands on,
- * rather than three clicks away from it.
+ * **None of it is new data.** The paragraph is read back out of the manuscript,
+ * the note is the chapter notes panel, and the names come from the story bible
+ * — the feature is entirely in putting the three on the screen a writer lands
+ * on rather than three clicks away from it.
+ *
+ * The names waited for the bible to exist and are silent without one. A writer
+ * who has not made a bible does not need telling what they are missing every
+ * time they open a book.
  */
 export function ResumeCard({ book }: { book: Book }) {
   /**
@@ -44,11 +50,13 @@ export function ResumeCard({ book }: { book: Book }) {
 
   const body = useChapterBody(chapter?.id ?? "");
   const notes = useNotes(chapter?.id ?? "");
+  const bible = useBible(book.id);
 
   if (!chapter) return null;
 
   const paragraph = lastParagraph(body);
   const hint = noteHint(notes);
+  const who = mentionedIn(chapterText("", body), bible);
 
   // Nothing to show but a link back. A chapter with a word count and no
   // readable body means the body is on another machine and has not synced yet.
@@ -77,6 +85,18 @@ export function ResumeCard({ book }: { book: Book }) {
       {hint && (
         <p className="mt-3 rounded-lg bg-raised px-3 py-2 text-sm text-muted">
           <span className="font-semibold text-fg">Your note:</span> {hint}
+        </p>
+      )}
+
+      {/* Who is in the scene — the third thing this card was always meant to
+          show, and the one that had to wait for the story bible to exist.
+          Silent when the bible is empty rather than explaining itself: a writer
+          who has not made one does not need to be told what they are missing
+          every time they open a book. */}
+      {who.length > 0 && (
+        <p className="mt-2 text-sm text-muted">
+          <span className="font-semibold text-fg">In this chapter:</span>{" "}
+          {who.slice(0, 6).map((m) => m.entry.name).join(", ")}
         </p>
       )}
 

@@ -122,10 +122,8 @@ const PLANNED: Record<string, [string, string][]> = {
     // The title check has moved out of this list — it is built.
     // Paperback setup has moved out of this list — it is built.
     ["ARC tracker", "Who holds it, who reviewed, when it is due."],
-    [
-      "Story bible",
-      "Characters, places and timeline — across a series, not one book. The assistant reads the chapters and fills it in; it still cannot write into them.",
-    ],
+    // The story bible has moved out of this list — it is built, in the
+    // editor's Story bible tab. Series-wide and AI-filled are still to come.
     // Version history has moved out of this list — it is built, in the
     // editor's Versions tab.
     [

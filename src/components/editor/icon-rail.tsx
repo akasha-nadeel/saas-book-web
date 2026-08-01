@@ -126,6 +126,13 @@ export const icons = {
       <path d="M10 6.6V10l2.4 1.4" />
     </>
   ),
+  /** An open book with a bookmark, for the story bible. */
+  bible: (
+    <>
+      <path d="M3.2 4.6h4.4a2.4 2.4 0 0 1 2.4 2.4v9.2a1.8 1.8 0 0 0-1.8-1.8H3.2Z" />
+      <path d="M16.8 4.6h-4.4A2.4 2.4 0 0 0 10 7v9.2a1.8 1.8 0 0 1 1.8-1.8h5Z" />
+    </>
+  ),
   /** A lamp, for the idea parking lot. One shape, one viewBox, round caps. */
   ideas: (
     <>

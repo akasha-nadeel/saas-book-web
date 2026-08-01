@@ -191,8 +191,37 @@ than replacing it.
 
       *Left:* `book-templates.ts` is still unused — chapter skeletons are a
       different idea from beats, and it stays held back for its own reasons.
-- [ ] **Story bible.** Characters, places, timeline — and **across a series**,
-      not one book, which is how it was asked for. Extends the notes panel.
+- [x] **Story bible.** Done 2026-08-01. A tab in the editor rail beside Ideas,
+      backed by `src/lib/bible.ts` (pure, 15 tests) and one
+      `openchapter:bible:<bookId>` key per book. People, places, things and
+      notes, each with the aliases it answers to.
+
+      **The lookup is the feature, not the list.** Anyone can keep a file of
+      names and nobody keeps it current; what a file cannot do is say who is in
+      the chapter you have open. That is a search over what is already written,
+      so it is right whether or not the bible has been maintained — which is why
+      the panel opens with it.
+
+      **Whole-word matching is the whole difficulty.** A character called Ash
+      must not match "ashes", "cashew" or "Ashton", a two-word name is matched
+      as a phrase so "Mrs Danvers" does not count every "Danvers", and an alias
+      sitting inside a longer name is not counted twice. A plain `includes`
+      turns the feature into noise the first time somebody names a character Sam
+      and writes "same".
+
+      Aliases are the point rather than a nicety: a character who is Elizabeth
+      to the narrator and Lizzie to her brother is one person, and a lookup that
+      missed the second would be worse than no lookup.
+
+      **This also completed the resume card**, which was built with a "who is in
+      the scene" line noted as waiting for exactly this. It is silent when the
+      bible is empty — a writer who has not made one does not need telling what
+      they are missing every time they open a book.
+
+      *Left:* **across a series**, which is how it was asked for. The shape here
+      would carry, but a series needs a notion of series the store does not
+      have. And the assistant filling it in by reading chapters, which is the
+      "AI reads, never writes" job.
 - [x] **Blurb workshop.** Done 2026-08-01. `/book/[bookId]/blurb`, backed by
       `src/lib/blurb.ts` (pure, 25 tests). Explicitly *not* "AI writes your
       blurb": writers in this research describe an AI-written blurb as the thing

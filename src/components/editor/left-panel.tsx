@@ -4,6 +4,7 @@ import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
 import { HistoryPanel } from "@/components/editor/history-panel";
+import { BiblePanel } from "@/components/editor/bible-panel";
 import { IdeasPanel } from "@/components/editor/ideas-panel";
 import { NotesPanel } from "@/components/editor/notes-panel";
 import { TrashPanel } from "@/components/editor/trash-panel";
@@ -22,6 +23,7 @@ export type PanelTab =
   | "search"
   | "notes"
   | "ideas"
+  | "bible"
   | "bookmarks"
   | "assistant"
   | "history"
@@ -65,6 +67,7 @@ export function LeftPanel({
       {tab === "search" && <SearchPanel bookId={bookId} />}
       {tab === "notes" && <NotesPanel key={chapterId} chapterId={chapterId} />}
       {tab === "ideas" && <IdeasPanel bookId={bookId} />}
+      {tab === "bible" && <BiblePanel bookId={bookId} chapterId={chapterId} />}
       {tab === "bookmarks" && <BookmarksPanel bookId={bookId} />}
       {tab === "history" && (
         <HistoryPanel key={chapterId} bookId={bookId} chapterId={chapterId} />

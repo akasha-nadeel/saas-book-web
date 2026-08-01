@@ -1546,6 +1546,49 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// The story bible
+//
+// One key per book, like covers: it belongs to a book rather than to the
+// library, and it is unbounded text that must not ride along in a shelf write.
+// ---------------------------------------------------------------------------
+
+const BIBLE_PREFIX = "openchapter:bible:";
+const bibleKey = (bookId: string) => `${BIBLE_PREFIX}${bookId}`;
+const bibleListeners = new Set<() => void>();
+
+export function subscribeToBible(bookId: string, onStoreChange: () => void) {
+  bibleListeners.add(onStoreChange);
+  const key = bibleKey(bookId);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    bibleListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getBibleRaw(bookId: string): string | null {
+  return readRaw(bibleKey(bookId));
+}
+
+export function getServerBibleRaw(): string | null {
+  return null;
+}
+
+/**
+ * Write a book's bible back.
+ *
+ * Not swallowed on failure, for the same reason the ledger is not: this is what
+ * the writer typed, rather than something the app worked out for itself.
+ */
+export function saveBibleRaw(bookId: string, json: string) {
+  window.localStorage.setItem(bibleKey(bookId), json);
+  for (const listener of bibleListeners) listener();
+}
+
+// ---------------------------------------------------------------------------
 // The ledger — what each book cost against what it earned
 //
 // One key for the library rather than one per book: the rows are small, a

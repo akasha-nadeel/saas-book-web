@@ -35,6 +35,12 @@ const TABS = [
   // Beside Notes, because it is the same gesture aimed elsewhere: notes are
   // about this book, ideas are the ones that are not.
   ["ideas", "Ideas", icons.ideas],
+  // Beside Ideas: both are things a writer keeps *about* the book rather than
+  // in it, and both are wanted mid-sentence.
+  ["bible", "Story bible", icons.bible],
+  // Beside Ideas: both are things a writer keeps *about* the book rather than
+  // in it, and both are wanted mid-sentence.
+  ["bible", "Story bible", icons.bible],
   ["bookmarks", "Bookmarks", icons.bookmarks],
   ["assistant", "Assistant", icons.assistant],
   ["history", "Versions", icons.history],

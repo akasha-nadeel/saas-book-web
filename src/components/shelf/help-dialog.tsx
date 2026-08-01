@@ -146,6 +146,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "A version of the open chapter is kept about every ten minutes you are editing, and the last eight are kept — so a bad afternoon is not permanent. The panel also counts how many sittings the chapter has had. It is a safety net rather than an archive: it can give you this chapter as it was before lunch, not as it was last March.",
       },
       {
+        name: "Story bible",
+        desc: "People, places and things, kept beside the manuscript — with the aliases each answers to, so a character who is Elizabeth to the narrator and Lizzie to her brother is one person. The panel opens with who is in the chapter you have open, which is a search over what you have written rather than something you have to keep current. Per book for now; a series bible is still to come.",
+      },
+      {
         name: "Ideas",
         desc: "Park the idea that is not this book, without leaving the chapter you are in. Ideas are not books — they sit here costing nothing until you decide one is real, and Start a book turns it into one.",
       },
