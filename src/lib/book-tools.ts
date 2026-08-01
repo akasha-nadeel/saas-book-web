@@ -23,32 +23,54 @@ export interface BookTool {
   name: string;
   /** What it does, in the writer's terms rather than the roadmap's. */
   what: string;
+  /**
+   * Which glyph to draw. A name rather than the drawing itself, so this file
+   * stays free of JSX and can be read as a list of what the product does —
+   * `tool-grid.tsx` holds the paths.
+   */
+  icon: string;
 }
+
+/** The four hues, one per group. See `tool-grid.tsx` for what they are. */
+export type ToolTone = "blue" | "violet" | "emerald" | "amber";
 
 export interface ToolGroup {
   title: string;
   /** The one thing worth knowing about the whole group. */
   note: string;
+  /**
+   * The group's colour, carried by every card in it.
+   *
+   * Colour is the grouping, doing the work the headings were doing alone: at
+   * fifteen cards the eye finds the block it wants by hue long before it reads
+   * a word. It is never the *only* signal — each group keeps its heading, so a
+   * reader who cannot tell the hues apart loses nothing.
+   */
+  tone: ToolTone;
   tools: BookTool[];
 }
 
 export const TOOL_GROUPS: ToolGroup[] = [
   {
     title: "Get it out",
+    tone: "blue",
     note: "The parts a shop sees.",
     tools: [
       {
         path: "export",
+        icon: "package",
         name: "Export and publish",
         what: "EPUB, DOCX, Markdown and a print PDF — and what a shop would refuse before you upload it.",
       },
       {
         path: "roadmap",
+        icon: "compass",
         name: "What to do next",
         what: "Every step in the order it happens. Most of it ticks itself from what is already in the book.",
       },
       {
         path: "paperback",
+        icon: "ruler",
         name: "Paperback setup",
         what: "Trim size, margins and the spine width for the page count you actually have.",
       },
@@ -56,30 +78,36 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     title: "Find your shelf",
+    tone: "violet",
     note: "Read from Google Books and Open Library. Nothing you have written is sent.",
     tools: [
       {
         path: "comps",
+        icon: "shelf",
         name: "Comp titles",
         what: "The published books yours sits beside, which every listing form and query letter asks for.",
       },
       {
         path: "blurb",
+        icon: "quote",
         name: "Blurb",
         what: "Counted against the shops’ limits, and shown real blurbs from books like yours.",
       },
       {
         path: "categories",
+        icon: "tag",
         name: "Categories",
         what: "Which shelf you land on, worked out from where comparable books are filed.",
       },
       {
         path: "covers",
+        icon: "image",
         name: "Covers",
         what: "Yours at thumbnail size beside the shelf it competes on, and a check on the file itself.",
       },
       {
         path: "title-check",
+        icon: "search",
         name: "Title check",
         what: "Whether somebody else’s book turns up first when a reader searches for yours.",
       },
@@ -87,25 +115,30 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     title: "The writing",
+    tone: "emerald",
     note: "About the manuscript rather than the listing.",
     tools: [
       {
         path: "structure",
+        icon: "arc",
         name: "Structure",
         what: "The shape most novels share, with your word count placed on it. A convention, not a rule.",
       },
       {
         path: "prose",
+        icon: "lines",
         name: "Prose report",
         what: "What is in a chapter, counted. No score, and it never changes a word.",
       },
       {
         path: "progress",
+        icon: "trend",
         name: "Progress",
         what: "Whether the writing is moving, and roughly when it finishes at this pace.",
       },
       {
         path: "provenance",
+        icon: "shield",
         name: "Writing record",
         what: "The trail the work left, in a document you can send if you are ever accused.",
       },
@@ -113,20 +146,24 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     title: "Money and reviews",
+    tone: "amber",
     note: "What happens once it is out.",
     tools: [
       {
         path: "money",
+        icon: "wallet",
         name: "Before you spend",
         what: "What covers, editing and promotion cost, and what to establish before the money moves.",
       },
       {
         path: "track",
+        icon: "coins",
         name: "Track",
         what: "What this book cost against what it earned, and how many copies get you level.",
       },
       {
         path: "arc",
+        icon: "send",
         name: "Advance copies",
         what: "Who holds one, who reviewed, and who is late. One list instead of six sites.",
       },
