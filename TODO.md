@@ -298,9 +298,25 @@ than replacing it.
       and not a regular expression's.
 - [ ] **"Why isn't it selling" diagnostic.** A structured self-audit — cover,
       blurb, categories, price, sample. Extends `storeReadiness()`.
-- [ ] **Cover checker.** Not a designer: is the title legible at thumbnail
-      size, is the resolution enough, does it match the trim ratio. Honest,
-      useful, and nobody offers it.
+- [x] **Cover checker.** Done 2026-08-01, on the covers page under the wall,
+      backed by `src/lib/cover-check.ts` (pure, 14 tests). Dimensions, shape,
+      file weight and overall contrast, measured in the browser and never
+      uploaded.
+
+      **Only two things are called problems** — under the minimum size, and over
+      the file limit — because those are the two a shop actually refuses.
+      Everything else is a note, including the shape: an unusual ratio is not
+      rejected, it is letterboxed, so the cover appears smaller than its
+      neighbours in a list, which is worth knowing and is not an error.
+
+      **It checks the file the writer is about to upload, not the copy this app
+      stores**, and says so. Ours is compressed to fit a 250KB cap and would
+      fail a size check it was never meant to pass; a checker quietly measuring
+      the wrong file would be worse than none.
+
+      The two questions that actually decide a cover — is the title readable at
+      60px, does it look like its genre — are **not** attempted. Neither is
+      measurable, and both are answered by the wall directly above it.
 - [x] **Streaks, pace and a finish date.** Done 2026-08-01.
       `/book/[bookId]/progress`, backed by `src/lib/activity.ts` (pure, 22
       tests) and an `openchapter:activity` key — one number per day, so a year

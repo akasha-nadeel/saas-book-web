@@ -5,32 +5,191 @@ import Link from "next/link";
 import { BookCover } from "@/components/shelf/book-cover";
 import { LoadingScreen } from "@/components/loading-screen";
 import { buildQuery, coversOf, type CompTitle } from "@/lib/comps/comps";
+import { checkCover, contrastOf, type CoverFacts } from "@/lib/cover-check";
 import { bookWordCount, findBook } from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 /**
- * The cover wall: a writer's cover beside the shelf it has to sit on.
+ * Covers, in the only two ways we can honestly help with one.
  *
- * Covers are the loudest pain in the research — a bad one sinks a good book,
- * and a good one costs a thousand pounds. We cannot design covers, and the
- * cheap way to would be generative, which this product has said in public it
- * will not do. What is left is the thing a writer would do themselves if they
- * had a bookshop and an afternoon: stand your cover next to twenty others in
- * the same genre and see whether it belongs.
+ * Covers are the loudest sales pain in the research — a bad one sinks a good
+ * book, and a good one costs a thousand pounds. We cannot design covers, and
+ * the cheap way to would be generative, which this product has said in public
+ * it will not do. So this module is the two things that are left, and they
+ * divide cleanly:
  *
- * **The size control is the feature, not a convenience.** Nobody buys a book at
- * the size a cover is designed at. They see it sixty pixels wide in a search
- * result, next to nine others, and decide in about a second — so the wall opens
- * at thumbnail size, which is the honest test, and the larger sizes are there
- * for looking at afterwards. A cover whose title cannot be read at 60px has a
- * problem that no amount of admiring it at full size will reveal.
+ * - **`CoversPage`, the wall.** The writer's cover beside twenty others in the
+ *   same genre — what they would do themselves given a bookshop and an
+ *   afternoon. The size control is the feature rather than a convenience:
+ *   nobody buys a book at the size a cover is designed at, they see it sixty
+ *   pixels wide next to nine others and decide in about a second, so the wall
+ *   opens at thumbnail. A cover whose title cannot be read at 60px has a
+ *   problem no amount of admiring it at full size will reveal.
  *
- * **Nothing here is scored.** No palette analysis, no "your cover is 34% less
- * saturated than your genre" — partly because reading pixels off another
- * origin's image needs CORS headers neither service reliably sends, and mostly
- * because it would be a number invented to look like an answer. The writer
- * looks. Looking is the skill being lent.
+ * - **`CoverChecker`, the file.** Whether a shop will refuse it: dimensions,
+ *   shape, weight, contrast. Mechanical, and that is the whole list.
+ *
+ * **Neither half scores anything.** No palette analysis, no "34% less saturated
+ * than your genre" — partly because reading pixels off another origin's image
+ * needs CORS headers neither catalogue reliably sends, and mostly because it
+ * would be a number invented to look like an answer. The two things that
+ * actually decide a cover — is the title readable small, does it look like its
+ * genre — are answered by looking. Looking is the skill being lent.
  */
+
+/**
+ * The other half: whether the *file* will be refused.
+ *
+ * Checks the artwork the writer is about to upload, not the copy this app
+ * stores — that one is compressed to fit a 250KB cap and would fail a size
+ * check it was never meant to pass. Saying so matters: a checker quietly
+ * measuring the wrong file is worse than none.
+ *
+ * Everything happens in the browser. The image is read into a canvas to measure
+ * contrast and then discarded; nothing is uploaded, which is both the honest
+ * default and the only one consistent with the rest of the page.
+ */
+function CoverChecker() {
+  const [facts, setFacts] = useState<CoverFacts | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function read(file: File) {
+    setError(null);
+    const url = URL.createObjectURL(file);
+    try {
+      const image = new Image();
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("not an image"));
+        image.src = url;
+      });
+
+      // Contrast is measured on a small copy: a 2560px cover is six million
+      // pixels and the answer does not change past a few thousand.
+      let contrast: number | undefined;
+      const canvas = document.createElement("canvas");
+      canvas.width = 120;
+      canvas.height = Math.max(
+        1,
+        Math.round((image.naturalHeight / image.naturalWidth) * 120),
+      );
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (context) {
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        try {
+          contrast = contrastOf(
+            context.getImageData(0, 0, canvas.width, canvas.height).data,
+            4,
+          );
+        } catch {
+          // A tainted canvas cannot be read. Every other check still works, so
+          // the contrast note is simply absent rather than the whole thing
+          // failing.
+        }
+      }
+
+      setFacts({
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        bytes: file.size,
+        ...(contrast !== undefined ? { contrast } : {}),
+      });
+      setPreview(url);
+    } catch {
+      URL.revokeObjectURL(url);
+      setError("That file could not be read as an image.");
+      setFacts(null);
+      setPreview(null);
+    }
+  }
+
+  const findings = facts ? checkCover(facts) : [];
+
+  return (
+    <section className="mt-12 border-t border-line pt-8">
+      <h2 className="text-xl font-extrabold text-fg">Check the file</h2>
+      <p className="mt-2 max-w-2xl text-muted">
+        Drop in the artwork you are about to upload and this will say whether a
+        shop refuses it. Check the real file, not the copy stored here — this
+        app compresses covers to fit in your browser, so its version would fail
+        a size check it was never meant to pass.
+      </p>
+
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void read(file);
+        }}
+        className="mt-4 text-sm text-fg"
+      />
+
+      {error && <p className="mt-4 text-sm text-fg">{error}</p>}
+
+      {facts && (
+        <div className="mt-6 flex flex-wrap gap-6">
+          {preview && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={preview}
+              alt=""
+              className="h-[120px] w-[80px] shrink-0 rounded object-cover shadow-sm"
+            />
+          )}
+          <div className="min-w-[16rem] flex-1">
+            <p className="text-sm text-muted">
+              {facts.width.toLocaleString()} × {facts.height.toLocaleString()}{" "}
+              pixels · {(facts.bytes / 1024).toFixed(0)}KB ·{" "}
+              {(facts.height / facts.width).toFixed(2)}:1
+            </p>
+
+            {findings.length === 0 ? (
+              <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
+                Nothing a shop would refuse, and nothing worth flagging. That is
+                the file checked — whether the cover works is the wall above.
+              </p>
+            ) : (
+              <ul className="mt-3 flex flex-col gap-2">
+                {findings.map((finding) => (
+                  <li
+                    key={finding.id}
+                    className="rounded-lg border border-line bg-panel p-4"
+                  >
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
+                          finding.level === "problem"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-raised text-muted"
+                        }`}
+                      >
+                        {finding.level === "problem" ? "problem" : "note"}
+                      </span>
+                      <span className="font-bold text-fg">{finding.label}</span>
+                    </span>
+                    <p className="mt-1.5 text-sm text-muted">
+                      {finding.detail}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="mt-4 text-xs text-muted">
+              Measured in your browser; the file is never uploaded. These are
+              Amazon KDP&rsquo;s published figures and do not replace the
+              shop&rsquo;s own check. Two things decide a cover and neither can
+              be measured: whether the title is readable at 60px, and whether it
+              looks like its genre. Both are up there on the wall.
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 /** Thumbnail first: it is the size the decision is actually made at. */
 const SIZES = [
@@ -223,11 +382,13 @@ export function CoversPage({ bookId }: { bookId: string }) {
           </p>
         )}
 
+        <CoverChecker />
+
         <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
           Covers are shown from Google Books and Open Library, at the size a
-          reader meets them. Nothing here is scored or measured — a number
-          comparing your cover to a genre would be invented to look like an
-          answer. Look at the wall, then look at yours.
+          reader meets them. The wall is not scored — a number comparing your
+          cover to a genre would be invented to look like an answer. Look at the
+          wall, then look at yours.
         </p>
       </div>
     </div>

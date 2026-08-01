@@ -112,10 +112,8 @@ const PLANNED: Record<string, [string, string][]> = {
     // out of this list — they are built.
   ],
   tools: [
-    [
-      "Cover checker",
-      "The wall shows you the shelf; this would check the file — resolution, trim ratio, and whether the title survives being shrunk.",
-    ],
+    // The cover checker has moved out of this list — it is built, on the
+    // covers page under the wall.
     // Comp titles has moved out of this list — it is built. See the Tools area
     // below, which now lists it as working and links to it per book.
     // The blurb workshop has moved out of this list — it is built. See the
@@ -704,7 +702,7 @@ function Tools({ books }: { books: Book[] }) {
           yours. <strong className="text-fg">Categories</strong> — which shelf
           you land on, from where comparable books are actually filed.{" "}
           <strong className="text-fg">Covers</strong> — yours at thumbnail size,
-          beside the shelf it has to sit on. <strong className="text-fg">Title</strong>{" "}
+          beside the shelf it has to sit on, and a check on the file a shop will receive. <strong className="text-fg">Title</strong>{" "}
           — whether somebody else&rsquo;s book turns up first when a reader
           searches for yours. All five read Google Books and Open Library, free,
           and none of them sends anything you have written.

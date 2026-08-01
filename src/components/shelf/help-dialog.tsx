@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Cover checker",
+        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Check the real file rather than the copy stored here, which is compressed to fit in your browser. Measured in your browser and never uploaded. Whether the cover is any good is the wall's job, not a number's.",
+      },
+      {
         name: "Track",
         desc: "What a book cost against what it earned. Add what you spent on covers, editing and ads, then import a sales report as CSV — you say which column is which, so it works whatever the shop calls things. It tells you how many more copies get you level, using the per-copy figure your own rows show rather than a royalty rate we made up. Amazon has no public API, so nothing is fetched and nothing is sent.",
       },
