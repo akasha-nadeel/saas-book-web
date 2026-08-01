@@ -1526,6 +1526,52 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 // every keystroke rewrite the document the sidebar reads.
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// The idea parking lot
+//
+// At its own key, and *not* on the shelf: ideas are unbounded text with no book
+// attached, and they belong to the writer rather than to any one manuscript —
+// the whole point is that they are the ideas which are not the book being
+// written. See lib/ideas.ts for the shape and why they are parked rather than
+// started.
+//
+// Local fan-out is manual, as the shelf's is: a writer capturing an idea in the
+// editor should see the count change in the same tab, not only in the next one.
+// ---------------------------------------------------------------------------
+
+const IDEAS_KEY = "openchapter:ideas";
+const ideaListeners = new Set<() => void>();
+
+export function subscribeToIdeas(onStoreChange: () => void) {
+  ideaListeners.add(onStoreChange);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === IDEAS_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    ideaListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getIdeasRaw(): string | null {
+  return readRaw(IDEAS_KEY);
+}
+
+export function getServerIdeasRaw(): string | null {
+  return null;
+}
+
+export function saveIdeasRaw(json: string) {
+  try {
+    window.localStorage.setItem(IDEAS_KEY, json);
+  } catch (err) {
+    console.error("[store] could not write ideas", err);
+    return;
+  }
+  for (const listener of ideaListeners) listener();
+}
+
 export function subscribeToNotes(id: string, onStoreChange: () => void) {
   const key = notesKey(id);
   const onStorage = (event: StorageEvent) => {

@@ -118,6 +118,13 @@ export function Rail({
  * sets its own would break step with the rest.
  */
 export const icons = {
+  /** A lamp, for the idea parking lot. One shape, one viewBox, round caps. */
+  ideas: (
+    <>
+      <path d="M10 2.9a4.7 4.7 0 0 0-2.8 8.5c.5.4.8 1 .8 1.6v.6h4v-.6c0-.6.3-1.2.8-1.6A4.7 4.7 0 0 0 10 2.9Z" />
+      <path d="M8.4 16.1h3.2M8.9 17.7h2.2" />
+    </>
+  ),
   home: (
     <>
       <path d="M2.8 8.4 10 2.8l7.2 5.6v7.1a1.4 1.4 0 0 1-1.4 1.4H4.2a1.4 1.4 0 0 1-1.4-1.4z" />

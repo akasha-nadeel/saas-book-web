@@ -32,6 +32,9 @@ const TABS = [
   ["chapters", "Manuscript", icons.chapters],
   ["search", "Search this book", icons.search],
   ["notes", "Notes", icons.notes],
+  // Beside Notes, because it is the same gesture aimed elsewhere: notes are
+  // about this book, ideas are the ones that are not.
+  ["ideas", "Ideas", icons.ideas],
   ["bookmarks", "Bookmarks", icons.bookmarks],
   ["assistant", "Assistant", icons.assistant],
   ["trash", "Deleted chapters", icons.trash],

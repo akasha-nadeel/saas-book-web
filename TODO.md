@@ -43,10 +43,32 @@ than replacing it.
       is the sentence they stopped in the middle of.
 
       *Left:* "who is in the scene" wants the story bible, which is not built.
-- [ ] **Idea parking lot.** Capture a new idea in ten seconds *without leaving
-      the current book*. Writers repeatedly describe a shiny new idea stalling
-      book two of a trilogy. Tiny, and it protects the thing they already
-      started.
+- [x] **Idea parking lot.** Done 2026-08-01. A tab in the editor's own rail,
+      beside Notes, backed by `src/lib/ideas.ts` (pure, 17 tests) and a new
+      `openchapter:ideas` key.
+
+      **Being in the rail is the feature.** Writers describe the shiny idea
+      arriving mid-draft and stalling book two, and describe writing ideas down
+      on their phone because there is nowhere else. Both are one problem: the
+      idea nags until it is captured, and if capturing it means leaving the
+      book then leaving *is* the interruption. Enter commits, so it costs no
+      mouse either.
+
+      **Parked, not started.** An idea has no shelf entry and costs nothing to
+      keep. Turning every stray thought into a book is how a shelf fills with
+      eleven abandoned first chapters, which is its own pain further down this
+      research — so "Start a book" is a button pressed for the one that turns
+      out to be real, and `titleFromIdea()` takes only the first clause, since
+      ideas get typed as premises rather than titles.
+
+      A long paste is capped rather than refused: somebody pasting three
+      paragraphs into a ten-second box should get their idea kept, not an error
+      about a limit they did not know existed. Each idea records which book was
+      open when it struck — never navigated to, but four ideas from one book is
+      usually a fact about that book.
+
+      *Left:* not synced, like the roadmap ticks. It is at its own key rather
+      than on a book, so `sync.ts` would need a table rather than a column.
 - [x] **Publishing roadmap.** Done 2026-08-01. `/book/[bookId]/roadmap`, backed
       by `src/lib/roadmap.ts` (pure, 14 tests). Eighteen steps in five phases,
       each linking to the screen that does it where one exists.

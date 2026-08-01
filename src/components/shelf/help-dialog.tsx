@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Ideas",
+        desc: "Park the idea that is not this book, without leaving the chapter you are in. Ideas are not books — they sit here costing nothing until you decide one is real, and Start a book turns it into one.",
+      },
+      {
         name: "Focus mode",
         desc: "Dim every paragraph but the one you are working on.",
       },

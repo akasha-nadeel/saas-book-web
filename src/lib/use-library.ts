@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { parseIdeas, type Idea } from "./ideas";
 import {
   getBody,
   getBodyReload,
@@ -8,8 +9,10 @@ import {
   getServerCover,
   getServerBody,
   getServerBodyReload,
+  getIdeasRaw,
   getNotes,
   getPrefs,
+  getServerIdeasRaw,
   getServerNotes,
   getServerPrefs,
   getServerShelf,
@@ -17,6 +20,7 @@ import {
   subscribeToBody,
   subscribeToBodyReload,
   subscribeToCover,
+  subscribeToIdeas,
   subscribeToNotes,
   subscribeToPrefs,
   subscribeToShelf,
@@ -93,6 +97,23 @@ export function useCover(bookId: string): string | null {
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */
 export function usePrefs(): Prefs {
   return useSyncExternalStore(subscribeToPrefs, getPrefs, getServerPrefs);
+}
+
+/**
+ * The idea parking lot.
+ *
+ * Parsed here rather than in the snapshot, because `useSyncExternalStore`
+ * demands a referentially stable value and `parseIdeas` returns a new array
+ * every call — handing that back as the snapshot loops the store forever. The
+ * raw string is the snapshot, and the parse is memoised off it.
+ */
+export function useIdeas(): Idea[] {
+  const raw = useSyncExternalStore(
+    subscribeToIdeas,
+    getIdeasRaw,
+    getServerIdeasRaw,
+  );
+  return useMemo(() => parseIdeas(raw), [raw]);
 }
 
 /** A chapter's notes, or null if none have been written. */

@@ -3,6 +3,7 @@
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
+import { IdeasPanel } from "@/components/editor/ideas-panel";
 import { NotesPanel } from "@/components/editor/notes-panel";
 import { TrashPanel } from "@/components/editor/trash-panel";
 import { SearchPanel } from "@/components/editor/search-panel";
@@ -19,6 +20,7 @@ export type PanelTab =
   | "chapters"
   | "search"
   | "notes"
+  | "ideas"
   | "bookmarks"
   | "assistant"
   | "trash";
@@ -60,6 +62,7 @@ export function LeftPanel({
       {tab === "chapters" && <ChapterSidebar bookId={bookId} />}
       {tab === "search" && <SearchPanel bookId={bookId} />}
       {tab === "notes" && <NotesPanel key={chapterId} chapterId={chapterId} />}
+      {tab === "ideas" && <IdeasPanel bookId={bookId} />}
       {tab === "bookmarks" && <BookmarksPanel bookId={bookId} />}
       {tab === "trash" && <TrashPanel bookId={bookId} />}
       {tab === "assistant" && (
