@@ -44,13 +44,7 @@ import {
 } from "@/lib/arc";
 import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
-import {
-  progressOf,
-  roadmapFor,
-  SELF_TICKING,
-  YOURS_TO_TICK,
-  type Progress,
-} from "@/lib/roadmap";
+import { progressOf, roadmapFor } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
 import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
@@ -70,10 +64,17 @@ import {
  * *one part* of the job, and that the expensive, frightening parts are the
  * ones around it.
  *
- * So this is a hub with six areas — Overview, Write, Prepare, Track, Learn,
- * Tools — and **Write is one of them**. The arrangement is the argument: a
- * writer opening this should see immediately that the app has an opinion about
- * the whole job, not just the manuscript.
+ * So this is a hub with five areas — Overview, Write, Prepare, Track, Tools —
+ * and **Write is one of them**. The arrangement is the argument: a writer
+ * opening this should see immediately that the app has an opinion about the
+ * whole job, not just the manuscript.
+ *
+ * There were six. **Learn is gone**: it had become a per-book list of roadmap
+ * progress with a menu of four tools hanging off it, which is the roadmap page
+ * told thinly, plus four links that are also in Tools. Two screens answering
+ * one question is one screen to forget to update, and the roadmap is the one
+ * that actually answers it — so the rail item went and the roadmap kept the
+ * job. Nothing was deleted but the index.
  *
  * **All six areas are real, and nothing on this screen is a preview.** Every
  * feature the dashboard names is built and works; there is no longer a
@@ -84,7 +85,7 @@ import {
  * rather than glimpsed as a grey card.
  */
 
-type Area = "overview" | "write" | "prepare" | "track" | "learn" | "tools";
+type Area = "overview" | "write" | "prepare" | "track" | "tools";
 
 const AREAS: {
   id: Area;
@@ -95,10 +96,10 @@ const AREAS: {
   /**
    * A stage in the book's life rather than something you consult.
    *
-   * Overview, Write, Prepare and Track happen in that order; Learn and Tools
-   * are open at any point. The rail draws the two groups apart on this, so the
-   * order in this array stays the order on screen and the flag is the only
-   * thing to change if an area ever moves between them.
+   * Overview, Write, Prepare and Track happen in that order; Tools is open at
+   * any point. The rail draws the two apart on this, so the order in this array
+   * stays the order on screen and the flag is the only thing to change if an
+   * area ever moves between them.
    */
   stage: boolean;
 }[] = [
@@ -133,14 +134,6 @@ const AREAS: {
     blurb: "What the book cost against what it earned.",
     icon: shelfIcons.track,
     stage: true,
-  },
-  {
-    id: "learn",
-    label: "Learn",
-    live: true,
-    blurb: "The order to do things in, and what a shop expects.",
-    icon: shelfIcons.learn,
-    stage: false,
   },
   {
     id: "tools",
@@ -344,10 +337,10 @@ export function Bookshelf({
 
         {/* Two groups, because there are two kinds of item here and the flat
             list said so nowhere. Overview, Write, Prepare and Track are the
-            arc of a book's life, in the order it happens. Learn and Tools are
-            not stages — you dip into them at any point — so a rule separates
-            them rather than letting the eye read six equal steps and expect
-            Tools to come after Learn. */}
+            arc of a book's life, in the order it happens. Tools is not a
+            stage — you open it at any point — so a rule separates it rather
+            than letting the eye read five equal steps and expect Tools to come
+            after Track. */}
         <nav className="flex flex-col gap-0.5">
           {AREAS.filter((a) => a.stage).map((a) => (
             <SideItem
@@ -554,8 +547,6 @@ export function Bookshelf({
           {area === "prepare" && <Prepare books={active} />}
 
           {area === "tools" && <Tools books={active} current={current} />}
-
-          {area === "learn" && <Learn books={active} />}
 
           {area === "track" && <Track books={active} />}
         </main>
@@ -1466,167 +1457,6 @@ function Tools({
         <ToolGrid bookId={book.id} />
       </section>
     </div>
-  );
-}
-
-/**
- * Learn — the order to do things in.
- *
- * Three research threads pointed the same way: writers do not lack tools, they
- * lack the order. Most sharply, the one who found out advance copies were
- * essential *after* publishing.
- *
- * The area used to answer that with a paragraph naming five tools and then five
- * identical buttons on every book row — thirty-five buttons for seven books,
- * and the same five words read over and over. It also showed nothing at all
- * about *where each book actually was*, which is the only question the area's
- * own subtitle promises to answer.
- *
- * So the roadmap is the area now. `roadmapFor` works most of the steps out from
- * the book itself, so each row can show how far along it is and name the next
- * thing to do. The four tools that were buttons moved behind a ⋯ menu, the same
- * shape the book cards use.
- */
-function Learn({ books }: { books: Book[] }) {
-  const rows = useMemo(
-    () =>
-      books.map((book) => ({
-        book,
-        progress: progressOf(roadmapFor(book, book.roadmapDone ?? [])),
-      })),
-    [books],
-  );
-
-  const finished = rows.filter((r) => r.progress.next === null).length;
-
-  return (
-    <div className="flex flex-col gap-5">
-      <section className="rounded-2xl border border-line bg-panel p-5">
-        <h2 className="font-bold text-fg">Blank page to published</h2>
-        <p className="mt-1 text-muted">
-          Every step in the order it has to happen, so you do not find out about
-          advance copies after the book is already out. {SELF_TICKING} of them
-          work themselves out from what is in your book; the other{" "}
-          {YOURS_TO_TICK} happen somewhere else and are yours to tick.
-        </p>
-
-        {books.length === 0 ? (
-          <p className="mt-4 text-muted">No books yet.</p>
-        ) : (
-          <>
-            {finished > 0 && (
-              <p className="mt-3 text-sm text-muted">
-                {finished} of {books.length} through every step.
-              </p>
-            )}
-            <ul className="mt-4 flex flex-col gap-2">
-              {rows.map(({ book, progress }) => (
-                <LearnRow key={book.id} book={book} progress={progress} />
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
-    </div>
-  );
-}
-
-/**
- * One book's place in the sequence.
- *
- * It names the next step rather than counting the remaining ones, for the same
- * reason the Prepare rows name their worst problem: "Write the blurb" is
- * something a writer can go and do, and "12 steps left" is a mood.
- */
-function LearnRow({ book, progress }: { book: Book; progress: Progress }) {
-  const share = Math.round((progress.done / progress.total) * 100);
-
-  return (
-    <li
-      className="flex flex-wrap items-center gap-3 rounded-xl border border-line
-                   bg-surface px-4 py-3"
-    >
-      <Link
-        href={`/book/${book.id}/roadmap`}
-        className="flex min-w-0 flex-1 items-center gap-3"
-      >
-        <span className="w-8 shrink-0">
-          <CoverOf book={book} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate font-semibold text-fg">
-            {book.title}
-          </span>
-          <span className="mt-0.5 block truncate text-xs text-muted">
-            {progress.next ? (
-              <>
-                <span className="font-semibold text-accent">Next</span>{" "}
-                {progress.next.title}
-              </>
-            ) : (
-              "Every step done."
-            )}
-          </span>
-        </span>
-      </Link>
-
-      <span className="flex shrink-0 items-center gap-2.5">
-        <span className="h-1.5 w-20 overflow-hidden rounded-full bg-raised">
-          <span
-            className="block h-full rounded-full bg-accent"
-            style={{ width: `${share}%` }}
-          />
-        </span>
-        <span className="w-16 text-right text-xs text-muted tabular-nums">
-          {progress.done} of {progress.total}
-        </span>
-
-        {/* The four that were buttons on every row. Behind a menu here for the
-            same reason they are on the book cards: five identical words down a
-            column is five words to read and one to want. */}
-        <Menu
-          label={`More for ${book.title}`}
-          align="end"
-          width={244}
-          triggerClassName="flex items-center rounded-lg border border-line
-                            bg-panel px-2 py-1.5 text-fg"
-          trigger={shelfIcons.more}
-        >
-          {(close) => (
-            <>
-              <MenuLink
-                href={`/book/${book.id}/structure`}
-                icon={shelfIcons.learn}
-                onNavigate={close}
-              >
-                Structure
-              </MenuLink>
-              <MenuLink
-                href={`/book/${book.id}/prose`}
-                icon={shelfIcons.write}
-                onNavigate={close}
-              >
-                Prose report
-              </MenuLink>
-              <MenuLink
-                href={`/book/${book.id}/progress`}
-                icon={shelfIcons.target}
-                onNavigate={close}
-              >
-                Progress
-              </MenuLink>
-              <MenuLink
-                href={`/book/${book.id}/money`}
-                icon={shelfIcons.pricing}
-                onNavigate={close}
-              >
-                Before you spend
-              </MenuLink>
-            </>
-          )}
-        </Menu>
-      </span>
-    </li>
   );
 }
 

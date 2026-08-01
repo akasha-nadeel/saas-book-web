@@ -88,9 +88,9 @@ export function ToolHeader({
           {/* Beside the trail rather than in it. The breadcrumb describes where
               this page sits — a tool belongs to a book — and the launcher is
               not its parent: the same screen is reached from the book cards,
-              from Prepare and from Learn. This is a shortcut back to the wall
-              of them, which is a different claim and belongs in a different
-              control. */}
+              from Prepare and from the roadmap. This is a shortcut back to the
+              wall of them, which is a different claim and belongs in a
+              different control. */}
           <Link
             href="/?area=tools"
             className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs
