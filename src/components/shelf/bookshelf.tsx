@@ -299,7 +299,7 @@ export function Bookshelf({
           which reads as an unfinished sidebar; and it filed Templates and
           Background sound — two extras — beside Help and Pricing, which are
           chrome. Grouping says which is which and closes the hole. */}
-      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 py-4 md:flex">
+      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-14 md:flex">
         <Link
           href="/"
           className="mb-5 px-2 text-lg font-bold tracking-tight text-fg"
@@ -578,6 +578,19 @@ function Overview({
   const run = useMemo(() => streak(activity), [activity]);
 
   /**
+   * Whether the day log has anything in it at all.
+   *
+   * Not "did they write this month" — a writer back after a fallow summer has
+   * a log worth showing and a zero week is a true fact about them. This is the
+   * narrower question of whether the log has ever recorded a day, which is the
+   * only case where three zeros would misrepresent the shelf behind them.
+   */
+  const logged = useMemo(
+    () => Object.values(activity).some((n) => n !== 0),
+    [activity],
+  );
+
+  /**
    * The next unfinished step for the book being offered.
    *
    * `roadmapFor` works most of it out from the book itself, so this is not a
@@ -736,31 +749,60 @@ function Overview({
         </section>
       )}
 
+      {/* Three zeros beside a shelf of finished books is a lie by arithmetic:
+          the day log only started when it shipped, so a writer with 6,000 words
+          behind them opens this and reads that they have written nothing. Until
+          there is a single logged day, the momentum cards are one card that
+          says why they are empty. */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat
-          icon={shelfIcons.write}
-          value={week.words.toLocaleString()}
-          label="words this week"
-          note={
-            week.daysWritten > 0
-              ? `across ${week.daysWritten} ${week.daysWritten === 1 ? "day" : "days"}`
-              : "no writing days yet"
-          }
-        />
-        <Stat
-          icon={shelfIcons.flame}
-          value={String(run)}
-          label={run === 1 ? "day running" : "days running"}
-          // Stated, never scolded. The research was explicit about how writers
-          // feel regarding apps that turn a streak into a stick.
-          note={run > 0 ? "keep it or don't" : "a broken streak is fine"}
-        />
-        <Stat
-          icon={shelfIcons.target}
-          value={String(month.daysWritten)}
-          label="days in the last 30"
-          note={`${month.perWritingDay.toLocaleString()} words on a day you write`}
-        />
+        {logged ? (
+          <>
+            <Stat
+              icon={shelfIcons.write}
+              value={week.words.toLocaleString()}
+              label="words this week"
+              note={
+                week.daysWritten > 0
+                  ? `across ${week.daysWritten} ${week.daysWritten === 1 ? "day" : "days"}`
+                  : "nothing yet this week"
+              }
+            />
+            <Stat
+              icon={shelfIcons.calendar}
+              value={String(run)}
+              label={run === 1 ? "day running" : "days running"}
+              // Stated, never scolded. The research was explicit about how
+              // writers feel regarding apps that turn a streak into a stick.
+              note={run > 0 ? "keep it or don't" : "a broken streak is fine"}
+            />
+            <Stat
+              icon={shelfIcons.target}
+              value={String(month.daysWritten)}
+              label="days in the last 30"
+              note={
+                month.daysWritten > 0
+                  ? `${month.perWritingDay.toLocaleString()} words on a day you write`
+                  : "the log is waiting"
+              }
+            />
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4 sm:col-span-2 lg:col-span-3">
+            <div className="flex items-center gap-2 text-muted">
+              {shelfIcons.calendar}
+              <p className="text-sm font-medium">No writing log yet</p>
+            </div>
+            <p className="mt-1.5 text-sm text-fg">
+              It starts the first time you write here and counts net words a
+              day — so a day of cutting counts too.
+            </p>
+            <p className="mt-1 text-xs text-muted">
+              Anything already on your shelf was written before the log existed,
+              which is why it is not in here.
+            </p>
+          </div>
+        )}
+
         <Stat
           icon={shelfIcons.overview}
           value={String(books)}

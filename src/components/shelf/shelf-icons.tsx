@@ -159,9 +159,18 @@ export const shelfIcons = {
       <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
     </Svg>
   ),
-  flame: (
+  /**
+   * Days in a row.
+   *
+   * A calendar rather than the flame every streak counter reaches for. The
+   * flame is the gamification signal, and the card it sits on deliberately
+   * says a broken streak is fine — an icon arguing the opposite of its own
+   * caption is worse than a plain one.
+   */
+  calendar: (
     <Svg>
-      <path d="M12 3c.5 3-2 4-2 7a2 2 0 0 0 4 0c0-1 .5-1.5 1-2 1.5 1.5 2.5 3.5 2.5 5.5a7.5 7.5 0 0 1-15 0C2.5 9 7 6.5 12 3Z" />
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M8 3v4M16 3v4M3 10h18" />
     </Svg>
   ),
   check: (
