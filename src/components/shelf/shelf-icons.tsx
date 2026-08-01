@@ -178,4 +178,19 @@ export const shelfIcons = {
       <path d="m4 12.5 5 5L20 6.5" />
     </Svg>
   ),
+  archive: (
+    <Svg>
+      <rect x="3" y="3" width="18" height="5" rx="1.5" />
+      <path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" />
+      <path d="M10 12h4" />
+    </Svg>
+  ),
+  trash: (
+    <Svg>
+      <path d="M4 7h16" />
+      <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+      <path d="M6 7v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" />
+      <path d="M10 11v6M14 11v6" />
+    </Svg>
+  ),
 } as const;

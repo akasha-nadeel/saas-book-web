@@ -5,6 +5,7 @@ import Link from "next/link";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
+import { BookToolsDialog } from "@/components/shelf/book-tools-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
@@ -25,7 +26,12 @@ import {
   type BookView,
 } from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
-import { useActivity, useCover, useHydrated, useShelf } from "@/lib/use-library";
+import {
+  useActivity,
+  useCover,
+  useHydrated,
+  useShelf,
+} from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
 import { progressOf, roadmapFor } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
@@ -184,6 +190,7 @@ export function Bookshelf({
   const [area, setArea] = useState<Area>("overview");
   const [editing, setEditing] = useState<Book | null>(null);
   const [covering, setCovering] = useState<Book | null>(null);
+  const [tooling, setTooling] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<BookView>("active");
@@ -267,14 +274,19 @@ export function Bookshelf({
    * has since been archived) would send the writer to an arbitrary one.
    */
   const current = useMemo(() => {
-    const byRecent = [...active].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
+    const byRecent = [...active].sort(
+      (a, b) => b.lastOpenedAt - a.lastOpenedAt,
+    );
     return (
-      byRecent.find((b) => b.id === shelf.lastOpenedBookId) ?? byRecent[0] ?? null
+      byRecent.find((b) => b.id === shelf.lastOpenedBookId) ??
+      byRecent[0] ??
+      null
     );
   }, [active, shelf.lastOpenedBookId]);
 
   const handleTrash = (book: Book) => {
-    if (window.confirm(`Move “${book.title}” to the trash?`)) trashBook(book.id);
+    if (window.confirm(`Move “${book.title}” to the trash?`))
+      trashBook(book.id);
   };
 
   const handleDeleteForever = (book: Book) => {
@@ -302,7 +314,7 @@ export function Bookshelf({
       <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-14 md:flex">
         <Link
           href="/"
-          className="mb-5 px-2 text-lg font-bold tracking-tight text-fg"
+          className="mb-6 px-2 text-2xl font-extrabold tracking-tight text-fg"
         >
           Open<span className="text-accent">Chapter</span>
         </Link>
@@ -353,107 +365,116 @@ export function Bookshelf({
 
       {/* ---- The area ------------------------------------------------ */}
       <div className="flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-line bg-panel/95 px-6 py-3 backdrop-blur">
-          {/* The area picker again, for the widths where the rail is hidden. */}
-          <select
-            value={area}
-            onChange={(e) => setArea(e.target.value as Area)}
-            className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg md:hidden"
-          >
-            {AREAS.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
-                {a.live ? "" : " (planned)"}
-              </option>
-            ))}
-          </select>
+        {/* The bar keeps its full-width background and border — a sticky
+            header that stopped short of the edges would tear as the page
+            scrolled under it — but its *contents* sit in the same max-w-6xl
+            column as the page, so the search lines up with the heading below
+            and the account chip lines up with the right edge of the cards. */}
+        <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
+            {/* The area picker again, for the widths where the rail is hidden. */}
+            <select
+              value={area}
+              onChange={(e) => setArea(e.target.value as Area)}
+              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg md:hidden"
+            >
+              {AREAS.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                  {a.live ? "" : " (planned)"}
+                </option>
+              ))}
+            </select>
 
-          {/* Capped rather than `flex-1`. At full width it was the loudest
+            {/* Capped rather than `flex-1`. At full width it was the loudest
               thing on the screen, and it is a filter for one list, not the
               product's main verb. */}
-          <div className="relative min-w-[8rem] max-w-sm flex-1">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-              {shelfIcons.search}
-            </span>
-            <input
-              ref={searchRef}
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                // The results live in Write. Searching from Overview used to
-                // filter a list nobody could see, so the box appeared broken.
-                if (e.target.value.trim()) setArea("write");
-              }}
-              placeholder="Search your books"
-              aria-label="Search your books"
-              className="w-full rounded-lg border border-line bg-surface py-2 pr-12 pl-9
+            <div className="relative min-w-[8rem] max-w-sm flex-1">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+                {shelfIcons.search}
+              </span>
+              <input
+                ref={searchRef}
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  // The results live in Write. Searching from Overview used to
+                  // filter a list nobody could see, so the box appeared broken.
+                  if (e.target.value.trim()) setArea("write");
+                }}
+                placeholder="Search your books"
+                aria-label="Search your books"
+                className="w-full rounded-lg border border-line bg-surface py-2 pr-12 pl-9
                          text-sm text-fg outline-none focus-visible:ring-2
                          focus-visible:ring-accent/50"
-            />
-            <kbd
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-2.5 my-auto flex h-5
+              />
+              <kbd
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 right-2.5 my-auto flex h-5
                          items-center rounded border border-line bg-raised px-1.5
                          text-[11px] font-medium text-muted"
-            >
-              /
-            </kbd>
-          </div>
+              >
+                /
+              </kbd>
+            </div>
 
-          {/* A split button. New book is the verb; import and templates are
+            {/* A split button. New book is the verb; import and templates are
               two other ways to arrive at the same place, and three peer
               buttons in a header made none of them read as the main one. */}
-          <div className="flex items-stretch">
-            <Link
-              href="/book/new"
-              className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
+            <div className="ml-auto flex items-center gap-3">
+              <div className="flex items-stretch">
+                <Link
+                  href="/book/new"
+                  className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
                          text-sm font-semibold text-white"
-            >
-              {shelfIcons.plus}
-              New book
-            </Link>
-            <span aria-hidden="true" className="w-px bg-white/25" />
-            <Menu
-              label="Other ways to start a book"
-              align="end"
-              width={248}
-              triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-white"
-              trigger={shelfIcons.chevron}
-            >
-              {(close) => (
-                <>
-                  <MenuLabel>Start a book</MenuLabel>
-                  <MenuLink
-                    href="/book/new"
-                    icon={shelfIcons.plus}
-                    onNavigate={close}
-                  >
-                    Blank book
-                  </MenuLink>
-                  <MenuButton
-                    icon={shelfIcons.upload}
-                    onClick={() => {
-                      setDialog("import");
-                      close();
-                    }}
-                  >
-                    Import a file…
-                  </MenuButton>
-                  <MenuButton
-                    icon={shelfIcons.template}
-                    onClick={() => {
-                      setDialog("templates");
-                      close();
-                    }}
-                  >
-                    From a template
-                  </MenuButton>
-                </>
-              )}
-            </Menu>
-          </div>
+                >
+                  {shelfIcons.plus}
+                  New book
+                </Link>
+                <span aria-hidden="true" className="w-px bg-white/25" />
+                <Menu
+                  label="Other ways to start a book"
+                  align="end"
+                  width={248}
+                  triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-white"
+                  trigger={shelfIcons.chevron}
+                >
+                  {(close) => (
+                    <>
+                      <MenuLabel>Start a book</MenuLabel>
+                      <MenuLink
+                        href="/book/new"
+                        icon={shelfIcons.plus}
+                        onNavigate={close}
+                      >
+                        Blank book
+                      </MenuLink>
+                      <MenuButton
+                        icon={shelfIcons.upload}
+                        onClick={() => {
+                          setDialog("import");
+                          close();
+                        }}
+                      >
+                        Import a file…
+                      </MenuButton>
+                      <MenuButton
+                        icon={shelfIcons.template}
+                        onClick={() => {
+                          setDialog("templates");
+                          close();
+                        }}
+                      >
+                        From a template
+                      </MenuButton>
+                    </>
+                  )}
+                </Menu>
+              </div>
 
-          <AccountMenu account={account} />
+              <AccountMenu account={account} />
+            </div>
+          </div>
         </header>
 
         {/* Capped, so the cards do not stretch to a metre wide on a desktop
@@ -496,6 +517,7 @@ export function Bookshelf({
               onCover={setCovering}
               onTrash={handleTrash}
               onDeleteForever={handleDeleteForever}
+              onTools={setTooling}
             />
           )}
 
@@ -522,9 +544,14 @@ export function Bookshelf({
       {covering && (
         <CoverDialog book={covering} onClose={() => setCovering(null)} />
       )}
+      {tooling && (
+        <BookToolsDialog book={tooling} onClose={() => setTooling(null)} />
+      )}
       {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
-      {dialog === "support" && <SupportDialog onClose={() => setDialog(null)} />}
+      {dialog === "support" && (
+        <SupportDialog onClose={() => setDialog(null)} />
+      )}
       {/* Both are complete features pointed at this dialog on purpose — see
           TODO.md. Re-pointing the button is the whole of switching either on. */}
       {dialog === "templates" && (
@@ -534,7 +561,10 @@ export function Bookshelf({
         </ComingSoonDialog>
       )}
       {dialog === "sounds" && (
-        <ComingSoonDialog title="Background sound" onClose={() => setDialog(null)}>
+        <ComingSoonDialog
+          title="Background sound"
+          onClose={() => setDialog(null)}
+        >
           Rain, surf, wind or a flat hush while you write. Built, and held back
           until the scenes are real recordings rather than synthesised noise.
         </ComingSoonDialog>
@@ -621,9 +651,11 @@ function Overview({
               <p className="text-xs font-bold tracking-widest text-muted uppercase">
                 Pick up where you left off
               </p>
-              <p className="mt-1.5 text-xl font-bold text-fg">{current.title}</p>
+              <p className="mt-1.5 text-xl font-bold text-fg">
+                {current.title}
+              </p>
               <p className="mt-1 text-sm text-muted">
-                {bookChapterCount(current)} chapters ·{" "}
+                {plural(bookChapterCount(current), "chapter")} ·{" "}
                 {bookWordCount(current).toLocaleString()} words · opened{" "}
                 {relativeTime(current.lastOpenedAt)}
               </p>
@@ -793,8 +825,8 @@ function Overview({
               <p className="text-sm font-medium">No writing log yet</p>
             </div>
             <p className="mt-1.5 text-sm text-fg">
-              It starts the first time you write here and counts net words a
-              day — so a day of cutting counts too.
+              It starts the first time you write here and counts net words a day
+              — so a day of cutting counts too.
             </p>
             <p className="mt-1 text-xs text-muted">
               Anything already on your shelf was written before the log existed,
@@ -885,6 +917,7 @@ function Write({
   onCover,
   onTrash,
   onDeleteForever,
+  onTools,
 }: {
   visible: Book[];
   view: BookView;
@@ -897,6 +930,8 @@ function Write({
   onCover: (b: Book) => void;
   onTrash: (b: Book) => void;
   onDeleteForever: (b: Book) => void;
+  /** Opens the sheet holding every per-book tool. */
+  onTools: (b: Book) => void;
 }) {
   return (
     <div>
@@ -960,7 +995,7 @@ function Write({
                     {book.title}
                   </Link>
                   <p className="mt-1 text-xs text-muted">
-                    {bookChapterCount(book)} chapters ·{" "}
+                    {plural(bookChapterCount(book), "chapter")} ·{" "}
                     {bookWordCount(book).toLocaleString()} words
                   </p>
                   <p className="text-xs text-muted">
@@ -968,44 +1003,132 @@ function Write({
                   </p>
                 </div>
               </div>
-              <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+              {/* Two verbs and a menu, where there were twenty-one chips.
+                  Nothing had weight before: Write and Trash were the same
+                  size and colour, and a pill has room for a name but not for
+                  what the thing is. */}
+              <div className="mt-3.5 flex flex-wrap items-center gap-2">
                 {view === "active" ? (
                   <>
-                    <Chip href={`/book/${book.id}`}>Write</Chip>
-                    <Chip href={`/book/${book.id}/read`}>Read</Chip>
-                    <Chip href={`/book/${book.id}/export`}>Prepare</Chip>
-                    <Chip href={`/book/${book.id}/comps`}>Comps</Chip>
-                    <Chip href={`/book/${book.id}/blurb`}>Blurb</Chip>
-                    <Chip href={`/book/${book.id}/categories`}>Categories</Chip>
-                    <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
-                    <Chip href={`/book/${book.id}/title-check`}>Title</Chip>
-                    <Chip href={`/book/${book.id}/paperback`}>Paperback</Chip>
-                    <Chip href={`/book/${book.id}/provenance`}>Record</Chip>
-                    <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
-                    <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
-                    <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
-                    <Chip href={`/book/${book.id}/progress`}>Progress</Chip>
-                    <Chip href={`/book/${book.id}/money`}>Money</Chip>
-                    <Chip href={`/book/${book.id}/arc`}>Advance copies</Chip>
-                    <Chip href={`/book/${book.id}/track`}>Track</Chip>
-                    <ChipButton onClick={() => onDetails(book)}>
-                      Details
-                    </ChipButton>
-                    <ChipButton onClick={() => onCover(book)}>Cover</ChipButton>
-                    <ChipButton onClick={() => archiveBook(book.id)}>
-                      Archive
-                    </ChipButton>
-                    <ChipButton onClick={() => onTrash(book)}>Trash</ChipButton>
+                    <Link
+                      href={`/book/${book.id}`}
+                      className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5
+                                 text-sm font-semibold text-white"
+                    >
+                      {shelfIcons.write}
+                      Write
+                    </Link>
+                    <Link
+                      href={`/book/${book.id}/read`}
+                      className="flex items-center gap-1.5 rounded-lg border border-line
+                                 bg-surface px-3.5 py-1.5 text-sm font-semibold text-fg"
+                    >
+                      {shelfIcons.read}
+                      Read
+                    </Link>
+                    <Menu
+                      label={`More for ${book.title}`}
+                      align="end"
+                      width={244}
+                      triggerClassName="ml-auto flex items-center rounded-lg border
+                                        border-line bg-surface px-2 py-1.5 text-fg"
+                      trigger={shelfIcons.more}
+                    >
+                      {(close) => (
+                        <>
+                          <MenuLink
+                            href={`/book/${book.id}/export`}
+                            icon={shelfIcons.prepare}
+                            onNavigate={close}
+                          >
+                            Export and publish
+                          </MenuLink>
+                          <MenuLink
+                            href={`/book/${book.id}/roadmap`}
+                            icon={shelfIcons.compass}
+                            onNavigate={close}
+                          >
+                            What to do next
+                          </MenuLink>
+                          {/* The other thirteen live behind this rather than
+                              on the card, where they were a wall of names with
+                              nothing to say what any of them did. */}
+                          <MenuButton
+                            icon={shelfIcons.tools}
+                            onClick={() => {
+                              onTools(book);
+                              close();
+                            }}
+                          >
+                            All tools for this book…
+                          </MenuButton>
+
+                          <MenuSeparator />
+                          <MenuButton
+                            icon={shelfIcons.info}
+                            onClick={() => {
+                              onDetails(book);
+                              close();
+                            }}
+                          >
+                            Details
+                          </MenuButton>
+                          <MenuButton
+                            icon={shelfIcons.image}
+                            onClick={() => {
+                              onCover(book);
+                              close();
+                            }}
+                          >
+                            Change cover
+                          </MenuButton>
+
+                          {/* Below the line, and the destructive one is
+                              coloured — both of these sat in the same grey as
+                              Write, one pill away from it. */}
+                          <MenuSeparator />
+                          <MenuButton
+                            icon={shelfIcons.archive}
+                            onClick={() => {
+                              archiveBook(book.id);
+                              close();
+                            }}
+                          >
+                            Archive
+                          </MenuButton>
+                          <MenuButton
+                            danger
+                            icon={shelfIcons.trash}
+                            onClick={() => {
+                              onTrash(book);
+                              close();
+                            }}
+                          >
+                            Move to trash
+                          </MenuButton>
+                        </>
+                      )}
+                    </Menu>
                   </>
                 ) : (
                   <>
-                    <ChipButton onClick={() => restoreBook(book.id)}>
+                    <button
+                      type="button"
+                      onClick={() => restoreBook(book.id)}
+                      className="rounded-lg border border-line bg-surface px-3.5 py-1.5
+                                 text-sm font-semibold text-fg"
+                    >
                       Restore
-                    </ChipButton>
+                    </button>
                     {view === "trashed" && (
-                      <ChipButton onClick={() => onDeleteForever(book)}>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteForever(book)}
+                        className="rounded-lg px-3.5 py-1.5 text-sm font-semibold
+                                   text-red-600 dark:text-red-400"
+                      >
                         Delete for good
-                      </ChipButton>
+                      </button>
                     )}
                   </>
                 )}
@@ -1073,10 +1196,11 @@ function Tools({ books }: { books: Book[] }) {
           yours. <strong className="text-fg">Categories</strong> — which shelf
           you land on, from where comparable books are actually filed.{" "}
           <strong className="text-fg">Covers</strong> — yours at thumbnail size,
-          beside the shelf it has to sit on, and a check on the file a shop will receive. <strong className="text-fg">Title</strong>{" "}
-          — whether somebody else&rsquo;s book turns up first when a reader
-          searches for yours. All five read Google Books and Open Library, free,
-          and none of them sends anything you have written.{" "}
+          beside the shelf it has to sit on, and a check on the file a shop will
+          receive. <strong className="text-fg">Title</strong> — whether somebody
+          else&rsquo;s book turns up first when a reader searches for yours. All
+          five read Google Books and Open Library, free, and none of them sends
+          anything you have written.{" "}
           <strong className="text-fg">Writing record</strong> — the day-by-day
           trail your work left, for when somebody accuses you of not having
           written it. Evidence rather than proof, and it says so in the document
@@ -1335,7 +1459,9 @@ function Go({
     <Link
       href={href}
       className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-        primary ? "bg-accent text-white" : "border border-line bg-surface text-fg"
+        primary
+          ? "bg-accent text-white"
+          : "border border-line bg-surface text-fg"
       }`}
     >
       {children}
@@ -1343,34 +1469,16 @@ function Go({
   );
 }
 
-function Chip({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="rounded-md border border-line px-2.5 py-1 font-medium text-fg"
-    >
-      {children}
-    </Link>
-  );
+/**
+ * "1 chapters" was on the shelf for as long as the shelf has existed. Only ever
+ * an -s, because every count this is used for takes one.
+ */
+function plural(count: number, noun: string): string {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-function ChipButton({
-  onClick,
-  children,
-}: {
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-md border border-line px-2.5 py-1 font-medium text-muted"
-    >
-      {children}
-    </button>
-  );
-}
+// `Chip` and `ChipButton` are gone. They existed for the book card's row of
+// twenty-one identical pills, and that row is now two buttons and a menu.
 
 /**
  * One rail row, as a button or a link.
