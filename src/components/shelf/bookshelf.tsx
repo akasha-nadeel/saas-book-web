@@ -25,7 +25,17 @@ import {
   type BookView,
 } from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
-import { useCover, useHydrated, useShelf } from "@/lib/use-library";
+import { useActivity, useCover, useHydrated, useShelf } from "@/lib/use-library";
+import { pace, streak } from "@/lib/activity";
+import { progressOf, roadmapFor } from "@/lib/roadmap";
+import { shelfIcons } from "@/components/shelf/shelf-icons";
+import {
+  Menu,
+  MenuButton,
+  MenuLabel,
+  MenuLink,
+  MenuSeparator,
+} from "@/components/ui/menu";
 
 /**
  * The dashboard, as a prototype of the product this is becoming.
@@ -54,42 +64,54 @@ import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 type Area = "overview" | "write" | "prepare" | "track" | "learn" | "tools";
 
-const AREAS: { id: Area; label: string; live: boolean; blurb: string }[] = [
+const AREAS: {
+  id: Area;
+  label: string;
+  live: boolean;
+  blurb: string;
+  icon: React.ReactNode;
+}[] = [
   {
     id: "overview",
     label: "Overview",
     live: true,
     blurb: "Where the book is, and what to do next.",
+    icon: shelfIcons.overview,
   },
   {
     id: "write",
     label: "Write",
     live: true,
     blurb: "Draft it, and keep it safe. One part of the job.",
+    icon: shelfIcons.write,
   },
   {
     id: "prepare",
     label: "Prepare",
     live: true,
     blurb: "Get it out without paying to find out what was wrong.",
+    icon: shelfIcons.prepare,
   },
   {
     id: "track",
     label: "Track",
     live: true,
     blurb: "What the book cost against what it earned.",
+    icon: shelfIcons.track,
   },
   {
     id: "learn",
     label: "Learn",
     live: true,
     blurb: "The order to do things in, and what a shop expects.",
+    icon: shelfIcons.learn,
   },
   {
     id: "tools",
     label: "Tools",
     live: true,
     blurb: "The small jobs that cost a fortune elsewhere.",
+    icon: shelfIcons.tools,
   },
 ];
 
@@ -169,6 +191,31 @@ export function Bookshelf({
     "templates" | "help" | "support" | "sounds" | "import" | null
   >(null);
 
+  /**
+   * `/` puts the caret in the search box, the convention every list-shaped app
+   * shares. Ignored while the writer is already in a field, or typing a date
+   * into the advance-copies form would jump them somewhere else mid-word.
+   */
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.isContentEditable ||
+        ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName ?? "")
+      ) {
+        return;
+      }
+      event.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // `migrateLegacy` is idempotent, but running it twice is wasted work and
   // React runs effects twice in development.
   const migrated = useRef(false);
@@ -246,52 +293,61 @@ export function Bookshelf({
   return (
     <div className="flex h-dvh bg-surface">
       {/* ---- The six areas ------------------------------------------- */}
-      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel p-4 md:flex">
-        <Link href="/" className="mb-6 px-2 text-lg font-bold text-fg">
+      {/* The rail is three groups rather than one list with everything else
+          shoved to the bottom by `mt-auto`. That arrangement left a hand's
+          width of empty panel between Tools and Help on any normal screen,
+          which reads as an unfinished sidebar; and it filed Templates and
+          Background sound — two extras — beside Help and Pricing, which are
+          chrome. Grouping says which is which and closes the hole. */}
+      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 py-4 md:flex">
+        <Link
+          href="/"
+          className="mb-5 px-2 text-lg font-bold tracking-tight text-fg"
+        >
           Open<span className="text-accent">Chapter</span>
         </Link>
 
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-0.5">
           {AREAS.map((a) => (
-            <button
+            <SideItem
               key={a.id}
-              type="button"
+              icon={a.icon}
+              active={area === a.id}
               onClick={() => setArea(a.id)}
-              className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${
-                area === a.id ? "bg-accent text-white" : "text-fg"
-              }`}
             >
-              <span className="font-medium">{a.label}</span>
-              {!a.live && (
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                    area === a.id
-                      ? "bg-white/20 text-white"
-                      : "bg-raised text-muted"
-                  }`}
-                >
-                  Planned
-                </span>
-              )}
-            </button>
+              {a.label}
+            </SideItem>
           ))}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-1 pt-6">
-          <SideButton onClick={() => setDialog("help")}>Help</SideButton>
-          <SideButton onClick={() => setDialog("support")}>Support</SideButton>
-          <SideButton onClick={() => setDialog("templates")}>
-            Templates
-          </SideButton>
-          <SideButton onClick={() => setDialog("sounds")}>
-            Background sound
-          </SideButton>
-          <Link
-            href="/upgrade"
-            className="rounded-lg px-3 py-2 text-sm text-muted"
+        <div className="my-3 h-px bg-line" />
+
+        <SideGroup label="Extras" />
+        <div className="flex flex-col gap-0.5">
+          <SideItem
+            icon={shelfIcons.template}
+            onClick={() => setDialog("templates")}
           >
+            Templates
+          </SideItem>
+          <SideItem icon={shelfIcons.sound} onClick={() => setDialog("sounds")}>
+            Background sound
+          </SideItem>
+        </div>
+
+        <div className="mt-auto flex flex-col gap-0.5 pt-6">
+          <SideItem icon={shelfIcons.help} onClick={() => setDialog("help")}>
+            Help
+          </SideItem>
+          <SideItem
+            icon={shelfIcons.support}
+            onClick={() => setDialog("support")}
+          >
+            Support
+          </SideItem>
+          <SideItem icon={shelfIcons.pricing} href="/upgrade">
             Pricing
-          </Link>
+          </SideItem>
         </div>
       </aside>
 
@@ -312,37 +368,108 @@ export function Bookshelf({
             ))}
           </select>
 
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search your books"
-            aria-label="Search your books"
-            className="min-w-[8rem] flex-1 rounded-lg border border-line bg-surface px-3.5
-                       py-2 text-sm text-fg outline-none focus-visible:ring-2
-                       focus-visible:ring-accent/50"
-          />
-          <Link
-            href="/book/new"
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white"
-          >
-            New book
-          </Link>
-          <button
-            type="button"
-            onClick={() => setDialog("import")}
-            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-fg"
-          >
-            Import
-          </button>
+          {/* Capped rather than `flex-1`. At full width it was the loudest
+              thing on the screen, and it is a filter for one list, not the
+              product's main verb. */}
+          <div className="relative min-w-[8rem] max-w-sm flex-1">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+              {shelfIcons.search}
+            </span>
+            <input
+              ref={searchRef}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                // The results live in Write. Searching from Overview used to
+                // filter a list nobody could see, so the box appeared broken.
+                if (e.target.value.trim()) setArea("write");
+              }}
+              placeholder="Search your books"
+              aria-label="Search your books"
+              className="w-full rounded-lg border border-line bg-surface py-2 pr-12 pl-9
+                         text-sm text-fg outline-none focus-visible:ring-2
+                         focus-visible:ring-accent/50"
+            />
+            <kbd
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-2.5 my-auto flex h-5
+                         items-center rounded border border-line bg-raised px-1.5
+                         text-[11px] font-medium text-muted"
+            >
+              /
+            </kbd>
+          </div>
+
+          {/* A split button. New book is the verb; import and templates are
+              two other ways to arrive at the same place, and three peer
+              buttons in a header made none of them read as the main one. */}
+          <div className="flex items-stretch">
+            <Link
+              href="/book/new"
+              className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
+                         text-sm font-semibold text-white"
+            >
+              {shelfIcons.plus}
+              New book
+            </Link>
+            <span aria-hidden="true" className="w-px bg-white/25" />
+            <Menu
+              label="Other ways to start a book"
+              align="end"
+              width={248}
+              triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-white"
+              trigger={shelfIcons.chevron}
+            >
+              {(close) => (
+                <>
+                  <MenuLabel>Start a book</MenuLabel>
+                  <MenuLink
+                    href="/book/new"
+                    icon={shelfIcons.plus}
+                    onNavigate={close}
+                  >
+                    Blank book
+                  </MenuLink>
+                  <MenuButton
+                    icon={shelfIcons.upload}
+                    onClick={() => {
+                      setDialog("import");
+                      close();
+                    }}
+                  >
+                    Import a file…
+                  </MenuButton>
+                  <MenuButton
+                    icon={shelfIcons.template}
+                    onClick={() => {
+                      setDialog("templates");
+                      close();
+                    }}
+                  >
+                    From a template
+                  </MenuButton>
+                </>
+              )}
+            </Menu>
+          </div>
+
           <AccountMenu account={account} />
         </header>
 
-        <main className="px-6 pb-16">
-          <div className="mt-8 mb-8 flex items-center gap-3">
-            <h1 className="text-2xl font-extrabold text-fg">{meta.label}</h1>
-            {!meta.live && <Badge>Not built yet</Badge>}
+        {/* Capped, so the cards do not stretch to a metre wide on a desktop
+            monitor and leave the eye travelling between a number and its
+            label. */}
+        <main className="mx-auto max-w-6xl px-6 pb-16">
+          {/* One block. The heading and its line used to be two siblings with
+              `mb-8` and `-mt-6` cancelling each other out — a spacing bug
+              waiting to be inherited by the next area added. */}
+          <div className="mt-8 mb-7">
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl font-extrabold text-fg">{meta.label}</h1>
+              {!meta.live && <Badge>Not built yet</Badge>}
+            </div>
+            <p className="mt-1.5 text-muted">{meta.blurb}</p>
           </div>
-          <p className="-mt-6 mb-8 text-muted">{meta.blurb}</p>
 
           {area === "overview" && (
             <Overview
@@ -351,6 +478,8 @@ export function Bookshelf({
               words={totals.words}
               chapters={totals.chapters}
               onGo={setArea}
+              onDetails={setEditing}
+              onCover={setCovering}
             />
           )}
 
@@ -422,68 +551,232 @@ function Overview({
   words,
   chapters,
   onGo,
+  onDetails,
+  onCover,
 }: {
   current: Book | null;
   books: number;
   words: number;
   chapters: number;
   onGo: (a: Area) => void;
+  onDetails: (b: Book) => void;
+  onCover: (b: Book) => void;
 }) {
+  const activity = useActivity();
+
+  /**
+   * Momentum, not totals.
+   *
+   * The three numbers here were books, words and chapters — facts about the
+   * library that change by a rounding error in a week and answer no question a
+   * writer actually has on opening the app. `activity.ts` has been recording
+   * net words per day all along, and "did I write this week" is the question
+   * the screen is being asked.
+   */
+  const week = useMemo(() => pace(activity, 7), [activity]);
+  const month = useMemo(() => pace(activity, 30), [activity]);
+  const run = useMemo(() => streak(activity), [activity]);
+
+  /**
+   * The next unfinished step for the book being offered.
+   *
+   * `roadmapFor` works most of it out from the book itself, so this is not a
+   * checklist somebody has to maintain — it is the same answer the roadmap
+   * page gives, surfaced where the writer already is.
+   */
+  const next = useMemo(
+    () =>
+      current
+        ? progressOf(roadmapFor(current, current.roadmapDone ?? []))
+        : null,
+    [current],
+  );
+
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {current ? (
-        <Panel title="Pick up where you left off">
-          <div className="flex flex-wrap items-center gap-5">
-            <Link href={`/book/${current.id}`} className="w-[84px] shrink-0">
+        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+          <div className="flex flex-wrap items-start gap-5 p-5">
+            <Link
+              href={`/book/${current.id}`}
+              className="w-[92px] shrink-0 transition-transform hover:-translate-y-0.5"
+            >
               <CoverOf book={current} />
             </Link>
-            <div className="min-w-[12rem] flex-1">
-              <p className="text-xl font-bold text-fg">{current.title}</p>
+
+            <div className="min-w-[14rem] flex-1">
+              <p className="text-xs font-bold tracking-widest text-muted uppercase">
+                Pick up where you left off
+              </p>
+              <p className="mt-1.5 text-xl font-bold text-fg">{current.title}</p>
               <p className="mt-1 text-sm text-muted">
                 {bookChapterCount(current)} chapters ·{" "}
                 {bookWordCount(current).toLocaleString()} words · opened{" "}
                 {relativeTime(current.lastOpenedAt)}
               </p>
-              {/* The roadmap sits with the three phases rather than under
-                  Learn alone, because "what do I do next" is the question this
-                  card is answering and the roadmap is the only thing here that
-                  knows. */}
-              <div className="mt-4 flex flex-wrap gap-2 text-sm">
-                <Go href={`/book/${current.id}`} primary>
-                  Write
-                </Go>
-                <Go href={`/book/${current.id}/read`}>Read</Go>
-                <Go href={`/book/${current.id}/export`}>Prepare</Go>
-                <Go href={`/book/${current.id}/roadmap`}>What next?</Go>
+
+              {/* Only when the writer set a goal. A bar against a target we
+                  invented would be the made-up number this app keeps
+                  refusing to print. */}
+              {current.targetWords ? (
+                <TargetBar
+                  words={bookWordCount(current)}
+                  target={current.targetWords}
+                />
+              ) : null}
+
+              {/* One primary, one secondary, everything else behind ⋯. Four
+                  buttons of equal weight made the writer read all four to
+                  find the one they wanted, every single time. */}
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                <Link
+                  href={`/book/${current.id}`}
+                  className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2
+                             font-semibold text-white"
+                >
+                  {shelfIcons.write}
+                  Continue writing
+                </Link>
+                <Link
+                  href={`/book/${current.id}/read`}
+                  className="flex items-center gap-1.5 rounded-lg border border-line
+                             bg-surface px-4 py-2 font-semibold text-fg"
+                >
+                  {shelfIcons.read}
+                  Read
+                </Link>
+                <Menu
+                  label={`More for ${current.title}`}
+                  width={232}
+                  triggerClassName="flex items-center rounded-lg border border-line
+                                    bg-surface px-2.5 py-2 text-fg"
+                  trigger={shelfIcons.more}
+                >
+                  {(close) => (
+                    <>
+                      <MenuLabel>Prepare</MenuLabel>
+                      <MenuLink
+                        href={`/book/${current.id}/export`}
+                        icon={shelfIcons.prepare}
+                        onNavigate={close}
+                      >
+                        Export and publish
+                      </MenuLink>
+                      <MenuLink
+                        href={`/book/${current.id}/roadmap`}
+                        icon={shelfIcons.compass}
+                        onNavigate={close}
+                      >
+                        What to do next
+                      </MenuLink>
+                      <MenuSeparator />
+                      <MenuLabel>This book</MenuLabel>
+                      <MenuButton
+                        icon={shelfIcons.info}
+                        onClick={() => {
+                          onDetails(current);
+                          close();
+                        }}
+                      >
+                        Details
+                      </MenuButton>
+                      <MenuButton
+                        icon={shelfIcons.image}
+                        onClick={() => {
+                          onCover(current);
+                          close();
+                        }}
+                      >
+                        Change cover
+                      </MenuButton>
+                    </>
+                  )}
+                </Menu>
               </div>
             </div>
           </div>
-        </Panel>
+
+          {/* The next step, on the rail of the card that asked "what now?".
+              It is the roadmap's own answer rather than a second opinion. */}
+          {next?.next && (
+            <Link
+              href={`/book/${current.id}/roadmap`}
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-line
+                         bg-surface px-5 py-3 text-sm"
+            >
+              <span className="font-semibold text-accent">Next</span>
+              <span className="text-fg">{next.next.title}</span>
+              <span className="ml-auto text-xs text-muted">
+                {next.done} of {next.total} done
+              </span>
+            </Link>
+          )}
+        </section>
       ) : (
-        <Panel title="Nothing on the shelf yet">
-          <p className="text-muted">
+        <section className="rounded-2xl border border-line bg-panel p-8 text-center">
+          <p className="text-lg font-bold text-fg">Nothing on the shelf yet</p>
+          <p className="mx-auto mt-2 max-w-md text-muted">
             Start typing and name the book later, or bring in a .docx, .epub,
             .md, .txt or .html file.
           </p>
-          <Link
-            href="/book/new"
-            className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
-          >
-            Start a book
-          </Link>
-        </Panel>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/book/new"
+              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+            >
+              Start a book
+            </Link>
+            <Link
+              href="/book/import"
+              className="rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-fg"
+            >
+              Import a file
+            </Link>
+          </div>
+        </section>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Stat value={String(books)} label="books" />
-        <Stat value={words.toLocaleString()} label="words written" />
-        <Stat value={String(chapters)} label="chapters" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Stat
+          icon={shelfIcons.write}
+          value={week.words.toLocaleString()}
+          label="words this week"
+          note={
+            week.daysWritten > 0
+              ? `across ${week.daysWritten} ${week.daysWritten === 1 ? "day" : "days"}`
+              : "no writing days yet"
+          }
+        />
+        <Stat
+          icon={shelfIcons.flame}
+          value={String(run)}
+          label={run === 1 ? "day running" : "days running"}
+          // Stated, never scolded. The research was explicit about how writers
+          // feel regarding apps that turn a streak into a stick.
+          note={run > 0 ? "keep it or don't" : "a broken streak is fine"}
+        />
+        <Stat
+          icon={shelfIcons.target}
+          value={String(month.daysWritten)}
+          label="days in the last 30"
+          note={`${month.perWritingDay.toLocaleString()} words on a day you write`}
+        />
+        <Stat
+          icon={shelfIcons.overview}
+          value={String(books)}
+          label={books === 1 ? "book" : "books"}
+          note={`${words.toLocaleString()} words · ${chapters} chapters`}
+        />
       </div>
 
-      <Panel title="The rest of the job">
-        <p className="mb-4 text-muted">
-          Writing is one part. These are the others. Two work today; three are
-          what we are building.
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <h2 className="font-bold text-fg">The rest of the job</h2>
+        {/* Was "Two work today; three are what we are building" — untrue since
+            the last five features shipped, and exactly the kind of stale claim
+            the house rules exist to catch. All five areas work. */}
+        <p className="mt-1 mb-4 text-muted">
+          Writing is one part. These are the others, and all five of them work
+          today.
         </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {AREAS.filter((a) => a.id !== "overview").map((a) => (
@@ -491,17 +784,49 @@ function Overview({
               key={a.id}
               type="button"
               onClick={() => onGo(a.id)}
-              className="rounded-xl border border-line bg-surface p-4 text-left"
+              className="group rounded-xl border border-line bg-surface p-4 text-left
+                         transition-colors hover:border-accent/40"
             >
               <span className="flex items-center gap-2">
+                <span className="text-muted group-hover:text-accent">
+                  {a.icon}
+                </span>
                 <span className="font-bold text-fg">{a.label}</span>
-                {a.live ? <Badge live>Live</Badge> : <Badge>Planned</Badge>}
+                {!a.live && <Badge>Planned</Badge>}
               </span>
               <span className="mt-1.5 block text-sm text-muted">{a.blurb}</span>
             </button>
           ))}
         </div>
-      </Panel>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Words against the goal the writer set.
+ *
+ * Capped at 100% so a book that overshoots does not draw a bar out of its own
+ * box, and it says the raw pair as well as the percentage — a writer past their
+ * target wants to see by how much, not a full bar that stops telling them
+ * anything.
+ */
+function TargetBar({ words, target }: { words: number; target: number }) {
+  const share = Math.min(100, Math.round((words / target) * 100));
+  return (
+    <div className="mt-3.5 max-w-sm">
+      <div className="flex items-baseline justify-between text-xs">
+        <span className="font-semibold text-fg">{share}% of target</span>
+        <span className="text-muted">
+          {words.toLocaleString()} of {target.toLocaleString()}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised">
+        <div
+          className="h-full rounded-full bg-accent"
+          style={{ width: `${share}%` }}
+        />
+      </div>
     </div>
   );
 }
@@ -925,11 +1250,32 @@ function Badge({ children, live }: { children: ReactNode; live?: boolean }) {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+/**
+ * A number with something to hang it on.
+ *
+ * The old one was a value and a word. "6,236 words" invites the question it
+ * cannot answer — is that a lot, is it more than last week — so every card
+ * now carries a second line that says what the figure is *against*.
+ */
+function Stat({
+  value,
+  label,
+  note,
+  icon,
+}: {
+  value: string;
+  label: string;
+  note?: string;
+  icon?: ReactNode;
+}) {
   return (
     <div className="rounded-xl border border-line bg-panel px-5 py-4">
-      <p className="text-2xl font-extrabold text-fg">{value}</p>
-      <p className="text-sm text-muted">{label}</p>
+      <div className="flex items-center gap-2 text-muted">
+        {icon}
+        <p className="text-sm font-medium">{label}</p>
+      </div>
+      <p className="mt-1.5 text-2xl font-extrabold text-fg">{value}</p>
+      {note && <p className="mt-0.5 text-xs text-muted">{note}</p>}
     </div>
   );
 }
@@ -984,21 +1330,61 @@ function ChipButton({
   );
 }
 
-function SideButton({
+/**
+ * One rail row, as a button or a link.
+ *
+ * The active state is a tinted panel with accent text rather than the solid
+ * blue bar it replaced. At six items a saturated block is the heaviest thing
+ * on the screen and pulls the eye away from the work; the tint is enough to
+ * answer "where am I" without competing with the page.
+ */
+function SideItem({
+  icon,
+  active,
+  href,
   onClick,
   children,
 }: {
-  onClick: () => void;
+  icon: ReactNode;
+  active?: boolean;
+  href?: string;
+  onClick?: () => void;
   children: ReactNode;
 }) {
+  const className = `flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm
+     font-medium transition-colors ${
+       active
+         ? "bg-accent/10 text-accent"
+         : "text-muted hover:bg-raised hover:text-fg"
+     }`;
+
+  if (href) {
+    return (
+      <Link href={href} className={className}>
+        {icon}
+        {children}
+      </Link>
+    );
+  }
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-lg px-3 py-2 text-left text-sm text-muted"
+      aria-current={active ? "page" : undefined}
+      className={className}
     >
+      {icon}
       {children}
     </button>
+  );
+}
+
+/** A rail section heading. Small, quiet, and only where a group needs naming. */
+function SideGroup({ label }: { label: string }) {
+  return (
+    <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold tracking-wider text-muted uppercase">
+      {label}
+    </p>
   );
 }
 
