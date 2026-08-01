@@ -187,10 +187,36 @@ from them as *what is out there*, never as *the answer*.
       published book, so the blurb tool can show five actual blurbs from books
       like yours and the average length, instead of giving advice. This is what
       makes the blurb workshop teach rather than lecture.
-- [ ] **Category suggestions without licensing BISAC.** Read the subjects and
-      categories the comp titles sit in and suggest those. It answers the
-      question from real books rather than from a code list we would have to
-      pay BISG for. See the note under *Ruled out* about Thema.
+- [x] **Category suggestions without licensing BISAC.** Done 2026-08-01.
+      `/book/[bookId]/categories`, backed by `src/lib/comps/subjects.ts` (pure,
+      18 tests). Reads what comparable books are filed under and ranks it, so
+      the answer comes off the shelf rather than out of a code list we would
+      have to license from BISG.
+
+      **The cleaning is most of the feature.** Raw, a live search for dragons
+      answered `Fiction (20)` — true of every novel ever written — alongside
+      `Protected DAISY`, `In library` and `Collection:dragonlance`, which are
+      things a librarian recorded about a copy. Compound strings are split on
+      both shapes the services use, Google's path (`Fiction / Fantasy / Epic`)
+      and Open Library's reversed heading (`Fiction, fantasy, general`), which
+      is what lets the useless half be dropped while the useful half is kept.
+      The same search now answers `Dragons (14), Fantasy (14), Juvenile fiction
+      (9)`. Every one of the noise terms was found in live results rather than
+      guessed at.
+
+      Two deliberate refusals. **Nothing is merged semantically** — "Fantasy"
+      and "Fantasy fiction" stay separate, because every rule that folds those
+      together also folds "Science fiction" into "Science". And **nothing is
+      selected automatically**: each row says how many of the comparable books
+      carry it, because "9 of 20" and "2 of 20" are different kinds of advice
+      and the count is the only honest way to say which.
+
+      `summarise()` in `comps.ts` now runs through the same ranking, so the
+      comps screen stopped showing "Fiction" as its top subject too.
+
+      *Left:* these are what a *librarian* files a book under, not a shop's own
+      category list, and the screen says so. Matching them to KDP's own scheme
+      is still the writer's job.
 - [ ] **A cover wall for the genre.** The covers of the top books in a genre,
       shown together. Answers "I do not know what a thriller cover looks like",
       and it is the reference the cover checker has to check *against* — without

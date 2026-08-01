@@ -23,6 +23,10 @@
  * the model switched off.
  */
 
+// Not a runtime cycle: subjects.ts imports only the *type* from here, and a
+// type import is erased at compile time.
+import { rankSubjects } from "./subjects";
+
 /** One published book, normalised across the two services. */
 export interface CompTitle {
   /** Stable within a result set. ISBN-13 when we have one, else source + id. */
@@ -335,22 +339,15 @@ export function summarise(books: CompTitle[]): CompSummary {
     .map((b) => b.description?.length)
     .filter((n): n is number => typeof n === "number" && n > 0);
 
-  const counts = new Map<string, number>();
-  for (const book of books) {
-    // One book counts once per subject, however often it repeats it.
-    for (const subject of new Set(book.subjects)) {
-      counts.set(subject, (counts.get(subject) ?? 0) + 1);
-    }
-  }
-
   return {
     pagesFrom: pages.length,
     medianPages: median(pages),
     blurbsFrom: blurbs.length,
     medianBlurbChars: median(blurbs),
-    subjects: [...counts.entries()]
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
-      .slice(0, 12),
+    // Through `rankSubjects` rather than counted raw. Raw, a live search for
+    // dragons answers "Fiction (20)" — true of every novel ever written — and
+    // carries "Protected DAISY" and "In library", which are things a librarian
+    // recorded about a copy. See subjects.ts.
+    subjects: rankSubjects(books).slice(0, 12),
   };
 }
