@@ -20,5 +20,6 @@ export const SECTIONS = [
   ["Formats", "#formats"],
   ["The path", "#path"],
   ["Publishing checks", "#publishing"],
+  ["What's next", "#next"],
   ["FAQ", "#faq"],
 ] as const;
