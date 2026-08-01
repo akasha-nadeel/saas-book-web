@@ -68,15 +68,13 @@ import {
  * writer opening this should see immediately that the app has an opinion about
  * the whole job, not just the manuscript.
  *
- * **All six areas now have real work in them.** What is still unbuilt sits in
- * each area's own "Coming to this area" panel, as dead unclickable cards under
- * a PLANNED badge — the house rule is that a control either works or plainly
- * says it is not built, and a screen that quietly implies a working feature is
- * the exact thing this product is positioned against. The comments in `PLANNED`
- * record what has left each list, and a list that empties hides its panel
- * rather than heading an empty box.
- *
- * The styling is deliberately plain. What is under review is the shape.
+ * **All six areas are real, and nothing on this screen is a preview.** Every
+ * feature the dashboard names is built and works; there is no longer a
+ * "Coming to this area" panel anywhere, because there is nothing to put in one.
+ * The house rule still stands for the next thing that ships half-finished — a
+ * control either works or plainly says it is not built — and `Badge` is kept
+ * for it. Pending work lives in TODO.md, which is where it can be read in full
+ * rather than glimpsed as a grey card.
  */
 
 type Area = "overview" | "write" | "prepare" | "track" | "learn" | "tools";
@@ -147,49 +145,16 @@ const AREAS: {
   },
 ];
 
-/** Planned contents, per area. Nothing here is clickable — none of it exists. */
-const PLANNED: Record<string, [string, string][]> = {
-  track: [
-    // The sales import, cost against earnings, break-even and the ad sum have
-    // all moved out of this list — they are built, on one Track page.
-    [
-      "The book-three curve",
-      "Writers report no traction until their third book. Whether you are on that curve should not be a feeling. Needs more than one book's ledger to say anything, so it waits until there is one.",
-    ],
-  ],
-  learn: [
-    // The publishing roadmap and the beat sheets have moved out of this
-    // list — both are built.
-    // Honest numbers and the before-you-pay checks have moved out of this
-    // list — both are built, on one "Before you spend" page.
-    // Real length targets, the cover wall and the beat sheets have all moved
-    // out of this list — they are built.
-  ],
-  tools: [
-    // The cover checker has moved out of this list — it is built, on the
-    // covers page under the wall.
-    // Comp titles has moved out of this list — it is built. See the Tools area
-    // below, which now lists it as working and links to it per book.
-    // The blurb workshop has moved out of this list — it is built. See the
-    // Tools area, which links to it per book.
-    // Category suggestions has moved out of this list — it is built.
-    // The title check has moved out of this list — it is built.
-    // Paperback setup has moved out of this list — it is built.
-    // The ARC tracker has moved out of this list — it is built, and it landed
-    // in Track rather than here: reviews and money are the two halves of what
-    // happens to a book after it goes out, and a writer chasing one is usually
-    // looking at the other.
-    // The story bible has moved out of this list — it is built, in the
-    // editor's Story bible tab. Series-wide and AI-filled are still to come.
-    // Version history has moved out of this list — it is built, in the
-    // editor's Versions tab.
-    // Writing provenance has moved out of this list — it is built, as the
-    // Writing record. What is *not* built, and is not going in this list
-    // either, is a C2PA signature: its value is a chain to a certificate
-    // authority, and signing with a key we ship in the browser would produce a
-    // file that looks like the real thing and carries none of its weight.
-  ],
-};
+// `PLANNED` is gone. It held the unbuilt features, per area, as dead cards
+// under a badge — and it emptied as they shipped. The last entry was the
+// book-three curve, which is not waiting on work: it needs more than one book's
+// ledger before it can say anything, and that is the writer's data rather than
+// ours to produce. TODO.md keeps it, with the reasoning.
+//
+// The mechanism is worth rebuilding the day something ships half-finished: the
+// house rule is that a control either works or plainly says it is not built,
+// and an unbuilt feature belongs on the screen saying so rather than hidden.
+// `Badge` is still here for it.
 
 const VIEW_LABEL: Record<BookView, string> = {
   active: "Books",
@@ -1468,12 +1433,6 @@ function Tools({
         </p>
         <ToolGrid bookId={book.id} />
       </section>
-
-      {PLANNED.tools.length > 0 && (
-        <Panel title="Coming to this area">
-          <PlannedGrid items={PLANNED.tools} />
-        </Panel>
-      )}
     </div>
   );
 }
@@ -1536,12 +1495,6 @@ function Learn({ books }: { books: Book[] }) {
           </>
         )}
       </section>
-
-      {PLANNED.learn.length > 0 && (
-        <Panel title="Coming to this area">
-          <PlannedGrid items={PLANNED.learn} />
-        </Panel>
-      )}
     </div>
   );
 }
@@ -1766,12 +1719,6 @@ function Track({ books }: { books: Book[] }) {
           </ul>
         )}
       </section>
-
-      {PLANNED.track.length > 0 && (
-        <Panel title="Coming to this area">
-          <PlannedGrid items={PLANNED.track} />
-        </Panel>
-      )}
     </div>
   );
 }
@@ -1878,32 +1825,6 @@ function Cell({
 // being half built. It went out with Track, the last one that was empty.
 
 /* ---- Bits ---------------------------------------------------------------- */
-
-function PlannedGrid({ items }: { items: [string, string][] }) {
-  return (
-    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {items.map(([name, note]) => (
-        <li
-          key={name}
-          className="rounded-xl border border-dashed border-line bg-panel p-4 opacity-80"
-        >
-          <Badge>Planned</Badge>
-          <p className="mt-2 font-bold text-fg">{name}</p>
-          <p className="mt-1 text-sm text-muted">{note}</p>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-line bg-panel p-5">
-      <h2 className="mb-4 font-bold text-fg">{title}</h2>
-      {children}
-    </section>
-  );
-}
 
 function Badge({ children, live }: { children: ReactNode; live?: boolean }) {
   return (
