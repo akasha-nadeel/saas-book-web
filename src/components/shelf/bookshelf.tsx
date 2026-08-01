@@ -9,6 +9,7 @@ import { BookToolsDialog } from "@/components/shelf/book-tools-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
+import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import { type Account } from "@/lib/account";
@@ -86,6 +87,15 @@ const AREAS: {
   live: boolean;
   blurb: string;
   icon: React.ReactNode;
+  /**
+   * A stage in the book's life rather than something you consult.
+   *
+   * Overview, Write, Prepare and Track happen in that order; Learn and Tools
+   * are open at any point. The rail draws the two groups apart on this, so the
+   * order in this array stays the order on screen and the flag is the only
+   * thing to change if an area ever moves between them.
+   */
+  stage: boolean;
 }[] = [
   {
     id: "overview",
@@ -93,6 +103,7 @@ const AREAS: {
     live: true,
     blurb: "Where the book is, and what to do next.",
     icon: shelfIcons.overview,
+    stage: true,
   },
   {
     id: "write",
@@ -100,6 +111,7 @@ const AREAS: {
     live: true,
     blurb: "Draft it, and keep it safe. One part of the job.",
     icon: shelfIcons.write,
+    stage: true,
   },
   {
     id: "prepare",
@@ -107,6 +119,7 @@ const AREAS: {
     live: true,
     blurb: "Get it out without paying to find out what was wrong.",
     icon: shelfIcons.prepare,
+    stage: true,
   },
   {
     id: "track",
@@ -114,6 +127,7 @@ const AREAS: {
     live: true,
     blurb: "What the book cost against what it earned.",
     icon: shelfIcons.track,
+    stage: true,
   },
   {
     id: "learn",
@@ -121,6 +135,7 @@ const AREAS: {
     live: true,
     blurb: "The order to do things in, and what a shop expects.",
     icon: shelfIcons.learn,
+    stage: false,
   },
   {
     id: "tools",
@@ -128,6 +143,7 @@ const AREAS: {
     live: true,
     blurb: "The small jobs that cost a fortune elsewhere.",
     icon: shelfIcons.tools,
+    stage: false,
   },
 ];
 
@@ -204,9 +220,9 @@ export function Bookshelf({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<BookView>("active");
-  const [dialog, setDialog] = useState<"help" | "support" | "import" | null>(
-    null,
-  );
+  const [dialog, setDialog] = useState<
+    "help" | "support" | "feedback" | "import" | null
+  >(null);
 
   /**
    * `/` puts the caret in the search box, the convention every list-shaped app
@@ -329,8 +345,14 @@ export function Bookshelf({
           Open<span className="text-accent">Chapter</span>
         </Link>
 
+        {/* Two groups, because there are two kinds of item here and the flat
+            list said so nowhere. Overview, Write, Prepare and Track are the
+            arc of a book's life, in the order it happens. Learn and Tools are
+            not stages — you dip into them at any point — so a rule separates
+            them rather than letting the eye read six equal steps and expect
+            Tools to come after Learn. */}
         <nav className="flex flex-col gap-0.5">
-          {AREAS.map((a) => (
+          {AREAS.filter((a) => a.stage).map((a) => (
             <SideItem
               key={a.id}
               icon={a.icon}
@@ -342,6 +364,25 @@ export function Bookshelf({
           ))}
         </nav>
 
+        <div className="my-3 h-px bg-line" />
+
+        <nav className="flex flex-col gap-0.5">
+          {AREAS.filter((a) => !a.stage).map((a) => (
+            <SideItem
+              key={a.id}
+              icon={a.icon}
+              active={area === a.id}
+              onClick={() => setArea(a.id)}
+            >
+              {a.label}
+            </SideItem>
+          ))}
+        </nav>
+
+        {/* Getting help, then giving it back, then the account. Help before
+            Support because Support's own first line points at the guide, and
+            Feedback after both because it is the other direction: nothing
+            comes back, and a writer reaching for it is not stuck. */}
         <div className="mt-auto flex flex-col gap-0.5 pt-6">
           <SideItem icon={shelfIcons.help} onClick={() => setDialog("help")}>
             Help
@@ -351,6 +392,12 @@ export function Bookshelf({
             onClick={() => setDialog("support")}
           >
             Support
+          </SideItem>
+          <SideItem
+            icon={shelfIcons.feedback}
+            onClick={() => setDialog("feedback")}
+          >
+            Send feedback
           </SideItem>
           <SideItem icon={shelfIcons.pricing} href="/upgrade">
             Pricing
@@ -537,6 +584,9 @@ export function Bookshelf({
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && (
         <SupportDialog onClose={() => setDialog(null)} />
+      )}
+      {dialog === "feedback" && (
+        <FeedbackDialog onClose={() => setDialog(null)} />
       )}
     </div>
   );

@@ -134,6 +134,19 @@ export const shelfIcons = {
       <path d="M9.5 9.2a2.6 2.6 0 1 1 3.4 2.5c-.6.2-.9.8-.9 1.4v.4M12 16.8v.2" />
     </Svg>
   ),
+  /**
+   * Feedback: a paper plane, not another speech bubble.
+   *
+   * Support already has the bubble, and the two sit two rows apart. Feedback
+   * goes one way — you send it and nobody replies — which is what a plane says
+   * and a conversation bubble does not.
+   */
+  feedback: (
+    <Svg>
+      <path d="M21.5 2.5 2.5 9.5l7 3 3 7Z" />
+      <path d="m9.5 12.5 5-5" />
+    </Svg>
+  ),
   support: (
     <Svg>
       <path d="M21 11.5a8 8 0 0 1-11.6 7.1L3 20.5l1.9-6.3A8 8 0 1 1 21 11.5Z" />
