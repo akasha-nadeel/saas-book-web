@@ -1,6 +1,201 @@
 # OpenChapter — what's next
 
-Last updated 2026-07-29. Ordered roughly by value, not by effort.
+Last updated 2026-08-01. Ordered roughly by value, not by effort.
+
+## The direction changed
+
+**OpenChapter is no longer primarily a writing-and-export app.** As of
+2026-08-01 it is meant to solve the problems book writers actually have, and
+the writing app is one part of that rather than the whole of it.
+
+The list below comes from four batches of Reddit research (r/selfpublish,
+r/writing), sorted by one rule: **what can be built in code, what needs people
+recruited, and what no tool fixes at all.** Everything in the first group is
+here. The other two groups are at the end of this section, written down so they
+are not re-proposed every quarter.
+
+Everything already shipped — the editor, the shelf, import, export, the
+pre-upload check, billing — stays. Most of the list below extends it rather
+than replacing it.
+
+### Start here — days each, and mostly assembly
+
+- [ ] **"Where you left off" card.** On opening a chapter, show the last
+      paragraph written, the note about what happens next, and who is in the
+      scene. This answers the top-voted pain in the whole research — *"I have
+      about 17 free minutes with no interruptions a day"* against *"it takes
+      forever to get back in the groove"*. Assembly from `lastOpened`, the notes
+      panel and word counts; almost nothing new to invent.
+- [ ] **Idea parking lot.** Capture a new idea in ten seconds *without leaving
+      the current book*. Writers repeatedly describe a shiny new idea stalling
+      book two of a trilogy. Tiny, and it protects the thing they already
+      started.
+- [ ] **Publishing roadmap.** Every step from blank page to published, in
+      order, with progress saved. Confirmed by three separate batches — the
+      clearest case being a writer who found out ARCs were essential *after*
+      publishing. Content and checkboxes; no new infrastructure.
+- [ ] **Backups and version history.** Snapshots and "restore an earlier
+      draft". Extends `library-store.ts` and `sync.ts`, which already do most of
+      the work.
+- [ ] **Revision tracker.** Mark a chapter done; count and show the passes.
+      *"My first chapter has had about twenty rounds of editing."* Making the
+      loop visible is what breaks it — nobody can see themselves circling.
+- [ ] **Surface what is already built.** Dictation (`use-dictation.ts` — free,
+      no key, Chrome/Edge) answers *"the process of typing drains my
+      discipline"*, raised in two separate batches. Pen names already work,
+      because `author` in `publishing.ts` is per-book. Neither appears anywhere
+      on the landing page. This costs nothing to ship.
+
+### Then — the differentiators
+
+- [ ] **KDP sales import and book P&L.** KDP exports sales as a spreadsheet;
+      parsing one is a file import, which this codebase is already good at.
+      Unlocks spend against earnings per book, break-even, and the "no traction
+      until book three" curve across a backlist. It answers the loudest money
+      pain in the research — *"I look at the massive amount of money I
+      wasted"* — and it is arithmetic, not AI. Fold the ad break-even sum into
+      the same screen.
+- [ ] **Genre beat sheets.** Structure, word targets, and the midpoint. Three
+      batches name the same wall: *"First 20,000 words fly by. Then I realize I
+      have enough content to get to 30,000."* Builds on `book-kinds.ts` and the
+      already-written, currently-unused `book-templates.ts`.
+- [ ] **Story bible.** Characters, places, timeline — and **across a series**,
+      not one book, which is how it was asked for. Extends the notes panel.
+- [ ] **Blurb workshop.** The real per-store character limits and a structure
+      checklist. Explicitly *not* "AI writes your blurb": writers in this
+      research describe an AI-written blurb as a thing that hurt their sales.
+      Extends `publishing.ts`.
+- [ ] **Paperback setup.** Spine width (page count × paper thickness), margins,
+      gutter, bleed. *"I'm just cursed when it comes to setting up paperbacks —
+      it always takes ten times as long as it should."* Extends `page-setup.ts`,
+      and it is the kind of arithmetic nobody else bothers to do properly.
+- [ ] **Categories and comp titles.** A real BISAC picker, replacing today's
+      free-text field in `publishing.ts` — which is already noted further down
+      this file as a gap.
+- [ ] **Honest numbers.** The real medians — 97% of books sell under 5,000
+      copies, most under 100 — shown *before* somebody spends a thousand pounds
+      on a cover. Content only, and it is the most on-brand thing on this list:
+      everyone else in this market sells hope.
+- [ ] **Before-you-pay checklist.** What to verify before hiring a publisher,
+      a cover designer or a promotion service. Content only. **Do not name
+      specific companies as scams**, however often they come up by name in the
+      research — that is a legal problem, not a feature.
+
+### Later
+
+- [ ] **Prose report — and never a prose editor.** Dialogue tags, filter words,
+      adverb density, plot-hole notes. Report it; never rewrite it. This is the
+      `storeReadiness()` pattern pointed at prose instead of metadata, and the
+      distinction is load-bearing: writers in this research are sick of
+      Grammarly, and the product's strongest claim is that the assistant has no
+      write access to the manuscript. A report keeps both promises. An AI
+      rewrite breaks both.
+- [ ] **"Why isn't it selling" diagnostic.** A structured self-audit — cover,
+      blurb, categories, price, sample. Extends `storeReadiness()`.
+- [ ] **Cover checker.** Not a designer: is the title legible at thumbnail
+      size, is the resolution enough, does it match the trim ratio. Honest,
+      useful, and nobody offers it.
+- [ ] **Sprints, streaks and session history.** Supports finishing; does not
+      promise it.
+- [ ] **ARC tracker.** Who holds the ARC, who reviewed, when it is due. A
+      tracker, not a marketplace — the distinction is the whole point.
+- [ ] **Writing provenance.** Evidence a human wrote the book, over time, built
+      from the keystroke-level autosave history the app already keeps. In a
+      market where legitimate authors are being *accused* of using AI, no
+      competitor can offer this, because none of them has the history. Needs
+      care around privacy and around what it does and does not prove; the claim
+      has to stay narrower than "this proves you wrote it".
+
+### Built on two free APIs
+
+**Google Books** (`googleapis.com/books/v1/volumes`) and **Open Library**
+(`openlibrary.org`, plus `covers.openlibrary.org`) are both free, need no key
+for basic use, and between them answer most of what a writer cannot look up
+today. Cache everything — both are rate-limited, and Open Library is
+crowd-sourced, so records vary from complete to nearly empty. Present anything
+from them as *what is out there*, never as *the answer*.
+
+- [ ] **Comp titles.** Search by genre or keyword; get real published books with
+      title, author, cover, page count and categories. Writers need comps for a
+      KDP listing and for a query letter, and currently guess. **Build this
+      first — the next three fall out of having it.**
+
+      **This is the one place in the cluster where AI earns its cost:
+      *deciding which books are actually like yours*.** Everything else here is
+      a plain request and some arithmetic — no key, no model, no bill. But a
+      keyword search returns forty books of which five are genuinely
+      comparable, and sorting those five out is a fuzzy judgement, which is
+      what a model is for. Three jobs and no more: turn the writer's blurb and
+      opening chapter into a good search, rank and filter what comes back, and
+      name the pattern across them ("blurbs in this genre usually open with a
+      question").
+
+      Use it for the judgement, never the fetching. The APIs are free and every
+      model call is not, and a feature that calls a model to read a page count
+      is one that gets switched off when the invoice arrives. All three jobs
+      stay inside the standing position — the assistant reads and reports, and
+      never writes into the book.
+- [ ] **Blurb benchmarking.** Google Books returns the real blurb of every
+      published book, so the blurb tool can show five actual blurbs from books
+      like yours and the average length, instead of giving advice. This is what
+      makes the blurb workshop teach rather than lecture.
+- [ ] **Category suggestions without licensing BISAC.** Read the subjects and
+      categories the comp titles sit in and suggest those. It answers the
+      question from real books rather than from a code list we would have to
+      pay BISG for. See the note under *Ruled out* about Thema.
+- [ ] **A cover wall for the genre.** The covers of the top books in a genre,
+      shown together. Answers "I do not know what a thriller cover looks like",
+      and it is the reference the cover checker has to check *against* — without
+      it, that checker can only judge resolution and legibility, not convention.
+- [ ] **Is this title already taken?** One search. Cheap, and writers ask it
+      constantly.
+- [ ] **Real length targets.** Page counts of actual books in the genre,
+      replacing the folklore numbers currently hard-coded in `book-kinds.ts`.
+
+### Two standards worth using rather than inventing
+
+- **C2PA / Content Credentials** for the provenance feature. It is the open
+  standard Adobe and the camera makers are backing for "a human made this", and
+  `c2pa-js` exists. A homegrown format proves the same thing and convinces
+  nobody; the point of that feature is being *believed*.
+- **Thema** (EDItEUR) instead of BISAC for subject codes, if a code list is
+  needed at all. BISAC is owned by BISG and licensed; Thema is open.
+
+### Ruled out, and why
+
+Written down so they stop being re-proposed.
+
+**Needs people recruited, not code.** Cover design, editing, beta readers, ARC
+readers, community, coaching, running anyone's marketing. Each is a two-sided
+marketplace with a chicken-and-egg problem — readers will not come before
+writers, writers will not come before readers — and running one is a different
+company from shipping software.
+
+**Do not solve either of these with AI.** Covers and editing are the two
+most-wanted items in the research, and the cheap way to build both is
+generative. Doing so would contradict, in one release, the assistant's lack of
+write access, the roadmap's promise that covers will not come from a stock site
+full of AI, and the FAQ's statement that manuscripts are not training data — in
+front of the one audience that checks. If they are ever built, they come from
+real designers and real editors.
+
+**No API exists for these, whatever anyone sells you.** Amazon has no public API
+for KDP sales *or* for keywords — which is why the money feature reads the
+spreadsheet KDP already lets you download, and why keyword research is not on
+this list at all. Publisher Rocket and its kind scrape; building on that
+inherits their terms-of-service problem. NetGalley, BookSirens and BookSprout
+have no public APIs either, so the ARC tracker is manual entry — which is fine,
+because the pain was "six sites and a spreadsheet", not "no API".
+
+**No tool fixes these.** Finishing the book. Judging whether your own writing is
+good. Self-doubt, loneliness, negativity from family, nobody reading it, health,
+ADHD, day jobs, unwanted advice. Some of the list above *supports* these;
+nothing on it solves them, and the people selling that fix are the ones this
+audience has already been burned by.
+
+**Community is the open question.** It was asked for more times than anything
+else across all four batches and it is the strongest thing that cannot be a
+feature. It deserves a real decision at some point rather than another shrug.
 
 ## Built, but held back on purpose
 
