@@ -63,6 +63,10 @@ const WRITE = [
     "Your manuscript lives in your browser and syncs when you are signed in. It does not need us to be up.",
   ],
   [
+    "Proof of the work, if you are ever accused",
+    "A day-by-day record of the book accumulating, the drafts saved along the way, and a fingerprint of the text — in a document you can send. Evidence, not proof, and it says which it is in its own words.",
+  ],
+  [
     "An assistant that cannot touch your book",
     "No write access at all. It reads one chapter, only when you ask. Every word stays yours.",
   ],
@@ -130,10 +134,6 @@ const LATER = [
   [
     "Comps ranked, not just found",
     "A model reading your opening chapter to say which five of twenty are genuinely like your book, rather than which forty matched a word.",
-  ],
-  [
-    "Writing provenance",
-    "Evidence a human wrote the book, over months, from the save history we already keep. For when someone accuses you.",
   ],
   [
     "The book-three curve",

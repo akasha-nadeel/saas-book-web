@@ -129,10 +129,11 @@ const PLANNED: Record<string, [string, string][]> = {
     // editor's Story bible tab. Series-wide and AI-filled are still to come.
     // Version history has moved out of this list — it is built, in the
     // editor's Versions tab.
-    [
-      "Writing provenance",
-      "Evidence a human wrote the book, from the save history we already keep.",
-    ],
+    // Writing provenance has moved out of this list — it is built, as the
+    // Writing record. What is *not* built, and is not going in this list
+    // either, is a C2PA signature: its value is a chain to a certificate
+    // authority, and signing with a key we ship in the browser would produce a
+    // file that looks like the real thing and carries none of its weight.
   ],
 };
 
@@ -612,6 +613,7 @@ function Write({
                     <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
                     <Chip href={`/book/${book.id}/title-check`}>Title</Chip>
                     <Chip href={`/book/${book.id}/paperback`}>Paperback</Chip>
+                    <Chip href={`/book/${book.id}/provenance`}>Record</Chip>
                     <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
                     <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
                     <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
@@ -707,7 +709,11 @@ function Tools({ books }: { books: Book[] }) {
           beside the shelf it has to sit on, and a check on the file a shop will receive. <strong className="text-fg">Title</strong>{" "}
           — whether somebody else&rsquo;s book turns up first when a reader
           searches for yours. All five read Google Books and Open Library, free,
-          and none of them sends anything you have written.
+          and none of them sends anything you have written.{" "}
+          <strong className="text-fg">Writing record</strong> — the day-by-day
+          trail your work left, for when somebody accuses you of not having
+          written it. Evidence rather than proof, and it says so in the document
+          it produces.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -727,6 +733,7 @@ function Tools({ books }: { books: Book[] }) {
                   <Go href={`/book/${b.id}/covers`}>Covers</Go>
                   <Go href={`/book/${b.id}/title-check`}>Title</Go>
                   <Go href={`/book/${b.id}/paperback`}>Paperback</Go>
+                  <Go href={`/book/${b.id}/provenance`}>Record</Go>
                 </span>
               </li>
             ))}

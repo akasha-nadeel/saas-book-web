@@ -122,6 +122,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "What a book cost against what it earned. Add what you spent on covers, editing and ads, then import a sales report as CSV — you say which column is which, so it works whatever the shop calls things. It tells you how many more copies get you level, using the per-copy figure your own rows show rather than a royalty rate we made up. Amazon has no public API, so nothing is fetched and nothing is sent.",
       },
       {
+        name: "Writing record",
+        desc: "For when somebody accuses you of not having written your own book. It gathers what the app has been keeping anyway — which days you wrote on, how the count moved, and every draft saved along the way — into a plain-text document you can send, with a SHA-256 fingerprint of the manuscript. The limits are in the document as well as on the screen: it is evidence rather than proof, it is not tamper-evident, it starts when you started here, and an imported manuscript lands as one large day. The fingerprint is only worth something once you timestamp it somewhere we do not control, so the page tells you to do that and never offers to keep it.",
+      },
+      {
         name: "Advance copies",
         desc: "Who holds an advance copy, who read it, who is late — one list instead of six sites and a spreadsheet. Record where you found each reader and what they actually read, since the review everybody remembers comes from someone who does not read your genre. Late readers sort to the top, and if the book has a publication date the page works back to when copies need to go out. It finds nobody for you and sends nothing.",
       },

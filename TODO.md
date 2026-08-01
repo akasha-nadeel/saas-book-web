@@ -405,12 +405,40 @@ than replacing it.
       overdue from one minute past midnight on the morning their review was due.
 
       *Left:* not synced, like the other own-key stores.
-- [ ] **Writing provenance.** Evidence a human wrote the book, over time, built
-      from the keystroke-level autosave history the app already keeps. In a
-      market where legitimate authors are being *accused* of using AI, no
-      competitor can offer this, because none of them has the history. Needs
-      care around privacy and around what it does and does not prove; the claim
-      has to stay narrower than "this proves you wrote it".
+- [x] **Writing provenance.** `src/lib/provenance.ts` + `/book/[bookId]/provenance`,
+      called the Writing record, linked from Tools.
+
+      It gathers what the app was keeping anyway — the day log from
+      `activity.ts`, the saved drafts from `history.ts` — into a plain-text
+      document that survives being pasted into an email or a contest form, plus
+      a SHA-256 of the manuscript.
+
+      **The claim stayed narrower than "this proves you wrote it"**, which was
+      the condition on building it at all. Four limits are stated on the screen
+      *and again in the exported file*, because the screen is not what gets
+      forwarded: it is evidence rather than proof; it is not tamper-evident,
+      since the record is in a browser the writer controls; it begins when they
+      started here, so an imported manuscript lands as one large day; and the
+      day figures are library-wide rather than per book. `importDays()` surfaces
+      those large days on the page on purpose — being surprised by your own
+      record in somebody else's hands is the failure this exists to prevent.
+
+      **The fingerprint is the only part that is not self-reported**, and it is
+      worth nothing until it is timestamped somewhere we do not control. The
+      page says so and deliberately does not offer to store it: a notary that is
+      also the accused party is not a notary. `crypto.subtle` is absent outside
+      a secure context (plain `http://<lan-ip>`, the same trap `newId()` works
+      around), so the hash degrades to null and the rest of the record still
+      builds.
+
+      *Not doing:* **C2PA**. Its value is a signature chained to a certificate
+      authority; signing with a key shipped in the browser produces a file that
+      looks like the real thing and carries none of its weight, which is worse
+      than not signing. Revisit only with a real CA relationship.
+
+      *Left:* keystroke-level history was the original idea and is not what got
+      built — the app keeps eight snapshots per chapter and a net figure per
+      day, not every edit. Storing more is a localStorage question first.
 
 ### Built on two free APIs
 
