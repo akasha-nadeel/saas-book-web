@@ -20,12 +20,29 @@ than replacing it.
 
 ### Start here — days each, and mostly assembly
 
-- [ ] **"Where you left off" card.** On opening a chapter, show the last
-      paragraph written, the note about what happens next, and who is in the
-      scene. This answers the top-voted pain in the whole research — *"I have
-      about 17 free minutes with no interruptions a day"* against *"it takes
-      forever to get back in the groove"*. Assembly from `lastOpened`, the notes
-      panel and word counts; almost nothing new to invent.
+- [x] **"Where you left off" card.** Done 2026-08-01. On the book overview,
+      which is the screen a writer lands on. Backed by `src/lib/resume.ts`
+      (pure, 13 tests): the last paragraph of the chapter they were in, and the
+      first line of the note they left themselves.
+
+      This answers the top-voted pain in the whole research — *"I have about 17
+      free minutes with no interruptions a day"* against *"it takes forever to
+      get back in the groove"*. Those are the same complaint: most of a short
+      session goes on remembering rather than writing, and nothing on the
+      market addresses it because every writing app is built for somebody with
+      two clear hours.
+
+      **Nothing new is stored.** The paragraph is read back out of the
+      manuscript and the note is the chapter notes panel that already exists;
+      the whole feature is putting the two where the writer arrives. The
+      chapter is `lastOpenedId` when it has prose, falling back to the last
+      chapter with any — somebody who opened chapter twelve, wrote nothing and
+      shut the laptop is not resuming there, and quoting an empty chapter back
+      at them is worse than saying nothing. The excerpt is the paragraph's
+      *tail* rather than its head, cut at a word: what a returning writer needs
+      is the sentence they stopped in the middle of.
+
+      *Left:* "who is in the scene" wants the story bible, which is not built.
 - [ ] **Idea parking lot.** Capture a new idea in ten seconds *without leaving
       the current book*. Writers repeatedly describe a shiny new idea stalling
       book two of a trilogy. Tiny, and it protects the thing they already

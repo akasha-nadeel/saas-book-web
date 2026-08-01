@@ -10,6 +10,7 @@ import {
   type BookPanelMode,
 } from "@/components/editor/book-panel";
 import { BookGuide } from "@/components/editor/book-guide";
+import { ResumeCard } from "@/components/editor/resume-card";
 import { LoadingScreen } from "@/components/loading-screen";
 import { findBook, setPref, touchLastOpenedBook } from "@/lib/library-store";
 import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
@@ -140,7 +141,15 @@ export function BookOverview({ bookId }: { bookId: string }) {
         always
       />
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* The resume card sits above the guide rather than replacing it: the
+          guide explains the panel to somebody who has just arrived, and the
+          card is for somebody coming back. A book with prose in it has both,
+          in that order, because the returning writer is the common case and
+          the one with seventeen minutes. */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        <div className="mx-auto w-full max-w-2xl px-6 pt-6">
+          <ResumeCard book={book} />
+        </div>
         <BookGuide title={book.title} entering={entering} />
       </div>
     </div>
