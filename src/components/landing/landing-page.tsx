@@ -19,11 +19,19 @@ import { displayPrice, perMonthOf } from "@/lib/billing/plans";
  * they find a feature.
  *
  * The rule that survives every rewrite: **nothing here claims something the
- * code cannot do.** Write and Prepare are built and shipping. Track is not
- * built at all, so it sits under a heading that says so and carries a Planned
- * badge on every card. The reader this page is written for has already bought a
- * course that taught nothing and a cover that turned out to be AI; the only
- * asset it has that a funded competitor cannot copy is being checkable.
+ * code cannot do, and nothing stays marked unbuilt once it is built.** All
+ * three phases ship today; what is genuinely still to come is in one section
+ * under a Not-built-yet badge, and it is a short list.
+ *
+ * That second half of the rule is easy to forget, because it fails in the safe
+ * direction. Track carried "none of it exists today, do not sign up for it"
+ * for a while after it shipped — an understatement rather than an overclaim,
+ * and still a page saying something untrue about the product. This list has to
+ * be walked whenever a feature lands.
+ *
+ * The reader this page is written for has already bought a course that taught
+ * nothing and a cover that turned out to be AI; the only asset it has that a
+ * funded competitor cannot copy is being checkable.
  */
 
 const FREE_LINE =
@@ -31,24 +39,28 @@ const FREE_LINE =
 
 const WRITE = [
   [
+    "Where you left off",
+    "Open the book and the last paragraph you wrote is there, with the note you left yourself. For the seventeen free minutes, not the two clear hours.",
+  ],
+  [
+    "An idea parking lot",
+    "Catch the shiny new idea without leaving the chapter you are in. Leaving is the interruption.",
+  ],
+  [
+    "The shape most novels share",
+    "Your word count placed on it, in plain words, for when the middle has run out of road. A convention, not a rule.",
+  ],
+  [
+    "Versions, and how many sittings",
+    "A version kept every ten minutes or so, and a count of how often you have been round this chapter. A bad afternoon is not permanent.",
+  ],
+  [
     "A distraction-light editor",
-    "Chapters, focus mode and typewriter scrolling. The page holds still while you type.",
+    "Chapters, focus mode, typewriter scrolling, and free dictation for the days when typing is the thing draining you.",
   ],
   [
-    "Dictation, free",
-    "For the days when typing itself is what drains you. No key, no bill — Chrome and Edge.",
-  ],
-  [
-    "It saves as you type",
-    "And syncs to your other machine when you are signed in. Nothing to remember.",
-  ],
-  [
-    "It works offline",
-    "Your manuscript lives in your browser. It does not need us to be up.",
-  ],
-  [
-    "Pen names",
-    "Each book carries its own author name, if you need separation from the people who know you.",
+    "It saves as you type, and works offline",
+    "Your manuscript lives in your browser and syncs when you are signed in. It does not need us to be up.",
   ],
   [
     "An assistant that cannot touch your book",
@@ -58,118 +70,74 @@ const WRITE = [
 
 const PREPARE = [
   [
+    "Every step, in the order it happens",
+    "So you do not learn that advance copies had to go out weeks ago on the day after you publish. Most of it ticks itself from what is in your book.",
+  ],
+  [
     "A pre-upload check",
     "It names what a store would refuse — missing cover, malformed ISBN, blurb over the limit — and says which problems would actually stop the upload as against the ones that only cost you readers. It never blocks your export.",
   ],
   [
+    "The books yours sits beside",
+    "Real comparable titles, found by reading your blurb rather than matching one word — and from them, what your genre is filed under, how long those books run, and what their covers look like at the size a reader meets them.",
+  ],
+  [
+    "Your blurb, counted against real ones",
+    "The shops' limit, five actual blurbs from books like yours, and the length they run to. We do not write it.",
+  ],
+  [
+    "Is the title taken, and will the cover be refused",
+    "Whether somebody else's book turns up first when a reader searches for yours; and whether your artwork is the right size, shape and weight to upload.",
+  ],
+  [
+    "Paperback numbers, worked out",
+    "Spine width, inside margin and the full cover wrap, from your page count and trim size.",
+  ],
+  [
     "Four files out",
-    "EPUB, DOCX, PDF at your trim size, and Markdown. No watermark, no export cap.",
-  ],
-  [
-    "An EPUB built to be sold",
-    "Checked against EPUBCheck 5.3 for EPUB 3.3, with no errors and no warnings.",
-  ],
-  [
-    "Six ways in",
-    "Bring in a .docx, .epub, .md, .txt or .html file and your headings become chapters. An audiobook can be transcribed and split into chapters too.",
-  ],
-  [
-    "Title, copyright and contents pages",
-    "Generated for the EPUB and the PDF from details you already filled in.",
+    "EPUB, DOCX, PDF at your trim size, and Markdown. No watermark, no export cap, and the EPUB is checked against EPUBCheck 5.3 with no errors and no warnings.",
   ],
 ] as const;
 
 const TRACK = [
   [
-    "Import your KDP sales report",
-    "Your sales already come as a spreadsheet. Reading one is a file import, which this app is already good at.",
+    "Cost against earnings, per book",
+    "Cover, editing, ads and proof copies on one side. Royalties on the other. Nobody keeps this, which is why the total is always a shock.",
   ],
   [
-    "Cost against earnings",
-    "Cover, editing, ads and proof copies on one side. Royalties on the other. Per book.",
+    "Import your sales report",
+    "Amazon has no public API, so nothing is fetched — but it will let you download your sales. Hand the file over and you say which column is which, so it works whatever the shop renames next year.",
   ],
-  ["Break-even", "How many more copies before you stop being underwater."],
   [
-    "The book-three curve",
-    "Writers report no traction until their third book. Whether you are on that curve should not be a feeling.",
+    "How many more copies get you level",
+    "Worked from what a copy has actually earned you, never from a royalty rate we invented. If your rows do not say, neither do we.",
+  ],
+  [
+    "What it usually costs, and what to check first",
+    "What a book typically earns, what covers and editing and promotion run to, and what to establish before the money moves. Every figure says where it came from.",
   ],
 ] as const;
 
 const LATER = [
   [
-    "A publishing roadmap",
-    "Every step from blank page to published, in order, so you do not learn about ARCs after you publish.",
-  ],
-  [
-    "Where you left off",
-    "Open a chapter and see your last paragraph, your note about what happens next, and who is in the scene.",
-  ],
-  [
-    "An idea parking lot",
-    "Catch the shiny new idea in ten seconds without abandoning book two.",
-  ],
-  [
-    "Genre beat sheets",
-    "For the wall at 30,000 words of an 80,000-word book.",
-  ],
-  [
     "A story bible",
-    "Characters, places and timeline — across a series, not one book.",
+    "Characters, places and timeline, across a series rather than one book — filled in by the assistant reading your chapters, which it still cannot write into.",
   ],
   [
-    "Version history",
-    "Snapshots and restore, so a bad afternoon is not permanent.",
-  ],
-  // The six below are the ones Google Books and Open Library make possible.
-  // Both are free and need no key, which is why this cluster is realistic
-  // rather than aspirational — see TODO.md.
-  [
-    "Comp titles",
-    "Books yours is genuinely like — found by reading your blurb and opening chapter, not by matching the word “fantasy” against forty thousand others. Every listing and every query letter asks for these, and everyone guesses.",
+    "An ARC tracker",
+    "Who holds an advance copy, who reviewed, when it is due. Instead of six sites and a spreadsheet.",
   ],
   [
-    "Blurb help, with evidence",
-    "Five real blurbs from books like yours and the length they actually run to — instead of advice, and instead of a chatbot writing it for you.",
-  ],
-  [
-    "Which category your book belongs in",
-    "Worked out from where books like yours are actually filed.",
-  ],
-  [
-    "What covers in your genre look like",
-    "The covers of the books you are shelved beside, together on one page. So you know the convention before you pay someone to break it.",
-  ],
-  [
-    "Is your title already taken?",
-    "One search, before you print it on anything.",
-  ],
-  [
-    "Real length targets",
-    "How long books in your genre actually are, from books that exist — not the numbers everyone repeats.",
-  ],
-  [
-    "Paperback setup",
-    "Spine width, margins, gutter and bleed, worked out instead of guessed at.",
-  ],
-  [
-    "A cover checker",
-    "Is the title legible at thumbnail size? Is the resolution enough? We check covers. We do not design them.",
-  ],
-  [
-    "Progress and pace",
-    "Words per session, your streak, and the date you finish at this rate. Arithmetic, not a coach — it shows you the number and lets you decide what it means.",
-  ],
-  // The distinction in this one is the whole product position, not a nicety.
-  // Everything named here is the assistant *reading*: summarising, extracting,
-  // comparing. None of it writes to the manuscript, which is what keeps the
-  // "cannot touch your book" card and the refusal below from being lies.
-  [
-    "An assistant that reads, never writes",
-    "Remind you where you left off. Pull your characters into a story bible. Flag that her eyes were grey in chapter two. Work out which published books yours is actually like. It reports; you decide. It still cannot type a word into your book.",
+    "Comps ranked, not just found",
+    "A model reading your opening chapter to say which five of twenty are genuinely like your book, rather than which forty matched a word.",
   ],
   [
     "Writing provenance",
     "Evidence a human wrote the book, over months, from the save history we already keep. For when someone accuses you.",
+  ],
+  [
+    "The book-three curve",
+    "Writers report no traction until their third book. Whether you are on that curve should not be a feeling — but it needs more than one book of history to say anything.",
   ],
 ] as const;
 
@@ -192,7 +160,7 @@ const REFUSALS = [
 const FAQ = [
   [
     "What doesn’t it do?",
-    "A fair amount. It does not design covers, edit your prose, write your blurb, market your book, buy ads, upload to any store, or introduce you to other writers. Some of that is on the roadmap above. Most of it is not.",
+    "A fair amount. It does not design covers, edit your prose, write your blurb, market your book, buy ads, upload to any store, or introduce you to other writers. It will tell you what a cover needs to be and show you the shelf yours has to sit on; it will not draw one. It will count what is in your prose; it will not change a word. Everything else on your list is still yours.",
   ],
   [
     "Who owns what I write?",
@@ -346,20 +314,22 @@ export function LandingPage() {
           </p>
         </Band>
 
-        <Band id="next" tint>
+        {/* Was the unbuilt phase, with a line telling readers not to sign up
+            for it. It is built now, and leaving that warning up would have
+            been a different kind of lie from the usual one. */}
+        <Band tint>
           <Head
             eyebrow="Phase three"
-            badge="Not built yet"
-            warn
+            badge="Working today"
             title="Track — find out what actually happened"
-            lead="This is the part nobody does for indie authors, and it is what we are building next. None of it exists today. Do not sign up for it."
+            lead="The part nobody does for indie authors: what the book cost against what it earned, and how far off level it still is."
           />
-          <Cards items={TRACK} planned />
+          <Cards items={TRACK} />
         </Band>
 
-        <Band>
+        <Band id="next">
           <Head
-            eyebrow="Also planned"
+            eyebrow="Still to come"
             badge="Not built yet"
             warn
             title="What comes after that"
