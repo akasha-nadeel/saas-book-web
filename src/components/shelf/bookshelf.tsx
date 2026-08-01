@@ -41,12 +41,13 @@ import { useCover, useHydrated, useShelf } from "@/lib/use-library";
  * writer opening this should see immediately that the app has an opinion about
  * the whole job, not just the manuscript.
  *
- * **Five of the six are real; Track is not, and says so.** Anything unbuilt
- * renders as a dead, unclickable card under a PLANNED badge, because the house
- * rule is that a control either works or plainly says it is not built — and a
- * prototype that quietly implies a working section is the exact thing this
- * product is positioned against. Areas graduate from planned to live one
- * feature at a time; the comments in `PLANNED` record what has left each list.
+ * **All six areas now have real work in them.** What is still unbuilt sits in
+ * each area's own "Coming to this area" panel, as dead unclickable cards under
+ * a PLANNED badge — the house rule is that a control either works or plainly
+ * says it is not built, and a screen that quietly implies a working feature is
+ * the exact thing this product is positioned against. The comments in `PLANNED`
+ * record what has left each list, and a list that empties hides its panel
+ * rather than heading an empty box.
  *
  * The styling is deliberately plain. What is under review is the shape.
  */
@@ -75,7 +76,7 @@ const AREAS: { id: Area; label: string; live: boolean; blurb: string }[] = [
   {
     id: "track",
     label: "Track",
-    live: false,
+    live: true,
     blurb: "What the book cost against what it earned.",
   },
   {
@@ -95,22 +96,11 @@ const AREAS: { id: Area; label: string; live: boolean; blurb: string }[] = [
 /** Planned contents, per area. Nothing here is clickable — none of it exists. */
 const PLANNED: Record<string, [string, string][]> = {
   track: [
-    [
-      "Import your KDP sales report",
-      "Your sales already come as a spreadsheet. Reading one is a file import.",
-    ],
-    [
-      "Cost against earnings",
-      "Cover, editing, ads and proof copies on one side. Royalties on the other. Per book.",
-    ],
-    ["Break-even", "How many more copies before you stop being underwater."],
+    // The sales import, cost against earnings, break-even and the ad sum have
+    // all moved out of this list — they are built, on one Track page.
     [
       "The book-three curve",
-      "Writers report no traction until their third book. Whether you are on that curve should not be a feeling.",
-    ],
-    [
-      "Ad break-even",
-      "How many sales at your royalty rate to cover what you have spent.",
+      "Writers report no traction until their third book. Whether you are on that curve should not be a feeling. Needs more than one book's ledger to say anything, so it waits until there is one.",
     ],
   ],
   learn: [
@@ -386,7 +376,7 @@ export function Bookshelf({
 
           {area === "learn" && <Learn books={active} />}
 
-          {area === "track" && <PlannedArea items={PLANNED.track} />}
+          {area === "track" && <Track books={active} />}
         </main>
       </div>
 
@@ -628,6 +618,7 @@ function Write({
                     <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
                     <Chip href={`/book/${book.id}/progress`}>Progress</Chip>
                     <Chip href={`/book/${book.id}/money`}>Money</Chip>
+                    <Chip href={`/book/${book.id}/track`}>Track</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -809,17 +800,54 @@ function Learn({ books }: { books: Book[] }) {
   );
 }
 
-function PlannedArea({ items }: { items: [string, string][] }) {
+/**
+ * Track — the last of the six areas to become real.
+ *
+ * It was the one deliberately left until the end, because it is the largest:
+ * everything else on the dashboard reads data the app already had, and this one
+ * needed a ledger of its own and a file import to fill it.
+ */
+function Track({ books }: { books: Book[] }) {
   return (
-    <div>
-      <p className="mb-6 rounded-lg border border-line bg-panel px-4 py-3 text-sm text-muted">
-        None of this exists yet. It is here so the shape of the product is
-        visible — nothing below is clickable, and nothing below is charged for.
-      </p>
-      <PlannedGrid items={items} />
+    <div className="flex flex-col gap-6">
+      <Panel title="What each book cost against what it earned">
+        <p className="mb-4 text-muted">
+          Nobody keeps this, which is why the total is always a shock. Add what
+          you have spent, import a sales report, and see how many more copies
+          get you level. Amazon has no public API, so the report is a file you
+          download and hand over — nothing is fetched and nothing is sent.
+        </p>
+        {books.length === 0 ? (
+          <p className="text-muted">No books yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {books.map((b) => (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-3
+                           rounded-lg border border-line bg-surface px-4 py-3"
+              >
+                <span className="truncate font-medium text-fg">{b.title}</span>
+                <Go href={`/book/${b.id}/track`}>Open the ledger</Go>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      {PLANNED.track.length > 0 && (
+        <Panel title="Coming to this area">
+          <PlannedGrid items={PLANNED.track} />
+        </Panel>
+      )}
     </div>
   );
 }
+
+// `PlannedArea` — the whole-area "none of this exists yet" wrapper — is gone.
+// Every area now has real work in it and shows what is still coming in its own
+// "Coming to this area" panel instead, which is the shape that survives an area
+// being half built. It went out with Track, the last one that was empty.
 
 /* ---- Bits ---------------------------------------------------------------- */
 

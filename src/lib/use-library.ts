@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { parseActivity, type Activity } from "./activity";
+import { parseLedger, type Entry } from "./ledger";
 import { parseHistory, type Snapshot } from "./history";
 import { parseIdeas, type Idea } from "./ideas";
 import {
@@ -11,6 +12,9 @@ import {
   getServerCover,
   getServerBody,
   getServerBodyReload,
+  getLedgerRaw,
+  getServerLedgerRaw,
+  subscribeToLedger,
   getActivityRaw,
   getServerActivityRaw,
   subscribeToActivity,
@@ -105,6 +109,16 @@ export function useCover(bookId: string): string | null {
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */
 export function usePrefs(): Prefs {
   return useSyncExternalStore(subscribeToPrefs, getPrefs, getServerPrefs);
+}
+
+/** Every cost and every royalty the writer has recorded, newest first. */
+export function useLedger(): Entry[] {
+  const raw = useSyncExternalStore(
+    subscribeToLedger,
+    getLedgerRaw,
+    getServerLedgerRaw,
+  );
+  return useMemo(() => parseLedger(raw), [raw]);
 }
 
 /** The writing log — net words per day, across the whole library. */

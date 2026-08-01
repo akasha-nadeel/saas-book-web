@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Track",
+        desc: "What a book cost against what it earned. Add what you spent on covers, editing and ads, then import a sales report as CSV — you say which column is which, so it works whatever the shop calls things. It tells you how many more copies get you level, using the per-copy figure your own rows show rather than a royalty rate we made up. Amazon has no public API, so nothing is fetched and nothing is sent.",
+      },
+      {
         name: "Before you spend",
         desc: "What a book usually earns, what covers, editing, promotion and courses cost, and what to establish before the money moves — plus how many copies a given spend has to sell to get back to nothing. Every figure says where it came from and how much weight it can carry. No company is named: the checks describe the shape of the thing, which is more use, because next year it will have a different name.",
       },

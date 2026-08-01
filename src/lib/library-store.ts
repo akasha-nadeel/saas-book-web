@@ -1546,6 +1546,51 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// The ledger — what each book cost against what it earned
+//
+// One key for the library rather than one per book: the rows are small, a
+// writer wants to see all their books together, and this is the one store here
+// that a person might genuinely want to export and keep.
+// ---------------------------------------------------------------------------
+
+const LEDGER_KEY = "openchapter:ledger";
+const ledgerListeners = new Set<() => void>();
+
+export function subscribeToLedger(onStoreChange: () => void) {
+  ledgerListeners.add(onStoreChange);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === LEDGER_KEY) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    ledgerListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getLedgerRaw(): string | null {
+  return readRaw(LEDGER_KEY);
+}
+
+export function getServerLedgerRaw(): string | null {
+  return null;
+}
+
+/**
+ * Write the ledger back.
+ *
+ * Unlike history and the writing log, a failure here is *not* swallowed: those
+ * two are conveniences the app derives for itself, and this is what the writer
+ * typed. Losing a row they entered by hand, silently, in a screen about money,
+ * would be the worst kind of quiet failure — so it throws and the caller says
+ * so.
+ */
+export function saveLedgerRaw(json: string) {
+  window.localStorage.setItem(LEDGER_KEY, json);
+  for (const listener of ledgerListeners) listener();
+}
+
+// ---------------------------------------------------------------------------
 // The writing log
 //
 // A number per day and nothing else, at its own key — a year of it is a few

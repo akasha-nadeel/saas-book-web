@@ -135,13 +135,36 @@ than replacing it.
 
 ### Then — the differentiators
 
-- [ ] **KDP sales import and book P&L.** KDP exports sales as a spreadsheet;
-      parsing one is a file import, which this codebase is already good at.
-      Unlocks spend against earnings per book, break-even, and the "no traction
-      until book three" curve across a backlist. It answers the loudest money
-      pain in the research — *"I look at the massive amount of money I
-      wasted"* — and it is arithmetic, not AI. Fold the ad break-even sum into
-      the same screen.
+- [x] **Sales import and book P&L.** Done 2026-08-01. `/book/[bookId]/track`,
+      backed by `src/lib/ledger.ts` (pure, 23 tests) and an
+      `openchapter:ledger` key. Costs and royalties by hand, a CSV import for a
+      sales report, spend against earnings, and how many more copies get level.
+      **Track was the last of the six dashboard areas to become real**, and the
+      largest — every other area reads data the app already had.
+
+      **The import maps columns rather than assuming them.** A parser tied to
+      KDP's current column names is one that breaks silently the week Amazon
+      renames one, on a screen about money. Reading the header row and having
+      the writer confirm works with any shop's report, an aggregator's, or a
+      spreadsheet somebody keeps by hand. The guess is offered for correction,
+      never applied.
+
+      **It never invents a royalty rate.** Per-copy comes from rows that
+      actually recorded copies, and the break-even count refuses to appear
+      without one — a plausible figure there is worse than none, because it is
+      exactly what a writer would plan a year around.
+
+      Two details worth keeping. `cellNumber` insists on a digit after
+      cleaning, because "Total" strips to an empty string and `Number("")` is
+      zero — without that, every subtotal row in a report counts as a
+      zero-royalty sale, which a test caught. And `saveLedgerRaw` **does not**
+      swallow a failed write, unlike chapter history and the writing log: those
+      are derived, this is what the writer typed, and losing it silently on a
+      money screen is the worst kind of failure.
+
+      *Left:* the book-three curve, which needs more than one book's ledger to
+      say anything. And `.xlsx` — KDP's default download — still has to be
+      saved as CSV by hand; reading the zip is a later job.
 - [x] **Genre beat sheets.** Done 2026-08-01. `/book/[bookId]/structure`,
       backed by `src/lib/beats.ts` (pure, 14 tests). Eleven beats as shares of
       the finished length, with the writer's own word count placed on them.
