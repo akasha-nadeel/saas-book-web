@@ -21,6 +21,7 @@
  */
 
 import type { BookKind } from "./book-kinds";
+import { addSnapshot, parseHistory, shouldSnapshot } from "./history";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
@@ -677,6 +678,7 @@ export function deleteBook(bookId: string) {
     try {
       window.localStorage.removeItem(bodyKey(chapter.id));
       window.localStorage.removeItem(notesKey(chapter.id));
+      window.localStorage.removeItem(historyKey(chapter.id));
     } catch {
       // Unreachable bytes, not a broken app.
     }
@@ -964,6 +966,7 @@ export function importIntoBook(
       try {
         window.localStorage.removeItem(bodyKey(c.id));
         window.localStorage.removeItem(notesKey(c.id));
+        window.localStorage.removeItem(historyKey(c.id));
       } catch {
         // Unreachable bytes, not a broken book.
       }
@@ -995,6 +998,7 @@ export function undoChapterImport(undo: ImportUndo) {
     try {
       window.localStorage.removeItem(bodyKey(id));
       window.localStorage.removeItem(notesKey(id));
+      window.localStorage.removeItem(historyKey(id));
     } catch {
       // Unreachable bytes either way.
     }
@@ -1113,6 +1117,7 @@ export function deleteChapterForever(bookId: string, chapterId: string) {
   try {
     window.localStorage.removeItem(bodyKey(chapterId));
     window.localStorage.removeItem(notesKey(chapterId));
+    window.localStorage.removeItem(historyKey(chapterId));
   } catch {
     // Unreachable bytes, not a broken app.
   }
@@ -1151,6 +1156,11 @@ export function saveBody(
   const raw = JSON.stringify(doc);
   window.localStorage.setItem(bodyKey(chapterId), raw);
   pushBody(chapterId, raw);
+
+  // *After* the body is written, never before, and never in a way that can
+  // throw: history is a nicety and the manuscript is the point. A quota error
+  // taking the save down with it would be a backup feature that loses work.
+  rememberVersion(chapterId, raw, words);
 
   const book = findBook(getShelf(), bookId);
   const current = book?.chapters.find((c) => c.id === chapterId);
@@ -1525,6 +1535,70 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 // unbounded text a writer types into, and putting them in the shelf would make
 // every keystroke rewrite the document the sidebar reads.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Chapter history
+//
+// One key per chapter, like bodies and notes, and for a sharper version of the
+// same reason: versions are the largest thing this app stores per chapter and
+// must never ride along in a write of anything else.
+//
+// Everything here is best-effort. `localStorage` is about 5MB an origin and a
+// library of forty chapters could not possibly keep eight versions of each, so
+// a failed write is swallowed: the body has already been saved by the time any
+// of this runs, and losing a snapshot is a nicety lost, while throwing here
+// would be a backup feature that loses work.
+// ---------------------------------------------------------------------------
+
+const HISTORY_PREFIX = "openchapter:history:";
+const historyKey = (chapterId: string) => `${HISTORY_PREFIX}${chapterId}`;
+const historyListeners = new Set<() => void>();
+
+export function subscribeToHistory(id: string, onStoreChange: () => void) {
+  historyListeners.add(onStoreChange);
+  const key = historyKey(id);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    historyListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getHistoryRaw(chapterId: string): string | null {
+  return readRaw(historyKey(chapterId));
+}
+
+export function getServerHistoryRaw(): string | null {
+  return null;
+}
+
+/**
+ * Keep this version of a chapter, if it is worth keeping.
+ *
+ * Called from `saveBody` on every autosave, and declines most of them — see
+ * `shouldSnapshot`. Never throws: a full origin means no history, not a failed
+ * save.
+ */
+function rememberVersion(chapterId: string, body: string, words: number) {
+  try {
+    const history = parseHistory(getHistoryRaw(chapterId));
+    const now = Date.now();
+    if (!shouldSnapshot(history, body, now)) return;
+
+    const next = addSnapshot(history, { at: now, body, words });
+    window.localStorage.setItem(historyKey(chapterId), JSON.stringify(next));
+    for (const listener of historyListeners) listener();
+  } catch {
+    // Deliberately silent. See the note at the head of this section.
+  }
+}
+
+// A chapter's history is removed wherever its body and notes are, inline at
+// each of the four sites — the same shape those two already use. A helper here
+// would be a fifth way to do a thing that is done four ways already.
 
 // ---------------------------------------------------------------------------
 // The idea parking lot

@@ -118,6 +118,14 @@ export function Rail({
  * sets its own would break step with the rest.
  */
 export const icons = {
+  /** A clock turned back, for chapter history. */
+  history: (
+    <>
+      <path d="M3.2 10a6.8 6.8 0 1 0 2-4.8" />
+      <path d="M2.9 3.6v3.4h3.4" />
+      <path d="M10 6.6V10l2.4 1.4" />
+    </>
+  ),
   /** A lamp, for the idea parking lot. One shape, one viewBox, round caps. */
   ideas: (
     <>

@@ -37,6 +37,7 @@ const TABS = [
   ["ideas", "Ideas", icons.ideas],
   ["bookmarks", "Bookmarks", icons.bookmarks],
   ["assistant", "Assistant", icons.assistant],
+  ["history", "Versions", icons.history],
   ["trash", "Deleted chapters", icons.trash],
 ] as const;
 

@@ -94,9 +94,36 @@ than replacing it.
       *Left:* hand ticks live in `Book.roadmapDone` and are **not synced** —
       `sync.ts` maps a book's columns by name and this is not one of them, so a
       writer on two machines ticks twice. The page says so at its foot.
-- [ ] **Backups and version history.** Snapshots and "restore an earlier
-      draft". Extends `library-store.ts` and `sync.ts`, which already do most of
-      the work.
+- [x] **Backups and version history**, with the revision tracker on the same
+      panel. Done 2026-08-01. A Versions tab in the editor rail, backed by
+      `src/lib/history.ts` (pure, 14 tests) and one `openchapter:history:<id>`
+      key per chapter.
+
+      **Two features on one surface because they are one question asked twice.**
+      Writers name backups as a pain, and separately describe circling — *"my
+      first chapter has had about twenty rounds of editing"*. The versions
+      answer the first; counting them answers the second, because nobody can see
+      themselves circling from the inside.
+
+      **It is a safety net, not an archive, and the panel says so.** The ceiling
+      is what shapes it: `localStorage` is ~5MB an origin and this app already
+      lives near it, so history is bounded twice — eight versions a chapter, and
+      a 400KB budget behind that, oldest evicted first. A snapshot is taken at
+      most every ten minutes *and* only when the text really changed, or a
+      chapter left open with autosave ticking would push out the eight versions
+      that mattered with eight identical ones. What it can promise is "this
+      chapter as it was before lunch"; what it cannot promise is last March.
+
+      **A snapshot must never cost the manuscript.** `rememberVersion` runs
+      after the body is written and swallows every error: a full origin means no
+      history, not a failed save. Restoring goes back through `saveBody`, which
+      is what makes "this can be undone" true — the current text was snapshotted
+      on its own last autosave and is still in the list.
+
+      *Left:* not synced, like the roadmap ticks and the ideas. And there is no
+      *global* sweep yet — the byte cap keeps one chapter honest, but forty
+      chapters each holding their budget would not fit. See "Storage pressure"
+      below; this made that item more urgent rather than less.
 - [ ] **Revision tracker.** Mark a chapter done; count and show the passes.
       *"My first chapter has had about twenty rounds of editing."* Making the
       loop visible is what breaks it — nobody can see themselves circling.

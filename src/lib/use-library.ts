@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { parseHistory, type Snapshot } from "./history";
 import { parseIdeas, type Idea } from "./ideas";
 import {
   getBody,
@@ -9,6 +10,9 @@ import {
   getServerCover,
   getServerBody,
   getServerBodyReload,
+  getHistoryRaw,
+  getServerHistoryRaw,
+  subscribeToHistory,
   getIdeasRaw,
   getNotes,
   getPrefs,
@@ -97,6 +101,23 @@ export function useCover(bookId: string): string | null {
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */
 export function usePrefs(): Prefs {
   return useSyncExternalStore(subscribeToPrefs, getPrefs, getServerPrefs);
+}
+
+/**
+ * One chapter's saved versions, newest first.
+ *
+ * Parsed off the raw string for the same reason `useIdeas` is: the snapshot
+ * `useSyncExternalStore` compares has to be referentially stable, and a parse
+ * that returns a fresh array every call loops the store.
+ */
+export function useHistory(chapterId: string): Snapshot[] {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToHistory(chapterId, onStoreChange),
+    [chapterId],
+  );
+  const snapshot = useCallback(() => getHistoryRaw(chapterId), [chapterId]);
+  const raw = useSyncExternalStore(subscribe, snapshot, getServerHistoryRaw);
+  return useMemo(() => parseHistory(raw), [raw]);
 }
 
 /**
