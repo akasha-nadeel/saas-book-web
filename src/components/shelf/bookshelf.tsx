@@ -80,7 +80,7 @@ const AREAS: { id: Area; label: string; live: boolean; blurb: string }[] = [
   {
     id: "learn",
     label: "Learn",
-    live: false,
+    live: true,
     blurb: "The order to do things in, and what a shop expects.",
   },
   {
@@ -113,10 +113,7 @@ const PLANNED: Record<string, [string, string][]> = {
     ],
   ],
   learn: [
-    [
-      "Publishing roadmap",
-      "Every step from blank page to published, in order, so you do not learn about ARCs after you publish.",
-    ],
+    // The publishing roadmap has moved out of this list — it is built.
     [
       "Genre beat sheets",
       "For the wall at 30,000 words of an 80,000-word book.",
@@ -403,9 +400,9 @@ export function Bookshelf({
 
           {area === "tools" && <Tools books={active} />}
 
-          {(area === "track" || area === "learn") && (
-            <PlannedArea items={PLANNED[area]} />
-          )}
+          {area === "learn" && <Learn books={active} />}
+
+          {area === "track" && <PlannedArea items={PLANNED.track} />}
         </main>
       </div>
 
@@ -473,12 +470,17 @@ function Overview({
                 {bookWordCount(current).toLocaleString()} words · opened{" "}
                 {relativeTime(current.lastOpenedAt)}
               </p>
+              {/* The roadmap sits with the three phases rather than under
+                  Learn alone, because "what do I do next" is the question this
+                  card is answering and the roadmap is the only thing here that
+                  knows. */}
               <div className="mt-4 flex flex-wrap gap-2 text-sm">
                 <Go href={`/book/${current.id}`} primary>
                   Write
                 </Go>
                 <Go href={`/book/${current.id}/read`}>Read</Go>
                 <Go href={`/book/${current.id}/export`}>Prepare</Go>
+                <Go href={`/book/${current.id}/roadmap`}>What next?</Go>
               </div>
             </div>
           </div>
@@ -636,6 +638,7 @@ function Write({
                     <Chip href={`/book/${book.id}/categories`}>Categories</Chip>
                     <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
                     <Chip href={`/book/${book.id}/title-check`}>Title</Chip>
+                    <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -752,6 +755,47 @@ function Tools({ books }: { books: Book[] }) {
 
       <Panel title="Coming to this area">
         <PlannedGrid items={PLANNED.tools} />
+      </Panel>
+    </div>
+  );
+}
+
+/**
+ * Learn — the order to do things in.
+ *
+ * One real thing so far, and it is the one three separate research threads
+ * pointed at: writers do not lack tools, they lack the order. Most sharply the
+ * writer who found out advance copies were essential *after* publishing.
+ */
+function Learn({ books }: { books: Book[] }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <Panel title="Blank page to published">
+        <p className="mb-4 text-muted">
+          Every step in the order it has to happen, so you do not find out about
+          advance copies after the book is already out. Most of it ticks itself
+          from what is in your book.
+        </p>
+        {books.length === 0 ? (
+          <p className="text-muted">No books yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {books.map((b) => (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-3
+                           rounded-lg border border-line bg-surface px-4 py-3"
+              >
+                <span className="truncate font-medium text-fg">{b.title}</span>
+                <Go href={`/book/${b.id}/roadmap`}>Open the roadmap</Go>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel title="Coming to this area">
+        <PlannedGrid items={PLANNED.learn} />
       </Panel>
     </div>
   );

@@ -30,10 +30,31 @@ than replacing it.
       the current book*. Writers repeatedly describe a shiny new idea stalling
       book two of a trilogy. Tiny, and it protects the thing they already
       started.
-- [ ] **Publishing roadmap.** Every step from blank page to published, in
-      order, with progress saved. Confirmed by three separate batches — the
-      clearest case being a writer who found out ARCs were essential *after*
-      publishing. Content and checkboxes; no new infrastructure.
+- [x] **Publishing roadmap.** Done 2026-08-01. `/book/[bookId]/roadmap`, backed
+      by `src/lib/roadmap.ts` (pure, 14 tests). Eighteen steps in five phases,
+      each linking to the screen that does it where one exists.
+
+      **The load-bearing part is where "Line up ARC readers" sits: before
+      publishing, not after.** Three separate research batches describe the same
+      injury — not a missing tool, a missing *order* — most sharply the writer
+      who realised advance copies were essential only after publishing, then
+      spent months chasing reviews for a book already out. There is a test
+      asserting that step comes before "Upload to the shop", because if it ever
+      moves the list has lost the thing it was built to say.
+
+      **Most steps work themselves out from the book** rather than waiting to be
+      ticked, and **detected beats ticked**: a writer who ticks "write the blurb"
+      and then deletes the blurb sees the step come back. A checklist that can be
+      lied to will be, usually by accident, and then it is worse than not
+      existing. Two steps are deliberately *not* detected — "finish the first
+      draft", because finishing is a decision rather than a word count, and
+      "get a cover made", because a generated placeholder is attached like any
+      other and ticking off the most expensive step in the list on the strength
+      of a gradient would be the worst kind of wrong.
+
+      *Left:* hand ticks live in `Book.roadmapDone` and are **not synced** —
+      `sync.ts` maps a book's columns by name and this is not one of them, so a
+      writer on two machines ticks twice. The page says so at its foot.
 - [ ] **Backups and version history.** Snapshots and "restore an earlier
       draft". Extends `library-store.ts` and `sync.ts`, which already do most of
       the work.

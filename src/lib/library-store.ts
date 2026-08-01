@@ -240,6 +240,12 @@ export interface Book {
   genre?: string;
   /** Words aimed at. Absent means no goal, and no progress is shown. */
   targetWords?: number;
+  /**
+   * Roadmap steps ticked by hand — only the ones that happen outside the app.
+   * Everything else `roadmapFor()` works out from the book itself. Absent until
+   * the first tick, and local-only: see `setRoadmapStep`.
+   */
+  roadmapDone?: string[];
   /** Page geometry. Absent means the default — see pageSetupOf. */
   page?: PageSetup;
   /** Body-text typography. Absent means the default — see typographyOf. */
@@ -1290,6 +1296,31 @@ function migrateSpike(): boolean {
 
 export function setBookAuthor(bookId: string, author: string) {
   commitBook(bookId, (book) => ({ ...book, author }));
+}
+
+/**
+ * Tick or untick one step of the publishing roadmap.
+ *
+ * Only the steps that happen *outside* the app are stored — getting a cover
+ * made, sending the ARCs, uploading. The rest work themselves out from the
+ * book, and `roadmapFor()` ignores a stored tick on those deliberately, so
+ * nothing here can put the list out of step with the truth.
+ *
+ * **Not synced.** `sync.ts` maps a book's columns by name and this is not one
+ * of them, so roadmap ticks stay on the machine they were made on. Noted in
+ * TODO.md; a writer on two machines will tick twice.
+ */
+export function setRoadmapStep(bookId: string, stepId: string, done: boolean) {
+  commitBook(bookId, (book) => {
+    const current = book.roadmapDone ?? [];
+    const next = done
+      ? [...new Set([...current, stepId])]
+      : current.filter((id) => id !== stepId);
+    const out = { ...book };
+    if (next.length > 0) out.roadmapDone = next;
+    else delete out.roadmapDone;
+    return out;
+  });
 }
 
 /**
