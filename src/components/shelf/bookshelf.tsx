@@ -121,7 +121,10 @@ const PLANNED: Record<string, [string, string][]> = {
     // Category suggestions has moved out of this list — it is built.
     // The title check has moved out of this list — it is built.
     // Paperback setup has moved out of this list — it is built.
-    ["ARC tracker", "Who holds it, who reviewed, when it is due."],
+    // The ARC tracker has moved out of this list — it is built, and it landed
+    // in Track rather than here: reviews and money are the two halves of what
+    // happens to a book after it goes out, and a writer chasing one is usually
+    // looking at the other.
     // The story bible has moved out of this list — it is built, in the
     // editor's Story bible tab. Series-wide and AI-filled are still to come.
     // Version history has moved out of this list — it is built, in the
@@ -614,6 +617,7 @@ function Write({
                     <Chip href={`/book/${book.id}/prose`}>Prose</Chip>
                     <Chip href={`/book/${book.id}/progress`}>Progress</Chip>
                     <Chip href={`/book/${book.id}/money`}>Money</Chip>
+                    <Chip href={`/book/${book.id}/arc`}>Advance copies</Chip>
                     <Chip href={`/book/${book.id}/track`}>Track</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
@@ -802,10 +806,39 @@ function Learn({ books }: { books: Book[] }) {
  * It was the one deliberately left until the end, because it is the largest:
  * everything else on the dashboard reads data the app already had, and this one
  * needed a ledger of its own and a file import to fill it.
+ *
+ * The two panels are the two halves of what happens to a book once it is out —
+ * what it earned, and whether anybody said anything about it.
  */
 function Track({ books }: { books: Book[] }) {
   return (
     <div className="flex flex-col gap-6">
+      <Panel title="Who has an advance copy">
+        <p className="mb-4 text-muted">
+          One launch in the research ran across seven sites and a spreadsheet;
+          another writer worked out advance copies mattered only after the book
+          was already published. This is the list, with the dates attached — who
+          holds it, who read it, and who is late. It does not find readers for
+          you, and it does not send anything.
+        </p>
+        {books.length === 0 ? (
+          <p className="text-muted">No books yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {books.map((b) => (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-3
+                           rounded-lg border border-line bg-surface px-4 py-3"
+              >
+                <span className="truncate font-medium text-fg">{b.title}</span>
+                <Go href={`/book/${b.id}/arc`}>Advance copies</Go>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
       <Panel title="What each book cost against what it earned">
         <p className="mb-4 text-muted">
           Nobody keeps this, which is why the total is always a shock. Add what

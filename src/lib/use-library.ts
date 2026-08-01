@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { parseActivity, type Activity } from "./activity";
+import { parseArc, type ArcReader } from "./arc";
 import { parseBible, type BibleEntry } from "./bible";
 import { parseLedger, type Entry } from "./ledger";
 import { parseHistory, type Snapshot } from "./history";
@@ -16,6 +17,9 @@ import {
   getBibleRaw,
   getServerBibleRaw,
   subscribeToBible,
+  getArcRaw,
+  getServerArcRaw,
+  subscribeToArc,
   getLedgerRaw,
   getServerLedgerRaw,
   subscribeToLedger,
@@ -124,6 +128,17 @@ export function useBible(bookId: string): BibleEntry[] {
   const snapshot = useCallback(() => getBibleRaw(bookId), [bookId]);
   const raw = useSyncExternalStore(subscribe, snapshot, getServerBibleRaw);
   return useMemo(() => parseBible(raw), [raw]);
+}
+
+/** One book's advance readers, the ones to chase first. */
+export function useArc(bookId: string): ArcReader[] {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToArc(bookId, onStoreChange),
+    [bookId],
+  );
+  const snapshot = useCallback(() => getArcRaw(bookId), [bookId]);
+  const raw = useSyncExternalStore(subscribe, snapshot, getServerArcRaw);
+  return useMemo(() => parseArc(raw), [raw]);
 }
 
 /** Every cost and every royalty the writer has recorded, newest first. */

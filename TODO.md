@@ -378,8 +378,33 @@ than replacing it.
 
       *Left:* not synced, like the other own-key stores. Sprints — a timer for a
       single sitting — are a different feature and not built.
-- [ ] **ARC tracker.** Who holds the ARC, who reviewed, when it is due. A
-      tracker, not a marketplace — the distinction is the whole point.
+- [x] **ARC tracker.** `src/lib/arc.ts` + `/book/[bookId]/arc`, in the
+      dashboard's Track area beside the ledger — reviews and money are the two
+      halves of what happens to a book once it is out.
+
+      A tracker, not a marketplace, and that distinction is the whole point: it
+      finds nobody for you and sends nothing. The complaint in the research was
+      never "there are no readers", it was six open tabs and no idea who held
+      what.
+
+      Three things carry the feature. **The deadline**, which is what turns
+      thirty contacts into the two people to email this morning — late readers
+      sort to the top, and if the book has a publication date the page works
+      back to when copies need to go out (28 days, the convention the shops and
+      the review sites both work to). **What each reader actually reads**,
+      recorded at the point of adding them, because the review everybody
+      remembers comes from someone outside the genre. And **the review rate is
+      counted against those who answered**, not against everyone — the silent
+      majority are neither failures nor pending forever, and the screen shows
+      how many are still open beside the figure.
+
+      `fromDay()` is the tested part that looks trivial and is not: a date input
+      gives `YYYY-MM-DD`, which `new Date()` parses as *UTC*, so a writer west
+      of Greenwich picking the 1st gets an instant that is the 31st where they
+      are sitting. It also anchors to the *end* of the day, or every reader is
+      overdue from one minute past midnight on the morning their review was due.
+
+      *Left:* not synced, like the other own-key stores.
 - [ ] **Writing provenance.** Evidence a human wrote the book, over time, built
       from the keystroke-level autosave history the app already keeps. In a
       market where legitimate authors are being *accused* of using AI, no

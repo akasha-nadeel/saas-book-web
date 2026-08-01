@@ -1589,6 +1589,50 @@ export function saveBibleRaw(bookId: string, json: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Advance copies
+//
+// One key per book, like the bible: an advance-copy list belongs to a launch,
+// and a writer running two launches at once needs two lists, not one merged one.
+// ---------------------------------------------------------------------------
+
+const ARC_PREFIX = "openchapter:arc:";
+const arcKey = (bookId: string) => `${ARC_PREFIX}${bookId}`;
+const arcListeners = new Set<() => void>();
+
+export function subscribeToArc(bookId: string, onStoreChange: () => void) {
+  arcListeners.add(onStoreChange);
+  const key = arcKey(bookId);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    arcListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getArcRaw(bookId: string): string | null {
+  return readRaw(arcKey(bookId));
+}
+
+export function getServerArcRaw(): string | null {
+  return null;
+}
+
+/**
+ * Write a book's advance-copy list back.
+ *
+ * Not swallowed, like the bible and the ledger: these are names and dates the
+ * writer typed, and a silent failure here loses the only record of who has the
+ * book.
+ */
+export function saveArcRaw(bookId: string, json: string) {
+  window.localStorage.setItem(arcKey(bookId), json);
+  for (const listener of arcListeners) listener();
+}
+
+// ---------------------------------------------------------------------------
 // The ledger — what each book cost against what it earned
 //
 // One key for the library rather than one per book: the rows are small, a

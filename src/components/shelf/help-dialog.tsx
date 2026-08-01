@@ -122,6 +122,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "What a book cost against what it earned. Add what you spent on covers, editing and ads, then import a sales report as CSV — you say which column is which, so it works whatever the shop calls things. It tells you how many more copies get you level, using the per-copy figure your own rows show rather than a royalty rate we made up. Amazon has no public API, so nothing is fetched and nothing is sent.",
       },
       {
+        name: "Advance copies",
+        desc: "Who holds an advance copy, who read it, who is late — one list instead of six sites and a spreadsheet. Record where you found each reader and what they actually read, since the review everybody remembers comes from someone who does not read your genre. Late readers sort to the top, and if the book has a publication date the page works back to when copies need to go out. It finds nobody for you and sends nothing.",
+      },
+      {
         name: "Before you spend",
         desc: "What a book usually earns, what covers, editing, promotion and courses cost, and what to establish before the money moves — plus how many copies a given spend has to sell to get back to nothing. Every figure says where it came from and how much weight it can carry. No company is named: the checks describe the shape of the thing, which is more use, because next year it will have a different name.",
       },

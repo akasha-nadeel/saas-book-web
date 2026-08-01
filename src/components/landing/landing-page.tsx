@@ -113,6 +113,10 @@ const TRACK = [
     "Worked from what a copy has actually earned you, never from a royalty rate we invented. If your rows do not say, neither do we.",
   ],
   [
+    "Who has an advance copy, and who is late",
+    "One list instead of six sites and a spreadsheet, with the dates attached — and a send-by date worked back from your publication date, so you learn advance copies matter before the book is out rather than after.",
+  ],
+  [
     "What it usually costs, and what to check first",
     "What a book typically earns, what covers and editing and promotion run to, and what to establish before the money moves. Every figure says where it came from.",
   ],
@@ -122,10 +126,6 @@ const LATER = [
   [
     "A story bible",
     "Characters, places and timeline, across a series rather than one book — filled in by the assistant reading your chapters, which it still cannot write into.",
-  ],
-  [
-    "An ARC tracker",
-    "Who holds an advance copy, who reviewed, when it is due. Instead of six sites and a spreadsheet.",
   ],
   [
     "Comps ranked, not just found",
