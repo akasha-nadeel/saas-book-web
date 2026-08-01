@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
+import { GENRES } from "@/lib/book-kinds";
 import { buildQuery, type CompTitle } from "@/lib/comps/comps";
 import { rankSubjects, worthSuggesting } from "@/lib/comps/subjects";
 import { findBook, setPublishing } from "@/lib/library-store";
@@ -15,13 +17,19 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * licensed — shipping the code list is neither free nor ours to do. The way
  * round it turns out to be the better answer anyway: read what books like this
  * one are filed under and rank that. It comes off the shelf rather than out of
- * a taxonomy, which is how a writer would answer it themselves given a
- * bookshop and an afternoon.
+ * a taxonomy, which is how a writer would answer it themselves given a bookshop
+ * and an afternoon.
  *
- * **Suggestions, and the writer picks.** Every row says how many of the
- * comparable books carry it, because "9 of 20" and "2 of 20" are different
- * kinds of advice and the number is the only honest way to say which. Nothing
- * is selected automatically.
+ * **Suggestions, and the writer picks.** Nothing is selected automatically, and
+ * every row carries how many of the comparable books are filed under it —
+ * because "9 of 20" and "2 of 20" are different kinds of advice and the number
+ * is the only honest way to say which.
+ *
+ * **That number is drawn as well as written.** It was plain text at the end of
+ * a row, which made the most important thing on the line the last thing read
+ * and impossible to compare down a column. A bar is scanned in one pass; the
+ * figure stays beside it, because a bar alone says *more* without saying how
+ * many.
  *
  * The cleaning is in `subjects.ts` and it is most of the feature — raw, these
  * two catalogues answer with "Fiction", which is true of every novel ever
@@ -103,45 +111,56 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">Categories</h1>
-        <p className="mt-3 text-muted">
-          Which shelf your book lands on. Worked out from where books like yours
-          are actually filed, rather than from a list we made up.
-        </p>
+      <ToolHeader book={book} tool="Categories">
+        Which shelf your book lands on — worked out from where books like yours
+        are actually filed, rather than from a list we made up.
+      </ToolHeader>
 
-        {/* ---- What is chosen ------------------------------------------ */}
-        <section className="mt-8 rounded-xl border border-line bg-panel p-5">
-          <h2 className="font-bold text-fg">On this book</h2>
-          {chosen.length === 0 ? (
-            <p className="mt-2 text-sm text-muted">
-              None chosen yet. These decide which shelf the book turns up on,
-              and an empty list is one of the things the pre-upload check will
-              raise.
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+        {/* ---- What is chosen --------------------------------------------
+            A strip rather than the card this was. Before the first search a
+            writer cannot have chosen anything, so a panel headed "On this
+            book" containing one sentence of apology was the largest thing on
+            the screen and the least useful thing on it. */}
+        {chosen.length > 0 ? (
+          <section className="rounded-xl border border-line bg-panel p-4">
+            <p className="text-xs font-bold tracking-widest text-muted uppercase">
+              On this book · {chosen.length}
             </p>
-          ) : (
-            <ul className="mt-3 flex flex-wrap gap-2">
+            <ul className="mt-2.5 flex flex-wrap gap-2">
               {chosen.map((name) => (
                 <li key={name}>
                   <button
                     type="button"
                     onClick={() => toggle(name)}
-                    className="rounded-full bg-accent px-3.5 py-1.5 text-sm font-medium text-white"
+                    aria-label={`Remove ${name}`}
+                    className="flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5
+                               text-sm font-medium text-white"
                   >
-                    {name} ✕
+                    {name}
+                    <span aria-hidden="true" className="text-white/70">
+                      ✕
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
-          )}
-        </section>
+            <p className="mt-2.5 text-xs text-muted">
+              Saved to this book. Check the shop&rsquo;s own limit on how many
+              it takes.
+            </p>
+          </section>
+        ) : (
+          <p className="rounded-xl border border-line bg-panel px-4 py-3 text-sm text-muted">
+            <strong className="text-fg">Nothing chosen yet.</strong> An empty
+            list is one of the things the pre-upload check raises, because a
+            book with no categories has no shelf to turn up on.
+          </p>
+        )}
 
-        {/* ---- Suggestions --------------------------------------------- */}
+        {/* ---- Find some -------------------------------------------------- */}
         <form
-          className="mt-8 flex flex-wrap gap-2"
+          className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             void search(query);
@@ -164,10 +183,58 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
           </button>
         </form>
 
+        {/* With no genre and no blurb the seed is empty, which left the box
+            blank and the button dead. Same fix as the comps screen: the app's
+            own genres as starting points, which search rather than save. */}
+        {!book.genre && (
+          <div className="mt-3">
+            <p className="text-xs text-muted">
+              This book has no genre set, so there was nothing to seed the box
+              with. Start from one of these, or describe the story above.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {GENRES.filter((g) => g !== "Other").map((genre) => (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => {
+                    const seed = `subject:"${genre}"`;
+                    setQuery(seed);
+                    void search(seed);
+                  }}
+                  className="rounded-full border border-line bg-panel px-3 py-1 text-xs
+                             font-medium text-fg hover:border-accent/40"
+                >
+                  {genre}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {error && (
-          <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
+          <p className="mt-6 rounded-lg border border-amber-500/40 bg-amber-500/8 p-4 text-sm text-fg">
             {error}
           </p>
+        )}
+
+        {state === "idle" && (
+          <section className="mt-8 rounded-xl border border-line bg-panel p-5">
+            <h2 className="font-bold text-fg">What these are, exactly</h2>
+            <p className="mt-1.5 text-sm text-muted">
+              Not a shop&rsquo;s category list. These are the subjects two
+              public catalogues file comparable books under — the answer to
+              &ldquo;what is this book, to a librarian&rdquo;. Shops run their
+              own scheme, so the box on their form may not take these words as
+              typed; what they give you is the right shape of answer, and the
+              vocabulary to match against theirs.
+            </p>
+            <p className="mt-3 text-sm text-muted">
+              Search, and each suggestion says how many comparable books carry
+              it. A subject one book in twenty is filed under is that book
+              rather than a pattern, which is why those are left out.
+            </p>
+          </section>
         )}
 
         {state === "done" && suggestions.length === 0 && (
@@ -180,38 +247,25 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
 
         {suggestions.length > 0 && (
           <>
-            <p className="mt-8 text-sm text-muted">
-              From {books.length} comparable books. Tap to add one to your book.
-            </p>
-            <ul className="mt-4 flex flex-col gap-2">
-              {suggestions.map((subject) => {
-                const on = chosen.includes(subject.name);
-                return (
-                  <li key={subject.name}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(subject.name)}
-                      className={`flex w-full flex-wrap items-center justify-between gap-3
-                                  rounded-lg border px-4 py-3 text-left ${
-                                    on
-                                      ? "border-accent bg-accent/10"
-                                      : "border-line bg-panel"
-                                  }`}
-                    >
-                      <span className="font-medium text-fg">
-                        {subject.name}
-                      </span>
-                      <span className="text-sm text-muted">
-                        {/* The number, always. "9 of 20" and "2 of 20" are
-                            different kinds of advice, and this is the only
-                            honest way to say which one a row is. */}
-                        {subject.count} of {books.length} books
-                        {on ? " · on your book" : ""}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
+            <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-bold text-fg">
+                {suggestions.length} worth considering
+              </h2>
+              <p className="text-sm text-muted">
+                From {books.length} comparable books · tap to add
+              </p>
+            </div>
+            <ul className="mt-3 flex flex-col gap-1.5">
+              {suggestions.map((subject) => (
+                <SuggestionRow
+                  key={subject.name}
+                  name={subject.name}
+                  count={subject.count}
+                  total={books.length}
+                  on={chosen.includes(subject.name)}
+                  onToggle={() => toggle(subject.name)}
+                />
+              ))}
             </ul>
           </>
         )}
@@ -225,5 +279,75 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * One suggestion, with its share of the comparable books drawn.
+ *
+ * The bar gives a column of "9 of 20", "7 of 20", "4 of 20" the sorting sense
+ * it does not otherwise have: those must be read and compared one at a time,
+ * where the shape is taken in at a glance. The figure stays beside it, because
+ * a bar alone says *more* without saying how many — and the whole reason this
+ * screen prints the count is that a subject carried by two books and one
+ * carried by nine are different advice.
+ */
+function SuggestionRow({
+  name,
+  count,
+  total,
+  on,
+  onToggle,
+}: {
+  name: string;
+  count: number;
+  total: number;
+  on: boolean;
+  onToggle: () => void;
+}) {
+  const share = total > 0 ? (count / total) * 100 : 0;
+
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={on}
+        className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left
+                    transition-colors ${
+                      on
+                        ? "border-accent bg-accent/8"
+                        : "border-line bg-panel hover:border-accent/40"
+                    }`}
+      >
+        <span
+          aria-hidden="true"
+          className={`grid h-5 w-5 shrink-0 place-items-center rounded text-[11px]
+                      font-bold ${
+                        on
+                          ? "bg-accent text-white"
+                          : "border-2 border-line text-transparent"
+                      }`}
+        >
+          ✓
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-fg">
+            {name}
+          </span>
+          <span className="mt-1 block h-1 overflow-hidden rounded-full bg-raised">
+            <span
+              className={`block h-full rounded-full ${on ? "bg-accent" : "bg-fg/25"}`}
+              style={{ width: `${share}%` }}
+            />
+          </span>
+        </span>
+
+        <span className="shrink-0 text-xs whitespace-nowrap text-muted tabular-nums">
+          {count} of {total}
+        </span>
+      </button>
+    </li>
   );
 }
