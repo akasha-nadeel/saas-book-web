@@ -28,36 +28,70 @@ import { useCover } from "@/lib/use-library";
  * rather than a heading repeated below, which is why pages using this drop
  * their `<h1>`.
  */
+/**
+ * The column widths the tool pages use.
+ *
+ * Passed in rather than fixed, because the header's contents have to line up
+ * with the page's — the bar spans the window but what is written on it must
+ * start at the same left edge as the first card below it. Written out rather
+ * than interpolated: Tailwind reads class names as literals and would ship no
+ * rule for a name built at runtime.
+ */
+const WIDTHS = {
+  "3xl": "max-w-3xl",
+  "4xl": "max-w-4xl",
+  "5xl": "max-w-5xl",
+} as const;
+
 export function ToolHeader({
   book,
   /** This screen's name — the last crumb. */
   tool,
+  /** Must match the page's own container, or the two edges disagree. */
+  width = "3xl",
   /** One line under the title, if the tool has something to say up front. */
   children,
 }: {
   book: Book;
   tool: string;
+  width?: keyof typeof WIDTHS;
   children?: React.ReactNode;
 }) {
   const cover = useCover(book.id);
 
   return (
     <header className="border-b border-line bg-panel">
-      <div className="mx-auto max-w-3xl px-6 py-4">
-        <nav
-          aria-label="Breadcrumb"
-          className="flex flex-wrap items-center gap-1.5 text-xs text-muted"
-        >
-          <Link href="/" className="hover:text-fg">
-            Books
+      <div className={`mx-auto ${WIDTHS[width]} px-6 py-4`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <nav
+            aria-label="Breadcrumb"
+            className="flex flex-wrap items-center gap-1.5 text-xs text-muted"
+          >
+            <Link href="/" className="hover:text-fg">
+              Books
+            </Link>
+            <span aria-hidden="true">›</span>
+            <Link href={`/book/${book.id}`} className="truncate hover:text-fg">
+              {book.title}
+            </Link>
+            <span aria-hidden="true">›</span>
+            <span className="font-semibold text-fg">{tool}</span>
+          </nav>
+
+          {/* Beside the trail rather than in it. The breadcrumb describes where
+              this page sits — a tool belongs to a book — and the launcher is
+              not its parent: the same screen is reached from the book cards,
+              from Prepare and from Learn. This is a shortcut back to the wall
+              of them, which is a different claim and belongs in a different
+              control. */}
+          <Link
+            href="/?area=tools"
+            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs
+                       font-semibold text-fg hover:border-accent/40"
+          >
+            ← All tools
           </Link>
-          <span aria-hidden="true">›</span>
-          <Link href={`/book/${book.id}`} className="truncate hover:text-fg">
-            {book.title}
-          </Link>
-          <span aria-hidden="true">›</span>
-          <span className="font-semibold text-fg">{tool}</span>
-        </nav>
+        </div>
 
         <div className="mt-3 flex items-center gap-3.5">
           {/* Linked, so the cover is also the way back into the book — the

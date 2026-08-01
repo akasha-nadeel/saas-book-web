@@ -108,7 +108,7 @@ export function CompsPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Comp titles">
+      <ToolHeader book={book} tool="Comp titles" width="4xl">
         The published books yours sits beside — what every listing form and
         every query letter asks for. Edit the search; you know what your book is
         like better than we do.

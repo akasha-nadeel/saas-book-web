@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
@@ -184,7 +185,32 @@ export function Bookshelf({
   const hydrated = useHydrated();
   const shelf = useShelf();
 
-  const [area, setArea] = useState<Area>("overview");
+  /**
+   * Which area is open, taken from `?area=` and written back to it.
+   *
+   * Two things needed this. A tool page is a whole screen with none of the
+   * dashboard on it, so coming back has to land on the area the writer left
+   * rather than dumping them on Overview — and without a URL there was nothing
+   * for a link to aim at. A reload used to lose the area for the same reason.
+   *
+   * `useSearchParams` rather than reading `window.location` in a lazy
+   * initialiser, which was tried and is wrong: on a client navigation the
+   * router renders the new page before the History API has caught up, so the
+   * initialiser saw the *previous* URL and the area arrived as Overview every
+   * time. This hook is fed by the router and is correct during the navigation
+   * that sets it.
+   */
+  const params = useSearchParams();
+  const asked = params.get("area");
+  const [picked, setPicked] = useState<Area | null>(null);
+
+  // What the URL says, until the writer clicks something. After that their
+  // click wins — retyping the URL on every tab change would stack history
+  // entries and make the back button walk the tabs instead of leaving.
+  const area: Area =
+    picked ??
+    (AREAS.some((a) => a.id === asked) ? (asked as Area) : "overview");
+  const setArea = setPicked;
   const [editing, setEditing] = useState<Book | null>(null);
   const [covering, setCovering] = useState<Book | null>(null);
   const [tooling, setTooling] = useState<Book | null>(null);

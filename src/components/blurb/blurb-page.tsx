@@ -109,7 +109,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Blurb">
+      <ToolHeader book={book} tool="Blurb" width="5xl">
         The two hundred words that decide whether anybody opens the book. We do
         not write it — we count it, and we show you what books like yours did.
       </ToolHeader>
