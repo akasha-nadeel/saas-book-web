@@ -56,15 +56,23 @@ export function BlurbPage({ bookId }: { bookId: string }) {
     [draft, benchmark, book?.title],
   );
 
+  /**
+   * What the examples are fetched with. Empty when the book has neither a genre
+   * nor a blurb — which is most new books, and which used to be sent as `?q=`
+   * and come back as "could not reach the search just now". It reached fine.
+   * There was nothing to ask it.
+   */
+  const seedQuery = book
+    ? buildQuery({ genre: book.genre, blurb: book.publishing?.description })
+    : "";
+
   async function loadExamples() {
-    if (!book) return;
+    if (!book || !seedQuery.trim()) return;
     setState("loading");
     try {
-      const query = buildQuery({
-        genre: book.genre,
-        blurb: book.publishing?.description,
-      });
-      const response = await fetch(`/api/comps?q=${encodeURIComponent(query)}`);
+      const response = await fetch(
+        `/api/comps?q=${encodeURIComponent(seedQuery)}`,
+      );
       const data = await response.json();
       if (!response.ok) {
         setState("error");
@@ -107,7 +115,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
       </ToolHeader>
 
       <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
           {/* ---- The blurb itself -------------------------------------- */}
           <div>
             {/* The counters live inside the box's frame rather than under it.
@@ -121,7 +129,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
                 // Saved on blur rather than on every keystroke: the shelf is one
                 // document and a write per character is a write per character.
                 onBlur={() => setPublishing(book.id, { description: draft })}
-                rows={10}
+                rows={8}
                 placeholder="What happens, who it happens to, and what is at stake."
                 aria-label="Your blurb"
                 className="w-full resize-y bg-transparent p-4 leading-relaxed text-fg
@@ -176,21 +184,30 @@ export function BlurbPage({ bookId }: { bookId: string }) {
                 {report.issues.map((issue) => (
                   <li
                     key={issue.field + issue.message}
-                    className="rounded-lg border border-line bg-panel p-4"
+                    className={`flex gap-3 rounded-lg border px-4 py-3 ${
+                      issue.level === "problem"
+                        ? "border-amber-500/40 bg-amber-500/8"
+                        : "border-line bg-panel"
+                    }`}
                   >
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
-                          issue.level === "problem"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-raised text-muted"
-                        }`}
-                      >
-                        {issue.level === "problem" ? "problem" : "note"}
-                      </span>
-                      <span className="font-bold text-fg">{issue.field}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`mt-0.5 text-sm font-bold ${
+                        issue.level === "problem"
+                          ? "text-amber-700"
+                          : "text-muted"
+                      }`}
+                    >
+                      {issue.level === "problem" ? "!" : "·"}
                     </span>
-                    <p className="mt-1.5 text-sm text-muted">{issue.message}</p>
+                    <span className="min-w-0">
+                      <span className="text-sm font-bold text-fg">
+                        {issue.field}
+                      </span>
+                      <span className="mt-0.5 block text-sm text-muted">
+                        {issue.message}
+                      </span>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -212,17 +229,29 @@ export function BlurbPage({ bookId }: { bookId: string }) {
             <p className="mt-2 text-sm text-muted">
               Five real ones, so you can see the shape rather than be told it.
             </p>
-            <button
-              type="button"
-              onClick={loadExamples}
-              disabled={state === "loading"}
-              // Filled. It is the only action in this column and it was a
-              // white box on a white panel, which reads as disabled.
-              className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm
+            {!seedQuery.trim() ? (
+              <p className="mt-4 rounded-lg border border-line bg-surface p-3 text-sm text-muted">
+                Finding these needs something to search on, and this book has no
+                genre or blurb set yet. Add a genre in{" "}
+                <Link href="/" className="font-semibold text-accent">
+                  Details
+                </Link>{" "}
+                on the shelf, or write a first draft of the blurb here — either
+                gives it enough to go on.
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={loadExamples}
+                disabled={state === "loading"}
+                // Filled. It is the only action in this column and it was a
+                // white box on a white panel, which reads as disabled.
+                className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm
                          font-semibold text-white disabled:opacity-50"
-            >
-              {state === "loading" ? "Looking…" : "Show me five"}
-            </button>
+              >
+                {state === "loading" ? "Looking…" : "Show me five"}
+              </button>
+            )}
 
             {benchmark && (
               <p className="mt-4 rounded-lg border border-line bg-panel p-3 text-sm text-fg">
@@ -240,8 +269,11 @@ export function BlurbPage({ bookId }: { bookId: string }) {
             )}
 
             {state === "error" && (
-              <p className="mt-4 text-sm text-muted">
-                Could not reach the search just now.
+              <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/8 p-3 text-sm text-fg">
+                That search did not come back. Google Books rate-limits without
+                an API key, which is the usual reason — see{" "}
+                <code className="text-xs">.env.local.example</code>. Your blurb
+                is untouched either way.
               </p>
             )}
 
