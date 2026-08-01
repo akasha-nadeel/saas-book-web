@@ -45,6 +45,7 @@ import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { progressOf, roadmapFor, type Progress } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
+import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
   Menu,
   MenuButton,
@@ -533,7 +534,7 @@ export function Bookshelf({
 
           {area === "prepare" && <Prepare books={active} />}
 
-          {area === "tools" && <Tools books={active} />}
+          {area === "tools" && <Tools books={active} current={current} />}
 
           {area === "learn" && <Learn books={active} />}
 
@@ -1331,62 +1332,131 @@ function Flag({
 }
 
 /**
- * Tools — the first area with something real in it besides the manuscript.
+ * Tools — what the product can do, rather than a grid of ways to reach it.
  *
- * Comp titles is built and links per book; everything else here is still a
- * dead card under a PLANNED badge. The two are kept in one area, and visibly
- * different from each other, rather than the working one being promoted to its
- * own screen: the point of this dashboard is that a writer can see at a glance
- * what the product does and does not do yet, and hiding the unbuilt ones would
- * make that harder to read, not easier.
+ * This area was seven books down the page with the same seven buttons on each:
+ * forty-nine controls, all of them one word, above a paragraph that named seven
+ * tools in a single run-on block. Every other area on this dashboard was fixed
+ * by *hiding* its controls behind a menu. This one is the opposite case, and
+ * getting that backwards would have been the easy mistake — the area's whole
+ * job is to show a writer what they have, so a compact row of ⋯ menus would
+ * work directly against it.
+ *
+ * The fix is to turn it round. It was book-first and needed to be tool-first:
+ * one book chosen at the top, then every tool named *and* explained. Forty-nine
+ * anonymous buttons become one picker and fifteen described cards — and the
+ * fifteen are the same ones a book card's ⋯ menu opens, out of one list in
+ * `lib/book-tools.ts`.
  */
-function Tools({ books }: { books: Book[] }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <Panel title="Working on a book">
-        <p className="mb-4 text-muted">
-          <strong className="text-fg">Comp titles</strong> — the published books
-          yours sits beside, which every listing form and every query letter
-          asks for. <strong className="text-fg">Blurb</strong> — counted against
-          the shops&rsquo; limit, and shown five real blurbs from books like
-          yours. <strong className="text-fg">Categories</strong> — which shelf
-          you land on, from where comparable books are actually filed.{" "}
-          <strong className="text-fg">Covers</strong> — yours at thumbnail size,
-          beside the shelf it has to sit on, and a check on the file a shop will
-          receive. <strong className="text-fg">Title</strong> — whether somebody
-          else&rsquo;s book turns up first when a reader searches for yours. All
-          five read Google Books and Open Library, free, and none of them sends
-          anything you have written.{" "}
-          <strong className="text-fg">Writing record</strong> — the day-by-day
-          trail your work left, for when somebody accuses you of not having
-          written it. Evidence rather than proof, and it says so in the document
-          it produces.
+function Tools({
+  books,
+  current,
+}: {
+  books: Book[];
+  /** The book to offer first — the same one the Overview leads with. */
+  current: Book | null;
+}) {
+  const [chosenId, setChosen] = useState<string | null>(null);
+
+  // The picked book, or the one the shelf was already offering. Resolved rather
+  // than copied into state, so a rename or a deletion cannot leave this holding
+  // a stale book.
+  const book = books.find((b) => b.id === chosenId) ?? current;
+
+  if (!book) {
+    return (
+      <section className="rounded-2xl border border-line bg-panel p-8 text-center">
+        <p className="text-lg font-bold text-fg">Nothing on the shelf yet</p>
+        <p className="mx-auto mt-2 max-w-md text-muted">
+          These all work on a book, so there is nothing to point them at. Start
+          one and they light up.
         </p>
-        {books.length === 0 ? (
-          <p className="text-muted">No books yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {books.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3
-                           rounded-lg border border-line bg-surface px-4 py-3"
-              >
-                <span className="truncate font-medium text-fg">{b.title}</span>
-                <span className="flex gap-2">
-                  <Go href={`/book/${b.id}/comps`}>Comps</Go>
-                  <Go href={`/book/${b.id}/blurb`}>Blurb</Go>
-                  <Go href={`/book/${b.id}/categories`}>Categories</Go>
-                  <Go href={`/book/${b.id}/covers`}>Covers</Go>
-                  <Go href={`/book/${b.id}/title-check`}>Title</Go>
-                  <Go href={`/book/${b.id}/paperback`}>Paperback</Go>
-                  <Go href={`/book/${b.id}/provenance`}>Record</Go>
-                </span>
-              </li>
-            ))}
-          </ul>
+        <Link
+          href="/book/new"
+          className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+        >
+          Start a book
+        </Link>
+      </section>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <section
+        className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl
+                          border border-line bg-panel px-5 py-4"
+      >
+        <span className="w-10 shrink-0">
+          <CoverOf book={book} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold tracking-widest text-muted uppercase">
+            Working on
+          </p>
+          <p className="mt-0.5 truncate text-lg font-bold text-fg">
+            {book.title}
+          </p>
+        </div>
+
+        {/* One picker instead of repeating every tool for every book. With
+            seven books and fifteen tools the old shape would now be a hundred
+            and five controls. */}
+        {books.length > 1 && (
+          <Menu
+            label="Choose a book"
+            align="end"
+            width={260}
+            triggerClassName="flex items-center gap-1.5 rounded-lg border border-line
+                              bg-surface px-3.5 py-2 text-sm font-semibold text-fg"
+            trigger={
+              <>
+                Change book
+                {shelfIcons.chevron}
+              </>
+            }
+          >
+            {(close) => (
+              <>
+                <MenuLabel>Your books</MenuLabel>
+                {books.map((b) => (
+                  <MenuButton
+                    key={b.id}
+                    // The slot is filled either way, blank where there is no
+                    // tick. Passing `undefined` collapses it, and then the one
+                    // checked row sits indented while the rest start further
+                    // left — a list where the current item is the only one out
+                    // of line reads as a rendering fault.
+                    icon={
+                      b.id === book.id ? (
+                        shelfIcons.check
+                      ) : (
+                        <span aria-hidden="true" className="block h-[18px] w-[18px]" />
+                      )
+                    }
+                    onClick={() => {
+                      setChosen(b.id);
+                      close();
+                    }}
+                  >
+                    {b.title}
+                  </MenuButton>
+                ))}
+              </>
+            )}
+          </Menu>
         )}
-      </Panel>
+      </section>
+
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <h2 className="font-bold text-fg">Everything that works on a book</h2>
+        <p className="mt-1 mb-5 text-muted">
+          The jobs that cost a fortune to hand to somebody else. All of it is
+          built and none of it is held back — a tool that is not finished is not
+          on this list.
+        </p>
+        <ToolGrid bookId={book.id} />
+      </section>
 
       {PLANNED.tools.length > 0 && (
         <Panel title="Coming to this area">
@@ -1872,28 +1942,9 @@ function Stat({
   );
 }
 
-function Go({
-  href,
-  primary,
-  children,
-}: {
-  href: string;
-  primary?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`rounded-lg px-4 py-2 text-sm font-semibold ${
-        primary
-          ? "bg-accent text-white"
-          : "border border-line bg-surface text-fg"
-      }`}
-    >
-      {children}
-    </Link>
-  );
-}
+// `Go` is gone with the last of the button rows. Every area now leads with
+// one named action or a described card, so a generic "link that looks like a
+// button" had nothing left to be.
 
 /**
  * "1 chapters" was on the shelf for as long as the shelf has existed. Only ever
