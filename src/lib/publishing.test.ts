@@ -141,6 +141,24 @@ describe("storeReadiness", () => {
     ).toContain("blocking:title");
   });
 
+  it("blocks on the placeholder however it is capitalised", () => {
+    // The one the app actually creates is "Untitled Book" with a capital B —
+    // `createBook` and five other sites in library-store.ts write it that way,
+    // while `sync.ts` falls back to the lowercase spelling. This check was
+    // written against the lowercase one and so never fired on a real book.
+    for (const title of ["Untitled Book", "untitled book", "  Untitled Book "]) {
+      expect(fields({ ...READY, book: makeBook({ title }) })).toContain(
+        "blocking:title",
+      );
+    }
+  });
+
+  it("leaves a real title alone even when it starts with the word", () => {
+    expect(
+      fields({ ...READY, book: makeBook({ title: "Untitled Book Two" }) }),
+    ).not.toContain("blocking:title");
+  });
+
   it("blocks on an empty book", () => {
     expect(fields({ ...READY, chapterCount: 0 })).toContain(
       "blocking:chapters",

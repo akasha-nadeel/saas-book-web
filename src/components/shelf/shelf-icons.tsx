@@ -85,6 +85,11 @@ export const shelfIcons = {
       <path d="m6 9 6 6 6-6" />
     </Svg>
   ),
+  chevronRight: (
+    <Svg>
+      <path d="m9 6 6 6-6 6" />
+    </Svg>
+  ),
   more: (
     <Svg>
       <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />

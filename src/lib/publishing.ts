@@ -175,7 +175,14 @@ export function storeReadiness({
   const advisory = (field: string, message: string) =>
     issues.push({ level: "advisory", field, message });
 
-  if (!book.title.trim() || book.title.trim() === "Untitled book") {
+  // Matched without regard to case, because the placeholder is written three
+  // different ways in this codebase already: `createBook` and five other sites
+  // in library-store.ts make "Untitled Book", `sync.ts` falls back to "Untitled
+  // book", and this check was spelled like the latter — so it never once fired
+  // on a real book. Comparing exact strings across six call sites is a check
+  // that silently stops working the next time somebody capitalises differently.
+  const title = book.title.trim();
+  if (!title || title.toLowerCase() === "untitled book") {
     blocking("title", "The book still has no title of its own.");
   }
 

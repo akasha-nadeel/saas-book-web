@@ -19,6 +19,7 @@ import {
   bookWordCount,
   booksIn,
   deleteBook,
+  hasCover,
   migrateLegacy,
   restoreBook,
   trashBook,
@@ -33,6 +34,7 @@ import {
   useShelf,
 } from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
+import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { progressOf, roadmapFor } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
 import {
@@ -1141,36 +1143,182 @@ function Write({
   );
 }
 
+/**
+ * Prepare — what a shop would refuse, before you find out from the shop.
+ *
+ * This was a list of book titles with an identical "Check and export" button
+ * beside each, and the state of every one of them hidden behind that button.
+ * On the *one screen* in the app whose entire subject is readiness, a writer
+ * could not see which of their books was ready without opening seven pages.
+ *
+ * `storeReadiness()` is pure and works off the book alone, so the answer can
+ * simply be shown. Each row now names its own worst problem, and the strip at
+ * the top says how many books would pass today.
+ *
+ * **It reports the listing half only, and says so.** The blocking checks that
+ * need the manuscript — images that will not package, missing alt text — are
+ * `checkStoreReadiness()` on the export page, because they have to read every
+ * chapter. Counting them here would mean parsing the whole library to draw a
+ * list. So a book that reads "Ready" here has nothing wrong with its *details*,
+ * which is a narrower claim than "a shop will take it", and the row says which.
+ */
 function Prepare({ books }: { books: Book[] }) {
+  /**
+   * Read once per shelf change rather than per render. Cheap on its own —
+   * `hasCover` tests for the key instead of fetching a 250KB data URL — but it
+   * is a loop over every book and there is no reason to run it on a keystroke.
+   */
+  const rows = useMemo(
+    () =>
+      books.map((book) => ({
+        book,
+        issues: storeReadiness({
+          book,
+          ...(book.publishing ? { meta: book.publishing } : {}),
+          hasCover: hasCover(book.id),
+          // Chapters with prose in them. The count is denormalised into the
+          // shelf, so this needs no chapter bodies.
+          chapterCount: book.chapters.filter((c) => c.words > 0).length,
+          // Not knowable without the manuscript; the export page does these.
+          brokenImages: 0,
+        }),
+      })),
+    [books],
+  );
+
+  const ready = rows.filter(
+    (r) => !r.issues.some((i) => i.level === "blocking"),
+  ).length;
+
   return (
-    <div className="flex flex-col gap-6">
-      <Panel title="Check and export a book">
-        <p className="mb-4 text-muted">
-          The pre-upload check names what a shop would refuse, and says which
-          problems would actually stop the upload. It never blocks your export.
+    <div className="flex flex-col gap-5">
+      {books.length > 0 && (
+        <section className="rounded-2xl border border-line bg-panel px-5 py-4">
+          <p className="text-fg">
+            <strong>
+              {ready} of {books.length}
+            </strong>{" "}
+            {books.length === 1 ? "book has" : "books have"} their listing
+            details in order.
+          </p>
+          <p className="mt-1 text-sm text-muted">
+            Title, author, cover and something to publish — the things a shop
+            checks before it looks at the file. Open a book to run the rest,
+            which has to read the manuscript.
+          </p>
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <h2 className="font-bold text-fg">Check and export</h2>
+        <p className="mt-1 mb-4 text-muted">
+          The check names what a shop would refuse and which problems would
+          actually stop the upload. It never blocks your export — the file is
+          yours whether or not a shop would take it.
         </p>
+
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {books.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3
-                           rounded-lg border border-line bg-surface px-4 py-3"
-              >
-                <span className="truncate font-medium text-fg">{b.title}</span>
-                <Go href={`/book/${b.id}/export`}>Check and export</Go>
-              </li>
+            {rows.map(({ book, issues }) => (
+              <PrepareRow key={book.id} book={book} issues={issues} />
             ))}
           </ul>
         )}
-      </Panel>
-
-      <Panel title="Coming to this area">
-        <PlannedGrid items={PLANNED.tools.slice(0, 4)} />
-      </Panel>
+      </section>
     </div>
+  );
+}
+
+/**
+ * One book, with its worst problem said out loud.
+ *
+ * The whole row is the link. A button labelled "Check and export" repeated down
+ * a column is the same word seven times and a smaller target than the row it
+ * sits in, so the arrow marks it and the row takes the click.
+ */
+function PrepareRow({
+  book,
+  issues,
+}: {
+  book: Book;
+  issues: ReadinessIssue[];
+}) {
+  const blocking = issues.filter((i) => i.level === "blocking");
+  const advisory = issues.filter((i) => i.level === "advisory");
+
+  return (
+    <li>
+      <Link
+        href={`/book/${book.id}/export`}
+        className="flex items-center gap-4 rounded-xl border border-line bg-surface
+                   px-4 py-3 transition-colors hover:border-accent/40"
+      >
+        <span className="w-9 shrink-0">
+          <CoverOf book={book} />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold text-fg">
+            {book.title}
+          </span>
+          <span className="mt-0.5 block truncate text-xs text-muted">
+            {blocking.length > 0
+              ? // The first is the worst — storeReadiness orders them. Naming
+                // it beats a count, because "no author name" is a thing a
+                // writer can go and fix and "3 issues" is not.
+                blocking[0].message
+              : advisory.length > 0
+                ? advisory[0].message
+                : `${plural(bookChapterCount(book), "chapter")} · ${plural(bookWordCount(book), "word")}`}
+          </span>
+        </span>
+
+        {blocking.length > 0 ? (
+          <Flag tone="stop">
+            {blocking.length} to fix
+            {advisory.length > 0 ? ` · ${advisory.length} more` : ""}
+          </Flag>
+        ) : advisory.length > 0 ? (
+          <Flag tone="note">{advisory.length} worth doing</Flag>
+        ) : (
+          <Flag tone="ok">Details in order</Flag>
+        )}
+
+        <span aria-hidden="true" className="shrink-0 text-muted">
+          {shelfIcons.chevronRight}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
+/**
+ * A readiness marker.
+ *
+ * Colour *and* a word, never colour alone — a red pill and a green pill are the
+ * same pill to a red-green colourblind reader, and this is the screen where the
+ * difference decides whether they upload.
+ */
+function Flag({
+  tone,
+  children,
+}: {
+  tone: "ok" | "note" | "stop";
+  children: ReactNode;
+}) {
+  const tones = {
+    ok: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
+    note: "bg-amber-500/12 text-amber-700 dark:text-amber-400",
+    stop: "bg-red-500/12 text-red-700 dark:text-red-400",
+  };
+  return (
+    <span
+      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap ${tones[tone]}`}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -1232,9 +1380,11 @@ function Tools({ books }: { books: Book[] }) {
         )}
       </Panel>
 
-      <Panel title="Coming to this area">
-        <PlannedGrid items={PLANNED.tools} />
-      </Panel>
+      {PLANNED.tools.length > 0 && (
+        <Panel title="Coming to this area">
+          <PlannedGrid items={PLANNED.tools} />
+        </Panel>
+      )}
     </div>
   );
 }

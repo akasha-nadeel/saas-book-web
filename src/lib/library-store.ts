@@ -448,6 +448,22 @@ export function getServerCover(): string | null {
   return null;
 }
 
+/**
+ * Whether a book has cover art, without reading it.
+ *
+ * `getItem` returns the whole data URL, and a cover is allowed to be 250KB.
+ * Asking "does this book have one" for every book on a list — which the Prepare
+ * screen does, to say what a shop would refuse — would otherwise materialise a
+ * couple of megabytes of base64 to answer seven booleans.
+ *
+ * `in` tests for the key rather than fetching the value, because a Storage
+ * object exposes its keys as named properties.
+ */
+export function hasCover(bookId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return coverKey(bookId) in window.localStorage;
+}
+
 export function subscribeToCover(bookId: string, onStoreChange: () => void) {
   // Local writes arrive on the shelf channel, which is what setCover emits on;
   // the storage event covers the other tabs.
