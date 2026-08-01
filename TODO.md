@@ -115,10 +115,38 @@ today. Cache everything — both are rate-limited, and Open Library is
 crowd-sourced, so records vary from complete to nearly empty. Present anything
 from them as *what is out there*, never as *the answer*.
 
-- [ ] **Comp titles.** Search by genre or keyword; get real published books with
-      title, author, cover, page count and categories. Writers need comps for a
-      KDP listing and for a query letter, and currently guess. **Build this
-      first — the next three fall out of having it.**
+- [x] **Comp titles.** Done 2026-08-01. `/book/[bookId]/comps`, backed by
+      `src/lib/comps/comps.ts` (pure, 24 tests) and `/api/comps`. The search is
+      seeded from the book's genre and blurb and then handed to the writer to
+      edit, because they know what their book is like and we do not.
+
+      What the merge is for: Google Books has the blurbs and page counts, Open
+      Library has the subjects and a cover for almost everything, and the gaps
+      are in different places — so records are matched on ISBN, or on
+      title-plus-author when neither has one, and then merged **field by
+      field**. Preferring a source wholesale throws away exactly the field the
+      other was fetched for. Records with no author are dropped: both services
+      return catalogue entries and anthologies with an empty author list, and
+      none of them is a comparable title.
+
+      `summarise()` is the reason this unlocks the others — median pages,
+      median blurb length, and subject counts, each reported *with how many of
+      the results carried the field*. "The median is 320 pages" from three of
+      twenty books is a different statement from the same figure from eighteen.
+      Median rather than mean throughout: one 1,200-page omnibus drags an
+      average somewhere no real book sits.
+
+      **`GOOGLE_BOOKS_API_KEY` is optional and newly documented in
+      `.env.local.example`.** Google Books works without a key and rate-limits
+      hard without one — the anonymous quota is per IP, and a server is one IP
+      for every writer, so it answers 429 under any real traffic. It did during
+      development. Without the key the feature still works: Open Library carries
+      it, and the panel says plainly that Google did not answer rather than
+      leaving a writer to conclude their genre is empty.
+
+      *Left:* the ranking step below.
+
+- [ ] **Rank the comps with a model.**
 
       **This is the one place in the cluster where AI earns its cost:
       *deciding which books are actually like yours*.** Everything else here is

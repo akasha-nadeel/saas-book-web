@@ -86,7 +86,7 @@ const AREAS: { id: Area; label: string; live: boolean; blurb: string }[] = [
   {
     id: "tools",
     label: "Tools",
-    live: false,
+    live: true,
     blurb: "The small jobs that cost a fortune elsewhere.",
   },
 ];
@@ -143,10 +143,8 @@ const PLANNED: Record<string, [string, string][]> = {
       "Cover checker",
       "Legible at thumbnail size? Enough resolution? Right ratio? We check covers. We do not design them.",
     ],
-    [
-      "Comp titles",
-      "Books yours is genuinely like — found by reading your blurb and opening chapter, not by matching one word. What every listing and query letter asks for.",
-    ],
+    // Comp titles has moved out of this list — it is built. See the Tools area
+    // below, which now lists it as working and links to it per book.
     [
       "Blurb workshop",
       "Real per-store limits, plus five actual blurbs from books like yours and the length they run to. Not a chatbot writing it for you.",
@@ -414,7 +412,9 @@ export function Bookshelf({
 
           {area === "prepare" && <Prepare books={active} />}
 
-          {(area === "track" || area === "learn" || area === "tools") && (
+          {area === "tools" && <Tools books={active} />}
+
+          {(area === "track" || area === "learn") && (
             <PlannedArea items={PLANNED[area]} />
           )}
         </main>
@@ -642,6 +642,7 @@ function Write({
                     <Chip href={`/book/${book.id}`}>Write</Chip>
                     <Chip href={`/book/${book.id}/read`}>Read</Chip>
                     <Chip href={`/book/${book.id}/export`}>Prepare</Chip>
+                    <Chip href={`/book/${book.id}/comps`}>Comps</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -700,6 +701,51 @@ function Prepare({ books }: { books: Book[] }) {
 
       <Panel title="Coming to this area">
         <PlannedGrid items={PLANNED.tools.slice(0, 4)} />
+      </Panel>
+    </div>
+  );
+}
+
+/**
+ * Tools — the first area with something real in it besides the manuscript.
+ *
+ * Comp titles is built and links per book; everything else here is still a
+ * dead card under a PLANNED badge. The two are kept in one area, and visibly
+ * different from each other, rather than the working one being promoted to its
+ * own screen: the point of this dashboard is that a writer can see at a glance
+ * what the product does and does not do yet, and hiding the unbuilt ones would
+ * make that harder to read, not easier.
+ */
+function Tools({ books }: { books: Book[] }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <Panel title="Comp titles">
+        <p className="mb-4 text-muted">
+          The published books yours sits beside — what every listing form and
+          every query letter asks for, and what almost everyone guesses at. Read
+          from Google Books and Open Library, free, and nothing you have written
+          is sent.
+        </p>
+        {books.length === 0 ? (
+          <p className="text-muted">No books yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {books.map((b) => (
+              <li
+                key={b.id}
+                className="flex flex-wrap items-center justify-between gap-3
+                           rounded-lg border border-line bg-surface px-4 py-3"
+              >
+                <span className="truncate font-medium text-fg">{b.title}</span>
+                <Go href={`/book/${b.id}/comps`}>Find comps</Go>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel title="Coming to this area">
+        <PlannedGrid items={PLANNED.tools} />
       </Panel>
     </div>
   );
