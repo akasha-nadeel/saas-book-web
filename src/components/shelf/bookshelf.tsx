@@ -19,6 +19,7 @@ import {
   bookWordCount,
   booksIn,
   deleteBook,
+  getArcRaw,
   hasCover,
   migrateLegacy,
   restoreBook,
@@ -31,9 +32,16 @@ import {
   useActivity,
   useCover,
   useHydrated,
+  useLedger,
   useShelf,
 } from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
+import {
+  parseArc,
+  summarise as summariseArc,
+  type ArcSummary,
+} from "@/lib/arc";
+import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { progressOf, roadmapFor } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
@@ -1449,68 +1457,126 @@ function Learn({ books }: { books: Book[] }) {
 }
 
 /**
- * Track — the last of the six areas to become real.
+ * Track — what happened to each book after it went out.
  *
- * It was the one deliberately left until the end, because it is the largest:
- * everything else on the dashboard reads data the app already had, and this one
- * needed a ledger of its own and a file import to fill it.
+ * This was two panels, each a list of the same seven titles with an identical
+ * button beside every one: fourteen rows a hundred pixels tall, carrying seven
+ * book names and no numbers. On the screen whose entire subject is *what the
+ * book cost against what it earned*, neither figure appeared anywhere.
  *
- * The two panels are the two halves of what happens to a book once it is out —
- * what it earned, and whether anybody said anything about it.
+ * It is one list now, and each row shows both halves of the answer. The money
+ * comes from the ledger, the reviews from the advance-copy list, and each half
+ * links to the page that can change it. The strip on top adds the library up,
+ * because "am I down overall" is a question no per-book page can answer.
+ *
+ * **Nothing here is estimated.** A book with no rows says so rather than
+ * showing a zero, which on a money screen would read as a fact about the book
+ * instead of a gap in the record.
  */
 function Track({ books }: { books: Book[] }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <Panel title="Who has an advance copy">
-        <p className="mb-4 text-muted">
-          One launch in the research ran across seven sites and a spreadsheet;
-          another writer worked out advance copies mattered only after the book
-          was already published. This is the list, with the dates attached — who
-          holds it, who read it, and who is late. It does not find readers for
-          you, and it does not send anything.
-        </p>
-        {books.length === 0 ? (
-          <p className="text-muted">No books yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {books.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3
-                           rounded-lg border border-line bg-surface px-4 py-3"
-              >
-                <span className="truncate font-medium text-fg">{b.title}</span>
-                <Go href={`/book/${b.id}/arc`}>Advance copies</Go>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Panel>
+  const ledger = useLedger();
 
-      <Panel title="What each book cost against what it earned">
-        <p className="mb-4 text-muted">
-          Nobody keeps this, which is why the total is always a shock. Add what
-          you have spent, import a sales report, and see how many more copies
-          get you level. Amazon has no public API, so the report is a file you
-          download and hand over — nothing is fetched and nothing is sent.
+  /**
+   * Both halves, per book.
+   *
+   * The advance-copy lists are read straight from the store rather than through
+   * `useArc`, because a hook cannot be called in a loop and there is one list
+   * per book. Recomputed only when the shelf or the ledger changes; the arc
+   * lists are small — names and dates — so this is nothing like reading covers.
+   */
+  const rows = useMemo(
+    () =>
+      books.map((book) => ({
+        book,
+        money: totals(ledger.filter((e) => e.bookId === book.id)),
+        readers: summariseArc(parseArc(getArcRaw(book.id))),
+      })),
+    [books, ledger],
+  );
+
+  const library = useMemo(() => totals(ledger), [ledger]);
+  const out = rows.reduce((n, r) => n + r.readers.out, 0);
+  const late = rows.reduce((n, r) => n + r.readers.overdue, 0);
+  const anyMoney = ledger.length > 0;
+
+  return (
+    <div className="flex flex-col gap-5">
+      {books.length > 0 && (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {anyMoney ? (
+            <>
+              <Stat
+                icon={shelfIcons.track}
+                value={library.spent.toLocaleString()}
+                label="spent"
+                note="across every book"
+              />
+              <Stat
+                icon={shelfIcons.track}
+                value={library.earned.toLocaleString()}
+                label="earned"
+                note={
+                  library.units > 0
+                    ? `${library.units.toLocaleString()} ${library.units === 1 ? "copy" : "copies"} recorded`
+                    : "no copy counts recorded"
+                }
+              />
+              <Stat
+                icon={shelfIcons.target}
+                value={`${library.net >= 0 ? "+" : "\u2212"}${Math.abs(library.net).toLocaleString()}`}
+                label={library.net >= 0 ? "ahead" : "down"}
+                note={
+                  library.net >= 0
+                    ? "rarer than anyone tells you"
+                    : "which is the normal place to be"
+                }
+              />
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4 sm:col-span-2 lg:col-span-3">
+              <div className="flex items-center gap-2 text-muted">
+                {shelfIcons.track}
+                <p className="text-sm font-medium">Nothing recorded yet</p>
+              </div>
+              <p className="mt-1.5 text-sm text-fg">
+                Start with what you have already spent. It is the number that
+                matters most and the one nobody writes down.
+              </p>
+            </div>
+          )}
+
+          <Stat
+            icon={shelfIcons.calendar}
+            value={String(out)}
+            label="advance copies out"
+            note={late > 0 ? `${late} past their date` : "none late"}
+          />
+        </section>
+      )}
+
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <h2 className="font-bold text-fg">Every book</h2>
+        <p className="mt-1 mb-4 text-muted">
+          What each one cost against what it earned, and who still has an
+          advance copy. Amazon has no public API, so a sales report is a file
+          you download and hand over — nothing is fetched and nothing is sent.
         </p>
+
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {books.map((b) => (
-              <li
-                key={b.id}
-                className="flex flex-wrap items-center justify-between gap-3
-                           rounded-lg border border-line bg-surface px-4 py-3"
-              >
-                <span className="truncate font-medium text-fg">{b.title}</span>
-                <Go href={`/book/${b.id}/track`}>Open the ledger</Go>
-              </li>
+          <ul className="grid gap-3 lg:grid-cols-2">
+            {rows.map(({ book, money, readers }) => (
+              <TrackRow
+                key={book.id}
+                book={book}
+                money={money}
+                readers={readers}
+              />
             ))}
           </ul>
         )}
-      </Panel>
+      </section>
 
       {PLANNED.track.length > 0 && (
         <Panel title="Coming to this area">
@@ -1518,6 +1584,108 @@ function Track({ books }: { books: Book[] }) {
         </Panel>
       )}
     </div>
+  );
+}
+
+/**
+ * One book, with both halves of what happened to it.
+ *
+ * Two cells rather than two rows in two separate lists: money and reviews are
+ * the same question asked twice, and a writer chasing one is usually looking at
+ * the other. Each cell is its own link, so the row does not have to choose a
+ * single destination.
+ */
+function TrackRow({
+  book,
+  money,
+  readers,
+}: {
+  book: Book;
+  money: Ledger;
+  readers: ArcSummary;
+}) {
+  const recorded = money.spent > 0 || money.earned > 0;
+
+  return (
+    <li className="overflow-hidden rounded-xl border border-line bg-surface">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="w-8 shrink-0">
+          <CoverOf book={book} />
+        </span>
+        <span className="min-w-0 flex-1 truncate font-semibold text-fg">
+          {book.title}
+        </span>
+        {readers.overdue > 0 && <Flag tone="stop">{readers.overdue} late</Flag>}
+      </div>
+
+      <div className="grid grid-cols-2 border-t border-line">
+        <Cell href={`/book/${book.id}/track`} label="Money" divider>
+          {recorded ? (
+            <>
+              <span
+                className={
+                  money.net >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-fg"
+                }
+              >
+                {money.net >= 0 ? "+" : "\u2212"}
+                {Math.abs(money.net).toLocaleString()}
+              </span>{" "}
+              <span className="text-xs font-normal text-muted">
+                {money.net >= 0 ? "ahead" : "down"}
+              </span>
+            </>
+          ) : (
+            // Not "0". A zero here reads as a fact about the book rather than
+            // an empty record, on the one screen where that difference is the
+            // whole point.
+            <span className="text-muted">Nothing recorded</span>
+          )}
+        </Cell>
+
+        <Cell href={`/book/${book.id}/arc`} label="Advance copies">
+          {readers.total > 0 ? (
+            <>
+              {readers.out}{" "}
+              <span className="text-xs font-normal text-muted">
+                out · {readers.reviewed} reviewed
+              </span>
+            </>
+          ) : (
+            <span className="text-muted">Nobody yet</span>
+          )}
+        </Cell>
+      </div>
+    </li>
+  );
+}
+
+function Cell({
+  href,
+  label,
+  divider,
+  children,
+}: {
+  href: string;
+  label: string;
+  divider?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`px-4 py-2.5 transition-colors hover:bg-raised ${
+        divider ? "border-r border-line" : ""
+      }`}
+    >
+      <span className="block text-[11px] font-bold tracking-wider text-muted uppercase">
+        {label}
+      </span>
+      <span className="mt-0.5 block truncate text-sm font-bold text-fg">
+        {children}
+      </span>
+    </Link>
   );
 }
 
