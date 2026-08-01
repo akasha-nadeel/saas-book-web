@@ -331,6 +331,31 @@ function median(values: number[]): number | undefined {
  * of twenty books is a different statement from the same figure drawn from
  * eighteen. The screen has to be able to say which.
  */
+/**
+ * The comps that can actually be looked at, for the cover wall.
+ *
+ * Two filters and both earn their place. A book with no cover is not a row with
+ * a gap in it — a wall of covers is a wall or it is nothing, and a grid half
+ * full of grey boxes teaches a writer that their genre has no visual
+ * convention, which is the opposite of true.
+ *
+ * And the same artwork often arrives twice, because the two services carry
+ * different editions of one book and both point at the same scan. Deduping on
+ * the image URL rather than on the book is the right test: two genuinely
+ * different editions with different covers are two useful data points, and the
+ * same JPEG twice is a repetition that makes a convention look stronger than it
+ * is.
+ */
+export function coversOf(books: CompTitle[]): CompTitle[] {
+  const seen = new Set<string>();
+  return books.filter((book) => {
+    if (!book.coverUrl) return false;
+    if (seen.has(book.coverUrl)) return false;
+    seen.add(book.coverUrl);
+    return true;
+  });
+}
+
 export function summarise(books: CompTitle[]): CompSummary {
   const pages = books
     .map((b) => b.pageCount)

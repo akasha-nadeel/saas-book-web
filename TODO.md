@@ -217,10 +217,30 @@ from them as *what is out there*, never as *the answer*.
       *Left:* these are what a *librarian* files a book under, not a shop's own
       category list, and the screen says so. Matching them to KDP's own scheme
       is still the writer's job.
-- [ ] **A cover wall for the genre.** The covers of the top books in a genre,
-      shown together. Answers "I do not know what a thriller cover looks like",
-      and it is the reference the cover checker has to check *against* — without
-      it, that checker can only judge resolution and legibility, not convention.
+- [x] **A cover wall for the genre.** Done 2026-08-01. `/book/[bookId]/covers`.
+      The writer's cover beside the shelf it has to sit on — the thing they
+      would do themselves given a bookshop and an afternoon, which is all we can
+      honestly offer when we cannot design covers and have said in public that
+      we will not generate them.
+
+      **The size control is the feature.** The wall opens at 60px, because
+      nobody buys a book at the size a cover was designed at — they see it in a
+      search result next to nine others and decide in about a second. A cover
+      whose title cannot be read at thumbnail size has a problem that no amount
+      of admiring it at full size will reveal. Larger sizes are there for
+      afterwards.
+
+      **Nothing is scored.** No palette analysis, no "34% less saturated than
+      your genre". Partly practical — reading pixels off another origin's image
+      needs CORS headers neither service reliably sends — and mostly because it
+      would be a number invented to look like an answer. The writer looks;
+      looking is the skill being lent.
+
+      `coversOf()` in `comps.ts` (3 tests) drops books with no cover rather than
+      leaving gaps in the grid, since a half-empty wall teaches that a genre has
+      no visual convention, and dedupes on the image URL rather than the book —
+      the two services carry different editions pointing at the same scan, and
+      the same JPEG twice makes a convention look stronger than it is.
 - [ ] **Is this title already taken?** One search. Cheap, and writers ask it
       constantly.
 - [ ] **Real length targets.** Page counts of actual books in the genre,

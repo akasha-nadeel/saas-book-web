@@ -133,15 +133,12 @@ const PLANNED: Record<string, [string, string][]> = {
       "Real length targets",
       "How long books in your genre actually are, from books that exist.",
     ],
-    [
-      "What covers in your genre look like",
-      "The books you are shelved beside, together on one page.",
-    ],
+    // The cover wall has moved out of this list — it is built.
   ],
   tools: [
     [
       "Cover checker",
-      "Legible at thumbnail size? Enough resolution? Right ratio? We check covers. We do not design them.",
+      "The wall shows you the shelf; this would check the file — resolution, trim ratio, and whether the title survives being shrunk.",
     ],
     // Comp titles has moved out of this list — it is built. See the Tools area
     // below, which now lists it as working and links to it per book.
@@ -640,6 +637,7 @@ function Write({
                     <Chip href={`/book/${book.id}/comps`}>Comps</Chip>
                     <Chip href={`/book/${book.id}/blurb`}>Blurb</Chip>
                     <Chip href={`/book/${book.id}/categories`}>Categories</Chip>
+                    <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -723,9 +721,10 @@ function Tools({ books }: { books: Book[] }) {
           asks for. <strong className="text-fg">Blurb</strong> — counted against
           the shops&rsquo; limit, and shown five real blurbs from books like
           yours. <strong className="text-fg">Categories</strong> — which shelf
-          you land on, from where comparable books are actually filed. All three
-          read Google Books and Open Library, free, and none of them sends
-          anything you have written.
+          you land on, from where comparable books are actually filed.{" "}
+          <strong className="text-fg">Covers</strong> — yours at thumbnail size,
+          beside the shelf it has to sit on. All four read Google Books and Open
+          Library, free, and none of them sends anything you have written.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -742,6 +741,7 @@ function Tools({ books }: { books: Book[] }) {
                   <Go href={`/book/${b.id}/comps`}>Comps</Go>
                   <Go href={`/book/${b.id}/blurb`}>Blurb</Go>
                   <Go href={`/book/${b.id}/categories`}>Categories</Go>
+                  <Go href={`/book/${b.id}/covers`}>Covers</Go>
                 </span>
               </li>
             ))}

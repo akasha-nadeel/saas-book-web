@@ -5,6 +5,7 @@ import {
   mergeComps,
   parseGoogle,
   parseOpenLibrary,
+  coversOf,
   summarise,
   yearOf,
   type CompTitle,
@@ -227,6 +228,40 @@ describe("mergeComps", () => {
 
   it("drops records with no author — those are catalogue entries, not comps", () => {
     expect(mergeComps([comp({ authors: [] })])).toEqual([]);
+  });
+});
+
+describe("coversOf", () => {
+  /**
+   * A wall of covers is a wall or it is nothing. A grid half full of grey
+   * boxes teaches a writer that their genre has no visual convention, which is
+   * the opposite of what the page is for.
+   */
+  it("drops books with no cover rather than leaving a gap", () => {
+    const kept = coversOf([
+      comp({ key: "1", coverUrl: "https://c/1.jpg" }),
+      comp({ key: "2" }),
+    ]);
+    expect(kept).toHaveLength(1);
+  });
+
+  // The two services carry different editions of one book and often point at
+  // the same scan. The same JPEG twice makes a convention look stronger than
+  // it is.
+  it("shows the same artwork once", () => {
+    const kept = coversOf([
+      comp({ key: "1", coverUrl: "https://c/1.jpg" }),
+      comp({ key: "2", coverUrl: "https://c/1.jpg" }),
+    ]);
+    expect(kept).toHaveLength(1);
+  });
+
+  it("keeps two editions that really do look different", () => {
+    const kept = coversOf([
+      comp({ key: "1", coverUrl: "https://c/1.jpg" }),
+      comp({ key: "2", coverUrl: "https://c/2.jpg" }),
+    ]);
+    expect(kept).toHaveLength(2);
   });
 });
 
