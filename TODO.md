@@ -142,10 +142,32 @@ than replacing it.
       pain in the research — *"I look at the massive amount of money I
       wasted"* — and it is arithmetic, not AI. Fold the ad break-even sum into
       the same screen.
-- [ ] **Genre beat sheets.** Structure, word targets, and the midpoint. Three
-      batches name the same wall: *"First 20,000 words fly by. Then I realize I
-      have enough content to get to 30,000."* Builds on `book-kinds.ts` and the
-      already-written, currently-unused `book-templates.ts`.
+- [x] **Genre beat sheets.** Done 2026-08-01. `/book/[bookId]/structure`,
+      backed by `src/lib/beats.ts` (pure, 14 tests). Eleven beats as shares of
+      the finished length, with the writer's own word count placed on them.
+
+      For the wall three batches name at the same spot — *"First 20,000 words
+      fly by. Then I realize I have enough content to get to 30,000."*, *"I
+      always get writer's block at the midpoint."* A writer stuck there does not
+      need a theory of narrative; they need telling that they are at the middle
+      and what the middle usually is. A test asserts the middle turn still
+      straddles 50%, because if it drifts the feature has lost its point.
+
+      **The names are ours and deliberately plain.** The famous beat sheets are
+      somebody's copyrighted framework, and their vocabulary is a second barrier
+      — this research complains directly that structure terminology is bad and
+      hard to learn. "The middle turn" says what it is; "the Dark Night of the
+      Soul" needs a book explaining it first.
+
+      **It refuses to work without a target, and offers to set one rather than
+      guessing.** Inventing a length from the genre would put a number on screen
+      the writer never agreed to and then measure them against it. Genre notes
+      exist only where a difference is real and widely agreed; a genre with no
+      note gets the spine, because a made-up convention is worse than an absent
+      one, and a test keeps the notes to genres the app actually offers.
+
+      *Left:* `book-templates.ts` is still unused — chapter skeletons are a
+      different idea from beats, and it stays held back for its own reasons.
 - [ ] **Story bible.** Characters, places, timeline — and **across a series**,
       not one book, which is how it was asked for. Extends the notes panel.
 - [x] **Blurb workshop.** Done 2026-08-01. `/book/[bookId]/blurb`, backed by

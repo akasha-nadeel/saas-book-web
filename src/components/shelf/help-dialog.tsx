@@ -114,6 +114,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
+        name: "Structure",
+        desc: "The shape most novels share, in plain words, with your own word count placed on it — for when the middle has run out of road. It needs a target length, because every position is a share of a finished book, and it will not guess one. A convention, not a rule.",
+      },
+      {
         name: "Versions",
         desc: "A version of the open chapter is kept about every ten minutes you are editing, and the last eight are kept — so a bad afternoon is not permanent. The panel also counts how many sittings the chapter has had. It is a safety net rather than an archive: it can give you this chapter as it was before lunch, not as it was last March.",
       },

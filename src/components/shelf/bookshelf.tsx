@@ -41,11 +41,12 @@ import { useCover, useHydrated, useShelf } from "@/lib/use-library";
  * writer opening this should see immediately that the app has an opinion about
  * the whole job, not just the manuscript.
  *
- * **Two of the six are real. Four are not, and every one of them says so.**
- * Planned areas render their contents as dead, unclickable cards under a
- * PLANNED badge, because the house rule is that a control either works or
- * plainly says it is not built — and a prototype that quietly implies four
- * working sections is the exact thing this product is positioned against.
+ * **Five of the six are real; Track is not, and says so.** Anything unbuilt
+ * renders as a dead, unclickable card under a PLANNED badge, because the house
+ * rule is that a control either works or plainly says it is not built — and a
+ * prototype that quietly implies a working section is the exact thing this
+ * product is positioned against. Areas graduate from planned to live one
+ * feature at a time; the comments in `PLANNED` record what has left each list.
  *
  * The styling is deliberately plain. What is under review is the shape.
  */
@@ -113,11 +114,8 @@ const PLANNED: Record<string, [string, string][]> = {
     ],
   ],
   learn: [
-    // The publishing roadmap has moved out of this list — it is built.
-    [
-      "Genre beat sheets",
-      "For the wall at 30,000 words of an 80,000-word book.",
-    ],
+    // The publishing roadmap and the beat sheets have moved out of this
+    // list — both are built.
     [
       "Honest numbers",
       "97% of books sell under 5,000 copies. Shown before you spend, not after.",
@@ -126,11 +124,8 @@ const PLANNED: Record<string, [string, string][]> = {
       "Before you pay",
       "What to verify before hiring a publisher, a designer or a promotion service.",
     ],
-    [
-      "Real length targets",
-      "How long books in your genre actually are, from books that exist.",
-    ],
-    // The cover wall has moved out of this list — it is built.
+    // Real length targets, the cover wall and the beat sheets have all moved
+    // out of this list — they are built.
   ],
   tools: [
     [
@@ -152,10 +147,8 @@ const PLANNED: Record<string, [string, string][]> = {
       "Story bible",
       "Characters, places and timeline — across a series, not one book. The assistant reads the chapters and fills it in; it still cannot write into them.",
     ],
-    [
-      "Version history",
-      "Snapshots and restore, so a bad afternoon is not permanent.",
-    ],
+    // Version history has moved out of this list — it is built, in the
+    // editor's Versions tab.
     [
       "Writing provenance",
       "Evidence a human wrote the book, from the save history we already keep.",
@@ -639,6 +632,7 @@ function Write({
                     <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
                     <Chip href={`/book/${book.id}/title-check`}>Title</Chip>
                     <Chip href={`/book/${book.id}/roadmap`}>Roadmap</Chip>
+                    <Chip href={`/book/${book.id}/structure`}>Structure</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -772,9 +766,12 @@ function Learn({ books }: { books: Book[] }) {
     <div className="flex flex-col gap-6">
       <Panel title="Blank page to published">
         <p className="mb-4 text-muted">
-          Every step in the order it has to happen, so you do not find out about
-          advance copies after the book is already out. Most of it ticks itself
-          from what is in your book.
+          <strong className="text-fg">Roadmap</strong> — every step in the order
+          it has to happen, so you do not find out about advance copies after
+          the book is already out; most of it ticks itself from what is in your
+          book. <strong className="text-fg">Structure</strong> — the shape most
+          novels share, with your word count on it, for when the middle has run
+          out of road.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -787,7 +784,10 @@ function Learn({ books }: { books: Book[] }) {
                            rounded-lg border border-line bg-surface px-4 py-3"
               >
                 <span className="truncate font-medium text-fg">{b.title}</span>
-                <Go href={`/book/${b.id}/roadmap`}>Open the roadmap</Go>
+                <span className="flex gap-2">
+                  <Go href={`/book/${b.id}/roadmap`}>Roadmap</Go>
+                  <Go href={`/book/${b.id}/structure`}>Structure</Go>
+                </span>
               </li>
             ))}
           </ul>
