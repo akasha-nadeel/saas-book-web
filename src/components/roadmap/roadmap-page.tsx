@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
+import { ToolHeader } from "@/components/tool-header";
 import { findBook, setRoadmapStep } from "@/lib/library-store";
 import { PHASES, progressOf, roadmapFor, type StepState } from "@/lib/roadmap";
 import { useHydrated, useShelf } from "@/lib/use-library";
@@ -15,10 +16,23 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * most sharply the one who realised advance copies were essential only after
  * publishing, and then spent months chasing reviews for a book already out.
  *
- * **Most of this ticks itself**, from what is in the book. A checklist a writer
- * has to maintain by hand is a second job, and the first time they forget to
- * tick something it starts lying — which is worse than not existing. The steps
- * that happen outside the app say so on their face.
+ * **A third of them work themselves out** from what is in the book; the rest
+ * happen somewhere else and are the writer's to tick. This page used to say
+ * "most of this ticks itself", which was the wrong way round and is exactly the
+ * claim the house rules exist to catch. The real split is counted in
+ * `SELF_TICKING` and printed, and only the self-ticking ones are marked — a step that fills itself in is the surprising
+ * one, and labelling the other eleven was eleven repeats of something the
+ * checkbox already says.
+ *
+ * **It is drawn as a line rather than a stack of cards**, because the whole
+ * feature is that these are in an order. Eighteen equal boxes said nothing
+ * about sequence and ran to two and a half screens; a rail with the phases as
+ * stations says it in the shape.
+ *
+ * A step that is done loses its explanation. "Why this matters" is for somebody
+ * deciding whether to do a thing, and it is dead weight above a line already
+ * crossed — so the page gets shorter as the book gets further along, which is
+ * the right direction for it to move in.
  */
 export function RoadmapPage({ bookId }: { bookId: string }) {
   const hydrated = useHydrated();
@@ -30,6 +44,10 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
     [book],
   );
   const progress = useMemo(() => progressOf(steps), [steps]);
+
+  // Counted rather than written down, so the sentence below cannot go stale
+  // the way "most of this ticks itself" did.
+  const automatic = steps.filter((s) => s.automatic).length;
 
   if (!hydrated) return <LoadingScreen />;
 
@@ -46,129 +64,225 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
     );
   }
 
+  const nextHref = progress.next?.href?.(bookId);
+  const share = Math.round((progress.done / progress.total) * 100);
+
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
-      <div className="mx-auto max-w-3xl px-6 py-10">
-        <Link href={`/book/${bookId}`} className="text-sm text-muted">
-          ← {book.title}
-        </Link>
-        <h1 className="mt-4 text-3xl font-extrabold text-fg">
-          Blank page to published
-        </h1>
-        <p className="mt-3 text-muted">
-          The order it actually has to happen in. Most of this ticks itself from
-          what is in your book.
-        </p>
+      {/* Which book this is. Shared by every tool screen, because they all open
+          full-window with none of the dashboard around them, and the Tools area
+          lets a writer change book before opening one. */}
+      <ToolHeader book={book} tool="Roadmap">
+        The order it actually has to happen in — including the step almost
+        everybody finds out about too late.
+      </ToolHeader>
 
-        {/* ---- Where you are ------------------------------------------ */}
-        <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="font-bold text-fg">
-              {progress.done} of {progress.total} done
-            </p>
-            {progress.next && (
-              <p className="text-sm text-muted">
-                Next: <strong className="text-fg">{progress.next.title}</strong>
+      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+        {/* ---- Where you are ---------------------------------------------
+            The next step is a button, not a sentence. It is the one thing a
+            writer opens this page to find, and reading its name only to go
+            hunting for the same name further down is the work this card exists
+            to save. Its explanation is gone from here too — it appeared twice
+            on one screen, once in this card and again in the step's own row. */}
+        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
+            <div className="min-w-[8rem]">
+              <p className="text-2xl font-extrabold text-fg">
+                {progress.done}
+                <span className="text-base font-bold text-muted">
+                  {" "}
+                  of {progress.total}
+                </span>
               </p>
-            )}
+              <p className="text-xs text-muted">steps done</p>
+            </div>
+
+            <div className="min-w-[10rem] flex-1">
+              <div
+                className="h-2 w-full overflow-hidden rounded-full bg-raised"
+                role="progressbar"
+                aria-valuenow={progress.done}
+                aria-valuemin={0}
+                aria-valuemax={progress.total}
+              >
+                <div
+                  className="h-full rounded-full bg-accent transition-[width]"
+                  style={{ width: `${share}%` }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-muted">{share}% of the way</p>
+            </div>
           </div>
-          <div
-            className="mt-3 h-2 w-full overflow-hidden rounded-full bg-raised"
-            role="progressbar"
-            aria-valuenow={progress.done}
-            aria-valuemin={0}
-            aria-valuemax={progress.total}
-          >
-            <div
-              className="h-full rounded-full bg-accent"
-              style={{
-                width: `${(progress.done / progress.total) * 100}%`,
-              }}
-            />
-          </div>
-          {progress.next && (
-            <p className="mt-3 text-sm text-muted">{progress.next.note}</p>
+
+          {progress.next ? (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-surface px-5 py-3.5">
+              <span className="text-xs font-bold tracking-widest text-muted uppercase">
+                Next
+              </span>
+              <span className="min-w-0 flex-1 truncate font-semibold text-fg">
+                {progress.next.title}
+              </span>
+              {nextHref && (
+                <Link
+                  href={nextHref}
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white"
+                >
+                  Do this
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="border-t border-line bg-surface px-5 py-3.5 font-semibold text-fg">
+              Every step done. That is the whole list.
+            </p>
           )}
         </section>
 
-        {/* ---- The list ----------------------------------------------- */}
+        {/* Said once, here, rather than on all eighteen rows. */}
+        <p className="mt-4 text-sm text-muted">
+          {automatic} of these work themselves out from what is in your book,
+          and are marked <em>ticks itself</em>. The other{" "}
+          {progress.total - automatic} happen somewhere else, so they are yours
+          to tick — and those ticks stay on this machine rather than syncing to
+          your other ones.
+        </p>
+
+        {/* ---- The line --------------------------------------------------- */}
         {PHASES.map((phase) => {
           const inPhase = steps.filter((s) => s.phase === phase.id);
+          const done = inPhase.filter((s) => s.done).length;
+          const complete = done === inPhase.length;
+
           return (
             <section key={phase.id} className="mt-8">
-              <h2 className="font-bold text-fg">{phase.label}</h2>
-              <p className="text-sm text-muted">{phase.note}</p>
-              <ul className="mt-3 flex flex-col gap-2">
-                {inPhase.map((step) => (
-                  <Row key={step.id} step={step} bookId={bookId} />
+              <div className="flex flex-wrap items-baseline gap-x-3">
+                <h2 className="font-bold text-fg">{phase.label}</h2>
+                <span
+                  className={`text-xs font-bold ${
+                    complete ? "text-emerald-700" : "text-muted"
+                  }`}
+                >
+                  {complete ? "done" : `${done} of ${inPhase.length}`}
+                </span>
+              </div>
+              <p className="mt-0.5 text-sm text-muted">{phase.note}</p>
+
+              <ul className="mt-3">
+                {inPhase.map((step, i) => (
+                  <Row
+                    key={step.id}
+                    step={step}
+                    bookId={bookId}
+                    next={progress.next?.id === step.id}
+                    last={i === inPhase.length - 1}
+                  />
                 ))}
               </ul>
             </section>
           );
         })}
-
-        <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
-          Ticks you make by hand stay on this machine — they are not synced to
-          your other devices yet.
-        </p>
       </div>
     </div>
   );
 }
 
-function Row({ step, bookId }: { step: StepState; bookId: string }) {
+/**
+ * One step on the rail.
+ *
+ * The marker is the control where there is one to have. A step the app works
+ * out is a dot and never a checkbox: a checkbox a writer can click, which then
+ * snaps back the moment the page re-reads the book, is a lie about who is in
+ * charge of it.
+ */
+function Row({
+  step,
+  bookId,
+  next,
+  last,
+}: {
+  step: StepState;
+  bookId: string;
+  /** The first unfinished step in the whole list. */
+  next: boolean;
+  /** Last in its phase, so the rail stops here. */
+  last: boolean;
+}) {
   const href = step.href?.(bookId);
 
-  return (
-    <li
-      className={`rounded-xl border p-4 ${
-        step.done ? "border-line bg-panel" : "border-line bg-panel"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        {step.automatic ? (
-          /* Worked out, so not a control. A checkbox a writer can click but
-             which snaps back the moment the page re-reads the book would be a
-             lie about who is in charge of it. */
-          <span
-            aria-hidden="true"
-            className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-xs ${
-              step.done ? "bg-accent text-white" : "bg-raised text-muted"
-            }`}
-          >
-            {step.done ? "✓" : ""}
-          </span>
-        ) : (
-          <input
-            type="checkbox"
-            checked={step.done}
-            onChange={(e) => setRoadmapStep(bookId, step.id, e.target.checked)}
-            aria-label={step.title}
-            className="mt-0.5 h-5 w-5 shrink-0 accent-accent"
-          />
-        )}
+  const marker = `z-10 mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full
+                  text-[11px] font-bold ${
+                    step.done
+                      ? "bg-accent text-white"
+                      : "border-2 border-line bg-panel text-transparent"
+                  }`;
 
-        <div className="min-w-0 flex-1">
+  return (
+    <li className="relative flex gap-3 pb-2.5 last:pb-0">
+      {/* The rail stops at the end of each phase rather than running on through
+          the next heading, so the phases read as stations rather than as one
+          undifferentiated queue of eighteen. */}
+      {!last && (
+        <span
+          aria-hidden="true"
+          className="absolute top-8 bottom-0 left-3 w-px -translate-x-1/2 bg-line"
+        />
+      )}
+
+      {step.automatic ? (
+        <span aria-hidden="true" className={marker}>
+          ✓
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setRoadmapStep(bookId, step.id, !step.done)}
+          aria-pressed={step.done}
+          aria-label={
+            step.done
+              ? `Mark "${step.title}" as not done`
+              : `Mark "${step.title}" as done`
+          }
+          className={`${marker} transition-colors ${
+            step.done ? "" : "hover:border-accent hover:text-accent/40"
+          }`}
+        >
+          ✓
+        </button>
+      )}
+
+      <div
+        className={`min-w-0 flex-1 rounded-xl border px-4 py-2.5 ${
+          next
+            ? "border-accent/50 bg-panel ring-1 ring-accent/20"
+            : "border-line bg-panel"
+        }`}
+      >
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <p
-            className={`font-bold ${step.done ? "text-muted line-through" : "text-fg"}`}
+            className={`font-semibold ${step.done ? "text-muted" : "text-fg"}`}
           >
             {step.title}
           </p>
-          <p className="mt-1 text-sm text-muted">{step.note}</p>
-
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-            {href && (
-              <Link href={href} className="font-semibold text-accent">
-                {step.done ? "Open" : "Do this"} →
-              </Link>
-            )}
-            <span className="text-muted">
-              {step.automatic
-                ? "Ticks itself from your book"
-                : "You tick this one"}
+          {next && (
+            <span className="rounded-full bg-accent/12 px-2 py-0.5 text-[10px] font-bold tracking-wide text-accent uppercase">
+              Next
             </span>
-          </div>
+          )}
+          {step.automatic && (
+            <span className="text-[11px] text-muted">ticks itself</span>
+          )}
+
+          {href && (
+            <Link
+              href={href}
+              className="ml-auto text-xs font-semibold text-accent"
+            >
+              Open →
+            </Link>
+          )}
         </div>
+
+        {!step.done && <p className="mt-1 text-sm text-muted">{step.note}</p>}
       </div>
     </li>
   );

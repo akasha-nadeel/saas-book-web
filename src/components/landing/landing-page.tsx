@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { displayPrice, perMonthOf } from "@/lib/billing/plans";
+import { SELF_TICKING, YOURS_TO_TICK } from "@/lib/roadmap";
 
 /**
  * The landing page, rebuilt around what the product is becoming rather than
@@ -75,7 +76,7 @@ const WRITE = [
 const PREPARE = [
   [
     "Every step, in the order it happens",
-    "So you do not learn that advance copies had to go out weeks ago on the day after you publish. Most of it ticks itself from what is in your book.",
+    `So you do not learn that advance copies had to go out weeks ago on the day after you publish. ${SELF_TICKING} of the ${SELF_TICKING + YOURS_TO_TICK} tick themselves from what is in your book; the rest are yours.`,
   ],
   [
     "A pre-upload check",

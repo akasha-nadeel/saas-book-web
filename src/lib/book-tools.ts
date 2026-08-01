@@ -17,6 +17,8 @@
  * it goes in `PLANNED` on the dashboard, as a card that plainly says so.
  */
 
+import { SELF_TICKING } from "./roadmap";
+
 export interface BookTool {
   /** Appended to `/book/<id>/`. */
   path: string;
@@ -66,7 +68,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: "roadmap",
         icon: "compass",
         name: "What to do next",
-        what: "Every step in the order it happens. Most of it ticks itself from what is already in the book.",
+        what: `Every step in the order it happens, with the ${SELF_TICKING} that tick themselves from your book already marked.`,
       },
       {
         path: "paperback",

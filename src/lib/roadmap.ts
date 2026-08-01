@@ -201,6 +201,19 @@ export const STEPS: Step[] = [
 ];
 
 /**
+ * How many steps work themselves out from the book, and how many are the
+ * writer's to tick.
+ *
+ * Counted from `STEPS` rather than written down anywhere, because four screens
+ * quote this split in prose — the roadmap page, the dashboard's Learn area, the
+ * tools list and the landing page — and every one of them said "most of it
+ * ticks itself" while the truth was the opposite way round. A number typed into
+ * four files is a number that will be wrong in at least one of them.
+ */
+export const SELF_TICKING = STEPS.filter((s) => s.done).length;
+export const YOURS_TO_TICK = STEPS.length - SELF_TICKING;
+
+/**
  * `Omit<Step, "done">` because the field changes meaning here: on a `Step` it
  * is the *rule* for working the answer out, and on a `StepState` it is the
  * answer.

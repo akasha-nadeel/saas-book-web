@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { PHASES, STEPS, progressOf, roadmapFor } from "./roadmap";
+import {
+  PHASES,
+  SELF_TICKING,
+  STEPS,
+  YOURS_TO_TICK,
+  progressOf,
+  roadmapFor,
+} from "./roadmap";
 import type { Book } from "./library-store";
 
 const chapter = (words: number) => ({ id: "c1", title: "One", words });
@@ -118,5 +125,28 @@ describe("progressOf", () => {
       done: true,
     }));
     expect(progressOf(finished).next).toBeNull();
+  });
+});
+
+describe("SELF_TICKING", () => {
+  it("is what roadmapFor actually reports as automatic", () => {
+    // Four screens quote this split in prose — the roadmap page, the
+    // dashboard's Learn area, the tools list and the landing page. They all
+    // read these constants now, and this is what stops the constants drifting
+    // from the steps they describe. Every one of those screens previously said
+    // "most of it ticks itself", which was the wrong way round.
+    const automatic = roadmapFor(book(), []).filter((s) => s.automatic).length;
+    expect(SELF_TICKING).toBe(automatic);
+  });
+
+  it("splits the whole list and nothing else", () => {
+    expect(SELF_TICKING + YOURS_TO_TICK).toBe(STEPS.length);
+  });
+
+  it("is the minority, which is the thing the copy has to say", () => {
+    // Not a style point. If this ever flips, every sentence built on these
+    // constants still reads correctly, but the *emphasis* is wrong — so the
+    // test fails on purpose and somebody re-reads the four screens.
+    expect(SELF_TICKING).toBeLessThan(YOURS_TO_TICK);
   });
 });

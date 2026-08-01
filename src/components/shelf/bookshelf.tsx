@@ -43,7 +43,13 @@ import {
 } from "@/lib/arc";
 import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
-import { progressOf, roadmapFor, type Progress } from "@/lib/roadmap";
+import {
+  progressOf,
+  roadmapFor,
+  SELF_TICKING,
+  YOURS_TO_TICK,
+  type Progress,
+} from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
 import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
@@ -1473,9 +1479,9 @@ function Learn({ books }: { books: Book[] }) {
         <h2 className="font-bold text-fg">Blank page to published</h2>
         <p className="mt-1 text-muted">
           Every step in the order it has to happen, so you do not find out about
-          advance copies after the book is already out. Most of it ticks itself
-          from what is in your book — the steps you have to claim by hand are
-          the ones that happen somewhere else.
+          advance copies after the book is already out. {SELF_TICKING} of them
+          work themselves out from what is in your book; the other{" "}
+          {YOURS_TO_TICK} happen somewhere else and are yours to tick.
         </p>
 
         {books.length === 0 ? (
