@@ -195,14 +195,19 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
  * a row of these read as a shelf of products, and it is the one thing every
  * logo grid worth copying has in common. The border does the lifting a shadow
  * would, and stays crisp at this size.
+ *
+ * Drawn large. These are the only thing on a card now — the descriptions moved
+ * to the hover — so the mark has to carry the recognition on its own, and a
+ * 26px glyph on a grid this size reads as a bullet rather than a logo.
  */
 export function ToolMark({ name }: { name: string }) {
   return (
     <span
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl
-                 border border-line bg-white shadow-sm"
+      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl
+                 border border-line bg-white shadow-sm transition-shadow
+                 group-hover:shadow-md"
     >
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[26px] w-[26px]">
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-8 w-8">
         {TOOL_MARKS[name]}
       </svg>
     </span>

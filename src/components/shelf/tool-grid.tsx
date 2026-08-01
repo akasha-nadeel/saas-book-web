@@ -3,23 +3,27 @@ import { ToolMark } from "@/components/shelf/tool-marks";
 import { TOOL_GROUPS, type ToolTone } from "@/lib/book-tools";
 
 /**
- * The fifteen per-book tools, grouped and explained, pointed at one book.
+ * The fifteen per-book tools, pointed at one book.
+ *
+ * A grid of marks with a name under each, the shape every integrations page
+ * uses, because it is the shape that answers the question this screen is asked:
+ * *what is in here?* The cards it replaced carried a sentence of explanation
+ * apiece, which made the same fifteen tools four screens tall and turned a
+ * glance into a read.
+ *
+ * **The explanations are not deleted, they are on the hover.** Each tile
+ * carries its sentence as a `title`, so the answer to "what is Comps?" is a
+ * pause away rather than gone — and `book-tools.ts` still holds all fifteen in
+ * one place, which is where they can be checked against what the product
+ * actually does.
  *
  * Shared by the sheet a book card opens and the dashboard's Tools area, which
  * show the same list from two entry points — one where the book is already
- * chosen, one where it has just been picked. Keeping it in a single component
- * means the two cannot drift apart in layout the way they were about to drift
- * apart in wording.
+ * chosen, one where it has just been picked.
  *
- * **Every tool has a mark of its own**, drawn in `tool-marks.tsx` the way a
- * product logo is: solid shapes, its own colours, a silhouette you could name
- * with the label covered. The uniform stroke icons this replaced read as
- * interface furniture — one weight, one hue, fifteen of them — so the page had
- * to be read top to bottom every time.
- *
- * The group keeps its hue on the *heading*, not on the cards. Colour on both
- * would flatten fifteen products back into four blocks, which is the thing the
- * marks are there to undo.
+ * The group keeps its hue on the *heading* only. Colouring the tiles as well
+ * would flatten fifteen products into four blocks, which is the thing the marks
+ * exist to undo.
  */
 
 const HEADS: Record<ToolTone, string> = {
@@ -40,30 +44,37 @@ export function ToolGrid({
   return (
     <>
       {TOOL_GROUPS.map((group) => (
-        <section key={group.title} className="mb-7 last:mb-0">
+        <section key={group.title} className="mb-6 last:mb-0">
           <h3
             className={`text-xs font-bold tracking-widest uppercase ${HEADS[group.tone]}`}
           >
             {group.title}
           </h3>
           <p className="mt-1 text-xs text-muted">{group.note}</p>
-          <div className="mt-3 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+
+          {/* Ruled, like a table. The lines are what make a wall of marks read
+              as a catalogue rather than as scattered buttons, and they give
+              each cell an edge to light up on hover.
+
+              Every cell carries a full border and is pulled a pixel back, so
+              neighbouring borders collapse into one line — rather than putting
+              the rule on two sides and leaving a partial last row with a
+              missing edge, which is what happens when a group's count does not
+              divide by the column count. Three of these four groups do not. */}
+          <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-line sm:grid-cols-4 lg:grid-cols-5">
             {group.tools.map((tool) => (
               <Link
                 key={tool.path}
                 href={`/book/${bookId}/${tool.path}`}
                 onClick={onPick}
-                className="flex gap-3 rounded-xl border border-line bg-surface p-3.5
-                           transition-colors hover:border-accent/40"
+                title={tool.what}
+                className="group -mt-px -ml-px flex flex-col items-center gap-2 border
+                           border-line px-2 py-4 text-center transition-colors
+                           hover:bg-raised"
               >
                 <ToolMark name={tool.icon} />
-                <span className="min-w-0">
-                  <span className="block text-sm font-bold text-fg">
-                    {tool.name}
-                  </span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-muted">
-                    {tool.what}
-                  </span>
+                <span className="text-xs leading-snug font-medium text-fg">
+                  {tool.name}
                 </span>
               </Link>
             ))}
