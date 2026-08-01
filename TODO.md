@@ -645,12 +645,40 @@ audience has already been burned by.
 else across all four batches and it is the strongest thing that cannot be a
 feature. It deserves a real decision at some point rather than another shrug.
 
+## Taken out on purpose
+
+- **The light/dark theme,** removed 2026-08-01 at the owner's request. It is one
+  commit in the history if it is ever wanted back — search for the one that
+  removes `ThemeSync`.
+
+  What went with it: `theme` in `Prefs`, the `Theme` type, `theme-sync.tsx` and
+  the already-unused `theme-toggle.tsx`, the pre-paint bootstrap script and
+  `suppressHydrationWarning` in `layout.tsx`, the editor rail's toggle, the
+  `:root[data-theme="dark"]` token block, and the `[data-theme="light"]` block
+  that only existed so the landing page could opt *out* of dark.
+
+  Two things this bought. Six chrome classes (`.nav-chrome`, `.panel-chrome`,
+  `.shelf-sidebar`, `.auth-ground`, `.auth-aside`, `.shelf-hero`) were written
+  as a dark base plus a `:root:not([data-theme="dark"])` override — the light
+  rule was the real styling and the base was the fallback, which is a
+  confusing shape to read. They now state their colour once. And the
+  `[data-theme="light"]` block carried a standing hazard, recorded in its own
+  comment: *"this block has to be kept in step with @theme by hand"*.
+
+  **Do not add `dark:` variants.** They will never match, and they read to the
+  next person as though the app still had a theme.
+
 ## Built, but held back on purpose
 
-Two of the shelf header's buttons open an "Available soon" dialog. **Neither
-feature was deleted** — both are complete and still in the repo. Do not tidy
-them away: pointing the button at its own dialog again in `bookshelf.tsx` is the
-whole of switching either back on.
+Two features are complete, tested, and have **no way in**. They were shelf
+buttons pointed at an "Available soon" dialog; on 2026-08-01 the buttons were
+removed too, at the owner's request, so nothing reaches the code now.
+
+**Neither feature was deleted** and neither is dead code. Do not tidy them away:
+adding a rail item that opens the real dialog is the whole of switching either
+on. The "Available soon" dialog itself (`coming-soon-dialog.tsx`) is likewise
+kept — it has no callers at the moment and is the thing to reach for the next
+time something ships half-ready.
 
 - **Templates** — `templates-dialog.tsx` + `book-templates.ts` (tested). Starts
   a book from a chapter skeleton. Held back pending a rethink of what the

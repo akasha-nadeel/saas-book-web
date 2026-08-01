@@ -193,10 +193,6 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         name: "Assistant",
         desc: "An AI writing partner for the chapter you have open. Needs an ANTHROPIC_API_KEY set on the server.",
       },
-      {
-        name: "Light & dark",
-        desc: "Switch the theme from the editor rail or the shelf header.",
-      },
     ],
   },
   {

@@ -105,7 +105,6 @@ export function BookOverview({ bookId }: { bookId: string }) {
         // a second one would be the same list twice — the editor's reasoning,
         // now that this screen has the same panel.
         chapters={false}
-        theme={prefs.theme}
       />
 
       {panelOpen && (

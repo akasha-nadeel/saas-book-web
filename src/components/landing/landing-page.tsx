@@ -187,7 +187,6 @@ export function LandingPage() {
     // `<body>` is overflow-hidden for the editor shell, so this page owns its
     // own scrolling. `min-h-dvh` would put the footer out of reach.
     <div
-      data-theme="light"
       className="h-dvh overflow-y-auto bg-white text-slate-600 [scroll-behavior:smooth]"
     >
       <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">

@@ -698,7 +698,6 @@ it("starts with every writing mode off and the panel open", () => {
     marks: false,
     leftPanel: true,
     paper: "white",
-    theme: "light",
   });
 });
 

@@ -1437,8 +1437,6 @@ const PAPER_COLORS: readonly PaperColor[] = [
 
 /** The whole app's colour scheme. The paper above is a separate choice — a
  *  writer can keep a cream page whichever theme the chrome is wearing. */
-export type Theme = "light" | "dark";
-
 export interface Prefs {
   /** Dim every paragraph but the one being written. */
   focusMode: boolean;
@@ -1466,7 +1464,6 @@ export interface Prefs {
   /** The colour of the page under the prose. */
   paper: PaperColor;
   /** The chrome's colour scheme — light or dark. */
-  theme: Theme;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -1485,7 +1482,6 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // what most people still read most comfortably on a light surface.
   paper: "white",
   // Light out of the box; the toggle switches to the dark workspace.
-  theme: "light",
 });
 
 const prefsListeners = new Set<() => void>();
@@ -1530,7 +1526,6 @@ function parsePrefs(raw: string | null): Prefs {
       paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
         ? (parsed.paper as PaperColor)
         : DEFAULT_PREFS.paper,
-      theme: parsed.theme === "dark" ? "dark" : "light",
     };
   } catch {
     return DEFAULT_PREFS;

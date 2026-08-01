@@ -9,7 +9,6 @@ import { BookToolsDialog } from "@/components/shelf/book-tools-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
-import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import { type Account } from "@/lib/account";
@@ -205,9 +204,9 @@ export function Bookshelf({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<BookView>("active");
-  const [dialog, setDialog] = useState<
-    "templates" | "help" | "support" | "sounds" | "import" | null
-  >(null);
+  const [dialog, setDialog] = useState<"help" | "support" | "import" | null>(
+    null,
+  );
 
   /**
    * `/` puts the caret in the search box, the convention every list-shaped app
@@ -343,21 +342,6 @@ export function Bookshelf({
           ))}
         </nav>
 
-        <div className="my-3 h-px bg-line" />
-
-        <SideGroup label="Extras" />
-        <div className="flex flex-col gap-0.5">
-          <SideItem
-            icon={shelfIcons.template}
-            onClick={() => setDialog("templates")}
-          >
-            Templates
-          </SideItem>
-          <SideItem icon={shelfIcons.sound} onClick={() => setDialog("sounds")}>
-            Background sound
-          </SideItem>
-        </div>
-
         <div className="mt-auto flex flex-col gap-0.5 pt-6">
           <SideItem icon={shelfIcons.help} onClick={() => setDialog("help")}>
             Help
@@ -469,15 +453,6 @@ export function Bookshelf({
                       >
                         Import a file…
                       </MenuButton>
-                      <MenuButton
-                        icon={shelfIcons.template}
-                        onClick={() => {
-                          setDialog("templates");
-                          close();
-                        }}
-                      >
-                        From a template
-                      </MenuButton>
                     </>
                   )}
                 </Menu>
@@ -562,23 +537,6 @@ export function Bookshelf({
       {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
       {dialog === "support" && (
         <SupportDialog onClose={() => setDialog(null)} />
-      )}
-      {/* Both are complete features pointed at this dialog on purpose — see
-          TODO.md. Re-pointing the button is the whole of switching either on. */}
-      {dialog === "templates" && (
-        <ComingSoonDialog title="Templates" onClose={() => setDialog(null)}>
-          Start a book from a chapter skeleton instead of a blank page. Built,
-          and held back until we have decided what the templates should be.
-        </ComingSoonDialog>
-      )}
-      {dialog === "sounds" && (
-        <ComingSoonDialog
-          title="Background sound"
-          onClose={() => setDialog(null)}
-        >
-          Rain, surf, wind or a flat hush while you write. Built, and held back
-          until the scenes are real recordings rather than synthesised noise.
-        </ComingSoonDialog>
       )}
     </div>
   );
@@ -1136,7 +1094,7 @@ function Write({
                         type="button"
                         onClick={() => onDeleteForever(book)}
                         className="rounded-lg px-3.5 py-1.5 text-sm font-semibold
-                                   text-red-600 dark:text-red-400"
+                                   text-red-600"
                       >
                         Delete for good
                       </button>
@@ -1318,9 +1276,9 @@ function Flag({
   children: ReactNode;
 }) {
   const tones = {
-    ok: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400",
-    note: "bg-amber-500/12 text-amber-700 dark:text-amber-400",
-    stop: "bg-red-500/12 text-red-700 dark:text-red-400",
+    ok: "bg-emerald-500/12 text-emerald-700",
+    note: "bg-amber-500/12 text-amber-700",
+    stop: "bg-red-500/12 text-red-700",
   };
   return (
     <span
@@ -1431,7 +1389,10 @@ function Tools({
                       b.id === book.id ? (
                         shelfIcons.check
                       ) : (
-                        <span aria-hidden="true" className="block h-[18px] w-[18px]" />
+                        <span
+                          aria-hidden="true"
+                          className="block h-[18px] w-[18px]"
+                        />
                       )
                     }
                     onClick={() => {
@@ -1800,13 +1761,7 @@ function TrackRow({
         <Cell href={`/book/${book.id}/track`} label="Money" divider>
           {recorded ? (
             <>
-              <span
-                className={
-                  money.net >= 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : "text-fg"
-                }
-              >
+              <span className={money.net >= 0 ? "text-emerald-600" : "text-fg"}>
                 {money.net >= 0 ? "+" : "\u2212"}
                 {Math.abs(money.net).toLocaleString()}
               </span>{" "}
@@ -2006,14 +1961,8 @@ function SideItem({
   );
 }
 
-/** A rail section heading. Small, quiet, and only where a group needs naming. */
-function SideGroup({ label }: { label: string }) {
-  return (
-    <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold tracking-wider text-muted uppercase">
-      {label}
-    </p>
-  );
-}
+// `SideGroup` is gone with the Extras group it labelled. The rail is one list
+// and a footer again, so nothing needs naming.
 
 function CoverOf({ book }: { book: Book }) {
   // `useCover` returns the artwork itself, or null. Whether to draw the title

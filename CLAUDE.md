@@ -394,10 +394,11 @@ paints and is taken away, which is the flash it exists to prevent.
 `src/components/landing/` is what a signed-out visitor sees at `/`, drawn to the
 "OpenChapter Landing v2" design in that design's own palette and in Plus Jakarta
 Sans (`font-brand`, declared in `globals.css` and wired in `layout.tsx`). The
-hexes are written literally on purpose: the `@theme` tokens describe a *product*
-that has to work in light and dark, and this is a shop front that is one fixed
-light composition — the page carries `data-theme="light"` for that reason.
-Bending the tokens to cover both would make every one of them lie a little.
+hexes are written literally on purpose: the `@theme` tokens describe the
+*product*, and this is a shop front — a fixed composition built around a
+photograph and a shelf of covers. Bending the app's tokens to cover both would
+make several of them lie a little. (It used to carry `data-theme="light"` to opt
+out of the dark theme; that theme is gone, so the attribute went with it.)
 
 Three things there will bite. `sections.ts` has no `"use client"` and exists
 *only* so both sides of the boundary can read the section list: Next replaces a
@@ -447,15 +448,17 @@ attribute. Body type is the same shape: `src/lib/page-setup.ts` and
 properties on the manuscript container, which the editor and the reading view
 both read — so one setting styles the writing surface and the read-through alike.
 
-Three writer-facing looks are stored in `prefs` and each is applied its own way:
-`theme` (light/dark) as `data-theme` on `<html>`, `paper` as `[data-paper]` on the
-writing surface, and `focusMode` / `typewriter` as behaviour. The theme is set
-before first paint by an inline script in `src/app/layout.tsx` so a dark-mode
-writer never sees a white flash; it runs before React, so it *cannot* import
-`library-store` and instead reads the `openchapter:prefs` key literally — change
-that key or the shape of `theme` and the bootstrap goes stale silently. `<html>`
-carries `suppressHydrationWarning` for the same reason, and `ThemeSync` takes
-over every change after hydration.
+**There is one palette, and it is light.** A light/dark theme lived in `prefs`
+until it was removed — with it went `ThemeSync`, the pre-paint bootstrap script
+in `layout.tsx`, `suppressHydrationWarning` on `<html>`, the rail's toggle, and
+the `:root[data-theme="dark"]` block. Nothing reads `data-theme` now. Do not add
+a `dark:` variant to a class: it will never match, and it reads to the next
+person as if the app still had a theme. If dark is ever wanted back, the git
+history has the whole of it in one commit.
+
+Two writer-facing looks are still stored in `prefs` and each is applied its own
+way: `paper` as `[data-paper]` on the writing surface, and `focusMode` /
+`typewriter` as behaviour.
 
 `<body>` is `overflow-hidden` (for the editor shell). A standalone scrolling page
 therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reach.
@@ -473,12 +476,13 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
 - **The Help dialog is documentation and goes stale like documentation.** When a
   feature ships, add it to the `SECTIONS` list in `shelf/help-dialog.tsx` — it's
   the only place in the app that explains what exists.
-- **Two shelf buttons are complete features pointed at an "Available soon"
-  dialog on purpose** — Templates (`templates-dialog.tsx` + `book-templates.ts`)
-  and Background sound (`ambience.ts`, `use-ambience.ts`, `sounds-dialog.tsx`,
-  all tested). They are not leftovers; do not tidy them away. `TODO.md` says
-  what each is waiting on, and re-pointing the button in `bookshelf.tsx` is the
-  whole of switching either back on.
+- **Templates and Background sound are built, tested, and have no way in.**
+  `templates-dialog.tsx` + `book-templates.ts`, and `ambience.ts` +
+  `use-ambience.ts` + `sounds-dialog.tsx`. They were shelf buttons pointed at an
+  "Available soon" dialog; the buttons are now gone too, so the code is
+  unreachable. It is not dead — do not tidy it away. `TODO.md` says what each is
+  waiting on, and adding a rail item that opens the real dialog is the whole of
+  switching either on.
 - Storage limits are real: covers capped at 250KB, inline images at 900KB, import
   at 8MB — localStorage is ~5MB per origin. `setCover` and `createBookFromImport`
   fail cleanly and return a signal; honour it.

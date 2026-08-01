@@ -41,14 +41,14 @@
    The OpenChapter palette.
 
    Named for the job each colour does rather than the colour it is, so a later
-   change of hue — or a change of whole theme — does not leave every class in
-   the app lying about itself. That naming is what makes the theme toggle a
-   handful of variables rather than a rewrite: re-point a token here and every
-   `bg-surface`, `text-fg`, `bg-accent` in the app follows, none the wiser.
+   change of hue does not leave every class in the app lying about itself:
+   re-point a token here and every `bg-surface`, `text-fg`, `bg-accent` in the
+   app follows, none the wiser.
 
-   Light is the default and lives in @theme (so it is also what SSR and a
-   JS-off page render). Dark re-points the same tokens under
-   [data-theme="dark"], further down.
+   **There is one palette.** A dark theme lived here until it was taken out —
+   see the note in TODO.md for what that cost and why. The tokens are the light
+   set and nothing overrides them, which is why the chrome classes below can
+   simply state their colour instead of stating it twice.
 
    Light inverts the elevation logic of a dark UI: the desk is a soft grey, and
    panels are white sitting *up* on it, lifted by a hairline and a shadow rather
@@ -77,14 +77,12 @@
   /* Selected navigation — the open chapter, the chosen view tab. On light this
      is a soft blue wash with deep-blue ink, not a saturated block: a heavy
      fill reads as a button you should press, and these only say "you are here".
-     Dark keeps the original deep fill with light text (see the override). */
+     A pale blue ground with the accent's own ink on it. */
   --color-selected: #dbe7f7; /* the highlighted row's ground */
   --color-selected-fg: #154f9f; /* its text */
 
   /* Backs the shelf chrome and — so its rounded corner nests into the chrome
-     rather than the page — the content area behind it. Navy in light; under
-     [data-theme="dark"] it becomes the page colour, and the chrome stays
-     neutral. See .nav-chrome. */
+     rather than the page — the content area behind it. See .nav-chrome. */
   --color-nav: #123a63;
 
   /* The three parts a book is bound in, each with its own colour, so the
@@ -128,109 +126,6 @@
 /* --------------------------------------------------------------------------
    Dark theme.
 
-   The original low-glare workspace, re-pointed onto the same tokens. Here the
-   steps run the other way — the page is the deepest, panels sit lighter on it,
-   and a hover lifts by brightening — which is why the neutrals, not just their
-   order, differ from the light set above.
-
-   Set on <html> by the toggle and, before first paint, by the inline script in
-   the root layout. No component references it: they all speak in tokens.
-   -------------------------------------------------------------------------- */
-:root[data-theme="dark"] {
-  /* Native scrollbars, form controls and the like render dark to match. */
-  color-scheme: dark;
-
-  --color-surface: #121821;
-  --color-panel: #1d2732;
-  --color-raised: #28323f;
-  --color-line: #313d4c;
-
-  --color-fg: #eaf0f6;
-  --color-muted: #93a2b4;
-
-  --color-accent: #3b82f6;
-  --color-accent-strong: #5a97f8;
-  --color-accent-deep: #22405f;
-
-  --color-danger: #ff6568;
-
-  /* The old look: a deep fill with light text. Held apart from accent-deep so
-     the drag-over washes that still use accent-deep are free to differ. */
-  --color-selected: #22405f;
-  --color-selected-fg: #eaf0f6;
-
-  /* No blue chrome at night: the nav backdrop is just the page colour, so the
-     shelf's header and sidebar read as ordinary dark chrome. */
-  --color-nav: var(--color-surface);
-
-  /* Green and purple only need lifting off the darker ground. */
-  --color-matter-front: #16a34a;
-  --color-matter-front-strong: #22c55e;
-
-  --color-matter-body: #7c3aed;
-  --color-matter-body-strong: #8b5cf6;
-
-  /* Black inverts. A near-black button on a near-black page is a hole, so at
-     night the back matter takes the other end of the same idea — the neutral
-     one, furthest from the page — and its ink flips with it. It still reads as
-     the odd one out beside the green and the purple, which is the whole job. */
-  --color-matter-back: #e5eaf0;
-  --color-matter-back-strong: #f2f5f8;
-  --color-matter-back-ink: #10151c;
-}
-
-/* --------------------------------------------------------------------------
-   Light, asked for by attribute rather than only by being :root.
-
-   The landing page is the one screen that does not follow the writer's theme.
-   It is the front of the product rather than a place to work: it is designed
-   around a photograph and a shelf of covers, and every one of them was made for
-   a white page. Half of it inverted and half of it did not.
-
-   Custom properties inherit from the nearest ancestor that sets them, so a
-   subtree can carry `data-theme="light"` and take these instead of the dark set
-   above, whatever <html> says.
-
-   The values are the light set from @theme, written again. They cannot be
-   aliased: an alias on :root would resolve to whatever :root currently holds,
-   which under a dark theme is the dark value. So this block has to be kept in
-   step with @theme by hand — it re-points every token the dark block does, so
-   nothing is left half-inverted.
-   -------------------------------------------------------------------------- */
-[data-theme="light"] {
-  color-scheme: light;
-
-  --color-surface: #f5f6f8;
-  --color-panel: #ffffff;
-  --color-raised: #eaedf1;
-  --color-line: #e3e7ec;
-
-  --color-fg: #1a222d;
-  --color-muted: #586573;
-
-  --color-accent: #1c66cc;
-  --color-accent-strong: #154f9f;
-  --color-accent-deep: #1f5aa8;
-
-  --color-danger: #c0362c;
-
-  --color-selected: #dbe7f7;
-  --color-selected-fg: #154f9f;
-
-  --color-nav: #123a63;
-
-  --color-matter-front: #15803d;
-  --color-matter-front-strong: #126a33;
-  --color-matter-front-ink: #ffffff;
-
-  --color-matter-body: #6d28d9;
-  --color-matter-body-strong: #5b21b6;
-  --color-matter-body-ink: #ffffff;
-
-  --color-matter-back: #111827;
-  --color-matter-back-strong: #1f2937;
-  --color-matter-back-ink: #ffffff;
-}
 
 /* App shell. Layout constants, not part of the design language.
 
@@ -582,22 +477,15 @@ body {
    The previous/next chapter buttons in the workspace corners.
 
    Blue in light — an action, in the app's accent. At night they take the page
-   colour itself (the deep navy the surface is in dark), so they read as part of
-   the chrome rather than a bright block floating over the page. Driven here
-   rather than by utilities so the dark override, which needs the higher
-   specificity, can win cleanly.
+   colour itself, so they read as part of the chrome rather than a bright block
+   floating over the page. Driven here rather than by utilities so it applies
+   inside the chrome's re-pointed tokens.
    -------------------------------------------------------------------------- */
 .chapter-step {
   background-color: var(--color-accent);
 }
 .chapter-step:hover {
   background-color: var(--color-accent-strong);
-}
-:root[data-theme="dark"] .chapter-step {
-  background-color: var(--color-surface);
-}
-:root[data-theme="dark"] .chapter-step:hover {
-  background-color: var(--color-panel);
 }
 
 /* --------------------------------------------------------------------------
@@ -637,23 +525,13 @@ body {
    mixed from white, so they read as a brighter shade of whatever sits beneath.
    -------------------------------------------------------------------------- */
 .nav-chrome {
-  /* Dark mode and the no-JS fallback: plain chrome, the page's own colour and
-     tokens. The light rule below paints the brand colour over this. */
-  background: var(--color-surface);
-
-  /* The filled actions on the chrome — New book, Upgrade, the active rail tile
-     — take the harmonised navy-blue in every theme, so they never fall back to
-     the brighter global accent. That is why this sits on the base, not in the
-     light-only rule below. */
-  --color-accent: #2670be;
-  --color-accent-strong: #3080d2;
-}
-
-/* Light theme only — and the JS-off default, which renders light. Dark keeps
-   the neutral chrome above: the shelf should not turn blue at night. */
-:root:not([data-theme="dark"]) .nav-chrome {
   /* The deep navy of the shelf sidebar, so the editor's rail matches it. */
   background: #0a1a2f;
+
+  /* The filled actions on the chrome — New book, Upgrade, the active rail tile
+     — take the harmonised navy-blue rather than the brighter global accent. */
+  --color-accent: #2670be;
+  --color-accent-strong: #3080d2;
 
   --color-surface: #0a1a2f;
   --color-panel: #0a1a2f;
@@ -671,8 +549,8 @@ body {
    Panel chrome (the brighter-blue half of the two-tone nav).
 
    The chapters / notes / assistant panel that sits between the navy rail and
-   the manuscript. Same scoping as .nav-chrome: a rich blue in light, the plain
-   dark panel at night.
+   the manuscript. Same idea as .nav-chrome: a rich blue that re-points tokens
+   rather than restyling each control.
 
    Deep enough now to carry white text, so it is inked like the rail rather than
    tinted: titles go near-white, the lifts (line, hover, selected) are mixed
@@ -681,18 +559,14 @@ body {
    two read as kin rather than as two different blues. The New chapter button
    brightens to rise off the ground. */
 .panel-chrome {
-  background: var(--color-panel);
-
-  /* New chapter and Send take the same harmonised navy-blue as the rail, in
-     every theme — see .nav-chrome. */
-  --color-accent: #2670be;
-  --color-accent-strong: #3080d2;
-}
-
-:root:not([data-theme="dark"]) .panel-chrome {
   /* The same deep navy as the rail and the shelf sidebar, so the whole left
      chrome reads as one surface. */
   background: #0a1a2f;
+
+  /* New chapter and Send take the same harmonised navy-blue as the rail —
+     see .nav-chrome. */
+  --color-accent: #2670be;
+  --color-accent-strong: #3080d2;
 
   --color-panel: #0a1a2f;
   --color-surface: color-mix(in srgb, #ffffff 8%, transparent); /* fields: a subtle lift */
@@ -721,23 +595,18 @@ body {
    light search-and-account bar, a hero band that resumes the book in progress,
    then the cover grid. Only the shelf wears this — the editor keeps .nav-chrome.
 
-   Like .nav-chrome, the sidebar re-points the theme tokens rather than restyling
-   each control, so every text-muted / hover:bg-raised / bg-selected inside
-   adapts on its own. Navy in light; at night it lifts to a panel so the card
-   still reads as a card against the dark desk rather than melting into it.
+   Like .nav-chrome, the sidebar re-points the palette tokens rather than
+   restyling each control, so every text-muted / hover:bg-raised / bg-selected
+   inside adapts on its own.
    -------------------------------------------------------------------------- */
 .shelf-sidebar {
-  background: var(--color-panel); /* dark: a lifted card on the dark desk */
-
-  /* The filled action (New book) takes the harmonised navy-blue in every theme,
-     so it never falls back to the brighter global accent on the navy. */
-  --color-accent: #2670be;
-  --color-accent-strong: #3080d2;
-}
-
-:root:not([data-theme="dark"]) .shelf-sidebar {
   /* One flat, uniform deep navy for the rail — no gradient. */
   background: #0a1a2f;
+
+  /* The filled action (New book) takes the harmonised navy-blue rather than
+     the brighter global accent, which would shout on the navy. */
+  --color-accent: #2670be;
+  --color-accent-strong: #3080d2;
 
   --color-fg: #f2f6fb; /* near-white ink for the wordmark and active items */
   --color-muted: #9fb2c9; /* nav labels and tools — a muted blue-grey */
@@ -757,22 +626,17 @@ body {
    column of copy that actually sits on the navy.
    -------------------------------------------------------------------------- */
 .auth-ground {
-  /* Dark: the desk, so the panel-coloured card reads as lifted off it. */
-  background: var(--color-surface);
-}
-
-:root:not([data-theme="dark"]) .auth-ground {
   /* The same deep navy the shelf rail uses, so the two screens agree. */
   background: #0a1a2f;
 }
 
-:root:not([data-theme="dark"]) .auth-aside {
+.auth-aside {
   --color-fg: #f2f6fb; /* near-white ink for the mark and the headline */
   --color-muted: #9fb2c9; /* the line under it — a muted blue-grey */
 }
 
-/* The hero band. A soft lavender wash in light, the way the reference tints its
-   "popular book this week" banner; a quiet panel with an accent glow at night. */
+/* The hero band. A soft lavender wash, the way the reference tints its
+   "popular book this week" banner. */
 .shelf-hero {
   background:
     radial-gradient(
@@ -783,15 +647,6 @@ body {
     linear-gradient(115deg, #e9ecfb 0%, #f2e7f1 100%);
 }
 
-:root[data-theme="dark"] .shelf-hero {
-  background:
-    radial-gradient(
-      130% 150% at 100% 0%,
-      color-mix(in srgb, var(--color-accent) 22%, transparent) 0%,
-      transparent 55%
-    ),
-    var(--color-panel);
-}
 
 /* --------------------------------------------------------------------------
    Book View page turn.

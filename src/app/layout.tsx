@@ -7,17 +7,8 @@ import {
   Poppins,
 } from "next/font/google";
 import "./globals.css";
-import { ThemeSync } from "@/components/theme/theme-sync";
 import { AppLoader } from "@/components/app-loader";
 import { LibrarySync } from "@/components/library-sync";
-
-/**
- * Sets the theme on <html> before the first paint, so a writer who chose dark
- * never sees a white flash on load. It runs before React hydrates, so it cannot
- * import library-store; it reads the same key that module writes and defaults to
- * light on anything unexpected. ThemeSync takes over once React is running.
- */
-const THEME_BOOTSTRAP = `try{var t=JSON.parse(localStorage.getItem('openchapter:prefs')||'{}').theme;document.documentElement.dataset.theme=t==='dark'?'dark':'light';}catch(e){document.documentElement.dataset.theme='light';}`;
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -76,7 +67,8 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: "OpenChapter",
-  description: "A calm, focused place to write your novel — chapter by chapter.",
+  description:
+    "A calm, focused place to write your novel — chapter by chapter.",
 };
 
 // The app shell is fixed-height and manages its own scrolling, so lock the page
@@ -85,10 +77,9 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f6f8" },
-    { media: "(prefers-color-scheme: dark)", color: "#121821" },
-  ],
+  // One colour, because there is one palette. This is the mobile browser's
+  // own chrome, not a theme the app switches between.
+  themeColor: "#f5f6f8",
 };
 
 export default function RootLayout({
@@ -97,35 +88,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // suppressHydrationWarning: the bootstrap script writes data-theme onto this
-    // element before hydration, which the server markup does not carry.
     <html
       lang="en"
-      suppressHydrationWarning
       className={`${fraunces.variable} ${inter.variable} ${poppins.variable} ${jakarta.variable} ${plexMono.variable} h-full antialiased`}
     >
-      {/*
-        Stays a bare <script> in <head>, deliberately.
-
-        React 19 logs "Encountered a script tag while rendering React component"
-        for this in development. That warning is about scripts *client*-rendered
-        never executing, which is true and irrelevant here: this one runs from
-        the server's HTML during parse, which is the only time it needs to, and
-        it is the whole reason a dark-mode writer never sees a white flash.
-
-        Swapping it for `next/script` at `beforeInteractive` was tried and is
-        wrong: that component cannot be a direct child of <html> ("Cannot render
-        a sync or defer <script> outside the main document"), and moving it into
-        <body> gives up the guarantee that matters — running before first paint.
-        The dev console message is cosmetic; the flash would not be.
-      */}
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
-      </head>
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}
       <body className="h-full overflow-hidden bg-surface text-fg">
-        <ThemeSync />
         <LibrarySync />
         <AppLoader />
         {children}

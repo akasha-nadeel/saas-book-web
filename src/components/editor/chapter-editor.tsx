@@ -321,7 +321,6 @@ export function ChapterEditor({
         // one screen is the duplication the book panel already taught us to
         // avoid — and the panel it opens is the same panel either way.
         assistant={false}
-        theme={prefs.theme}
       />
 
       {/* One continuous gradient wash behind the book panel and the paper — the

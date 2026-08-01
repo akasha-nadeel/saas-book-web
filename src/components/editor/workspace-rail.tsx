@@ -2,7 +2,6 @@
 
 import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
 import type { PanelTab } from "@/components/editor/left-panel";
-import { setPref, type Theme } from "@/lib/library-store";
 
 /**
  * Picking a panel, from whichever control is asking.
@@ -17,7 +16,10 @@ import { setPref, type Theme } from "@/lib/library-store";
 export function selectPanel(
   value: PanelTab,
   now: { tab: PanelTab; open: boolean },
-  set: { onSelectTab: (tab: PanelTab) => void; onPanel: (open: boolean) => void },
+  set: {
+    onSelectTab: (tab: PanelTab) => void;
+    onPanel: (open: boolean) => void;
+  },
 ) {
   if (now.open && now.tab === value) {
     set.onPanel(false);
@@ -71,7 +73,6 @@ export function WorkspaceRail({
   onPanel,
   chapters = true,
   assistant = true,
-  theme,
 }: {
   bookId: string;
   tab: PanelTab;
@@ -83,7 +84,6 @@ export function WorkspaceRail({
   chapters?: boolean;
   /** Offer the assistant tab. False where the right rail already carries it. */
   assistant?: boolean;
-  theme: Theme;
 }) {
   const tabs = TABS.filter(
     ([value]) =>
@@ -132,17 +132,6 @@ export function WorkspaceRail({
           {icon}
         </RailButton>
       ))}
-
-      <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-      {/* The app-wide theme toggle. A rail item rather than a footer, so the
-          dev-tools badge (and any other bottom overlay) can't sit on top of it. */}
-      <RailButton
-        label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
-        onClick={() => setPref("theme", theme === "dark" ? "light" : "dark")}
-      >
-        {icons.theme}
-      </RailButton>
     </Rail>
   );
 }

@@ -139,18 +139,6 @@ export const shelfIcons = {
       <path d="M21 11.5a8 8 0 0 1-11.6 7.1L3 20.5l1.9-6.3A8 8 0 1 1 21 11.5Z" />
     </Svg>
   ),
-  template: (
-    <Svg>
-      <rect x="3" y="3" width="18" height="18" rx="2" />
-      <path d="M3 9h18M9 21V9" />
-    </Svg>
-  ),
-  sound: (
-    <Svg>
-      <path d="M11 5 6.5 9H3v6h3.5L11 19Z" />
-      <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
-    </Svg>
-  ),
   pricing: (
     <Svg>
       <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1-.6-1.4V4.5a1.5 1.5 0 0 1 1.5-1.5H12a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.6Z" />
