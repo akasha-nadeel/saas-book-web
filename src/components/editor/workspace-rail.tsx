@@ -38,9 +38,6 @@ const TABS = [
   // Beside Ideas: both are things a writer keeps *about* the book rather than
   // in it, and both are wanted mid-sentence.
   ["bible", "Story bible", icons.bible],
-  // Beside Ideas: both are things a writer keeps *about* the book rather than
-  // in it, and both are wanted mid-sentence.
-  ["bible", "Story bible", icons.bible],
   ["bookmarks", "Bookmarks", icons.bookmarks],
   ["assistant", "Assistant", icons.assistant],
   ["history", "Versions", icons.history],
