@@ -61,10 +61,30 @@ than replacing it.
       already-written, currently-unused `book-templates.ts`.
 - [ ] **Story bible.** Characters, places, timeline — and **across a series**,
       not one book, which is how it was asked for. Extends the notes panel.
-- [ ] **Blurb workshop.** The real per-store character limits and a structure
-      checklist. Explicitly *not* "AI writes your blurb": writers in this
-      research describe an AI-written blurb as a thing that hurt their sales.
-      Extends `publishing.ts`.
+- [x] **Blurb workshop.** Done 2026-08-01. `/book/[bookId]/blurb`, backed by
+      `src/lib/blurb.ts` (pure, 25 tests). Explicitly *not* "AI writes your
+      blurb": writers in this research describe an AI-written blurb as the thing
+      that hurt their sales. It writes nothing — it counts, and it shows five
+      real blurbs from comparable books beside the box.
+
+      **Only two things in it are called problems, and both are facts:** an
+      empty blurb, and one over `BLURB_MAX`. Everything else is a *note* — a
+      measurement, with the same measurement from published books beside it
+      where the comps search found any. Nobody knows whether a writer's
+      three-paragraph blurb beats a two-paragraph one, and the screen says so
+      out loud so the notes are not mistaken for rules.
+
+      Two checks are deliberately weaker than they look. Sentence splitting
+      re-joins honorifics, because "Mr. Kelly" otherwise reads as two sentences
+      and the longest-sentence figure goes wrong. And **shouting is only flagged
+      as a run of two or more capitalised words** — a lone upper-case word
+      cannot be told from an acronym, NASA and NOVEL being the same shape, and a
+      check that calls an acronym a mistake is noise that gets ignored along
+      with the checks that matter.
+
+      Blurbs come from Google Books only; Open Library's search results carry
+      none. When Google is rate-limited that half of the screen is empty and
+      says why, rather than implying the genre has no blurbs in it.
 - [ ] **Paperback setup.** Spine width (page count × paper thickness), margins,
       gutter, bleed. *"I'm just cursed when it comes to setting up paperbacks —
       it always takes ten times as long as it should."* Extends `page-setup.ts`,

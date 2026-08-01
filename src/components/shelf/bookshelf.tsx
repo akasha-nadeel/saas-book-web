@@ -145,10 +145,8 @@ const PLANNED: Record<string, [string, string][]> = {
     ],
     // Comp titles has moved out of this list — it is built. See the Tools area
     // below, which now lists it as working and links to it per book.
-    [
-      "Blurb workshop",
-      "Real per-store limits, plus five actual blurbs from books like yours and the length they run to. Not a chatbot writing it for you.",
-    ],
+    // The blurb workshop has moved out of this list — it is built. See the
+    // Tools area, which links to it per book.
     [
       "Category suggestions",
       "Worked out from where books like yours are actually filed, instead of a free-text box.",
@@ -643,6 +641,7 @@ function Write({
                     <Chip href={`/book/${book.id}/read`}>Read</Chip>
                     <Chip href={`/book/${book.id}/export`}>Prepare</Chip>
                     <Chip href={`/book/${book.id}/comps`}>Comps</Chip>
+                    <Chip href={`/book/${book.id}/blurb`}>Blurb</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -719,12 +718,14 @@ function Prepare({ books }: { books: Book[] }) {
 function Tools({ books }: { books: Book[] }) {
   return (
     <div className="flex flex-col gap-6">
-      <Panel title="Comp titles">
+      <Panel title="Working on a book">
         <p className="mb-4 text-muted">
-          The published books yours sits beside — what every listing form and
-          every query letter asks for, and what almost everyone guesses at. Read
-          from Google Books and Open Library, free, and nothing you have written
-          is sent.
+          <strong className="text-fg">Comp titles</strong> — the published books
+          yours sits beside, which every listing form and every query letter
+          asks for. <strong className="text-fg">Blurb</strong> — counted against
+          the shops&rsquo; limit, and shown five real blurbs from books like
+          yours. Both read Google Books and Open Library, free, and neither
+          sends anything you have written.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -737,7 +738,10 @@ function Tools({ books }: { books: Book[] }) {
                            rounded-lg border border-line bg-surface px-4 py-3"
               >
                 <span className="truncate font-medium text-fg">{b.title}</span>
-                <Go href={`/book/${b.id}/comps`}>Find comps</Go>
+                <span className="flex gap-2">
+                  <Go href={`/book/${b.id}/comps`}>Comps</Go>
+                  <Go href={`/book/${b.id}/blurb`}>Blurb</Go>
+                </span>
               </li>
             ))}
           </ul>
