@@ -1293,6 +1293,22 @@ export function setBookAuthor(bookId: string, author: string) {
 }
 
 /**
+ * The word count a book is aiming at.
+ *
+ * Zero or less removes it rather than storing a goal of nothing: absent means
+ * "no target", and the editor shows no progress at all for a book without one.
+ * Storing `0` would instead show a bar that is permanently complete.
+ */
+export function setTargetWords(bookId: string, words: number) {
+  commitBook(bookId, (book) => {
+    const next = { ...book };
+    if (words > 0) next.targetWords = Math.round(words);
+    else delete next.targetWords;
+    return next;
+  });
+}
+
+/**
  * Whether cover artwork is shown without words printed over it.
  *
  * A jacket the writer designed already has its title on it, and printing ours

@@ -241,10 +241,50 @@ from them as *what is out there*, never as *the answer*.
       no visual convention, and dedupes on the image URL rather than the book —
       the two services carry different editions pointing at the same scan, and
       the same JPEG twice makes a convention look stronger than it is.
-- [ ] **Is this title already taken?** One search. Cheap, and writers ask it
-      constantly.
-- [ ] **Real length targets.** Page counts of actual books in the genre,
-      replacing the folklore numbers currently hard-coded in `book-kinds.ts`.
+- [x] **Is this title already taken?** Done 2026-08-01.
+      `/book/[bookId]/title-check`, backed by `src/lib/comps/title-check.ts`
+      (pure, 10 tests). Searched with `intitle:`, unlike every other screen
+      here — the comps query deliberately leaves the writer's own title out,
+      and this is the one question where finding a book of the same name is the
+      whole point.
+
+      **The answer is never yes or no, and the page opens by saying so.** Book
+      titles are not trademarks and cannot be copyrighted, so nothing here is
+      about permission. The useful question is whether somebody else's book
+      turns up first when a reader searches for yours — so it reports what is
+      out there in three grades of closeness, exact first, and recent first
+      within a grade, because a clash with last year deserves more attention
+      than one with 1961. A leading article is dropped in the comparison:
+      "The Drowned Coast" and "Drowned Coast" are the same title to anyone
+      searching, and a check that called them different would miss the clash it
+      exists to find.
+
+      It gives no advice. Sharing a title with an obscure book from 1974 is
+      nothing; sharing one with a bestseller in the same genre is a real
+      problem; and a writer can tell those apart faster than any rule we could
+      write.
+
+- [x] **Real length targets.** Done 2026-08-01. A panel on the comps screen,
+      backed by `src/lib/comps/length.ts` (pure, 8 tests), plus a new
+      `setTargetWords()` in the store.
+
+      **It returns a range, not a number, and that is the whole design.**
+      Catalogues record pages, and a page is not a fixed quantity of words — it
+      depends on trim size, type size and leading — so a median of 320 pages
+      becomes 80,000–96,000 words at 250–300 words a page. A single figure
+      derived from a page count would be a guess wearing the costume of a
+      measurement.
+
+      It also **shows the folklore beside it rather than replacing it**.
+      `suggestTarget()` says 110,000 for a fantasy novel; that number is roughly
+      right and nobody can name the books it came from. Printing it next to a
+      figure that names its twenty is the entire argument for the feature, and
+      hiding it would be claiming a victory over a number the writer never saw.
+
+      Refuses to answer from fewer than five books, and states "under" and
+      "over" as positions rather than verdicts — a book is finished when it is
+      finished, and telling a writer their novel is too short is the thing this
+      product exists not to do.
 
 ### Two standards worth using rather than inventing
 

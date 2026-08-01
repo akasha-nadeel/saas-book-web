@@ -4,7 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { buildQuery, type CompSummary, type CompTitle } from "@/lib/comps/comps";
-import { findBook } from "@/lib/library-store";
+import {
+  compareLength,
+  lengthFromPages,
+  WORDS_PER_PAGE,
+} from "@/lib/comps/length";
+import { bookWordCount, findBook, setTargetWords } from "@/lib/library-store";
+import { suggestTarget } from "@/lib/book-kinds";
 import { useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -186,6 +192,18 @@ export function CompsPage({ bookId }: { bookId: string }) {
           </section>
         )}
 
+        {/* ---- What that means for your length ------------------------ */}
+        {summary && (
+          <LengthPanel
+            medianPages={summary.medianPages}
+            from={summary.pagesFrom}
+            words={bookWordCount(book)}
+            target={book.targetWords}
+            folklore={suggestTarget(book.kind ?? "novel", book.genre ?? "Other")}
+            onUseTarget={(words) => setTargetWords(book.id, words)}
+          />
+        )}
+
         {books.length > 0 && (
           <ul className="mt-8 flex flex-col gap-3">
             {books.map((comp) => (
@@ -247,6 +265,93 @@ export function CompsPage({ bookId }: { bookId: string }) {
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * A word range from the page counts of real books, against the writer's own
+ * count and against the folklore number `book-kinds.ts` would have suggested.
+ *
+ * The folklore is shown rather than replaced. "110,000 for a fantasy novel" is
+ * roughly right and nobody can say which books it came from; putting it beside
+ * a figure that names its twenty is the whole argument for this feature, and
+ * hiding it would be claiming a victory over a number the writer never saw.
+ *
+ * "Under" and "over" are stated as positions, never as verdicts. A book is
+ * finished when it is finished, and a tool that tells a writer their novel is
+ * too short is doing the thing this product exists not to do.
+ */
+function LengthPanel({
+  medianPages,
+  from,
+  words,
+  target,
+  folklore,
+  onUseTarget,
+}: {
+  medianPages?: number;
+  from: number;
+  words: number;
+  target?: number;
+  folklore: number;
+  onUseTarget: (words: number) => void;
+}) {
+  const range = lengthFromPages(medianPages, from);
+
+  if (!range) {
+    return (
+      <section className="mt-4 rounded-xl border border-line bg-panel px-5 py-4">
+        <p className="text-sm font-bold text-fg">How long is a book like this?</p>
+        <p className="mt-1.5 text-sm text-muted">
+          Not enough of these results carried a page count to say. Your setup
+          suggests {folklore.toLocaleString()} words, which is the figure
+          everybody repeats for this genre — roughly right, and from books
+          nobody can name.
+        </p>
+      </section>
+    );
+  }
+
+  const where = compareLength(words, range);
+
+  return (
+    <section className="mt-4 rounded-xl border border-line bg-panel px-5 py-4">
+      <p className="text-sm font-bold text-fg">How long is a book like this?</p>
+      <p className="mt-1.5 text-fg">
+        <strong>
+          {range.low.toLocaleString()}–{range.high.toLocaleString()} words
+        </strong>
+        , from a median of {range.medianPages} pages across {range.from} books.
+      </p>
+      <p className="mt-1.5 text-xs text-muted">
+        Pages, not words — catalogues record pages, and a trade paperback runs
+        somewhere between {WORDS_PER_PAGE.low} and {WORDS_PER_PAGE.high} words a
+        page depending on trim size and type. That is why this is a range.
+      </p>
+
+      <p className="mt-3 text-sm text-muted">
+        You have {words.toLocaleString()} words
+        {where === "inside"
+          ? ", which is inside that range."
+          : where === "under"
+            ? ", which is below it. That is a position, not a problem."
+            : ", which is above it. Long books get published all the time."}
+      </p>
+
+      <p className="mt-3 text-sm text-muted">
+        The suggested target for this genre is {folklore.toLocaleString()} —
+        the number everybody repeats, from books nobody can name.
+        {target ? ` Yours is set to ${target.toLocaleString()}.` : ""}
+      </p>
+
+      <button
+        type="button"
+        onClick={() => onUseTarget(range.middle)}
+        className="mt-3 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-fg"
+      >
+        Set my target to {range.middle.toLocaleString()}
+      </button>
+    </section>
   );
 }
 

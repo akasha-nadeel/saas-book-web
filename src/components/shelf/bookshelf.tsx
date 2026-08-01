@@ -145,10 +145,7 @@ const PLANNED: Record<string, [string, string][]> = {
     // The blurb workshop has moved out of this list — it is built. See the
     // Tools area, which links to it per book.
     // Category suggestions has moved out of this list — it is built.
-    [
-      "Is your title taken?",
-      "One search, before you print it on anything.",
-    ],
+    // The title check has moved out of this list — it is built.
     [
       "Paperback setup",
       "Spine width, margins, gutter and bleed, worked out instead of guessed at.",
@@ -638,6 +635,7 @@ function Write({
                     <Chip href={`/book/${book.id}/blurb`}>Blurb</Chip>
                     <Chip href={`/book/${book.id}/categories`}>Categories</Chip>
                     <Chip href={`/book/${book.id}/covers`}>Covers</Chip>
+                    <Chip href={`/book/${book.id}/title-check`}>Title</Chip>
                     <ChipButton onClick={() => onDetails(book)}>
                       Details
                     </ChipButton>
@@ -723,8 +721,10 @@ function Tools({ books }: { books: Book[] }) {
           yours. <strong className="text-fg">Categories</strong> — which shelf
           you land on, from where comparable books are actually filed.{" "}
           <strong className="text-fg">Covers</strong> — yours at thumbnail size,
-          beside the shelf it has to sit on. All four read Google Books and Open
-          Library, free, and none of them sends anything you have written.
+          beside the shelf it has to sit on. <strong className="text-fg">Title</strong>{" "}
+          — whether somebody else&rsquo;s book turns up first when a reader
+          searches for yours. All five read Google Books and Open Library, free,
+          and none of them sends anything you have written.
         </p>
         {books.length === 0 ? (
           <p className="text-muted">No books yet.</p>
@@ -742,6 +742,7 @@ function Tools({ books }: { books: Book[] }) {
                   <Go href={`/book/${b.id}/blurb`}>Blurb</Go>
                   <Go href={`/book/${b.id}/categories`}>Categories</Go>
                   <Go href={`/book/${b.id}/covers`}>Covers</Go>
+                  <Go href={`/book/${b.id}/title-check`}>Title</Go>
                 </span>
               </li>
             ))}
