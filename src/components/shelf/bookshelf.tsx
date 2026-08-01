@@ -799,21 +799,27 @@ function Overview({
               href={`/book/${current.id}/roadmap`}
               className="block border-t border-line bg-surface px-5 py-3.5"
             >
-              <div className="flex gap-1.5">
-                {PHASES.map((phase) => {
+              <div className="flex">
+                {PHASES.map((phase, i) => {
                   const inPhase = steps.filter((st) => st.phase === phase.id);
                   const done = inPhase.filter((st) => st.done).length;
                   return (
-                    <div key={phase.id} className="min-w-0 flex-1">
-                      <div className="h-1.5 overflow-hidden rounded-full bg-raised">
-                        <div
-                          className="h-full rounded-full bg-accent"
-                          style={{
-                            width: `${(done / inPhase.length) * 100}%`,
-                          }}
+                    <div
+                      key={phase.id}
+                      className="relative flex min-w-0 flex-1 flex-col items-center"
+                    >
+                      {/* The line between the rings, drawn from the left edge
+                          to this one's centre. It is what makes five dials
+                          read as a sequence rather than as five gauges — and
+                          the sequence is the thing this strip is for. */}
+                      {i > 0 && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute top-[15px] right-1/2 left-0 h-px bg-line"
                         />
-                      </div>
-                      <p className="mt-1.5 truncate text-[11px] text-muted">
+                      )}
+                      <PhaseRing done={done} total={inPhase.length} />
+                      <p className="mt-1.5 text-center text-[10px] leading-tight text-muted">
                         {phase.label}
                       </p>
                     </div>
@@ -952,6 +958,72 @@ function Overview({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * One phase of the job, as a dial.
+ *
+ * A ring rather than a bar because these are five *stations*, not five
+ * measurements: a row of bars reads as a chart to compare across, where dials
+ * on a line read as a route with a position on it. The arc still carries the
+ * fraction, so nothing is lost in the change — a phase three-quarters done
+ * looks three-quarters done.
+ *
+ * A finished phase takes a tick instead of a full ring. A complete circle and a
+ * nearly-complete one are two arcs a couple of degrees apart, and "done" is the
+ * one state on this strip that should never be mistaken for "almost".
+ */
+function PhaseRing({ done, total }: { done: number; total: number }) {
+  const share = total > 0 ? done / total : 0;
+  const complete = total > 0 && done === total;
+
+  // Circumference of r=13 on the 32 box below, so the dash can be set as a
+  // length rather than a percentage — SVG has no percentage dash.
+  const circumference = 2 * Math.PI * 13;
+
+  return (
+    <span className="relative rounded-full bg-surface">
+      <svg
+        viewBox="0 0 32 32"
+        aria-hidden="true"
+        className="block h-[30px] w-[30px]"
+      >
+        <circle
+          cx="16"
+          cy="16"
+          r="13"
+          fill="none"
+          strokeWidth="3.5"
+          className="stroke-raised"
+        />
+        {share > 0 && (
+          <circle
+            cx="16"
+            cy="16"
+            r="13"
+            fill="none"
+            strokeWidth="3.5"
+            strokeLinecap="round"
+            strokeDasharray={`${share * circumference} ${circumference}`}
+            // From the top rather than from three o'clock, which is where a
+            // dial is read from and where SVG starts.
+            transform="rotate(-90 16 16)"
+            className="stroke-accent"
+          />
+        )}
+        {complete && (
+          <path
+            d="m11 16.2 3.2 3.2 6.4-6.8"
+            fill="none"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="stroke-accent"
+          />
+        )}
+      </svg>
+    </span>
   );
 }
 
