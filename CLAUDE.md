@@ -14,21 +14,31 @@ for the one assistant feature.
 - `npm run dev` — dev server (http://localhost:3000)
 - `npm run build` — production build. Also the way to check Tailwind output: v4
   silently drops utilities it cannot parse, so verify against `.next/static/chunks/*.css`.
-- `npm run lint` — ESLint (next/core-web-vitals + next/typescript)
+- `npm run lint` — ESLint (next/core-web-vitals + next/typescript). It does *not*
+  typecheck; for that, `npx tsc --noEmit` — there is no script for it.
 - `npm run test` — Vitest, single run (jsdom env)
 - `npm run test:watch` — Vitest watch
 - One test file: `npx vitest run src/lib/export/epub.test.ts`
 - One test by name: `npx vitest run -t "scene break"`
+- `java -jar epubcheck.jar book.epub` — the EPUB check the unit tests can't do
+  (see below). Not in CI; run it by hand after touching `epub.ts`.
+
+Every environment variable is optional and every one of them is documented, with
+its failure mode, in `.env.local.example`. That file is the canonical list —
+read it rather than grepping for `process.env`.
 
 Tests live beside their subjects as `*.test.ts` and concentrate on the pure
-logic: the import/export pipelines, the store, page setup, search, book kinds,
-the custom Tiptap marks, pagination arithmetic, narration chunking, transcript
-paragraphing, ambience, relative time. Components are not tested — jsdom is
-there for `localStorage`, not for a DOM.
+logic: the import/export pipelines (including the XHTML and front-matter
+renderers), the store, page setup, typography, search, book kinds, the custom
+Tiptap marks, pagination and click-to-type arithmetic, caret scrolling,
+narration chunking, transcript paragraphing, publishing details and the ISBN
+check digit, the billing price/cycle arithmetic and PayHere's two MD5s, the
+account fallbacks and the `?next=` redirect guard, ambience, relative time.
+Components are not tested — jsdom is there for `localStorage`, not for a DOM.
 
 `docs/plans/` holds the design and implementation notes for the bigger pieces
-(the bookshelf, export). They record what was decided and why, and are worth
-reading before reworking either.
+(the bookshelf, export, and the Supabase persistence design). They record what
+was decided and why, and are worth reading before reworking any of them.
 
 ## Stack
 
@@ -85,9 +95,18 @@ stable (see the frozen `EMPTY_SHELF`) or the store loops.
 is keyed on `${chapterId}:${storedText}` so a save from another tab reloads it
 instead of leaving it stale. Autosave is `src/lib/use-autosave.ts`; body is
 written before word count (a stale count is cosmetic, lost prose is not). Custom
-Tiptap extensions live in `src/lib/editor/` (font size, text align, blockquote,
-resizable images). The one to understand is `pagination.ts`: it sets the
-manuscript on real page sheets by *measuring* the rendered text and inserting
+Tiptap extensions live in `src/lib/editor/`: font size, font family, text align,
+blockquote, resizable images, and `no-indent.ts`. That last one is a mark, not a
+setting, and it pairs with `click-to-type.ts` — double-clicking blank page below
+the prose puts the caret *there* (Word's click-and-type), and a paragraph the
+writer placed must begin where the caret was shown rather than take the book's
+first-line indent. Aligning a body paragraph left is a different question and
+must leave the indent alone, which is why the two aren't one attribute.
+`caret-scroll.ts` is the other pure one: move the view only when the caret would
+leave it, and then only as far as the edge.
+
+The one to understand is `pagination.ts`: it sets the manuscript on real page
+sheets by *measuring* the rendered text and inserting
 spacer **decorations** at each page break — never document content, so undo,
 autosave and export see the same text. It measures in **lines**, not blocks, so a
 long paragraph fills the page and continues over the seam the way Word's does;
@@ -191,6 +210,17 @@ of components so they can be tested and changed in one place: `book-kinds.ts`
 (chapter skeletons only — never boilerplate prose), `search.ts` (walks plain text
 out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
 `relative-time.ts`, `use-typewriter.ts`.
+
+Two of them are about accounts and both are tested. `account.ts` resolves the
+name, face and email the chrome shows — a chain of fallbacks rather than a field
+lookup, because Google hands over a real name and a photo and an email signup
+hands over neither, and the shelf header and the account dialog have to agree on
+the answer. It takes whatever is in the JWT rather than a typed user, since
+`user_metadata` is written by identity providers and has never been
+type-checked. `auth-redirect.ts` is `safeNext()`, the open-redirect guard on the
+`?next=` parameter: rooted same-site paths only, which means rejecting `//evil`
+(protocol-relative, and reads as a path if you only check the leading slash) and
+anything with a backslash. Anyone can put anything in that query string.
 
 **The assistant** is `src/app/api/chat/route.ts` — Anthropic streaming. Needs
 `ANTHROPIC_API_KEY` in `.env.local`; without it the route returns 501 with a
@@ -344,6 +374,14 @@ a cancelled plan to its paid-up date with no grace, and an active or past_due
 one three days past it, because a renewal that needs one retry is a normal
 Tuesday and PayHere's queue is not instant.
 
+`use-plan.ts` is the client's view of all that, and it **fetches rather than
+derives**: the plan lives in Postgres and changes when PayHere says so — a
+webhook away, months later, with no page open — so there is nothing local to
+read it from, and it is deliberately not part of `library-store.ts`. Nothing it
+returns gates anything that costs money; the billed routes check server-side,
+which is the only check a reader with devtools cannot edit. It exists to tell a
+writer the truth about their own account.
+
 **The root layout carries three things no screen owns.** `ThemeSync` (above),
 `LibrarySync` — which runs `syncWithServer()` once per mount, enough because
 every way of signing in ends in a redirect or full navigation, and flushes
@@ -351,6 +389,38 @@ queued pushes on `visibilitychange` so a closed tab doesn't take the last save
 with it — and `AppLoader`, the held splash. `AppLoader` skips `/` deliberately
 and is *seeded* to "gone" there rather than switched off in an effect, or it
 paints and is taken away, which is the flash it exists to prevent.
+
+**The landing page is the one screen not built from the app's tokens.**
+`src/components/landing/` is what a signed-out visitor sees at `/`, drawn to the
+"OpenChapter Landing v2" design in that design's own palette and in Plus Jakarta
+Sans (`font-brand`, declared in `globals.css` and wired in `layout.tsx`). The
+hexes are written literally on purpose: the `@theme` tokens describe a *product*
+that has to work in light and dark, and this is a shop front that is one fixed
+light composition — the page carries `data-theme="light"` for that reason.
+Bending the tokens to cover both would make every one of them lie a little.
+
+Three things there will bite. `sections.ts` has no `"use client"` and exists
+*only* so both sides of the boundary can read the section list: Next replaces a
+client module's exports with client references, so a Server Component importing
+`SECTIONS` from `landing-nav.tsx` gets `.map` of a reference object and the page
+500s. The nav's scroll listener reads its scrolling *container*, not the window —
+`<body>` is `overflow-hidden`, so `window.scrollY` sits at 0 forever and the bar
+never gains its background. And the header's `h-16` and the hero's compensating
+`-mt-16 pt-32` are one measurement written in two places; move one without the
+other and the first heading slides under the bar.
+
+**Every claim on that page has to be true of the code**, which is where it
+departs from the source design — the deltas are listed in the header comment of
+`landing-page.tsx` and marked again at each site. The largest: four of the eight
+rows in `publishing-check.tsx` were invented by the design and are *gone* rather
+than reworded, because each remaining row is a check `storeReadiness()` actually
+performs and the section is one click from a signup that would show the real
+panel. `works-with.tsx` names export destinations rather than customer logos
+(there are none to show), with real marks in their real colours and the sourcing
+and licences recorded in the file. The figures (`landing-figures.tsx`,
+`toolkit-figures.tsx`, `laptop-mockup.tsx`, `book-fan.tsx`, `formats-flow.tsx`)
+are drawn from the app's own tokens rather than screenshotted, so they cannot go
+stale silently while the app moves.
 
 **Routes:** `/` — landing page for a signed-out visitor, shelf for a writer,
 decided on the server off `getClaims()` so neither sees the other's screen
@@ -394,6 +464,15 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
 
 - **No dead UI.** A control either works or plainly says it isn't built. Don't
   copy chrome from a reference and leave it inert.
+- **No claim the code can't back**, which is the same rule pointed at words
+  instead of controls. The landing page, the pricing rows and the FAQ are held
+  to what ships — the print PDF is the browser's print engine and is *not*
+  print-ready in the trade sense, and every page that mentions it says so. When
+  a design or a reference promises something we don't do, cut the promise rather
+  than reword it.
+- **The Help dialog is documentation and goes stale like documentation.** When a
+  feature ships, add it to the `SECTIONS` list in `shelf/help-dialog.tsx` — it's
+  the only place in the app that explains what exists.
 - **Two shelf buttons are complete features pointed at an "Available soon"
   dialog on purpose** — Templates (`templates-dialog.tsx` + `book-templates.ts`)
   and Background sound (`ambience.ts`, `use-ambience.ts`, `sounds-dialog.tsx`,
