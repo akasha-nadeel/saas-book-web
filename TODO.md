@@ -1,6 +1,6 @@
 # OpenChapter — what's next
 
-Last updated 2026-08-01. Ordered roughly by value, not by effort.
+Last updated 2026-08-02. Ordered roughly by value, not by effort.
 
 ## The direction changed
 
@@ -644,6 +644,58 @@ audience has already been burned by.
 **Community is the open question.** It was asked for more times than anything
 else across all four batches and it is the strongest thing that cannot be a
 feature. It deserves a real decision at some point rather than another shrug.
+
+## Guiding the writer — the UI/UX pass
+
+Written down 2026-08-02, after taking the dashboard and the tool screens through
+a redesign. The goal these serve is one sentence: **a writer should never have to
+work out what to do next, and should never hit a screen that cannot help them.**
+
+Ranked. The first and third together are most of it.
+
+- [ ] **Ask an imported book what it is.** `/book/new` defaults the genre to
+      Fantasy, so books made there are fine. `createBookFromImport` sets none —
+      and with no genre and no blurb, `buildQuery()` returns an empty string,
+      which dead-ends Comp titles, Categories, the Blurb examples and Structure.
+
+      Each of those four screens now catches it and offers the app's own genres
+      as chips, which is a patch at four sites for one cause. The fix is to ask
+      once, on the import screen or on the book overview of a book that has no
+      genre: one question, four tools, and `suggestTarget(kind, genre)` fills
+      the target length in at the same time.
+
+      Nothing currently tells a writer that skipping it cost them anything.
+- [ ] **One readiness model, not two.** Prepare says "3 to fix"; the roadmap
+      says "1 of 18". Same question — is this book ready — two scores, and
+      nothing reconciles them. The roadmap is the one with an opinion about
+      order, so it should be the spine, and `storeReadiness()` should read as
+      one phase inside it rather than as a rival number on another screen.
+
+      The deeper of these and the one to do deliberately: it is a rethink of how
+      the two screens relate, not a change to either.
+- [ ] **Every tool should say what comes after it.** Finish the blurb and the
+      screen sits there. `roadmapFor()` already knows the next step for that
+      book, so each tool page could end with "Next: choose categories →".
+
+      This is the whole guidance mechanism, and it is nearly free — the data
+      exists and `ToolHeader` is already shared, so the footer can be too. It is
+      what turns fifteen isolated screens into a path.
+- [ ] **The editor and the dashboard do not know about each other.** Inside a
+      chapter there is no way to reach the Prose report *for that chapter*: the
+      rail has nine tabs and none of them is a tool. A writer revising has to
+      leave the editor, find the dashboard, pick the book, pick the tool and
+      pick the chapter again.
+- [ ] **Saving is announced inconsistently.** The blurb says "saved when you
+      click away". Categories saves silently. Roadmap ticks save silently.
+      Adjacent screens give different answers to "did that stick?".
+- [ ] **The export screen is a different app.** Its own wizard chrome, no
+      breadcrumb, no book chip, no way back to Tools — the one screen that
+      skipped the shared `ToolHeader` when the other fourteen took it. Decide
+      whether it joins them or stays deliberately its own thing.
+
+**Not checked, so not claimed.** Mobile at any width, keyboard and screen-reader
+flow, and whether the tool pages survive a narrow window. The dashboard rail is
+`hidden md:flex` with a `<select>` fallback that has never been looked at.
 
 ## Taken out on purpose
 
