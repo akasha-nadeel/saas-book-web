@@ -9,6 +9,7 @@ import { buildQuery, type CompTitle } from "@/lib/comps/comps";
 import { findBook, setPublishing } from "@/lib/library-store";
 import { BLURB_MAX } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
  * The blurb workshop.
@@ -29,7 +30,7 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * so when Google is rate-limited this half of the screen is empty and says so
  * rather than pretending the genre has no blurbs in it.
  */
-export function BlurbPage({ bookId }: { bookId: string }) {
+export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -90,7 +91,11 @@ export function BlurbPage({ bookId }: { bookId: string }) {
     }
   }
 
-  if (!hydrated) return <LoadingScreen />;
+  // The app's splash is for the app. In the roadmap's panel it would take
+  // over half the window with a logo, so an embedded tool waits silently —
+  // see `Pending` in `roadmap/step-panel.tsx`.
+  if (!hydrated)
+    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
     return (
@@ -108,14 +113,26 @@ export function BlurbPage({ bookId }: { bookId: string }) {
   const over = report.stats.characters > BLURB_MAX;
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Blurb" width="5xl">
-        The two hundred words that decide whether anybody opens the book. We do
-        not write it — we count it, and we show you what books like yours did.
-      </ToolHeader>
+    <div className={toolShell(embedded)}>
+      {!embedded && (
+        <ToolHeader book={book} tool="Blurb" width="5xl">
+          The two hundred words that decide whether anybody opens the book. We do
+          not write it — we count it, and we show you what books like yours did.
+        </ToolHeader>
+      )}
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
-        <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      {/* `@container` + `@3xl:`, not `lg:`.
+
+          This screen now opens in two frames of very different widths: the
+          whole window, and the roadmap's panel at a little over half of it.
+          A viewport breakpoint cannot tell those apart — the *window* is wide
+          in both cases — so `lg:grid-cols-…` put a 320px sidebar next to a
+          shrinking editor inside the panel and squeezed both into columns too
+          narrow to use. A container query asks the only question that matters
+          here: how much room does this actually have? */}
+      <div className="@container mx-auto max-w-5xl px-6 pt-6 pb-16">
+        {heading}
+        <div className="grid items-start gap-8 @3xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* ---- The blurb itself -------------------------------------- */}
           <div>
             {/* The counters live inside the box's frame rather than under it.

@@ -9,6 +9,7 @@ import { buildQuery, type CompTitle } from "@/lib/comps/comps";
 import { rankSubjects, worthSuggesting } from "@/lib/comps/subjects";
 import { findBook, setPublishing } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
  * Categories, worked out from where comparable books are actually filed.
@@ -35,7 +36,7 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * two catalogues answer with "Fiction", which is true of every novel ever
  * written, and with "Protected DAISY", which is a note about a copy.
  */
-export function CategoriesPage({ bookId }: { bookId: string }) {
+export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -94,7 +95,11 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
     setPublishing(book.id, { subjects: next });
   }
 
-  if (!hydrated) return <LoadingScreen />;
+  // The app's splash is for the app. In the roadmap's panel it would take
+  // over half the window with a logo, so an embedded tool waits silently —
+  // see `Pending` in `roadmap/step-panel.tsx`.
+  if (!hydrated)
+    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
     return (
@@ -110,13 +115,16 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
   }
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Categories">
-        Which shelf your book lands on — worked out from where books like yours
-        are actually filed, rather than from a list we made up.
-      </ToolHeader>
+    <div className={toolShell(embedded)}>
+      {!embedded && (
+        <ToolHeader book={book} tool="Categories">
+          Which shelf your book lands on — worked out from where books like yours
+          are actually filed, rather than from a list we made up.
+        </ToolHeader>
+      )}
 
       <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+        {heading}
         {/* ---- What is chosen --------------------------------------------
             A strip rather than the card this was. Before the first search a
             writer cannot have chosen anything, so a panel headed "On this

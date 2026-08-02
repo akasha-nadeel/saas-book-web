@@ -87,7 +87,16 @@
 
   /* White is the action colour. There is no second hue to press into service
      for "currently on", so the three below are three *values* of white: the
-     button, its hover, and the fill under a selected row. */
+     button, its hover, and the fill under a selected row.
+
+     This is the one token whose two blocks disagree about *kind* rather than
+     value — the light set makes it the brand indigo. That is not drift, and
+     it is worth knowing why before "fixing" it. On black a hue has nowhere to
+     stand: dark enough to hold white text and it sinks into the page, light
+     enough to read against the page and it stops being the brand and starts
+     glowing. Contrast is the only currency here, and white is the whole of
+     it. On white there is room for both, so the action colour carries the
+     brand as well. See the light block for the rest of the argument. */
   --color-accent: #ffffff; /* actions: New book, Send, chosen menu rows */
   --color-accent-strong: #cccccc; /* its hover — dims, since it cannot brighten */
   --color-accent-deep: #e5e5e5; /* selected nav: the open chapter, active tab */
@@ -97,10 +106,23 @@
      `bg-danger` or matter fill. */
   --color-accent-ink: #000000;
 
-  /* The alarm, and one of the two places this palette keeps a hue — the other
-     is the status badges. Red is not decoration on a delete button, it is the
-     word "careful" in a language nobody has to be taught. Lifted well off the
-     light-theme red, which was chosen to sit on white and goes muddy here. */
+  /* The second half of the wordmark — the "Chapter" in OpenChapter, and
+     nothing else. It is a *brand* colour rather than chrome, which is why it
+     is allowed a hue at all: same reasoning as the fifteen tool marks, and the
+     same strict limit on where it may appear. Never reach for this to colour a
+     control.
+
+     White here, because on black the wordmark's two halves are told apart by
+     value and there is no ground for a hue to sit on. The light block carries
+     the indigo — see the note there. */
+  --color-wordmark: #ffffff;
+
+  /* The alarm, and one of the two places this palette keeps a hue in the dark
+     set — the other is the status badges. (The light set has a third: the
+     wordmark above, which is indigo there and white here.) Red is not
+     decoration on a delete button, it is the word "careful" in a language
+     nobody has to be taught. Lifted well off the light-theme red, which was
+     chosen to sit on white and goes muddy here. */
   --color-danger: #f87171; /* a failed save, and anything else gone wrong */
 
   /* Selected navigation — the open chapter, the chosen view tab. A white wash
@@ -151,6 +173,28 @@
   --color-stop-line: #7f1d1d;
   --color-stop-fg: #f87171;
 
+  /* The road, as a fourth member of that family — the same three parts, for
+     the strip that carries the roadmap's next step.
+
+     It earns a set of its own because it is the one panel on the dashboard
+     that is neither a problem nor a verdict. Under a column of red and amber
+     findings, "here is where you are and here is the way on" has to be
+     *visibly a different kind of thing*, and drawn on the page's own grey it
+     read as the bottom edge of the list instead.
+
+     So the ladder the writer learns is four wide: red is blocked, amber is
+     worth doing, green has passed, indigo is the way forward. It is the
+     accent's own hue, which is why it needs no teaching either — it is the
+     colour every button that moves you on is already wearing.
+
+     Unlike the accent, this one keeps its hue in *both* themes. It is a
+     ground rather than a fill: nothing has to stay legible on top of it
+     except its own ink, so the problem that forces white on black — a hue
+     dark enough to carry white text disappears — does not arise here. */
+  --color-step-bg: #15132e;
+  --color-step-line: #2c2764;
+  --color-step-fg: #a9a4ee;
+
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
@@ -197,18 +241,62 @@
   --color-fg: #17171a;
   --color-muted: #62626b;
 
-  /* Near-black, not pure: a #000 fill next to #17171a text reads as a hole
-     punched in the page rather than a button sitting on it. */
-  --color-accent: #17171a;
-  --color-accent-strong: #000000; /* its hover — deepens, since it cannot dim */
-  --color-accent-deep: #2b2b30;
+  /* The action colour in daylight, and the one place this palette spends a hue
+     on something that is not a verdict.
+
+     It is the landing page's indigo exactly — the fill under "Start free" and
+     under the closing banner. The argument is the same one behind the wordmark
+     below: the shop front and the app are one product, and a writer who
+     pressed an indigo button to sign up should not find a black one waiting
+     inside. It also does a job black cannot. On a screen of near-black type,
+     a near-black button *is* the type — it carries no signal beyond its own
+     box, so every screen has to be read to find the way on. A hue is read
+     before the words are, and reserving exactly one for "this is the way
+     forward" is what lets the rest of the app stay grey and quiet.
+
+     Why indigo and not the SaaS blue: it is ink. This audience buys books and
+     writes them, and the colour of a fountain pen reads as craft and
+     institution where a bright azure reads as a startup that will be gone in
+     a year — which is the exact suspicion this product is built against.
+
+     **Daylight only.** The dark set keeps white, because on black there is no
+     ground for a hue to sit on: any indigo dark enough to take white text
+     disappears into the page, and any light enough to read stops being the
+     brand. See the note in that block.
+
+     Near-black is still what `fg` is, so nothing about the *text* moved. */
+  --color-accent: #312e81;
+  --color-accent-strong: #252362; /* its hover — deepens, since it cannot dim */
+  --color-accent-deep: #423ead;
   --color-accent-ink: #ffffff;
+
+  /* The wordmark's second half, in daylight: the indigo of the landing page's
+     closing banner, lifted a step. That family is the whole reason for the
+     value — the shop front and the app are the same product, and the mark a
+     visitor read on the way in should be the mark they see once inside.
+
+     The lift is deliberate, and it is a lift of *lightness only*. The banner's
+     own #312e81 is a fill colour, chosen to carry white text across a whole
+     section; set as type beside a near-black "Open" it reads as another
+     near-black and the two halves stop telling themselves apart. So the hue
+     and the saturation are the banner's exactly — this is the same colour,
+     turned up — rather than a brighter indigo off the shelf, which would be a
+     second brand colour pretending to be the first.
+
+     It has to be stated here rather than derived, because the landing page
+     states its colours literally (it is always light, whatever the app is
+     wearing) and cannot share a token with a screen that has two themes. The
+     two are kept in step by hand: change one, change the other. */
+  --color-wordmark: #423ead;
 
   /* Chosen to sit on white; the dark set's #f87171 goes pale and sugary here. */
   --color-danger: #c0362c;
 
-  --color-selected: color-mix(in srgb, #17171a 8%, transparent);
-  --color-selected-fg: #17171a;
+  /* 10% where the near-black wanted 8%: a saturated hue at low alpha reads
+     fainter than a neutral at the same figure, so keeping the number would
+     have quietly weakened "you are here". */
+  --color-selected: color-mix(in srgb, #312e81 10%, transparent);
+  --color-selected-fg: #312e81;
 
   --color-nav: #ffffff;
 
@@ -239,6 +327,13 @@
   --color-stop-bg: #fef2f2;
   --color-stop-line: #fecaca;
   --color-stop-fg: #b91c1c;
+
+  /* The road, in daylight — see the note in the dark block. Pale ground, mid
+     hairline, and the accent itself as the ink, so the strip and the button
+     sitting on it are plainly the same colour saying the same thing. */
+  --color-step-bg: #eeeefb;
+  --color-step-line: #d8d8f4;
+  --color-step-fg: #312e81;
 }
 
 /* App shell. Layout constants, not part of the design language.
@@ -1881,6 +1976,66 @@ body {
    row standing still — clipped at the window's edge like any wide row. */
 @media (prefers-reduced-motion: reduce) {
   .oc-marquee-track {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The roadmap's step panel.
+
+   Opening a step used to be a hard cut: the road jumped to half width and a
+   tool appeared in the space, with nothing connecting the two states. The
+   writer's own press is the thing that should be traced — they pressed a row
+   on the left and the answer arrives from the right, so the movement says
+   where it came from.
+
+   Two separate motions, because they are two separate facts. The *split* is a
+   width change on the road, and it has to be a real width transition or the
+   column snaps while the panel eases, which is worse than neither moving. The
+   *contents* enter with opacity and a small translate, keyed on the step, so
+   switching from one tool to another re-runs it and the swap reads as a
+   replacement rather than a repaint.
+
+   Translate and opacity only — no scale. A scaled ancestor would make every
+   measured layout inside a tool (the comps figures, the blurb's container
+   query) measure a width that is not the one it will settle at.
+   -------------------------------------------------------------------------- */
+@keyframes oc-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oc-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The panel arriving. Slightly slower than the step swap inside it: this one
+   is a change of layout and needs to be followed, where the swap is a change
+   of contents in a frame that is already there. */
+.oc-panel-in {
+  animation: oc-panel-in 300ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.oc-step-in {
+  animation: oc-step-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-panel-in,
+  .oc-step-in {
     animation: none;
   }
 }

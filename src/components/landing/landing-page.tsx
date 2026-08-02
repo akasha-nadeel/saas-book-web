@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { LandingHeader } from "@/components/landing/landing-header";
+import { StoreListingDemo } from "@/components/landing/store-listing-demo";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
@@ -26,7 +27,9 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * stated on the page that sells it, and there is a section listing what the
  * product refuses to do. **The refusals convert.** They are the only block here
  * a funded competitor cannot copy, because copying it would cost them a
- * roadmap.
+ * roadmap. Each one is paired with the work behind it — see the note on
+ * `REFUSALS`: a no standing on its own is indistinguishable from a no we had
+ * no choice about.
  *
  * **The stat band is the honest version of "trusted by 5,000 brands".** The
  * layout this was built to wants social proof there and we have none, so it
@@ -149,13 +152,22 @@ const icons = {
   ),
 } as const;
 
-/** One glyph from the set above. 18px unless a caller has a reason. */
+/**
+ * One glyph from the set above. 18px unless a caller has a reason.
+ *
+ * `weight` exists because stroke width is in *user units*, so a glyph scaled up
+ * keeps the same absolute hairline and reads lighter the bigger it gets. A mark
+ * carrying meaning at 22px needs more stroke than one sitting inside a line of
+ * text, and this is the only honest way to ask for it.
+ */
 function Icon({
   name,
   className = "h-[18px] w-[18px]",
+  weight = 1.6,
 }: {
   name: keyof typeof icons;
   className?: string;
+  weight?: number;
 }) {
   return (
     <svg
@@ -163,7 +175,7 @@ function Icon({
       aria-hidden="true"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.6"
+      strokeWidth={weight}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -278,19 +290,46 @@ const LATER = [
   ],
 ] as const;
 
+/**
+ * Every refusal, with the work that sits on our side of it.
+ *
+ * **A no on its own reads as a missing feature.** This section was four
+ * refusals and nothing else for a while, and the failure mode of that is
+ * specific: a reader who does not already trust you cannot tell "we choose not
+ * to" from "we cannot", and every line lands as the second one. Pairing each no
+ * with the thing we do instead fixes that in both directions — the refusal
+ * becomes a decision rather than an absence, and the reader leaves the section
+ * knowing what they get rather than only what they don't.
+ *
+ * So the shape is one boundary drawn twice: what we will not cross, and the
+ * work we do up against it. Each third entry has to be something already
+ * shipped — this is the section a sceptical reader checks first, and a promise
+ * hiding among four refusals would cost more than all four earn.
+ */
 const REFUSALS = [
   [
     "We will not design your cover or edit your prose with AI",
     "AI here reads and reports. It never writes into your book. The cheap way to build covers and editing is generative, and doing it would make liars of us in front of the one audience that checks. If those ever exist here, they come from real designers and real editors.",
+    "We will check the cover you already have",
+    "Dimensions, shape, weight and contrast against what a shop refuses, and a shelf of the covers already selling in your genre to set yours beside. Then a count of what is in your prose, with none of it changed.",
   ],
-  ["We will not sell you a course", "You have met those people already."],
+  [
+    "We will not sell you a course",
+    "You have met those people already.",
+    "We will give you the order for nothing",
+    `${STEPS.length} steps across ${PHASES.length} phases, ${SELF_TICKING} of them ticking themselves off your own book. The sequence is the part the courses are charging for.`,
+  ],
   [
     "We will not promise your book will sell",
     "Anyone who does is selling you something. We can tell you what a shop will refuse. We cannot tell you what a reader will love.",
+    "We will tell you what would stop the upload",
+    "Named before you make it, and kept beside what the book has cost against what it has actually earned. Both of those can be checked; a forecast cannot.",
   ],
   [
     "We will not upload to Amazon for you",
     "There is no public API. Anyone automating that dashboard is risking your publishing account, not theirs.",
+    "We will hand you the file that shop takes",
+    "An EPUB that clears EPUBCheck with no errors and no warnings, with DOCX, PDF and Markdown beside it. The last step stays yours, and it is one upload.",
   ],
 ] as const;
 
@@ -612,7 +651,7 @@ export function LandingPage() {
         <Split
           eyebrow="The tedious part"
           title="Every field a shop asks for, and why"
-          figure={<ListingFigure />}
+          figure={<StoreListingDemo />}
           flip
         >
           <p className="oc-lead font-serif text-xl leading-relaxed">
@@ -710,38 +749,143 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ---- Refusals -------------------------------------------------
+        {/* ---- Refusals, and their other half ---------------------------
 
             High on the page on purpose. For a reader who has been sold to by
             everyone, the fastest way to earn a minute of attention is to say
-            what you will not take money for. */}
+            what you will not take money for.
+
+            Each row is one boundary from both sides, and a real `<table>` is
+            the honest markup for that: two columns, four rows, every cell
+            meaning something only in relation to the one beside it. A screen
+            reader gets "what we do instead" against each cell from the column
+            header, without the words being printed four times.
+
+            **Every point carries its own mark**, header or no header. The two
+            columns are the width of the page apart, and by the fourth row the
+            header that named them is off the top of the screen — so a reader
+            who has just glanced across has nothing telling them which side
+            they landed on. The marks are hung in the margin rather than set
+            inline, so the text of every point starts on one left edge and the
+            column still reads as a column.
+
+            **Both sides are shaped identically** — mark, title, small
+            description — because the moment the two halves are set out
+            differently, the fuller one reads as the real content and the other
+            as a caption on it. Same shape, both directions, and the reader
+            weighs them against each other instead.
+
+            The layout is the argument. Each column is an enclosed panel in its
+            own colour, and the seam where the two meet — a red edge against a
+            green one — is the boundary the whole section is about. Nothing
+            here is decoration: red is what we refuse, green is what you get,
+            which is the same ladder the app uses for readiness.
+
+            Three volumes of one hue per side, and the order matters. The
+            ground is `STOP` / `PASS` at about 4%, quiet enough that four rows
+            of it reads as paper rather than as a warning. The outline is the
+            same hue at about 35%, which is the least that reads as *coloured*
+            rather than as a grey hairline at 1px. The row separators inside
+            sit between the two, so the panel is outlined and the rows are only
+            divided — one line weight for both would flatten the panel into a
+            grid. The marks and the column labels are the full-strength
+            colours, and they are the only things here at full strength.
+
+            Below `md` there is no room for two columns of prose, so the table
+            unfolds into stacked pairs and the hidden column header comes back
+            per row. The alternative — a horizontally scrolling table on a
+            phone — is the one thing on this page that would need explaining. */}
         <section className="border-b border-[#ececee] bg-[#f7f7fb] px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Straight answer"
-              title="What we will not do"
-              lead="Every item below is something writers ask for constantly. We are saying no in public so you can plan around it."
+              title="What we will not do, and what we do instead"
+              lead="Every item below is something writers ask for constantly, and we say no in public so you can plan around it. Each no carries the work on our side of it — a refusal with nothing behind it is just a feature we are missing."
             />
-            <ul className="mt-12 flex flex-col">
-              {REFUSALS.map(([name, note]) => (
-                <li
-                  key={name}
-                  className="grid gap-2 border-t border-[#e6e6e8] py-6 first:border-t-0 first:pt-0 md:grid-cols-[1fr_1.4fr] md:gap-10"
-                >
-                  {/* A red ✕ against a "we will not" is the one decorative-
-                      looking use of colour that is not decorative: the whole
-                      section is a list of refusals, and the mark is what makes
-                      that legible before a word is read. */}
-                  <p className="oc-heading flex items-start gap-2.5 font-serif text-xl leading-snug text-[#0f0f10]">
-                    <span className="mt-1 shrink-0" style={{ color: STOP }}>
-                      <Icon name="cross" className="h-[18px] w-[18px]" />
+            <table className="mt-12 w-full border-separate border-spacing-0 text-left max-md:block">
+              <thead className="max-md:hidden">
+                <tr>
+                  <th
+                    scope="col"
+                    className="w-1/2 rounded-tl-2xl border-x border-t border-[#e6b0b0] bg-[#fdf2f2] px-7 pt-6 pb-4 align-bottom"
+                  >
+                    <span
+                      className="font-code flex items-center gap-3 text-[0.9375rem] font-semibold tracking-[0.12em] uppercase"
+                      style={{ color: STOP }}
+                    >
+                      <Icon
+                        name="cross"
+                        className="h-[23px] w-[23px]"
+                        weight={2.3}
+                      />
+                      What we will not do
                     </span>
-                    {name}
-                  </p>
-                  <p className="leading-relaxed">{note}</p>
-                </li>
-              ))}
-            </ul>
+                  </th>
+                  <th
+                    scope="col"
+                    className="rounded-tr-2xl border-x border-t border-[#add2bb] bg-[#f1f8f3] px-7 pt-6 pb-4 align-bottom"
+                  >
+                    <span
+                      className="font-code flex items-center gap-3 text-[0.9375rem] font-semibold tracking-[0.12em] uppercase"
+                      style={{ color: PASS }}
+                    >
+                      <Icon
+                        name="check"
+                        className="h-[23px] w-[23px]"
+                        weight={2.3}
+                      />
+                      What we do instead
+                    </span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="max-md:block">
+                {REFUSALS.map(([name, why, doTitle, doNote], i) => {
+                  const last = i === REFUSALS.length - 1;
+                  return (
+                    <tr key={name} className="max-md:block max-md:pt-4">
+                      <td
+                        className={`bg-[#fdf2f2] px-7 py-7 align-top max-md:block max-md:rounded-2xl max-md:border max-md:border-[#e6b0b0] md:border-x md:border-t md:border-x-[#e6b0b0] md:border-t-[#f5e2e2] ${
+                          last
+                            ? "md:rounded-bl-2xl md:border-b md:border-b-[#e6b0b0]"
+                            : ""
+                        }`}
+                      >
+                        <Point
+                          mark="cross"
+                          tone={STOP}
+                          title={name}
+                          note={why}
+                        />
+                      </td>
+                      <td
+                        className={`bg-[#f1f8f3] px-7 py-7 align-top max-md:mt-4 max-md:block max-md:rounded-2xl max-md:border max-md:border-[#add2bb] md:border-x md:border-t md:border-x-[#add2bb] md:border-t-[#dfeee4] ${
+                          last
+                            ? "md:rounded-br-2xl md:border-b md:border-b-[#add2bb]"
+                            : ""
+                        }`}
+                      >
+                        {/* The column header is hidden on a phone, so the
+                            label comes back per row. Its mark does not — the
+                            point below is already carrying one. */}
+                        <span
+                          className="font-code mb-3 block text-[0.9375rem] font-semibold tracking-[0.12em] uppercase md:hidden"
+                          style={{ color: PASS }}
+                        >
+                          What we do instead
+                        </span>
+                        <Point
+                          mark="check"
+                          tone={PASS}
+                          title={doTitle}
+                          note={doNote}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </section>
 
@@ -901,6 +1045,49 @@ function Split({
         <div className={flip ? "md:order-first" : ""}>{figure}</div>
       </div>
     </section>
+  );
+}
+
+/**
+ * One marked point: mark, title, small description.
+ *
+ * Shared by both halves of the refusals table, and that is the reason it
+ * exists rather than being written twice. The moment one side is set out more
+ * fully than the other, the fuller one reads as the argument and the other as
+ * a footnote on it — and the whole point of that table is that the two weigh
+ * the same. One component makes drifting apart impossible.
+ *
+ * The mark hangs in the margin rather than sitting inline in the title, so the
+ * description below starts on the same left edge as the words above it. Both
+ * glyphs centre on y=12 of the 24 grid, so one offset serves both.
+ *
+ * It is set heavier than the rest of the icon set on purpose: here the mark is
+ * the *verdict* — refused or provided — rather than a label's decoration, and
+ * at a hairline it was the quietest thing in a row it should lead.
+ */
+function Point({
+  mark,
+  tone,
+  title,
+  note,
+}: {
+  mark: "cross" | "check";
+  tone: string;
+  title: string;
+  note: string;
+}) {
+  return (
+    <div className="flex items-start gap-3.5">
+      <span className="mt-0.5 shrink-0" style={{ color: tone }}>
+        <Icon name={mark} className="h-[28px] w-[28px]" weight={2.3} />
+      </span>
+      <div>
+        <p className="oc-heading font-serif text-xl leading-snug text-[#0f0f10]">
+          {title}
+        </p>
+        <p className="mt-2 text-sm leading-relaxed">{note}</p>
+      </div>
+    </div>
   );
 }
 
@@ -1206,98 +1393,6 @@ function CheckFigure() {
         It never blocks the export. The file is yours whether or not a shop
         would take it.
       </p>
-    </div>
-  );
-}
-
-/**
- * The store-listing form, as the export wizard really draws it.
- *
- * **The hints are the point, not the inputs.** Any form can ask for an ISBN;
- * the line underneath saying *"Amazon assigns its own; Apple and Kobo want
- * yours"* is the thing a writer cannot get anywhere without paying somebody.
- * So the figure is drawn label-first with the hint given equal weight, which is
- * the opposite of how a form is usually shown off.
- *
- * The strings are copied from `publishing-card.tsx` rather than imported —
- * that file is a Client Component full of inputs and state, and pulling it in
- * to read six sentences would ship the whole editor to a marketing page. The
- * cost is that they can drift; the check against that is that they are short,
- * quoted here, and a change to a hint is a change somebody is already reading.
- *
- * **All six fields, not a representative four.** An earlier version showed
- * two-thirds of the form to keep the panel short, which is the kind of edit
- * that looks like design and is actually a small lie: the reader counts what
- * they are shown, and a page whose whole claim is being checkable cannot round
- * its own screenshots down. ISBN is left empty because it is the one most books
- * genuinely do not have yet, and the Skip line stays — "you can add this later"
- * is a promise the export really honours and the most reassuring thing here.
- */
-function ListingFigure() {
-  const fields: [string, string, string, boolean][] = [
-    ["ISBN", "978-0-306-40615-7", "13 digits. Amazon assigns its own; Apple and Kobo want yours.", false],
-    ["Language", "English", "Decides which storefront the book is listed on.", true],
-    ["Publisher", "Elena Rosa", "Your own name is the usual answer when self-publishing.", true],
-    ["Publication date", "08/02/2026", "Leave empty until it has one.", true],
-    ["Series", "The salt cycle", "The shelf this book belongs to, if any.", true],
-    ["Number in series", "1", "As a reader would count it.", true],
-  ];
-
-  return (
-    // A tablet, held slightly off the page.
-    //
-    // The bezel and the shadow are doing one job between them: they say *this
-    // is a real screen in a real product*, which a bordered card on a white
-    // page does not. The shadow is deliberately tight and dark rather than the
-    // big soft blur a template reaches for — a diffuse shadow reads as a
-    // sticker floating above the page, a short one reads as an object resting
-    // on it, and the second is the impression worth having.
-    //
-    // The frame is drawn, like every other figure here, because a photograph of
-    // a device is an asset that goes stale the day the UI moves.
-    <div
-      className="rounded-[1.75rem] border border-[#d8d8de] bg-[#f2f2f5] p-3
-                 shadow-[0_2px_0_#d8d8de,0_18px_28px_-14px_rgba(15,15,16,0.45)]"
-      aria-hidden="true"
-    >
-      <div className="rounded-[1.25rem] bg-white p-6 sm:p-7">
-      <p className="oc-heading font-serif text-xl text-[#0f0f10]">
-        What a shop asks for
-      </p>
-      <p className="mt-1 text-sm">
-        Saved to the book, so you answer these once rather than once per export.
-      </p>
-
-      <div className="mt-6 grid gap-x-5 gap-y-5 sm:grid-cols-2">
-        {fields.map(([label, value, hint, filled]) => (
-          <div key={label}>
-            <p className="text-xs font-medium text-[#0f0f10]">{label}</p>
-            <p
-              className={`mt-1.5 rounded-lg border px-3 py-2 text-sm ${
-                filled
-                  ? "border-[#dcdce0] text-[#0f0f10]"
-                  : "border-[#e6e6e8] text-[#b0b0b8]"
-              }`}
-            >
-              {value}
-            </p>
-            <p className="mt-1.5 text-xs leading-relaxed text-[#8a8a92]">
-              {hint}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <p
-        className="mt-6 rounded-lg py-2.5 text-center text-sm font-semibold text-white"
-        style={{ backgroundColor: INK }}
-      >
-        Continue
-      </p>
-      <p className="mt-3 text-center text-xs text-[#8a8a92]">
-        Skip — you can add this later
-      </p>
-      </div>
     </div>
   );
 }

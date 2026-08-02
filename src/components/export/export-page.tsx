@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   FormatMark,
   FormatPreview,
@@ -28,6 +29,7 @@ import { bookWordCount, findBook, type Book } from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { BookCover } from "@/components/shelf/book-cover";
 import { storeReadiness } from "@/lib/publishing";
+import { type ToolPageProps } from "@/lib/tool-page";
 
 /**
  * Getting the book out, as a sequence rather than a wall.
@@ -85,6 +87,17 @@ type StepId =
   | "listing"
   | "blurb"
   | "export";
+
+/**
+ * The steps a link from outside may open directly.
+ *
+ * Deliberately not every step. A deep link is a promise that the writer will
+ * land on the field they were sent for, so it only holds the ones a *finding*
+ * names — the listing details and the blurb. "Format" is where the flow starts
+ * anyway, and the export step at the end would drop somebody into a Download
+ * button having skipped every question it depends on.
+ */
+const STEP_DEEP_LINKS = new Set<StepId>(["listing", "blurb"]);
 
 interface Step {
   id: StepId;
@@ -188,16 +201,40 @@ function groupsOf(steps: Step[]) {
   return groups;
 }
 
-export function ExportPage({ bookId }: { bookId: string }) {
+export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const cover = useCover(bookId);
 
-  // Nothing chosen to begin with. A card that arrives already ticked is the app
-  // answering its own first question, and a writer who wanted that format never
-  // finds out they had a choice.
-  const [output, setOutput] = useState<Output | null>(null);
-  const [stepId, setStepId] = useState<StepId>("format");
+  /*
+   * Where to open, and in what format.
+   *
+   * **Nothing chosen to begin with**, normally. A card that arrives already
+   * ticked is the app answering its own first question, and a writer who wanted
+   * that format never finds out they had a choice.
+   *
+   * `?step=` is the exception, and it exists because of a specific broken
+   * promise. A finding on the dashboard says "No ISBN" with a button reading
+   * "Set the ISBN" — and that field lives on this flow's *listing* step, four
+   * screens in. Sent to the top, the writer arrives at "How do you want it?"
+   * and has to guess that a format chooser is the way to an ISBN box. So a
+   * caller that knows which field it is sending somebody to may say so.
+   *
+   * It carries the format with it, because a step is only reachable in a format
+   * that has it: the listing steps exist for EPUB alone — attaching an ISBN to
+   * a Markdown download would be asking a writer to fill in a form for a file
+   * nobody will list. Deep-linking to a step therefore *is* choosing EPUB, and
+   * pretending otherwise would land them back on the format chooser anyway.
+   *
+   * Read once, as an initial value. After that the flow is the writer's: making
+   * this reactive would drag them back to the linked step every time they moved.
+   */
+  const initial = useSearchParams().get("step");
+  const deepLink =
+    initial && STEP_DEEP_LINKS.has(initial as StepId) ? (initial as StepId) : null;
+
+  const [output, setOutput] = useState<Output | null>(deepLink ? "epub" : null);
+  const [stepId, setStepId] = useState<StepId>(deepLink ?? "format");
   const [manuscript, setManuscript] = useState(true);
   const [typeset, setTypeset] = useState<TypesetOptions>(DEFAULT_TYPESET);
   const [busy, setBusy] = useState(false);
@@ -356,7 +393,12 @@ export function ExportPage({ bookId }: { bookId: string }) {
     // The rail takes the tint and the content takes the white, which is the way
     // round this pattern wants: the form is the subject, so it gets the clean
     // ground, and the navigation sits back on a wash.
-    <main className="flex h-dvh overflow-hidden bg-panel">
+    // The export screen keeps its own rail in the panel rather than taking the
+    // `toolShell` helper: this one is already a two-pane layout and the rail is
+    // the step list, not chrome. Only the height claim changes.
+    <main
+      className={`flex ${embedded ? "h-full" : "h-dvh"} overflow-hidden bg-panel`}
+    >
       <Rail
         book={book}
         bookId={bookId}
@@ -370,6 +412,10 @@ export function ExportPage({ bookId }: { bookId: string }) {
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Above this screen's own Back/step header rather than inside it: the
+            step name belongs to the whole export flow, and the header below
+            changes with every step of it. */}
+        {heading && <div className="shrink-0 px-5 pt-5 md:px-12 md:pt-7">{heading}</div>}
         <header className="flex shrink-0 items-center gap-4 px-5 pt-5 md:px-12 md:pt-7">
           {/* Back sits at the top, where you came in, rather than at the bottom
               where it would compete with the step's own action. Absent on the

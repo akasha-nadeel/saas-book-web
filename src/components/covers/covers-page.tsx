@@ -9,6 +9,7 @@ import { buildQuery, coversOf, type CompTitle } from "@/lib/comps/comps";
 import { checkCover, contrastOf, type CoverFacts } from "@/lib/cover-check";
 import { bookWordCount, findBook } from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
+import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
  * Covers, in the only two ways we can honestly help with one.
@@ -201,7 +202,7 @@ const SIZES = [
 
 type SizeId = (typeof SIZES)[number]["id"];
 
-export function CoversPage({ bookId }: { bookId: string }) {
+export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -247,7 +248,11 @@ export function CoversPage({ bookId }: { bookId: string }) {
     }
   }
 
-  if (!hydrated) return <LoadingScreen />;
+  // The app's splash is for the app. In the roadmap's panel it would take
+  // over half the window with a logo, so an embedded tool waits silently —
+  // see `Pending` in `roadmap/step-panel.tsx`.
+  if (!hydrated)
+    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
     return (
@@ -263,14 +268,17 @@ export function CoversPage({ bookId }: { bookId: string }) {
   }
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Covers" width="5xl">
-        Your cover, next to the shelf it has to sit on. We do not design covers
-        and we will not generate one — this is the thing you would do yourself
-        in a bookshop, if you had the afternoon.
-      </ToolHeader>
+    <div className={toolShell(embedded)}>
+      {!embedded && (
+        <ToolHeader book={book} tool="Covers" width="5xl">
+          Your cover, next to the shelf it has to sit on. We do not design covers
+          and we will not generate one — this is the thing you would do yourself
+          in a bookshop, if you had the afternoon.
+        </ToolHeader>
+      )}
 
       <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+        {heading}
         <form
           className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {

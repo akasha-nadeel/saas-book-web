@@ -17,6 +17,7 @@ import {
 import { bookWordCount, findBook, setTargetWords } from "@/lib/library-store";
 import { GENRES, suggestTarget } from "@/lib/book-kinds";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
  * Comparable titles for one book.
@@ -38,7 +39,7 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * a later step, and deliberately not this one, so the whole screen works with
  * the model switched off and the bill at zero.
  */
-export function CompsPage({ bookId }: { bookId: string }) {
+export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -91,7 +92,11 @@ export function CompsPage({ bookId }: { bookId: string }) {
     }
   }, []);
 
-  if (!hydrated) return <LoadingScreen />;
+  // The app's splash is for the app. In the roadmap's panel it would take
+  // over half the window with a logo, so an embedded tool waits silently —
+  // see `Pending` in `roadmap/step-panel.tsx`.
+  if (!hydrated)
+    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
     return (
@@ -107,14 +112,20 @@ export function CompsPage({ bookId }: { bookId: string }) {
   }
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Comp titles" width="4xl">
-        The published books yours sits beside — what every listing form and
-        every query letter asks for. Edit the search; you know what your book is
-        like better than we do.
-      </ToolHeader>
+    <div className={toolShell(embedded)}>
+      {!embedded && (
+        <ToolHeader book={book} tool="Comp titles" width="4xl">
+          The published books yours sits beside — what every listing form and
+          every query letter asks for. Edit the search; you know what your book is
+          like better than we do.
+        </ToolHeader>
+      )}
 
-      <div className="mx-auto max-w-4xl px-6 pt-6 pb-16">
+      {/* A query container, so the figures below break on the width this page
+          actually has rather than on the window's — it opens in the roadmap's
+          panel at about half a screen. See the note in `blurb-page.tsx`. */}
+      <div className="@container mx-auto max-w-4xl px-6 pt-6 pb-16">
+        {heading}
         <form
           className="flex flex-wrap gap-2"
           onSubmit={(e) => {
@@ -223,7 +234,7 @@ export function CompsPage({ bookId }: { bookId: string }) {
         )}
 
         {summary && books.length > 0 && (
-          <section className="mt-8 grid gap-3 sm:grid-cols-3">
+          <section className="mt-8 grid gap-3 @md:grid-cols-3">
             <Figure
               value={summary.medianPages ? `${summary.medianPages}` : "—"}
               label="median pages"

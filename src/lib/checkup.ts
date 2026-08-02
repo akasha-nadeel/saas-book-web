@@ -91,9 +91,30 @@ const DESTINATIONS: Record<string, Fix> = {
     path: "categories",
     action: "Choose categories",
   },
-  isbn: { kind: "route", path: "export", action: "Set the ISBN" },
-  publisher: { kind: "route", path: "export", action: "Set the publisher" },
-  published: { kind: "route", path: "export", action: "Fix the date" },
+  /*
+   * The three that live on the export flow's *listing* step, and say so.
+   *
+   * They pointed at `export` alone, which opens on "How do you want it?" — so
+   * a button reading "Set the ISBN" delivered a format chooser, and the writer
+   * had to guess that picking EPUB was the way to an ISBN box four screens
+   * later. A destination is a promise about where you land; these now keep it.
+   */
+  isbn: { kind: "route", path: "export?step=listing", action: "Set the ISBN" },
+  publisher: {
+    kind: "route",
+    path: "export?step=listing",
+    action: "Set the publisher",
+  },
+  published: {
+    kind: "route",
+    path: "export?step=listing",
+    action: "Fix the date",
+  },
+  /*
+   * These two stay at the front door on purpose. Both are found by reading the
+   * manuscript, which only happens once a format is chosen and the export runs
+   * — there is no earlier screen holding the answer to jump to.
+   */
   images: { kind: "route", path: "export", action: "Check the images" },
   alt: { kind: "route", path: "export", action: "Describe the images" },
 };
@@ -104,8 +125,14 @@ const DESTINATIONS: Record<string, Fix> = {
  * `blocking` becomes "fix" and `advisory` becomes "note", which is the same
  * two-weight ladder the badges use everywhere else in the app: a thing that
  * would be refused, and a thing worth doing.
+ *
+ * Exported because Prepare needs it too. That screen runs `storeReadiness()`
+ * over every book to draw its rows, and when a row is opened it has to show
+ * those issues *with somewhere to go* — which is exactly the mapping this
+ * already does. A second copy of `DESTINATIONS` on that screen is how a field
+ * gains a fix here and stays a dead end there.
  */
-function fromReadiness(issue: ReadinessIssue): Finding | null {
+export function fromReadiness(issue: ReadinessIssue): Finding | null {
   const fix = DESTINATIONS[issue.field];
   if (!fix) return null;
   return {

@@ -8,6 +8,7 @@ import type { CompTitle } from "@/lib/comps/comps";
 import { findClashes, type TitleClash } from "@/lib/comps/title-check";
 import { findBook } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
  * Whether anything is already published under this title.
@@ -24,7 +25,7 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * same genre is a real problem, and the writer can tell which of those they are
  * looking at faster than any rule we could write.
  */
-export function TitleCheckPage({ bookId }: { bookId: string }) {
+export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -69,7 +70,11 @@ export function TitleCheckPage({ bookId }: { bookId: string }) {
     }
   }
 
-  if (!hydrated) return <LoadingScreen />;
+  // The app's splash is for the app. In the roadmap's panel it would take
+  // over half the window with a logo, so an embedded tool waits silently —
+  // see `Pending` in `roadmap/step-panel.tsx`.
+  if (!hydrated)
+    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
 
   if (!book) {
     return (
@@ -87,14 +92,17 @@ export function TitleCheckPage({ bookId }: { bookId: string }) {
   const exact = clashes?.filter((c) => c.match === "exact") ?? [];
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
-      <ToolHeader book={book} tool="Title check" title="Is this title taken?">
-        Strictly, no title is taken — titles are not trademarks and cannot be
-        copyrighted. The useful question is whether somebody else&rsquo;s book
-        turns up first when a reader searches for yours.
-      </ToolHeader>
+    <div className={toolShell(embedded)}>
+      {!embedded && (
+        <ToolHeader book={book} tool="Title check" title="Is this title taken?">
+          Strictly, no title is taken — titles are not trademarks and cannot be
+          copyrighted. The useful question is whether somebody else&rsquo;s book
+          turns up first when a reader searches for yours.
+        </ToolHeader>
+      )}
 
       <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+        {heading}
         <form
           className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {

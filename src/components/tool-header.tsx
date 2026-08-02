@@ -22,11 +22,23 @@ import { useCover } from "@/lib/use-library";
  * naming the *context* rather than the page, so every screen looked like the
  * same screen with different contents. A page is what it does.
  *
- * **The book is a chip above it**, small but with its cover. The cover is the
- * part that does the work — a writer knows their own covers on sight and has to
- * read a title — and it matters because the Tools area lets them switch books
- * before opening one, so landing on the wrong manuscript's export screen is a
- * real way to lose ten minutes.
+ * **The book identifies the block rather than sitting in a chip of its own.**
+ * The cover is the part that does the work — a writer knows their own covers on
+ * sight and has to *read* a title — and it matters because the Tools area lets
+ * them switch books before opening one, so landing on the wrong manuscript's
+ * export screen is a real way to lose ten minutes.
+ *
+ * It used to be a bordered pill on its own line, and that arrangement made this
+ * header four separate bands: a trail, a pill, a heading, a paragraph — each
+ * starting at the same left edge, none aligned to anything, and the pill the
+ * loudest thing on a screen where the heading should be. A capsule with a
+ * border also reads as a *tag*, which is the wrong idea: this is the book, not
+ * a label applied to something else.
+ *
+ * So the cover moved out to the left and the rest hangs off it as one block —
+ * whose book, then what the page is, then what it does, in the order somebody
+ * needs them. One optical left edge for the text, one object beside it, and the
+ * heading is the biggest thing again.
  */
 
 /**
@@ -42,6 +54,11 @@ const WIDTHS = {
   "3xl": "max-w-3xl",
   "4xl": "max-w-4xl",
   "5xl": "max-w-5xl",
+  /* No cap at all, for a screen whose own column is already narrow — the
+     roadmap when a step's tool is open beside it. Centring a 48rem column
+     inside a 24rem one does nothing, but the `mx-auto` would still push the
+     contents off the page's left edge if the cap ever mattered. */
+  full: "max-w-none",
 } as const;
 
 export function ToolHeader({
@@ -68,11 +85,11 @@ export function ToolHeader({
 
   return (
     <header className="border-b border-line bg-panel">
-      <div className={`mx-auto ${WIDTHS[width]} px-6 py-4`}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={`mx-auto ${WIDTHS[width]} px-6 py-5`}>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <nav
             aria-label="Breadcrumb"
-            className="flex flex-wrap items-center gap-1.5 text-xs text-muted"
+            className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted"
           >
             <Link href="/" className="hover:text-fg">
               Books
@@ -90,26 +107,36 @@ export function ToolHeader({
               not its parent: the same screen is reached from the book cards,
               from Prepare and from the roadmap. This is a shortcut back to the
               wall of them, which is a different claim and belongs in a
-              different control. */}
+              different control.
+
+              A plain link, not a bordered button. It is the least important
+              thing in this header and a box gave it the weight of an action —
+              which put a second heavy element on the one row that should be
+              quiet. */}
           <Link
             href="/?area=tools"
-            className="rounded-lg border border-line bg-surface px-3 py-1.5 text-xs
-                       font-semibold text-fg hover:border-accent/40"
+            className="shrink-0 text-xs font-semibold text-muted hover:text-fg"
           >
             ← All tools
           </Link>
         </div>
 
-        {/* The book, as a chip. Linked on both halves, so the cover is also the
-            way back into it — that is what a writer reaches for the moment they
-            see it is the wrong one. */}
-        <Link
-          href={`/book/${book.id}`}
-          className="mt-3 inline-flex max-w-full items-center gap-2.5 rounded-full
-                     border border-line bg-surface py-1 pr-3.5 pl-1 transition-colors
-                     hover:border-accent/40"
-        >
-          <span className="w-6 shrink-0">
+        {/* Cover, then the whole of the text hanging off it.
+
+            `items-start` and not `items-center`: the block is three lines of
+            different weights, and centring it against the cover would leave
+            the heading floating at whatever height the description happened to
+            make. The top edges agree instead. */}
+        <div className="mt-4 flex items-start gap-4">
+          {/* Linked, because the cover is what a writer reaches for the moment
+              they see it is the wrong book. Shadowed rather than bordered so it
+              reads as an object on the page instead of a framed thumbnail. */}
+          <Link
+            href={`/book/${book.id}`}
+            aria-label={`Open ${book.title}`}
+            className="w-11 shrink-0 overflow-hidden rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.18),0_6px_12px_-6px_rgba(0,0,0,0.35)]
+                       transition-transform hover:-translate-y-0.5 sm:w-12"
+          >
             <BookCover
               title={book.title}
               words={bookWordCount(book)}
@@ -119,23 +146,41 @@ export function ToolHeader({
               {...(book.author ? { author: book.author } : {})}
               {...(book.bareCover ? { bare: true } : {})}
             />
-          </span>
-          <span className="min-w-0 truncate text-sm font-semibold text-fg">
-            {book.title}
-          </span>
-          <span className="shrink-0 text-xs whitespace-nowrap text-muted">
-            {bookChapterCount(book).toLocaleString()}{" "}
-            {bookChapterCount(book) === 1 ? "chapter" : "chapters"} ·{" "}
-            {bookWordCount(book).toLocaleString()}{" "}
-            {bookWordCount(book) === 1 ? "word" : "words"}
-          </span>
-        </Link>
+          </Link>
 
-        <h1 className="mt-3 text-2xl font-extrabold text-fg">
-          {title ?? tool}
-        </h1>
+          <div className="min-w-0 flex-1">
+            {/* Whose book, small and above — the eyebrow the heading needed.
+                It was a pill on its own row and is now a line of type, which
+                is all it ever had to be. */}
+            <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs">
+              <Link
+                href={`/book/${book.id}`}
+                className="truncate font-semibold text-fg hover:text-accent"
+              >
+                {book.title}
+              </Link>
+              <span className="whitespace-nowrap text-muted">
+                {bookChapterCount(book).toLocaleString()}{" "}
+                {bookChapterCount(book) === 1 ? "chapter" : "chapters"} ·{" "}
+                {bookWordCount(book).toLocaleString()}{" "}
+                {bookWordCount(book) === 1 ? "word" : "words"}
+              </span>
+            </p>
 
-        {children && <p className="mt-1.5 text-muted">{children}</p>}
+            <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-fg">
+              {title ?? tool}
+            </h1>
+
+            {/* Capped at a readable measure. Running the full width of a 5xl
+                page gave a line nobody wants to read twice, and it was most of
+                why this header looked loose. */}
+            {children && (
+              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
+                {children}
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </header>
   );

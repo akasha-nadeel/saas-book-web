@@ -32,6 +32,8 @@ import {
 import {
   checkup,
   countFindings,
+  fromReadiness,
+  type Finding,
   type FindingLevel,
   type Fix,
 } from "@/lib/checkup";
@@ -54,7 +56,8 @@ import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { PHASES, progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
-import { ToolGrid } from "@/components/shelf/tool-grid";
+import { ToolGrid, ToolGroupBlock } from "@/components/shelf/tool-grid";
+import { GET_IT_OUT } from "@/lib/book-tools";
 import {
   Menu,
   MenuButton,
@@ -373,7 +376,7 @@ export function Bookshelf({
           href="/"
           className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
         >
-          Open<span className="text-accent">Chapter</span>
+          Open<span className="text-wordmark">Chapter</span>
         </Link>
 
         {/* Two groups, because there are two kinds of item here and the flat
@@ -520,7 +523,11 @@ export function Bookshelf({
                   {shelfIcons.plus}
                   New book
                 </Link>
-                <span aria-hidden="true" className="w-px bg-white/25" />
+                {/* The ink, not white: this divider sits *on* the accent fill,
+                    and the fill is white at night — a fixed white hairline is
+                    invisible in exactly the theme nobody checks. Same rule as
+                    `text-accent-ink`. */}
+                <span aria-hidden="true" className="w-px bg-accent-ink/25" />
                 <Menu
                   label="Other ways to start a book"
                   align="end"
@@ -609,7 +616,9 @@ export function Bookshelf({
             />
           )}
 
-          {area === "prepare" && <Prepare books={active} />}
+          {area === "prepare" && (
+            <Prepare books={active} onCover={setCovering} />
+          )}
 
           {area === "tools" && <Tools books={active} current={current} />}
 
@@ -796,6 +805,58 @@ function Overview({
     [steps],
   );
 
+  /**
+   * The last step ticked by hand, so it can be un-ticked.
+   *
+   * "Already done" is the one control on this screen that changes the book and
+   * then *removes itself* — ticking a step advances `progress.next`, so the
+   * step you pressed is no longer on the bar and there is nothing left to
+   * press again. A writer who hit it by mistake, or ticked "Revise" meaning
+   * the step below it, had no way back short of finding the roadmap page and
+   * working out what had happened.
+   *
+   * **Derived, not remembered.** This was session state at first — "the step
+   * ticked a moment ago" — and that is the wrong model for the thing it is
+   * protecting against. A mis-tick is usually noticed *later*: on the next
+   * visit, when the phase dials are further along than the book is. State held
+   * in a component dies on reload, so the escape hatch was gone at exactly the
+   * point somebody would look for it. `!automatic && done` is what a hand-tick
+   * *is*, so reading it back off the book gives an undo that is still there
+   * tomorrow.
+   *
+   * The last one in road order rather than a list: undo it and the one before
+   * it appears, so a writer can walk back as far as they need without the
+   * strip turning into a second checklist.
+   */
+  /**
+   * Whether the whole finding list is open.
+   *
+   * Collapsed by default at `FINDINGS_SHOWN`, because the first screen should
+   * not open with fourteen problems — but the rest are one press away and
+   * *here*, rather than on another screen that asks a different question
+   * first.
+   *
+   * The book id is held *with* the flag rather than reset by an effect. "Show
+   * all" is about the list in front of you, so changing book has to close it —
+   * and an effect doing that would fire a second render after the first has
+   * already painted the wrong state, which is the cascade
+   * `react-hooks/set-state-in-effect` exists to catch. Comparing ids while
+   * rendering has no such gap.
+   */
+  const [expanded, setExpanded] = useState<{ bookId: string; on: boolean }>();
+  const showAllFindings = Boolean(
+    book && expanded?.bookId === book.id && expanded.on,
+  );
+  const setShowAllFindings = (on: boolean) => {
+    if (book) setExpanded({ bookId: book.id, on });
+  };
+
+  const handTicked = useMemo(
+    () => steps.filter((s) => !s.automatic && s.done),
+    [steps],
+  );
+  const undoable = handTicked.length > 0 ? handTicked[handTicked.length - 1] : null;
+
   return (
     <div className="flex flex-col gap-5">
       {book ? (
@@ -916,8 +977,18 @@ function Overview({
                       </span>
                     </>
                   ) : (
+                    /* The one verdict on this screen worth colouring, and it
+                       is the *good* one. A blocked book already gets red cards
+                       under this line; a clear one used to get the same
+                       neutral sentence a problem got, so the best news the
+                       screen can carry looked like no news. Green only on the
+                       clause that is the finding — a whole green sentence
+                       reads as a banner. */
                     <span className="text-fg">
-                      <strong>Nothing here would stop a shop</strong> taking it.
+                      <strong className="text-ok-fg">
+                        Nothing here would stop a shop
+                      </strong>{" "}
+                      taking it.
                     </span>
                   )}
                   {counts.note > 0 && (
@@ -930,11 +1001,41 @@ function Overview({
 
                 {findings.length > 0 ? (
                   <ul className="mt-3 flex flex-col gap-2">
-                    {findings.slice(0, FINDINGS_SHOWN).map((finding) => (
+                    {(showAllFindings
+                      ? findings
+                      : findings.slice(0, FINDINGS_SHOWN)
+                    ).map((finding) => (
+                      /*
+                       * Toned by severity, because `checkup()` already worked
+                       * that out and drawing every finding on the same grey
+                       * threw the answer away. "A shop will reject this" and
+                       * "this would be worth doing" arrived looking identical,
+                       * so the list had to be *read* to be sorted — on the
+                       * first screen a writer sees, which is the worst place
+                       * to make somebody read before they can look.
+                       *
+                       * This is the status family doing the job it is kept
+                       * for: here the colour *is* the information, and it is
+                       * the same red/amber the readiness badges use, so a
+                       * writer learns the ladder once.
+                       *
+                       * The ground carries the severity and the button does
+                       * not. A red button would say pressing it is dangerous,
+                       * when it is the way *out* of the danger — so the card
+                       * says "this is blocking" and the control inside it
+                       * stays the one colour that means "this way on". The
+                       * two levels also differ in button *weight* (filled
+                       * against outlined), so the distinction survives
+                       * without colour.
+                       */
                       <li
                         key={finding.id}
-                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
-                                   border border-line bg-surface px-3.5 py-3"
+                        className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
+                                   border px-3.5 py-3 ${
+                                     finding.level === "fix"
+                                       ? "border-stop-line bg-stop-bg"
+                                       : "border-note-line bg-note-bg"
+                                   }`}
                       >
                         <div className="min-w-[12rem] flex-1">
                           <p className="text-sm font-semibold text-fg">
@@ -958,20 +1059,67 @@ function Overview({
                   </p>
                 )}
 
+                {/* Opens in place. It used to be a link to the export screen,
+                    and that was the bug: a writer counts the problems they
+                    have just been told about, presses to see the rest, and
+                    arrives at "How do you want it? Pick a format" — a
+                    different question entirely, about a flow they had not
+                    asked to start. The rest of the list was never there; it
+                    was here all along, already computed by `checkup()` and
+                    thrown away by a `slice`.
+
+                    Every product that does this well deep-links to the answer
+                    rather than to the tool that contains it — a failed-checks
+                    count opens the checks, already expanded; a "needs
+                    response" count opens that list, already filtered. And when
+                    the data is in hand, as it is here, the answer is not to
+                    navigate at all. */}
                 {findings.length > FINDINGS_SHOWN && (
-                  <Link
-                    href={`/book/${book.id}/export`}
-                    className="mt-2.5 inline-block text-sm font-semibold text-accent"
+                  <button
+                    type="button"
+                    onClick={() => setShowAllFindings(!showAllFindings)}
+                    aria-expanded={showAllFindings}
+                    className="mt-2.5 text-sm font-semibold text-accent"
                   >
-                    {findings.length - FINDINGS_SHOWN} more, with the full check
-                    →
-                  </Link>
+                    {showAllFindings
+                      ? "Show fewer"
+                      : `Show all ${findings.length}`}
+                  </button>
+                )}
+
+                {/* Said once, under the list, because it is the honest reason
+                    this list is not the whole story — and it names where the
+                    rest happens without pretending to be more of the same. */}
+                {findings.length > 0 && (
+                  <p className="mt-2.5 text-xs text-muted">
+                    Checks that need the manuscript itself — a missing chapter
+                    title, an image too large — run on the{" "}
+                    <Link
+                      href={`/book/${book.id}/export`}
+                      className="font-semibold text-accent"
+                    >
+                      export screen
+                    </Link>
+                    .
+                  </p>
                 )}
               </div>
 
-              {/* One primary, one secondary, everything else behind ⋯. Four
-                  buttons of equal weight made the writer read all four to
-                  find the one they wanted, every single time. */}
+              {/* The three verbs for a book, then ⋯.
+
+                  This row was two buttons and a menu, under a note warning
+                  that four of equal weight make the writer read all four to
+                  find the one they want. That warning still stands and is why
+                  this is *three* and not five — what changed is that the third
+                  is not a fourth thing competing, it is the question the whole
+                  screen is answering: write it, read it, or find out what
+                  comes next.
+
+                  Its two former homes are gone rather than kept as spares. It
+                  was in the ⋯ menu, which is now for what is genuinely
+                  secondary, and a hidden copy of a control sitting visible on
+                  the same card is dead weight that has to be maintained
+                  anyway. */}
               <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
                 <Link
                   href={`/book/${book.id}`}
@@ -989,6 +1137,14 @@ function Overview({
                   {shelfIcons.read}
                   Read
                 </Link>
+                <Link
+                  href={`/book/${book.id}/roadmap`}
+                  className="flex items-center gap-1.5 rounded-lg border border-line
+                             bg-surface px-4 py-2 font-semibold text-fg"
+                >
+                  {shelfIcons.compass}
+                  What to do next
+                </Link>
                 <Menu
                   label={`More for ${book.title}`}
                   width={232}
@@ -998,22 +1154,14 @@ function Overview({
                 >
                   {(close) => (
                     <>
-                      <MenuLabel>Prepare</MenuLabel>
-                      <MenuLink
-                        href={`/book/${book.id}/export`}
-                        icon={shelfIcons.prepare}
-                        onNavigate={close}
-                      >
-                        Export and publish
-                      </MenuLink>
-                      <MenuLink
-                        href={`/book/${book.id}/roadmap`}
-                        icon={shelfIcons.compass}
-                        onNavigate={close}
-                      >
-                        What to do next
-                      </MenuLink>
-                      <MenuSeparator />
+                      {/* The "Prepare" pair that used to head this menu —
+                          Export and publish, What to do next — is gone: both
+                          are now on the card itself, one as a button in the
+                          row above and both as tiles in "Get it out" at the
+                          foot. A menu whose first half repeats what is already
+                          on screen teaches a writer that it holds nothing, and
+                          then they stop opening it for the things it does
+                          hold. What is left is what has no other way in. */}
                       <MenuLabel>This book</MenuLabel>
                       <MenuButton
                         icon={shelfIcons.info}
@@ -1105,13 +1253,67 @@ function Overview({
                   thought — here is the state of it, here is the position. Side
                   by side they competed, and the writer had to work out which
                   one to obey. */}
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
+              {/* What the writer has asserted rather than earned, with the way
+                  back. Sits above the strip because it is behind you and the
+                  strip is ahead of you, and the card reads top to bottom.
+
+                  Deliberately quiet — a hairline row, not the green alert this
+                  started as. It is permanent, so it has to be able to sit
+                  there for weeks without shouting; the tick carries the good
+                  news and the rest is a footnote. It also doubles as the
+                  acknowledgement for the press itself, which previously had
+                  none: the bar just silently changed to a different step. */}
+              {undoable && (
+                <div
+                  className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
+                             border border-line bg-surface px-3.5 py-2"
+                >
+                  <span aria-hidden="true" className="shrink-0 text-ok-fg">
+                    {shelfIcons.check}
+                  </span>
+                  <span className="min-w-0 flex-1 text-sm text-muted">
+                    <strong className="font-semibold text-fg">
+                      {undoable.title}
+                    </strong>{" "}
+                    — you marked this done.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRoadmapStep(book.id, undoable.id, false)}
+                    className="shrink-0 rounded-lg border border-line bg-panel px-3 py-1.5
+                               text-xs font-semibold text-fg hover:border-accent"
+                  >
+                    Undo
+                  </button>
+                </div>
+              )}
+
+              {/* The way on, and the one strip on this card that is not a
+                  problem — so it takes the accent rather than the status
+                  family. Red is blocked, amber is worth doing, indigo is the
+                  road: three meanings the writer learns once and reads
+                  everywhere after.
+
+                  A tinted panel rather than the hairline rule it used to be.
+                  Under four red and amber cards a plain rule read as the
+                  bottom edge of the list rather than as its own answer, which
+                  is the opposite of what it is for.
+
+                  Its own `step` tokens rather than the accent at low alpha:
+                  the accent is white at night, so a wash of it gave a grey bar
+                  in the one theme where the strip most needed to be findable.
+                  A ground has no legibility problem with a hue — nothing sits
+                  on it but its own ink — so this one is indigo in both. */}
+              <div
+                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
+                           border border-step-line bg-step-bg px-3.5 py-2.5"
+              >
                 {progress.next ? (
                   <>
-                    <span className="text-xs font-bold tracking-widest text-muted uppercase">
+                    <span className="text-xs font-bold tracking-widest text-step-fg uppercase">
                       Next
                     </span>
-                    <span className="min-w-0 flex-1 text-sm text-fg">
+                    <span className="min-w-0 flex-1 text-sm font-semibold text-fg">
                       {progress.next.title}
                     </span>
 
@@ -1128,8 +1330,8 @@ function Overview({
                         onClick={() =>
                           setRoadmapStep(book.id, progress.next!.id, true)
                         }
-                        className="rounded-lg border border-line bg-panel px-3 py-1.5
-                                   text-xs font-semibold text-fg hover:border-accent/40"
+                        className="rounded-lg border border-step-line bg-panel px-3 py-1.5
+                                   text-xs font-semibold text-fg hover:border-accent"
                       >
                         Already done
                       </button>
@@ -1137,19 +1339,51 @@ function Overview({
                     <Link
                       href={progress.next.href?.(book.id) ?? `/book/${book.id}`}
                       className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold
-                                 text-accent-ink"
+                                 text-accent-ink hover:bg-accent-strong"
                     >
                       Do this →
                     </Link>
                   </>
                 ) : (
-                  <span className="text-sm font-semibold text-fg">
+                  <span className="min-w-0 flex-1 text-sm font-semibold text-fg">
                     Every step done. That is the whole list.
                   </span>
                 )}
-                <span className="text-xs text-muted">
+                <span className="text-xs font-medium text-step-fg">
                   {progress.done} of {progress.total}
                 </span>
+              </div>
+
+              {/* ---- The way out ------------------------------------------
+
+                  The three tools that get a finished book out, on the screen
+                  whose stated job is "what stands between your book and a
+                  shop, and what to do about it". Everything above answers the
+                  first half; until now the second half was a fix button per
+                  finding and one next step, and the standing destinations —
+                  the export itself, the whole road, the paperback — were
+                  reachable only from behind a ⋯ or by leaving for the Tools
+                  area.
+
+                  Last in the card on purpose. The order down this column is
+                  urgency: what is *wrong* with the book, then where you *are*
+                  on the road, then where you can *go* whenever you like. Put
+                  above the findings it would compete with them, and a shortcut
+                  that competes with a diagnosis wins for the wrong reason —
+                  it is the more pleasant thing to press.
+
+                  Rendered from `TOOL_GROUPS` through the same block the Tools
+                  area uses, so the names and the one-line claims are still
+                  written in exactly one place. `columns="three"` because this
+                  group has three tools and the catalogue's five-wide grid
+                  would leave two empty ruled cells, which read as tools that
+                  failed to load rather than as spacing. */}
+              <div className="mt-5 border-t border-line pt-4">
+                <ToolGroupBlock
+                  group={GET_IT_OUT}
+                  bookId={book.id}
+                  columns="three"
+                />
               </div>
             </div>
           )}
@@ -1384,10 +1618,20 @@ function FixLink({
   level: FindingLevel;
   onCover: (b: Book) => void;
 }) {
+  /*
+   * The way out, in the one colour that means "this way on" — never in the
+   * severity of the thing it fixes. A red button on a red card reads as
+   * "pressing this is the dangerous part", which is the opposite of true.
+   *
+   * The two levels separate by weight rather than hue: a blocking finding gets
+   * the filled action, a merely-worth-doing one an outlined button on the
+   * card's own ground. That ordering survives greyscale and colour blindness,
+   * which the tint behind it does not.
+   */
   const className = `shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
     level === "fix"
-      ? "bg-accent text-accent-ink"
-      : "border border-line bg-panel text-fg hover:border-accent/40"
+      ? "bg-accent text-accent-ink hover:bg-accent-strong"
+      : "border border-line bg-panel text-accent hover:border-accent/40"
   }`;
 
   if (fix.kind === "route") {
@@ -1484,17 +1728,25 @@ function PhaseRing({ done, total }: { done: number; total: number }) {
  */
 function TargetBar({ words, target }: { words: number; target: number }) {
   const share = Math.min(100, Math.round((words / target) * 100));
+  // The bar is the accent while it is a *measure* and turns green once the
+  // target is met, because at that point it stops measuring and becomes a
+  // verdict — which is the one thing green is kept for here. Reaching a target
+  // you set yourself is the rarest good news on this screen and it should not
+  // look like 94%.
+  const met = share >= 100;
   return (
     <div className="mt-3.5 max-w-sm">
       <div className="flex items-baseline justify-between text-xs">
-        <span className="font-semibold text-fg">{share}% of target</span>
+        <span className={`font-semibold ${met ? "text-ok-fg" : "text-fg"}`}>
+          {share}% of target
+        </span>
         <span className="text-muted">
           {words.toLocaleString()} of {target.toLocaleString()}
         </span>
       </div>
       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised">
         <div
-          className="h-full rounded-full bg-accent"
+          className={`h-full rounded-full ${met ? "bg-ok-fg" : "bg-accent"}`}
           style={{ width: `${share}%` }}
         />
       </div>
@@ -1793,7 +2045,14 @@ function Write({
  * list. So a book that reads "Ready" here has nothing wrong with its *details*,
  * which is a narrower claim than "a shop will take it", and the row says which.
  */
-function Prepare({ books }: { books: Book[] }) {
+function Prepare({
+  books,
+  onCover,
+}: {
+  books: Book[];
+  /** The three commonest problems are fixed in a dialog the shelf owns. */
+  onCover: (b: Book) => void;
+}) {
   /**
    * Read once per shelf change rather than per render. Cheap on its own —
    * `hasCover` tests for the key instead of fetching a 250KB data URL — but it
@@ -1861,7 +2120,12 @@ function Prepare({ books }: { books: Book[] }) {
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map(({ book, issues }) => (
-              <PrepareRow key={book.id} book={book} issues={issues} />
+              <PrepareRow
+                key={book.id}
+                book={book}
+                issues={issues}
+                onCover={onCover}
+              />
             ))}
           </ul>
         )}
@@ -1871,28 +2135,51 @@ function Prepare({ books }: { books: Book[] }) {
 }
 
 /**
- * One book, with its worst problem said out loud.
+ * One book, with its worst problem said out loud — and the rest a press away.
  *
- * The whole row is the link. A button labelled "Check and export" repeated down
- * a column is the same word seven times and a smaller target than the row it
- * sits in, so the arrow marks it and the row takes the click.
+ * **The row opens; it does not navigate.** It used to be one big link to the
+ * export screen, and a badge reading "2 worth doing" beside a chevron is a
+ * promise to *show me those two* — while the export screen opens on "How do
+ * you want it? Pick a format", a different question about a flow nobody asked
+ * to start. The two things the row named were never on the far side of it.
+ *
+ * They were here all along: `storeReadiness()` has already returned them to
+ * draw this row's summary, and the count in the badge is `issues.length`. So
+ * the chevron now does what a chevron beside a count does everywhere else —
+ * it expands the item and shows them, each with the control that fixes it,
+ * through the same `Fix` map the dashboard's findings use.
+ *
+ * Export stays reachable and is now a *named* action rather than the accidental
+ * destination of every click on the row. Going to a five-step export flow is a
+ * decision, and it should take pressing something that says so.
  */
 function PrepareRow({
   book,
   issues,
+  onCover,
 }: {
   book: Book;
   issues: ReadinessIssue[];
+  onCover: (b: Book) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const blocking = issues.filter((i) => i.level === "blocking");
   const advisory = issues.filter((i) => i.level === "advisory");
+  // Only the ones with somewhere to go. A field with no destination would be a
+  // line of text in a list whose whole promise is that each row is actionable.
+  const findings = issues
+    .map(fromReadiness)
+    .filter((f): f is Finding => f !== null);
 
   return (
-    <li>
-      <Link
-        href={`/book/${book.id}/export`}
-        className="flex items-center gap-4 rounded-xl border border-line bg-surface
-                   px-4 py-3 transition-colors hover:border-accent/40"
+    <li className="overflow-hidden rounded-xl border border-line bg-surface">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        disabled={findings.length === 0}
+        className="flex w-full items-center gap-4 px-4 py-3 text-left transition-colors
+                   hover:bg-raised disabled:hover:bg-transparent"
       >
         <span className="w-9 shrink-0">
           <CoverOf book={book} />
@@ -1925,10 +2212,56 @@ function PrepareRow({
           <Flag tone="ok">Details in order</Flag>
         )}
 
-        <span aria-hidden="true" className="shrink-0 text-muted">
-          {shelfIcons.chevronRight}
-        </span>
-      </Link>
+        {/* Points down when open, which is the whole of what a disclosure
+            chevron has to say. It pointed right and went somewhere else. */}
+        {findings.length > 0 && (
+          <span
+            aria-hidden="true"
+            className={`shrink-0 text-muted transition-transform ${
+              open ? "rotate-90" : ""
+            }`}
+          >
+            {shelfIcons.chevronRight}
+          </span>
+        )}
+      </button>
+
+      {open && findings.length > 0 && (
+        <div className="border-t border-line px-4 py-3">
+          <ul className="flex flex-col gap-2">
+            {findings.map((finding) => (
+              <li
+                key={finding.id}
+                className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border
+                            px-3 py-2 ${
+                              finding.level === "fix"
+                                ? "border-stop-line bg-stop-bg"
+                                : "border-note-line bg-note-bg"
+                            }`}
+              >
+                <span className="min-w-[10rem] flex-1 text-sm text-fg">
+                  {finding.title}
+                </span>
+                <FixLink
+                  book={book}
+                  fix={finding.fix}
+                  level={finding.level}
+                  onCover={onCover}
+                />
+              </li>
+            ))}
+          </ul>
+
+          {/* Named, so going to the export flow is a decision rather than what
+              happens when you press anything on this row. */}
+          <Link
+            href={`/book/${book.id}/export`}
+            className="mt-3 inline-block text-sm font-semibold text-accent"
+          >
+            Check and export this book →
+          </Link>
+        </div>
+      )}
     </li>
   );
 }

@@ -48,31 +48,43 @@ export interface ToolGroup {
  * that was always the fallback for anyone who could not tell the hues apart.
  */
 
+/**
+ * The three tools that get a finished book out.
+ *
+ * Named, and part of `TOOL_GROUPS` below rather than a copy of it, because the
+ * dashboard's Overview shows this one group on its own — that screen's job is
+ * "what stands between your book and a shop", and these are the answers to the
+ * second half of it. A lookup by title would have worked until somebody
+ * renamed the group, and then the block would vanish from the Overview with
+ * nothing failing anywhere. One definition, two readers.
+ */
+export const GET_IT_OUT: ToolGroup = {
+  title: "Get it out",
+  note: "The parts a shop sees.",
+  tools: [
+    {
+      path: "export",
+      icon: "package",
+      name: "Export and publish",
+      what: "EPUB, DOCX, Markdown and a print PDF — and what a shop would refuse before you upload it.",
+    },
+    {
+      path: "roadmap",
+      icon: "compass",
+      name: "What to do next",
+      what: `Every step in the order it happens, with the ${SELF_TICKING} that tick themselves from your book already marked.`,
+    },
+    {
+      path: "paperback",
+      icon: "ruler",
+      name: "Paperback setup",
+      what: "Trim size, margins and the spine width for the page count you actually have.",
+    },
+  ],
+};
+
 export const TOOL_GROUPS: ToolGroup[] = [
-  {
-    title: "Get it out",
-    note: "The parts a shop sees.",
-    tools: [
-      {
-        path: "export",
-        icon: "package",
-        name: "Export and publish",
-        what: "EPUB, DOCX, Markdown and a print PDF — and what a shop would refuse before you upload it.",
-      },
-      {
-        path: "roadmap",
-        icon: "compass",
-        name: "What to do next",
-        what: `Every step in the order it happens, with the ${SELF_TICKING} that tick themselves from your book already marked.`,
-      },
-      {
-        path: "paperback",
-        icon: "ruler",
-        name: "Paperback setup",
-        what: "Trim size, margins and the spine width for the page count you actually have.",
-      },
-    ],
-  },
+  GET_IT_OUT,
   {
     title: "Find your shelf",
     note: "Read from Google Books and Open Library. Nothing you have written is sent.",

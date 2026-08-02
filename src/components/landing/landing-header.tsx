@@ -56,11 +56,25 @@ export function LandingHeader({ ink }: { ink: string }) {
       }`}
     >
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
+        {/* The same wordmark the dashboard sidebar carries, at the same size:
+            a visitor who signs up should not have to learn a second mark on
+            the other side of the door.
+
+            Its colour is stated literally rather than taken from the
+            `--color-wordmark` token the app uses, because this page is always
+            light whatever theme the reader has chosen inside the product — and
+            that token turns white in the dark set, which here would be white
+            on white. Keep the two in step by hand.
+
+            It is `ink` with its lightness lifted and nothing else changed —
+            same hue, same saturation. That value is a fill colour, and set as
+            type beside a near-black "Open" it reads as more near-black instead
+            of as the second half of a mark. */}
         <Link
           href="/"
-          className="oc-heading font-serif text-lg font-semibold tracking-tight text-[#0f0f10]"
+          className="text-2xl font-bold tracking-tight text-[#0f0f10]"
         >
-          OpenChapter
+          Open<span className="text-[#423ead]">Chapter</span>
         </Link>
         <nav className="flex items-center gap-6 font-sans text-sm text-[#5b5b63]">
           <a href="#order" className="hidden sm:inline hover:text-[#0f0f10]">

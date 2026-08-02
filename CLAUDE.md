@@ -564,7 +564,16 @@ and is *seeded* to "gone" there rather than switched off in an effect, or it
 paints and is taken away, which is the flash it exists to prevent.
 
 **The landing page is one file:** `src/components/landing/landing-page.tsx`,
-what a signed-out visitor sees at `/`.
+what a signed-out visitor sees at `/`. It is a Server Component, so the one
+thing it cannot hold is the one thing that had to move out:
+`store-listing-demo.tsx`, the listing form filling itself in beside "Every field
+a shop asks for". Two rules govern anything else that animates there. It runs
+only while on screen and stops with the tab, because a landing page is a page
+somebody leaves open. And **it measures with the camera parked** — the pointer
+aims at real rects, `getBoundingClientRect` reports the *transformed* rect, and
+the fonts land a second in, so measuring through a live push records where a
+field currently appears rather than where it sits and the pointer clicks air.
+Same rule as `pagination.ts`.
 
 **Its positioning is "nobody tells you the order"** — the sharpest thing in the
 writer research and the one claim a competitor cannot answer by shipping a
@@ -702,6 +711,25 @@ Three more things follow from the palette, and each has bitten already:
   Deriving it at read time instead was tried and is wrong: `getPrefs` is cached
   on the raw string, so anything derived from outside that string goes stale the
   moment the theme moves and nothing invalidates it.
+- **In daylight the action colour is the brand ink, not near-black.**
+  `--color-accent` is `#312e81` in the light block — the landing page's own
+  indigo, the fill under "Start free" — and stays white in the dark block. The
+  asymmetry is deliberate and documented at both ends: on black a hue has
+  nowhere to stand (dark enough to carry white text and it sinks, light enough
+  to read and it glows), so contrast is the only currency there. On white there
+  is room for both, so one hue is reserved for *"this is the way forward"* and
+  everything else stays grey. That is what lets a writer find the way on
+  without reading the screen. Nothing else in the chrome may spend a hue.
+- **The dashboard's colour ladder is four wide, and each one is a meaning.**
+  Red is blocked (a shop would refuse this), amber is worth doing, green has
+  passed or been earned, indigo is the road. So the Overview findings are toned
+  by the severity `checkup()` already computed — drawing them all grey threw
+  that answer away — while the *button* inside a red card stays indigo, because
+  it is the way out of the problem and a red button would say pressing it is
+  the dangerous part. `--color-step-*` is the fourth member of the status
+  family, for the roadmap strip: it keeps its hue in both themes, since a
+  ground carries nothing but its own ink and so never hits the legibility wall
+  that forces the accent to white at night.
 - **Two things keep their colour, on purpose.** The status family — the
   readiness badges (`Flag` in `bookshelf.tsx`), warnings, `danger`, the
   roadmap's completed ticks — because there the colour *is* the information and
@@ -713,6 +741,18 @@ Three more things follow from the palette, and each has bitten already:
   faded sticker. The other is the fifteen tool marks (`tool-marks.tsx`), which
   are product marks rather than chrome — fifteen grey marks are fifteen grey
   squares — and whose tile is a theme token, so the colour stays inside the mark.
+- **The wordmark is the third exception, and it is one token wide.**
+  `--color-wordmark` colours the "Chapter" in OpenChapter and nothing else —
+  white in the dark set, and in the light set the indigo the landing page's
+  closing banner is filled with (`#312e81`) at a higher lightness and the same
+  hue and saturation (`#423ead`), so the mark a visitor reads on the way in is
+  the mark they see once inside. The lift is only of lightness: a fill value
+  set as type beside a near-black "Open" reads as more near-black, and a
+  brighter indigo off the shelf would be a second brand colour pretending to
+  be the first. The landing header draws the
+  same wordmark at the same size but states that indigo *literally*: that page
+  is always light whatever the app is wearing, and the token would turn white
+  on it. The two are kept in step by hand.
 
 The writer-facing looks stored in `prefs` are each applied their own way:
 `theme` as `[data-theme]` on `<html>` (above), `paper` as `[data-paper]` on the

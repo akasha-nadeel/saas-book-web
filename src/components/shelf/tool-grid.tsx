@@ -1,6 +1,81 @@
 import Link from "next/link";
 import { ToolMark } from "@/components/shelf/tool-marks";
-import { TOOL_GROUPS } from "@/lib/book-tools";
+import { TOOL_GROUPS, type ToolGroup } from "@/lib/book-tools";
+
+/**
+ * How many columns a block of tools is laid out in.
+ *
+ * A prop rather than something worked out from `tools.length`, because Tailwind
+ * reads class names as literals and would ship no rule for one built at
+ * runtime. Two callers, two honest answers: the Tools area is a catalogue and
+ * fills the width it is given, while a group standing on its own inside a card
+ * wants a column per tool — a five-wide grid holding three tools leaves two
+ * empty ruled cells, which read as tools that failed to load.
+ */
+const COLUMNS = {
+  fill: "grid-cols-3 sm:grid-cols-4 lg:grid-cols-5",
+  three: "grid-cols-3",
+} as const;
+
+/**
+ * One group of tools: heading, note, and a ruled block of marks.
+ *
+ * Exported because the Overview borrows a single group — the three tools that
+ * get a finished book out — and the alternative was a second copy of this
+ * markup on the dashboard. `book-tools.ts` exists so the *descriptions* live
+ * once; this is the same argument applied to the drawing of them.
+ */
+export function ToolGroupBlock({
+  group,
+  bookId,
+  onPick,
+  columns = "fill",
+}: {
+  group: ToolGroup;
+  bookId: string;
+  /** Called on navigation, so a sheet can shut itself. */
+  onPick?: () => void;
+  columns?: keyof typeof COLUMNS;
+}) {
+  return (
+    <section>
+      <h3 className="text-xs font-bold tracking-widest text-fg uppercase">
+        {group.title}
+      </h3>
+      <p className="mt-1 text-xs text-muted">{group.note}</p>
+
+      {/* Ruled, like a table. The lines are what make a wall of marks read
+          as a catalogue rather than as scattered buttons, and they give
+          each cell an edge to light up on hover.
+
+          Every cell carries a full border and is pulled a pixel back, so
+          neighbouring borders collapse into one line — rather than putting
+          the rule on two sides and leaving a partial last row with a
+          missing edge, which is what happens when a group's count does not
+          divide by the column count. Three of these four groups do not. */}
+      <div
+        className={`mt-3 grid overflow-hidden rounded-xl border border-line ${COLUMNS[columns]}`}
+      >
+        {group.tools.map((tool) => (
+          <Link
+            key={tool.path}
+            href={`/book/${bookId}/${tool.path}`}
+            onClick={onPick}
+            title={tool.what}
+            className="group -mt-px -ml-px flex flex-col items-center gap-2 border
+                       border-line px-2 py-4 text-center transition-colors
+                       hover:bg-raised"
+          >
+            <ToolMark name={tool.icon} />
+            <span className="text-xs leading-snug font-medium text-fg">
+              {tool.name}
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 /**
  * The fifteen per-book tools, pointed at one book.
@@ -40,40 +115,9 @@ export function ToolGrid({
   return (
     <>
       {TOOL_GROUPS.map((group) => (
-        <section key={group.title} className="mb-6 last:mb-0">
-          <h3 className="text-xs font-bold tracking-widest text-fg uppercase">
-            {group.title}
-          </h3>
-          <p className="mt-1 text-xs text-muted">{group.note}</p>
-
-          {/* Ruled, like a table. The lines are what make a wall of marks read
-              as a catalogue rather than as scattered buttons, and they give
-              each cell an edge to light up on hover.
-
-              Every cell carries a full border and is pulled a pixel back, so
-              neighbouring borders collapse into one line — rather than putting
-              the rule on two sides and leaving a partial last row with a
-              missing edge, which is what happens when a group's count does not
-              divide by the column count. Three of these four groups do not. */}
-          <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border border-line sm:grid-cols-4 lg:grid-cols-5">
-            {group.tools.map((tool) => (
-              <Link
-                key={tool.path}
-                href={`/book/${bookId}/${tool.path}`}
-                onClick={onPick}
-                title={tool.what}
-                className="group -mt-px -ml-px flex flex-col items-center gap-2 border
-                           border-line px-2 py-4 text-center transition-colors
-                           hover:bg-raised"
-              >
-                <ToolMark name={tool.icon} />
-                <span className="text-xs leading-snug font-medium text-fg">
-                  {tool.name}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
+        <div key={group.title} className="mb-6 last:mb-0">
+          <ToolGroupBlock group={group} bookId={bookId} onPick={onPick} />
+        </div>
       ))}
     </>
   );
