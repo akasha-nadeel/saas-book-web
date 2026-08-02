@@ -93,9 +93,6 @@ const PASS = "#15803d"; // free, passed, earned
  * built at runtime.
  */
 
-const FREE_LINE =
-  "Writing, your shelf, syncing and all four export formats are free, and stay free.";
-
 /**
  * The icon set, drawn here rather than imported.
  *
@@ -354,41 +351,60 @@ export function LandingPage() {
                 all made again below, where they land against something. The
                 first thing on the page should be the sentence the page is
                 about. */}
-            {/* The problem, then the fix — which is the shape a headline has to
-                take for a reader who arrived with a rejection email.
+            {/* An instruction, then what it saves — which is the shape that
+                works on somebody who arrived with a finished book and a
+                problem, because they know what they would get by the fourth
+                word.
 
-                Line one is the injury in the reader's own words: shops refuse
-                and do not say why, which is the single most enraging fact in
-                the research. Line two is the whole product in five words, and
-                it is checkable — the pre-upload check is a real screen that
-                names real refusals, so this promises nothing the code cannot do.
+                **Both halves are claims the code can back.** The first is the
+                pre-upload check, which really does name what a shop would
+                refuse. The second is about *time*, not about shops being
+                silent: a draft of this read "and never says why", which is a
+                good line and not reliably true — shops usually do say
+                something, even if it is templated, vague about which of several
+                problems it means, or a wall of validator output. On the first
+                line a reader sees, that would have broken the one rule this
+                page lives by.
 
-                Earlier drafts led on "the order", which is the deeper truth and
-                the slower one: it needs a paragraph before it means anything.
-                Rejection needs none. The order is still the argument — it is
-                section 01, and the deck below hands off to it.
+                **No number in the second line, deliberately.** A draft read
+                "before it costs you a month", which sounds concrete and is not
+                defensible: a rejected upload is a few days' loop at most shops,
+                not four weeks. The only real month in this product is the 28
+                days `arc.ts` works back for advance copies — a true figure
+                attached to an entirely different problem. Borrowing it here
+                would have been the invented number this app refuses everywhere
+                else, on the first line a reader sees.
 
-                Line one is muted indigo rather than grey, so the two lines read
-                as one sentence in one colour at two volumes rather than as grey
-                text with a coloured answer stapled underneath. */}
+                "Before you upload it" needs no defending, and it is the better
+                line anyway: it names the reader's own action rather than the
+                shop's, which is the decision actually in front of them.
+
+                Line one is muted indigo rather than grey, so the two read as one
+                sentence at two volumes rather than as grey text with a coloured
+                answer stapled underneath. */}
             <h1 className="oc-display font-serif text-[2.5rem] leading-[1.08] font-semibold sm:text-[3.5rem]">
               <span className="block text-[#6e6c96]">
-                A shop refuses your book and never says why.
+                Find out what&rsquo;s wrong with your book
               </span>
               <span className="block" style={{ color: INK }}>
-                We tell you before you upload.
+                before you upload it.
               </span>
             </h1>
 
-            {/* The three commonest refusals, named. Concrete beats abstract
-                here: a reader who has had the email recognises their own one in
-                this list, and the last sentence hands off to section 01, which
-                is where the deeper argument lives. */}
+            {/* The three commonest refusals, then the sting. Concrete beats
+                abstract here — a reader who has had that email recognises their
+                own one in the list — and every item is a check the app really
+                performs, so the deck is as checkable as the headline above it.
+
+                Cut to two lines. It ran to four, and a hero deck that long
+                stops being a deck and becomes the first paragraph of an essay:
+                the eye leaves before the buttons. The clauses that went were
+                the qualifying ones ("eleven characters", "with a bad check
+                digit") — precision the reader does not need to feel the point,
+                and which is made properly further down where there is room. */}
             <p className="oc-lead mx-auto mt-7 max-w-2xl font-serif text-xl leading-relaxed">
-              A missing cover. An ISBN with a bad check digit. A blurb eleven
-              characters over the limit. You find out weeks later, in an email
-              that does not say which — and by then you have also missed the
-              things nobody told you were coming.
+              A missing cover. A bad ISBN digit. A blurb over the limit. Every
+              one of them is knowable before you upload.
             </p>
 
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -411,18 +427,6 @@ export function LandingPage() {
               />
             </div>
 
-            {/* Free, said once and immediately under the buttons.
-
-                This line used to live in the price section, and removing that
-                section took the word "free" off the page altogether — which is
-                the most persuasive true thing here and the cheapest to prove.
-                It belongs at the point of decision anyway: a reassurance is
-                worth most in the half-second before a click, not eight screens
-                below it. */}
-            <p className="mx-auto mt-6 max-w-lg text-sm leading-relaxed text-[#6b6b78]">
-              {FREE_LINE} No card, and nothing to unlock before you can publish
-              a finished book.
-            </p>
           </div>
 
           <DashboardFigure />
