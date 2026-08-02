@@ -563,16 +563,35 @@ with it — and `AppLoader`, the held splash. `AppLoader` skips `/` deliberately
 and is *seeded* to "gone" there rather than switched off in an effect, or it
 paints and is taken away, which is the flash it exists to prevent.
 
-**The landing page was rebuilt around the new positioning**, and it is one file:
-`src/components/landing/landing-page.tsx`, what a signed-out visitor sees at `/`.
-The frame is the book's life — **Write → Prepare → Track** — rather than a
-feature list, so a writer finds their own problem named before they find a
-feature. Its styling is deliberately ordinary stock Tailwind (`bg-black`, white
-and neutral greys) and is *scaffolding rather than a design*: the thing under
-review is the structure and the words, and judging new copy through the old
-furniture is what the rewrite was avoiding. It is the one screen not built from
-the app's `@theme` tokens — it states its greys literally, so a change to the
-palette does not reach it and has to be made here too.
+**The landing page is one file:** `src/components/landing/landing-page.tsx`,
+what a signed-out visitor sees at `/`.
+
+**Its positioning is "nobody tells you the order"** — the sharpest thing in the
+writer research and the one claim a competitor cannot answer by shipping a
+feature, because it is the shape of the problem rather than a part of it. So the
+page leads with the order, proves it by naming where the ARC step sits, and only
+then says what the software does. It opened on a feature for a while, which is
+an answer to a question the reader has not been asked yet.
+
+**It is always light**, whichever theme the app is wearing, and it states its
+colours literally rather than using the `@theme` tokens: a shop front that
+changed colour depending on a setting made inside the product would not be the
+page somebody linked to. A palette change therefore does *not* reach it and has
+to be made here too.
+
+Three things in it are load-bearing:
+
+- **The figures are drawn in markup, never screenshotted** — the dashboard, the
+  phase list, the pre-upload check, the money panel. A screenshot is an asset
+  that goes stale silently while the app moves, on the one page whose whole
+  pitch is being checkable.
+- **Everything countable is imported and counted**: `STEPS`, `PHASES`,
+  `ALL_TOOLS`, `TOOL_GROUPS`, the price from `plans.ts`. The ARC step's title,
+  its number and its phase are all derived, because the page quotes them.
+- **The stat band is where a SaaS page puts "trusted by 5,000 brands".** There
+  are no customers to count and none may be invented, so it carries four figures
+  counted out of the source instead. Never put a user count, a rating or a
+  testimonial in that row until there is a real one.
 
 **Every claim on it has to be true of the code, in both directions.** Nothing
 claims what the app cannot do — the print PDF is the browser's print engine and

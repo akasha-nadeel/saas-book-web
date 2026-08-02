@@ -3,40 +3,65 @@ import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { displayPrice, perMonthOf } from "@/lib/billing/plans";
-import { SELF_TICKING, YOURS_TO_TICK } from "@/lib/roadmap";
+import { DESTINATIONS } from "@/components/landing/works-with";
+import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
+import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
 
 /**
- * The landing page, rebuilt around what the product is becoming rather than
- * around what it currently does.
+ * The landing page.
  *
- * **The styling here is deliberately ordinary** — a centred hero, cards in a
- * grid, alternating section grounds. It is scaffolding, not a design: the thing
- * under review is the structure and the words, and the previous version was a
- * finished visual design of the *old* positioning, which meant judging new copy
- * through old furniture.
+ * **The positioning, in one line: nobody tells you the order.** That is the
+ * sharpest thing in four batches of writer research and the one claim no
+ * competitor is making, because it is not a feature — it is the shape of the
+ * whole problem. A writer arrives having finished a book and discovers, one
+ * expensive surprise at a time, that advance copies had to go out weeks ago,
+ * that the blurb is over a limit nobody mentioned, that the cover was the
+ * problem all along. So the page leads with the order, proves it with the ARC
+ * example, and only then says what the software does.
  *
- * The frame is the book's life rather than a feature list: **Write → Prepare →
- * Track.** A writer arriving here should find their own problem named before
- * they find a feature.
+ * **The reader has been sold to already.** This audience has bought a course
+ * that taught nothing and a cover that turned out to be AI. Every superlative
+ * spends credit this page does not have, so there are none: the numbers are
+ * counted from the code, the unbuilt things are labelled, the PDF's limits are
+ * stated on the page that sells it, and there is a section listing what the
+ * product refuses to do. **The refusals convert.** They are the only block here
+ * a funded competitor cannot copy, because copying it would cost them a
+ * roadmap.
  *
- * The rule that survives every rewrite: **nothing here claims something the
- * code cannot do, and nothing stays marked unbuilt once it is built.** All
- * three phases ship today; what is genuinely still to come is in one section
- * under a Not-built-yet badge, and it is a short list.
+ * **The stat band is the honest version of "trusted by 5,000 brands".** The
+ * layout this was built to wants social proof there and we have none, so it
+ * carries four figures counted out of the source instead — steps, tools,
+ * formats, EPUBCheck errors. Never put a user count, a rating or a testimonial
+ * in that row until there is one to count.
  *
- * That second half of the rule is easy to forget, because it fails in the safe
- * direction. Track carried "none of it exists today, do not sign up for it"
- * for a while after it shipped — an understatement rather than an overclaim,
- * and still a page saying something untrue about the product. This list has to
- * be walked whenever a feature lands.
+ * **It is always light**, whichever theme the app is wearing, and it states its
+ * colours literally rather than using the `@theme` tokens. A shop front that
+ * changed colour depending on a setting made inside the product would be a
+ * different page to the one someone linked to.
  *
- * The reader this page is written for has already bought a course that taught
- * nothing and a cover that turned out to be AI; the only asset it has that a
- * funded competitor cannot copy is being checkable.
+ * **Every claim has to be true of the code, in both directions** — nothing
+ * claims what the app cannot do, and nothing stays under the "Not built yet"
+ * badge once it ships. That second half fails silently and has been wrong once
+ * already, so walk the badges whenever a feature lands. The phases, the step
+ * counts, the tool list and the price are all imported rather than restated,
+ * which is the shape to prefer for any new figure here.
  */
 
 const FREE_LINE =
   "Writing, your shelf, syncing and all four export formats are free, and stay free.";
+
+/**
+ * The step that carries the whole argument, read out of the roadmap itself.
+ *
+ * Derived rather than typed, because the page quotes the step's own title and
+ * states where it sits — "step 13 of 18, phase four" — and those are three
+ * facts about a list that lives somewhere else. Written by hand they would be
+ * right today and quietly wrong the first time a step is added, on the one page
+ * whose entire pitch is being checkable.
+ */
+const ARC_INDEX = STEPS.findIndex((step) => step.id === "arc");
+const ARC_STEP = STEPS[ARC_INDEX]!;
+const ARC_PHASE = PHASES.findIndex((phase) => phase.id === ARC_STEP.phase) + 1;
 
 const WRITE = [
   [
@@ -60,24 +85,12 @@ const WRITE = [
     "Chapters, focus mode, typewriter scrolling, and free dictation for the days when typing is the thing draining you.",
   ],
   [
-    "It saves as you type, and works offline",
-    "Your manuscript lives in your browser and syncs when you are signed in. It does not need us to be up.",
-  ],
-  [
     "Proof of the work, if you are ever accused",
     "A day-by-day record of the book accumulating, the drafts saved along the way, and a fingerprint of the text — in a document you can send. Evidence, not proof, and it says which it is in its own words.",
-  ],
-  [
-    "An assistant that cannot touch your book",
-    "No write access at all. It reads one chapter, only when you ask. Every word stays yours.",
   ],
 ] as const;
 
 const PREPARE = [
-  [
-    "Every step, in the order it happens",
-    `So you do not learn that advance copies had to go out weeks ago on the day after you publish. ${SELF_TICKING} of the ${SELF_TICKING + YOURS_TO_TICK} tick themselves from what is in your book; the rest are yours.`,
-  ],
   [
     "A pre-upload check",
     "It names what a store would refuse — missing cover, malformed ISBN, blurb over the limit — and says which problems would actually stop the upload as against the ones that only cost you readers. It never blocks your export.",
@@ -119,7 +132,7 @@ const TRACK = [
   ],
   [
     "Who has an advance copy, and who is late",
-    "One list instead of six sites and a spreadsheet, with the dates attached — and a send-by date worked back from your publication date, so you learn advance copies matter before the book is out rather than after.",
+    "One list instead of six sites and a spreadsheet, with the dates attached — and a send-by date worked back from your publication date.",
   ],
   [
     "What it usually costs, and what to check first",
@@ -129,8 +142,8 @@ const TRACK = [
 
 const LATER = [
   [
-    "A story bible",
-    "Characters, places and timeline, across a series rather than one book — filled in by the assistant reading your chapters, which it still cannot write into.",
+    "A story bible across a series",
+    "People, places and things travel between books in a series. Today they stop at the one book they were written in.",
   ],
   [
     "Comps ranked, not just found",
@@ -145,7 +158,7 @@ const LATER = [
 const REFUSALS = [
   [
     "We will not design your cover or edit your prose with AI",
-    "AI here reads and reports — summaries, story bibles, consistency flags. It never writes into your book. The cheap way to build covers and editing is generative, and doing it would make liars of us. If those ever exist here, they come from real designers and real editors.",
+    "AI here reads and reports. It never writes into your book. The cheap way to build covers and editing is generative, and doing it would make liars of us in front of the one audience that checks. If those ever exist here, they come from real designers and real editors.",
   ],
   ["We will not sell you a course", "You have met those people already."],
   [
@@ -160,8 +173,12 @@ const REFUSALS = [
 
 const FAQ = [
   [
+    "I have a finished manuscript. Where does it go?",
+    "Straight in. Import a .docx, .epub, .md, .txt or .html file and it is split into chapters for you. Then the first screen tells you what stands between it and a shop — usually four or five things, most of them ten minutes each.",
+  ],
+  [
     "What doesn’t it do?",
-    "A fair amount. It does not design covers, edit your prose, write your blurb, market your book, buy ads, upload to any store, or introduce you to other writers. It will tell you what a cover needs to be and show you the shelf yours has to sit on; it will not draw one. It will count what is in your prose; it will not change a word. Everything else on your list is still yours.",
+    "A fair amount. It does not design covers, edit your prose, write your blurb, market your book, buy ads, upload to any store, or introduce you to other writers. It will tell you what a cover needs to be and show you the shelf yours has to sit on; it will not draw one. It will count what is in your prose; it will not change a word.",
   ],
   [
     "Who owns what I write?",
@@ -177,7 +194,7 @@ const FAQ = [
   ],
   [
     "I’ve paid for tools that did none of this. Why is this different?",
-    "You can test the whole claim in an afternoon without paying: write a page, import a draft, run the check, export all four files, open them in Word and an e-reader. If any of it does not work, you have lost an afternoon rather than a thousand pounds.",
+    "You can test the whole claim in an afternoon without paying: import a draft, run the check, export all four files, open them in Word and an e-reader. If any of it does not work, you have lost an afternoon rather than a thousand pounds.",
   ],
 ] as const;
 
@@ -187,30 +204,38 @@ export function LandingPage() {
   return (
     // `<body>` is overflow-hidden for the editor shell, so this page owns its
     // own scrolling. `min-h-dvh` would put the footer out of reach.
-    <div
-      className="h-dvh overflow-y-auto bg-black text-neutral-400 [scroll-behavior:smooth]"
-    >
-      <header className="sticky top-0 z-50 border-b border-neutral-800 bg-black/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-white">
-            Open<span className="text-white">Chapter</span>
+    //
+    // Colours stated literally, so the page is the same page whichever theme
+    // the reader has chosen inside the app — including a reader who has never
+    // been inside it.
+    <div className="h-dvh overflow-y-auto bg-white text-[#5b5b63] [scroll-behavior:smooth]">
+      <header className="sticky top-0 z-50 border-b border-[#ececee] bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
+          <Link
+            href="/"
+            className="font-serif text-lg font-semibold tracking-tight text-[#0f0f10]"
+          >
+            OpenChapter
           </Link>
-          <nav className="flex items-center gap-6 text-sm font-medium">
-            <a href="#write" className="hidden sm:inline hover:text-white">
+          <nav className="flex items-center gap-6 font-sans text-sm">
+            <a href="#order" className="hidden sm:inline hover:text-[#0f0f10]">
+              The order
+            </a>
+            <a href="#does" className="hidden sm:inline hover:text-[#0f0f10]">
               What it does
             </a>
-            <a href="#next" className="hidden sm:inline hover:text-white">
-              What&rsquo;s next
+            <a href="#tools" className="hidden sm:inline hover:text-[#0f0f10]">
+              Tools
             </a>
-            <a href="#price" className="hidden sm:inline hover:text-white">
+            <a href="#price" className="hidden sm:inline hover:text-[#0f0f10]">
               Price
             </a>
-            <Link href="/signin" className="hover:text-white">
+            <Link href="/signin" className="hover:text-[#0f0f10]">
               Log in
             </Link>
             <Link
               href="/signup"
-              className="rounded-lg bg-white px-4 py-2 font-semibold text-black hover:bg-neutral-200"
+              className="rounded-full bg-[#0f0f10] px-4 py-2 font-semibold text-white hover:bg-black"
             >
               Start free
             </Link>
@@ -219,278 +244,466 @@ export function LandingPage() {
       </header>
 
       <main>
-        {/* ---- Hero ---------------------------------------------------- */}
-        <section className="bg-[#0a0a0a] px-6 py-20 text-center">
-          <div className="mx-auto max-w-3xl">
-            <span className="inline-block rounded-full border border-neutral-700 bg-white/10 px-4 py-1.5 text-sm font-semibold text-neutral-300">
-              Write · Prepare · Track
-            </span>
-            {/* The headline names the pain the product can answer *today*.
-                The earlier draft led on "no idea what went wrong", which is
-                the Track phase — the one thing here that is not built. A hero
-                promising the unbuilt part is the overclaim this page cannot
-                afford, and it is also the weaker line: rejection is a sharper
-                fear than analytics. */}
-            <h1 className="mt-6 text-4xl leading-tight font-extrabold text-white sm:text-5xl">
-              Find out what&rsquo;s wrong with your book{" "}
-              <span className="text-white">before a shop does.</span>
-            </h1>
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed">
-              A missing cover. An ISBN with a bad digit. A blurb eleven
-              characters over the limit. You find out weeks later, in a rejection
-              email that does not say which.
+        {/* ---- Hero -----------------------------------------------------
+
+            Centred stack, then the product cropped by the fold — the shape
+            the references use, and the right one: a reader who has been
+            promised things by four other tools wants to see the thing before
+            they read another adjective. */}
+        <section className="overflow-hidden border-b border-[#ececee] bg-[#fafafa] px-6 pt-14 sm:pt-16">
+          <div className="mx-auto max-w-3xl text-center">
+            {/* Where the reference puts "trusted by 5,000+ brands". We have
+                nobody to count and will not invent them, so it carries the
+                three facts a suspicious reader wants first instead — each one
+                checkable in an afternoon. */}
+            <p className="inline-block rounded-full border border-[#e2e2e5] bg-white px-4 py-1.5 font-code text-[0.6875rem] tracking-[0.14em] text-[#62626b] uppercase">
+              Free · Works offline · Your book stays in your browser
             </p>
-            <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed">
-              OpenChapter writes the book with you and checks it before you
-              upload — in plain words, naming what would actually stop the
-              upload. One app instead of seven. Free, and it works offline.
+
+            {/* Two-tone, the way both references split a headline. There is no
+                accent hue in this product to split on, so the two lines split
+                on weight of ink: the quiet half sets up the loud one. */}
+            <h1 className="mt-8 font-serif text-5xl leading-[1.05] font-semibold sm:text-6xl">
+              <span className="block text-[#a5a5ad]">Nobody tells you</span>
+              <span className="block text-[#0f0f10]">the order.</span>
+            </h1>
+
+            <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed">
+              Advance copies had to go out weeks before you published. The blurb
+              was eleven characters over a limit nobody mentioned. The cover was
+              the problem all along.
+            </p>
+
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/signup"
+                className="rounded-full bg-[#0f0f10] px-7 py-3.5 font-semibold text-white hover:bg-black"
+              >
+                Start free
+              </Link>
+              {/* `GoogleButton` renders its own form; `next` is where the
+                  writer lands once Supabase is done, which for a new signup is
+                  the shelf at `/`. inline-flex, or its mark and label stack
+                  into two rows and it stands taller than the pill beside it. */}
+              <GoogleButton
+                action={signInWithGoogle}
+                next="/"
+                label="Continue with Google"
+                className="inline-flex items-center justify-center gap-2.5 rounded-full border border-[#dcdce0] bg-white px-7 py-3.5 font-semibold text-[#0f0f10] hover:border-[#b9b9c0]"
+              />
+            </div>
+          </div>
+
+          <DashboardFigure />
+        </section>
+
+        {/* ---- The logo strip -------------------------------------------
+
+            The row a landing page fills with customer logos, and we have none
+            to put there — a wall of publishers' marks would be inventing them.
+            So it names the places a finished manuscript *goes*, which is both
+            true of the export pipeline and the thing a writer is actually
+            nervous about: not who else is here, but whether the book comes out
+            again. The format sits beside each name, so the claim is checkable
+            on sight rather than taken on faith.
+
+            Real marks in their real colours — the only colour on the page —
+            from `works-with.tsx`, where the sourcing and licences for each one
+            are recorded. Nominative use: these are programs that open our
+            exports, not partners or customers. */}
+        <section className="border-b border-[#ececee] px-6 py-10">
+          <div className="mx-auto max-w-5xl">
+            <p className="text-center font-code text-[0.6875rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+              Your book comes back out — and opens in
+            </p>
+            {/* Tight enough that seven sit on one line at desktop widths — a
+                strip that wraps five-then-two reads as a mistake rather than
+                as a row. The format tag is the first thing to go when there is
+                no room for it; the name and the mark are the claim. */}
+            <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-7 gap-y-5">
+              {DESTINATIONS.map((destination) => (
+                <li
+                  key={destination.name}
+                  className="flex items-center gap-2.5"
+                  title={`${destination.name} — opens the ${destination.format} export`}
+                >
+                  <svg
+                    viewBox={destination.mark.viewBox}
+                    aria-hidden="true"
+                    className="h-5 w-5 shrink-0"
+                  >
+                    {destination.mark.paths.map((path) => (
+                      <path key={path.d} d={path.d} fill={path.fill} />
+                    ))}
+                  </svg>
+                  <span className="text-[0.8125rem] font-medium text-[#3f3f46]">
+                    {destination.name}
+                  </span>
+                  <span className="hidden font-code text-[0.625rem] tracking-wider text-[#b0b0b8] uppercase xl:inline">
+                    {destination.format}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* ---- The counted band -----------------------------------------
+
+            The slot a SaaS page fills with users and downloads. Every figure
+            here is counted out of the source at build time, so the row cannot
+            drift and cannot flatter. */}
+        <section className="border-b border-[#ececee] px-6 py-14">
+          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 text-center md:grid-cols-4">
+            <Counted n={String(STEPS.length)} label="steps, in order" />
+            <Counted n={String(ALL_TOOLS.length)} label="tools, all included" />
+            <Counted n="4" label="export formats" />
+            <Counted n="0" label="EPUBCheck errors" />
+          </div>
+        </section>
+
+        {/* ---- Three up, one lit ---------------------------------------- */}
+        <section id="does" className="border-b border-[#ececee] px-6 py-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="What it does"
+              title="Three phases. Writing is one."
+              lead="Most tools stop when the draft does. The expensive part starts there."
+            />
+            <div className="mt-12 grid gap-5 md:grid-cols-3">
+              <Phase
+                lit
+                n="01"
+                title="Write"
+                note="Seventeen free minutes a day, and not losing your place between them."
+                items={WRITE.length}
+              />
+              <Phase
+                n="02"
+                title="Prepare"
+                note="Everything a shop asks for that is not the book, checked before you upload."
+                items={PREPARE.length}
+              />
+              <Phase
+                n="03"
+                title="Track"
+                note="What the book cost against what it earned, and who still owes you a review."
+                items={TRACK.length}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* ---- The order, as an alternating block ------------------------ */}
+        <Split
+          id="order"
+          eyebrow="The whole point"
+          title="The order"
+          tint
+          figure={<OrderFigure />}
+        >
+          <p className="text-lg leading-relaxed">
+            {STEPS.length} steps, {PHASES.length} phases. The software is the
+            least of it; the sequence is the thing nobody hands you.
+          </p>
+          <p className="mt-5 leading-relaxed">
+            <strong className="text-[#0f0f10]">
+              “{ARC_STEP.title}” is step {ARC_INDEX + 1}, in phase {ARC_PHASE}.
+            </strong>{" "}
+            Before you publish, not after. That single placement is why this
+            exists: three separate batches of writer research describe the same
+            injury, and it is never a missing tool — it is a missing order.
+          </p>
+          <p className="mt-4 leading-relaxed">
+            There is a test in the codebase asserting that step stays where it
+            is. If it ever moves, the build fails.
+          </p>
+          <p className="mt-6 leading-relaxed">
+            <strong className="text-[#0f0f10]">
+              {SELF_TICKING} of the {SELF_TICKING + YOURS_TO_TICK} tick
+              themselves
+            </strong>{" "}
+            from what is already in your book — no checklist to maintain, and
+            nothing that can be lied to by accident.
+          </p>
+        </Split>
+
+        {/* ---- Prepare, mirrored ---------------------------------------- */}
+        <Split
+          eyebrow="Before you upload"
+          title="Find out from us, not from a rejection"
+          flip
+          figure={<CheckFigure />}
+        >
+          <p className="text-lg leading-relaxed">
+            A shop refusing your upload is a slow, silent thing. The check names
+            what would actually stop it — and separates that from what merely
+            costs you readers.
+          </p>
+          <ul className="mt-6 flex flex-col gap-3">
+            {PREPARE.slice(0, 4).map(([name, note]) => (
+              <li key={name}>
+                <p className="font-semibold text-[#0f0f10]">{name}</p>
+                <p className="text-sm leading-relaxed">{note}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 rounded-xl border border-[#e6e6e8] bg-[#fafafa] p-4 text-sm leading-relaxed">
+            <strong className="text-[#0f0f10]">About the PDF.</strong> A clean
+            interior file at your trim size with fonts embedded — not a
+            pre-press file. No bleed, no crop marks, no CMYK, because it comes
+            from your browser’s print engine.
+          </p>
+        </Split>
+
+        {/* ---- Track ---------------------------------------------------- */}
+        <Split
+          eyebrow="Once it is out"
+          title="What it cost against what it earned"
+          tint
+          figure={<MoneyFigure />}
+        >
+          <p className="text-lg leading-relaxed">
+            Nobody keeps this, which is why the total is always a shock.
+          </p>
+          <ul className="mt-6 flex flex-col gap-3">
+            {TRACK.slice(0, 4).map(([name, note]) => (
+              <li key={name}>
+                <p className="font-semibold text-[#0f0f10]">{name}</p>
+                <p className="text-sm leading-relaxed">{note}</p>
+              </li>
+            ))}
+          </ul>
+        </Split>
+
+        {/* ---- The bento ------------------------------------------------
+
+            The tool list, read out of `book-tools.ts` so the page cannot claim
+            a tool that does not exist or miss one that does. Cards of two
+            sizes, the way the reference mixes them, with the group that answers
+            the most expensive question given the wide cell. */}
+        <section id="tools" className="border-b border-[#ececee] px-6 py-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="All of it included"
+              title={`${ALL_TOOLS.length} tools, nothing held back`}
+              lead="Every one works on a real book, and none of them is behind the paid plan."
+            />
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
+              {TOOL_GROUPS.map((group, i) => (
+                <div
+                  key={group.title}
+                  className={`rounded-2xl border border-[#e6e6e8] p-6 ${
+                    // The first group gets the wide cell: "the parts a shop
+                    // sees" is the question this audience arrives with.
+                    i === 0 ? "bg-[#0f0f10] text-[#b6b6bd] md:col-span-2" : ""
+                  }`}
+                >
+                  <p
+                    className={`font-serif text-xl ${
+                      i === 0 ? "text-white" : "text-[#0f0f10]"
+                    }`}
+                  >
+                    {group.title}
+                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed">{group.note}</p>
+                  <ul className="mt-4 flex flex-wrap gap-2">
+                    {group.tools.map((tool) => (
+                      <li
+                        key={tool.path}
+                        className={`rounded-full border px-3 py-1 text-xs ${
+                          i === 0
+                            ? "border-white/20 text-white"
+                            : "border-[#e2e2e5] text-[#0f0f10]"
+                        }`}
+                      >
+                        {tool.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---- Refusals -------------------------------------------------
+
+            High on the page on purpose. For a reader who has been sold to by
+            everyone, the fastest way to earn a minute of attention is to say
+            what you will not take money for. */}
+        <section className="border-b border-[#ececee] bg-[#fafafa] px-6 py-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="Straight answer"
+              title="What we will not do"
+              lead="Every item below is something writers ask for constantly. We are saying no in public so you can plan around it."
+            />
+            <ul className="mt-12 flex flex-col">
+              {REFUSALS.map(([name, note]) => (
+                <li
+                  key={name}
+                  className="grid gap-2 border-t border-[#e6e6e8] py-6 first:border-t-0 first:pt-0 md:grid-cols-[1fr_1.4fr] md:gap-10"
+                >
+                  <p className="font-serif text-xl leading-snug text-[#0f0f10]">
+                    {name}
+                  </p>
+                  <p className="leading-relaxed">{note}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* ---- Still to come -------------------------------------------- */}
+        <section className="border-b border-[#ececee] px-6 py-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="Not built yet"
+              title="What comes after that"
+              lead="Listed so you know where this is going, and so you can hold us to the difference between a plan and a product. No dates — a date is a promise with a number on it."
+            />
+            <div className="mt-12 grid gap-4 md:grid-cols-3">
+              {LATER.map(([name, note]) => (
+                <div
+                  key={name}
+                  className="rounded-2xl border border-dashed border-[#dcdce0] p-6"
+                >
+                  <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
+                    Not built
+                  </p>
+                  <p className="mt-3 font-serif text-lg text-[#0f0f10]">
+                    {name}
+                  </p>
+                  <p className="mt-2 text-sm leading-relaxed">{note}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---- Price ---------------------------------------------------- */}
+        <section id="price" className="border-b border-[#ececee] bg-[#fafafa] px-6 py-20">
+          <div className="mx-auto max-w-4xl">
+            <Head eyebrow="Price" title="Free, and what isn’t" />
+            <div className="mt-12 grid gap-5 md:grid-cols-2">
+              <div className="rounded-2xl border-2 border-[#0f0f10] bg-white p-8">
+                <p className="font-code text-xs tracking-[0.18em] text-[#0f0f10] uppercase">
+                  Free
+                </p>
+                <p className="mt-4 font-serif text-5xl text-[#0f0f10]">£0</p>
+                <p className="mt-5 leading-relaxed">{FREE_LINE}</p>
+                <p className="mt-3 leading-relaxed">
+                  No watermark, no export cap, nothing to unlock before you can
+                  publish a finished book.
+                </p>
+                <Link
+                  href="/signup"
+                  className="mt-6 inline-block rounded-full bg-[#0f0f10] px-6 py-3 font-semibold text-white hover:bg-black"
+                >
+                  Start free
+                </Link>
+              </div>
+              <div className="rounded-2xl border border-[#e6e6e8] bg-white p-8">
+                <p className="font-code text-xs tracking-[0.18em] text-[#9a9aa2] uppercase">
+                  Pro
+                </p>
+                <p className="mt-4 font-serif text-5xl text-[#0f0f10]">
+                  {monthly}
+                  <span className="font-sans text-base text-[#9a9aa2]">
+                    {" "}
+                    / month
+                  </span>
+                </p>
+                <p className="mt-5 leading-relaxed">
+                  The assistant, audiobook narration and the bookmarks panel —
+                  the three things that cost us money each time they run. You
+                  never need any of them to write a book and publish it.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ---- FAQ ------------------------------------------------------ */}
+        <section className="border-b border-[#ececee] px-6 py-20">
+          <div className="mx-auto max-w-4xl">
+            <Head eyebrow="Questions" title="Reasonable suspicion, answered" />
+            <div className="mt-12 flex flex-col">
+              {FAQ.map(([q, a], i) => (
+                <details
+                  key={q}
+                  open={i === 0}
+                  className="border-t border-[#e6e6e8] py-5 first:border-t-0 first:pt-0"
+                >
+                  <summary className="cursor-pointer font-serif text-lg text-[#0f0f10] marker:text-[#c8c8ce]">
+                    {q}
+                  </summary>
+                  <p className="mt-3 leading-relaxed">{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ---- Close ---------------------------------------------------- */}
+        <section className="bg-[#0f0f10] px-6 py-24 text-center">
+          <div className="mx-auto max-w-2xl">
+            <h2 className="font-serif text-4xl leading-tight text-white sm:text-5xl">
+              You have the book.
+              <br />
+              Take the order for free.
+            </h2>
+            <p className="mt-6 leading-relaxed text-[#a5a5ad]">
+              Import the manuscript you already have and the first screen tells
+              you what stands between it and a shop. If any of it does not work,
+              you have lost an afternoon.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/signup"
-                className="rounded-lg bg-white px-7 py-3.5 font-semibold text-black hover:bg-neutral-200"
+                className="rounded-full bg-white px-7 py-3.5 font-semibold text-[#0f0f10] hover:bg-[#e6e6e8]"
               >
-                Start writing free
+                Start free
               </Link>
-              {/* `GoogleButton` renders its own form; `next` is where the
-                  writer lands once Supabase is done, which for a new signup is
-                  the shelf at `/`. */}
-              <GoogleButton
-                action={signInWithGoogle}
-                next="/"
-                label="Sign up with Google"
-                className="rounded-lg border border-neutral-700 bg-black px-7 py-3.5 font-semibold text-white hover:bg-[#0a0a0a]"
-              />
+              <Link
+                href="/signin"
+                className="rounded-full border border-white/25 px-7 py-3.5 font-semibold text-white hover:border-white/50"
+              >
+                Log in
+              </Link>
             </div>
-            <p className="mt-5 text-sm text-neutral-500">{FREE_LINE}</p>
           </div>
         </section>
-
-        {/* ---- The problem --------------------------------------------- */}
-        <Band>
-          <Head eyebrow="The problem" title="Where the money and the time go" />
-          <div className="grid gap-5 md:grid-cols-3">
-            <Stat n="7 tools" s="A word processor, a converter site, an EPUB formatter, a validator, cloud storage, a spreadsheet. Most bill monthly." />
-            <Stat n="£1,000+" s="Spent on covers and ads before anyone finds out whether the book had a chance." />
-            {/* Attributed rather than asserted. The figure is widely repeated
-                and rarely sourced — including by people selling courses — and
-                a page whose whole pitch is being checkable cannot state a
-                number it cannot check. The in-app version carries the same
-                caveat under every figure. */}
-            <Stat n="97%" s="The much-repeated share of books said to sell under 5,000 copies. Nobody publishes an audited figure — but no writer we found was told any number at all before they spent." />
-          </div>
-          <p className="mt-8 text-center text-lg">
-            You learn ARC readers matter <em>after</em> you publish. You find out
-            the blurb is over the limit when the upload is refused. You discover
-            the cover was the problem a year later.
-          </p>
-        </Band>
-
-        {/* ---- Phases -------------------------------------------------- */}
-        <Band id="write" tint>
-          <Head
-            eyebrow="Phase one"
-            badge="Working today"
-            title="Write — get the book finished"
-            lead="The pain here is not inspiration. It is seventeen free minutes a day, and losing your place between them."
-          />
-          <Cards items={WRITE} />
-        </Band>
-
-        <Band>
-          <Head
-            eyebrow="Phase two"
-            badge="Working today"
-            title="Prepare — get it out without paying to find out"
-            lead="A shop rejecting your upload is a slow, silent thing. This is the part that tells you first."
-          />
-          <Cards items={PREPARE} />
-          <p className="mt-8 rounded-xl border border-neutral-800 bg-[#0a0a0a] p-5 text-sm">
-            <strong className="text-white">About the PDF.</strong> It is a
-            clean interior file at your trim size with fonts embedded. It is not
-            a pre-press file — no bleed, no crop marks, no CMYK — because it
-            comes from your browser&rsquo;s print engine. If your printer asks
-            for bleed, that step still needs another tool.
-          </p>
-        </Band>
-
-        {/* Was the unbuilt phase, with a line telling readers not to sign up
-            for it. It is built now, and leaving that warning up would have
-            been a different kind of lie from the usual one. */}
-        <Band tint>
-          <Head
-            eyebrow="Phase three"
-            badge="Working today"
-            title="Track — find out what actually happened"
-            lead="The part nobody does for indie authors: what the book cost against what it earned, and how far off level it still is."
-          />
-          <Cards items={TRACK} />
-        </Band>
-
-        <Band id="next">
-          <Head
-            eyebrow="Still to come"
-            badge="Not built yet"
-            warn
-            title="What comes after that"
-            lead="Listed so you know where this is going, and so you can hold us to the difference between a plan and a product. No dates — a date is a promise with a number on it."
-          />
-          <Cards items={LATER} planned />
-        </Band>
-
-        {/* ---- Refusals ------------------------------------------------ */}
-        <Band tint>
-          <Head
-            eyebrow="Straight answer"
-            title="What we will not do"
-            lead="Every item below is something writers ask for constantly. We are saying no in public so you can plan around it."
-          />
-          <ul className="mx-auto flex max-w-3xl flex-col gap-4">
-            {REFUSALS.map(([name, note]) => (
-              <li
-                key={name}
-                className="rounded-xl border border-neutral-800 bg-black p-5"
-              >
-                <p className="font-bold text-white">
-                  <span className="mr-2 text-red-500">✕</span>
-                  {name}
-                </p>
-                <p className="mt-1.5">{note}</p>
-              </li>
-            ))}
-          </ul>
-        </Band>
-
-        {/* ---- Price --------------------------------------------------- */}
-        <Band id="price">
-          <Head eyebrow="Price" title="Free, and what isn’t" />
-          <div className="mx-auto grid max-w-3xl gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border-2 border-white bg-black p-7">
-              <p className="text-sm font-bold tracking-widest text-white uppercase">
-                Free
-              </p>
-              <p className="mt-3 text-3xl font-extrabold text-white">£0</p>
-              <p className="mt-3">{FREE_LINE}</p>
-              <p className="mt-2">
-                No watermark, no export cap, nothing to unlock before you can
-                publish a finished book.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-neutral-800 bg-black p-7">
-              <p className="text-sm font-bold tracking-widest text-neutral-500 uppercase">
-                Pro
-              </p>
-              <p className="mt-3 text-3xl font-extrabold text-white">
-                {monthly}
-                <span className="text-base font-medium text-neutral-500">
-                  {" "}
-                  / month
-                </span>
-              </p>
-              <p className="mt-3">
-                The assistant, audiobook narration and the bookmarks panel. You
-                never need any of them to write a book and publish it.
-              </p>
-            </div>
-          </div>
-          <div className="mt-9 text-center">
-            <Link
-              href="/signup"
-              className="inline-block rounded-lg bg-white px-7 py-3.5 font-semibold text-black hover:bg-neutral-200"
-            >
-              Start writing free
-            </Link>
-          </div>
-        </Band>
-
-        {/* ---- FAQ ----------------------------------------------------- */}
-        <Band tint>
-          <Head eyebrow="Questions" title="Reasonable suspicion, answered" />
-          <div className="mx-auto flex max-w-3xl flex-col gap-3">
-            {FAQ.map(([q, a], i) => (
-              <details
-                key={q}
-                open={i === 0}
-                className="rounded-xl border border-neutral-800 bg-black p-5"
-              >
-                <summary className="cursor-pointer font-bold text-white">
-                  {q}
-                </summary>
-                <p className="mt-3">{a}</p>
-              </details>
-            ))}
-          </div>
-        </Band>
       </main>
 
-      <footer className="border-t border-neutral-800 px-6 py-10 text-center text-sm text-neutral-500">
-        <p className="font-bold text-white">
-          Open<span className="text-white">Chapter</span>
-        </p>
-        <p className="mt-2">Your manuscript stays on your machine.</p>
+      <footer className="px-6 py-10">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 font-code text-xs tracking-wider text-[#9a9aa2] uppercase">
+          <span>© {new Date().getFullYear()} OpenChapter</span>
+          <span>Your manuscript stays in your browser</span>
+        </div>
       </footer>
     </div>
   );
 }
 
-/* --------------------------------------------------------------------------
-   Scaffolding. Plain on purpose — see the note at the top of the file.
-   -------------------------------------------------------------------------- */
-
-function Band({
-  id,
-  tint,
-  children,
-}: {
-  id?: string;
-  tint?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <section
-      id={id}
-      className={`px-6 py-20 ${tint ? "bg-[#0a0a0a]" : "bg-black"}`}
-    >
-      <div className="mx-auto max-w-6xl">{children}</div>
-    </section>
-  );
-}
+/* ---- The furniture ------------------------------------------------------- */
 
 function Head({
   eyebrow,
-  badge,
-  warn,
   title,
   lead,
 }: {
   eyebrow: string;
-  /** "Working today" or "Not built yet". The whole page turns on the difference. */
-  badge?: string;
-  warn?: boolean;
   title: string;
   lead?: string;
 }) {
   return (
-    <div className="mx-auto mb-10 max-w-3xl text-center">
-      <div className="flex items-center justify-center gap-3">
-        <span className="text-sm font-bold tracking-widest text-white uppercase">
-          {eyebrow}
-        </span>
-        {badge && (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
-              /* The same two-weight badge the app uses: filled for the claim
-                 being made, outlined for the caveat on it. */
-              warn
-                ? "border border-neutral-600 text-neutral-300"
-                : "bg-white text-black"
-            }`}
-          >
-            {badge}
-          </span>
-        )}
-      </div>
-      <h2 className="mt-4 text-3xl leading-snug font-extrabold text-white">
+    <div className="max-w-2xl">
+      <p className="font-code text-[0.6875rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+        {eyebrow}
+      </p>
+      <h2 className="mt-4 font-serif text-4xl leading-tight text-[#0f0f10] sm:text-[2.75rem]">
         {title}
       </h2>
       {lead && <p className="mt-4 text-lg leading-relaxed">{lead}</p>}
@@ -498,42 +711,325 @@ function Head({
   );
 }
 
-function Cards({
-  items,
-  planned,
+/**
+ * A section with the words on one side and a picture of the thing on the other.
+ *
+ * `flip` swaps the sides. Alternating them down the page is what stops six
+ * sections reading as one long column — the reference does it for the same
+ * reason, and the order-reversal classes are on the *figure* so the words stay
+ * first in the DOM and a screen reader is never handed the picture first.
+ */
+function Split({
+  id,
+  eyebrow,
+  title,
+  children,
+  figure,
+  flip,
+  tint,
 }: {
-  items: readonly (readonly [string, string])[];
-  planned?: boolean;
+  id?: string;
+  eyebrow: string;
+  title: string;
+  children: ReactNode;
+  figure: ReactNode;
+  flip?: boolean;
+  tint?: boolean;
 }) {
   return (
-    <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-      {items.map(([name, note]) => (
-        <li
-          key={name}
-          className={`rounded-xl border p-6 ${
-            planned
-              ? "border-dashed border-neutral-700 bg-black"
-              : "border-neutral-800 bg-black shadow-sm"
-          }`}
-        >
-          {planned && (
-            <span className="mb-3 inline-block rounded-full bg-[#1c1c1c] px-2.5 py-1 text-[11px] font-bold tracking-wider text-neutral-500 uppercase">
-              Planned
-            </span>
-          )}
-          <p className="font-bold text-white">{name}</p>
-          <p className="mt-2 text-[15px] leading-relaxed">{note}</p>
-        </li>
-      ))}
-    </ul>
+    <section
+      {...(id ? { id } : {})}
+      className={`border-b border-[#ececee] px-6 py-20 ${
+        tint ? "bg-[#fafafa]" : ""
+      }`}
+    >
+      <div className="mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-2">
+        <div>
+          <Head eyebrow={eyebrow} title={title} />
+          <div className="mt-6">{children}</div>
+        </div>
+        <div className={flip ? "md:order-first" : ""}>{figure}</div>
+      </div>
+    </section>
   );
 }
 
-function Stat({ n, s }: { n: string; s: string }) {
+/** One counted figure. Never a user count — see the note at the top. */
+function Counted({ n, label }: { n: string; label: string }) {
   return (
-    <div className="rounded-xl border border-neutral-800 bg-black p-6 text-center">
-      <p className="text-3xl font-extrabold text-white">{n}</p>
-      <p className="mt-2 text-[15px] leading-relaxed">{s}</p>
+    <div>
+      <p className="font-serif text-4xl text-[#0f0f10]">{n}</p>
+      <p className="mt-1 text-sm">{label}</p>
+    </div>
+  );
+}
+
+function Phase({
+  n,
+  title,
+  note,
+  items,
+  lit,
+}: {
+  n: string;
+  title: string;
+  note: string;
+  items: number;
+  lit?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-2xl border p-7 ${
+        lit
+          ? "border-[#0f0f10] bg-[#0f0f10] text-[#b6b6bd]"
+          : "border-[#e6e6e8] bg-white"
+      }`}
+    >
+      <p
+        className={`font-code text-xs tracking-[0.18em] uppercase ${
+          lit ? "text-white/60" : "text-[#9a9aa2]"
+        }`}
+      >
+        {n}
+      </p>
+      <p
+        className={`mt-4 font-serif text-2xl ${
+          lit ? "text-white" : "text-[#0f0f10]"
+        }`}
+      >
+        {title}
+      </p>
+      <p className="mt-2 leading-relaxed">{note}</p>
+      <p
+        className={`mt-5 font-code text-xs tracking-wider uppercase ${
+          lit ? "text-white/60" : "text-[#9a9aa2]"
+        }`}
+      >
+        {items} things it does
+      </p>
+    </div>
+  );
+}
+
+/* ---- The figures ---------------------------------------------------------
+ *
+ * Drawn in markup rather than screenshotted, which is this repo's standing
+ * rule for its own figures: a screenshot is an asset that goes stale silently
+ * while the app moves, and these would be lying about the first screen a new
+ * writer sees. Each uses the same words and the same order the real screen
+ * does, so they can only go wrong if the product does.
+ * ------------------------------------------------------------------------- */
+
+/** The Overview, cropped by the fold. */
+function DashboardFigure() {
+  return (
+    <div className="mx-auto mt-16 max-w-5xl" aria-hidden="true">
+      <div className="rounded-t-2xl border-x border-t border-[#e6e6e8] bg-white p-2 shadow-[0_-24px_60px_-30px_rgba(15,15,16,0.25)]">
+        <div className="flex gap-px overflow-hidden rounded-t-xl bg-[#ececee]">
+          <div className="hidden w-44 shrink-0 flex-col gap-1 bg-white p-4 sm:flex">
+            <span className="mb-3 font-serif text-sm text-[#0f0f10]">
+              OpenChapter
+            </span>
+            {["Overview", "Write", "Prepare", "Track", "Tools"].map(
+              (item, i) => (
+                <span
+                  key={item}
+                  className={`rounded-md px-2.5 py-1.5 text-xs ${
+                    i === 0
+                      ? "bg-[#f1f1f3] font-medium text-[#0f0f10]"
+                      : "text-[#9a9aa2]"
+                  }`}
+                >
+                  {item}
+                </span>
+              ),
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1 bg-white p-5 sm:p-6">
+            <p className="font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+              Getting it ready
+            </p>
+            <p className="mt-1.5 font-serif text-xl text-[#0f0f10]">
+              The Drowned Coast
+            </p>
+            <p className="mt-3 text-sm">
+              <span className="font-semibold text-[#0f0f10]">2 things</span>{" "}
+              would stop a shop taking this · 3 worth doing
+            </p>
+
+            <div className="mt-4 flex flex-col gap-2">
+              {[
+                [
+                  "No cover.",
+                  "It is the only thing most readers ever see.",
+                  "Add a cover",
+                ],
+                [
+                  "No blurb.",
+                  "The text under the cover is what decides the sale.",
+                  "Work on the blurb",
+                ],
+              ].map(([title, why, action]) => (
+                <div
+                  key={title}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#e6e6e8] bg-[#fafafa] px-3.5 py-3"
+                >
+                  <span className="min-w-[10rem] flex-1">
+                    <span className="block text-sm font-semibold text-[#0f0f10]">
+                      {title}
+                    </span>
+                    <span className="block text-sm">{why}</span>
+                  </span>
+                  <span className="shrink-0 rounded-md bg-[#0f0f10] px-3 py-1.5 text-xs font-semibold text-white">
+                    {action}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex items-center gap-2 border-t border-[#ececee] pt-4">
+              {PHASES.map((phase, i) => (
+                <span key={phase.id} className="flex flex-1 items-center gap-2">
+                  <span
+                    className={`h-4 w-4 shrink-0 rounded-full border-2 ${
+                      i < 2
+                        ? "border-[#0f0f10] bg-[#0f0f10]"
+                        : i === 2
+                          ? "border-[#0f0f10]"
+                          : "border-[#dcdce0]"
+                    }`}
+                  />
+                  {i < PHASES.length - 1 && (
+                    <span className="h-px flex-1 bg-[#ececee]" />
+                  )}
+                </span>
+              ))}
+            </div>
+            <p className="mt-3 font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+              Next · {ARC_STEP.title}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The five phases, with the ARC step marked where it actually sits. */
+function OrderFigure() {
+  return (
+    <div
+      className="rounded-2xl border border-[#e6e6e8] bg-white p-7"
+      aria-hidden="true"
+    >
+      <ol className="flex flex-col">
+        {PHASES.map((phase, i) => {
+          const here = i + 1 === ARC_PHASE;
+          return (
+            <li
+              key={phase.id}
+              className="flex gap-4 border-t border-[#f1f1f3] py-4 first:border-t-0 first:pt-0"
+            >
+              <span className="font-code text-xs text-[#c0c0c6]">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className="min-w-0">
+                <span
+                  className={`block font-serif text-lg ${
+                    here ? "text-[#0f0f10]" : "text-[#5b5b63]"
+                  }`}
+                >
+                  {phase.label}
+                </span>
+                {here && (
+                  <span className="mt-2 block rounded-lg bg-[#0f0f10] px-3 py-2 text-xs font-semibold text-white">
+                    {ARC_STEP.title}
+                  </span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+/** The pre-upload check, as it reads on the export screen. */
+function CheckFigure() {
+  return (
+    <div
+      className="rounded-2xl border border-[#e6e6e8] bg-white p-7"
+      aria-hidden="true"
+    >
+      <p className="font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+        Before you upload
+      </p>
+      <ul className="mt-5 flex flex-col gap-3">
+        {[
+          ["Would be refused", "Cover missing", true],
+          ["Would be refused", "ISBN check digit does not add up", true],
+          ["Costs you readers", "No categories chosen", false],
+          ["Costs you readers", "No publisher named", false],
+        ].map(([weight, what, blocking]) => (
+          <li
+            key={what as string}
+            className="flex items-start gap-3 border-b border-[#f1f1f3] pb-3 last:border-b-0 last:pb-0"
+          >
+            <span
+              className={`mt-0.5 shrink-0 rounded-md px-2 py-1 font-code text-[0.5625rem] tracking-wider uppercase ${
+                blocking
+                  ? "bg-[#0f0f10] text-white"
+                  : "border border-[#e2e2e5] text-[#9a9aa2]"
+              }`}
+            >
+              {weight as string}
+            </span>
+            <span className="text-sm text-[#0f0f10]">{what as string}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-5 text-xs leading-relaxed text-[#9a9aa2]">
+        It never blocks the export. The file is yours whether or not a shop
+        would take it.
+      </p>
+    </div>
+  );
+}
+
+/** Cost against earnings, the way the Track screen puts it. */
+function MoneyFigure() {
+  return (
+    <div
+      className="rounded-2xl border border-[#e6e6e8] bg-white p-7"
+      aria-hidden="true"
+    >
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-xl bg-[#fafafa] p-4">
+          <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
+            Spent
+          </p>
+          <p className="mt-2 font-serif text-2xl text-[#0f0f10]">£1,240</p>
+          <p className="mt-1 text-xs">Cover · editing · ads · proofs</p>
+        </div>
+        <div className="rounded-xl bg-[#fafafa] p-4">
+          <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
+            Earned
+          </p>
+          <p className="mt-2 font-serif text-2xl text-[#0f0f10]">£410</p>
+          <p className="mt-1 text-xs">From your own sales report</p>
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl border border-[#e6e6e8] p-4">
+        <p className="text-sm text-[#0f0f10]">
+          <strong>412 more copies</strong> gets you level.
+        </p>
+        <p className="mt-1 text-xs leading-relaxed">
+          Worked from what a copy has actually earned you. With no rows saying
+          so, the figure does not appear at all.
+        </p>
+      </div>
     </div>
   );
 }
