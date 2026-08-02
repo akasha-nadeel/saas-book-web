@@ -579,6 +579,7 @@ export function Bookshelf({
               searching={query.trim().length > 0}
               onView={setView}
               onSort={setSort}
+              onClearSearch={() => setQuery("")}
               onDetails={setEditing}
               onCover={setCovering}
               onTrash={handleTrash}
@@ -1133,27 +1134,11 @@ function Overview({
           )}
         </section>
       ) : (
-        <section className="rounded-2xl border border-line bg-panel p-8 text-center">
-          <p className="text-lg font-bold text-fg">Nothing on the shelf yet</p>
-          <p className="mx-auto mt-2 max-w-md text-muted">
-            Start typing and name the book later, or bring in a .docx, .epub,
-            .md, .txt or .html file.
-          </p>
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <Link
-              href="/book/new"
-              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
-            >
-              Start a book
-            </Link>
-            <Link
-              href="/book/import"
-              className="rounded-lg border border-line bg-surface px-5 py-2.5 text-sm font-semibold text-fg"
-            >
-              Import a file
-            </Link>
-          </div>
-        </section>
+        <EmptyState title="Nothing on the shelf yet" primary={START} secondary={IMPORT}>
+          Start one and name it later, or bring in a manuscript you already have
+          — .docx, .epub, .md, .txt or .html. Then this screen tells you what
+          stands between it and a shop.
+        </EmptyState>
       )}
 
       {/* Nothing when nothing is late, which is most days. A panel that has
@@ -1249,6 +1234,109 @@ function Overview({
     </div>
   );
 }
+
+/** Somewhere to go, or something to do. Empty states take one of each. */
+type EmptyAction =
+  | { label: string; href: string }
+  | { label: string; onClick: () => void };
+
+function ActionButton({
+  action,
+  primary,
+}: {
+  action: EmptyAction;
+  primary?: boolean;
+}) {
+  const className = `rounded-lg px-5 py-2.5 text-sm font-semibold ${
+    primary
+      ? "bg-accent text-accent-ink"
+      : "border border-line bg-surface text-fg hover:border-accent/40"
+  }`;
+
+  return "href" in action ? (
+    <Link href={action.href} className={className}>
+      {action.label}
+    </Link>
+  ) : (
+    <button type="button" onClick={action.onClick} className={className}>
+      {action.label}
+    </button>
+  );
+}
+
+/**
+ * A screen with nothing on it, which is a screen with something to say.
+ *
+ * Four of these were a single grey sentence — "No books yet.", "The trash is
+ * empty." — with nothing to press. An empty screen is the one moment a writer
+ * is guaranteed to be looking and has nothing else to read, so spending it on a
+ * statement of the obvious is the most expensive silence in the app.
+ *
+ * **The two kinds are opposites and the difference is the whole design.** An
+ * area with *no books at all* is somebody at the start: it owes them the two
+ * ways in, and a line about what this area will do once there is a book. A
+ * *filter* with nothing in it — archived, trash, a search that matched nothing
+ * — is not that at all. The library is fine; this view is narrow. Offering
+ * "Start a book" there answers a question nobody asked and quietly implies they
+ * have none, so those get the way *back* instead, and a line explaining what
+ * the view is for.
+ *
+ * `bare` drops the frame, for the two that already sit inside a card.
+ */
+function EmptyState({
+  title,
+  children,
+  primary,
+  secondary,
+  bare,
+}: {
+  title: string;
+  /** One line: what this area does for you, or what this view holds. */
+  children: ReactNode;
+  primary?: EmptyAction;
+  secondary?: EmptyAction;
+  bare?: boolean;
+}) {
+  return (
+    <div
+      className={
+        bare
+          ? "py-2"
+          : "rounded-2xl border border-line bg-panel px-6 py-10 text-center"
+      }
+    >
+      <p className="text-lg font-bold text-fg">{title}</p>
+      <p
+        className={`mt-2 max-w-md text-muted ${bare ? "" : "mx-auto"}`}
+      >
+        {children}
+      </p>
+      {(primary || secondary) && (
+        <div
+          className={`mt-5 flex flex-wrap gap-2 ${bare ? "" : "justify-center"}`}
+        >
+          {primary && <ActionButton action={primary} primary />}
+          {secondary && <ActionButton action={secondary} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The two ways a book gets here, as actions for an empty state.
+ *
+ * Which one leads is the area's own answer. Write and Overview put *Start a
+ * book* first, because drafting is what those two are for. Prepare, Track and
+ * Tools put *Import* first, because all three work on a book that already
+ * exists — and the person who lands on them with an empty shelf is far more
+ * likely to have a manuscript in a file than to be about to type one.
+ */
+const START: EmptyAction = { label: "Start a book", href: "/book/new" };
+const IMPORT: EmptyAction = {
+  label: "Import a manuscript",
+  href: "/book/import",
+};
 
 /**
  * The way out of a finding.
@@ -1401,6 +1489,7 @@ function Write({
   searching,
   onView,
   onSort,
+  onClearSearch,
   onDetails,
   onCover,
   onTrash,
@@ -1413,6 +1502,8 @@ function Write({
   sort: Sort;
   searching: boolean;
   onView: (v: BookView) => void;
+  /** Empties the box in the header, which lives on the screen above this. */
+  onClearSearch: () => void;
   onSort: (s: Sort) => void;
   onDetails: (b: Book) => void;
   onCover: (b: Book) => void;
@@ -1455,15 +1546,48 @@ function Write({
       </div>
 
       {visible.length === 0 ? (
-        <p className="mt-10 text-center text-muted">
-          {searching
-            ? "No book here matches that."
-            : view === "archived"
-              ? "Nothing archived."
-              : view === "trashed"
-                ? "The trash is empty."
-                : "Nothing on the shelf yet."}
-        </p>
+        <div className="mt-6">
+          {searching ? (
+            <EmptyState
+              title="No book here matches that"
+              primary={{ label: "Clear the search", onClick: onClearSearch }}
+            >
+              This searches titles. To look inside a book, open it and use the
+              search tab — that one reads the prose.
+            </EmptyState>
+          ) : view === "archived" ? (
+            <EmptyState
+              title="Nothing archived"
+              primary={{
+                label: "Back to your books",
+                onClick: () => onView("active"),
+              }}
+            >
+              Archiving takes a finished book off the shelf without deleting
+              anything — its chapters, notes and cover stay exactly as they are.
+            </EmptyState>
+          ) : view === "trashed" ? (
+            <EmptyState
+              title="The trash is empty"
+              primary={{
+                label: "Back to your books",
+                onClick: () => onView("active"),
+              }}
+            >
+              A deleted book waits here with everything still in it, so you can
+              put it back. Nothing goes for good until you say so.
+            </EmptyState>
+          ) : (
+            <EmptyState
+              title="Nothing on the shelf yet"
+              primary={START}
+              secondary={IMPORT}
+            >
+              Start one and name it later, or bring in a manuscript you already
+              have — .docx, .epub, .md, .txt or .html.
+            </EmptyState>
+          )}
+        </div>
       ) : (
         <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((book) => (
@@ -1704,7 +1828,15 @@ function Prepare({ books }: { books: Book[] }) {
         </p>
 
         {books.length === 0 ? (
-          <p className="text-muted">No books yet.</p>
+          // Bare: the card above already carries the paragraph explaining what
+          // the check is, so this says only what is missing and how to fix it.
+          // Import leads here — the person on this screen with an empty shelf
+          // has a manuscript somewhere, or they would not be reading about
+          // what a shop refuses.
+          <EmptyState bare title="No book to check yet" primary={IMPORT} secondary={START}>
+            Bring one in and this names what a shop would refuse before you find
+            out from a rejection.
+          </EmptyState>
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map(({ book, issues }) => (
@@ -1861,19 +1993,14 @@ function Tools({
 
   if (!book) {
     return (
-      <section className="rounded-2xl border border-line bg-panel p-8 text-center">
-        <p className="text-lg font-bold text-fg">Nothing on the shelf yet</p>
-        <p className="mx-auto mt-2 max-w-md text-muted">
-          These all work on a book, so there is nothing to point them at. Start
-          one and they light up.
-        </p>
-        <Link
-          href="/book/new"
-          className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
-        >
-          Start a book
-        </Link>
-      </section>
+      <EmptyState
+        title="Nothing to point them at"
+        primary={IMPORT}
+        secondary={START}
+      >
+        All fifteen work on a book. Bring one in and they light up — comps,
+        categories, blurb, cover, paperback and the rest.
+      </EmptyState>
     );
   }
 
@@ -2067,7 +2194,10 @@ function Track({ books }: { books: Book[] }) {
         </p>
 
         {books.length === 0 ? (
-          <p className="text-muted">No books yet.</p>
+          <EmptyState bare title="Nothing to track yet" primary={IMPORT} secondary={START}>
+            Costs, royalties and advance readers all hang off a book. Bring one
+            in and this starts keeping the account.
+          </EmptyState>
         ) : (
           <ul className="grid gap-3 lg:grid-cols-2">
             {rows.map(({ book, money, readers }) => (
