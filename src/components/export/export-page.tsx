@@ -30,6 +30,7 @@ import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { BookCover } from "@/components/shelf/book-cover";
 import { storeReadiness } from "@/lib/publishing";
 import { type ToolPageProps } from "@/lib/tool-page";
+import { areaLabel } from "@/lib/areas";
 
 /**
  * Getting the book out, as a sequence rather than a wall.
@@ -229,9 +230,12 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
    * Read once, as an initial value. After that the flow is the writer's: making
    * this reactive would drag them back to the linked step every time they moved.
    */
-  const initial = useSearchParams().get("step");
+  const params = useSearchParams();
+  const initial = params.get("step");
   const deepLink =
     initial && STEP_DEEP_LINKS.has(initial as StepId) ? (initial as StepId) : null;
+  /** Which dashboard area sent the writer here, for the rail's way back. */
+  const from = params.get("from");
 
   const [output, setOutput] = useState<Output | null>(deepLink ? "epub" : null);
   const [stepId, setStepId] = useState<StepId>(deepLink ?? "format");
@@ -409,6 +413,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
         currentIndex={index}
         steps={steps}
         onGo={(id) => go(steps.findIndex((s) => s.id === id))}
+        from={from}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -637,9 +642,12 @@ function Rail({
   currentId,
   currentIndex,
   onGo,
+  from,
 }: {
   book: Book;
   bookId: string;
+  /** The dashboard area this was opened from, if the link said so. */
+  from: string | null;
   /** The stored cover, or null. Passed down so the rail fetches nothing. */
   cover: string | null;
   /** How many listing problems a shop would refuse today. */
@@ -662,11 +670,11 @@ function Rail({
             because the whole shape of it implies there is no exit until the
             end. */}
         <Link
-          href="/?area=tools"
+          href={areaLabel(from) ? `/?area=${from}` : "/?area=tools"}
           className="font-sans text-xs font-semibold text-muted
                      underline-offset-4 hover:text-fg hover:underline"
         >
-          ← All tools
+          ← {areaLabel(from) ? `Back to ${areaLabel(from)}` : "All tools"}
         </Link>
 
         {/* The book, with its cover.

@@ -38,6 +38,7 @@ import {
   type Fix,
 } from "@/lib/checkup";
 import { relativeTime } from "@/lib/relative-time";
+import { withReturn, type AreaId } from "@/lib/areas";
 import {
   useActivity,
   useCover,
@@ -1048,6 +1049,7 @@ function Overview({
                           fix={finding.fix}
                           level={finding.level}
                           onCover={onCover}
+                          from="overview"
                         />
                       </li>
                     ))}
@@ -1612,11 +1614,21 @@ function FixLink({
   fix,
   level,
   onCover,
+  from,
 }: {
   book: Book;
   fix: Fix;
   level: FindingLevel;
   onCover: (b: Book) => void;
+  /**
+   * The area this was pressed in, so the tool can offer a way back to it.
+   *
+   * A fix takes the writer out of the dashboard entirely, and the tool's only
+   * exit was "All tools" — which returns to the launcher rather than to the
+   * list they were working through. Naming the origin is the whole of the fix;
+   * `ToolHeader` does the rest.
+   */
+  from?: AreaId;
 }) {
   /*
    * The way out, in the one colour that means "this way on" — never in the
@@ -1637,7 +1649,10 @@ function FixLink({
   if (fix.kind === "route") {
     return (
       <Link
-        href={`/book/${book.id}${fix.path ? `/${fix.path}` : ""}`}
+        href={withReturn(
+          `/book/${book.id}${fix.path ? `/${fix.path}` : ""}`,
+          from,
+        )}
         className={className}
       >
         {fix.action} →
@@ -2247,6 +2262,7 @@ function PrepareRow({
                   fix={finding.fix}
                   level={finding.level}
                   onCover={onCover}
+                  from="prepare"
                 />
               </li>
             ))}
@@ -2255,7 +2271,7 @@ function PrepareRow({
           {/* Named, so going to the export flow is a decision rather than what
               happens when you press anything on this row. */}
           <Link
-            href={`/book/${book.id}/export`}
+            href={withReturn(`/book/${book.id}/export`, "prepare")}
             className="mt-3 inline-block text-sm font-semibold text-accent"
           >
             Check and export this book →

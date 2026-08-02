@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
+import { areaLabel } from "@/lib/areas";
 import {
   bookChapterCount,
   bookWordCount,
@@ -83,6 +85,19 @@ export function ToolHeader({
 }) {
   const cover = useCover(book.id);
 
+  /*
+   * Where the writer came from, if whoever linked here said so.
+   *
+   * "All tools" is a shortcut to the launcher, not a way back — it was the only
+   * exit on this screen, so somebody who pressed "Choose categories" on a
+   * finding in Prepare landed in the Tools wall when they were done and had to
+   * find their way to Prepare again to see the rest of the list they were
+   * working through. A back control has to name the place it returns to, and
+   * only the caller knows it.
+   */
+  const fromId = useSearchParams().get("from");
+  const from = areaLabel(fromId);
+
   return (
     <header className="border-b border-line bg-panel">
       <div className={`mx-auto ${WIDTHS[width]} px-6 py-5`}>
@@ -113,11 +128,15 @@ export function ToolHeader({
               thing in this header and a box gave it the weight of an action —
               which put a second heavy element on the one row that should be
               quiet. */}
+          {/* The way back names where it goes. When a caller said where the
+              writer came from, that wins — returning them to the launcher when
+              they arrived from a list they were working through is the thing
+              this exists to stop. "All tools" stays for everyone else. */}
           <Link
-            href="/?area=tools"
+            href={from ? `/?area=${fromId}` : "/?area=tools"}
             className="shrink-0 text-xs font-semibold text-muted hover:text-fg"
           >
-            ← All tools
+            ← {from ? `Back to ${from}` : "All tools"}
           </Link>
         </div>
 
