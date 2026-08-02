@@ -132,6 +132,18 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
           here: how much room does this actually have? */}
       <div className="@container mx-auto max-w-5xl px-6 pt-6 pb-16">
         {heading}
+
+        {/* `ToolHeader` is suppressed in the roadmap's panel and it was the
+            only place this screen said what it will and will not do — so the
+            panel opened on a title and an empty box, which is the one thing a
+            writer stuck on a blurb does not need more of. */}
+        {embedded && (
+          <p className="-mt-2 mb-5 max-w-2xl text-sm text-muted">
+            The two hundred words that decide whether anybody opens the book. We
+            do not write it — we count it, and show you what books like yours
+            did.
+          </p>
+        )}
         <div className="grid items-start gap-8 @3xl:grid-cols-[minmax(0,1fr)_320px]">
           {/* ---- The blurb itself -------------------------------------- */}
           <div>
@@ -146,7 +158,11 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                 // Saved on blur rather than on every keystroke: the shelf is one
                 // document and a write per character is a write per character.
                 onBlur={() => setPublishing(book.id, { description: draft })}
-                rows={8}
+                // Six, not eight. A blurb runs to two or three short
+                // paragraphs, and in the roadmap's panel eight rows put the
+                // counter — the thing this screen is actually for — below the
+                // fold under a field that is mostly empty.
+                rows={6}
                 placeholder="What happens, who it happens to, and what is at stake."
                 aria-label="Your blurb"
                 className="w-full resize-y bg-transparent p-4 leading-relaxed text-fg
@@ -230,45 +246,63 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
               </ul>
             )}
 
-            {/* The one rule on this screen, said plainly so the notes above are
-                not mistaken for rules too. */}
-            <p className="mt-6 border-t border-line pt-4 text-xs text-muted">
+            {/* Attached to the counters it qualifies, not floating under
+                them. It was a third grey paragraph in a column of grey
+                paragraphs, so the one *rule* on the screen read as more
+                commentary. */}
+            <p className="mt-2 text-xs text-muted">
               Only two things here are facts: an empty blurb, and one over{" "}
               {BLURB_MAX.toLocaleString()} characters, which shops refuse.
-              Everything else is a measurement. Nobody knows whether your
-              three-paragraph blurb beats a two-paragraph one, including us.
+              Everything else is a measurement, not a rule.
             </p>
           </div>
 
-          {/* ---- Real blurbs ------------------------------------------- */}
+          {/* ---- Real blurbs -------------------------------------------
+
+              One bordered card rather than a heading, a line, a button and a
+              note stacked loose on the page. Everything here is prose at
+              roughly one weight, so four separate text blocks in a column read
+              as one undifferentiated wall — and the *action* was lost in the
+              middle of it. Boxing the section gives the examples an edge, and
+              the button something to sit at the foot of.
+
+              It also removed a duplicate: the section had a subtitle saying
+              "five real ones" and, under the button, a note saying "five
+              blurbs from published books". Two sentences for one fact, on a
+              screen already accused of being all text. */}
           <aside>
-            <h2 className="font-bold text-fg">Blurbs from books like yours</h2>
-            <p className="mt-2 text-sm text-muted">
-              Five real ones, so you can see the shape rather than be told it.
-            </p>
-            {!seedQuery.trim() ? (
-              <p className="mt-4 rounded-lg border border-line bg-surface p-3 text-sm text-muted">
-                Finding these needs something to search on, and this book has no
-                genre or blurb set yet. Add a genre in{" "}
-                <Link href="/" className="font-semibold text-accent">
-                  Details
-                </Link>{" "}
-                on the shelf, or write a first draft of the blurb here — either
-                gives it enough to go on.
+            <div className="rounded-xl border border-line bg-panel p-4">
+              <h2 className="font-bold text-fg">Blurbs from books like yours</h2>
+              <p className="mt-1.5 text-sm text-muted">
+                Five real ones from published books in your genre, with the
+                length each runs to. Read from Google Books — nothing you have
+                written is sent.
               </p>
-            ) : (
-              <button
-                type="button"
-                onClick={loadExamples}
-                disabled={state === "loading"}
-                // Filled. It is the only action in this column and it was a
-                // white box on a white panel, which reads as disabled.
-                className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm
-                         font-semibold text-accent-ink disabled:opacity-50"
-              >
-                {state === "loading" ? "Looking…" : "Show me five"}
-              </button>
-            )}
+
+              {!seedQuery.trim() ? (
+                <p className="mt-3 border-t border-line pt-3 text-sm text-muted">
+                  Finding these needs something to search on, and this book has
+                  no genre or blurb set yet. Add a genre in{" "}
+                  <Link href="/" className="font-semibold text-accent">
+                    Details
+                  </Link>{" "}
+                  on the shelf, or write a first draft here — either gives it
+                  enough to go on.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={loadExamples}
+                  disabled={state === "loading"}
+                  // Filled. It is the only action in this column and it was a
+                  // white box on a white panel, which reads as disabled.
+                  className="mt-3 w-full rounded-lg bg-accent px-4 py-2.5 text-sm
+                           font-semibold text-accent-ink disabled:opacity-50"
+                >
+                  {state === "loading" ? "Looking…" : "Show me five"}
+                </button>
+              )}
+            </div>
 
             {benchmark && (
               <p className="mt-4 rounded-lg border border-line bg-panel p-3 text-sm text-fg">

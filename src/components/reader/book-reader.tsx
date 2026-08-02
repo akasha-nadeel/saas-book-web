@@ -72,8 +72,11 @@ const ZOOM_STEP = 0.1;
 export function BookReader({
   bookId,
   from,
+  phase,
 }: {
   bookId: string;
+  /** The roadmap phase that sent them, when `from` is "roadmap". */
+  phase?: string;
   /** Which door the reader was opened by — see backHref below. */
   from?: string;
 }) {
@@ -105,16 +108,40 @@ export function BookReader({
   // ?from=shelf and this honours it.
   const cameFromShelf = from === "shelf";
 
+  /*
+   * The roadmap is the third door, and it had no way back at all.
+   *
+   * "Read it end to end" is a step on the road, and this screen is where that
+   * step is *done* — but it is one of the two destinations that take the whole
+   * window rather than opening beside the road, so pressing it left the
+   * roadmap entirely and the only exits here were the editor and the shelf. A
+   * writer working down eighteen steps had to find their way back through the
+   * dashboard and reopen the tool.
+   *
+   * The phase rides along so they land on the part of the road they left,
+   * rather than at the top of it.
+   */
+  const cameFromRoadmap = from === "roadmap";
+  const roadmapHref = `/book/${bookId}/roadmap${
+    phase ? `?phase=${encodeURIComponent(phase)}` : ""
+  }`;
+
   // Otherwise: back into the editor at the chapter last open, or the first one.
   const resumeId = book.chapters.some((c) => c.id === book.lastOpenedId)
     ? book.lastOpenedId
     : (book.chapters[0]?.id ?? null);
-  const backHref = cameFromShelf
-    ? "/"
-    : resumeId
-      ? `/book/${bookId}/chapter/${resumeId}`
-      : `/book/${bookId}`;
-  const backLabel = cameFromShelf ? "Back to your books" : "Back to editing";
+  const backHref = cameFromRoadmap
+    ? roadmapHref
+    : cameFromShelf
+      ? "/"
+      : resumeId
+        ? `/book/${bookId}/chapter/${resumeId}`
+        : `/book/${bookId}`;
+  const backLabel = cameFromRoadmap
+    ? "Back to the roadmap"
+    : cameFromShelf
+      ? "Back to your books"
+      : "Back to editing";
 
   const dark = prefs.paper === "slate" || prefs.paper === "black";
 

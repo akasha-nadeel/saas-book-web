@@ -103,6 +103,21 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
 
       <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
         {heading}
+
+        {/* `ToolHeader` is suppressed in the roadmap's panel and it was the
+            only place this screen said what the question actually is — so the
+            panel opened on "Check the title" and a text box, with the premise
+            missing. */}
+        {embedded && (
+          <p className="-mt-2 mb-2 max-w-2xl text-sm text-muted">
+            {/* Explicit space: the one after `</em>` is swallowed when the
+                line wraps, which set this as "taken— titles". */}
+            No title is <em>taken</em>{" "}
+            &mdash; titles cannot be copyrighted. The useful question is whether
+            somebody else&rsquo;s book turns up first when a reader searches for
+            yours.
+          </p>
+        )}
         <form
           className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {
@@ -134,6 +149,23 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
           </p>
+        )}
+
+        {/* What pressing the button will show, before it has been pressed.
+        
+            The screen was a box, a caveat and half a page of nothing — and the
+            caveat was written to be read *beside results*, so arriving at it
+            cold explained a judgement the writer had not been given yet. */}
+        {state === "idle" && !error && (
+          <div className="mt-6 rounded-xl border border-dashed border-line bg-surface p-5">
+            <p className="text-sm font-semibold text-fg">
+              Books already published under that name.
+            </p>
+            <p className="mt-1.5 max-w-2xl text-sm text-muted">
+              From Google Books and Open Library, newest first, with the author
+              and year so you can see who you would be standing next to.
+            </p>
+          </div>
         )}
 
         {state === "done" && clashes && clashes.length === 0 && (
@@ -210,12 +242,16 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
           </>
         )}
 
-        <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
-          We do not tell you whether to change it. Sharing a title with an
-          obscure book from 1974 is nothing; sharing one with a bestseller in
-          your own genre is a real problem, and you can tell which of those you
-          are looking at faster than any rule we could write.
-        </p>
+        {/* Only alongside results. It is advice about *reading* a list, and
+            it ran on an empty screen where there was no list to read. */}
+        {state === "done" && !error && (
+          <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
+            We do not tell you whether to change it. Sharing a title with an
+            obscure book from 1974 is nothing; sharing one with a bestseller in
+            your genre is a real problem — and you can tell which you are
+            looking at faster than any rule we could write.
+          </p>
+        )}
       </div>
     </div>
   );

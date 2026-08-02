@@ -31,8 +31,6 @@ import {
   type BookView,
 } from "@/lib/library-store";
 import {
-  checkup,
-  countFindings,
   fromReadiness,
   type Finding,
   type FindingLevel,
@@ -841,27 +839,58 @@ function Overview({
   );
 
   /**
-   * The diagnosis: what is wrong with this book, and where each is fixed.
+   * What Prepare will actually show for this book.
    *
-   * `checkup` is pure and tested, and it is the whole of the thinking — this
-   * component decides nothing about severity, order or destinations. Cheap
-   * enough to run on a shelf change: `hasCover` tests for the key rather than
-   * fetching a 250KB data URL, the chapter count is denormalised into the
-   * shelf, and no manuscript is parsed to draw this screen.
+   * The banner counts *this* and not `checkup()`, because the button under it
+   * says "See them in Prepare" — and a count that does not match the list it
+   * promises is a broken promise the moment somebody presses it.
+   *
+   * The two differ for a good reason. `checkup` withholds advisory findings
+   * until the book reaches a selling phase, so a writer on chapter three is
+   * not scolded about an ISBN; `Prepare` runs `storeReadiness()` raw. That
+   * gate is worth keeping — but it was making this card claim *"the listing
+   * details are in order"* about a book Prepare listed two outstanding things
+   * for. The gate may decide what to *raise*; it may not make the screen say
+   * something untrue.
+   *
+   * So the all-clear is now earned rather than assumed: green means nothing is
+   * outstanding at all, and anything withheld shows as a count without being
+   * spelled out — which is the quiet version of the same fact, and the reason
+   * the gate existed.
    */
-  const findings = useMemo(
-    () =>
-      book
-        ? checkup({
-            book,
-            hasCover: hasCover(book.id),
-            chapterCount: book.chapters.filter((c) => c.words > 0).length,
-            arcCount: readers.get(book.id)?.length ?? 0,
-          })
-        : [],
-    [book, readers],
-  );
-  const counts = useMemo(() => countFindings(findings), [findings]);
+  /**
+   * The banner the writer has waved away, and exactly which one.
+   *
+   * A dismissal here is not "hide this box forever" — this is the first screen
+   * a writer sees and the one place the app says a shop would refuse their
+   * book, so a permanent hide would let a *new* blocking problem arrive
+   * silently behind an X pressed weeks ago. The signature is the book and its
+   * two counts, so waving away "1 to fix · 4 worth doing" hides exactly that,
+   * and the moment the situation changes the banner returns with the new
+   * figures.
+   *
+   * Deliberately not persisted. It lasts while the writer is on the screen,
+   * which is what "I have read it" means, and it comes back on a fresh visit —
+   * the safe direction for a diagnosis to fail in, and one that needs no new
+   * key in a store that does not sync.
+   */
+  const [waved, setWaved] = useState<string | null>(null);
+
+  const counts = useMemo(() => {
+    if (!book) return { fix: 0, note: 0 };
+    const issues = storeReadiness({
+      book,
+      ...(book.publishing ? { meta: book.publishing } : {}),
+      hasCover: hasCover(book.id),
+      chapterCount: book.chapters.filter((c) => c.words > 0).length,
+      // The two that need the manuscript are the export screen's job.
+      brokenImages: 0,
+    });
+    return {
+      fix: issues.filter((i) => i.level === "blocking").length,
+      note: issues.filter((i) => i.level === "advisory").length,
+    };
+  }, [book]);
 
   const steps = useMemo(
     () => (book ? roadmapFor(book, book.roadmapDone ?? []) : []),
@@ -1022,6 +1051,7 @@ function Overview({
                   first screen a writer sees it would be the most damaging place
                   to print one. Two counts and a way to the detail say more and
                   claim less. */}
+              {waved !== `${book.id}:${counts.fix}:${counts.note}` && (
               <div
                 className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
                             border px-3.5 py-3 ${
@@ -1051,8 +1081,13 @@ function Overview({
                       </span>
                     </>
                   ) : counts.note > 0 ? (
+                    /* True and incomplete on purpose: nothing is *blocking*,
+                       and there is still work. Saying only the first half is
+                       how this card came to claim a book was in order while
+                       Prepare listed two things for it. */
                     <span className="text-note-fg">
-                      <strong>Nothing would stop a shop</strong> taking it.
+                      <strong>Nothing would stop a shop</strong> taking it, but
+                      there is more to do.
                     </span>
                   ) : (
                     /* The one verdict on this screen worth colouring, and it is
@@ -1095,7 +1130,43 @@ function Overview({
                     See them in Prepare →
                   </button>
                 )}
+
+                {/* Waving it away, and only here.
+                
+                    The Prepare rows keep theirs: that screen *is* the list, and
+                    a dismissable row on it would be a way to lose work rather
+                    than a way to stop being told. This one is a summary on a
+                    dashboard, and a writer who has read it should be able to
+                    put it down. */}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setWaved(`${book.id}:${counts.fix}:${counts.note}`)
+                  }
+                  aria-label="Dismiss until this changes"
+                  title="Dismiss until this changes"
+                  className={`shrink-0 rounded-md p-1 transition-opacity hover:opacity-70 ${
+                    counts.fix > 0
+                      ? "text-stop-fg"
+                      : counts.note > 0
+                        ? "text-note-fg"
+                        : "text-ok-fg"
+                  }`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    className="h-[15px] w-[15px]"
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
               </div>
+              )}
 
               {/* The three verbs for a book, then ⋯.
 
@@ -1164,14 +1235,25 @@ function Overview({
                       >
                         Details
                       </MenuButton>
+                      {/* "Edit", because it is one.
+                      
+                          This sat directly under "Details" and was called
+                          "Book details" — two near-identical names, one of
+                          which opens a read-only card and the other a form
+                          with Save and Cancel. Nothing in either label said
+                          which was which, so the only way to find the edit
+                          screen was to open both. A menu item is a promise
+                          about what happens next; this one now keeps it, and
+                          takes the pencil so the pair differ by mark as well
+                          as by word. */}
                       <MenuButton
-                        icon={shelfIcons.image}
+                        icon={shelfIcons.write}
                         onClick={() => {
                           onCover(book);
                           close();
                         }}
                       >
-                        Book details
+                        Edit title, author and cover
                       </MenuButton>
                     </>
                   )}
@@ -2008,13 +2090,13 @@ function Write({
                             Details
                           </MenuButton>
                           <MenuButton
-                            icon={shelfIcons.image}
+                            icon={shelfIcons.write}
                             onClick={() => {
                               onCover(book);
                               close();
                             }}
                           >
-                            Book details
+                            Edit title, author and cover
                           </MenuButton>
 
                           {/* Below the line, and the destructive one is

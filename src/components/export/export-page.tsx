@@ -403,18 +403,34 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     <main
       className={`flex ${embedded ? "h-full" : "h-dvh"} overflow-hidden bg-panel`}
     >
-      <Rail
-        book={book}
-        bookId={bookId}
-        cover={cover}
-        blocking={blocking}
-        groups={groups}
-        currentId={step.id}
-        currentIndex={index}
-        steps={steps}
-        onGo={(id) => go(steps.findIndex((s) => s.id === id))}
-        from={from}
-      />
+      {/* No rail in the panel.
+
+          The rail is this screen's table of contents, and it earns its 18rem
+          when the screen owns the window. Inside the roadmap's panel it is a
+          sidebar within a sidebar: the roadmap is already the navigation on
+          the left, the panel is already half the width, and the rail took most
+          of what was left — the format cards ended up in a column narrow
+          enough to break "How do you want it?" over three lines.
+
+          Nothing is lost that the writer needs there. The rail's job is
+          *where am I and what is left*, and the header below answers both in a
+          line; its steps are reachable with Previous and Continue, which is
+          how a wizard is walked anyway. The book chip and "All tools" are
+          chrome the panel already provides. */}
+      {!embedded && (
+        <Rail
+          book={book}
+          bookId={bookId}
+          cover={cover}
+          blocking={blocking}
+          groups={groups}
+          currentId={step.id}
+          currentIndex={index}
+          steps={steps}
+          onGo={(id) => go(steps.findIndex((s) => s.id === id))}
+          from={from}
+        />
+      )}
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Above this screen's own Back/step header rather than inside it: the
@@ -454,8 +470,20 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                 Previous
               </span>
             </button>
-          ) : (
-            <span className="font-sans text-sm text-muted lg:hidden">
+          ) : null}
+
+          {/* "Where am I", which the rail carries when there is a rail.
+              Below `lg` there never is one; in the panel there is no longer
+              one either, and a wizard that cannot say which step you are on is
+              a wizard you cannot tell you are near the end of. Shown beside
+              Previous rather than instead of it, so the count does not vanish
+              the moment you move off the first step. */}
+          {(index === 0 || embedded) && (
+            <span
+              className={`font-sans text-sm text-muted ${
+                embedded ? "" : "lg:hidden"
+              }`}
+            >
               Step {index + 1} of {steps.length}
             </span>
           )}

@@ -5,6 +5,7 @@ import {
   SUPABASE_URL,
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
+import { safeNext } from "@/lib/auth-redirect";
 
 /**
  * Session refresh, and the sign-in wall.
@@ -99,11 +100,34 @@ export async function proxy(request: NextRequest) {
     return withCookies(NextResponse.redirect(url), response);
   }
 
-  // A signed-in writer has no use for the sign-in screen.
+  /*
+   * A signed-in writer has no use for the sign-in screen — but they may have
+   * been sent to it by the rule above, and in that case they asked for
+   * somewhere.
+   *
+   * **This dropped the destination it had just written.** An access token
+   * expires roughly hourly, and the request that discovers it is the one the
+   * writer made: the gate above sees no claims yet, bounces them to
+   * `/signin?next=<where they were going>`, and by the time that request
+   * arrives the refreshed cookie has landed — so this rule fires, sent them to
+   * `/`, and the `next` was thrown away one line after being set. From the
+   * writer's side a link simply stopped working and dumped them on the
+   * dashboard, which is exactly the "logged out at random" failure this proxy
+   * exists to prevent, wearing a different hat.
+   *
+   * `safeNext()` is the guard that already exists for this parameter: rooted
+   * same-site paths only, so `//evil`, a protocol-relative host and anything
+   * with a backslash all collapse to `/`. Anyone can put anything in a query
+   * string, and this one is now acted on rather than ignored.
+   */
   if (signedIn && (pathname === "/signin" || pathname === "/signup")) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/";
-    url.search = "";
+    const next = safeNext(request.nextUrl.searchParams.get("next"));
+    const url = new URL(next, request.nextUrl.origin);
+    // A `next` pointing back at the door would bounce forever.
+    if (url.pathname === "/signin" || url.pathname === "/signup") {
+      url.pathname = "/";
+      url.search = "";
+    }
     return withCookies(NextResponse.redirect(url), response);
   }
 

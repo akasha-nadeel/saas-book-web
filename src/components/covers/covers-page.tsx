@@ -55,6 +55,8 @@ function CoverChecker() {
   const [facts, setFacts] = useState<CoverFacts | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
 
   async function read(file: File) {
     setError(null);
@@ -109,24 +111,64 @@ function CoverChecker() {
   const findings = facts ? checkCover(facts) : [];
 
   return (
-    <section className="mt-12 border-t border-line pt-8">
+    <section className="mt-6">
       <h2 className="text-xl font-extrabold text-fg">Check the file</h2>
       <p className="mt-2 max-w-2xl text-muted">
-        Drop in the artwork you are about to upload and this will say whether a
-        shop refuses it. Check the real file, not the copy stored here — this
-        app compresses covers to fit in your browser, so its version would fail
-        a size check it was never meant to pass.
+        Whether a shop would refuse the artwork. Use your original file, not
+        the compressed copy stored here — that one would fail on size.
       </p>
 
-      <input
-        type="file"
-        accept="image/*"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void read(file);
+      {/* A real drop target, because the sentence above promises one.
+          
+          This was a bare `<input type="file">`, which the browser draws as
+          "Choose File | No file chosen" — the one undesigned control on a
+          screen about how things look, under a line inviting the writer to
+          *drop* a file on something that could not be dropped on. The words
+          and the control now agree, and clicking still opens the picker,
+          because the label wraps the input rather than replacing it. */}
+      <label
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
         }}
-        className="mt-4 text-sm text-fg"
-      />
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) {
+            setName(file.name);
+            void read(file);
+          }
+        }}
+        className={`mt-4 flex cursor-pointer flex-col items-center gap-1.5 rounded-xl
+                    border-2 border-dashed px-6 py-7 text-center transition-colors ${
+                      dragging
+                        ? "border-accent bg-accent/8"
+                        : "border-line bg-surface hover:border-accent/50"
+                    }`}
+      >
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+              setName(file.name);
+              void read(file);
+            }
+          }}
+          className="sr-only"
+        />
+        <span className="text-sm font-semibold text-fg">
+          {name ?? "Drop your cover here, or choose a file"}
+        </span>
+        <span className="text-xs text-muted">
+          {name
+            ? "Drop another to check it instead."
+            : "The file you are about to upload — not the copy stored here."}
+        </span>
+      </label>
 
       {error && <p className="mt-4 text-sm text-fg">{error}</p>}
 
@@ -149,8 +191,9 @@ function CoverChecker() {
 
             {findings.length === 0 ? (
               <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-                Nothing a shop would refuse, and nothing worth flagging. That is
-                the file checked — whether the cover works is the wall above.
+                Nothing a shop would refuse, and nothing worth flagging. That
+                is the <em>file</em> checked. Whether the cover works is a
+                different question, and the shelf above is how you answer it.
               </p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
@@ -211,6 +254,26 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
   const [size, setSize] = useState<SizeId>("thumb");
+
+  /**
+   * Which half of this tool is on screen.
+   *
+   * The two do different work with different inputs, and stacked in one column
+   * the second was always below the fold — a writer who came to check a file
+   * before uploading had to scroll past a whole wall of other people's covers
+   * to find out the checker existed. They are also used one at a time and
+   * minutes apart: you look at the shelf while deciding what to commission,
+   * and you check a file the day you have one.
+   *
+   * A segmented control is the pattern every tool with two parallel modes
+   * settles on, and this file already owns one for the wall's sizes — so the
+   * same control means the same thing twice on one screen rather than
+   * introducing a second idea of what "pick a view" looks like.
+   *
+   * The shelf leads because it is what the step is called: "Get a cover made"
+   * is answered by looking at the ones that sell, not by validating a PNG.
+   */
+  const [half, setHalf] = useState<"shelf" | "file">("shelf");
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );
@@ -279,6 +342,48 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
 
       <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {heading}
+
+        {/* The line the header carries when this screen owns the window.
+        
+            `ToolHeader` is suppressed in the roadmap's panel, and it was the
+            only place this tool said what it is for — so the panel opened on a
+            title, a search box and a file field, with nothing explaining why a
+            screen called "Get a cover made" was asking to search. The panel
+            gets the sentence too, since it is the frame that lost it. */}
+        {embedded && (
+          <p className="-mt-2 mb-6 max-w-2xl text-sm text-muted">
+            Your cover, next to the shelf it has to sit on.
+          </p>
+        )}
+        <div
+          role="tablist"
+          aria-label="Cover tools"
+          className="mt-6 flex gap-1 rounded-lg border border-line bg-panel p-1"
+        >
+          {(
+            [
+              ["shelf", "The shelf"],
+              ["file", "Check a file"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={half === id}
+              onClick={() => setHalf(id)}
+              className={`flex-1 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                half === id
+                  ? "bg-accent text-accent-ink"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div hidden={half !== "shelf"}>
         <form
           className="mt-6 flex flex-wrap gap-2"
           onSubmit={(e) => {
@@ -307,6 +412,26 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
           </p>
+        )}
+
+        {/* What the button is for, before it has been pressed.
+        
+            The screen opened on a heading, a search box and nothing else — so
+            a writer arriving from "Get a cover made" was shown a text field
+            and left to guess what searching had to do with it. The wall is the
+            whole point of this tool and it was invisible until you had already
+            worked out how to summon it. */}
+        {wall.length === 0 && state !== "loading" && !error && (
+          <div className="mt-6 rounded-xl border border-dashed border-line bg-surface p-5">
+            <p className="text-sm font-semibold text-fg">
+              We do not design covers.
+            </p>
+            <p className="mt-1.5 max-w-2xl text-sm text-muted">
+              Press <strong className="text-fg">Show me the shelf</strong> to
+              see yours beside the covers already selling in your genre, at the
+              size a reader meets them.
+            </p>
+          </div>
         )}
 
         {wall.length > 0 && (
@@ -386,14 +511,24 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
           </p>
         )}
 
-        <CoverChecker />
-
+        {/* Only once there is a wall to describe. It ran unconditionally, so
+            a writer who had not searched yet read a paragraph about "the wall"
+            and the fact that it is not scored, with nothing on screen it could
+            be about. */}
+        {wall.length > 0 && (
         <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
           Covers are shown from Google Books and Open Library, at the size a
           reader meets them. The wall is not scored — a number comparing your
           cover to a genre would be invented to look like an answer. Look at the
           wall, then look at yours.
         </p>
+        )}
+        </div>
+
+        <div hidden={half !== "file"}>
+          <CoverChecker />
+        </div>
+
       </div>
     </div>
   );

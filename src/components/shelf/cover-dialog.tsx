@@ -79,7 +79,7 @@ export function CoverDialog({
                  p-0 text-fg backdrop:bg-black/70"
     >
       <form onSubmit={save} className="p-7">
-        <h2 className="font-serif text-xl">Book details</h2>
+        <h2 className="font-serif text-xl">Edit book details</h2>
         <p className="mt-1 font-sans text-sm text-muted">
           What this book is, and how it appears on your shelf.
         </p>

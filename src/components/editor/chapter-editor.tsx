@@ -423,7 +423,7 @@ export function ChapterEditor({
               type="button"
               onClick={() => setEditingCover(true)}
               aria-label={`Edit the cover of ${book.title}`}
-              title="Book details"
+              title="Edit book details"
               className="block w-10 shrink-0 rounded-md outline-none
                        transition-transform hover:-translate-y-0.5
                        focus-visible:ring-2 focus-visible:ring-accent/60"

@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LoadingScreen } from "@/components/loading-screen";
-import { ToolHeader } from "@/components/tool-header";
+import { BookCover } from "@/components/shelf/book-cover";
 import { StepPanelTool, panelToolFor } from "@/components/roadmap/step-panel";
-import { findBook, setRoadmapStep } from "@/lib/library-store";
+import { bookWordCount, findBook, setRoadmapStep } from "@/lib/library-store";
 import {
   PHASES,
   progressOf,
@@ -14,7 +14,7 @@ import {
   type Phase,
   type StepState,
 } from "@/lib/roadmap";
-import { useHydrated, useShelf } from "@/lib/use-library";
+import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 /**
  * Blank page to published, in the order it has to happen.
@@ -64,6 +64,7 @@ import { useHydrated, useShelf } from "@/lib/use-library";
 export function RoadmapPage({ bookId }: { bookId: string }) {
   const hydrated = useHydrated();
   const shelf = useShelf();
+  const cover = useCover(bookId);
   const book = findBook(shelf, bookId);
 
   const steps = useMemo(
@@ -72,9 +73,10 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
   );
   const progress = useMemo(() => progressOf(steps), [steps]);
 
-  // Counted rather than written down, so the sentence below cannot go stale
-  // the way "most of this ticks itself" did.
-  const automatic = steps.filter((s) => s.automatic).length;
+  /* `automatic` was counted here for the paragraph that explained which ticks
+     work themselves out. That paragraph is gone with the rest of the header —
+     the rows say "ticks itself" on the steps it applies to, which is the same
+     fact where it can be acted on rather than three lines above. */
 
   /** Each phase with its steps and tally, in road order. Drawn twice — the
    *  strip reads the counts, the panel reads the steps of one of them. */
@@ -175,7 +177,6 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
     );
   }
 
-  const nextHref = progress.next?.href?.(bookId);
   const share = Math.round((progress.done / progress.total) * 100);
 
   const split = Boolean(openTool);
@@ -219,117 +220,82 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
                         : "w-full"
                     }`}
       >
-        {/* Which book this is. Shared by every tool screen, because they all open
-            full-window with none of the dashboard around them, and the Tools area
-            lets a writer change book before opening one. */}
-        <ToolHeader
-          book={book}
-          tool="Roadmap"
-          title="Blank page to published"
-          width={split ? "full" : "3xl"}
-        >
-          The order it actually has to happen in — including the step almost
-          everybody finds out about too late.
-        </ToolHeader>
+        {/* ---- One strip, instead of three blocks -------------------------
+
+            This screen opened with a full `ToolHeader` (cover, title, a line of
+            explanation), then a progress card (a big "5 of 18", a bar, a
+            percentage, the next step), then a paragraph about which ticks are
+            automatic. Three stacked blocks, most of a screen, before the road
+            itself began — on a page whose entire job is to show eighteen steps
+            in order. On the panel's half-width column it was worse: the first
+            actual step sat below the fold.
+
+            All of it collapses into one line. The cover shrinks to an icon
+            because it is an *identifier* here, not a subject — the writer knows
+            which book they are in, and the breadcrumb says so anyway. The
+            counts survive as text, which is all they ever were: "5 of 18" and
+            "28%" are two numbers, and they had a card each. */}
+        <header className="sticky top-0 z-10 border-b border-line bg-panel/95 px-6 py-2.5 backdrop-blur">
+          <div className={`flex items-center gap-3 ${split ? "" : "mx-auto max-w-3xl"}`}>
+            <Link
+              href={`/book/${book.id}`}
+              aria-label={`Open ${book.title}`}
+              className="w-7 shrink-0 overflow-hidden rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.2)]
+                         transition-transform hover:-translate-y-0.5"
+            >
+              <BookCover
+                title={book.title}
+                words={bookWordCount(book)}
+                seed={book.id}
+                image={cover}
+                {...(book.subtitle ? { subtitle: book.subtitle } : {})}
+                {...(book.author ? { author: book.author } : {})}
+                {...(book.bareCover ? { bare: true } : {})}
+              />
+            </Link>
+
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-fg">
+                Blank page to published
+              </p>
+              <p className="truncate text-xs text-muted">
+                {book.title} · {progress.done} of {progress.total} steps ·{" "}
+                {share}% of the way
+              </p>
+            </div>
+
+            <Link
+              href="/?area=tools"
+              className="shrink-0 text-xs font-semibold text-muted hover:text-fg"
+            >
+              ← All tools
+            </Link>
+          </div>
+        </header>
 
         <div
-          className={`px-6 pt-6 pb-16 ${split ? "" : "mx-auto max-w-3xl"}`}
+          className={`px-6 pt-5 pb-16 ${split ? "" : "mx-auto max-w-3xl"}`}
         >
-        {/* ---- Where you are ---------------------------------------------
-            The next step is a button, not a sentence. It is the one thing a
-            writer opens this page to find, and reading its name only to go
-            hunting for the same name further down is the work this card exists
-            to save. Its explanation is gone from here too — it appeared twice
-            on one screen, once in this card and again in the step's own row. */}
-        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 px-5 py-4">
-            <div className="min-w-[8rem]">
-              <p className="text-2xl font-extrabold text-fg">
-                {progress.done}
-                <span className="text-base font-bold text-muted">
-                  {" "}
-                  of {progress.total}
-                </span>
-              </p>
-              <p className="text-xs text-muted">steps done</p>
-            </div>
+        {/* ---- The road, as a stepper -------------------------------------
 
-            <div className="min-w-[10rem] flex-1">
-              <div
-                className="h-2 w-full overflow-hidden rounded-full bg-raised"
-                role="progressbar"
-                aria-valuenow={progress.done}
-                aria-valuemin={0}
-                aria-valuemax={progress.total}
-              >
-                <div
-                  className="h-full rounded-full bg-accent transition-[width]"
-                  style={{ width: `${share}%` }}
-                />
-              </div>
-              <p className="mt-1.5 text-xs text-muted">{share}% of the way</p>
-            </div>
-          </div>
+            A rail of segments rather than five stacked bars. The bars were an
+            improvement on five boxes that could not fit, but they still cost a
+            line each — five rows of chrome above a list that is itself rows,
+            which on the panel's column pushed the first step off the screen.
 
-          {progress.next ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line bg-surface px-5 py-3.5">
-              <span className="text-xs font-bold tracking-widest text-muted uppercase">
-                Next
-              </span>
-              <span className="min-w-0 flex-1 truncate font-semibold text-fg">
-                {progress.next.title}
-              </span>
-              {nextHref && (
-                <Link
-                  href={nextHref}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
-                >
-                  Do this
-                </Link>
-              )}
-            </div>
-          ) : (
-            <p className="border-t border-line bg-surface px-5 py-3.5 font-semibold text-fg">
-              Every step done. That is the whole list.
-            </p>
-          )}
-        </section>
+            The segment is the bar: a hairline that fills with the phase's own
+            progress, with the station under it. That is the shape every
+            multi-step flow uses, and it is *horizontal* here for the reason
+            the boxes were: these are in an order, and a row says so where a
+            stack says only "five things".
 
-        {/* Said once, here, rather than on all eighteen rows. */}
-        <p className="mt-4 text-sm text-muted">
-          {automatic} of these work themselves out from what is in your book,
-          and are marked <em>ticks itself</em>. The other{" "}
-          {progress.total - automatic} happen somewhere else, so they are yours
-          to tick — and those ticks stay on this machine rather than syncing to
-          your other ones.
-        </p>
-
-        {/* ---- The order, all of it, always ------------------------------
-
-            Five stations with their tallies. This is the half of the page
-            that carries the claim — a writer can see the whole road and where
-            on it they stand without reading eighteen steps to work it out.
-
-            Scrolls sideways on a narrow screen rather than wrapping to two
-            rows: a line that wraps stops looking like a line, and the shape is
-            doing the explaining here. */}
-        {/* Five bars, stacked, each filled by its own progress.
-
-            They were five boxes in a row, which is the shape that cannot
-            survive this page: the column is a third of the screen once a step
-            is open, five cards do not fit in it at any label length, and what
-            a reader got was a horizontal scrollbar under the one control that
-            is supposed to show the whole road at a glance. A thing you have to
-            scroll to see all of is not an overview.
-
-            Stacked bars have no such width to lose. Every phase is one full
-            line at any container size — no truncation, no scrollbar, nothing
-            to fit — and the fill turns the tally into something readable
-            before it is read, which the boxes never did. It also stops being
-            five competing cards and starts looking like a route, which is what
-            it is. */}
-        <nav aria-label="Phases" className="mt-6 flex flex-col gap-1.5">
-          {phases.map((phase, i) => {
+            It fits at this size where the boxes did not because a segment has
+            no box to fit — the label may truncate and the line still reads.
+            The mark carries the state for anyone who cannot see the fill: a
+            tick for done, a filled ring for where you are, an empty one for
+            what is ahead. */}
+        <nav aria-label="Phases" className="flex gap-2">
+          {phases.map((phase) => {
             const isOpen = phase.id === open;
             const share =
               phase.steps.length > 0
@@ -341,62 +307,52 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
                 type="button"
                 onClick={() => setPicked(phase.id)}
                 aria-current={isOpen ? "step" : undefined}
-                className={`relative overflow-hidden rounded-lg border px-3 py-2 text-left
-                            transition-colors ${
-                              isOpen
-                                ? "border-accent bg-panel"
-                                : "border-line bg-panel hover:border-accent/40"
-                            }`}
+                title={`${phase.label} — ${
+                  phase.complete ? "done" : `${phase.done} of ${phase.steps.length}`
+                }`}
+                className="group min-w-0 flex-1 text-left"
               >
-                {/* The bar itself. A wash rather than a hairline strip, so the
-                    row *is* the measure and there is no second element to keep
-                    in step with the number beside it. */}
-                <span
-                  aria-hidden="true"
-                  className={`absolute inset-y-0 left-0 ${
-                    phase.complete ? "bg-ok-fg/12" : "bg-accent/10"
-                  }`}
-                  style={{ width: `${share}%` }}
-                />
+                <span className="block h-[3px] overflow-hidden rounded-full bg-raised">
+                  <span
+                    className={`block h-full rounded-full ${
+                      phase.complete ? "bg-ok-fg" : "bg-accent"
+                    }`}
+                    style={{ width: `${share}%` }}
+                  />
+                </span>
 
-                <span className="relative flex items-center gap-2.5">
+                <span className="mt-2 flex items-center gap-1.5">
                   <span
                     aria-hidden="true"
-                    className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold ${
-                      phase.complete
-                        ? "bg-ok-fg text-panel"
-                        : isOpen
-                          ? "bg-accent text-accent-ink"
-                          : "bg-raised text-muted"
-                    }`}
+                    className={`grid h-[15px] w-[15px] shrink-0 place-items-center rounded-full
+                                text-[8px] font-bold ${
+                                  phase.complete
+                                    ? "bg-ok-fg text-panel"
+                                    : isOpen
+                                      ? "bg-accent text-accent-ink"
+                                      : "border-2 border-line"
+                                }`}
                   >
-                    {phase.complete ? "✓" : i + 1}
+                    {phase.complete ? "✓" : isOpen ? "" : ""}
                   </span>
                   <span
-                    className={`min-w-0 flex-1 truncate text-xs font-bold ${
-                      isOpen ? "text-fg" : "text-muted"
+                    className={`truncate text-[11px] font-semibold ${
+                      isOpen
+                        ? "text-fg"
+                        : "text-muted group-hover:text-fg"
                     }`}
                   >
                     {phase.label}
                   </span>
                   {/* Where the road actually is, which is not always what is
                       open — a writer browsing ahead should still be able to
-                      see their own position without leaving the page. */}
-                  {phase.id === here && (
+                      see their own position. */}
+                  {phase.id === here && !isOpen && (
                     <span
-                      className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
-                      title="You are here"
+                      aria-hidden="true"
+                      className="h-1 w-1 shrink-0 rounded-full bg-accent"
                     />
                   )}
-                  <span
-                    className={`shrink-0 text-[11px] font-semibold ${
-                      phase.complete ? "text-ok-fg" : "text-muted"
-                    }`}
-                  >
-                    {phase.complete
-                      ? "done"
-                      : `${phase.done} of ${phase.steps.length}`}
-                  </span>
                 </span>
               </button>
             );
@@ -432,6 +388,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
                 last={i === current.steps.length - 1}
                 active={openStep?.id === step.id}
                 onOpen={() => setPanel(step.id)}
+                phase={open}
               />
             ))}
           </ul>
@@ -591,9 +548,12 @@ function Row({
   last,
   onOpen,
   active,
+  phase,
 }: {
   step: StepState;
   bookId: string;
+  /** The open phase, so a step that navigates away can point the way back. */
+  phase: string;
   /** The first unfinished step in the whole list. */
   next: boolean;
   /** Last in its phase, so the rail stops here. */
@@ -691,8 +651,14 @@ function Row({
             </button>
           ) : (
             href && (
+              /* The two that leave — the editor and the reading view — mark
+                 the door they came out of. Both take the whole window by
+                 design, and until now that was a one-way trip: a writer who
+                 pressed "Read it end to end" from the road had no route back
+                 to it. The phase rides along so the way back lands where they
+                 left rather than at step one. */
               <Link
-                href={href}
+                href={`${href}${href.includes("?") ? "&" : "?"}from=roadmap&phase=${phase}`}
                 className="ml-auto text-xs font-semibold text-accent"
               >
                 Open →
@@ -706,3 +672,4 @@ function Row({
     </li>
   );
 }
+
