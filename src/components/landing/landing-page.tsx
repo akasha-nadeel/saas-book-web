@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
-import { displayPrice, perMonthOf } from "@/lib/billing/plans";
+import { LandingHeader } from "@/components/landing/landing-header";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
@@ -43,7 +43,7 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * claims what the app cannot do, and nothing stays under the "Not built yet"
  * badge once it ships. That second half fails silently and has been wrong once
  * already, so walk the badges whenever a feature lands. The phases, the step
- * counts, the tool list and the price are all imported rather than restated,
+ * counts and the tool list are all imported rather than restated,
  * which is the shape to prefer for any new figure here.
  */
 
@@ -63,20 +63,35 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  *   ladder the app itself uses (`stop` / `note` / `ok` tokens). Red is
  *   *would be refused*, amber is *costs you readers*, green is *free, passed,
  *   nothing owed*. They never appear as decoration, only as verdicts.
- * - `PAPER` warms the alternating bands. A cold grey band reads as a dashboard;
- *   a warm one reads as stock, which is what a book is printed on and free
- *   atmosphere for a product about books.
+ * - The tinted grounds are `INK` itself with the volume down — see the note
+ *   under the constants. One colour at four volumes, not a hue plus a neutral.
  *
  * The emotional arc down the page is deliberate: red where the fear is named,
- * amber where the cost is, green at the price and the all-clear, indigo on
- * every way forward.
+ * amber where the cost is, green where something has passed or been earned,
+ * indigo on every way forward.
  */
 const INK = "#312e81"; // indigo-900 — actions and links
 const STOP = "#b91c1c"; // would be refused
 const WARN = "#b45309"; // costs you readers
 const PASS = "#15803d"; // free, passed, earned
-// The warm band is `bg-[#faf9f7]` at each site rather than a constant: Tailwind
-// reads class names as literals and would ship no rule for one built at runtime.
+
+/*
+ * The two tinted grounds, and both are `INK` with the volume down.
+ *
+ * `#eeeef5` is INK at about 8% on white and backs the hero; `#f7f7fb` is the
+ * same at about 4% and backs the alternating bands. Tinting the *brand* colour
+ * rather than reaching for a neutral is what makes a page feel designed instead
+ * of assembled: the hero, the lit card and the section grounds are then one
+ * colour at four volumes, and the eye reads that as intent.
+ *
+ * They were a warm paper grey, which was pleasant and wrong — a warm ground
+ * under a cool indigo card is two colour systems in one viewport, and it is the
+ * kind of mismatch nobody can name but everybody feels.
+ *
+ * Written at each site as literal classes rather than held here as constants:
+ * Tailwind reads class names as literals and would ship no rule for a name
+ * built at runtime.
+ */
 
 const FREE_LINE =
   "Writing, your shelf, syncing and all four export formats are free, and stay free.";
@@ -310,8 +325,6 @@ const FAQ = [
 ] as const;
 
 export function LandingPage() {
-  const monthly = displayPrice(perMonthOf("monthly"));
-
   return (
     // `<body>` is overflow-hidden for the editor shell, so this page owns its
     // own scrolling. `min-h-dvh` would put the footer out of reach.
@@ -320,40 +333,7 @@ export function LandingPage() {
     // the reader has chosen inside the app — including a reader who has never
     // been inside it.
     <div className="h-dvh overflow-y-auto bg-white text-[#5b5b63] [scroll-behavior:smooth]">
-      <header className="sticky top-0 z-50 border-b border-[#ececee] bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
-          <Link
-            href="/"
-            className="font-serif text-lg font-semibold tracking-tight text-[#0f0f10]"
-          >
-            OpenChapter
-          </Link>
-          <nav className="flex items-center gap-6 font-sans text-sm">
-            <a href="#order" className="hidden sm:inline hover:text-[#0f0f10]">
-              The order
-            </a>
-            <a href="#does" className="hidden sm:inline hover:text-[#0f0f10]">
-              What it does
-            </a>
-            <a href="#tools" className="hidden sm:inline hover:text-[#0f0f10]">
-              Tools
-            </a>
-            <a href="#price" className="hidden sm:inline hover:text-[#0f0f10]">
-              Price
-            </a>
-            <Link href="/signin" className="hover:text-[#0f0f10]">
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              style={{ backgroundColor: INK }}
-              className="rounded-full px-4 py-2 font-semibold text-white hover:opacity-90"
-            >
-              Start free
-            </Link>
-          </nav>
-        </div>
-      </header>
+      <LandingHeader ink={INK} />
 
       <main>
         {/* ---- Hero -----------------------------------------------------
@@ -362,8 +342,8 @@ export function LandingPage() {
             the references use, and the right one: a reader who has been
             promised things by four other tools wants to see the thing before
             they read another adjective. */}
-        <section className="overflow-hidden border-b border-[#ececee] bg-[#faf9f7] px-6 pt-20 sm:pt-24">
-          <div className="mx-auto max-w-3xl text-center">
+        <section className="-mt-16 overflow-hidden border-b border-[#ececee] bg-[#eeeef5] px-6 pt-28 sm:pt-32">
+          <div className="mx-auto max-w-5xl text-center">
             {/* Two-tone, the way both references split a headline. There is no
                 accent hue in this product to split on, so the two lines split
                 on weight of ink: the quiet half sets up the loud one.
@@ -374,15 +354,41 @@ export function LandingPage() {
                 all made again below, where they land against something. The
                 first thing on the page should be the sentence the page is
                 about. */}
-            <h1 className="oc-display font-serif text-[3.5rem] leading-[1.02] font-semibold sm:text-7xl">
-              <span className="block text-[#a5a5ad]">Nobody tells you</span>
-              <span className="block text-[#0f0f10]">the order.</span>
+            {/* The problem, then the fix — which is the shape a headline has to
+                take for a reader who arrived with a rejection email.
+
+                Line one is the injury in the reader's own words: shops refuse
+                and do not say why, which is the single most enraging fact in
+                the research. Line two is the whole product in five words, and
+                it is checkable — the pre-upload check is a real screen that
+                names real refusals, so this promises nothing the code cannot do.
+
+                Earlier drafts led on "the order", which is the deeper truth and
+                the slower one: it needs a paragraph before it means anything.
+                Rejection needs none. The order is still the argument — it is
+                section 01, and the deck below hands off to it.
+
+                Line one is muted indigo rather than grey, so the two lines read
+                as one sentence in one colour at two volumes rather than as grey
+                text with a coloured answer stapled underneath. */}
+            <h1 className="oc-display font-serif text-[2.5rem] leading-[1.08] font-semibold sm:text-[3.5rem]">
+              <span className="block text-[#6e6c96]">
+                A shop refuses your book and never says why.
+              </span>
+              <span className="block" style={{ color: INK }}>
+                We tell you before you upload.
+              </span>
             </h1>
 
-            <p className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed">
-              Advance copies had to go out weeks before you published. The blurb
-              was eleven characters over a limit nobody mentioned. The cover was
-              the problem all along.
+            {/* The three commonest refusals, named. Concrete beats abstract
+                here: a reader who has had the email recognises their own one in
+                this list, and the last sentence hands off to section 01, which
+                is where the deeper argument lives. */}
+            <p className="oc-lead mx-auto mt-7 max-w-2xl font-serif text-xl leading-relaxed">
+              A missing cover. An ISBN with a bad check digit. A blurb eleven
+              characters over the limit. You find out weeks later, in an email
+              that does not say which — and by then you have also missed the
+              things nobody told you were coming.
             </p>
 
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
@@ -404,6 +410,19 @@ export function LandingPage() {
                 className="inline-flex items-center justify-center gap-2.5 rounded-full border border-[#dcdce0] bg-white px-7 py-3.5 font-semibold text-[#0f0f10] hover:border-[#b9b9c0]"
               />
             </div>
+
+            {/* Free, said once and immediately under the buttons.
+
+                This line used to live in the price section, and removing that
+                section took the word "free" off the page altogether — which is
+                the most persuasive true thing here and the cheapest to prove.
+                It belongs at the point of decision anyway: a reassurance is
+                worth most in the half-second before a click, not eight screens
+                below it. */}
+            <p className="mx-auto mt-6 max-w-lg text-sm leading-relaxed text-[#6b6b78]">
+              {FREE_LINE} No card, and nothing to unlock before you can publish
+              a finished book.
+            </p>
           </div>
 
           <DashboardFigure />
@@ -524,7 +543,7 @@ export function LandingPage() {
           tint
           figure={<OrderFigure />}
         >
-          <p className="text-lg leading-relaxed">
+          <p className="oc-lead font-serif text-xl leading-relaxed">
             {STEPS.length} steps, {PHASES.length} phases. The software is the
             least of it; the sequence is the thing nobody hands you.
           </p>
@@ -557,7 +576,7 @@ export function LandingPage() {
           flip
           figure={<CheckFigure />}
         >
-          <p className="text-lg leading-relaxed">
+          <p className="oc-lead font-serif text-xl leading-relaxed">
             A shop refusing your upload is a slow, silent thing. The check names
             what would actually stop it — and separates that from what merely
             costs you readers.
@@ -570,7 +589,7 @@ export function LandingPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-6 rounded-xl border border-[#e6e6e8] bg-[#faf9f7] p-4 text-sm leading-relaxed">
+          <p className="mt-6 rounded-xl border border-[#e6e6e8] bg-[#f7f7fb] p-4 text-sm leading-relaxed">
             <strong className="text-[#0f0f10]">About the PDF.</strong> A clean
             interior file at your trim size with fonts embedded — not a
             pre-press file. No bleed, no crop marks, no CMYK, because it comes
@@ -585,7 +604,7 @@ export function LandingPage() {
           tint
           figure={<MoneyFigure />}
         >
-          <p className="text-lg leading-relaxed">
+          <p className="oc-lead font-serif text-xl leading-relaxed">
             Nobody keeps this, which is why the total is always a shock.
           </p>
           <ul className="mt-6 flex flex-col gap-3">
@@ -660,7 +679,7 @@ export function LandingPage() {
             High on the page on purpose. For a reader who has been sold to by
             everyone, the fastest way to earn a minute of attention is to say
             what you will not take money for. */}
-        <section className="border-b border-[#ececee] bg-[#faf9f7] px-6 py-20">
+        <section className="border-b border-[#ececee] bg-[#f7f7fb] px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Straight answer"
@@ -717,57 +736,6 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ---- Price ---------------------------------------------------- */}
-        <section id="price" className="border-b border-[#ececee] bg-[#faf9f7] px-6 py-20">
-          <div className="mx-auto max-w-4xl">
-            <Head eyebrow="Price" title="Free, and what isn’t" />
-            <div className="mt-12 grid gap-5 md:grid-cols-2">
-              <div
-                className="rounded-2xl border-2 bg-white p-8"
-                style={{ borderColor: PASS }}
-              >
-                <p
-                  className="font-code text-xs tracking-[0.18em] uppercase"
-                  style={{ color: PASS }}
-                >
-                  Free
-                </p>
-                <p className="oc-heading mt-4 font-serif text-5xl" style={{ color: PASS }}>
-                  £0
-                </p>
-                <p className="mt-5 leading-relaxed">{FREE_LINE}</p>
-                <p className="mt-3 leading-relaxed">
-                  No watermark, no export cap, nothing to unlock before you can
-                  publish a finished book.
-                </p>
-                <Link
-                  href="/signup"
-                  style={{ backgroundColor: INK }}
-                  className="mt-6 inline-block rounded-full px-6 py-3 font-semibold text-white hover:opacity-90"
-                >
-                  Start free
-                </Link>
-              </div>
-              <div className="rounded-2xl border border-[#e6e6e8] bg-white p-8">
-                <p className="font-code text-xs tracking-[0.18em] text-[#9a9aa2] uppercase">
-                  Pro
-                </p>
-                <p className="oc-heading mt-4 font-serif text-5xl text-[#0f0f10]">
-                  {monthly}
-                  <span className="font-sans text-base text-[#9a9aa2]">
-                    {" "}
-                    / month
-                  </span>
-                </p>
-                <p className="mt-5 leading-relaxed">
-                  The assistant, audiobook narration and the bookmarks panel —
-                  the three things that cost us money each time they run. You
-                  never need any of them to write a book and publish it.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
 
         {/* ---- FAQ ------------------------------------------------------ */}
         <section className="border-b border-[#ececee] px-6 py-20">
@@ -798,7 +766,7 @@ export function LandingPage() {
               <br />
               Take the order for free.
             </h2>
-            <p className="mt-6 leading-relaxed text-[#a5a5ad]">
+            <p className="oc-lead mt-6 font-serif text-xl leading-relaxed text-[#c7d2fe]">
               Import the manuscript you already have and the first screen tells
               you what stands between it and a shop. If any of it does not work,
               you have lost an afternoon.
@@ -850,7 +818,9 @@ function Head({
       <h2 className="oc-heading mt-4 font-serif text-4xl leading-tight text-[#0f0f10] sm:text-[2.75rem]">
         {title}
       </h2>
-      {lead && <p className="mt-4 text-lg leading-relaxed">{lead}</p>}
+      {lead && (
+        <p className="oc-lead mt-4 font-serif text-xl leading-relaxed">{lead}</p>
+      )}
     </div>
   );
 }
@@ -884,7 +854,7 @@ function Split({
     <section
       {...(id ? { id } : {})}
       className={`border-b border-[#ececee] px-6 py-20 ${
-        tint ? "bg-[#faf9f7]" : ""
+        tint ? "bg-[#f7f7fb]" : ""
       }`}
     >
       <div className="mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-2">
@@ -988,7 +958,7 @@ function Phase({
       >
         {title}
       </p>
-      <p className="mt-2 leading-relaxed">{note}</p>
+      <p className="oc-lead mt-2 font-serif text-lg leading-relaxed">{note}</p>
       <p
         className={`mt-5 font-code text-xs tracking-wider uppercase ${
           lit ? "text-white/60" : "text-[#9a9aa2]"
@@ -1062,7 +1032,7 @@ function DashboardFigure() {
               ].map(([title, why, action]) => (
                 <div
                   key={title}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#e6e6e8] bg-[#faf9f7] px-3.5 py-3"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#e6e6e8] bg-[#f7f7fb] px-3.5 py-3"
                 >
                   <span className="min-w-[10rem] flex-1">
                     <span className="block text-sm font-semibold text-[#0f0f10]">
@@ -1212,7 +1182,7 @@ function MoneyFigure() {
       aria-hidden="true"
     >
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl bg-[#faf9f7] p-4">
+        <div className="rounded-xl bg-[#f7f7fb] p-4">
           <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
             Spent
           </p>
@@ -1221,7 +1191,7 @@ function MoneyFigure() {
           </p>
           <p className="mt-1 text-xs">Cover · editing · ads · proofs</p>
         </div>
-        <div className="rounded-xl bg-[#faf9f7] p-4">
+        <div className="rounded-xl bg-[#f7f7fb] p-4">
           <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
             Earned
           </p>

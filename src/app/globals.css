@@ -844,6 +844,27 @@ body {
   letter-spacing: -0.01em;
 }
 
+/**
+ * The line under a heading — the deck, the lead, the card's one sentence.
+ *
+ * Same family as the heading it sits under, so a title and its subtitle read as
+ * one utterance rather than as two typefaces arguing. `opsz` is low here and
+ * `WONK` is off: this is a *reading* size, and the wonky alternates that give a
+ * 60px headline its character become fidgety at 18px. That is the whole point of
+ * an optical size axis — the same face, cut differently for the job.
+ *
+ * Body copy proper (the FAQ answers, the long notes) stays in the sans. A page
+ * of serif paragraphs is a book, and this page is asking somebody to decide
+ * something rather than to settle in.
+ */
+.oc-lead {
+  font-variation-settings:
+    "opsz" 14,
+    "SOFT" 0,
+    "WONK" 0;
+  letter-spacing: -0.005em;
+}
+
 /* --------------------------------------------------------------------------
    Book View page turn.
 
