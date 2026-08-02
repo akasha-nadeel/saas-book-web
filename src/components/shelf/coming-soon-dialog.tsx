@@ -16,6 +16,15 @@ import { useEffect, useRef } from "react";
  * room it is hung in. It is also the one screen in the app that is not a place
  * to work, so it can afford to be the loudest.
  *
+ * **So its colours are stated literally, and that is not a style preference.**
+ * A fixed ground with themed ink is the same bug as themed ground with fixed
+ * ink, pointed the other way: this drew its body in `text-fg` and its button
+ * label in `text-accent-ink`, both of which are near-black *by day* — on a
+ * ground that is black in every theme. The button was white-on-white and the
+ * sentence explaining the feature was black-on-black, in exactly one theme,
+ * which is the half nobody checks. Nothing in here may use a theme token.
+ * Same rule as the landing page, and for the same reason.
+ *
  * Neither feature was removed to make this. `templates-dialog.tsx` and
  * `sounds-dialog.tsx` are both complete and still in the repo — see the note in
  * TODO.md. Switching either back on is a matter of pointing its button at its
@@ -73,7 +82,7 @@ export function ComingSoonDialog({
         />
 
         <div className="relative">
-          <p className="font-sans text-xs font-semibold tracking-[0.28em] text-muted uppercase">
+          <p className="font-sans text-xs font-semibold tracking-[0.28em] text-white/55 uppercase">
             Something new
           </p>
 
@@ -102,7 +111,7 @@ export function ComingSoonDialog({
 
           <div
             className="mx-auto mt-3 max-w-md font-sans text-base leading-relaxed
-                       font-medium text-fg/90"
+                       font-medium text-white/85"
           >
             {children}
           </div>
@@ -111,10 +120,10 @@ export function ComingSoonDialog({
             type="button"
             onClick={onClose}
             className="mt-9 cursor-pointer rounded-full bg-white px-7 py-3
-                       font-sans text-sm font-semibold text-accent-ink
+                       font-sans text-sm font-semibold text-[#0f0f10]
                        outline-none transition-opacity hover:opacity-90
-                       focus-visible:ring-2 focus-visible:ring-fg/60
-                       focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                       focus-visible:ring-2 focus-visible:ring-white/60
+                       focus-visible:ring-offset-2 focus-visible:ring-offset-black"
           >
             Back to writing
           </button>

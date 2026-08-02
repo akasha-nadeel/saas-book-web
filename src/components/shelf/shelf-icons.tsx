@@ -146,6 +146,17 @@ export const shelfIcons = {
       <path d="M21 11.5a8 8 0 0 1-11.6 7.1L3 20.5l1.9-6.3A8 8 0 1 1 21 11.5Z" />
     </Svg>
   ),
+  /* Two writers rather than three, and no speech bubble: this is the *people*,
+     and Support already owns the bubble. Two heads at different depths read as
+     "others" at 18px where three become a smudge. */
+  community: (
+    <Svg>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 20a5.5 5.5 0 0 1 11 0" />
+      <path d="M16.2 5.3a3.2 3.2 0 0 1 0 5.9" />
+      <path d="M18 14.6a5.5 5.5 0 0 1 2.5 4.6" />
+    </Svg>
+  ),
   pricing: (
     <Svg>
       <path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1-.6-1.4V4.5a1.5 1.5 0 0 1 1.5-1.5H12a2 2 0 0 1 1.4.6l7.2 7.2a2 2 0 0 1 0 2.6Z" />

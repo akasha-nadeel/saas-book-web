@@ -173,6 +173,22 @@
   --color-stop-line: #7f1d1d;
   --color-stop-fg: #f87171;
 
+  /* The *fill* under a button inside a status banner, as opposed to `-fg`,
+     which is the ink the banner writes in.
+
+     They have to be two different values because they do two different jobs.
+     `-fg` is tuned to be legible *on* the banner, so at night it is a bright
+     red — and white text on a bright red is about 1.9:1, which is a button
+     nobody can read. A fill has to be dark enough to carry white ink, so these
+     are stated once and used in both themes: the banner ground moves between
+     light and dark, the button on it does not need to.
+
+     White is written literally at the call site rather than through
+     `accent-ink`, and that is correct here precisely because these two do not
+     invert — an ink token that crossed over would put black on them at night. */
+  --color-stop-solid: #b91c1c;
+  --color-note-solid: #b45309;
+
   /* The road, as a fourth member of that family — the same three parts, for
      the strip that carries the roadmap's next step.
 
@@ -327,6 +343,12 @@
   --color-stop-bg: #fef2f2;
   --color-stop-line: #fecaca;
   --color-stop-fg: #b91c1c;
+
+  /* Stated in both blocks, as every token must be — and deliberately the same
+     values as the dark set. See the note there: a button fill is not a thing
+     that has to invert, because nothing but its own white ink sits on it. */
+  --color-stop-solid: #b91c1c;
+  --color-note-solid: #b45309;
 
   /* The road, in daylight — see the note in the dark block. Pale ground, mid
      hairline, and the accent itself as the ink, so the strip and the button

@@ -11,6 +11,7 @@ import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
+import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import { type Account } from "@/lib/account";
@@ -244,6 +245,23 @@ export function Bookshelf({
     picked ??
     (AREAS.some((a) => a.id === asked) ? (asked as Area) : "overview");
   const setArea = setPicked;
+  /**
+   * Which book Prepare should open, and how many times it has been asked.
+   *
+   * The count is what makes the second press work. Overview's banner sends a
+   * writer here to see one book's findings, and if the *id* were the whole
+   * state then pressing it, closing the row, and pressing it again would ask
+   * for a book that is already the target — no change, no reopen, a button
+   * that appears to have stopped working. Bumping a nonce changes the row's
+   * key every time, so each press is a fresh instruction rather than a
+   * restatement of the last one.
+   */
+  const [focus, setFocus] = useState<{ id: string; n: number } | null>(null);
+  const showInPrepare = (bookId: string) => {
+    setFocus((f) => ({ id: bookId, n: (f?.n ?? 0) + 1 }));
+    setArea("prepare");
+  };
+
   const [editing, setEditing] = useState<Book | null>(null);
   const [covering, setCovering] = useState<Book | null>(null);
   const [tooling, setTooling] = useState<Book | null>(null);
@@ -251,7 +269,7 @@ export function Bookshelf({
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<BookView>("active");
   const [dialog, setDialog] = useState<
-    "help" | "support" | "feedback" | "import" | null
+    "help" | "support" | "feedback" | "import" | "community" | null
   >(null);
 
   /**
@@ -412,6 +430,25 @@ export function Bookshelf({
               {a.label}
             </SideItem>
           ))}
+
+          {/* Not built, and sitting where it will be built.
+
+              It goes beside Tools rather than among the four stages because
+              that is what it is — somewhere you go at any point, not a step in
+              a book's life — and putting it in its eventual home now means
+              nothing moves under a writer on the day it ships.
+
+              The badge is the house rule, not decoration: a control either
+              works or plainly says it is not built. Pressing it explains
+              itself rather than doing nothing, which is the difference between
+              a promise and a dead button. */}
+          <SideItem
+            icon={shelfIcons.community}
+            badge={<Badge>Soon</Badge>}
+            onClick={() => setDialog("community")}
+          >
+            Community
+          </SideItem>
         </nav>
 
         {/* Getting help, then giving it back, then the account. Help before
@@ -596,6 +633,7 @@ export function Bookshelf({
               chapters={totals.chapters}
               onDetails={setEditing}
               onCover={setCovering}
+              onPrepare={showInPrepare}
             />
           )}
 
@@ -618,7 +656,11 @@ export function Bookshelf({
           )}
 
           {area === "prepare" && (
-            <Prepare books={active} onCover={setCovering} />
+            <Prepare
+              books={active}
+              onCover={setCovering}
+              focus={focus}
+            />
           )}
 
           {area === "tools" && <Tools books={active} current={current} />}
@@ -651,21 +693,34 @@ export function Bookshelf({
       {dialog === "feedback" && (
         <FeedbackDialog onClose={() => setDialog(null)} />
       )}
+      {/* What it will be, in the writer's terms — and no date. A date is a
+          promise with a number on it, which is the thing the landing page
+          refuses to make about unbuilt work, and this screen is held to the
+          same rule. */}
+      {dialog === "community" && (
+        <ComingSoonDialog title="Community" onClose={() => setDialog(null)}>
+          Somewhere to ask the writers who have already been through this — what
+          a cover cost them, which aggregator paid, whether the third book is
+          really where it turns. Not built yet, and it is not here as a preview:
+          this button exists so you know it is coming rather than wondering
+          whether you missed it.
+        </ComingSoonDialog>
+      )}
     </div>
   );
 }
 
 /* ---- Areas --------------------------------------------------------------- */
 
-/**
- * How many findings the card shows before it points at the full check.
- *
- * Five is about a screen's worth. A dashboard that lists eleven problems is
- * not a dashboard, it is the export screen with a different heading — and the
- * point of this one is that a writer can read it in a glance and know what to
- * press.
+/*
+ * `FINDINGS_SHOWN` lived here — how many findings the Overview card listed
+ * before offering the rest. It is gone with the list: the card now carries the
+ * counts and a way to Prepare, which holds every finding with its fix. The
+ * reasoning behind the old number is the reasoning for the change, and it was
+ * written down at the time: "a dashboard that lists eleven problems is not a
+ * dashboard, it is the export screen with a different heading". Five was a
+ * smaller version of the same mistake.
  */
-const FINDINGS_SHOWN = 5;
 
 /** What a book is *doing*, in the writer's terms rather than the roadmap's. */
 const PHASE_STATE: Record<Phase, string> = {
@@ -684,6 +739,7 @@ function Overview({
   chapters,
   onDetails,
   onCover,
+  onPrepare,
 }: {
   current: Book | null;
   /** Every active book, for the things that are only true across the shelf. */
@@ -693,6 +749,16 @@ function Overview({
   chapters: number;
   onDetails: (b: Book) => void;
   onCover: (b: Book) => void;
+  /**
+   * Goes to Prepare with this book's row already open.
+   *
+   * One callback rather than "change area" plus "expand that row", because
+   * from here they are one intention: *show me those findings*. Splitting them
+   * would let a caller do half of it and land the writer on a list of books
+   * with nothing opened, which is the version of this that reads as a dead
+   * button.
+   */
+  onPrepare: (bookId: string) => void;
 }) {
   const activity = useActivity();
 
@@ -829,29 +895,6 @@ function Overview({
    * it appears, so a writer can walk back as far as they need without the
    * strip turning into a second checklist.
    */
-  /**
-   * Whether the whole finding list is open.
-   *
-   * Collapsed by default at `FINDINGS_SHOWN`, because the first screen should
-   * not open with fourteen problems — but the rest are one press away and
-   * *here*, rather than on another screen that asks a different question
-   * first.
-   *
-   * The book id is held *with* the flag rather than reset by an effect. "Show
-   * all" is about the list in front of you, so changing book has to close it —
-   * and an effect doing that would fire a second render after the first has
-   * already painted the wrong state, which is the cascade
-   * `react-hooks/set-state-in-effect` exists to catch. Comparing ids while
-   * rendering has no such gap.
-   */
-  const [expanded, setExpanded] = useState<{ bookId: string; on: boolean }>();
-  const showAllFindings = Boolean(
-    book && expanded?.bookId === book.id && expanded.on,
-  );
-  const setShowAllFindings = (on: boolean) => {
-    if (book) setExpanded({ bookId: book.id, on });
-  };
-
   const handTicked = useMemo(
     () => steps.filter((s) => !s.automatic && s.done),
     [steps],
@@ -954,156 +997,103 @@ function Overview({
                 />
               ) : null}
 
-              {/* ---- The diagnosis ---------------------------------------
+              {/* ---- The diagnosis, as one line -------------------------
 
-                  The thing the screen is for. Everything here comes from
-                  `checkup`, which is pure and tested and decides all of it —
-                  severity, order, and where each one is put right. This
-                  component chooses nothing except how it looks.
+                  A summary and a way to the list, not the list.
 
-                  There is no score. A percentage or a grade out of ten would be
-                  the invented number this app refuses everywhere else, and on
-                  the first screen a writer sees it would be the most damaging
-                  place to print one. Two counts and a list of real problems say
-                  more and claim less. */}
-              <div className="mt-4">
-                <p className="text-sm">
+                  Everything here still comes from `checkup`, which is pure and
+                  tested and decides severity, order and where each thing is
+                  put right. What changed is how much of it belongs on *this*
+                  screen. Seven full-width banners, each with its own button,
+                  turned the first thing a writer sees into a wall of things
+                  wrong with their book — and pushed the book's own controls,
+                  the phase dials and the next step below the fold. Overview is
+                  meant to be the state of the book at a glance; it had become
+                  a worklist.
+
+                  So the counts stay and the work moves. Prepare is the screen
+                  built for exactly this — one row per book, opened to show
+                  every finding with its fix — and sending a writer there costs
+                  one press and gains them the version that can actually be
+                  worked through.
+
+                  There is still no score. A percentage or a grade would be the
+                  invented number this app refuses everywhere else, and on the
+                  first screen a writer sees it would be the most damaging place
+                  to print one. Two counts and a way to the detail say more and
+                  claim less. */}
+              <div
+                className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
+                            border px-3.5 py-3 ${
+                              counts.fix > 0
+                                ? "border-stop-line bg-stop-bg"
+                                : counts.note > 0
+                                  ? "border-note-line bg-note-bg"
+                                  : "border-ok-line bg-ok-bg"
+                            }`}
+              >
+                {counts.fix + counts.note > 0 ? (
+                  <AlertMark level={counts.fix > 0 ? "fix" : "note"} />
+                ) : (
+                  <span aria-hidden="true" className="shrink-0 text-ok-fg">
+                    {shelfIcons.check}
+                  </span>
+                )}
+
+                <p className="min-w-[12rem] flex-1 text-sm">
                   {counts.fix > 0 ? (
                     <>
-                      <strong className="text-fg">
+                      <strong className="text-stop-fg">
                         {plural(counts.fix, "thing")}
                       </strong>{" "}
-                      <span className="text-muted">
+                      <span className="text-stop-fg/80">
                         would stop a shop taking this
                       </span>
                     </>
+                  ) : counts.note > 0 ? (
+                    <span className="text-note-fg">
+                      <strong>Nothing would stop a shop</strong> taking it.
+                    </span>
                   ) : (
-                    /* The one verdict on this screen worth colouring, and it
-                       is the *good* one. A blocked book already gets red cards
-                       under this line; a clear one used to get the same
-                       neutral sentence a problem got, so the best news the
-                       screen can carry looked like no news. Green only on the
-                       clause that is the finding — a whole green sentence
-                       reads as a banner. */
-                    <span className="text-fg">
-                      <strong className="text-ok-fg">
-                        Nothing here would stop a shop
-                      </strong>{" "}
-                      taking it.
+                    /* The one verdict on this screen worth colouring, and it is
+                       the *good* one. A clear book used to get the same neutral
+                       sentence a blocked one got, so the best news the screen
+                       can carry looked like no news. */
+                    <span className="text-ok-fg">
+                      <strong>Nothing here would stop a shop</strong> taking it.
+                      The listing details are in order.
                     </span>
                   )}
                   {counts.note > 0 && (
-                    <span className="text-muted">
-                      {" · "}
+                    <span
+                      className={
+                        counts.fix > 0 ? "text-stop-fg/80" : "text-note-fg"
+                      }
+                    >
+                      {counts.fix > 0 ? " · " : " "}
                       {counts.note} worth doing
                     </span>
                   )}
                 </p>
 
-                {findings.length > 0 ? (
-                  <ul className="mt-3 flex flex-col gap-2">
-                    {(showAllFindings
-                      ? findings
-                      : findings.slice(0, FINDINGS_SHOWN)
-                    ).map((finding) => (
-                      /*
-                       * Toned by severity, because `checkup()` already worked
-                       * that out and drawing every finding on the same grey
-                       * threw the answer away. "A shop will reject this" and
-                       * "this would be worth doing" arrived looking identical,
-                       * so the list had to be *read* to be sorted — on the
-                       * first screen a writer sees, which is the worst place
-                       * to make somebody read before they can look.
-                       *
-                       * This is the status family doing the job it is kept
-                       * for: here the colour *is* the information, and it is
-                       * the same red/amber the readiness badges use, so a
-                       * writer learns the ladder once.
-                       *
-                       * The ground carries the severity and the button does
-                       * not. A red button would say pressing it is dangerous,
-                       * when it is the way *out* of the danger — so the card
-                       * says "this is blocking" and the control inside it
-                       * stays the one colour that means "this way on". The
-                       * two levels also differ in button *weight* (filled
-                       * against outlined), so the distinction survives
-                       * without colour.
-                       */
-                      <li
-                        key={finding.id}
-                        className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
-                                   border px-3.5 py-3 ${
-                                     finding.level === "fix"
-                                       ? "border-stop-line bg-stop-bg"
-                                       : "border-note-line bg-note-bg"
-                                   }`}
-                      >
-                        <div className="min-w-[12rem] flex-1">
-                          <p className="text-sm font-semibold text-fg">
-                            {finding.title}
-                          </p>
-                          <p className="text-sm text-muted">{finding.why}</p>
-                        </div>
-                        <FixLink
-                          book={book}
-                          fix={finding.fix}
-                          level={finding.level}
-                          onCover={onCover}
-                          from="overview"
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-1 text-sm text-muted">
-                    The listing details are in order. The checks that need the
-                    manuscript itself run on the export screen.
-                  </p>
-                )}
-
-                {/* Opens in place. It used to be a link to the export screen,
-                    and that was the bug: a writer counts the problems they
-                    have just been told about, presses to see the rest, and
-                    arrives at "How do you want it? Pick a format" — a
-                    different question entirely, about a flow they had not
-                    asked to start. The rest of the list was never there; it
-                    was here all along, already computed by `checkup()` and
-                    thrown away by a `slice`.
-
-                    Every product that does this well deep-links to the answer
-                    rather than to the tool that contains it — a failed-checks
-                    count opens the checks, already expanded; a "needs
-                    response" count opens that list, already filtered. And when
-                    the data is in hand, as it is here, the answer is not to
-                    navigate at all. */}
-                {findings.length > FINDINGS_SHOWN && (
+                {/* Prepare rather than a tool, because what a writer wants
+                    after reading a count is the *list*, and that is the screen
+                    that holds it. An area change rather than a link: both are
+                    the dashboard, and a navigation here would throw away the
+                    scroll position and the book they had chosen. */}
+                {counts.fix + counts.note > 0 && (
                   <button
                     type="button"
-                    onClick={() => setShowAllFindings(!showAllFindings)}
-                    aria-expanded={showAllFindings}
-                    className="mt-2.5 text-sm font-semibold text-accent"
+                    onClick={() => onPrepare(book.id)}
+                    className={`shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold
+                                text-white transition-opacity hover:opacity-90 ${
+                                  counts.fix > 0
+                                    ? "bg-stop-solid"
+                                    : "bg-note-solid"
+                                }`}
                   >
-                    {showAllFindings
-                      ? "Show fewer"
-                      : `Show all ${findings.length}`}
+                    See them in Prepare →
                   </button>
-                )}
-
-                {/* Said once, under the list, because it is the honest reason
-                    this list is not the whole story — and it names where the
-                    rest happens without pretending to be more of the same. */}
-                {findings.length > 0 && (
-                  <p className="mt-2.5 text-xs text-muted">
-                    Checks that need the manuscript itself — a missing chapter
-                    title, an image too large — run on the{" "}
-                    <Link
-                      href={`/book/${book.id}/export`}
-                      className="font-semibold text-accent"
-                    >
-                      export screen
-                    </Link>
-                    .
-                  </p>
                 )}
               </div>
 
@@ -1609,6 +1599,48 @@ const IMPORT: EmptyAction = {
  * two-weight ladder as the badges, and the same reasoning: weight carries the
  * severity so that a reader who cannot separate the hues loses nothing.
  */
+/**
+ * The badge at the head of a finding, in that finding's colour.
+ *
+ * A filled rounded square rather than a line icon, and it is the one filled
+ * glyph on these screens. Every other icon in the dashboard is a 1.75 stroke,
+ * which is right for chrome — it sits beside a label without shouting. This
+ * one is not chrome: it marks a row as a *refusal* or a *warning* at the head
+ * of a banner whose whole job is to be read before the words are, and an
+ * outline would make it one more quiet line among the rest.
+ *
+ * **Two glyphs, not one.** A cross for what a shop would refuse, an
+ * exclamation for what is merely worth doing — so the two levels are told
+ * apart by shape as well as by hue, which is what makes the distinction
+ * survive for a reader who cannot separate red from amber. Colour alone would
+ * be the one thing the status family exists not to do.
+ *
+ * The glyph is knocked out in the banner's own ground rather than in white, so
+ * a single drawing serves the pale banner by day and the near-black one at
+ * night with no second colour to keep in step.
+ */
+function AlertMark({ level }: { level: FindingLevel }) {
+  const stop = level === "fix";
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className={`h-[18px] w-[18px] shrink-0 ${
+        stop ? "text-stop-fg" : "text-note-fg"
+      }`}
+    >
+      <rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" />
+      <path
+        d={stop ? "M9 9l6 6M15 9l-6 6" : "M12 7.4v6M12 15.9v.7"}
+        stroke={stop ? "var(--color-stop-bg)" : "var(--color-note-bg)"}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
 function FixLink({
   book,
   fix,
@@ -1631,20 +1663,22 @@ function FixLink({
   from?: AreaId;
 }) {
   /*
-   * The way out, in the one colour that means "this way on" — never in the
-   * severity of the thing it fixes. A red button on a red card reads as
-   * "pressing this is the dangerous part", which is the opposite of true.
+   * Filled in the severity of the row it sits in, so the banner is one
+   * statement rather than a notice with an unrelated action beside it.
    *
-   * The two levels separate by weight rather than hue: a blocking finding gets
-   * the filled action, a merely-worth-doing one an outlined button on the
-   * card's own ground. That ordering survives greyscale and colour blindness,
-   * which the tint behind it does not.
+   * **`-solid`, not `-fg`, and white ink written literally.** `-fg` is tuned
+   * to be read *on* the banner, which at night makes it a bright red or a
+   * bright amber — and white on those is around 1.9:1, a button nobody can
+   * read. The `-solid` pair is the fill: dark enough for white in either
+   * theme, and identical in both blocks because nothing sits on it but its own
+   * ink. That is also why `text-white` is right here where it is wrong on
+   * `bg-accent` — this fill does not cross over, so an ink token that did
+   * would put black on it at night.
    */
-  const className = `shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
-    level === "fix"
-      ? "bg-accent text-accent-ink hover:bg-accent-strong"
-      : "border border-line bg-panel text-accent hover:border-accent/40"
-  }`;
+  const className = `shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold
+                     text-white transition-opacity hover:opacity-90 ${
+                       level === "fix" ? "bg-stop-solid" : "bg-note-solid"
+                     }`;
 
   if (fix.kind === "route") {
     return (
@@ -2063,10 +2097,13 @@ function Write({
 function Prepare({
   books,
   onCover,
+  focus,
 }: {
   books: Book[];
   /** The three commonest problems are fixed in a dialog the shelf owns. */
   onCover: (b: Book) => void;
+  /** A book to open on arrival, sent by Overview's banner. */
+  focus?: { id: string; n: number } | null;
 }) {
   /**
    * Read once per shelf change rather than per render. Cheap on its own —
@@ -2135,11 +2172,18 @@ function Prepare({
         ) : (
           <ul className="flex flex-col gap-2">
             {rows.map(({ book, issues }) => (
+              /* Keyed on the nonce when this is the book being asked
+                 for, so a second press remounts the row and opens it again
+                 even if the writer had closed it. Every other row keeps a
+                 stable key and its own open/shut. */
               <PrepareRow
-                key={book.id}
+                key={
+                  focus?.id === book.id ? `${book.id}:${focus.n}` : book.id
+                }
                 book={book}
                 issues={issues}
                 onCover={onCover}
+                startOpen={focus?.id === book.id}
               />
             ))}
           </ul>
@@ -2172,12 +2216,30 @@ function PrepareRow({
   book,
   issues,
   onCover,
+  startOpen,
 }: {
   book: Book;
   issues: ReadinessIssue[];
   onCover: (b: Book) => void;
+  /** Open on mount — this is the book Overview's banner asked for. */
+  startOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(startOpen));
+
+  /*
+   * Bring it into view when it was asked for by name.
+   *
+   * Prepare is a list, and the book somebody pressed for is rarely the first
+   * row — arriving with it open below the fold is the same as arriving with it
+   * shut. `nearest` rather than `center` so a row already on screen does not
+   * jump for no reason, and `smooth` so the movement reads as the page
+   * answering rather than as a reload.
+   */
+  const ref = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (!startOpen) return;
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [startOpen]);
   const blocking = issues.filter((i) => i.level === "blocking");
   const advisory = issues.filter((i) => i.level === "advisory");
   // Only the ones with somewhere to go. A field with no destination would be a
@@ -2187,7 +2249,10 @@ function PrepareRow({
     .filter((f): f is Finding => f !== null);
 
   return (
-    <li className="overflow-hidden rounded-xl border border-line bg-surface">
+    <li
+      ref={ref}
+      className="overflow-hidden rounded-xl border border-line bg-surface"
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -2254,7 +2319,16 @@ function PrepareRow({
                                 : "border-note-line bg-note-bg"
                             }`}
               >
-                <span className="min-w-[10rem] flex-1 text-sm text-fg">
+                {/* Severity across the whole row — see the note on the
+                    Overview list, which this matches deliberately. Two screens
+                    showing the same findings in two liveries would read as two
+                    different kinds of problem. */}
+                <AlertMark level={finding.level} />
+                <span
+                  className={`min-w-[10rem] flex-1 text-sm font-medium ${
+                    finding.level === "fix" ? "text-stop-fg" : "text-note-fg"
+                  }`}
+                >
                   {finding.title}
                 </span>
                 <FixLink
@@ -2762,12 +2836,15 @@ function SideItem({
   active,
   href,
   onClick,
+  badge,
   children,
 }: {
   icon: ReactNode;
   active?: boolean;
   href?: string;
   onClick?: () => void;
+  /** A marker at the right of the row — "Soon" on anything not built yet. */
+  badge?: ReactNode;
   children: ReactNode;
 }) {
   const className = `flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm
@@ -2777,11 +2854,20 @@ function SideItem({
          : "text-muted hover:bg-raised hover:text-fg"
      }`;
 
+  // `mr-auto` on the label rather than `ml-auto` on the badge, so a row without
+  // one keeps the icon and its word tight together exactly as before.
+  const body = (
+    <>
+      {icon}
+      <span className={badge ? "mr-auto" : undefined}>{children}</span>
+      {badge}
+    </>
+  );
+
   if (href) {
     return (
       <Link href={href} className={className}>
-        {icon}
-        {children}
+        {body}
       </Link>
     );
   }
@@ -2792,8 +2878,7 @@ function SideItem({
       aria-current={active ? "page" : undefined}
       className={className}
     >
-      {icon}
-      {children}
+      {body}
     </button>
   );
 }
