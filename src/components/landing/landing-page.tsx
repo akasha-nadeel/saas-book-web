@@ -601,6 +601,38 @@ export function LandingPage() {
           </p>
         </Split>
 
+        {/* ---- The metadata, which is where people actually give up ------
+
+            A separate section from the check on purpose. The check is about
+            what is *wrong*; this is about the part nobody warns you is boring
+            — eight fields a shop demands, half of which have names you have
+            never had to know. It is the most-skipped work in publishing and the
+            cheapest to get right, so showing the form is showing the product
+            doing its least glamorous and most useful thing. */}
+        <Split
+          eyebrow="The tedious part"
+          title="Every field a shop asks for, and why"
+          figure={<ListingFigure />}
+          flip
+        >
+          <p className="oc-lead font-serif text-xl leading-relaxed">
+            An ISBN, a publisher, a language, a series. Fields with names you
+            have never needed until the moment a shop refuses to go on without
+            them.
+          </p>
+          <p className="mt-5 leading-relaxed">
+            Every one carries a line saying what it is for and who actually
+            wants it — Amazon assigns its own ISBN, Apple and Kobo want yours,
+            and nobody tells you that until you have hunted for the answer.
+          </p>
+          <p className="mt-4 leading-relaxed">
+            Answered once and saved to the book, not re-asked on every export.
+            And every one of them is skippable: the export runs on a blank form,
+            because a file you want for your own reader is nobody else&rsquo;s
+            business.
+          </p>
+        </Split>
+
         {/* ---- Track ---------------------------------------------------- */}
         <Split
           eyebrow="Once it is out"
@@ -1174,6 +1206,98 @@ function CheckFigure() {
         It never blocks the export. The file is yours whether or not a shop
         would take it.
       </p>
+    </div>
+  );
+}
+
+/**
+ * The store-listing form, as the export wizard really draws it.
+ *
+ * **The hints are the point, not the inputs.** Any form can ask for an ISBN;
+ * the line underneath saying *"Amazon assigns its own; Apple and Kobo want
+ * yours"* is the thing a writer cannot get anywhere without paying somebody.
+ * So the figure is drawn label-first with the hint given equal weight, which is
+ * the opposite of how a form is usually shown off.
+ *
+ * The strings are copied from `publishing-card.tsx` rather than imported —
+ * that file is a Client Component full of inputs and state, and pulling it in
+ * to read six sentences would ship the whole editor to a marketing page. The
+ * cost is that they can drift; the check against that is that they are short,
+ * quoted here, and a change to a hint is a change somebody is already reading.
+ *
+ * **All six fields, not a representative four.** An earlier version showed
+ * two-thirds of the form to keep the panel short, which is the kind of edit
+ * that looks like design and is actually a small lie: the reader counts what
+ * they are shown, and a page whose whole claim is being checkable cannot round
+ * its own screenshots down. ISBN is left empty because it is the one most books
+ * genuinely do not have yet, and the Skip line stays — "you can add this later"
+ * is a promise the export really honours and the most reassuring thing here.
+ */
+function ListingFigure() {
+  const fields: [string, string, string, boolean][] = [
+    ["ISBN", "978-0-306-40615-7", "13 digits. Amazon assigns its own; Apple and Kobo want yours.", false],
+    ["Language", "English", "Decides which storefront the book is listed on.", true],
+    ["Publisher", "Elena Rosa", "Your own name is the usual answer when self-publishing.", true],
+    ["Publication date", "08/02/2026", "Leave empty until it has one.", true],
+    ["Series", "The salt cycle", "The shelf this book belongs to, if any.", true],
+    ["Number in series", "1", "As a reader would count it.", true],
+  ];
+
+  return (
+    // A tablet, held slightly off the page.
+    //
+    // The bezel and the shadow are doing one job between them: they say *this
+    // is a real screen in a real product*, which a bordered card on a white
+    // page does not. The shadow is deliberately tight and dark rather than the
+    // big soft blur a template reaches for — a diffuse shadow reads as a
+    // sticker floating above the page, a short one reads as an object resting
+    // on it, and the second is the impression worth having.
+    //
+    // The frame is drawn, like every other figure here, because a photograph of
+    // a device is an asset that goes stale the day the UI moves.
+    <div
+      className="rounded-[1.75rem] border border-[#d8d8de] bg-[#f2f2f5] p-3
+                 shadow-[0_2px_0_#d8d8de,0_18px_28px_-14px_rgba(15,15,16,0.45)]"
+      aria-hidden="true"
+    >
+      <div className="rounded-[1.25rem] bg-white p-6 sm:p-7">
+      <p className="oc-heading font-serif text-xl text-[#0f0f10]">
+        What a shop asks for
+      </p>
+      <p className="mt-1 text-sm">
+        Saved to the book, so you answer these once rather than once per export.
+      </p>
+
+      <div className="mt-6 grid gap-x-5 gap-y-5 sm:grid-cols-2">
+        {fields.map(([label, value, hint, filled]) => (
+          <div key={label}>
+            <p className="text-xs font-medium text-[#0f0f10]">{label}</p>
+            <p
+              className={`mt-1.5 rounded-lg border px-3 py-2 text-sm ${
+                filled
+                  ? "border-[#dcdce0] text-[#0f0f10]"
+                  : "border-[#e6e6e8] text-[#b0b0b8]"
+              }`}
+            >
+              {value}
+            </p>
+            <p className="mt-1.5 text-xs leading-relaxed text-[#8a8a92]">
+              {hint}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <p
+        className="mt-6 rounded-lg py-2.5 text-center text-sm font-semibold text-white"
+        style={{ backgroundColor: INK }}
+      >
+        Continue
+      </p>
+      <p className="mt-3 text-center text-xs text-[#8a8a92]">
+        Skip — you can add this later
+      </p>
+      </div>
     </div>
   );
 }
