@@ -513,7 +513,7 @@ export function Avatar({
       aria-hidden="true"
       style={{ width: size, height: size }}
       className="flex shrink-0 items-center justify-center rounded-full
-                 bg-accent font-sans text-sm font-semibold text-white"
+                 bg-accent font-sans text-sm font-semibold text-accent-ink"
     >
       {initialOf(name)}
     </span>

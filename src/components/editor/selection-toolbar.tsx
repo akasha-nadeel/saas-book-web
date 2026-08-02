@@ -91,7 +91,7 @@ function Btn({
                   justify-center rounded text-xs outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
-                    active ? "bg-accent text-white" : "text-fg hover:bg-raised"
+                    active ? "bg-accent text-accent-ink" : "text-fg hover:bg-raised"
                   }`}
     >
       {children}
@@ -525,7 +525,7 @@ function FontOptionRow({
                   rounded-md px-2.5 py-1.5 text-left text-sm outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/50 ${
-                    active ? "bg-accent text-white" : "text-fg hover:bg-raised"
+                    active ? "bg-accent text-accent-ink" : "text-fg hover:bg-raised"
                   }`}
     >
       {label}

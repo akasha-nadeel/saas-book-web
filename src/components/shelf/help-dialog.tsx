@@ -175,7 +175,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Paper",
-        desc: "Choose the page colour: white, cream, sepia, slate, or black.",
+        desc: "Choose the page colour under your prose — white, off-white, grey, charcoal or black — from the Aa flyout in the editor. Until you pick one it follows the theme, so a light app gets a white page and a dark one a black page.",
+      },
+      {
+        name: "Theme",
+        desc: "Light, dark, or whatever your computer is set to. The control is at the foot of the sidebar on this screen, and in the editor's Aa flyout beside the page colour. On “match my system” the app turns with your machine, so it goes dark when your laptop does.",
       },
       {
         name: "Print layout",
@@ -331,7 +335,7 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                       font-semibold text-white outline-none transition-colors
+                       font-semibold text-accent-ink outline-none transition-colors
                        hover:bg-accent-strong focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >

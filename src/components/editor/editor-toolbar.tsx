@@ -25,6 +25,7 @@ import {
 } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 import type { Dictation } from "@/lib/editor/use-dictation";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /** The four alignments, each with a small icon of ruled lines. */
 const ALIGN_OPTIONS: {
@@ -320,11 +321,16 @@ function Flyout({
 }
 
 const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
+  // Five sheets, no hues — the labels say the value each one actually is now,
+  // since a swatch marked Cream that renders grey is a lie the eye catches
+  // immediately. The stored values keep their old names: they are keys in
+  // `prefs`, not words anybody reads, and renaming them would strand the
+  // setting of every writer who already picked one.
   { value: "white", label: "White", swatch: "#ffffff" },
-  { value: "cream", label: "Cream", swatch: "#f5f1e8" },
-  { value: "sepia", label: "Sepia", swatch: "#f2e7d0" },
-  { value: "slate", label: "Slate", swatch: "#1d2732" },
-  { value: "black", label: "Black", swatch: "#0a0d11" },
+  { value: "cream", label: "Off-white", swatch: "#ededed" },
+  { value: "sepia", label: "Grey", swatch: "#d6d6d6" },
+  { value: "slate", label: "Charcoal", swatch: "#1c1c1c" },
+  { value: "black", label: "Black", swatch: "#0d0d0d" },
 ];
 
 export function ToolRail({
@@ -518,7 +524,7 @@ export function ToolRail({
                                 rounded-md outline-none transition-colors
                                 focus-visible:ring-2 focus-visible:ring-accent/60 ${
                                   activeAlign === option.value
-                                    ? "bg-accent text-white"
+                                    ? "bg-accent text-accent-ink"
                                     : "text-fg hover:bg-raised"
                                 }`}
                   >
@@ -635,6 +641,14 @@ export function ToolRail({
               ))}
             </div>
           </Field>
+
+          {/* Beside the page colour rather than off in the dashboard, because
+              they are the same decision asked twice — how bright is this going
+              to be — and the writer asking it is sitting in front of the
+              manuscript at midnight, not on the shelf screen. */}
+          <Field label="Theme">
+            <ThemeToggle />
+          </Field>
         </div>
       </Flyout>
 
@@ -723,7 +737,7 @@ export function ToolRail({
         <p
           role="status"
           title={problem}
-          className="px-1 text-center font-sans text-[0.6rem] leading-tight text-red-400"
+          className="px-1 text-center font-sans text-[0.6rem] leading-tight text-danger"
         >
           Too large
         </p>

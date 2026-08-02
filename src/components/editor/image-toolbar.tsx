@@ -52,7 +52,7 @@ function Btn({
       className={`flex h-8 min-w-8 shrink-0 items-center justify-center rounded-md
                   px-1.5 text-sm outline-none transition-colors
                   focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                    active ? "bg-accent text-white" : "text-fg hover:bg-raised"
+                    active ? "bg-accent text-accent-ink" : "text-fg hover:bg-raised"
                   }`}
     >
       {children}

@@ -137,7 +137,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
               />
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line bg-surface px-4 py-2 text-xs">
                 <span
-                  className={over ? "font-bold text-red-600" : "text-muted"}
+                  className={over ? "font-bold text-danger" : "text-muted"}
                 >
                   {report.stats.characters.toLocaleString()} /{" "}
                   {BLURB_MAX.toLocaleString()} characters · {report.stats.words}{" "}
@@ -186,7 +186,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
                     key={issue.field + issue.message}
                     className={`flex gap-3 rounded-lg border px-4 py-3 ${
                       issue.level === "problem"
-                        ? "border-amber-500/40 bg-amber-500/8"
+                        ? "border-note-line bg-note-bg"
                         : "border-line bg-panel"
                     }`}
                   >
@@ -194,7 +194,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
                       aria-hidden="true"
                       className={`mt-0.5 text-sm font-bold ${
                         issue.level === "problem"
-                          ? "text-amber-700"
+                          ? "text-note-fg"
                           : "text-muted"
                       }`}
                     >
@@ -247,7 +247,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
                 // Filled. It is the only action in this column and it was a
                 // white box on a white panel, which reads as disabled.
                 className="mt-4 w-full rounded-lg bg-accent px-4 py-2.5 text-sm
-                         font-semibold text-white disabled:opacity-50"
+                         font-semibold text-accent-ink disabled:opacity-50"
               >
                 {state === "loading" ? "Looking…" : "Show me five"}
               </button>
@@ -269,7 +269,7 @@ export function BlurbPage({ bookId }: { bookId: string }) {
             )}
 
             {state === "error" && (
-              <p className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/8 p-3 text-sm text-fg">
+              <p className="mt-4 rounded-lg border border-note-line bg-note-bg p-3 text-sm text-fg">
                 That search did not come back. Google Books rate-limits without
                 an API key, which is the usual reason — see{" "}
                 <code className="text-xs">.env.local.example</code>. Your blurb

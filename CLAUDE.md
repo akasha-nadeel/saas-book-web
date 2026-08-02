@@ -4,10 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
-OpenChapter is a novel-writing app: a shelf of books, a distraction-light chapter
-editor, and import/export to the formats a writer actually hands off. It runs
-almost entirely in the browser — the manuscript never leaves the machine except
-for the one assistant feature.
+OpenChapter is a book-writing *and* self-publishing app. It began as a shelf of
+books, a distraction-light chapter editor, and import/export to the formats a
+writer actually hands off; **as of 2026-08-01 it is aimed at the whole job** —
+fifteen per-book tools around the manuscript (comps, blurb, categories, covers,
+paperback setup, structure, prose, progress, money, ARC readers, a publishing
+roadmap) with the editor as one part rather than the whole. It runs almost
+entirely in the browser: the manuscript never leaves the machine except for the
+assistant, the two audio routes, and a comp search that sends only words the
+writer typed for a shop to read.
+
+**`TODO.md` is the canonical statement of that direction** — what shipped and
+why, what each feature deliberately refuses to do, and what was ruled out
+(marketplaces, AI covers, AI editing) so it is not re-proposed. Read it before
+proposing a feature or rebuilding something that looks missing.
 
 ## Commands
 
@@ -33,8 +43,15 @@ renderers), the store, page setup, typography, search, book kinds, the custom
 Tiptap marks, pagination and click-to-type arithmetic, caret scrolling,
 narration chunking, transcript paragraphing, publishing details and the ISBN
 check digit, the billing price/cycle arithmetic and PayHere's two MD5s, the
-account fallbacks and the `?next=` redirect guard, ambience, relative time.
-Components are not tested — jsdom is there for `localStorage`, not for a DOM.
+account fallbacks and the `?next=` redirect guard, ambience, relative time —
+and one module per tool screen (see the tools section below). Components are
+not tested — jsdom is there for `localStorage`, not for a DOM.
+
+Several tests assert *positions* rather than behaviour, and they are the ones
+not to "fix" when they fail: that the ARC step sorts before publishing, that
+the middle beat straddles 50%, that the prose report has no score, that the
+money page names no company and every figure carries its provenance. If one of
+those goes red the feature has lost the thing it was built to say.
 
 `docs/plans/` holds the design and implementation notes for the bigger pieces
 (the bookshelf, export, and the Supabase persistence design). They record what
@@ -48,16 +65,20 @@ Gateway (speech and transcription) · `docx` + `jszip` for exports. Path alias
 `@/*` → `src/*`.
 
 This is a newer Next.js than your training data (see AGENTS.md). Two things that
-bite: `params` is a `Promise` and must be awaited, and route components are typed
-with the generated helpers `PageProps<"/route">` / `LayoutProps<"/route">` rather
-than hand-written prop types.
+bite: `params` is a `Promise` and must be awaited, and route components can be
+typed with the generated helpers `PageProps<"/route">` / `LayoutProps<"/route">`.
+Both shapes are in the tree — the older routes use the helpers, the fifteen tool
+routes write `props: { params: Promise<{ bookId: string }> }` by hand. Either is
+fine; awaiting `params` is not optional.
 
 ## Architecture
 
 **Persistence is one module.** `src/lib/library-store.ts` is the *only* file that
-touches `localStorage`; everything else goes through it. This is deliberate — the
-planned Supabase migration is meant to be a rewrite of that one module plus its
-React bindings, with nothing else changing. Keep that boundary intact.
+touches `localStorage`; everything else goes through it. That boundary is what
+let Supabase arrive *behind* the store (`sync.ts`) without any of the ~40 files
+that read it changing a line — and it is what any future storage change will
+need again. Keep it intact: a screen reaching for `localStorage` directly is a
+bug even when it works.
 
 **The store is split by write-cost, not by type:**
 - **shelf** (`openchapter:shelf`) — one document holding every book with its
@@ -69,6 +90,12 @@ React bindings, with nothing else changing. Keep that boundary intact.
   each at its own key, so opening a 40-chapter book parses no prose.
 - **covers**, **notes**, **prefs** — likewise at their own keys, for the same
   reason: unbounded data that must not ride along in every shelf write.
+- **the tool stores** — `bible:<bookId>`, `arc:<bookId>`, `history:<chapterId>`,
+  and the library-wide `ledger`, `activity` (one net word count per day) and
+  `ideas` — same reasoning, plus one shared caveat: **none of them sync.**
+  `sync.ts` maps a book's *columns* by name and these are not columns, so a
+  writer on two machines keeps two ledgers. Every screen with one says so on the
+  page; don't quietly drop that line.
 
 Book/chapter totals are summed on read, never stored, so they can't drift.
 Deleting a chapter is a soft delete: its meta moves to the book's `trash` list in
@@ -89,7 +116,109 @@ store stays React-free. It uses `useSyncExternalStore` with empty server
 snapshots (SSR renders nothing, the client swaps in real data after hydration).
 `useHydrated()` distinguishes "no books yet" from "storage not read yet"; guard
 on it before rendering not-found states. Server snapshots must be referentially
-stable (see the frozen `EMPTY_SHELF`) or the store loops.
+stable (see the frozen `EMPTY_SHELF`) or the store loops. There is one hook per
+store and they are all the same shape — `useShelf`, `useChapterBody`,
+`useBodyReload`, `useCover`, `useNotes`, `usePrefs`, and one each for the tool
+stores (`useBible`, `useArc`, `useLedger`, `useActivity`, `useHistory`,
+`useIdeas`); a new store gets a new hook here rather than an effect in a screen.
+
+**The front door is a dashboard, not a shelf.**
+`src/components/shelf/bookshelf.tsx` is five areas — Overview, Write, Prepare,
+Track, Tools — and **Write is one of them**; the arrangement is the argument
+that the manuscript is one part of the job.
+
+**Overview is a diagnosis, and `src/lib/checkup.ts` is the whole of it.** The
+person arriving usually has a book already — often finished, often imported —
+and came because they do not know what stands between it and a shop; a word
+count and a "continue writing" button answer a question they did not ask. So
+`checkup()` returns **findings**: what is wrong with this book, worst first,
+each carrying the control that fixes it. The component chooses only how they
+look. Three things in that module are load-bearing:
+
+- **Every finding carries its own `Fix`**, and it is a typed union rather than a
+  URL because the three commonest problems — no title, no author, no cover —
+  are all put right in a *dialog* the shelf owns, not on a page. A URL-shaped
+  destination would have left exactly those three with nothing to press.
+- **A test walks every field `storeReadiness()` can emit** and fails if
+  `DESTINATIONS` has no entry for it. Add a check to `publishing.ts` and forget
+  that map, and the finding lands on the dashboard as a dead end.
+- **Nothing is invented** — no score, no grade, no percentage. Two counts and
+  real problems say more and claim less, and the first screen a writer sees is
+  the worst possible place to print a made-up number.
+
+**Advice is raised only once a book has asked.** `checkup` gates its advisory
+findings on the roadmap's own phase: a shop's *refusals* travel at any stage,
+but "no ISBN", "no categories" and "nobody has an advance copy" wait until the
+book has reached prepare/launch/publish. Keeping all of it off the dashboard
+was the earlier answer, and it was right about chapter three and wrong as a
+blanket ban — a writer standing in Prepare came here to be told. The fix was
+the trigger, not the rule.
+
+Under the findings sit the five phase dials and the roadmap's next step, in
+that order: the findings are what is wrong with the *book*, the step is where
+you are on the *road*, and stacked they read as one thought where side by side
+they competed. The step also carries **Already done** for the two steps nobody
+can detect ("Finish the first draft", "Revise") — without it an imported
+finished manuscript sits at Drafting forever and never reaches the phases where
+the publishing help lives.
+Which area is open lives in **`?area=`** rather than in state: a tool screen is
+a whole window with none of the dashboard on it, so coming back has to land
+where the writer left, and `/?area=tools` is the link the tool header uses. Read
+it with `useSearchParams` — a lazy initialiser reading `window.location` sees
+the *previous* URL during a client navigation, which was tried and is why the
+area kept arriving as Overview.
+
+**Fifteen per-book tools, described in one place.** `src/lib/book-tools.ts`
+holds every tool's path, name and one-line description, in four groups with a
+colour each. The dashboard's Tools grid (`tool-grid.tsx`, glyphs in
+`tool-marks.tsx`) and the sheet behind a book card's ⋯ (`book-tools-dialog.tsx`)
+both render from it, so the descriptions — which are product claims, held to the
+same rule as the landing page — exist once. Nothing in that list is a preview:
+a tool that is not finished does not go in it.
+
+Each tool is the same three pieces, and the split is the convention:
+
+- a **pure, tested module** in `src/lib/` holding the whole of the thinking —
+  `roadmap.ts`, `paperback.ts`, `blurb.ts`, `beats.ts` (structure), `prose.ts`,
+  `activity.ts` (progress), `provenance.ts`, `money.ts`, `ledger.ts` (track),
+  `arc.ts`, `cover-check.ts` (covers), and `comps/` —
+  `comps.ts`, `length.ts`, `subjects.ts` (categories), `title-check.ts`.
+  Export is the exception and predates the pattern: it is the whole of
+  `src/lib/export/`;
+- a thin `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`;
+- a client component in `src/components/<tool>/`.
+
+Every one of them mounts **`ToolHeader`** (`src/components/tool-header.tsx`):
+breadcrumb, the book as a chip *with its cover*, and the tool's own name as the
+`h1`. The cover is load-bearing — the Tools area lets a writer pick a book
+before opening a tool, so landing on the wrong manuscript is a real way to lose
+ten minutes — and the heading is the tool rather than the book, or every screen
+looks like the same screen with different contents. The `width` prop must match
+the page's own container or the two left edges disagree. The export screen is
+the one that never took this header; TODO.md records the decision as open.
+
+**These screens share a house style, and tests enforce it.** No score, no grade,
+no number invented to look like an answer. Facts rather than verdicts ("you
+wrote on 12 of the last 30 days", never "you should write more"). **Detected
+beats ticked** — a roadmap step worked out from the book cannot be lied to, and
+the two that cannot be detected honestly (finishing a draft, commissioning a
+cover) are hand-ticked and say so. Every figure carries its provenance. And a
+measurement is reported *with how many records carried the field*, because a
+median from three books and the same median from eighteen are different claims.
+
+**Two free catalogues sit behind `/api/comps`** — Google Books and Open Library.
+Server-side not for secrecy (neither needs a key) but for a shared cache, so one
+service being down costs half the results rather than the panel, and so a
+reader's browser is not handed to two third parties for a request they did not
+make. Records are merged **field by field** on ISBN, or title-plus-author when
+neither has one: Google carries blurbs and page counts, Open Library carries
+subjects and a cover for almost everything, and the gaps are in different
+places, so preferring one source wholesale throws away the field the other was
+fetched for. `GOOGLE_BOOKS_API_KEY` is optional — without it Google answers 429
+under any real traffic (the anonymous quota is per IP and a server is one IP for
+every writer), the feature degrades to Open Library alone, and the screen says
+Google did not answer rather than implying the genre is empty. **The manuscript
+never goes**: what leaves is a query built from the book's genre and blurb.
 
 **The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. The surface
 is keyed on `${chapterId}:${storedText}` so a save from another tab reloads it
@@ -122,9 +251,22 @@ of the column; `src/lib/image-import.ts` handles paste/drop, capped at 900KB.
 
 **The editor shell is a rail, a tool panel, and the book panel.**
 `workspace-rail.tsx` selects which tool panel (`PanelTab` in `left-panel.tsx`:
-chapters, search, notes, bookmarks, assistant, trash) is open, and clicking the
-active tab closes it — one control, never two. The chapter editor and the book
-overview now mount the *same three*, so a change lands on both screens at once:
+chapters, search, notes, ideas, bible, bookmarks, assistant, history, trash) is
+open, and clicking the active tab closes it — one control, never two. Three of
+those tabs are writer-pain features, each a panel over a pure module:
+**ideas** (`ideas.ts`) is a parking lot for the shiny idea that would otherwise
+stall book two — being *in the rail* is the feature, since leaving the book to
+write it down is itself the interruption; **bible** (`bible.ts`) is people and
+places with the aliases they answer to, and its opening question is "who is in
+this chapter", answered by whole-word search over what is written rather than
+by the list being maintained; **history** (`history.ts`) is eight snapshots a
+chapter under a 400KB budget, taken at most every ten minutes and only when the
+text really changed — a safety net, not an archive, and the panel says so.
+`rememberVersion` runs after the body is written and swallows every error: a
+full origin means no history, never a failed save.
+
+The chapter editor and the book overview mount the *same three parts* — rail,
+tool panel, book panel — so a change lands on both screens at once:
 both pass `chapters={false}` and keep the tool panel closed until a tab is
 picked, because `book-panel.tsx` on the right is already the chapter list. The
 overview used to carry its own list on the left instead; two navigators for one
@@ -210,6 +352,16 @@ of components so they can be tested and changed in one place: `book-kinds.ts`
 (chapter skeletons only — never boilerplate prose), `search.ts` (walks plain text
 out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
 `relative-time.ts`, `use-typewriter.ts`.
+
+`resume.ts` belongs to that set and is the one to understand, because it stores
+nothing: the "where you left off" card on the book overview
+(`resume-card.tsx`) is the tail of the last paragraph written plus the first
+line of the chapter note, both read back out of what already exists. The
+chapter is `lastOpenedId` *when it has prose*, falling back to the last chapter
+with any — quoting an empty chapter back at a returning writer is worse than
+saying nothing — and the excerpt is the paragraph's tail rather than its head,
+cut at a word, because what a writer needs is the sentence they stopped in the
+middle of.
 
 Two of them are about accounts and both are tested. `account.ts` resolves the
 name, face and email the chrome shows — a chain of fallbacks rather than a field
@@ -321,8 +473,17 @@ field in one chapter is otherwise enough to abort a whole library upload.
 up: after enough versions some keys belong to nothing, and a dangling foreign
 key takes the batch with it.
 
-The SQL behind all that is checked in: `supabase/migrations/`. Schema changes
-belong there, not only in the dashboard.
+**A browser is shared, so the cache is owned.** `openchapter:owner` records
+whose library is sitting in this browser, and `clearLocalLibrary()` wipes every
+`openchapter:` key when a different account signs in. Without it the second
+writer on a machine inherits the first one's shelf — and now, with a server
+behind it, pushes those books up under their own account.
+
+The SQL behind all that is checked in: `supabase/migrations/` (library,
+book publishing, billing, feedback). Schema changes belong there, not only in
+the dashboard. `20260730000000_book_publishing.sql` has **not been applied** to
+the live project — see TODO.md; until it is, listing details save locally and
+the push silently rejects the unknown column.
 
 **Payments are PayHere, and optional in the same way everything else is.** Set
 `PAYHERE_MERCHANT_ID` and `PAYHERE_MERCHANT_SECRET` and the app grows plans;
@@ -382,59 +543,81 @@ returns gates anything that costs money; the billed routes check server-side,
 which is the only check a reader with devtools cannot edit. It exists to tell a
 writer the truth about their own account.
 
-**The root layout carries three things no screen owns.** `ThemeSync` (above),
-`LibrarySync` — which runs `syncWithServer()` once per mount, enough because
+**Feedback is a private channel, and what it may carry is the whole design.**
+`src/lib/feedback.ts` (the topics and the four faces) plus `feedback-dialog.tsx`,
+which inserts straight into Supabase. The migration grants `authenticated` an
+insert and **no select at all**, so a signed-in reader with devtools cannot read
+anybody's notes including their own — it is a suggestion box, not a forum.
+Nothing about the book is sent: no title, no word count, and deliberately not
+the URL, because a URL in this app carries book and chapter ids. What goes is
+the message, a topic from a fixed list, one face, and the account id the server
+already knows. The dialog lists exactly that above the send button; if you add a
+field, add it there too.
+
+**The root layout carries three things no screen owns.** `ThemeSync` — which
+applies `[data-theme]`, listens to `prefers-color-scheme` while the pref is
+"system", and runs the one-time theme migration — `LibrarySync` — which runs `syncWithServer()` once per mount, enough because
 every way of signing in ends in a redirect or full navigation, and flushes
 queued pushes on `visibilitychange` so a closed tab doesn't take the last save
 with it — and `AppLoader`, the held splash. `AppLoader` skips `/` deliberately
 and is *seeded* to "gone" there rather than switched off in an effect, or it
 paints and is taken away, which is the flash it exists to prevent.
 
-**The landing page is the one screen not built from the app's tokens.**
-`src/components/landing/` is what a signed-out visitor sees at `/`, drawn to the
-"OpenChapter Landing v2" design in that design's own palette and in Plus Jakarta
-Sans (`font-brand`, declared in `globals.css` and wired in `layout.tsx`). The
-hexes are written literally on purpose: the `@theme` tokens describe the
-*product*, and this is a shop front — a fixed composition built around a
-photograph and a shelf of covers. Bending the app's tokens to cover both would
-make several of them lie a little. (It used to carry `data-theme="light"` to opt
-out of the dark theme; that theme is gone, so the attribute went with it.)
+**The landing page was rebuilt around the new positioning**, and it is one file:
+`src/components/landing/landing-page.tsx`, what a signed-out visitor sees at `/`.
+The frame is the book's life — **Write → Prepare → Track** — rather than a
+feature list, so a writer finds their own problem named before they find a
+feature. Its styling is deliberately ordinary stock Tailwind (`bg-black`, white
+and neutral greys) and is *scaffolding rather than a design*: the thing under
+review is the structure and the words, and judging new copy through the old
+furniture is what the rewrite was avoiding. It is the one screen not built from
+the app's `@theme` tokens — it states its greys literally, so a change to the
+palette does not reach it and has to be made here too.
 
-Three things there will bite. `sections.ts` has no `"use client"` and exists
-*only* so both sides of the boundary can read the section list: Next replaces a
-client module's exports with client references, so a Server Component importing
-`SECTIONS` from `landing-nav.tsx` gets `.map` of a reference object and the page
-500s. The nav's scroll listener reads its scrolling *container*, not the window —
-`<body>` is `overflow-hidden`, so `window.scrollY` sits at 0 forever and the bar
-never gains its background. And the header's `h-16` and the hero's compensating
-`-mt-16 pt-32` are one measurement written in two places; move one without the
-other and the first heading slides under the bar.
+**Every claim on it has to be true of the code, in both directions.** Nothing
+claims what the app cannot do — the print PDF is the browser's print engine and
+says so — and **nothing stays under the "Not built yet" badge once it ships.**
+That second half fails in the safe direction and so fails silently: Track
+carried "none of it exists today" for a while after Track shipped, which is
+still a page saying something untrue. Walk the badges whenever a feature lands.
+The page reads `SELF_TICKING` / `YOURS_TO_TICK` out of `roadmap.ts` and prices
+out of `billing/plans.ts` rather than restating either, which is the shape to
+prefer for any new figure on it.
 
-**Every claim on that page has to be true of the code**, which is where it
-departs from the source design — the deltas are listed in the header comment of
-`landing-page.tsx` and marked again at each site. The largest: four of the eight
-rows in `publishing-check.tsx` were invented by the design and are *gone* rather
-than reworded, because each remaining row is a check `storeReadiness()` actually
-performs and the section is one click from a signup that would show the real
-panel. `works-with.tsx` names export destinations rather than customer logos
-(there are none to show), with real marks in their real colours and the sourcing
-and licences recorded in the file. The figures (`landing-figures.tsx`,
-`toolkit-figures.tsx`, `laptop-mockup.tsx`, `book-fan.tsx`, `formats-flow.tsx`)
-are drawn from the app's own tokens rather than screenshotted, so they cannot go
-stale silently while the app moves.
+The **previous** design — `landing-nav.tsx`, `publishing-check.tsx`,
+`works-with.tsx`, `sections.ts`, `path-scroller.tsx` and the drawn figures
+(`landing-figures`, `toolkit-figures`, `laptop-mockup`, `book-fan`,
+`formats-flow`, `path-figures`) — is still in that folder and **nothing imports
+any of it now**; the rewrite left it behind, and `font-brand` and the
+"OpenChapter Landing v2" palette live only in those files. It is the finished
+visual design of the *old* positioning, so treat it as reference rather than as
+something to wire back up unchanged. One lesson in there is general and worth
+keeping whatever happens to the rest: `sections.ts` has no `"use client"` and
+exists only so both sides of the boundary can read one array — Next replaces a
+client module's exports with client *references*, so a Server Component
+importing an array from a `"use client"` file gets `.map` of a reference object
+and the page 500s.
 
-**Routes:** `/` — landing page for a signed-out visitor, shelf for a writer,
-decided on the server off `getClaims()` so neither sees the other's screen
-first; with no Supabase configured everyone gets the shelf ·
-`/signin` · `/signup` · `/forgot-password` ·
+**Routes:** `/` — landing page for a signed-out visitor, the **dashboard** for a
+writer (five areas, `?area=`), decided on the server off `getClaims()` so
+neither sees the other's screen first; with no Supabase configured everyone gets
+the dashboard · `/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
 `/upgrade` plans (public — a price is read before an account exists) ·
 `/upgrade/checkout/[orderId]` billing details, then a form POST straight to
 PayHere · `/upgrade/done` PayHere's return_url, which polls ·
 `/book/new` setup · `/book/import` · `/book/[bookId]` book
 overview (lands here, not on a chapter) ·
-`/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
-`/book/[bookId]/export`.
+`/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view.
+
+The fifteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
+`paperback` · `comps`, `blurb`, `categories`, `covers`, `title-check` ·
+`structure`, `prose`, `progress`, `provenance` · `money`, `track`, `arc` —
+grouped there the way `book-tools.ts` groups them.
+
+**API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
+`/api/comps` · `/api/billing/*`. The first three are metered and gated by
+`requirePro()`; `/api/comps` is free and stays free.
 
 ## Styling
 
@@ -448,17 +631,71 @@ attribute. Body type is the same shape: `src/lib/page-setup.ts` and
 properties on the manuscript container, which the editor and the reading view
 both read — so one setting styles the writing surface and the read-through alike.
 
-**There is one palette, and it is light.** A light/dark theme lived in `prefs`
-until it was removed — with it went `ThemeSync`, the pre-paint bootstrap script
-in `layout.tsx`, `suppressHydrationWarning` on `<html>`, the rail's toggle, and
-the `:root[data-theme="dark"]` block. Nothing reads `data-theme` now. Do not add
-a `dark:` variant to a class: it will never match, and it reads to the next
-person as if the app still had a theme. If dark is ever wanted back, the git
-history has the whole of it in one commit.
+**One greyscale palette in two values.** No hue anywhere except the status
+family below. The dark set is the `@theme` block and the default — `surface`
+#000 → `panel` #0a0a0a → `raised` #1c1c1c, `line` #262626, `fg` #ededed, `muted`
+#8f8f8f — and the light set is the `:root[data-theme="light"]` block right under
+it, which re-points those same names. Dark inverts light's elevation logic: on
+black every surface above the ground is *lighter* and lifted by a hairline
+(a shadow on black is invisible), while on white the desk is grey, cards are
+white on it, and a hover *deepens*. That is why `raised` crosses over between
+the two blocks rather than swapping ends.
 
-Two writer-facing looks are still stored in `prefs` and each is applied its own
-way: `paper` as `[data-paper]` on the writing surface, and `focusMode` /
-`typewriter` as behaviour.
+Two rules keep the pair honest, and both are in the file:
+
+- **Every token stated in one block must be stated in the other.** A name that
+  exists in only one keeps its dark value in daylight, and it will be a hairline
+  or a hover that nobody notices for a month.
+- **The theme decides colour, never layout.** No `[data-theme="light"] .thing {
+  padding: … }`, or the two become two designs.
+
+**The writer's choice is `prefs.theme`: `system` | `light` | `dark`.** "system"
+is a real answer and the default — a machine that turns dark at sunset has
+already said what its owner wants. It is resolved *before CSS sees it*: the
+bootstrap script in `layout.tsx` reads the pref, resolves "system" against
+`prefers-color-scheme`, and writes `light` or `dark` onto `<html data-theme>`
+before the first paint (hence `suppressHydrationWarning` on `<html>`).
+`ThemeSync` at the root carries every change after that, and **listens to the
+media query while the pref is "system"** — without that, a laptop turning dark
+at sunset would only reach the app on the next reload. `theme-toggle.tsx` is the
+control, in the dashboard sidebar and in the editor's Text & type flyout.
+
+Two consequences worth knowing. **Do not use Tailwind's `dark:` variant**: it
+keys off `prefers-color-scheme`, so it would ignore a writer who chose against
+their system — the whole point of the setting. And a library stored before the
+theme existed has no `theme` recorded; `themeUnset()` spots that and `ThemeSync`
+calls `setTheme("system")` once, which is the entire migration.
+
+Three more things follow from the palette, and each has bitten already:
+
+- **A filled action carries `text-accent-ink`.** The fill is white at night and
+  near-black by day, so a fixed `text-white` on `bg-accent` is invisible in
+  exactly one theme — the half nobody tests. `bg-danger` and the matter fills
+  each carry their own `-ink` token for the same reason.
+- **The three parts of a book are three values, not three hues** — front
+  strongest, back palest, in binding order — and the five papers are five greys.
+  **The unpicked paper follows the theme** (`setTheme` in `library-store.ts`):
+  a black page in a white app is something the writer would have to go and fix,
+  having chosen nothing. `paperPicked`, stamped by `setPref("paper", …)`, is
+  what stops that touching anyone who has actually been to the Paper menu.
+  Deriving it at read time instead was tried and is wrong: `getPrefs` is cached
+  on the raw string, so anything derived from outside that string goes stale the
+  moment the theme moves and nothing invalidates it.
+- **Two things keep their colour, on purpose.** The status family — the
+  readiness badges (`Flag` in `bookshelf.tsx`), warnings, `danger`, the
+  roadmap's completed ticks — because there the colour *is* the information and
+  red/amber/green need no teaching. They are **tokens, not literal shades**
+  (`ok`/`note`/`stop`, each a `-bg`, a `-line` and a `-fg`), precisely because a
+  shade tuned for black is a dark blob on white: near-black ground with
+  saturated ink at night, pale ground with dark ink by day, squared rather than
+  a capsule. A translucent wash with pale ink was tried first and reads as a
+  faded sticker. The other is the fifteen tool marks (`tool-marks.tsx`), which
+  are product marks rather than chrome — fifteen grey marks are fifteen grey
+  squares — and whose tile is a theme token, so the colour stays inside the mark.
+
+The writer-facing looks stored in `prefs` are each applied their own way:
+`theme` as `[data-theme]` on `<html>` (above), `paper` as `[data-paper]` on the
+writing surface, and `focusMode` / `typewriter` as behaviour.
 
 `<body>` is `overflow-hidden` (for the editor shell). A standalone scrolling page
 therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reach.
@@ -468,11 +705,22 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
 - **No dead UI.** A control either works or plainly says it isn't built. Don't
   copy chrome from a reference and leave it inert.
 - **No claim the code can't back**, which is the same rule pointed at words
-  instead of controls. The landing page, the pricing rows and the FAQ are held
-  to what ships — the print PDF is the browser's print engine and is *not*
-  print-ready in the trade sense, and every page that mentions it says so. When
-  a design or a reference promises something we don't do, cut the promise rather
-  than reword it.
+  instead of controls. The landing page, the pricing rows, the FAQ and the tool
+  descriptions in `book-tools.ts` are held to what ships — the print PDF is the
+  browser's print engine and is *not* print-ready in the trade sense, and every
+  page that mentions it says so. When a design or a reference promises something
+  we don't do, cut the promise rather than reword it.
+- **No invented number.** No score, no grade, no rating out of a hundred, and no
+  figure derived to look like a measurement. Where a figure is directional it
+  says where it came from; where it cannot be known honestly (a break-even count
+  with no royalty rate, a finish date off a shrinking manuscript) the screen
+  says nothing rather than something plausible. Report facts, never verdicts —
+  the people selling verdicts to this audience are the ones it has been burned
+  by.
+- **The assistant reads and reports; it never writes into the book.** Same rule
+  behind the prose report having no rewrite button. Two features are ruled out
+  on this ground and stay ruled out: AI-generated covers and AI editing. See
+  TODO.md.
 - **The Help dialog is documentation and goes stale like documentation.** When a
   feature ships, add it to the `SECTIONS` list in `shelf/help-dialog.tsx` — it's
   the only place in the app that explains what exists.
@@ -482,7 +730,10 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
   "Available soon" dialog; the buttons are now gone too, so the code is
   unreachable. It is not dead — do not tidy it away. `TODO.md` says what each is
   waiting on, and adding a rail item that opens the real dialog is the whole of
-  switching either on.
+  switching either on. Two more things are kept callerless on purpose:
+  `coming-soon-dialog.tsx` and `Badge` in `bookshelf.tsx`, which are what the
+  next half-finished feature announces itself with. (The old landing components
+  are a different case — see the landing note above.)
 - Storage limits are real: covers capped at 250KB, inline images at 900KB, import
   at 8MB — localStorage is ~5MB per origin. `setCover` and `createBookFromImport`
   fail cleanly and return a signal; honour it.

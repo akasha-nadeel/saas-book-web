@@ -1,13 +1,20 @@
 "use client";
 
 /**
- * Muted cloth-cover palettes for books with no artwork of their own.
+ * Cloth-cover palettes for books with no artwork of their own.
  *
- * A book is assigned one deterministically from its id, so its colour is its
- * own and never shifts. A shelf of these reads as a library rather than a paint
- * chart because every one is desaturated and they share a weight. Each carries
- * its own ink so the title stays legible — and tonal — instead of a flat black
- * on every hue.
+ * A book is assigned one deterministically from its id, so its cover is its own
+ * and never shifts. They were eight muted hues — slate blue, sage, sand — and
+ * are now eight *values*, because the app has one palette and no colour in it.
+ *
+ * **Eight greys work where eight hues did by running the full ladder**, from
+ * near-white to near-black, rather than crowding the light end where the cloth
+ * colours all sat. So the four dark ones print their titles in light ink and
+ * the four light ones in dark, which is a second axis of difference and is what
+ * keeps a shelf of these from reading as one book eight times.
+ *
+ * Each still carries its own ink and muted, for the reason it always did: a
+ * flat black title on every cover is a swatch card, not a shelf.
  */
 const COVER_PALETTES: {
   from: string;
@@ -15,14 +22,14 @@ const COVER_PALETTES: {
   ink: string;
   muted: string;
 }[] = [
-  { from: "#cfd8e1", to: "#bcc8d5", ink: "#2b3a49", muted: "#586878" }, // slate blue
-  { from: "#d2dac9", to: "#c0ccb6", ink: "#34402c", muted: "#606e57" }, // sage
-  { from: "#e5dcc8", to: "#d6cbb2", ink: "#463c28", muted: "#786b50" }, // sand
-  { from: "#dfcecc", to: "#cebbb9", ink: "#473839", muted: "#7b6666" }, // dusty rose
-  { from: "#d5cfe0", to: "#c4bad3", ink: "#3a3448", muted: "#675f7d" }, // lavender
-  { from: "#dfcbbc", to: "#d0b7a4", ink: "#4a3729", muted: "#806655" }, // clay
-  { from: "#c7d8d4", to: "#b3c9c4", ink: "#28403b", muted: "#54706b" }, // muted teal
-  { from: "#dbd5cb", to: "#cbc4b6", ink: "#3c3931", muted: "#6d675b" }, // greige
+  { from: "#ededed", to: "#dcdcdc", ink: "#1a1a1a", muted: "#5c5c5c" }, // chalk
+  { from: "#d4d4d4", to: "#c2c2c2", ink: "#1f1f1f", muted: "#565656" }, // bone
+  { from: "#bdbdbd", to: "#a8a8a8", ink: "#1c1c1c", muted: "#4b4b4b" }, // ash
+  { from: "#9c9c9c", to: "#8a8a8a", ink: "#141414", muted: "#3d3d3d" }, // pewter
+  { from: "#6e6e6e", to: "#5c5c5c", ink: "#f5f5f5", muted: "#d0d0d0" }, // slate
+  { from: "#4a4a4a", to: "#3a3a3a", ink: "#f0f0f0", muted: "#c0c0c0" }, // graphite
+  { from: "#2e2e2e", to: "#222222", ink: "#ededed", muted: "#a8a8a8" }, // charcoal
+  { from: "#171717", to: "#0d0d0d", ink: "#e5e5e5", muted: "#949494" }, // ink
 ];
 
 function coverPalette(seed: string) {

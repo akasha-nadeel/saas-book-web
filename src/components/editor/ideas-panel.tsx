@@ -86,7 +86,7 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
             type="submit"
             disabled={!text.trim()}
             className="rounded-md bg-accent px-3 py-1.5 font-sans text-xs font-semibold
-                       text-white disabled:opacity-40"
+                       text-accent-ink disabled:opacity-40"
           >
             Park it
           </button>

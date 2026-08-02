@@ -45,7 +45,7 @@ export function ImportBanner({
         <button
           type="button"
           onClick={onKeep}
-          className="rounded-md bg-accent px-3 py-1.5 font-semibold text-white
+          className="rounded-md bg-accent px-3 py-1.5 font-semibold text-accent-ink
                      outline-none transition-colors hover:bg-accent-strong
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >

@@ -61,7 +61,7 @@ export function SupportDialog({ onClose }: { onClose: () => void }) {
             type="button"
             onClick={onClose}
             className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                       font-semibold text-white outline-none transition-colors
+                       font-semibold text-accent-ink outline-none transition-colors
                        hover:bg-accent-strong focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >

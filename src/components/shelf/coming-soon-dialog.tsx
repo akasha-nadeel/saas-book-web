@@ -57,7 +57,7 @@ export function ComingSoonDialog({
         // deep ground it falls on.
         style={{
           backgroundImage:
-            "radial-gradient(120% 80% at 50% -10%, rgba(96,165,250,0.35) 0%, rgba(37,99,235,0.12) 38%, rgba(0,0,0,0) 72%), linear-gradient(180deg, #0d1424 0%, #070a12 100%)",
+            "radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.06) 38%, rgba(0,0,0,0) 72%), linear-gradient(180deg, #121212 0%, #000000 100%)",
         }}
       >
         {/* The beam itself: a soft wedge coming down from the top edge, which is
@@ -73,7 +73,7 @@ export function ComingSoonDialog({
         />
 
         <div className="relative">
-          <p className="font-sans text-xs font-semibold tracking-[0.28em] text-blue-200/70 uppercase">
+          <p className="font-sans text-xs font-semibold tracking-[0.28em] text-muted uppercase">
             Something new
           </p>
 
@@ -102,7 +102,7 @@ export function ComingSoonDialog({
 
           <div
             className="mx-auto mt-3 max-w-md font-sans text-base leading-relaxed
-                       font-medium text-blue-50/90"
+                       font-medium text-fg/90"
           >
             {children}
           </div>
@@ -111,10 +111,10 @@ export function ComingSoonDialog({
             type="button"
             onClick={onClose}
             className="mt-9 cursor-pointer rounded-full bg-white px-7 py-3
-                       font-sans text-sm font-semibold text-[#0d1424]
+                       font-sans text-sm font-semibold text-accent-ink
                        outline-none transition-opacity hover:opacity-90
-                       focus-visible:ring-2 focus-visible:ring-blue-300
-                       focus-visible:ring-offset-2 focus-visible:ring-offset-[#0d1424]"
+                       focus-visible:ring-2 focus-visible:ring-fg/60
+                       focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
             Back to writing
           </button>

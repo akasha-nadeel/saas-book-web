@@ -173,7 +173,7 @@ export function NewBookForm() {
                 {coverError && (
                   <p
                     role="alert"
-                    className="mt-2 font-sans text-xs text-red-400"
+                    className="mt-2 font-sans text-xs text-danger"
                   >
                     {coverError}
                   </p>
@@ -290,7 +290,7 @@ export function NewBookForm() {
             <button
               type="submit"
               className="rounded-md bg-accent px-5 py-2.5 font-sans text-sm
-                         font-semibold text-white outline-none
+                         font-semibold text-accent-ink outline-none
                          transition-colors hover:bg-accent-strong
                          focus-visible:ring-2 focus-visible:ring-accent/60"
             >

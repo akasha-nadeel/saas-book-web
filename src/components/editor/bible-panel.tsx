@@ -87,7 +87,7 @@ export function BiblePanel({
         <button
           type="button"
           onClick={() => setAdding((a) => !a)}
-          className="rounded-md bg-accent px-2.5 py-1 font-sans text-xs font-semibold text-white"
+          className="rounded-md bg-accent px-2.5 py-1 font-sans text-xs font-semibold text-accent-ink"
         >
           {adding ? "Cancel" : "Add"}
         </button>
@@ -142,7 +142,7 @@ export function BiblePanel({
             type="submit"
             disabled={!name.trim()}
             className="rounded-md bg-accent px-3 py-1.5 font-sans text-xs font-semibold
-                       text-white disabled:opacity-40"
+                       text-accent-ink disabled:opacity-40"
           >
             Add to the bible
           </button>

@@ -162,7 +162,7 @@ function CoverChecker() {
                       <span
                         className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
                           finding.level === "problem"
-                            ? "bg-red-100 text-red-700"
+                            ? "bg-stop-bg text-stop-fg"
                             : "bg-raised text-muted"
                         }`}
                       >
@@ -289,7 +289,7 @@ export function CoversPage({ bookId }: { bookId: string }) {
           <button
             type="submit"
             disabled={state === "loading" || query.trim().length < 2}
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
           >
             {state === "loading" ? "Looking…" : "Show me the shelf"}
           </button>
@@ -313,7 +313,7 @@ export function CoversPage({ bookId }: { bookId: string }) {
                     type="button"
                     onClick={() => setSize(s.id)}
                     className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
-                      size === s.id ? "bg-accent text-white" : "text-muted"
+                      size === s.id ? "bg-accent text-accent-ink" : "text-muted"
                     }`}
                   >
                     {s.label}

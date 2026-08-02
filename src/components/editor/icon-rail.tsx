@@ -30,7 +30,7 @@ export function RailButton({
                      outline-none transition-colors focus-visible:ring-2
                      focus-visible:ring-accent/60 ${
                        active
-                         ? "bg-accent text-white"
+                         ? "bg-accent text-accent-ink"
                          : "text-muted hover:bg-raised hover:text-fg"
                      }`;
 

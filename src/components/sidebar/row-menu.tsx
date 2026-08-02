@@ -33,7 +33,10 @@ export interface RowMenuItem {
  */
 const TONE: Record<"chrome" | "paper" | "art", string> = {
   chrome: "text-fg hover:bg-raised",
-  paper: "bg-black/10 text-[#16191f] hover:bg-black/25",
+  // The sheet takes its own ink, whichever of the five papers is set — the
+  // writer can still choose a white one under a black app, and a chip fixed to
+  // either end of the ladder would vanish on the other.
+  paper: "bg-[color-mix(in_srgb,var(--paper-fg)_10%,transparent)] text-[color:var(--paper-fg)] hover:bg-[color-mix(in_srgb,var(--paper-fg)_22%,transparent)]",
   art: "bg-black/45 text-white hover:bg-black/65",
 };
 
@@ -250,7 +253,7 @@ export function RowMenu({
                               transition-colors focus-visible:ring-2
                               focus-visible:ring-accent/60 ${
                                 item.danger
-                                  ? "text-red-400 hover:bg-red-400/10"
+                                  ? "text-danger hover:bg-fg/10"
                                   : "text-fg hover:bg-raised"
                               }`}
                 >

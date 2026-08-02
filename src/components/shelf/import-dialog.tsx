@@ -336,7 +336,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                       />
                       <span
                         className={`inline-block rounded-lg bg-accent px-4 py-2 font-sans
-                                    text-sm font-semibold text-white transition-colors
+                                    text-sm font-semibold text-accent-ink transition-colors
                                     ${
                                       transcribing || busy
                                         ? "opacity-40"
@@ -377,7 +377,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                       disabled={!pasteText.trim() || busy}
                       onClick={readPaste}
                       className="rounded-lg bg-accent px-4 py-2 font-sans text-sm
-                                 font-semibold text-white outline-none
+                                 font-semibold text-accent-ink outline-none
                                  transition-colors hover:bg-accent-strong
                                  focus-visible:ring-2 focus-visible:ring-accent/60
                                  disabled:opacity-40"
@@ -483,7 +483,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                 type="button"
                 onClick={create}
                 className="rounded-lg bg-accent px-5 py-2 font-sans text-sm
-                           font-semibold text-white outline-none transition-colors
+                           font-semibold text-accent-ink outline-none transition-colors
                            hover:bg-accent-strong focus-visible:ring-2
                            focus-visible:ring-accent/60"
               >

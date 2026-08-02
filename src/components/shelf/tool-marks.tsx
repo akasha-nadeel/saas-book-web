@@ -9,9 +9,16 @@
  * So each is built the way a product logo is: **solid shapes, two or three
  * colours, and a silhouette you could recognise with the label covered.** Two
  * rules keep the set from becoming a rabble — every mark is drawn on the same
- * 24 grid and sits on the same white tile, and every one is filled geometry
- * rather than line work, so none of them looks like a different set's icon that
+ * 24 grid and sits on the same tile, and every one is filled geometry rather
+ * than line work, so none of them looks like a different set's icon that
  * wandered in.
+ *
+ * **These keep their colour while the rest of the app is greyscale, and that is
+ * deliberate.** A product mark is not chrome: it is the thing you learn to find
+ * a tool by, the way you find an app on a phone without reading a single label.
+ * Fifteen grey marks are fifteen grey squares. The tile they sit on belongs to
+ * the app and is dark like everything else, so the colour is contained inside
+ * the mark rather than loose on the page.
  *
  * **None of these is anybody's logo.** They are marks for our own features, so
  * there is nothing real to reproduce and nothing to get wrong: the place real
@@ -20,8 +27,6 @@
  * Drawing a lookalike of somebody else's mark here would be the mistake that
  * file already warns about.
  *
- * Colour is per mark rather than per group, which is what makes a wall of them
- * read as a set of products. The group's own hue stays on its heading.
  */
 
 export const TOOL_MARKS: Record<string, React.ReactNode> = {
@@ -191,21 +196,26 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
 /**
  * One mark on its tile.
  *
- * White rather than a tint of the mark's own colour: a white tile is what makes
- * a row of these read as a shelf of products, and it is the one thing every
- * logo grid worth copying has in common. The border does the lifting a shadow
- * would, and stays crisp at this size.
+ * One neutral tile for all fifteen rather than a tint of each mark's own
+ * colour: a uniform tile is what makes a row of these read as a shelf of
+ * products, and it is the one thing every logo grid worth copying has in
+ * common. It is a lift off the card rather than the white it used to be,
+ * because on this palette fifteen white tiles would be the brightest thing on
+ * the screen — brighter than the marks they exist to hold. The border does the
+ * lifting a shadow would, and stays crisp at this size.
  *
  * Drawn large. These are the only thing on a card now — the descriptions moved
  * to the hover — so the mark has to carry the recognition on its own, and a
  * 26px glyph on a grid this size reads as a bullet rather than a logo.
  */
 export function ToolMark({ name }: { name: string }) {
+  // A tile one step up from the card it sits on, plus a hairline. A shadow does
+  // nothing on black, so the lift has to come from value.
   return (
     <span
       className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl
-                 border border-line bg-white shadow-sm transition-shadow
-                 group-hover:shadow-md"
+                 border border-line bg-raised transition-colors
+                 group-hover:border-fg/25"
     >
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-8 w-8">
         {TOOL_MARKS[name]}

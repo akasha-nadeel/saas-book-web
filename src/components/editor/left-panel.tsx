@@ -55,9 +55,9 @@ export function LeftPanel({
         className="fixed inset-0 z-30 bg-black/50 md:hidden"
       />
       <aside
-        // The pale half of the two-tone nav; see .panel-chrome. Blue in light,
-        // plain dark panel at night. Below md it sits over the page next to the
-        // rail; at md and up it's a static column as before.
+        // The tool panel; see .panel-chrome — it takes the rail's own value, so
+        // the left side reads as one surface. Below md it sits over the page
+        // next to the rail; at md and up it's a static column as before.
         className="panel-chrome fixed top-0 bottom-0 left-(--rail-width) z-40 flex
                    w-(--sidebar-width) max-w-[80vw] shrink-0 flex-col border-r
                    border-line md:static md:left-auto md:z-auto md:max-w-none"

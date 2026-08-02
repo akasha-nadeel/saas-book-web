@@ -24,10 +24,17 @@ import {
   hasCover,
   migrateLegacy,
   restoreBook,
+  setRoadmapStep,
   trashBook,
   type Book,
   type BookView,
 } from "@/lib/library-store";
+import {
+  checkup,
+  countFindings,
+  type FindingLevel,
+  type Fix,
+} from "@/lib/checkup";
 import { relativeTime } from "@/lib/relative-time";
 import {
   useActivity,
@@ -45,8 +52,9 @@ import {
 } from "@/lib/arc";
 import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
-import { PHASES, progressOf, roadmapFor } from "@/lib/roadmap";
+import { PHASES, progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
+import { ThemeRow } from "@/components/theme/theme-toggle";
 import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
   Menu,
@@ -70,11 +78,33 @@ import {
  * opening this should see immediately that the app has an opinion about the
  * whole job, not just the manuscript.
  *
- * **Overview carries only what no other area answers.** It used to end with a
- * grid of cards, one per area, which was four buttons duplicating four rail
- * items that are on screen at the same time — and whose caption had already
- * gone stale twice. Every block on it now answers a question nothing else does:
- * where was I, what is actually late, and am I moving.
+ * **Overview is a diagnosis, not a greeting.** It used to open on "Pick up
+ * where you left off" and end with four tiles, three of which counted words —
+ * a writing app's dashboard on a product whose whole argument is that writing
+ * is one part of the job. The person arriving usually *has* a book, often
+ * finished, often imported, and came because they do not know what is standing
+ * between it and a shop. A word count and a Continue writing button answer a
+ * question they did not ask.
+ *
+ * So the card is now: which book this is about (changeable — the last one
+ * opened is often not the one with the problem), what state it is in, and then
+ * **the findings** — what is actually wrong with it, worst first, each with the
+ * button that fixes it. `checkup()` decides every part of that and is pure and
+ * tested; this file chooses only how it looks.
+ *
+ * Under the findings, and deliberately under them, is the road: the five phase
+ * dials and the roadmap's own next step. Both are "what next" and they are
+ * different questions — the findings are what is wrong with the *book*, the
+ * step is where you are on the *road* — so they are stacked rather than set
+ * side by side, where the writer had to work out which one to obey.
+ *
+ * Every block still has to answer a question nothing else does; that is the
+ * rule that removed the grid of area cards, which were four buttons
+ * duplicating four rail items on screen at the same time. The findings are the
+ * near miss — the Prepare area lists readiness book by book — and they stay
+ * distinct because this is one book examined in depth and that is every book at
+ * a glance. When there are more findings than fit, this points at the export
+ * screen rather than growing into it.
  *
  * There were six. **Learn is gone**: it had become a per-book list of roadmap
  * progress with a menu of four tools hanging off it, which is the roadmap page
@@ -114,7 +144,7 @@ const AREAS: {
     id: "overview",
     label: "Overview",
     live: true,
-    blurb: "Where the book is, and what to do next.",
+    blurb: "What stands between your book and a shop, and what to do about it.",
     icon: shelfIcons.overview,
     stage: true,
   },
@@ -399,6 +429,12 @@ export function Bookshelf({
           <SideItem icon={shelfIcons.pricing} href="/upgrade">
             Pricing
           </SideItem>
+
+          {/* Last, and not a SideItem: the four above go somewhere, this one
+              changes what you are looking at. Separated by a rule for the same
+              reason — a control that acts on the app itself is a different kind
+              of thing from a list of places. */}
+          <ThemeRow className="mt-2 border-t border-line px-3 pt-3" />
         </div>
       </aside>
 
@@ -465,7 +501,7 @@ export function Bookshelf({
                 <Link
                   href="/book/new"
                   className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
-                         text-sm font-semibold text-white"
+                         text-sm font-semibold text-accent-ink"
                 >
                   {shelfIcons.plus}
                   New book
@@ -475,7 +511,7 @@ export function Bookshelf({
                   label="Other ways to start a book"
                   align="end"
                   width={248}
-                  triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-white"
+                  triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-accent-ink"
                   trigger={shelfIcons.chevron}
                 >
                   {(close) => (
@@ -589,6 +625,25 @@ export function Bookshelf({
 
 /* ---- Areas --------------------------------------------------------------- */
 
+/**
+ * How many findings the card shows before it points at the full check.
+ *
+ * Five is about a screen's worth. A dashboard that lists eleven problems is
+ * not a dashboard, it is the export screen with a different heading — and the
+ * point of this one is that a writer can read it in a glance and know what to
+ * press.
+ */
+const FINDINGS_SHOWN = 5;
+
+/** What a book is *doing*, in the writer's terms rather than the roadmap's. */
+const PHASE_STATE: Record<Phase, string> = {
+  write: "Drafting",
+  revise: "Revising",
+  prepare: "Getting it ready",
+  launch: "Before you publish",
+  publish: "Publishing",
+};
+
 function Overview({
   current,
   all,
@@ -629,15 +684,21 @@ function Overview({
   // Once per visit is also the right cadence — lateness turns over at midnight.
   const [now] = useState(() => Date.now());
 
+  /** Advance readers per book. One read, used by the checkup and by `late`. */
+  const readers = useMemo(
+    () => new Map(all.map((b) => [b.id, parseArc(getArcRaw(b.id))])),
+    [all],
+  );
+
   const late = useMemo(() => {
     return all
-      .map((book) => ({
-        book,
-        count: parseArc(getArcRaw(book.id)).filter((r) => isOverdue(r, now))
+      .map((b) => ({
+        book: b,
+        count: (readers.get(b.id) ?? []).filter((r) => isOverdue(r, now))
           .length,
       }))
       .filter((row) => row.count > 0);
-  }, [all, now]);
+  }, [all, readers, now]);
 
   /**
    * Momentum, not totals.
@@ -648,8 +709,10 @@ function Overview({
    * net words per day all along, and "did I write this week" is the question
    * the screen is being asked.
    */
+  // The thirty-day figure went with the tile that carried it. The Progress
+  // tool has the full picture, per book and with a finish date; this screen
+  // needs one line about whether there is movement.
   const week = useMemo(() => pace(activity, 7), [activity]);
-  const month = useMemo(() => pace(activity, 30), [activity]);
   const run = useMemo(() => streak(activity), [activity]);
 
   /**
@@ -666,70 +729,238 @@ function Overview({
   );
 
   /**
-   * The next unfinished step for the book being offered.
+   * Which book this screen is about.
    *
-   * `roadmapFor` works most of it out from the book itself, so this is not a
-   * checklist somebody has to maintain — it is the same answer the roadmap
-   * page gives, surfaced where the writer already is.
+   * The last one opened until the writer says otherwise, and *sticky* after
+   * that: a diagnosis you cannot hold still is one you cannot work through,
+   * and with seven books on the shelf the one most recently opened is often
+   * not the one with the problem.
    */
-  const steps = useMemo(
-    () => (current ? roadmapFor(current, current.roadmapDone ?? []) : []),
-    [current],
+  const [picked, setPicked] = useState<string | null>(null);
+  const book = useMemo(
+    () => all.find((b) => b.id === picked) ?? current,
+    [all, picked, current],
   );
-  const next = useMemo(
+
+  /**
+   * The diagnosis: what is wrong with this book, and where each is fixed.
+   *
+   * `checkup` is pure and tested, and it is the whole of the thinking — this
+   * component decides nothing about severity, order or destinations. Cheap
+   * enough to run on a shelf change: `hasCover` tests for the key rather than
+   * fetching a 250KB data URL, the chapter count is denormalised into the
+   * shelf, and no manuscript is parsed to draw this screen.
+   */
+  const findings = useMemo(
+    () =>
+      book
+        ? checkup({
+            book,
+            hasCover: hasCover(book.id),
+            chapterCount: book.chapters.filter((c) => c.words > 0).length,
+            arcCount: readers.get(book.id)?.length ?? 0,
+          })
+        : [],
+    [book, readers],
+  );
+  const counts = useMemo(() => countFindings(findings), [findings]);
+
+  const steps = useMemo(
+    () => (book ? roadmapFor(book, book.roadmapDone ?? []) : []),
+    [book],
+  );
+  const progress = useMemo(
     () => (steps.length > 0 ? progressOf(steps) : null),
     [steps],
   );
 
   return (
     <div className="flex flex-col gap-5">
-      {current ? (
+      {book ? (
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
           <div className="flex flex-wrap items-start gap-5 p-5">
             <Link
-              href={`/book/${current.id}`}
+              href={`/book/${book.id}`}
               className="w-[92px] shrink-0 transition-transform hover:-translate-y-0.5"
             >
-              <CoverOf book={current} />
+              <CoverOf book={book} />
             </Link>
 
-            <div className="min-w-[14rem] flex-1">
-              <p className="text-xs font-bold tracking-widest text-muted uppercase">
-                Pick up where you left off
-              </p>
-              <p className="mt-1.5 text-xl font-bold text-fg">
-                {current.title}
-              </p>
-              <p className="mt-1 text-sm text-muted">
-                {plural(bookChapterCount(current), "chapter")} ·{" "}
-                {bookWordCount(current).toLocaleString()} words · opened{" "}
-                {relativeTime(current.lastOpenedAt)}
-              </p>
+            <div className="min-w-[16rem] flex-1">
+              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                <div className="min-w-0">
+                  {/* The state of the book, not a greeting. This was "Pick up
+                      where you left off", which made the largest block on the
+                      first screen a writing prompt — wrong for most people who
+                      arrive, who already have a manuscript and want to know
+                      what is standing between it and a shop. */}
+                  <p className="text-xs font-bold tracking-widest text-muted uppercase">
+                    {progress?.next
+                      ? PHASE_STATE[progress.next.phase]
+                      : "Every step done"}
+                  </p>
+                  <p className="mt-1.5 text-xl font-bold text-fg">
+                    {book.title}
+                  </p>
+                  <p className="mt-1 text-sm text-muted">
+                    {plural(bookChapterCount(book), "chapter")} ·{" "}
+                    {bookWordCount(book).toLocaleString()} words · opened{" "}
+                    {relativeTime(book.lastOpenedAt)}
+                  </p>
+                </div>
+
+                {/* Which book is being diagnosed, changeable from here.
+
+                    The screen used to be about whichever book was opened last,
+                    with no way to say otherwise — and the book you opened last
+                    is very often not the one with the problem. Seven books and
+                    no switch meant opening one just to be told about it. */}
+                {all.length > 1 && (
+                  <Menu
+                    label="Choose which book this is about"
+                    align="end"
+                    width={260}
+                    triggerClassName="flex shrink-0 items-center gap-1.5 rounded-lg border
+                                      border-line bg-surface px-3 py-1.5 text-xs
+                                      font-semibold text-fg"
+                    trigger={
+                      <>
+                        Change book
+                        {shelfIcons.chevron}
+                      </>
+                    }
+                  >
+                    {(close) => (
+                      <>
+                        <MenuLabel>Your books</MenuLabel>
+                        {all.map((b) => (
+                          <MenuButton
+                            key={b.id}
+                            icon={
+                              b.id === book.id ? (
+                                shelfIcons.check
+                              ) : (
+                                <span
+                                  aria-hidden="true"
+                                  className="block h-[18px] w-[18px]"
+                                />
+                              )
+                            }
+                            onClick={() => {
+                              setPicked(b.id);
+                              close();
+                            }}
+                          >
+                            {b.title}
+                          </MenuButton>
+                        ))}
+                      </>
+                    )}
+                  </Menu>
+                )}
+              </div>
 
               {/* Only when the writer set a goal. A bar against a target we
                   invented would be the made-up number this app keeps
                   refusing to print. */}
-              {current.targetWords ? (
+              {book.targetWords ? (
                 <TargetBar
-                  words={bookWordCount(current)}
-                  target={current.targetWords}
+                  words={bookWordCount(book)}
+                  target={book.targetWords}
                 />
               ) : null}
+
+              {/* ---- The diagnosis ---------------------------------------
+
+                  The thing the screen is for. Everything here comes from
+                  `checkup`, which is pure and tested and decides all of it —
+                  severity, order, and where each one is put right. This
+                  component chooses nothing except how it looks.
+
+                  There is no score. A percentage or a grade out of ten would be
+                  the invented number this app refuses everywhere else, and on
+                  the first screen a writer sees it would be the most damaging
+                  place to print one. Two counts and a list of real problems say
+                  more and claim less. */}
+              <div className="mt-4">
+                <p className="text-sm">
+                  {counts.fix > 0 ? (
+                    <>
+                      <strong className="text-fg">
+                        {plural(counts.fix, "thing")}
+                      </strong>{" "}
+                      <span className="text-muted">
+                        would stop a shop taking this
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-fg">
+                      <strong>Nothing here would stop a shop</strong> taking it.
+                    </span>
+                  )}
+                  {counts.note > 0 && (
+                    <span className="text-muted">
+                      {" · "}
+                      {counts.note} worth doing
+                    </span>
+                  )}
+                </p>
+
+                {findings.length > 0 ? (
+                  <ul className="mt-3 flex flex-col gap-2">
+                    {findings.slice(0, FINDINGS_SHOWN).map((finding) => (
+                      <li
+                        key={finding.id}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
+                                   border border-line bg-surface px-3.5 py-3"
+                      >
+                        <div className="min-w-[12rem] flex-1">
+                          <p className="text-sm font-semibold text-fg">
+                            {finding.title}
+                          </p>
+                          <p className="text-sm text-muted">{finding.why}</p>
+                        </div>
+                        <FixLink
+                          book={book}
+                          fix={finding.fix}
+                          level={finding.level}
+                          onCover={onCover}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1 text-sm text-muted">
+                    The listing details are in order. The checks that need the
+                    manuscript itself run on the export screen.
+                  </p>
+                )}
+
+                {findings.length > FINDINGS_SHOWN && (
+                  <Link
+                    href={`/book/${book.id}/export`}
+                    className="mt-2.5 inline-block text-sm font-semibold text-accent"
+                  >
+                    {findings.length - FINDINGS_SHOWN} more, with the full check
+                    →
+                  </Link>
+                )}
+              </div>
 
               {/* One primary, one secondary, everything else behind ⋯. Four
                   buttons of equal weight made the writer read all four to
                   find the one they wanted, every single time. */}
               <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
                 <Link
-                  href={`/book/${current.id}`}
-                  className="flex items-center gap-1.5 rounded-lg bg-accent px-4 py-2
-                             font-semibold text-white"
+                  href={`/book/${book.id}`}
+                  className="flex items-center gap-1.5 rounded-lg border border-line
+                             bg-surface px-4 py-2 font-semibold text-fg"
                 >
                   {shelfIcons.write}
-                  Continue writing
+                  Open book
                 </Link>
                 <Link
-                  href={`/book/${current.id}/read`}
+                  href={`/book/${book.id}/read`}
                   className="flex items-center gap-1.5 rounded-lg border border-line
                              bg-surface px-4 py-2 font-semibold text-fg"
                 >
@@ -737,7 +968,7 @@ function Overview({
                   Read
                 </Link>
                 <Menu
-                  label={`More for ${current.title}`}
+                  label={`More for ${book.title}`}
                   width={232}
                   triggerClassName="flex items-center rounded-lg border border-line
                                     bg-surface px-2.5 py-2 text-fg"
@@ -747,14 +978,14 @@ function Overview({
                     <>
                       <MenuLabel>Prepare</MenuLabel>
                       <MenuLink
-                        href={`/book/${current.id}/export`}
+                        href={`/book/${book.id}/export`}
                         icon={shelfIcons.prepare}
                         onNavigate={close}
                       >
                         Export and publish
                       </MenuLink>
                       <MenuLink
-                        href={`/book/${current.id}/roadmap`}
+                        href={`/book/${book.id}/roadmap`}
                         icon={shelfIcons.compass}
                         onNavigate={close}
                       >
@@ -765,7 +996,7 @@ function Overview({
                       <MenuButton
                         icon={shelfIcons.info}
                         onClick={() => {
-                          onDetails(current);
+                          onDetails(book);
                           close();
                         }}
                       >
@@ -774,11 +1005,11 @@ function Overview({
                       <MenuButton
                         icon={shelfIcons.image}
                         onClick={() => {
-                          onCover(current);
+                          onCover(book);
                           close();
                         }}
                       >
-                        Change cover
+                        Book details
                       </MenuButton>
                     </>
                   )}
@@ -794,53 +1025,111 @@ function Overview({
               rendered: writing is one of five, and a writer who has finished
               drafting can see they are a fifth of the way rather than done.
               "2 of 18" said the same thing in a way nobody can picture. */}
-          {steps.length > 0 && (
-            <Link
-              href={`/book/${current.id}/roadmap`}
-              className="block border-t border-line bg-surface px-5 py-3.5"
-            >
-              <div className="flex">
-                {PHASES.map((phase, i) => {
-                  const inPhase = steps.filter((st) => st.phase === phase.id);
-                  const done = inPhase.filter((st) => st.done).length;
-                  return (
-                    <div
-                      key={phase.id}
-                      className="relative flex min-w-0 flex-1 flex-col items-center"
-                    >
-                      {/* The line between the rings, drawn from the left edge
-                          to this one's centre. It is what makes five dials
-                          read as a sequence rather than as five gauges — and
-                          the sequence is the thing this strip is for. */}
-                      {i > 0 && (
-                        <span
-                          aria-hidden="true"
-                          className="absolute top-[15px] right-1/2 left-0 h-px bg-line"
-                        />
-                      )}
-                      <PhaseRing done={done} total={inPhase.length} />
-                      <p className="mt-1.5 text-center text-[10px] leading-tight text-muted">
-                        {phase.label}
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
+          {progress && steps.length > 0 && (
+            <div className="border-t border-line bg-surface px-5 py-3.5">
+              <Link
+                href={`/book/${book.id}/roadmap`}
+                className="block"
+                aria-label="The whole road, and what each step is for"
+              >
+                <div className="flex">
+                  {PHASES.map((phase, i) => {
+                    const inPhase = steps.filter(
+                      (st) => st.phase === phase.id,
+                    );
+                    const done = inPhase.filter((st) => st.done).length;
+                    return (
+                      <div
+                        key={phase.id}
+                        className="relative flex min-w-0 flex-1 flex-col items-center"
+                      >
+                        {/* The line between the rings, drawn from the left edge
+                            to this one's centre. It is what makes five dials
+                            read as a sequence rather than as five gauges — and
+                            the sequence is the thing this strip is for. */}
+                        {i > 0 && (
+                          <span
+                            aria-hidden="true"
+                            className="absolute top-[15px] right-1/2 left-0 h-px bg-line"
+                          />
+                        )}
+                        <PhaseRing done={done} total={inPhase.length} />
+                        <p
+                          className={`mt-1.5 text-center text-[10px] leading-tight ${
+                            // The phase the book is standing in, named twice on
+                            // one card — as the eyebrow above and as the lit
+                            // dial here. Two views of one fact rather than two
+                            // facts: the eyebrow says where you are, the strip
+                            // says how far along that is.
+                            progress.next?.phase === phase.id
+                              ? "font-semibold text-fg"
+                              : "text-muted"
+                          }`}
+                        >
+                          {phase.label}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Link>
 
-              {next?.next ? (
-                <p className="mt-2.5 flex flex-wrap items-center gap-x-2 text-sm">
-                  <span className="font-semibold text-accent">Next</span>
-                  <span className="text-fg">{next.next.title}</span>
-                  <span className="ml-auto text-xs text-muted">
-                    {next.done} of {next.total}
+              {/* The roadmap's own next step, under the dials rather than above
+                  the findings.
+
+                  Both are "what to do next" and they are not the same question:
+                  the findings are what is *wrong with the book*, the step is
+                  where you are *on the road*. Stacked, the card reads as one
+                  thought — here is the state of it, here is the position. Side
+                  by side they competed, and the writer had to work out which
+                  one to obey. */}
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line pt-3">
+                {progress.next ? (
+                  <>
+                    <span className="text-xs font-bold tracking-widest text-muted uppercase">
+                      Next
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm text-fg">
+                      {progress.next.title}
+                    </span>
+
+                    {/* "Finish the first draft" and "Revise" have no detector on
+                        purpose — finishing is a decision, not a word count. But
+                        somebody who *imported* a finished manuscript arrives
+                        already past both, and with no way to say so they stay
+                        at Drafting forever, never reach the publishing phases,
+                        and never get told what a shop would refuse. The tick
+                        lives on the roadmap page; the writer is standing here. */}
+                    {!progress.next.automatic && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRoadmapStep(book.id, progress.next!.id, true)
+                        }
+                        className="rounded-lg border border-line bg-panel px-3 py-1.5
+                                   text-xs font-semibold text-fg hover:border-accent/40"
+                      >
+                        Already done
+                      </button>
+                    )}
+                    <Link
+                      href={progress.next.href?.(book.id) ?? `/book/${book.id}`}
+                      className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold
+                                 text-accent-ink"
+                    >
+                      Do this →
+                    </Link>
+                  </>
+                ) : (
+                  <span className="text-sm font-semibold text-fg">
+                    Every step done. That is the whole list.
                   </span>
-                </p>
-              ) : (
-                <p className="mt-2.5 text-sm font-semibold text-fg">
-                  Every step done. That is the whole list.
-                </p>
-              )}
-            </Link>
+                )}
+                <span className="text-xs text-muted">
+                  {progress.done} of {progress.total}
+                </span>
+              </div>
+            </div>
           )}
         </section>
       ) : (
@@ -853,7 +1142,7 @@ function Overview({
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <Link
               href="/book/new"
-              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
             >
               Start a book
             </Link>
@@ -871,7 +1160,7 @@ function Overview({
           to explain that it is empty is a panel earning its place by being
           there rather than by saying anything. */}
       {late.length > 0 && (
-        <section className="rounded-2xl border border-amber-500/40 bg-amber-500/8 p-5">
+        <section className="rounded-2xl border border-note-line bg-note-bg p-5">
           <p className="font-bold text-fg">
             {late.reduce((n, row) => n + row.count, 0)} advance{" "}
             {late.reduce((n, row) => n + row.count, 0) === 1
@@ -896,45 +1185,45 @@ function Overview({
         </section>
       )}
 
-      {/* Three zeros beside a shelf of finished books is a lie by arithmetic:
+      {/* ---- Am I moving -------------------------------------------------
+
+          Last, and half the size it was. There were four tiles here and three
+          of them counted the same thing — words this week, days running, days
+          in the last 30 — which made the foot of the screen a writing tracker
+          and, with the old writing-first card above it, made the whole
+          dashboard one. Writing is a fifth of this product's road; it does not
+          get three quarters of the numbers.
+
+          The two kept are the two that answer different questions: is there
+          movement, and how much is on the shelf. The full picture, per book and
+          with a finish date, is the Progress tool — which is where somebody
+          who actually wants it goes.
+
+          Three zeros beside a shelf of finished books is a lie by arithmetic:
           the day log only started when it shipped, so a writer with 6,000 words
-          behind them opens this and reads that they have written nothing. Until
-          there is a single logged day, the momentum cards are one card that
-          says why they are empty. */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          behind them would read that they had written nothing. Until there is a
+          single logged day, this is one card that says why it is empty. */}
+      <div className="grid gap-3 sm:grid-cols-2">
         {logged ? (
-          <>
-            <Stat
-              icon={shelfIcons.write}
-              value={week.words.toLocaleString()}
-              label="words this week"
-              note={
-                week.daysWritten > 0
-                  ? `across ${week.daysWritten} ${week.daysWritten === 1 ? "day" : "days"}`
-                  : "nothing yet this week"
-              }
-            />
-            <Stat
-              icon={shelfIcons.calendar}
-              value={String(run)}
-              label={run === 1 ? "day running" : "days running"}
-              // Stated, never scolded. The research was explicit about how
-              // writers feel regarding apps that turn a streak into a stick.
-              note={run > 0 ? "keep it or don't" : "a broken streak is fine"}
-            />
-            <Stat
-              icon={shelfIcons.target}
-              value={String(month.daysWritten)}
-              label="days in the last 30"
-              note={
-                month.daysWritten > 0
-                  ? `${month.perWritingDay.toLocaleString()} words on a day you write`
-                  : "the log is waiting"
-              }
-            />
-          </>
+          <Stat
+            icon={shelfIcons.write}
+            value={week.words.toLocaleString()}
+            label="words this week"
+            note={
+              week.daysWritten > 0
+                ? // The streak, folded in rather than given a tile of its own.
+                  // Stated, never scolded: the research was explicit about how
+                  // this audience feels about apps that turn a streak into a
+                  // stick, and a number that large on a screen this size was
+                  // doing the scolding by size alone.
+                  `across ${plural(week.daysWritten, "day")}${
+                    run > 0 ? ` · ${plural(run, "day")} running` : ""
+                  }`
+                : "nothing yet this week — that is allowed"
+            }
+          />
         ) : (
-          <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4 sm:col-span-2 lg:col-span-3">
+          <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4">
             <div className="flex items-center gap-2 text-muted">
               {shelfIcons.calendar}
               <p className="text-sm font-medium">No writing log yet</p>
@@ -958,6 +1247,55 @@ function Overview({
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * The way out of a finding.
+ *
+ * Every finding carries one, and that is the difference between a diagnosis and
+ * a list of reasons to feel bad. Three of them are dialogs rather than pages —
+ * the title, the author and the cover are all edited in the book-details dialog
+ * the shelf already owns — which is why `checkup` describes destinations as a
+ * union instead of a URL, and why this has to be a component rather than a
+ * `<Link>` with a computed href.
+ *
+ * The one that must be fixed is filled; the one worth doing is outlined. Same
+ * two-weight ladder as the badges, and the same reasoning: weight carries the
+ * severity so that a reader who cannot separate the hues loses nothing.
+ */
+function FixLink({
+  book,
+  fix,
+  level,
+  onCover,
+}: {
+  book: Book;
+  fix: Fix;
+  level: FindingLevel;
+  onCover: (b: Book) => void;
+}) {
+  const className = `shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold ${
+    level === "fix"
+      ? "bg-accent text-accent-ink"
+      : "border border-line bg-panel text-fg hover:border-accent/40"
+  }`;
+
+  if (fix.kind === "route") {
+    return (
+      <Link
+        href={`/book/${book.id}${fix.path ? `/${fix.path}` : ""}`}
+        className={className}
+      >
+        {fix.action} →
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => onCover(book)} className={className}>
+      {fix.action}
+    </button>
   );
 }
 
@@ -1093,7 +1431,7 @@ function Write({
               type="button"
               onClick={() => onView(v)}
               className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
-                view === v ? "bg-accent text-white" : "text-muted"
+                view === v ? "bg-accent text-accent-ink" : "text-muted"
               }`}
             >
               {VIEW_LABEL[v]} <span className="opacity-70">{counts[v]}</span>
@@ -1163,7 +1501,7 @@ function Write({
                     <Link
                       href={`/book/${book.id}`}
                       className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5
-                                 text-sm font-semibold text-white"
+                                 text-sm font-semibold text-accent-ink"
                     >
                       {shelfIcons.write}
                       Write
@@ -1230,7 +1568,7 @@ function Write({
                               close();
                             }}
                           >
-                            Change cover
+                            Book details
                           </MenuButton>
 
                           {/* Below the line, and the destructive one is
@@ -1275,7 +1613,7 @@ function Write({
                         type="button"
                         onClick={() => onDeleteForever(book)}
                         className="rounded-lg px-3.5 py-1.5 text-sm font-semibold
-                                   text-red-600"
+                                   text-danger underline underline-offset-4"
                       >
                         Delete for good
                       </button>
@@ -1456,14 +1794,33 @@ function Flag({
   tone: "ok" | "note" | "stop";
   children: ReactNode;
 }) {
+  /*
+   * The one place in a greyscale app that keeps its hues, because here the
+   * colour *is* the information: red, amber and green are the three words
+   * everybody already reads without reading, and this badge exists to be read
+   * at a glance down a column of books.
+   *
+   * Built in three parts rather than two — a **near-black ground of the hue, a
+   * hairline one step up from it, and saturated ink on top.** A translucent
+   * wash with pale ink was the first attempt and reads as a faded sticker: on
+   * black, lightening the *text* is what makes a colour legible, and darkening
+   * the *ground* is what keeps the badge sitting in the page instead of glowing
+   * off it. The border is what stops it dissolving into the card behind.
+   *
+   * Squared off rather than a capsule, for the same reason: at this size a full
+   * pill reads as a tag someone stuck on, and these are a property of the row.
+   *
+   * Weight still carries it for anyone who cannot separate the three — "3 to
+   * fix" and "4 worth doing" say the severity in words.
+   */
   const tones = {
-    ok: "bg-emerald-500/12 text-emerald-700",
-    note: "bg-amber-500/12 text-amber-700",
-    stop: "bg-red-500/12 text-red-700",
+    ok: "border-ok-line bg-ok-bg text-ok-fg",
+    note: "border-note-line bg-note-bg text-note-fg",
+    stop: "border-stop-line bg-stop-bg text-stop-fg",
   };
   return (
     <span
-      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold whitespace-nowrap ${tones[tone]}`}
+      className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold whitespace-nowrap ${tones[tone]}`}
     >
       {children}
     </span>
@@ -1512,7 +1869,7 @@ function Tools({
         </p>
         <Link
           href="/book/new"
-          className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+          className="mt-5 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
         >
           Start a book
         </Link>
@@ -1763,7 +2120,11 @@ function TrackRow({
         <Cell href={`/book/${book.id}/track`} label="Money" divider>
           {recorded ? (
             <>
-              <span className={money.net >= 0 ? "text-emerald-600" : "text-fg"}>
+              <span
+                className={
+                  money.net >= 0 ? "text-ok-fg" : "text-fg"
+                }
+              >
                 {money.net >= 0 ? "+" : "\u2212"}
                 {Math.abs(money.net).toLocaleString()}
               </span>{" "}
@@ -1892,7 +2253,7 @@ function plural(count: number, noun: string): string {
  * One rail row, as a button or a link.
  *
  * The active state is a tinted panel with accent text rather than the solid
- * blue bar it replaced. At six items a saturated block is the heaviest thing
+ * filled bar it replaced. At six items a saturated block is the heaviest thing
  * on the screen and pulls the eye away from the work; the tint is enough to
  * answer "where am I" without competing with the page.
  */

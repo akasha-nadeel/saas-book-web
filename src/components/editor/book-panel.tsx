@@ -49,9 +49,14 @@ export type BookPanelMode = "book" | "chapters";
  */
 
 /**
- * The three parts, each in its own colour, so the panel is read by hue before
- * it is read by word — the writer who has learnt that the purple one holds the
+ * The three parts, each at its own value, so the panel is read by weight before
+ * it is read by word — the writer who has learnt that the middle one holds the
  * chapters stops reading the headings at all.
+ *
+ * They were green, purple and near-black; the palette is greyscale now, so they
+ * are the same ladder in white, mid-grey and charcoal — lightest first, in the
+ * order a book is bound. Each states the ink that stays readable on it, which
+ * is why `-ink` is a token per part rather than a fixed white.
  *
  * Written out as whole class names rather than built from a part name, because
  * Tailwind finds its utilities by reading the source: `bg-matter-${part}` is a
@@ -67,8 +72,8 @@ const MATTER_TONE = {
     button: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
              focus-visible:ring-matter-front/50`,
     // Shrunk, the whole strip becomes the button, so it takes the fill the
-    // button had. Ink is a token too, because the black card inverts at night
-    // and white text on it would then be white on near-white.
+    // button had. Ink is a token too, because these three fills run from white
+    // to charcoal and a fixed white would be white on white at one end.
     strip: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
             focus-visible:ring-matter-front-ink/60`,
     outline: `border-matter-front text-matter-front hover:bg-matter-front/10
@@ -568,7 +573,7 @@ export function BookPanel({
               type="button"
               onClick={() => onMode("chapters")}
               className="mt-4 w-full cursor-pointer rounded-lg bg-accent py-2.5
-                         font-sans text-sm font-semibold text-white outline-none
+                         font-sans text-sm font-semibold text-accent-ink outline-none
                          transition-colors hover:bg-accent-strong
                          focus-visible:ring-2 focus-visible:ring-accent/50"
             >
@@ -639,7 +644,7 @@ export function BookPanel({
                             transition-colors focus-visible:ring-2
                             focus-visible:ring-accent/50 ${
                               dictation.listening
-                                ? "border-danger bg-danger text-white"
+                                ? "border-danger bg-danger text-accent-ink"
                                 : `border-line text-fg hover:border-accent/60
                                    hover:bg-raised`
                             }`}
@@ -915,9 +920,8 @@ function PageArrow({
       onClick={onClick}
       aria-label={label}
       title={label}
-      // bg-panel, not white: it is white on the light theme and the lifted
-      // slate on the dark one, so the disc stays a disc in both rather than
-      // becoming a bright hole at night.
+      // bg-panel, not white: a white disc here would be a bright hole punched
+      // in a dark card. The panel's own value plus a hairline keeps it a disc.
       className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center
                  rounded-full border border-line bg-panel text-fg shadow-sm
                  outline-none transition-[background-color,box-shadow,color]
@@ -941,7 +945,7 @@ function PageArrow({
   );
 }
 
-/** A body chapter as a pill — numbered, the soft blue wash, filled when open. */
+/** A body chapter as a pill — numbered, filled with the body value when open. */
 /**
  * One chapter in the contents.
  *
@@ -981,9 +985,9 @@ function ChapterPill({
                     transition-colors focus-visible:ring-2
                     focus-visible:ring-matter-body/50 ${
                       active
-                        ? // The body's own colour, not the app accent: this row
-                          // sits inside the purple card, and a blue fill there
-                          // would read as belonging to something else.
+                        ? // The body part's own value, not the app accent: this
+                          // row sits inside the body card, and a white fill
+                          // there would read as belonging to something else.
                           "bg-matter-body font-medium text-matter-body-ink"
                         : "text-fg hover:bg-raised"
                     }`}
@@ -992,7 +996,7 @@ function ChapterPill({
             number is 1 or 40 rather than stepping right as the book grows. */}
         <span
           className={`w-5 shrink-0 text-right text-xs tabular-nums ${
-            active ? "text-white/70" : "text-muted"
+            active ? "text-matter-body-ink/70" : "text-muted"
           }`}
         >
           {number ?? ""}

@@ -33,29 +33,24 @@ export interface BookTool {
   icon: string;
 }
 
-/** The four hues, one per group. See `tool-grid.tsx` for what they are. */
-export type ToolTone = "blue" | "violet" | "emerald" | "amber";
-
 export interface ToolGroup {
   title: string;
   /** The one thing worth knowing about the whole group. */
   note: string;
-  /**
-   * The group's colour, carried by every card in it.
-   *
-   * Colour is the grouping, doing the work the headings were doing alone: at
-   * fifteen cards the eye finds the block it wants by hue long before it reads
-   * a word. It is never the *only* signal — each group keeps its heading, so a
-   * reader who cannot tell the hues apart loses nothing.
-   */
-  tone: ToolTone;
   tools: BookTool[];
 }
+
+/*
+ * Each group used to carry a hue, and every card in it was tinted with that
+ * hue — the eye found the block it wanted by colour before it read a word. The
+ * palette is greyscale now, so the field is gone rather than left pointing at
+ * nothing. The heading, the note and the group's own ruled block carry it, and
+ * that was always the fallback for anyone who could not tell the hues apart.
+ */
 
 export const TOOL_GROUPS: ToolGroup[] = [
   {
     title: "Get it out",
-    tone: "blue",
     note: "The parts a shop sees.",
     tools: [
       {
@@ -80,7 +75,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     title: "Find your shelf",
-    tone: "violet",
     note: "Read from Google Books and Open Library. Nothing you have written is sent.",
     tools: [
       {
@@ -117,7 +111,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     title: "The writing",
-    tone: "emerald",
     note: "About the manuscript rather than the listing.",
     tools: [
       {
@@ -148,7 +141,6 @@ export const TOOL_GROUPS: ToolGroup[] = [
   },
   {
     title: "Money and reviews",
-    tone: "amber",
     note: "What happens once it is out.",
     tools: [
       {

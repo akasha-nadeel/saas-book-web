@@ -212,7 +212,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
           </label>
           <button
             type="submit"
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white"
+            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink"
           >
             Add
           </button>

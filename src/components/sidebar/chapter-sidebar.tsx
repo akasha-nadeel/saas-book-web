@@ -412,7 +412,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                      text-fg outline-none transition-opacity hover:opacity-90
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          Open<span style={{ color: "#3a86d4" }}>Chapter</span>
+          Open<span className="text-muted">Chapter</span>
         </Link>
 
         <button
@@ -446,7 +446,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
             type="button"
             onClick={handleCreate}
             className="flex-1 rounded-md bg-accent py-2.5 font-sans text-sm
-                       font-semibold text-white outline-none transition-colors
+                       font-semibold text-accent-ink outline-none transition-colors
                        hover:bg-accent-strong focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >

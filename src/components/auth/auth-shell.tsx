@@ -169,7 +169,7 @@ function Wordmark() {
       className="font-display text-xl font-semibold tracking-tight text-fg
                  outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
     >
-      Open<span style={{ color: "#3a86d4" }}>Chapter</span>
+      Open<span className="text-muted">Chapter</span>
     </Link>
   );
 }
@@ -199,7 +199,7 @@ export const FIELD =
 /** One look for the primary action on every one of them. */
 export const SUBMIT =
   "mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-3 " +
-  "font-sans text-sm font-semibold text-white outline-none transition-colors " +
+  "font-sans text-sm font-semibold text-accent-ink outline-none transition-colors " +
   "hover:bg-accent-strong focus-visible:ring-2 focus-visible:ring-accent/60 " +
   "disabled:opacity-60";
 

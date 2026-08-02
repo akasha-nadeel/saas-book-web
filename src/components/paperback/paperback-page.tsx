@@ -130,10 +130,10 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
             {spec.problems.map((problem) => (
               <li
                 key={problem}
-                className="flex gap-2.5 rounded-xl border border-amber-500/40 bg-amber-500/8
+                className="flex gap-2.5 rounded-xl border border-note-line bg-note-bg
                            px-4 py-3 text-sm text-fg"
               >
-                <span aria-hidden="true" className="font-bold text-amber-700">
+                <span aria-hidden="true" className="font-bold text-note-fg">
                   !
                 </span>
                 {problem}

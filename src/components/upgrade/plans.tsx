@@ -16,10 +16,10 @@ import { displayPrice, perMonthOf, priceOf } from "@/lib/billing/plans";
  * Pro have" but "what do I lose by staying". A row missing from one side breaks
  * the line the eye reads across, so a row is never dropped — it is answered.
  *
- * The paid card is `bg-fg`/`text-surface`, not a fixed near-black. Those two
- * tokens swap with the theme, so it is dark on the light theme and light on the
- * dark one — the same reasoning as the landing page's pill and the back-matter
- * colour: a near-black card on the night palette's near-black page is a hole.
+ * The paid card is `bg-fg`/`text-surface`, not a fixed colour. Stated as the
+ * two tokens it inverts with the palette rather than against it — which is what
+ * keeps it a card standing off the page instead of a hole cut in one, and is
+ * the whole of why the palette is written as jobs rather than as hues.
  *
  * Two of the lines below are still the plan the app intends rather than the app
  * as it stands: nothing counts a shelf to fifty or an eleventh import. The

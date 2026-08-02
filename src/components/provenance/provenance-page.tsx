@@ -201,7 +201,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
           type="button"
           onClick={() => void build()}
           disabled={working}
-          className="mt-4 rounded-lg bg-accent px-5 py-2.5 font-semibold text-white disabled:opacity-50"
+          className="mt-4 rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
         >
           {working ? "Reading the manuscript…" : "Build the record"}
         </button>
@@ -245,7 +245,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
                     `${book.title || "manuscript"} — writing record.txt`,
                   )
                 }
-                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
               >
                 Download
               </button>

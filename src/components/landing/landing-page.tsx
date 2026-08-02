@@ -188,29 +188,29 @@ export function LandingPage() {
     // `<body>` is overflow-hidden for the editor shell, so this page owns its
     // own scrolling. `min-h-dvh` would put the footer out of reach.
     <div
-      className="h-dvh overflow-y-auto bg-white text-slate-600 [scroll-behavior:smooth]"
+      className="h-dvh overflow-y-auto bg-black text-neutral-400 [scroll-behavior:smooth]"
     >
-      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/90 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-neutral-800 bg-black/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-4">
-          <Link href="/" className="text-lg font-bold text-slate-900">
-            Open<span className="text-blue-600">Chapter</span>
+          <Link href="/" className="text-lg font-bold text-white">
+            Open<span className="text-white">Chapter</span>
           </Link>
           <nav className="flex items-center gap-6 text-sm font-medium">
-            <a href="#write" className="hidden sm:inline hover:text-blue-600">
+            <a href="#write" className="hidden sm:inline hover:text-white">
               What it does
             </a>
-            <a href="#next" className="hidden sm:inline hover:text-blue-600">
+            <a href="#next" className="hidden sm:inline hover:text-white">
               What&rsquo;s next
             </a>
-            <a href="#price" className="hidden sm:inline hover:text-blue-600">
+            <a href="#price" className="hidden sm:inline hover:text-white">
               Price
             </a>
-            <Link href="/signin" className="hover:text-blue-600">
+            <Link href="/signin" className="hover:text-white">
               Log in
             </Link>
             <Link
               href="/signup"
-              className="rounded-lg bg-blue-600 px-4 py-2 font-semibold text-white hover:bg-blue-700"
+              className="rounded-lg bg-white px-4 py-2 font-semibold text-black hover:bg-neutral-200"
             >
               Start free
             </Link>
@@ -220,9 +220,9 @@ export function LandingPage() {
 
       <main>
         {/* ---- Hero ---------------------------------------------------- */}
-        <section className="bg-slate-50 px-6 py-20 text-center">
+        <section className="bg-[#0a0a0a] px-6 py-20 text-center">
           <div className="mx-auto max-w-3xl">
-            <span className="inline-block rounded-full border border-blue-200 bg-blue-50 px-4 py-1.5 text-sm font-semibold text-blue-700">
+            <span className="inline-block rounded-full border border-neutral-700 bg-white/10 px-4 py-1.5 text-sm font-semibold text-neutral-300">
               Write · Prepare · Track
             </span>
             {/* The headline names the pain the product can answer *today*.
@@ -231,9 +231,9 @@ export function LandingPage() {
                 promising the unbuilt part is the overclaim this page cannot
                 afford, and it is also the weaker line: rejection is a sharper
                 fear than analytics. */}
-            <h1 className="mt-6 text-4xl leading-tight font-extrabold text-slate-900 sm:text-5xl">
+            <h1 className="mt-6 text-4xl leading-tight font-extrabold text-white sm:text-5xl">
               Find out what&rsquo;s wrong with your book{" "}
-              <span className="text-blue-600">before a shop does.</span>
+              <span className="text-white">before a shop does.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed">
               A missing cover. An ISBN with a bad digit. A blurb eleven
@@ -248,7 +248,7 @@ export function LandingPage() {
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/signup"
-                className="rounded-lg bg-blue-600 px-7 py-3.5 font-semibold text-white hover:bg-blue-700"
+                className="rounded-lg bg-white px-7 py-3.5 font-semibold text-black hover:bg-neutral-200"
               >
                 Start writing free
               </Link>
@@ -259,10 +259,10 @@ export function LandingPage() {
                 action={signInWithGoogle}
                 next="/"
                 label="Sign up with Google"
-                className="rounded-lg border border-slate-300 bg-white px-7 py-3.5 font-semibold text-slate-900 hover:bg-slate-50"
+                className="rounded-lg border border-neutral-700 bg-black px-7 py-3.5 font-semibold text-white hover:bg-[#0a0a0a]"
               />
             </div>
-            <p className="mt-5 text-sm text-slate-500">{FREE_LINE}</p>
+            <p className="mt-5 text-sm text-neutral-500">{FREE_LINE}</p>
           </div>
         </section>
 
@@ -305,8 +305,8 @@ export function LandingPage() {
             lead="A shop rejecting your upload is a slow, silent thing. This is the part that tells you first."
           />
           <Cards items={PREPARE} />
-          <p className="mt-8 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm">
-            <strong className="text-slate-900">About the PDF.</strong> It is a
+          <p className="mt-8 rounded-xl border border-neutral-800 bg-[#0a0a0a] p-5 text-sm">
+            <strong className="text-white">About the PDF.</strong> It is a
             clean interior file at your trim size with fonts embedded. It is not
             a pre-press file — no bleed, no crop marks, no CMYK — because it
             comes from your browser&rsquo;s print engine. If your printer asks
@@ -349,9 +349,9 @@ export function LandingPage() {
             {REFUSALS.map(([name, note]) => (
               <li
                 key={name}
-                className="rounded-xl border border-slate-200 bg-white p-5"
+                className="rounded-xl border border-neutral-800 bg-black p-5"
               >
-                <p className="font-bold text-slate-900">
+                <p className="font-bold text-white">
                   <span className="mr-2 text-red-500">✕</span>
                   {name}
                 </p>
@@ -365,24 +365,24 @@ export function LandingPage() {
         <Band id="price">
           <Head eyebrow="Price" title="Free, and what isn’t" />
           <div className="mx-auto grid max-w-3xl gap-5 md:grid-cols-2">
-            <div className="rounded-2xl border-2 border-blue-600 bg-white p-7">
-              <p className="text-sm font-bold tracking-widest text-blue-600 uppercase">
+            <div className="rounded-2xl border-2 border-white bg-black p-7">
+              <p className="text-sm font-bold tracking-widest text-white uppercase">
                 Free
               </p>
-              <p className="mt-3 text-3xl font-extrabold text-slate-900">£0</p>
+              <p className="mt-3 text-3xl font-extrabold text-white">£0</p>
               <p className="mt-3">{FREE_LINE}</p>
               <p className="mt-2">
                 No watermark, no export cap, nothing to unlock before you can
                 publish a finished book.
               </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-7">
-              <p className="text-sm font-bold tracking-widest text-slate-500 uppercase">
+            <div className="rounded-2xl border border-neutral-800 bg-black p-7">
+              <p className="text-sm font-bold tracking-widest text-neutral-500 uppercase">
                 Pro
               </p>
-              <p className="mt-3 text-3xl font-extrabold text-slate-900">
+              <p className="mt-3 text-3xl font-extrabold text-white">
                 {monthly}
-                <span className="text-base font-medium text-slate-500">
+                <span className="text-base font-medium text-neutral-500">
                   {" "}
                   / month
                 </span>
@@ -396,7 +396,7 @@ export function LandingPage() {
           <div className="mt-9 text-center">
             <Link
               href="/signup"
-              className="inline-block rounded-lg bg-blue-600 px-7 py-3.5 font-semibold text-white hover:bg-blue-700"
+              className="inline-block rounded-lg bg-white px-7 py-3.5 font-semibold text-black hover:bg-neutral-200"
             >
               Start writing free
             </Link>
@@ -411,9 +411,9 @@ export function LandingPage() {
               <details
                 key={q}
                 open={i === 0}
-                className="rounded-xl border border-slate-200 bg-white p-5"
+                className="rounded-xl border border-neutral-800 bg-black p-5"
               >
-                <summary className="cursor-pointer font-bold text-slate-900">
+                <summary className="cursor-pointer font-bold text-white">
                   {q}
                 </summary>
                 <p className="mt-3">{a}</p>
@@ -423,9 +423,9 @@ export function LandingPage() {
         </Band>
       </main>
 
-      <footer className="border-t border-slate-200 px-6 py-10 text-center text-sm text-slate-500">
-        <p className="font-bold text-slate-900">
-          Open<span className="text-blue-600">Chapter</span>
+      <footer className="border-t border-neutral-800 px-6 py-10 text-center text-sm text-neutral-500">
+        <p className="font-bold text-white">
+          Open<span className="text-white">Chapter</span>
         </p>
         <p className="mt-2">Your manuscript stays on your machine.</p>
       </footer>
@@ -449,7 +449,7 @@ function Band({
   return (
     <section
       id={id}
-      className={`px-6 py-20 ${tint ? "bg-slate-50" : "bg-white"}`}
+      className={`px-6 py-20 ${tint ? "bg-[#0a0a0a]" : "bg-black"}`}
     >
       <div className="mx-auto max-w-6xl">{children}</div>
     </section>
@@ -473,22 +473,24 @@ function Head({
   return (
     <div className="mx-auto mb-10 max-w-3xl text-center">
       <div className="flex items-center justify-center gap-3">
-        <span className="text-sm font-bold tracking-widest text-blue-600 uppercase">
+        <span className="text-sm font-bold tracking-widest text-white uppercase">
           {eyebrow}
         </span>
         {badge && (
           <span
             className={`rounded-full px-3 py-1 text-xs font-bold uppercase ${
+              /* The same two-weight badge the app uses: filled for the claim
+                 being made, outlined for the caveat on it. */
               warn
-                ? "bg-amber-100 text-amber-800"
-                : "bg-green-100 text-green-800"
+                ? "border border-neutral-600 text-neutral-300"
+                : "bg-white text-black"
             }`}
           >
             {badge}
           </span>
         )}
       </div>
-      <h2 className="mt-4 text-3xl leading-snug font-extrabold text-slate-900">
+      <h2 className="mt-4 text-3xl leading-snug font-extrabold text-white">
         {title}
       </h2>
       {lead && <p className="mt-4 text-lg leading-relaxed">{lead}</p>}
@@ -510,16 +512,16 @@ function Cards({
           key={name}
           className={`rounded-xl border p-6 ${
             planned
-              ? "border-dashed border-slate-300 bg-white"
-              : "border-slate-200 bg-white shadow-sm"
+              ? "border-dashed border-neutral-700 bg-black"
+              : "border-neutral-800 bg-black shadow-sm"
           }`}
         >
           {planned && (
-            <span className="mb-3 inline-block rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+            <span className="mb-3 inline-block rounded-full bg-[#1c1c1c] px-2.5 py-1 text-[11px] font-bold tracking-wider text-neutral-500 uppercase">
               Planned
             </span>
           )}
-          <p className="font-bold text-slate-900">{name}</p>
+          <p className="font-bold text-white">{name}</p>
           <p className="mt-2 text-[15px] leading-relaxed">{note}</p>
         </li>
       ))}
@@ -529,8 +531,8 @@ function Cards({
 
 function Stat({ n, s }: { n: string; s: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-6 text-center">
-      <p className="text-3xl font-extrabold text-slate-900">{n}</p>
+    <div className="rounded-xl border border-neutral-800 bg-black p-6 text-center">
+      <p className="text-3xl font-extrabold text-white">{n}</p>
       <p className="mt-2 text-[15px] leading-relaxed">{s}</p>
     </div>
   );

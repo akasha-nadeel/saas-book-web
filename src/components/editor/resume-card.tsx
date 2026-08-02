@@ -102,7 +102,7 @@ export function ResumeCard({ book }: { book: Book }) {
 
       <Link
         href={`/book/${book.id}/chapter/${chapter.id}`}
-        className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+        className="mt-4 inline-block rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
       >
         Carry on
       </Link>

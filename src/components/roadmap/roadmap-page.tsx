@@ -125,7 +125,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
               {nextHref && (
                 <Link
                   href={nextHref}
-                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white"
+                  className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
                 >
                   Do this
                 </Link>
@@ -159,7 +159,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
                 <h2 className="font-bold text-fg">{phase.label}</h2>
                 <span
                   className={`text-xs font-bold ${
-                    complete ? "text-emerald-700" : "text-muted"
+                    complete ? "text-ok-fg" : "text-muted"
                   }`}
                 >
                   {complete ? "done" : `${done} of ${inPhase.length}`}
@@ -212,7 +212,7 @@ function Row({
   const marker = `z-10 mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full
                   text-[11px] font-bold ${
                     step.done
-                      ? "bg-accent text-white"
+                      ? "bg-accent text-accent-ink"
                       : "border-2 border-line bg-panel text-transparent"
                   }`;
 

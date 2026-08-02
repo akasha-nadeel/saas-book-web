@@ -231,7 +231,7 @@ export function ChapterEditor({
   const body = useBodyOpen();
 
   // Book View is not one of the three parts. It shows the book whole and picks
-  // out none of them, so the page takes the blue of the button it offers — the
+  // out none of them, so the page takes the accent of the button it offers — the
   // same rule as the rest, applied to a panel that has nothing selected.
   const selectedPart =
     panelMode === "book" ? "book" : body.open ? "body" : chapterPart;
@@ -423,7 +423,7 @@ export function ChapterEditor({
               type="button"
               onClick={() => setEditingCover(true)}
               aria-label={`Edit the cover of ${book.title}`}
-              title="Edit cover"
+              title="Book details"
               className="block w-10 shrink-0 rounded-md outline-none
                        transition-transform hover:-translate-y-0.5
                        focus-visible:ring-2 focus-visible:ring-accent/60"

@@ -653,18 +653,27 @@ work out what to do next, and should never hit a screen that cannot help them.**
 
 Ranked. The first and third together are most of it.
 
-- [ ] **Ask an imported book what it is.** `/book/new` defaults the genre to
-      Fantasy, so books made there are fine. `createBookFromImport` sets none —
-      and with no genre and no blurb, `buildQuery()` returns an empty string,
-      which dead-ends Comp titles, Categories, the Blurb examples and Structure.
+- [x] **Ask an imported book what it is.** Done 2026-08-02. `/book/new` defaults
+      the genre to Fantasy, so books made there were always fine.
+      `createBookFromImport` sets none — and with no genre and no blurb,
+      `buildQuery()` returns an empty string, which dead-ends Comp titles,
+      Categories, the Blurb examples and Structure.
 
-      Each of those four screens now catches it and offers the app's own genres
-      as chips, which is a patch at four sites for one cause. The fix is to ask
-      once, on the import screen or on the book overview of a book that has no
-      genre: one question, four tools, and `suggestTarget(kind, genre)` fills
-      the target length in at the same time.
+      Two halves, and the second is the one that was missing. **Genre is now
+      editable at all**: it could only ever be set when a book was *made*, so an
+      imported book had a blank there and nowhere in the app to fill it in. It
+      is a field in the book-details dialog now (`setBookDetails` takes it), and
+      that dialog is renamed from "Edit cover", which is what it stopped being
+      some time ago.
 
-      Nothing currently tells a writer that skipping it cost them anything.
+      And the dashboard **asks**. A book with no genre is a finding on the
+      Overview — "We do not know what kind of book this is", with what it costs
+      written beside it and the dialog one press away. Nothing used to tell a
+      writer that the blank cost them four tools.
+
+      *Left:* `suggestTarget(kind, genre)` could fill the target length in at the
+      same moment, which would close the "No length to aim at" finding in the
+      same click.
 - [ ] **One readiness model, not two.** Prepare says "3 to fix"; the roadmap
       says "1 of 18". Same question — is this book ready — two scores, and
       nothing reconciles them. The roadmap is the one with an opinion about
@@ -680,6 +689,14 @@ Ranked. The first and third together are most of it.
       This is the whole guidance mechanism, and it is nearly free — the data
       exists and `ToolHeader` is already shared, so the footer can be too. It is
       what turns fifteen isolated screens into a path.
+
+      *Half done, 2026-08-02:* the **dashboard** now does this. Overview's hero
+      is the book's phase plus its next step as the button, so the verb follows
+      the book instead of always being "continue writing", and a hand-ticked
+      step can be marked done from there — which matters most for an imported
+      finished manuscript, whose writer would otherwise sit at "Finish the first
+      draft" forever and never reach the phases where the publishing help is.
+      The fifteen tool pages still end where they end.
 - [ ] **The editor and the dashboard do not know about each other.** Inside a
       chapter there is no way to reach the Prose report *for that chapter*: the
       rail has nine tabs and none of them is a tool. A writer revising has to
@@ -717,8 +734,33 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
   `[data-theme="light"]` block carried a standing hazard, recorded in its own
   comment: *"this block has to be kept in step with @theme by hand"*.
 
-  **Do not add `dark:` variants.** They will never match, and they read to the
-  next person as though the app still had a theme.
+  **And then it came back, greyscale, on 2026-08-02** — also at the owner's
+  request, and in three steps in one sitting: the whole app was repainted black
+  and white, then the status badges and the tool marks were given their colour
+  back, then a System / Light / Dark toggle went in and the light half was
+  written to match.
+
+  What is there now: one greyscale palette in two value-sets, the dark one in
+  `@theme` and the light one in `:root[data-theme="light"]` under it, with the
+  two rules that keep them in step written at the top of the block.
+  `prefs.theme` is `system | light | dark`, "system" is resolved before CSS sees
+  it, and `ThemeSync` listens to `prefers-color-scheme` so a machine turning
+  dark at sunset takes the app with it. `--color-accent-ink` is the black-or-
+  white that sits on a filled action. The unpicked page follows the theme.
+
+  Two families keep their hue and neither is decoration — the status tokens
+  (`ok` / `note` / `stop`, plus `danger`), where the colour *is* the
+  information, and the fifteen tool marks, which are product marks rather than
+  chrome.
+
+  **Do not add `dark:` variants.** They key off `prefers-color-scheme`, so they
+  ignore a writer who chose against their system — which is the whole point of
+  the setting.
+
+  *Left:* the orphaned landing components still hold the old blue design, and
+  the landing page itself states its greys literally, so it stays dark in both
+  themes. The print/PDF output is untouched and still black on white, which is
+  correct for paper and worth not "fixing".
 
 ## Built, but held back on purpose
 

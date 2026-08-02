@@ -133,7 +133,7 @@ export function CompsPage({ bookId }: { bookId: string }) {
           <button
             type="submit"
             disabled={state === "loading" || query.trim().length < 2}
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
           >
             {state === "loading" ? "Looking…" : "Find comps"}
           </button>

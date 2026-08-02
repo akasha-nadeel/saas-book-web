@@ -25,9 +25,9 @@ export function BookGuide({
         entering ? "page-enter" : ""
       }`}
     >
-      {/* On a sheet with a blue edge, because that is what the page in this
-          position always is. Book View selects no part of the book, so the
-          manuscript's edge is the app's blue there; the overview stands in the
+      {/* On a sheet with the accent's edge, because that is what the page in
+          this position always is. Book View selects no part of the book, so the
+          manuscript's edge is the accent there; the overview stands in the
           manuscript's place and takes the same rectangle and the same colour,
           rather than being the one thing in the middle of the window that is
           not a page.
@@ -59,8 +59,8 @@ export function BookGuide({
                 they are bound: <span className="text-fg">Front matter</span>,{" "}
                 <span className="text-fg">Body matter</span>,{" "}
                 <span className="text-fg">Back matter</span>. Each has its own
-                colour, and the page you are writing on takes the colour of the
-                part it belongs to.
+                shade, and the edge of the page you are writing on takes the
+                shade of the part it belongs to.
               </p>
             </section>
 

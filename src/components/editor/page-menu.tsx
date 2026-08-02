@@ -61,7 +61,7 @@ function Choice({
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
                     selected
-                      ? "bg-accent text-white hover:bg-accent-strong"
+                      ? "bg-accent text-accent-ink hover:bg-accent-strong"
                       : "text-muted hover:bg-raised hover:text-fg"
                   }`}
     >

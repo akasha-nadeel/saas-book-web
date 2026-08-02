@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ToolMark } from "@/components/shelf/tool-marks";
-import { TOOL_GROUPS, type ToolTone } from "@/lib/book-tools";
+import { TOOL_GROUPS } from "@/lib/book-tools";
 
 /**
  * The fifteen per-book tools, pointed at one book.
@@ -21,17 +21,13 @@ import { TOOL_GROUPS, type ToolTone } from "@/lib/book-tools";
  * show the same list from two entry points — one where the book is already
  * chosen, one where it has just been picked.
  *
- * The group keeps its hue on the *heading* only. Colouring the tiles as well
- * would flatten fifteen products into four blocks, which is the thing the marks
- * exist to undo.
+ * **The groups were told apart by hue and now are not**, because the palette is
+ * greyscale. What separates them instead is what was always doing most of the
+ * work: a heading, a line of note under it, and a ruled block of its own. Four
+ * greys on four headings was the other option and is worse — differing values
+ * on the same kind of label read as differing *importance*, which is a claim
+ * none of these groups is making about the others.
  */
-
-const HEADS: Record<ToolTone, string> = {
-  blue: "text-blue-700",
-  violet: "text-violet-700",
-  emerald: "text-emerald-700",
-  amber: "text-amber-700",
-};
 
 export function ToolGrid({
   bookId,
@@ -45,9 +41,7 @@ export function ToolGrid({
     <>
       {TOOL_GROUPS.map((group) => (
         <section key={group.title} className="mb-6 last:mb-0">
-          <h3
-            className={`text-xs font-bold tracking-widest uppercase ${HEADS[group.tone]}`}
-          >
+          <h3 className="text-xs font-bold tracking-widest text-fg uppercase">
             {group.title}
           </h3>
           <p className="mt-1 text-xs text-muted">{group.note}</p>

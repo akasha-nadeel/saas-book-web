@@ -47,6 +47,8 @@ import {
   setTypography,
   typographyOf,
   setPref,
+  setTheme,
+  themeUnset,
   touchLastOpened,
   trashBook,
   toggleBookmark,
@@ -697,7 +699,7 @@ it("starts with every writing mode off and the panel open", () => {
     typewriter: false,
     marks: false,
     leftPanel: true,
-    paper: "white",
+    paper: "black",
   });
 });
 
@@ -781,8 +783,8 @@ it("remembers which panels are open", () => {
   expect(getPrefs().leftPanel).toBe(true);
 });
 
-it("defaults the page to white paper", () => {
-  expect(getPrefs().paper).toBe("white");
+it("defaults the page to black paper", () => {
+  expect(getPrefs().paper).toBe("black");
 });
 
 it("changes the paper colour", () => {
@@ -790,14 +792,65 @@ it("changes the paper colour", () => {
   expect(getPrefs().paper).toBe("sepia");
 });
 
-it("falls back to white for an unknown paper colour", () => {
+it("falls back to the default for an unknown paper colour", () => {
   // Prefs come from localStorage, which anything can write to. A bogus value
   // must not leave the manuscript with no background at all.
   localStorage.setItem(
     "openchapter:prefs",
     JSON.stringify({ paper: "chartreuse" }),
   );
+  expect(getPrefs().paper).toBe("black");
+});
+
+it("defaults the theme to the machine's own", () => {
+  expect(getPrefs().theme).toBe("system");
+});
+
+it("falls back to system for an unknown theme", () => {
+  localStorage.setItem("openchapter:prefs", JSON.stringify({ theme: "sepia" }));
+  expect(getPrefs().theme).toBe("system");
+});
+
+it("changes the theme", () => {
+  setTheme("light");
+  expect(getPrefs().theme).toBe("light");
+});
+
+// The page is a separate setting, but until a writer has actually chosen one
+// it is only carrying a default — and a black page in the middle of a white app
+// is something they would have to go and fix, having asked for nothing.
+it("brings an unpicked page with the theme", () => {
+  setTheme("light");
   expect(getPrefs().paper).toBe("white");
+  setTheme("dark");
+  expect(getPrefs().paper).toBe("black");
+});
+
+it("leaves a chosen page where the writer put it", () => {
+  setPref("paper", "sepia");
+  setTheme("light");
+  expect(getPrefs().paper).toBe("sepia");
+  setTheme("dark");
+  expect(getPrefs().paper).toBe("sepia");
+});
+
+it("keeps a chosen page through an unrelated preference write", () => {
+  // The stamp that records the choice is not part of Prefs, so a later write
+  // that spread only the parsed value would drop it — and the next theme
+  // change would then walk over a page the writer had picked.
+  setPref("paper", "white");
+  setPref("focusMode", true);
+  setTheme("dark");
+  expect(getPrefs().paper).toBe("white");
+});
+
+// A library stored before the theme existed has no theme recorded beside its
+// page. That is what ThemeSync looks for, and it is the whole of the migration.
+it("knows a library stored before the theme existed", () => {
+  localStorage.setItem("openchapter:prefs", JSON.stringify({ paper: "white" }));
+  expect(themeUnset()).toBe(true);
+  setTheme("system");
+  expect(themeUnset()).toBe(false);
 });
 
 it("gives a book a default page setup without storing one", () => {

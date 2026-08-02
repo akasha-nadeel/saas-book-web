@@ -43,67 +43,113 @@
    Named for the job each colour does rather than the colour it is, so a later
    change of hue does not leave every class in the app lying about itself:
    re-point a token here and every `bg-surface`, `text-fg`, `bg-accent` in the
-   app follows, none the wiser.
+   app follows, none the wiser. That naming is what made the change below a
+   day's work instead of a month's.
 
-   **There is one palette.** A dark theme lived here until it was taken out —
-   see the note in TODO.md for what that cost and why. The tokens are the light
-   set and nothing overrides them, which is why the chrome classes below can
-   simply state their colour instead of stating it twice.
+   **One palette in two values, and it is greyscale.** No hue anywhere except
+   the status family at the foot of this block: black ground and white ink at
+   night, white ground and black ink by day, with a ladder of greys between.
+   Anything that used to carry meaning in colour — the accent, the three parts
+   of a book — carries it in *value* and in words instead.
 
-   Light inverts the elevation logic of a dark UI: the desk is a soft grey, and
-   panels are white sitting *up* on it, lifted by a hairline and a shadow rather
-   than by a brighter fill. So `raised` is a touch darker than `panel`, not
-   lighter — a hover on white deepens, it does not glow.
+   **This block is the dark set, and it is the default.** The light set is the
+   `[data-theme="light"]` block below, which re-points these same names and
+   nothing else; a writer's choice lives in `prefs.theme` and is written onto
+   `<html data-theme>` before the first paint (see layout.tsx). Two rules keep
+   the pair honest:
+
+   - **Every token stated here must be stated there.** A name that only exists
+     in one block silently keeps its dark value in daylight, and it will be a
+     hairline or a hover that nobody notices for a month.
+   - **Only re-point tokens.** No rule may say `[data-theme="light"] .thing {
+     padding: … }` — the theme decides colour, never layout, or the two drift
+     into two designs.
+
+   Dark inverts the elevation logic of light. On black, every surface above the
+   ground is *lighter* and lifted by a hairline, because a shadow on black is
+   invisible; on white, the desk is grey, cards are white sitting up on it, and
+   a hover *deepens* rather than glowing. That is why `raised` crosses over
+   between the two blocks rather than simply swapping ends.
+
+   The one rule to hold on to: **a filled action carries `accent-ink`.** The
+   fill is white at night and near-black by day, so `bg-accent` with a fixed
+   `text-white` is invisible in exactly one of the two themes — which is the
+   half nobody tests.
    -------------------------------------------------------------------------- */
 @theme {
-  --color-surface: #f5f6f8; /* the page — the desk everything sits on */
-  --color-panel: #ffffff; /* cards, sidebars, the content well */
-  --color-raised: #eaedf1; /* hover, inputs, pressed states */
-  --color-line: #e3e7ec; /* hairlines and dividers */
+  --color-surface: #000000; /* the page — the desk everything sits on */
+  --color-panel: #0a0a0a; /* cards, sidebars, the content well */
+  --color-raised: #1c1c1c; /* hover, inputs, pressed states */
+  --color-line: #262626; /* hairlines and dividers */
 
-  --color-fg: #1a222d; /* body text — slate ink, not a hard black */
-  --color-muted: #586573; /* labels, metadata, anything secondary */
+  --color-fg: #ededed; /* body text — near-white, not a hard white */
+  --color-muted: #8f8f8f; /* labels, metadata, anything secondary */
 
-  /* Two blues, not one. The base one is for things you press; the deep one
-     fills the row or tab you are currently on. Both carry white text as a fill
-     and read as a soft wash at low alpha, so they hold up in either theme. */
-  --color-accent: #1c66cc; /* actions: New book, Send, chosen menu rows */
-  --color-accent-strong: #154f9f; /* its hover — deepens on a light ground */
-  --color-accent-deep: #1f5aa8; /* selected nav: the open chapter, active tab */
+  /* White is the action colour. There is no second hue to press into service
+     for "currently on", so the three below are three *values* of white: the
+     button, its hover, and the fill under a selected row. */
+  --color-accent: #ffffff; /* actions: New book, Send, chosen menu rows */
+  --color-accent-strong: #cccccc; /* its hover — dims, since it cannot brighten */
+  --color-accent-deep: #e5e5e5; /* selected nav: the open chapter, active tab */
 
-  /* A single alarm colour, tuned per theme for contrast on its own ground. */
-  --color-danger: #c0362c; /* a failed save, and anything else gone wrong */
+  /* The ink that sits on a filled action. Black, because the fill is white —
+     this is the token to reach for instead of `text-white` on any `bg-accent`,
+     `bg-danger` or matter fill. */
+  --color-accent-ink: #000000;
 
-  /* Selected navigation — the open chapter, the chosen view tab. On light this
-     is a soft blue wash with deep-blue ink, not a saturated block: a heavy
-     fill reads as a button you should press, and these only say "you are here".
-     A pale blue ground with the accent's own ink on it. */
-  --color-selected: #dbe7f7; /* the highlighted row's ground */
-  --color-selected-fg: #154f9f; /* its text */
+  /* The alarm, and one of the two places this palette keeps a hue — the other
+     is the status badges. Red is not decoration on a delete button, it is the
+     word "careful" in a language nobody has to be taught. Lifted well off the
+     light-theme red, which was chosen to sit on white and goes muddy here. */
+  --color-danger: #f87171; /* a failed save, and anything else gone wrong */
+
+  /* Selected navigation — the open chapter, the chosen view tab. A white wash
+     at low alpha rather than a solid fill: a heavy block reads as a button you
+     should press, and these only say "you are here". */
+  --color-selected: color-mix(in srgb, #ffffff 12%, transparent);
+  --color-selected-fg: #ffffff; /* its text */
 
   /* Backs the shelf chrome and — so its rounded corner nests into the chrome
      rather than the page — the content area behind it. See .nav-chrome. */
-  --color-nav: #123a63;
+  --color-nav: #0a0a0a;
 
-  /* The three parts a book is bound in, each with its own colour, so the
-     chapter panel is read by hue before it is read by word. They are all
-     button fills, so each needs a hover and the ink that sits on it.
+  /* The three parts a book is bound in. These used to be green / purple /
+     black, where the colour *was* the meaning; greyscale has no three hues to
+     spend, so they became three rungs of one ladder — front lightest, back
+     darkest, body between — and each states the ink that stays readable on it.
+     The order is the order they are bound in, so the panel is still read by
+     value before it is read by word. */
+  --color-matter-front: #ffffff;
+  --color-matter-front-strong: #e0e0e0;
+  --color-matter-front-ink: #000000;
 
-     These are the one place in the palette where the colour *is* the meaning —
-     green front, purple body, black back — so unlike the tokens above, the
-     names say the part rather than the job. There is nothing else they could
-     be renamed to. */
-  --color-matter-front: #15803d;
-  --color-matter-front-strong: #126a33;
-  --color-matter-front-ink: #ffffff;
+  --color-matter-body: #8f8f8f;
+  --color-matter-body-strong: #a3a3a3;
+  --color-matter-body-ink: #000000;
 
-  --color-matter-body: #6d28d9;
-  --color-matter-body-strong: #5b21b6;
-  --color-matter-body-ink: #ffffff;
-
-  --color-matter-back: #111827;
-  --color-matter-back-strong: #1f2937; /* lightens on hover — it is already ink */
+  --color-matter-back: #2e2e2e;
+  --color-matter-back-strong: #3d3d3d; /* lightens on hover — it is already ink */
   --color-matter-back-ink: #ffffff;
+
+  /* The status family — the one place with hues, because here the colour *is*
+     the information and red/amber/green need no teaching. Three parts each: a
+     ground of the hue, a hairline one step up from it, and the ink.
+
+     Tokens rather than `bg-red-950 text-red-400` written at each site, for the
+     reason the whole palette is tokens: these have to invert with the theme,
+     and a literal shade tuned for black is a dark blob on white. `ok` is the
+     all-clear, `note` is worth doing, `stop` is what a shop would refuse. */
+  --color-ok-bg: #022c22;
+  --color-ok-line: #065f46;
+  --color-ok-fg: #34d399;
+
+  --color-note-bg: #2a1c05;
+  --color-note-line: #78350f;
+  --color-note-fg: #fbbf24;
+
+  --color-stop-bg: #300a0a;
+  --color-stop-line: #7f1d1d;
+  --color-stop-fg: #f87171;
 
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -124,8 +170,76 @@
 }
 
 /* --------------------------------------------------------------------------
-   Dark theme.
+   The light set.
 
+   The same names, re-pointed, and nothing else — see the two rules in the block
+   above. Written by hand and kept in step by hand, which is the standing hazard
+   of this file: `@theme` cannot generate a second set, so the only thing
+   stopping the two drifting is that they sit one after the other and are read
+   together.
+
+   `data-theme` is always `light` or `dark` by the time CSS sees it, never
+   `system`: the bootstrap in layout.tsx resolves the writer's choice against
+   `prefers-color-scheme` and writes the answer. So there is exactly one block
+   to write here, not two.
+   -------------------------------------------------------------------------- */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* The desk is grey and the cards are white *on* it. This is the inversion
+     that catches people: `raised` is a step darker than `panel` here, because
+     a hover on white deepens — it cannot glow. */
+  --color-surface: #f4f4f5;
+  --color-panel: #ffffff;
+  --color-raised: #e9e9ec;
+  --color-line: #e2e2e5;
+
+  --color-fg: #17171a;
+  --color-muted: #62626b;
+
+  /* Near-black, not pure: a #000 fill next to #17171a text reads as a hole
+     punched in the page rather than a button sitting on it. */
+  --color-accent: #17171a;
+  --color-accent-strong: #000000; /* its hover — deepens, since it cannot dim */
+  --color-accent-deep: #2b2b30;
+  --color-accent-ink: #ffffff;
+
+  /* Chosen to sit on white; the dark set's #f87171 goes pale and sugary here. */
+  --color-danger: #c0362c;
+
+  --color-selected: color-mix(in srgb, #17171a 8%, transparent);
+  --color-selected-fg: #17171a;
+
+  --color-nav: #ffffff;
+
+  /* The same ladder, walked the other way: front is the strongest value in
+     either theme, so on white it is the near-black rather than the white. */
+  --color-matter-front: #17171a;
+  --color-matter-front-strong: #000000;
+  --color-matter-front-ink: #ffffff;
+
+  --color-matter-body: #6f6f78;
+  --color-matter-body-strong: #5b5b63;
+  --color-matter-body-ink: #ffffff;
+
+  --color-matter-back: #d4d4d8;
+  --color-matter-back-strong: #c2c2c8; /* deepens on hover — it is already pale */
+  --color-matter-back-ink: #17171a;
+
+  /* Pale ground, mid hairline, dark ink — the exact inverse of the dark set,
+     and the reason these are three tokens rather than one. */
+  --color-ok-bg: #ecfdf5;
+  --color-ok-line: #a7f3d0;
+  --color-ok-fg: #047857;
+
+  --color-note-bg: #fffbeb;
+  --color-note-line: #fde68a;
+  --color-note-fg: #b45309;
+
+  --color-stop-bg: #fef2f2;
+  --color-stop-line: #fecaca;
+  --color-stop-fg: #b91c1c;
+}
 
 /* App shell. Layout constants, not part of the design language.
 
@@ -134,10 +248,11 @@
    that panel plus two rails is over a third of the screen, and the page — the
    thing being written — gets squeezed. So 24rem is the ceiling, not the rule. */
 :root {
-  /* Light by default, so the browser never lays its dark OS scrollbar over the
-     light UI. The dark theme flips this to `dark` above. Without it, native
-     scrollbars and form controls ignore the app's theme entirely. */
-  color-scheme: light;
+  /* Dark, so the browser's own furniture — native scrollbars, date pickers,
+     select popups, autofill — comes out dark too. Without it they arrive white
+     over a black app, which is the single most obvious tell that a dark theme
+     was painted on rather than declared. */
+  color-scheme: dark;
 
   /* Phone-first: a narrower rail, and a panel that nearly fills the screen
      since it opens as an overlay there rather than sitting beside the page. */
@@ -175,75 +290,81 @@ body {
 /* --------------------------------------------------------------------------
    The page.
 
-   The chrome is dark; the page under the prose need not be. Each choice sets
-   its own text, muted and rule colours, because a background is only half a
-   decision — the pairing is what stays readable.
+   The five papers are now five greys, because the app is greyscale and a warm
+   sheet would be the only hue in it. What they still are is a real choice: a
+   writer who wants white paper under black type gets it, on a black app, and
+   the default is the black sheet so nothing glares by surprise at midnight.
+
+   Each sets its own text, muted and rule colours, because a background is only
+   half a decision — the pairing is what stays readable.
    -------------------------------------------------------------------------- */
 /* Keyed on the attribute alone, not on .manuscript, so anything that should
    sit with the page rather than with the chrome can opt in — the running head
    and the tool rail both do. */
 [data-paper] {
   --paper-bg: #ffffff;
-  --paper-fg: #16191f;
-  --paper-muted: #6b7280;
-  --paper-rule: #d9dde3;
+  --paper-fg: #111111;
+  --paper-muted: #6b6b6b;
+  --paper-rule: #d9d9d9;
 
-  /* The edge of the sheet, in the colour of the part of the book being written
-     — the same green, purple and black the chapter panel's cards carry, so the
-     page answers the panel.
+  /* The edge of the sheet, in the value of the part of the book being written
+     — the same ladder the chapter panel's cards carry, so the page answers the
+     panel.
 
      Tuned to the paper rather than to the theme, because that is what the edge
-     sits on: the app can be dark while the page is white, and the black one
-     would then be a dark line on white, which is right, while the theme's
-     inverted near-white would be invisible. Only the two dark papers below
-     need the other set. */
-  --paper-edge-front: #15803d;
-  --paper-edge-body: #6d28d9;
-  --paper-edge-back: #111827;
-  /* Book View selects no part — it shows the book whole, and its one button is
-     the app's blue. The page follows the panel, so here it is blue too. */
-  --paper-edge-book: #1c66cc;
+     sits on. On a white sheet the edges have to be *dark* to be seen at all,
+     which is the exact inverse of the tokens above; the dark papers below take
+     the light set instead. */
+  --paper-edge-front: #111111;
+  --paper-edge-body: #6b6b6b;
+  --paper-edge-back: #a3a3a3;
+  /* Book View selects no part — it shows the book whole. The page follows the
+     panel, so it takes the plain ink of the sheet. */
+  --paper-edge-book: #111111;
 }
 
+/* Was cream. A paper-white that has had the glare taken off it. */
 [data-paper="cream"] {
-  --paper-bg: #f5f1e8;
-  --paper-fg: #1f1d1a;
-  --paper-muted: #6d6862;
-  --paper-rule: #ded7c8;
+  --paper-bg: #ededed;
+  --paper-fg: #141414;
+  --paper-muted: #616161;
+  --paper-rule: #cfcfcf;
 }
 
+/* Was sepia. The lightest of the grey sheets. */
 [data-paper="sepia"] {
-  --paper-bg: #f2e7d0;
-  --paper-fg: #3a2f22;
-  --paper-muted: #7a6a52;
-  --paper-rule: #ddceb0;
+  --paper-bg: #d6d6d6;
+  --paper-fg: #171717;
+  --paper-muted: #575757;
+  --paper-rule: #b5b5b5;
 }
 
 [data-paper="slate"] {
-  --paper-bg: #1d2732;
-  --paper-fg: #e6ecf3;
-  --paper-muted: #93a2b4;
-  --paper-rule: #313d4c;
+  --paper-bg: #1c1c1c;
+  --paper-fg: #ededed;
+  --paper-muted: #8f8f8f;
+  --paper-rule: #333333;
 
-  /* Lifted off the dark sheet. Back matter's near-black would be no edge at
-     all here, so it takes the light neutral instead — the same inversion the
-     card's fill makes in dark mode, and for the same reason. */
-  --paper-edge-front: #2ea75c;
-  --paper-edge-body: #9061f0;
-  --paper-edge-back: #cfd8e2;
-  --paper-edge-book: #5a97f8;
+  /* Lifted off the dark sheet: on black, the edges run the other way up. */
+  --paper-edge-front: #ffffff;
+  --paper-edge-body: #8f8f8f;
+  --paper-edge-back: #4d4d4d;
+  --paper-edge-book: #ffffff;
 }
 
 [data-paper="black"] {
-  --paper-bg: #0a0d11;
-  --paper-fg: #dfe5ec;
-  --paper-muted: #7f8b99;
-  --paper-rule: #232a33;
+  /* Not quite #000: the desk behind the manuscript *is* black, and a sheet the
+     same value as the desk it lies on is not a sheet, it is a hole. One step up
+     is enough to read as paper once the hairline edge is on it. */
+  --paper-bg: #0d0d0d;
+  --paper-fg: #ededed;
+  --paper-muted: #8f8f8f;
+  --paper-rule: #262626;
 
-  --paper-edge-front: #2ea75c;
-  --paper-edge-body: #9061f0;
-  --paper-edge-back: #cfd8e2;
-  --paper-edge-book: #5a97f8;
+  --paper-edge-front: #ffffff;
+  --paper-edge-body: #8f8f8f;
+  --paper-edge-back: #4d4d4d;
+  --paper-edge-book: #ffffff;
 }
 
 /* --------------------------------------------------------------------------
@@ -476,10 +597,9 @@ body {
 /* --------------------------------------------------------------------------
    The previous/next chapter buttons in the workspace corners.
 
-   Blue in light — an action, in the app's accent. At night they take the page
-   colour itself, so they read as part of the chrome rather than a bright block
-   floating over the page. Driven here rather than by utilities so it applies
-   inside the chrome's re-pointed tokens.
+   The app's accent, which is white — these are actions, and white is the
+   loudest thing the palette has. Driven here rather than by utilities so it
+   applies inside the chrome's re-pointed tokens.
    -------------------------------------------------------------------------- */
 .chapter-step {
   background-color: var(--color-accent);
@@ -512,10 +632,10 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Navigation chrome (the deep half of the two-tone nav).
+   Navigation chrome.
 
-   The shelf's header and sidebar, and the editor's icon rail, wear a deep navy,
-   the way the Nexus dashboard frames its light content. Like .rail-paper above,
+   The shelf's header and sidebar, and the editor's icon rail, sit one step up
+   from the black ground rather than on it. Like .rail-paper above,
    it re-points the theme tokens rather than restyling each control, so every
    `text-muted`, `hover:bg-raised`, `bg-selected` and filled button inside
    adapts on its own — and no child is ever left with dark ink on a dark ground.
@@ -525,60 +645,50 @@ body {
    mixed from white, so they read as a brighter shade of whatever sits beneath.
    -------------------------------------------------------------------------- */
 .nav-chrome {
-  /* The deep navy of the shelf sidebar, so the editor's rail matches it. */
-  background: #0a1a2f;
+  /* One step up from the black ground, so the chrome reads as a surface rather
+     than as a hole. The hairline is what separates it, not a change of hue. */
+  background: #0a0a0a;
 
-  /* The filled actions on the chrome — New book, Upgrade, the active rail tile
-     — take the harmonised navy-blue rather than the brighter global accent. */
-  --color-accent: #2670be;
-  --color-accent-strong: #3080d2;
+  --color-surface: #0a0a0a;
+  --color-panel: #0a0a0a;
 
-  --color-surface: #0a1a2f;
-  --color-panel: #0a1a2f;
-
-  --color-fg: #f2f6fb; /* near-white ink for the wordmark and active items */
-  --color-muted: #9fb2c9; /* icons and labels — a muted blue-grey */
+  --color-fg: #ffffff; /* full white for the wordmark and active items */
+  --color-muted: #8f8f8f; /* icons and labels */
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
-  --color-raised: color-mix(in srgb, #ffffff 7%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
 
-  --color-selected: color-mix(in srgb, #ffffff 10%, transparent);
+  --color-selected: color-mix(in srgb, #ffffff 12%, transparent);
   --color-selected-fg: #ffffff;
 }
 
 /* --------------------------------------------------------------------------
-   Panel chrome (the brighter-blue half of the two-tone nav).
+   Panel chrome.
 
-   The chapters / notes / assistant panel that sits between the navy rail and
-   the manuscript. Same idea as .nav-chrome: a rich blue that re-points tokens
-   rather than restyling each control.
+   The chapters / notes / assistant panel that sits between the rail and the
+   manuscript. Same idea as .nav-chrome: it re-points tokens rather than
+   restyling each control.
 
-   Deep enough now to carry white text, so it is inked like the rail rather than
-   tinted: titles go near-white, the lifts (line, hover, selected) are mixed
-   from white, and the fields lift as subtle dark panels instead of white boxes.
-   A lighter shade of the rail's own navy — the same colour, one step up — so the
-   two read as kin rather than as two different blues. The New chapter button
-   brightens to rise off the ground. */
+   It takes the rail's exact value rather than one of its own, so the whole left
+   side reads as a single surface and the hairline between them is what separates
+   the two. The lifts (line, hover, selected) are mixed from white, so each is a
+   brighter shade of whatever sits beneath, and the fields lift as subtle panels
+   rather than as white boxes. */
 .panel-chrome {
-  /* The same deep navy as the rail and the shelf sidebar, so the whole left
+  /* The same near-black as the rail and the shelf sidebar, so the whole left
      chrome reads as one surface. */
-  background: #0a1a2f;
+  background: #0a0a0a;
 
-  /* New chapter and Send take the same harmonised navy-blue as the rail —
-     see .nav-chrome. */
-  --color-accent: #2670be;
-  --color-accent-strong: #3080d2;
-
-  --color-panel: #0a1a2f;
+  --color-panel: #0a0a0a;
   --color-surface: color-mix(in srgb, #ffffff 8%, transparent); /* fields: a subtle lift */
 
-  --color-fg: #f2f6fb; /* chapter titles and typed text, near white */
-  --color-muted: #9fb2c9; /* unselected titles, numbers, labels */
+  --color-fg: #ffffff; /* chapter titles and typed text */
+  --color-muted: #8f8f8f; /* unselected titles, numbers, labels */
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
-  --color-raised: color-mix(in srgb, #ffffff 7%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
 
   /* Selected nav — the open chapter — lifts with white text. Kept a touch
      stronger than the shelf's rows, which carry an edge bar this list does not. */
-  --color-selected: color-mix(in srgb, #ffffff 14%, transparent);
+  --color-selected: color-mix(in srgb, #ffffff 16%, transparent);
   --color-selected-fg: #ffffff;
 }
 
@@ -591,28 +701,23 @@ body {
 /* --------------------------------------------------------------------------
    The shelf, dressed as a book dashboard (the "dailybook" layout).
 
-   A light desk with a dark navy sidebar floating on it as a rounded card, a
-   light search-and-account bar, a hero band that resumes the book in progress,
-   then the cover grid. Only the shelf wears this — the editor keeps .nav-chrome.
+   A black desk with the sidebar floating on it as a rounded card, a
+   search-and-account bar, a hero band that resumes the book in progress, then
+   the cover grid. Only the shelf wears this — the editor keeps .nav-chrome.
 
    Like .nav-chrome, the sidebar re-points the palette tokens rather than
    restyling each control, so every text-muted / hover:bg-raised / bg-selected
    inside adapts on its own.
    -------------------------------------------------------------------------- */
 .shelf-sidebar {
-  /* One flat, uniform deep navy for the rail — no gradient. */
-  background: #0a1a2f;
+  /* One flat, uniform near-black for the rail — no gradient. */
+  background: #0a0a0a;
 
-  /* The filled action (New book) takes the harmonised navy-blue rather than
-     the brighter global accent, which would shout on the navy. */
-  --color-accent: #2670be;
-  --color-accent-strong: #3080d2;
-
-  --color-fg: #f2f6fb; /* near-white ink for the wordmark and active items */
-  --color-muted: #9fb2c9; /* nav labels and tools — a muted blue-grey */
+  --color-fg: #ffffff; /* full white for the wordmark and active items */
+  --color-muted: #8f8f8f; /* nav labels and tools */
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
-  --color-raised: color-mix(in srgb, #ffffff 7%, transparent);
-  --color-selected: color-mix(in srgb, #ffffff 8%, transparent);
+  --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
+  --color-selected: color-mix(in srgb, #ffffff 12%, transparent);
   --color-selected-fg: #ffffff;
 }
 
@@ -623,28 +728,83 @@ body {
    a background — no token re-pointing — because the form card is *inside* it,
    and a re-pointed --color-fg would cascade straight into the card and print
    near-white text on white. `.auth-aside` re-points the ink, and only wraps the
-   column of copy that actually sits on the navy.
+   column of copy that actually sits on the dark ground.
    -------------------------------------------------------------------------- */
 .auth-ground {
-  /* The same deep navy the shelf rail uses, so the two screens agree. */
-  background: #0a1a2f;
+  /* The same near-black the shelf rail uses, so the two screens agree. */
+  background: #0a0a0a;
 }
 
 .auth-aside {
-  --color-fg: #f2f6fb; /* near-white ink for the mark and the headline */
-  --color-muted: #9fb2c9; /* the line under it — a muted blue-grey */
+  --color-fg: #ffffff; /* the mark and the headline */
+  --color-muted: #8f8f8f; /* the line under it */
 }
 
-/* The hero band. A soft lavender wash, the way the reference tints its
-   "popular book this week" banner. */
+/* The hero band. A wash that lifts off the black ground from one corner —
+   the same gesture the light theme made with lavender, in value instead. */
 .shelf-hero {
   background:
     radial-gradient(
       130% 150% at 100% 0%,
-      #dde3fb 0%,
-      rgba(221, 227, 251, 0) 55%
+      rgba(255, 255, 255, 0.09) 0%,
+      rgba(255, 255, 255, 0) 55%
     ),
-    linear-gradient(115deg, #e9ecfb 0%, #f2e7f1 100%);
+    linear-gradient(115deg, #141414 0%, #0a0a0a 100%);
+}
+
+/* --------------------------------------------------------------------------
+   The chrome, by day.
+
+   The six classes above state a colour and re-point tokens for the dark set;
+   these are the same six in light, and they are kept here — together, after all
+   six — rather than beside each one, because what matters when reading them is
+   that the *set* is complete. A chrome class with no light rule stays black on
+   a white app, which is the one mistake this arrangement makes obvious.
+
+   The lifts invert with the ground: mixed from white on the dark chrome above,
+   from the ink here. Mixed rather than stated, so a change of chrome colour
+   carries its own hovers with it.
+   -------------------------------------------------------------------------- */
+:root[data-theme="light"] .nav-chrome,
+:root[data-theme="light"] .panel-chrome,
+:root[data-theme="light"] .shelf-sidebar {
+  background: #ffffff;
+
+  --color-surface: #ffffff;
+  --color-panel: #ffffff;
+
+  --color-fg: #17171a;
+  --color-muted: #62626b;
+  --color-line: color-mix(in srgb, #17171a 10%, transparent);
+  --color-raised: color-mix(in srgb, #17171a 6%, transparent);
+
+  --color-selected: color-mix(in srgb, #17171a 8%, transparent);
+  --color-selected-fg: #17171a;
+}
+
+/* The panel's fields lift *down* into the page on white — a lighter box on a
+   white ground is not a box at all. */
+:root[data-theme="light"] .panel-chrome {
+  --color-surface: color-mix(in srgb, #17171a 5%, transparent);
+}
+
+:root[data-theme="light"] .auth-ground {
+  background: #e9e9ec;
+}
+
+:root[data-theme="light"] .auth-aside {
+  --color-fg: #17171a;
+  --color-muted: #62626b;
+}
+
+:root[data-theme="light"] .shelf-hero {
+  background:
+    radial-gradient(
+      130% 150% at 100% 0%,
+      rgba(23, 23, 26, 0.07) 0%,
+      rgba(23, 23, 26, 0) 55%
+    ),
+    linear-gradient(115deg, #ffffff 0%, #f0f0f2 100%);
 }
 
 
@@ -943,10 +1103,10 @@ body {
   background-image: linear-gradient(
     100deg,
     #ffffff 0%,
-    #dbeafe 22%,
-    #93c5fd 38%,
+    #b8b8b8 22%,
+    #6e6e6e 38%,
     #ffffff 52%,
-    #dbeafe 70%,
+    #b8b8b8 70%,
     #ffffff 100%
   );
   background-size: 200% auto;
@@ -1083,7 +1243,7 @@ body {
   --paper-edge-w: 2px;
 }
 /* Not a part of the book but a state of the panel: Book View shows the book
-   whole and selects nothing, so the page takes the blue of the one button it
+   whole and selects nothing, so the page takes the accent of the one button it
    offers. Kept with the three so the rule stays in one place. */
 [data-matter="book"] {
   --paper-edge: var(--paper-edge-book);
@@ -1375,7 +1535,9 @@ body {
   max-height: 60%;
   transform: translateY(-50%);
   background: var(--color-accent);
-  border: 2px solid #fff;
+  /* The handle is a white block; its outline has to be the ink, not more white,
+     or it disappears into its own fill on a light sheet. */
+  border: 2px solid var(--color-accent-ink);
   border-radius: 6px;
   cursor: ew-resize;
   touch-action: none;

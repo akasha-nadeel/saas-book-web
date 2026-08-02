@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BookCover } from "@/components/shelf/book-cover";
+import { GENRES } from "@/lib/book-kinds";
 import {
   COVER_MAX_BYTES,
   COVER_MAX_EDGE,
@@ -16,7 +17,8 @@ import {
 import { useCover } from "@/lib/use-library";
 
 /**
- * Editing what a book looks like on the shelf.
+ * Editing what a book *is*: its title, who wrote it, what kind of book it is,
+ * and the picture on the front.
  *
  * A dialog rather than a page, unlike setup: this is a change to something that
  * already exists and the writer is looking straight at it, so the shelf staying
@@ -40,6 +42,7 @@ export function CoverDialog({
   const [title, setTitle] = useState(book.title);
   const [subtitle, setSubtitle] = useState(book.subtitle ?? "");
   const [author, setAuthor] = useState(book.author ?? "");
+  const [genre, setGenre] = useState(book.genre ?? "");
   // Undefined means "unchanged"; null means "remove the one that is there".
   const [cover, setNextCover] = useState<string | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
@@ -53,7 +56,7 @@ export function CoverDialog({
   const save = (e: React.FormEvent) => {
     e.preventDefault();
 
-    setBookDetails(book.id, { title, subtitle, author });
+    setBookDetails(book.id, { title, subtitle, author, genre });
 
     if (cover !== undefined && !setCover(book.id, cover)) {
       // The text saved either way; only the picture did not fit.
@@ -76,9 +79,9 @@ export function CoverDialog({
                  p-0 text-fg backdrop:bg-black/70"
     >
       <form onSubmit={save} className="p-7">
-        <h2 className="font-serif text-xl">Edit cover</h2>
+        <h2 className="font-serif text-xl">Book details</h2>
         <p className="mt-1 font-sans text-sm text-muted">
-          How this book appears on your shelf.
+          What this book is, and how it appears on your shelf.
         </p>
 
         <div className="mt-6 flex items-start gap-5">
@@ -130,6 +133,38 @@ export function CoverDialog({
                            px-3 py-2 text-fg placeholder:text-muted
                            focus-visible:border-accent focus-visible:outline-none"
               />
+            </label>
+
+            {/* Genre, which until now could only be set when a book was made.
+                That was fine while every book came from /book/new, which asks
+                — an imported one never does, and a book without it silently
+                dead-ends comp titles, categories, the blurb examples and the
+                structure targets, because `buildQuery()` has nothing to search
+                on. Four broken tools, one blank field, and nothing anywhere
+                that let a writer fill it in.
+
+                A select rather than free text: the same list `/book/new` offers
+                and `suggestTarget()` knows about, so the three cannot drift. */}
+            <label className="mt-4 block font-sans text-sm">
+              <span className="font-medium text-fg">Genre</span>
+              <select
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
+                className="mt-1.5 w-full rounded-md border border-line bg-surface
+                           px-3 py-2 text-fg focus-visible:border-accent
+                           focus-visible:outline-none"
+              >
+                <option value="">Not sure yet</option>
+                {GENRES.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-muted">
+                Comp titles, categories, blurb examples and structure all read
+                this.
+              </span>
             </label>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -208,7 +243,7 @@ export function CoverDialog({
           <button
             type="submit"
             className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                       font-medium text-white outline-none transition-colors
+                       font-medium text-accent-ink outline-none transition-colors
                        hover:bg-accent-strong focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >

@@ -222,7 +222,7 @@ export function MenuButton({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`${ITEM} ${danger ? "text-red-600" : ""}`}
+      className={`${ITEM} ${danger ? "text-danger" : ""}`}
     >
       {icon && (
         <span className={danger ? "text-current" : "text-muted"}>{icon}</span>

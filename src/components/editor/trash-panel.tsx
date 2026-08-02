@@ -103,7 +103,7 @@ export function TrashPanel({ bookId }: { bookId: string }) {
                 aria-label={`Delete ${item.title} forever`}
                 title="Delete forever"
                 className="shrink-0 rounded-md p-1.5 text-muted outline-none
-                           transition-colors hover:bg-red-400/15 hover:text-red-400
+                           transition-colors hover:bg-fg/10 hover:text-danger
                            focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 <svg

@@ -243,7 +243,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
           )}
           <button
             type="submit"
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white"
+            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink"
           >
             Add
           </button>
@@ -315,7 +315,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
                   type="button"
                   disabled={map.amount === undefined}
                   onClick={importRows}
-                  className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink disabled:opacity-50"
                 >
                   Import as money in
                 </button>

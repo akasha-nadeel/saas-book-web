@@ -126,7 +126,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+            className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
           >
             Back to writing
           </button>
@@ -237,7 +237,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
             <button
               type="submit"
               disabled={sending}
-              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white
+              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink
                          disabled:opacity-50"
             >
               {sending ? "Sending…" : "Send"}

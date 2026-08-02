@@ -172,7 +172,7 @@ export function ListingBlurb({ book }: { book: Book }) {
 }
 
 /**
- * The blue aside the reference uses to explain a field without turning it into
+ * The aside that explains a field without turning it into
  * a paragraph of label. Kept here rather than in the page so the copy sits
  * beside the control it is about.
  */

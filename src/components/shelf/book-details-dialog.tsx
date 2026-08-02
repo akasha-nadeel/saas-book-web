@@ -117,7 +117,7 @@ export function BookDetailsDialog({
                        hover:text-fg focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >
-            Edit cover
+            Edit details
           </button>
 
           <div className="flex items-center gap-2">
@@ -171,7 +171,7 @@ export function BookDetailsDialog({
               autoFocus
               onClick={() => router.push(`/book/${book.id}`)}
               className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                         font-medium text-white outline-none transition-colors
+                         font-medium text-accent-ink outline-none transition-colors
                          hover:bg-accent-strong focus-visible:ring-2
                          focus-visible:ring-accent/60"
             >

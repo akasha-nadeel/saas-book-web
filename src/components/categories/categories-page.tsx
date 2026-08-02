@@ -135,10 +135,10 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
                     onClick={() => toggle(name)}
                     aria-label={`Remove ${name}`}
                     className="flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5
-                               text-sm font-medium text-white"
+                               text-sm font-medium text-accent-ink"
                   >
                     {name}
-                    <span aria-hidden="true" className="text-white/70">
+                    <span aria-hidden="true" className="text-accent-ink/70">
                       ✕
                     </span>
                   </button>
@@ -177,7 +177,7 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
           <button
             type="submit"
             disabled={state === "loading" || query.trim().length < 2}
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-white disabled:opacity-50"
+            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
           >
             {state === "loading" ? "Looking…" : "Suggest categories"}
           </button>
@@ -213,7 +213,7 @@ export function CategoriesPage({ bookId }: { bookId: string }) {
         )}
 
         {error && (
-          <p className="mt-6 rounded-lg border border-amber-500/40 bg-amber-500/8 p-4 text-sm text-fg">
+          <p className="mt-6 rounded-lg border border-note-line bg-note-bg p-4 text-sm text-fg">
             {error}
           </p>
         )}
@@ -325,7 +325,7 @@ function SuggestionRow({
           className={`grid h-5 w-5 shrink-0 place-items-center rounded text-[11px]
                       font-bold ${
                         on
-                          ? "bg-accent text-white"
+                          ? "bg-accent text-accent-ink"
                           : "border-2 border-line text-transparent"
                       }`}
         >

@@ -500,7 +500,7 @@ export function ExportPage({ bookId }: { bookId: string }) {
                   // because which steps exist is what the pick decides.
                   disabled={output === null}
                   className="w-full rounded-lg bg-accent py-3 font-sans text-sm
-                             font-semibold text-white outline-none
+                             font-semibold text-accent-ink outline-none
                              transition-colors hover:bg-accent-strong
                              focus-visible:ring-2 focus-visible:ring-accent/60
                              disabled:cursor-not-allowed disabled:bg-raised
@@ -546,10 +546,10 @@ export function ExportPage({ bookId }: { bookId: string }) {
  * refusing to let a writer skip forward would be inventing a gate to guard an
  * empty room. "Done" therefore means *behind you*, not *answered*.
  *
- * Blue throughout rather than the usual green tick. Green already means
- * something in this app — it is the colour of front matter, in the book panel
- * and on the page edge — and a second meaning for it here would be a collision
- * a reader has to learn their way out of.
+ * The accent throughout rather than the usual green tick. There is no green in
+ * this palette to reach for, and the accent is what every other "done" in the
+ * app is drawn with, so a second treatment here would be a thing to learn for
+ * no gain.
  */
 function Rail({
   book,
@@ -621,7 +621,7 @@ function Rail({
                               rounded-full font-sans text-[11px] font-semibold
                               transition-colors ${
                                 isDone || isCurrent
-                                  ? "bg-accent text-white"
+                                  ? "bg-accent text-accent-ink"
                                   : "border border-line bg-panel text-muted"
                               }`}
                 >
@@ -868,7 +868,7 @@ function FormatCard({
         <span
           aria-hidden="true"
           className="absolute top-3.5 right-3.5 z-10 flex h-5 w-5 items-center
-                     justify-center rounded-full bg-accent text-white"
+                     justify-center rounded-full bg-accent text-accent-ink"
         >
           <Check />
         </span>
@@ -975,16 +975,16 @@ function TemplateCard({
                    shadow-sm"
       >
         <span
-          className="block h-full w-full px-4 pt-3 text-[#1a222d]"
+          className="block h-full w-full px-4 pt-3 text-[#ededed]"
           style={{ fontFamily: template.stack }}
         >
           {!typeset.hideChapterNumbers && (
-            <span className="block text-center text-[7px] text-[#1a222d]/40">
+            <span className="block text-center text-[7px] text-[#ededed]/40">
               1
             </span>
           )}
           <span
-            className="mt-1 block truncate text-center text-[9px] text-[#1a222d]/75"
+            className="mt-1 block truncate text-center text-[9px] text-[#ededed]/75"
             style={{
               fontVariant: template.headingCaps ? "small-caps" : "normal",
               letterSpacing: template.headingCaps ? "0.06em" : "0",
@@ -993,7 +993,7 @@ function TemplateCard({
             {sampleTitle}
           </span>
           <span
-            className="mt-2 block text-justify text-[6.5px] text-[#1a222d]/55"
+            className="mt-2 block text-justify text-[6.5px] text-[#ededed]/55"
             style={{ lineHeight: template.leading }}
           >
             {typeset.dropCaps && (
@@ -1039,7 +1039,7 @@ function Specimen({
     // setting rather than a picture of one.
     <div className="rounded-lg border border-line bg-white p-6">
       <div
-        className="mx-auto max-w-sm text-[#16191f]"
+        className="mx-auto max-w-sm text-[#ededed]"
         style={{
           fontFamily: template.stack,
           fontSize: `${template.bodyPt}pt`,
@@ -1251,7 +1251,7 @@ function ExportStep({
             onClick={onNarrate}
             disabled={narrating}
             className="flex w-full items-center justify-center gap-2 rounded-md
-                       bg-accent py-3 font-sans text-sm font-semibold text-white
+                       bg-accent py-3 font-sans text-sm font-semibold text-accent-ink
                        outline-none transition-colors hover:bg-accent-strong
                        focus-visible:ring-2 focus-visible:ring-accent/60
                        disabled:opacity-50"
@@ -1275,7 +1275,7 @@ function ExportStep({
             onClick={onRun}
             disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-md
-                       bg-accent py-3 font-sans text-sm font-semibold text-white
+                       bg-accent py-3 font-sans text-sm font-semibold text-accent-ink
                        outline-none transition-colors hover:bg-accent-strong
                        focus-visible:ring-2 focus-visible:ring-accent/60
                        disabled:opacity-50"

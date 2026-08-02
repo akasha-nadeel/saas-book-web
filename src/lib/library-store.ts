@@ -1398,7 +1398,21 @@ export function setBareCover(bookId: string, bare: boolean) {
  */
 export function setBookDetails(
   bookId: string,
-  details: { title: string; subtitle: string; author: string },
+  details: {
+    title: string;
+    subtitle: string;
+    author: string;
+    /**
+     * The genre, which until now could only be set when a book was *made*.
+     *
+     * That was fine while every book came from `/book/new`, which asks. An
+     * imported one never does, and a book with no genre silently dead-ends
+     * comp titles, categories, the blurb examples and the structure targets —
+     * `buildQuery()` has nothing to search on. Four broken tools and no way to
+     * fix the cause was the single worst gap on the shelf.
+     */
+    genre?: string;
+  },
 ) {
   commitBook(bookId, (book) => {
     const next = { ...book, title: details.title.trim() || "Untitled Book" };
@@ -1408,6 +1422,9 @@ export function setBookDetails(
 
     if (details.author.trim()) next.author = details.author.trim();
     else delete next.author;
+
+    if (details.genre?.trim()) next.genre = details.genre.trim();
+    else delete next.genre;
 
     return next;
   });
@@ -1435,8 +1452,14 @@ const PAPER_COLORS: readonly PaperColor[] = [
   "black",
 ];
 
-/** The whole app's colour scheme. The paper above is a separate choice — a
- *  writer can keep a cream page whichever theme the chrome is wearing. */
+/**
+ * The chrome's colour scheme. The paper above is a separate choice — a writer
+ * can keep a white page whichever way the chrome is dressed.
+ */
+export type Theme = "system" | "light" | "dark";
+
+const THEMES: readonly Theme[] = ["system", "light", "dark"];
+
 export interface Prefs {
   /** Dim every paragraph but the one being written. */
   focusMode: boolean;
@@ -1463,7 +1486,19 @@ export interface Prefs {
   bookPanel: "book" | "chapters";
   /** The colour of the page under the prose. */
   paper: PaperColor;
-  /** The chrome's colour scheme — light or dark. */
+  /**
+   * The chrome's colour scheme.
+   *
+   * Three values, not two: **"system" is a real answer, not the absence of
+   * one.** A writer whose laptop turns dark at sunset has already said what
+   * they want, and a two-way toggle makes them say it again twice a day. It is
+   * the default for the same reason.
+   *
+   * Only ever `light` or `dark` reaches CSS — the bootstrap in layout.tsx
+   * resolves "system" against `prefers-color-scheme` and writes the answer to
+   * `<html data-theme>`, so no stylesheet has to know this third value exists.
+   */
+  theme: Theme;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -1478,10 +1513,14 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // The cover: the panel opens on the book as an object, and the writer
   // steps into its parts from there.
   bookPanel: "book",
-  // White by default, and now on a light chrome to match. Long-form prose is
-  // what most people still read most comfortably on a light surface.
-  paper: "white",
-  // Light out of the box; the toggle switches to the dark workspace.
+  // Black by default, because the chrome around it is. A white sheet on a black
+  // app is the one combination that glares, and a writer arriving for the first
+  // time should not have to go and fix that. The other four sheets are still
+  // there — including white, for anyone who wants a page that looks like paper.
+  // setTheme keeps this in step with the chrome until the writer picks a sheet.
+  paper: "black",
+  // The machine's own answer, until the writer overrules it.
+  theme: "system",
 });
 
 const prefsListeners = new Set<() => void>();
@@ -1516,28 +1555,84 @@ export function getPrefs(): Prefs {
 function parsePrefs(raw: string | null): Prefs {
   if (!raw) return DEFAULT_PREFS;
   try {
-    const parsed = JSON.parse(raw) as Partial<Prefs>;
+    const parsed = JSON.parse(raw) as Partial<Prefs> & { paperPicked?: boolean };
     return {
       focusMode: parsed.focusMode === true,
       typewriter: parsed.typewriter === true,
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
       bookPanel: parsed.bookPanel === "chapters" ? "chapters" : "book",
-      paper: PAPER_COLORS.includes(parsed.paper as PaperColor)
-        ? (parsed.paper as PaperColor)
-        : DEFAULT_PREFS.paper,
+      paper: paperFrom(parsed),
+      theme: THEMES.includes(parsed.theme as Theme)
+        ? (parsed.theme as Theme)
+        : DEFAULT_PREFS.theme,
     };
   } catch {
     return DEFAULT_PREFS;
   }
 }
 
+/**
+ * The stored sheet, or the default for anyone who has never picked one.
+ *
+ * Reading is deliberately dumb — whatever is in the key, or the default. The
+ * decision about what an *unpicked* sheet should be belongs to `setTheme`,
+ * which is the only thing that knows which way the chrome is dressed, and it
+ * writes its answer down. Working it out here instead was tried and is wrong:
+ * this runs during render, off a cache keyed on the raw string, so a value
+ * derived from anything but that string goes stale the moment the theme moves
+ * and nothing invalidates it.
+ *
+ * `paperPicked` is written by `setPref` the moment anybody opens the Paper
+ * menu and chooses, and it is what keeps `setTheme` from overruling them.
+ */
+function paperFrom(parsed: Partial<Prefs> & { paperPicked?: boolean }) {
+  return PAPER_COLORS.includes(parsed.paper as PaperColor)
+    ? (parsed.paper as PaperColor)
+    : DEFAULT_PREFS.paper;
+}
+
+/**
+ * True for a library stored before the theme existed.
+ *
+ * Those carry `paper: "white"` — the old light default — with no theme beside
+ * it, so nothing has ever decided whether that sheet was a choice or a shrug.
+ * `ThemeSync` calls `setTheme("system")` once when this is true, which records
+ * the theme and moves the unpicked sheet to match the chrome in one write.
+ */
+export function themeUnset(): boolean {
+  return storedPrefs().theme === undefined;
+}
+
 export function getServerPrefs(): Prefs {
   return DEFAULT_PREFS;
 }
 
+/** Whatever is actually in the key, fields and all. Only setPref needs this. */
+function storedPrefs(): Record<string, unknown> {
+  const raw = readRaw(PREFS_KEY);
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object"
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
-  const next = { ...getPrefs(), [key]: value };
+  // Merged onto what is *stored* rather than onto the parsed value, so fields
+  // the type does not know about survive a write. There is one — `paperPicked`,
+  // below — and dropping it would re-run the white-to-black migration over a
+  // writer who had already said they wanted a white page.
+  const next = { ...storedPrefs(), ...getPrefs(), [key]: value };
+  // Stamped rather than added to Prefs: it is not a setting, it is a note to
+  // the parser that this writer has now answered the question. See paperFrom.
+  if (key === "paper") {
+    (next as Prefs & { paperPicked?: boolean }).paperPicked = true;
+  }
   try {
     window.localStorage.setItem(PREFS_KEY, JSON.stringify(next));
   } catch (err) {
@@ -1546,6 +1641,50 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
   }
   for (const listener of prefsListeners) listener();
   pushPrefs(next);
+}
+
+/** What "system" currently means on this machine. */
+export function systemTheme(): "light" | "dark" {
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+/**
+ * Change the theme, and bring the page with it.
+ *
+ * The paper is a separate setting on purpose — a writer may want a white sheet
+ * on a black app, and plenty do. But *until they have said so*, the sheet is
+ * only carrying the default, and leaving a black page in the middle of a white
+ * app is leaving the writer to fix something they did not choose. So the
+ * default sheet follows the chrome, and `paperPicked` is what stops this
+ * touching anybody who has been to the Paper menu.
+ *
+ * "system" is resolved here rather than stored as a rule, because there is no
+ * good answer to what should happen to the page at sunset: silently repainting
+ * the sheet somebody is writing on is worse than leaving it where they last
+ * saw it.
+ */
+export function setTheme(theme: Theme) {
+  const stored = storedPrefs();
+  const next = { ...stored, ...getPrefs(), theme };
+
+  if (stored.paperPicked !== true) {
+    const showing = theme === "system" ? systemTheme() : theme;
+    (next as Prefs).paper = showing === "light" ? "white" : "black";
+    // Still not "picked": the writer chose a *theme*, and the sheet came along
+    // with it. Marking it picked here would freeze the page at the first
+    // switch and quietly break the rule above.
+  }
+
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(next));
+  } catch (err) {
+    console.error("[store] could not write prefs", err);
+    return;
+  }
+  for (const listener of prefsListeners) listener();
+  pushPrefs(next as Prefs);
 }
 
 // ---------------------------------------------------------------------------

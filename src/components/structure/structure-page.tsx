@@ -73,7 +73,7 @@ export function StructurePage({ bookId }: { bookId: string }) {
               <button
                 type="button"
                 onClick={() => setTargetWords(book.id, suggested)}
-                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-white"
+                className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
               >
                 Use {suggested.toLocaleString()} words
               </button>
@@ -118,7 +118,7 @@ export function StructurePage({ bookId }: { bookId: string }) {
                     <p className="font-bold text-fg">
                       {beat.title}
                       {beat.current && (
-                        <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase text-white">
+                        <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-[11px] font-bold uppercase text-accent-ink">
                           you are here
                         </span>
                       )}
