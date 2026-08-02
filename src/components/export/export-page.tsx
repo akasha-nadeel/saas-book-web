@@ -24,8 +24,10 @@ import {
   trimById,
   type TypesetOptions,
 } from "@/lib/export/typeset";
-import { findBook, type Book } from "@/lib/library-store";
+import { bookWordCount, findBook, type Book } from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
+import { BookCover } from "@/components/shelf/book-cover";
+import { storeReadiness } from "@/lib/publishing";
 
 /**
  * Getting the book out, as a sequence rather than a wall.
@@ -210,6 +212,32 @@ export function ExportPage({ bookId }: { bookId: string }) {
 
   const steps = useMemo(() => stepsFor(output), [output]);
 
+  /**
+   * What a shop would refuse, for the rail to show from step one.
+   *
+   * The listing half only — `storeReadiness` is pure and reads the book's own
+   * fields, so this costs nothing per render. The half that needs the
+   * manuscript (`checkStoreReadiness`, which walks every chapter for broken or
+   * undescribed images) stays on the export step where it already runs, because
+   * parsing the whole book to draw a sidebar badge would be a real cost for a
+   * number that is only a prompt.
+   *
+   * `findBook` is called here rather than reusing the one below, because every
+   * hook has to run before the early returns — a book that is not there must
+   * not change how many hooks this component runs.
+   */
+  const blocking = useMemo(() => {
+    const b = findBook(shelf, bookId);
+    if (!b) return 0;
+    return storeReadiness({
+      book: b,
+      ...(b.publishing ? { meta: b.publishing } : {}),
+      hasCover: cover !== null,
+      chapterCount: b.chapters.filter((c) => c.words > 0).length,
+      brokenImages: 0,
+    }).filter((issue) => issue.level === "blocking").length;
+  }, [shelf, bookId, cover]);
+
   // Every hook is above the early returns on purpose — a book that is not there
   // must not change how many hooks this component runs.
   if (!hydrated) return null;
@@ -332,6 +360,8 @@ export function ExportPage({ bookId }: { bookId: string }) {
       <Rail
         book={book}
         bookId={bookId}
+        cover={cover}
+        blocking={blocking}
         groups={groups}
         currentId={step.id}
         currentIndex={index}
@@ -554,6 +584,8 @@ export function ExportPage({ bookId }: { bookId: string }) {
 function Rail({
   book,
   bookId,
+  cover,
+  blocking,
   groups,
   steps,
   currentId,
@@ -562,6 +594,10 @@ function Rail({
 }: {
   book: Book;
   bookId: string;
+  /** The stored cover, or null. Passed down so the rail fetches nothing. */
+  cover: string | null;
+  /** How many listing problems a shop would refuse today. */
+  blocking: number;
   groups: { name: string; steps: Step[] }[];
   steps: Step[];
   currentId: StepId;
@@ -570,13 +606,71 @@ function Rail({
 }) {
   return (
     <aside className="hidden w-72 shrink-0 flex-col border-r border-line bg-surface lg:flex">
-      <div className="shrink-0 px-8 pt-9">
-        <p className="font-sans text-base font-semibold text-fg">
-          Take it out of here
-        </p>
-        <p className="mt-1 truncate font-sans text-sm text-muted">
-          {book.title} · {book.chapters.length}{" "}
-          {book.chapters.length === 1 ? "chapter" : "chapters"}
+      <div className="shrink-0 px-8 pt-7">
+        {/* The way back out, first.
+
+            Every other tool screen carries a breadcrumb and an "All tools"
+            escape; this one never took the shared header, so a writer who
+            opened it from the wall of tools had no way back except the browser
+            button. A wizard is the *worst* screen to strand somebody on,
+            because the whole shape of it implies there is no exit until the
+            end. */}
+        <Link
+          href="/?area=tools"
+          className="font-sans text-xs font-semibold text-muted
+                     underline-offset-4 hover:text-fg hover:underline"
+        >
+          ← All tools
+        </Link>
+
+        {/* The book, with its cover.
+
+            The other fourteen tools put this in `ToolHeader` for one reason:
+            the Tools area lets a writer pick a book *before* opening a tool, so
+            landing on the wrong manuscript is a real way to lose ten minutes —
+            and on this screen it is a way to publish the wrong book. A writer
+            knows their own covers on sight and has to read a title. */}
+        <div className="mt-4 flex items-start gap-3">
+          <span className="w-9 shrink-0">
+            <BookCover
+              title={book.title}
+              words={bookWordCount(book)}
+              seed={book.id}
+              image={cover}
+              {...(book.subtitle ? { subtitle: book.subtitle } : {})}
+              {...(book.author ? { author: book.author } : {})}
+              {...(book.bareCover ? { bare: true } : {})}
+            />
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate font-sans text-sm font-semibold text-fg">
+              {book.title}
+            </span>
+            <span className="mt-0.5 block font-sans text-xs text-muted">
+              {book.chapters.length}{" "}
+              {book.chapters.length === 1 ? "chapter" : "chapters"} ·{" "}
+              {bookWordCount(book).toLocaleString()} words
+            </span>
+          </span>
+        </div>
+
+        {/* Where you are in the road, as a number.
+
+            The rail drew five circles and lit one, which says *which* step but
+            not *how far*. "Step 2 of 5" is the thing a person actually wants
+            when deciding whether to start something now or after lunch, and it
+            costs one line. */}
+        {/* Only once the road is known.
+
+            Before a format is chosen `steps` is genuinely one long, and "Step 1
+            of 1" reads as *finished* — the exact opposite of the truth, on the
+            screen where the writer has not yet answered anything. The honest
+            line there is that the length depends on the answer, which is also
+            the reason the first question is the first question. */}
+        <p className="mt-5 font-sans text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
+          {steps.length > 1
+            ? `Step ${currentIndex + 1} of ${steps.length}`
+            : "Pick a format to see the steps"}
         </p>
       </div>
 
@@ -670,6 +764,35 @@ function Rail({
           );
         })}
       </nav>
+
+      {/* What a shop would refuse, from step one rather than step five.
+
+          This is the product's whole argument and it was invisible until the
+          last screen of the wizard — a writer answered four steps' worth of
+          questions before anything told them the book had no author name. The
+          count is pure and cheap (`storeReadiness` reads the listing details
+          only; `hasCover` tests for a key rather than fetching a data URL), so
+          there is no reason to withhold it.
+
+          It never blocks: the sentence under it says the export runs anyway,
+          which is the standing promise of this screen — the file is yours
+          whether or not a shop would take it. */}
+      {blocking > 0 && (
+        <button
+          type="button"
+          onClick={() => onGo("export")}
+          className="mx-6 mb-4 shrink-0 rounded-xl border border-stop-line
+                     bg-stop-bg px-4 py-3 text-left outline-none
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <span className="block font-sans text-sm font-semibold text-stop-fg">
+            {blocking} {blocking === 1 ? "thing" : "things"} a shop would refuse
+          </span>
+          <span className="mt-0.5 block font-sans text-xs text-muted">
+            The export still runs. Fixing them first saves the upload.
+          </span>
+        </button>
+      )}
 
       {/* The way out, where the reference puts Log out: bottom of the rail,
           quiet, and never mistakable for a step. */}
