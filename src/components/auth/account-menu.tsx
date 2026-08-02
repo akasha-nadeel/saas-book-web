@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
+import { ThemeRow } from "@/components/theme/theme-toggle";
 import {
   displayName,
   firstNameOf,
@@ -13,7 +14,21 @@ import {
 import { usePlan } from "@/lib/use-plan";
 
 /**
- * The account chip in the shelf header, and the menu it opens.
+ * The account control, and the menu it opens.
+ *
+ * **Two triggers, one menu.** `bar` is the row at the foot of the dashboard
+ * sidebar — avatar, name, and a ⋯ at the end — which is where an account lives
+ * in every tool built in the last five years, and where this one now lives.
+ * `chip` is the older header control, kept for the widths below `md` where the
+ * sidebar is not rendered at all: without it, a writer on a phone would have no
+ * way to reach sign-out. The menu itself is identical either way, which is the
+ * point of doing this with a variant rather than a second component.
+ *
+ * There is no bell beside the ⋯, and the reference this was drawn from has one.
+ * The app has no notifications, and a bell that never rings is exactly the
+ * copied chrome the house rule forbids. If it is ever wanted, the honest
+ * version has something real to count — late advance readers is the one signal
+ * in here that is genuinely time-sensitive.
  *
  * A menu rather than the modal dialog this replaced. The chip has always drawn
  * a caret, which promises a menu; a dialog that dims the whole shelf to tell
@@ -37,7 +52,14 @@ import { usePlan } from "@/lib/use-plan";
 const MENU_WIDTH = 288;
 const EDGE_PADDING = 8;
 
-export function AccountMenu({ account }: { account: Account | null }) {
+export function AccountMenu({
+  account,
+  variant = "chip",
+}: {
+  account: Account | null;
+  /** `bar` is the sidebar row; `chip` the header control. See the note above. */
+  variant?: "chip" | "bar";
+}) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -145,11 +167,60 @@ export function AccountMenu({ account }: { account: Account | null }) {
         // bordered control competing with the search field. The ground still
         // fills on hover and while open, so it is not a control that gives no
         // sign of being one — it just does not announce itself at rest.
-        className={`flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-1
-                    pl-3 text-left outline-none transition-colors
-                    hover:bg-raised focus-visible:ring-2
-                    focus-visible:ring-accent/50 ${open ? "bg-raised" : ""}`}
+        className={
+          variant === "bar"
+            ? `flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left
+               outline-none transition-colors hover:bg-raised
+               focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                 open ? "bg-raised" : ""
+               }`
+            : `flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-1
+               pl-3 text-left outline-none transition-colors
+               hover:bg-raised focus-visible:ring-2
+               focus-visible:ring-accent/50 ${open ? "bg-raised" : ""}`
+        }
       >
+        {variant === "bar" ? (
+          <>
+            {/* Avatar first, then the name, then the ⋯ at the far end. The row
+                *is* the button — the ⋯ is drawn inside it as the affordance
+                rather than sitting beside it as a second control, because a
+                second control that opened the same menu would be two things to
+                explain and one of them redundant.
+
+                The full name rather than the first, unlike the chip: this row
+                is the width of the sidebar and has the room the chip did not.
+
+                The plan sits under the name, as it did in the header chip —
+                and it is the one thing on this row a writer might want at a
+                glance rather than a click, since it is what decides whether
+                the assistant and the audiobook will answer. Null until known:
+                a paying writer seeing "Free plan" flash under their own name
+                on every load is worse than a line that arrives a moment late. */}
+            <Avatar url={account?.avatarUrl ?? null} name={name} size={30} />
+            <span className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate font-sans text-sm font-medium text-fg">
+                {name}
+              </span>
+              {planLabel && (
+                <span className="font-sans text-[0.6875rem] font-medium text-muted">
+                  {planLabel}
+                </span>
+              )}
+            </span>
+            <span
+              aria-hidden="true"
+              className="shrink-0 text-muted transition-colors group-hover:text-fg"
+            >
+              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <circle cx="4" cy="10" r="1.6" />
+                <circle cx="10" cy="10" r="1.6" />
+                <circle cx="16" cy="10" r="1.6" />
+              </svg>
+            </span>
+          </>
+        ) : (
+          <>
         {/* Name over plan, then the avatar last — so the one round, solid thing
             in the bar is what finishes it.
 
@@ -179,7 +250,9 @@ export function AccountMenu({ account }: { account: Account | null }) {
             </span>
           )}
         </span>
-        <Avatar url={account?.avatarUrl ?? null} name={name} size={32} />
+            <Avatar url={account?.avatarUrl ?? null} name={name} size={32} />
+          </>
+        )}
       </button>
 
       {open &&
@@ -393,6 +466,23 @@ function MenuBody({
               Cancel subscription
             </MenuButton>
           ))}
+
+        <Rule className="my-1.5" />
+
+        {/* Theme, here rather than as a row of its own in the sidebar.
+
+            It is a setting about the app, and this is now the one place the
+            app's settings live — the same reasoning that moved the account out
+            of the header corner, and the same arrangement every tool with this
+            menu uses. It also gets the sidebar's foot back down to a single
+            row, which is what made the old two-row block look like two ideas.
+
+            The menu deliberately stays open when it is used: the whole point of
+            pressing it is to see what happens, and a menu that shut on the
+            first press would make comparing the three a three-trip job. */}
+        <div className="px-2.5 py-1.5">
+          <ThemeRow />
+        </div>
 
         <Rule className="my-1.5" />
 

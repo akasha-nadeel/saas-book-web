@@ -54,7 +54,6 @@ import { totals, type Ledger } from "@/lib/ledger";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { PHASES, progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
-import { ThemeRow } from "@/components/theme/theme-toggle";
 import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
   Menu,
@@ -364,10 +363,15 @@ export function Bookshelf({
           which reads as an unfinished sidebar; and it filed Templates and
           Background sound — two extras — beside Help and Pricing, which are
           chrome. Grouping says which is which and closes the hole. */}
-      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-14 md:flex">
+      {/* pb-3, not the pb-14 this used to carry. That padding existed to keep
+          the last item clear of Next's dev-tools badge, which sits in this
+          exact corner — and it left a hand's width of empty rail at the bottom
+          of the shipped product to dodge something only a developer ever sees.
+          The badge is moved to bottom-right in next.config.ts instead. */}
+      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-3 md:flex">
         <Link
           href="/"
-          className="mb-6 px-2 text-2xl font-extrabold tracking-tight text-fg"
+          className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
         >
           Open<span className="text-accent">Chapter</span>
         </Link>
@@ -430,11 +434,21 @@ export function Bookshelf({
             Pricing
           </SideItem>
 
-          {/* Last, and not a SideItem: the four above go somewhere, this one
-              changes what you are looking at. Separated by a rule for the same
-              reason — a control that acts on the app itself is a different kind
-              of thing from a list of places. */}
-          <ThemeRow className="mt-2 border-t border-line px-3 pt-3" />
+          {/* Below the rule: who you are, and everything that is a setting
+              rather than a place.
+
+              The four above go somewhere; this one opens the menu that holds
+              the account, the plan and the theme. It sits at the very foot,
+              where every tool built in the last five years puts it — it used
+              to be a chip in the top-right corner, which is the other
+              convention and the one this product was not otherwise following.
+
+              One row rather than two. Theme had a row of its own here and has
+              moved inside the menu, because it is a setting about the app and
+              that menu is now where the app's settings are. */}
+          <div className="mt-2 border-t border-line pt-2">
+            <AccountMenu account={account} variant="bar" />
+          </div>
         </div>
       </aside>
 
@@ -538,7 +552,14 @@ export function Bookshelf({
                 </Menu>
               </div>
 
-              <AccountMenu account={account} />
+              {/* Only where there is no sidebar to hold it. The account moved
+                  to the foot of the rail, and the rail is `hidden md:flex` —
+                  so on a phone this is the one way to reach sign-out, and
+                  removing it outright would have stranded exactly the writers
+                  least able to work around it. */}
+              <div className="md:hidden">
+                <AccountMenu account={account} />
+              </div>
             </div>
           </div>
         </header>

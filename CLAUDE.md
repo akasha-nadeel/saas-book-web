@@ -658,7 +658,9 @@ before the first paint (hence `suppressHydrationWarning` on `<html>`).
 `ThemeSync` at the root carries every change after that, and **listens to the
 media query while the pref is "system"** — without that, a laptop turning dark
 at sunset would only reach the app on the next reload. `theme-toggle.tsx` is the
-control, in the dashboard sidebar and in the editor's Text & type flyout.
+control, and it lives in two places: inside the account menu (the row at the
+foot of the dashboard sidebar) and in the editor's Text & type flyout, beside
+the page colour. Both are "how bright is this", asked where the writer is.
 
 Two consequences worth knowing. **Do not use Tailwind's `dark:` variant**: it
 keys off `prefers-color-scheme`, so it would ignore a writer who chose against
