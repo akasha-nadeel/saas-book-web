@@ -47,8 +47,119 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * which is the shape to prefer for any new figure here.
  */
 
+/**
+ * The palette, and the reasoning it has to survive.
+ *
+ * **Colour is information here, not decoration.** The reader is a writer who
+ * has been sold to by everybody, and a page where everything is coloured says
+ * nothing — brightness is what the courses and the cover mills look like. So
+ * the ground stays paper and ink, and a hue only appears where it is carrying a
+ * fact the reader needs to feel before they read it.
+ *
+ * - `INK` is the brand action — a deep indigo rather than the SaaS blue.
+ *   It is ink on paper, it reads as institution rather than startup, and it is
+ *   the colour of a decision: every CTA and every link is this and nothing else.
+ * - `STOP` / `WARN` / `PASS` are the semantic three, and they are the same
+ *   ladder the app itself uses (`stop` / `note` / `ok` tokens). Red is
+ *   *would be refused*, amber is *costs you readers*, green is *free, passed,
+ *   nothing owed*. They never appear as decoration, only as verdicts.
+ * - `PAPER` warms the alternating bands. A cold grey band reads as a dashboard;
+ *   a warm one reads as stock, which is what a book is printed on and free
+ *   atmosphere for a product about books.
+ *
+ * The emotional arc down the page is deliberate: red where the fear is named,
+ * amber where the cost is, green at the price and the all-clear, indigo on
+ * every way forward.
+ */
+const INK = "#312e81"; // indigo-900 — actions and links
+const STOP = "#b91c1c"; // would be refused
+const WARN = "#b45309"; // costs you readers
+const PASS = "#15803d"; // free, passed, earned
+// The warm band is `bg-[#faf9f7]` at each site rather than a constant: Tailwind
+// reads class names as literals and would ship no rule for one built at runtime.
+
 const FREE_LINE =
   "Writing, your shelf, syncing and all four export formats are free, and stay free.";
+
+/**
+ * The icon set, drawn here rather than imported.
+ *
+ * One grid (24), one stroke weight, one cap style, so eleven glyphs read as a
+ * set rather than as eleven downloads. Sized by the caller and never below
+ * 16px: a line icon under that is a smudge at any weight, which is the usual
+ * way an icon set stops carrying meaning and starts being texture.
+ */
+const icons = {
+  write: (
+    <>
+      <path d="M4 20h16" />
+      <path d="M14.5 4.5a2.1 2.1 0 0 1 3 3L9 16l-4 1 1-4Z" />
+    </>
+  ),
+  prepare: (
+    <>
+      <path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5Z" />
+      <path d="m8.5 12 2.5 2.5 4.5-5" />
+    </>
+  ),
+  track: (
+    <>
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <path d="m8 15 3.5-4 3 2.5L20 8" />
+    </>
+  ),
+  steps: (
+    <>
+      <path d="M4 18h4v-4H4z" />
+      <path d="M10 14h4v-4h-4z" />
+      <path d="M16 10h4V6h-4z" />
+    </>
+  ),
+  tools: (
+    <>
+      <path d="M14.5 5.5a3.5 3.5 0 0 0 4.6 4.6l-8 8a2.3 2.3 0 0 1-3.2-3.2Z" />
+      <path d="m5 5 3 3" />
+    </>
+  ),
+  formats: (
+    <>
+      <path d="M5.5 3.5h8L18.5 8v12.5h-13Z" />
+      <path d="M13.5 3.5V8h5" />
+    </>
+  ),
+  check: <path d="m5 12.5 4.5 4.5L19 7" />,
+  cross: (
+    <>
+      <path d="m6 6 12 12" />
+      <path d="m18 6-12 12" />
+    </>
+  ),
+} as const;
+
+/** One glyph from the set above. 18px unless a caller has a reason. */
+function Icon({
+  name,
+  className = "h-[18px] w-[18px]",
+}: {
+  name: keyof typeof icons;
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      {icons[name]}
+    </svg>
+  );
+}
 
 /**
  * The step that carries the whole argument, read out of the roadmap itself.
@@ -235,7 +346,8 @@ export function LandingPage() {
             </Link>
             <Link
               href="/signup"
-              className="rounded-full bg-[#0f0f10] px-4 py-2 font-semibold text-white hover:bg-black"
+              style={{ backgroundColor: INK }}
+              className="rounded-full px-4 py-2 font-semibold text-white hover:opacity-90"
             >
               Start free
             </Link>
@@ -250,20 +362,19 @@ export function LandingPage() {
             the references use, and the right one: a reader who has been
             promised things by four other tools wants to see the thing before
             they read another adjective. */}
-        <section className="overflow-hidden border-b border-[#ececee] bg-[#fafafa] px-6 pt-14 sm:pt-16">
+        <section className="overflow-hidden border-b border-[#ececee] bg-[#faf9f7] px-6 pt-20 sm:pt-24">
           <div className="mx-auto max-w-3xl text-center">
-            {/* Where the reference puts "trusted by 5,000+ brands". We have
-                nobody to count and will not invent them, so it carries the
-                three facts a suspicious reader wants first instead — each one
-                checkable in an afternoon. */}
-            <p className="inline-block rounded-full border border-[#e2e2e5] bg-white px-4 py-1.5 font-code text-[0.6875rem] tracking-[0.14em] text-[#62626b] uppercase">
-              Free · Works offline · Your book stays in your browser
-            </p>
-
             {/* Two-tone, the way both references split a headline. There is no
                 accent hue in this product to split on, so the two lines split
-                on weight of ink: the quiet half sets up the loud one. */}
-            <h1 className="mt-8 font-serif text-5xl leading-[1.05] font-semibold sm:text-6xl">
+                on weight of ink: the quiet half sets up the loud one.
+
+                Nothing above it. A badge there was buying attention with a
+                small grey sentence before the headline had spent any — and the
+                three facts it carried (free, offline, your book stays here) are
+                all made again below, where they land against something. The
+                first thing on the page should be the sentence the page is
+                about. */}
+            <h1 className="oc-display font-serif text-[3.5rem] leading-[1.02] font-semibold sm:text-7xl">
               <span className="block text-[#a5a5ad]">Nobody tells you</span>
               <span className="block text-[#0f0f10]">the order.</span>
             </h1>
@@ -277,7 +388,8 @@ export function LandingPage() {
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/signup"
-                className="rounded-full bg-[#0f0f10] px-7 py-3.5 font-semibold text-white hover:bg-black"
+                style={{ backgroundColor: INK }}
+                className="rounded-full px-7 py-3.5 font-semibold text-white hover:opacity-90"
               >
                 Start free
               </Link>
@@ -355,10 +467,17 @@ export function LandingPage() {
             drift and cannot flatter. */}
         <section className="border-b border-[#ececee] px-6 py-14">
           <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 text-center md:grid-cols-4">
-            <Counted n={String(STEPS.length)} label="steps, in order" />
-            <Counted n={String(ALL_TOOLS.length)} label="tools, all included" />
-            <Counted n="4" label="export formats" />
-            <Counted n="0" label="EPUBCheck errors" />
+            <Counted icon="steps" n={String(STEPS.length)} label="steps, in order" />
+            <Counted
+              icon="tools"
+              n={String(ALL_TOOLS.length)}
+              label="tools, all included"
+            />
+            <Counted icon="formats" n="4" label="export formats" />
+            {/* The only figure in the row that is a *verdict* rather than a
+                count, so it is the only one that gets a colour. A green zero
+                is the whole argument of the export pipeline in one glyph. */}
+            <Counted icon="check" n="0" label="EPUBCheck errors" tone={PASS} />
           </div>
         </section>
 
@@ -374,18 +493,21 @@ export function LandingPage() {
               <Phase
                 lit
                 n="01"
+                icon="write"
                 title="Write"
                 note="Seventeen free minutes a day, and not losing your place between them."
                 items={WRITE.length}
               />
               <Phase
                 n="02"
+                icon="prepare"
                 title="Prepare"
                 note="Everything a shop asks for that is not the book, checked before you upload."
                 items={PREPARE.length}
               />
               <Phase
                 n="03"
+                icon="track"
                 title="Track"
                 note="What the book cost against what it earned, and who still owes you a review."
                 items={TRACK.length}
@@ -443,12 +565,12 @@ export function LandingPage() {
           <ul className="mt-6 flex flex-col gap-3">
             {PREPARE.slice(0, 4).map(([name, note]) => (
               <li key={name}>
-                <p className="font-semibold text-[#0f0f10]">{name}</p>
+                <p className="oc-heading font-serif text-lg text-[#0f0f10]">{name}</p>
                 <p className="text-sm leading-relaxed">{note}</p>
               </li>
             ))}
           </ul>
-          <p className="mt-6 rounded-xl border border-[#e6e6e8] bg-[#fafafa] p-4 text-sm leading-relaxed">
+          <p className="mt-6 rounded-xl border border-[#e6e6e8] bg-[#faf9f7] p-4 text-sm leading-relaxed">
             <strong className="text-[#0f0f10]">About the PDF.</strong> A clean
             interior file at your trim size with fonts embedded — not a
             pre-press file. No bleed, no crop marks, no CMYK, because it comes
@@ -469,7 +591,7 @@ export function LandingPage() {
           <ul className="mt-6 flex flex-col gap-3">
             {TRACK.slice(0, 4).map(([name, note]) => (
               <li key={name}>
-                <p className="font-semibold text-[#0f0f10]">{name}</p>
+                <p className="oc-heading font-serif text-lg text-[#0f0f10]">{name}</p>
                 <p className="text-sm leading-relaxed">{note}</p>
               </li>
             ))}
@@ -493,14 +615,20 @@ export function LandingPage() {
               {TOOL_GROUPS.map((group, i) => (
                 <div
                   key={group.title}
-                  className={`rounded-2xl border border-[#e6e6e8] p-6 ${
-                    // The first group gets the wide cell: "the parts a shop
-                    // sees" is the question this audience arrives with.
-                    i === 0 ? "bg-[#0f0f10] text-[#b6b6bd] md:col-span-2" : ""
+                  // The first group gets the wide cell *and* the brand ground:
+                  // "the parts a shop sees" is the question this audience
+                  // arrives with, so it is the one that should be read first.
+                  className={`rounded-2xl border p-6 ${
+                    i === 0 ? "text-[#c7d2fe] md:col-span-2" : "border-[#e6e6e8]"
                   }`}
+                  style={
+                    i === 0
+                      ? { backgroundColor: INK, borderColor: INK }
+                      : undefined
+                  }
                 >
                   <p
-                    className={`font-serif text-xl ${
+                    className={`oc-heading font-serif text-xl ${
                       i === 0 ? "text-white" : "text-[#0f0f10]"
                     }`}
                   >
@@ -532,7 +660,7 @@ export function LandingPage() {
             High on the page on purpose. For a reader who has been sold to by
             everyone, the fastest way to earn a minute of attention is to say
             what you will not take money for. */}
-        <section className="border-b border-[#ececee] bg-[#fafafa] px-6 py-20">
+        <section className="border-b border-[#ececee] bg-[#faf9f7] px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Straight answer"
@@ -545,7 +673,14 @@ export function LandingPage() {
                   key={name}
                   className="grid gap-2 border-t border-[#e6e6e8] py-6 first:border-t-0 first:pt-0 md:grid-cols-[1fr_1.4fr] md:gap-10"
                 >
-                  <p className="font-serif text-xl leading-snug text-[#0f0f10]">
+                  {/* A red ✕ against a "we will not" is the one decorative-
+                      looking use of colour that is not decorative: the whole
+                      section is a list of refusals, and the mark is what makes
+                      that legible before a word is read. */}
+                  <p className="oc-heading flex items-start gap-2.5 font-serif text-xl leading-snug text-[#0f0f10]">
+                    <span className="mt-1 shrink-0" style={{ color: STOP }}>
+                      <Icon name="cross" className="h-[18px] w-[18px]" />
+                    </span>
                     {name}
                   </p>
                   <p className="leading-relaxed">{note}</p>
@@ -572,7 +707,7 @@ export function LandingPage() {
                   <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
                     Not built
                   </p>
-                  <p className="mt-3 font-serif text-lg text-[#0f0f10]">
+                  <p className="oc-heading mt-3 font-serif text-lg text-[#0f0f10]">
                     {name}
                   </p>
                   <p className="mt-2 text-sm leading-relaxed">{note}</p>
@@ -583,15 +718,23 @@ export function LandingPage() {
         </section>
 
         {/* ---- Price ---------------------------------------------------- */}
-        <section id="price" className="border-b border-[#ececee] bg-[#fafafa] px-6 py-20">
+        <section id="price" className="border-b border-[#ececee] bg-[#faf9f7] px-6 py-20">
           <div className="mx-auto max-w-4xl">
             <Head eyebrow="Price" title="Free, and what isn’t" />
             <div className="mt-12 grid gap-5 md:grid-cols-2">
-              <div className="rounded-2xl border-2 border-[#0f0f10] bg-white p-8">
-                <p className="font-code text-xs tracking-[0.18em] text-[#0f0f10] uppercase">
+              <div
+                className="rounded-2xl border-2 bg-white p-8"
+                style={{ borderColor: PASS }}
+              >
+                <p
+                  className="font-code text-xs tracking-[0.18em] uppercase"
+                  style={{ color: PASS }}
+                >
                   Free
                 </p>
-                <p className="mt-4 font-serif text-5xl text-[#0f0f10]">£0</p>
+                <p className="oc-heading mt-4 font-serif text-5xl" style={{ color: PASS }}>
+                  £0
+                </p>
                 <p className="mt-5 leading-relaxed">{FREE_LINE}</p>
                 <p className="mt-3 leading-relaxed">
                   No watermark, no export cap, nothing to unlock before you can
@@ -599,7 +742,8 @@ export function LandingPage() {
                 </p>
                 <Link
                   href="/signup"
-                  className="mt-6 inline-block rounded-full bg-[#0f0f10] px-6 py-3 font-semibold text-white hover:bg-black"
+                  style={{ backgroundColor: INK }}
+                  className="mt-6 inline-block rounded-full px-6 py-3 font-semibold text-white hover:opacity-90"
                 >
                   Start free
                 </Link>
@@ -608,7 +752,7 @@ export function LandingPage() {
                 <p className="font-code text-xs tracking-[0.18em] text-[#9a9aa2] uppercase">
                   Pro
                 </p>
-                <p className="mt-4 font-serif text-5xl text-[#0f0f10]">
+                <p className="oc-heading mt-4 font-serif text-5xl text-[#0f0f10]">
                   {monthly}
                   <span className="font-sans text-base text-[#9a9aa2]">
                     {" "}
@@ -636,7 +780,7 @@ export function LandingPage() {
                   open={i === 0}
                   className="border-t border-[#e6e6e8] py-5 first:border-t-0 first:pt-0"
                 >
-                  <summary className="cursor-pointer font-serif text-lg text-[#0f0f10] marker:text-[#c8c8ce]">
+                  <summary className="oc-heading cursor-pointer font-serif text-lg text-[#0f0f10] marker:text-[#c8c8ce]">
                     {q}
                   </summary>
                   <p className="mt-3 leading-relaxed">{a}</p>
@@ -647,9 +791,9 @@ export function LandingPage() {
         </section>
 
         {/* ---- Close ---------------------------------------------------- */}
-        <section className="bg-[#0f0f10] px-6 py-24 text-center">
+        <section className="px-6 py-24 text-center" style={{ backgroundColor: INK }}>
           <div className="mx-auto max-w-2xl">
-            <h2 className="font-serif text-4xl leading-tight text-white sm:text-5xl">
+            <h2 className="oc-heading font-serif text-4xl leading-tight text-white sm:text-5xl">
               You have the book.
               <br />
               Take the order for free.
@@ -703,7 +847,7 @@ function Head({
       <p className="font-code text-[0.6875rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
         {eyebrow}
       </p>
-      <h2 className="mt-4 font-serif text-4xl leading-tight text-[#0f0f10] sm:text-[2.75rem]">
+      <h2 className="oc-heading mt-4 font-serif text-4xl leading-tight text-[#0f0f10] sm:text-[2.75rem]">
         {title}
       </h2>
       {lead && <p className="mt-4 text-lg leading-relaxed">{lead}</p>}
@@ -740,7 +884,7 @@ function Split({
     <section
       {...(id ? { id } : {})}
       className={`border-b border-[#ececee] px-6 py-20 ${
-        tint ? "bg-[#fafafa]" : ""
+        tint ? "bg-[#faf9f7]" : ""
       }`}
     >
       <div className="mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-2">
@@ -754,11 +898,40 @@ function Split({
   );
 }
 
-/** One counted figure. Never a user count — see the note at the top. */
-function Counted({ n, label }: { n: string; label: string }) {
+/**
+ * One counted figure. Never a user count — see the note at the top.
+ *
+ * `tone` is for the one that is a verdict rather than a tally. Colouring all
+ * four would make the row decorative and the green would stop meaning "passed".
+ */
+function Counted({
+  icon,
+  n,
+  label,
+  tone,
+}: {
+  icon: keyof typeof icons;
+  n: string;
+  label: string;
+  tone?: string;
+}) {
   return (
     <div>
-      <p className="font-serif text-4xl text-[#0f0f10]">{n}</p>
+      <span
+        className="mx-auto flex h-9 w-9 items-center justify-center rounded-full"
+        style={{
+          color: tone ?? INK,
+          backgroundColor: `${tone ?? INK}12`,
+        }}
+      >
+        <Icon name={icon} />
+      </span>
+      <p
+        className="oc-heading mt-3 font-serif text-4xl"
+        style={{ color: tone ?? "#0f0f10" }}
+      >
+        {n}
+      </p>
       <p className="mt-1 text-sm">{label}</p>
     </div>
   );
@@ -766,12 +939,14 @@ function Counted({ n, label }: { n: string; label: string }) {
 
 function Phase({
   n,
+  icon,
   title,
   note,
   items,
   lit,
 }: {
   n: string;
+  icon: keyof typeof icons;
   title: string;
   note: string;
   items: number;
@@ -779,21 +954,35 @@ function Phase({
 }) {
   return (
     <div
-      className={`rounded-2xl border p-7 ${
+      className="rounded-2xl border p-7"
+      style={
         lit
-          ? "border-[#0f0f10] bg-[#0f0f10] text-[#b6b6bd]"
-          : "border-[#e6e6e8] bg-white"
-      }`}
+          ? { borderColor: INK, backgroundColor: INK, color: "#c7d2fe" }
+          : { borderColor: "#e6e6e8", backgroundColor: "#fff" }
+      }
     >
+      {/* The lit card is the brand indigo rather than black: it is the phase
+          most readers are standing in, and indigo says "you are here" where
+          black said "this one is heavier than the others". */}
+      <span
+        className="flex h-10 w-10 items-center justify-center rounded-xl"
+        style={
+          lit
+            ? { backgroundColor: "#ffffff1f", color: "#fff" }
+            : { backgroundColor: `${INK}12`, color: INK }
+        }
+      >
+        <Icon name={icon} className="h-5 w-5" />
+      </span>
       <p
-        className={`font-code text-xs tracking-[0.18em] uppercase ${
+        className={`mt-5 font-code text-xs tracking-[0.18em] uppercase ${
           lit ? "text-white/60" : "text-[#9a9aa2]"
         }`}
       >
         {n}
       </p>
       <p
-        className={`mt-4 font-serif text-2xl ${
+        className={`oc-heading mt-4 font-serif text-2xl ${
           lit ? "text-white" : "text-[#0f0f10]"
         }`}
       >
@@ -850,7 +1039,7 @@ function DashboardFigure() {
             <p className="font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
               Getting it ready
             </p>
-            <p className="mt-1.5 font-serif text-xl text-[#0f0f10]">
+            <p className="oc-heading mt-1.5 font-serif text-xl text-[#0f0f10]">
               The Drowned Coast
             </p>
             <p className="mt-3 text-sm">
@@ -873,7 +1062,7 @@ function DashboardFigure() {
               ].map(([title, why, action]) => (
                 <div
                   key={title}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#e6e6e8] bg-[#fafafa] px-3.5 py-3"
+                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#e6e6e8] bg-[#faf9f7] px-3.5 py-3"
                 >
                   <span className="min-w-[10rem] flex-1">
                     <span className="block text-sm font-semibold text-[#0f0f10]">
@@ -881,7 +1070,10 @@ function DashboardFigure() {
                     </span>
                     <span className="block text-sm">{why}</span>
                   </span>
-                  <span className="shrink-0 rounded-md bg-[#0f0f10] px-3 py-1.5 text-xs font-semibold text-white">
+                  <span
+                    className="shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold text-white"
+                    style={{ backgroundColor: INK }}
+                  >
                     {action}
                   </span>
                 </div>
@@ -891,14 +1083,16 @@ function DashboardFigure() {
             <div className="mt-5 flex items-center gap-2 border-t border-[#ececee] pt-4">
               {PHASES.map((phase, i) => (
                 <span key={phase.id} className="flex flex-1 items-center gap-2">
+                  {/* Filled = done, ringed = where the book is, hollow = ahead.
+                      Three states from one shape and one colour, which is what
+                      the real dials do — a second hue here would imply a
+                      severity that a phase does not have. */}
                   <span
-                    className={`h-4 w-4 shrink-0 rounded-full border-2 ${
-                      i < 2
-                        ? "border-[#0f0f10] bg-[#0f0f10]"
-                        : i === 2
-                          ? "border-[#0f0f10]"
-                          : "border-[#dcdce0]"
-                    }`}
+                    className="h-4 w-4 shrink-0 rounded-full border-2"
+                    style={{
+                      borderColor: i <= 2 ? INK : "#dcdce0",
+                      backgroundColor: i < 2 ? INK : "transparent",
+                    }}
                   />
                   {i < PHASES.length - 1 && (
                     <span className="h-px flex-1 bg-[#ececee]" />
@@ -943,7 +1137,13 @@ function OrderFigure() {
                   {phase.label}
                 </span>
                 {here && (
-                  <span className="mt-2 block rounded-lg bg-[#0f0f10] px-3 py-2 text-xs font-semibold text-white">
+                  // Indigo, not black: this is the step the whole page is
+                  // arguing about, and the brand colour is what every other
+                  // "here is the answer" on the page is set in.
+                  <span
+                    className="mt-2 block rounded-lg px-3 py-2 text-xs font-semibold text-white"
+                    style={{ backgroundColor: INK }}
+                  >
                     {ARC_STEP.title}
                   </span>
                 )}
@@ -978,11 +1178,17 @@ function CheckFigure() {
             className="flex items-start gap-3 border-b border-[#f1f1f3] pb-3 last:border-b-0 last:pb-0"
           >
             <span
-              className={`mt-0.5 shrink-0 rounded-md px-2 py-1 font-code text-[0.5625rem] tracking-wider uppercase ${
+              // The badge *is* the verdict, so it is the one place on the page
+              // where red and amber are load-bearing: filled red for what a
+              // shop refuses, outlined amber for what merely costs you readers.
+              // Weight carries it too — filled against outlined — so a reader
+              // who cannot separate the two hues still reads the difference.
+              className="mt-0.5 shrink-0 rounded-md px-2 py-1 font-code text-[0.5625rem] tracking-wider uppercase"
+              style={
                 blocking
-                  ? "bg-[#0f0f10] text-white"
-                  : "border border-[#e2e2e5] text-[#9a9aa2]"
-              }`}
+                  ? { backgroundColor: STOP, color: "#fff" }
+                  : { border: `1px solid ${WARN}55`, color: WARN }
+              }
             >
               {weight as string}
             </span>
@@ -1006,18 +1212,22 @@ function MoneyFigure() {
       aria-hidden="true"
     >
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl bg-[#fafafa] p-4">
+        <div className="rounded-xl bg-[#faf9f7] p-4">
           <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
             Spent
           </p>
-          <p className="mt-2 font-serif text-2xl text-[#0f0f10]">£1,240</p>
+          <p className="oc-heading mt-2 font-serif text-2xl" style={{ color: STOP }}>
+            £1,240
+          </p>
           <p className="mt-1 text-xs">Cover · editing · ads · proofs</p>
         </div>
-        <div className="rounded-xl bg-[#fafafa] p-4">
+        <div className="rounded-xl bg-[#faf9f7] p-4">
           <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
             Earned
           </p>
-          <p className="mt-2 font-serif text-2xl text-[#0f0f10]">£410</p>
+          <p className="oc-heading mt-2 font-serif text-2xl" style={{ color: PASS }}>
+            £410
+          </p>
           <p className="mt-1 text-xs">From your own sales report</p>
         </div>
       </div>

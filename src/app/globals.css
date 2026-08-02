@@ -809,6 +809,42 @@ body {
 
 
 /* --------------------------------------------------------------------------
+   Display type on the landing page.
+
+   Fraunces is a *variable* face and was being used as if it were a static one.
+   Three axes are loaded in layout.tsx and none of them were set, so every
+   headline rendered at the defaults — which are tuned for text, not for 60px.
+
+   `opsz` is the one that pays. An optical size axis is a real typographic
+   control: at display sizes a face should have finer hairlines, tighter joins
+   and more contrast than the same face at 16px, which is what a metal punchcutter
+   did by hand for every size. Setting it high at the hero and moderately at the
+   section headings is the whole refinement, and it costs nothing — the font is
+   already downloaded.
+
+   `WONK` 1 turns on the idiosyncratic alternates (the wonky terminals and the
+   single-storey g). It is what stops the page reading as Times, and it matches
+   what the app's own manuscript headings already ask for. `SOFT` 0 keeps the
+   joins sharp: softness reads as friendly, and this page is talking to somebody
+   who has been sold to by friendly.
+   -------------------------------------------------------------------------- */
+.oc-display {
+  font-variation-settings:
+    "opsz" 120,
+    "SOFT" 0,
+    "WONK" 1;
+  letter-spacing: -0.02em;
+}
+
+.oc-heading {
+  font-variation-settings:
+    "opsz" 48,
+    "SOFT" 0,
+    "WONK" 1;
+  letter-spacing: -0.01em;
+}
+
+/* --------------------------------------------------------------------------
    Book View page turn.
 
    Flipping the preview turns the leaf like a real book: the incoming page is
