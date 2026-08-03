@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AppWindow } from "@/components/landing/app-window";
 
 /**
  * The dashboard, working — the figure for "Before you upload".
@@ -1416,27 +1417,27 @@ export function CheckDemo() {
   const sel0 = reduced ? 54 : 0;
 
   return (
-    // The same tablet as `store-listing-demo.tsx` — same greys, same tight
-    // dark shadow, which rests the object on the page where a soft blur would
-    // float it above. The corners are tighter than that one's: the screen
-    // here is a *dashboard*, and a 20px radius eats into a sidebar that starts
-    // 8px from the edge. The bezel comes in with it, or a frame rounder than
-    // its own glass reads as a mistake.
-    <div
-      ref={hostRef}
-      role="img"
-      aria-label={LABEL}
-      className="rounded-[1.1rem] border border-lp-device-edge bg-lp-device p-3 select-none
-                 shadow-[0_2px_0_var(--color-lp-device-edge),0_10px_18px_-8px_rgba(15,15,16,0.30),0_30px_46px_-18px_rgba(15,15,16,0.55)]"
+    // The page's one screen — see `app-window.tsx`. It was a tablet slab,
+    // and so was the listing demo, and the hero was a bare card: three devices
+    // on one page, which reads as three products.
+    //
+    // `label` is what marks this as a picture rather than a control: the frame
+    // then takes `role="img"`, and everything drawn inside is hidden behind
+    // that one description rather than read out as a hundred stray words.
+    //
+    // The screen keeps its own aspect ratio, because the stage inside is a
+    // fixed design in `W × H` px scaled to whatever width the column gives it.
+    // The frame's title bar sits *above* that box, so it changes the height of
+    // the whole figure and nothing about the measurement inside — `screenRef`
+    // still measures the glass, and every rect the pointer aims at is taken
+    // relative to it.
+    <AppWindow
+      label={LABEL}
+      hostRef={hostRef}
+      screenRef={screenRef}
+      screenStyle={{ aspectRatio: `${W} / ${H}` }}
+      screenClassName="relative overflow-hidden bg-lp-ground"
     >
-      {/* The screen carries its own hairline: bezel and screen are both pale,
-          and without it the glass has no edge. */}
-      <div
-        ref={screenRef}
-        aria-hidden="true"
-        style={{ aspectRatio: `${W} / ${H}` }}
-        className="relative overflow-hidden rounded-[0.55rem] border border-lp-edge bg-lp-ground"
-      >
         <div
           ref={stageRef}
           style={{
@@ -1808,7 +1809,6 @@ export function CheckDemo() {
             </svg>
           </div>
         </div>
-      </div>
-    </div>
+    </AppWindow>
   );
 }

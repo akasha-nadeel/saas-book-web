@@ -762,98 +762,135 @@ export function LandingPage() {
 
         {/* ---- Prepare --------------------------------------------------
 
-            Words left, the product working on the right — but written out
-            rather than handed to `Split`, for two reasons that are both about
-            `CheckDemo`.
+            **Stacked, not split, and the figure decides it.** This was words
+            left and the product right, with the figure pinned while the claims
+            scrolled past. It was a good arrangement for reading and a bad one
+            for the thing being read: `CheckDemo` is a whole dashboard drawn at
+            760 design px whose *content is 11px labels* — a finding, and the
+            button that fixes it — and a column can never be wide enough for
+            them. On the larger half of `max-w-6xl` it scaled to about 0.8 and
+            the labels went to texture, which is the difference between a
+            picture of a product and a picture of a product you can read. It
+            also ran off the right edge of the viewport, which is what a fixed
+            aspect ratio does when the column it is in is narrower than the
+            picture wants.
 
-            **It is not on a half.** The figure is a whole dashboard at 760
-            design px with 11px labels on it, and those labels *are* the
-            content — a finding, and the button that fixes it. On an even half
-            of `max-w-5xl` it scales to about 0.6 and they stop being readable,
-            so this section takes the wider container and gives the figure the
-            larger column. That is the whole difference between a screenshot of
-            a product and a screenshot of a product you can read.
+            So the section centres: header, then the figure at its own full
+            width, then the claims underneath in two columns. The figure now
+            scales *up* rather than down, and the one thing this section exists
+            to show — the fix sitting on the problem — is legible at a glance
+            instead of needing to be leant into.
 
-            **And the ground is the hero's**, not the alternating tint the rest
-            of the page uses. This is where the promise the hero makes is shown
-            being kept, and the two are the same colour so they read as one
-            claim made twice.
+            **It is set on a black panel, inset from the page.** Everywhere
+            else the page alternates two tints and keeps one voice; here it
+            stops arguing and demonstrates, and going dark is how a keynote
+            marks that change of mode. It earns it twice over. The figure is a
+            *drawn light interface* — by day a white app on black, which is the
+            strongest contrast available on the page and puts every one of
+            those 11px labels on its own ground. And the panel is inset with
+            the page showing down both sides and around the corners, so it
+            reads as a stage the product is standing on rather than as another
+            full-bleed band in the stack.
 
-            **The figure is pinned and the words scroll past it.** The left
-            column is four points and a caveat — taller than the tablet by half
-            again — so centred it left the figure adrift in whitespace and, worse,
-            out of the frame for most of the reading. Sticky is the honest
-            arrangement: the claims go by while the thing making them stays on
-            screen, and the reader can look up from any one of them at a product
-            that is still working. `items-start` is what makes it possible —
-            a stretched grid item has nothing to stick inside — and it is
-            `md:` only, because on one column the figure would pin over the very
-            text it belongs to. `top-24` clears the sticky header above it.
+            The ink inside it is a palette of its own (`lp-stage-*`) that does
+            *not* invert with the theme, because the surface does not either —
+            see the note in globals.css.
 
             The figure replaced a drawn still of the export screen's readiness
             list. The still could show that the app lists problems; only the
             moving one shows the fix sitting *on* the problem, which is the
             claim this section is actually making. */}
-        <section className="border-b border-lp-line bg-lp-tint px-6 py-20">
-          <div className="mx-auto grid max-w-6xl items-start gap-12 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-            <div>
-              <Head
-                eyebrow="Before you upload"
-                title="Find out from us, not from a rejection"
-              />
-              <p className="oc-lead mt-6 font-serif text-xl leading-relaxed">
-                A shop refusing your upload is a slow, silent thing. The check
-                names what would actually stop it — and separates that from what
-                merely costs you readers.
-              </p>
-              {/* **The four headings are the list; the notes are the
-                  footnotes.** Set a step apart on the page's own scale — 24px
-                  serif against 14px sans — they can be read on their own, in
-                  order, without a word of the small text, which is how a reader
-                  who has just met a lit screen beside them actually arrives.
-                  Closing that gap made four paragraphs with bold first lines,
-                  and the eye had nowhere to land.
+        {/* Near full-bleed, with a thin gutter rather than a container width.
+            Capped at `max-w-7xl` the panel left a hand's width of page down
+            both sides on any wide screen, which made it read as a very large
+            card sitting *in* the layout. The reference this is built to runs
+            the dark almost to the glass and keeps only enough page to show the
+            rounded corner — so the stage is the width of the window and the
+            gutter is a detail, not a margin. The content inside keeps its own
+            measures, so nothing stretches with the viewport. */}
+        <section className="px-2 py-10 sm:px-4 sm:py-12">
+          <div className="rounded-[1.25rem] bg-lp-stage px-4 py-14 sm:rounded-[1.5rem] sm:px-8 sm:py-16">
+            <Head
+              center
+              stage
+              eyebrow="Before you upload"
+              title="Find out from us, not from a rejection"
+              lead="A shop refusing your upload is a slow, silent thing. The check names what would actually stop it — and separates that from what merely costs you readers."
+            />
 
-                  **The marks carry no tile.** A boxed icon is a *control* —
-                  the same shape as the chips inside the figure beside it — and
-                  four of them down the margin promised four buttons. Naked,
-                  they are what they are: a mark on the paper, in the way-forward
-                  indigo. Bigger and heavier to earn that (28px at weight 2),
-                  because stroke width is in user units and a glyph scaled up
-                  keeps its hairline and quietly reads lighter. */}
-              <ul className="mt-8 flex flex-col gap-7">
-                {PREPARE.slice(0, 4).map(([name, note], i) => (
-                  <li key={name} className="flex gap-4">
-                    <span className="mt-1 shrink-0" style={{ color: INK_TEXT }}>
-                      <Icon
-                        name={PREPARE_MARKS[i]!}
-                        className="h-7 w-7"
-                        weight={2}
-                      />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="oc-heading font-serif text-2xl leading-snug text-lp-ink">
-                        {name}
-                      </p>
-                      <p className="mt-1.5 text-sm leading-relaxed">{note}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              {/* White, where every other instance of this box is `var(--color-lp-tint-soft)`:
-                  on the hero's tinted ground that fill has nowhere to stand
-                  and the box stops reading as a box. */}
-              <p className="mt-7 rounded-xl border border-lp-edge bg-lp-ground p-4 text-sm leading-relaxed">
-                <strong className="text-lp-ink">About the PDF.</strong> A
-                clean interior file at your trim size with fonts embedded — not
-                a pre-press file. No bleed, no crop marks, no CMYK, because it
-                comes from your browser’s print engine.
-              </p>
-            </div>
+          {/* The figure, centred, and deliberately smaller than the panel it
+              sits on: about three fifths of it, so there is a full hand's
+              width of black down either side. A screen that fills its stage is
+              a section with a picture in it; one with room around it is a
+              thing being *presented*, which is the whole reason this section
+              went dark.
 
-            <div className="md:sticky md:top-24">
+              **760px is the floor and it is a hard one.** The stage is a fixed
+              design exactly that wide, so anything under it drops the scale
+              below 1, shrinks the 11px labels under native size, and the
+              findings stop being readable — which is the one thing this figure
+              exists to show. `max-w-4xl` (896) puts it at 1.18, comfortably
+              clear of that and still well short of about 1100, past which it
+              stops reading as a screen and starts reading as the page. */}
+            <div className="mx-auto mt-12 max-w-4xl sm:mt-14">
               <CheckDemo />
             </div>
+
+          {/* **The four headings are the list; the notes are the footnotes.**
+              Set a step apart on the page's own scale — 24px serif against 14px
+              sans — they can be read on their own, in order, without a word of
+              the small text, which is how a reader who has just watched the
+              screen above them actually arrives. Closing that gap made four
+              paragraphs with bold first lines, and the eye had nowhere to land.
+
+              Two columns rather than four: three of these headings run to five
+              or six words, and in a quarter of the container they break to four
+              lines each and the row reads as a wall. Two gives every heading at
+              most two lines.
+
+              **The marks carry no tile.** A boxed icon is a *control* — the
+              same shape as the chips inside the figure above — and four of them
+              promised four buttons. Naked, they are what they are: a mark on
+              the ground, in the way-forward indigo. Bigger and heavier to earn
+              that (28px at weight 2), because stroke width is in user units and
+              a glyph scaled up keeps its hairline and quietly reads lighter.
+              On the black it takes the stage's own lightness of that indigo —
+              the page's #312e81 is a smudge down here. */}
+            <ul className="mx-auto mt-14 grid max-w-4xl gap-x-12 gap-y-9 sm:mt-16 sm:grid-cols-2">
+              {PREPARE.slice(0, 4).map(([name, note], i) => (
+                <li key={name} className="flex gap-4">
+                  <span className="mt-1 shrink-0 text-lp-stage-accent">
+                    <Icon
+                      name={PREPARE_MARKS[i]!}
+                      className="h-7 w-7"
+                      weight={2}
+                    />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="oc-heading font-serif text-2xl leading-snug text-lp-stage-ink">
+                      {name}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-lp-stage-body">
+                      {note}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Outlined rather than filled, which is the opposite of every
+                other instance of this box on the page. A white card here would
+                be a second lit rectangle competing with the screen above it —
+                on black, a hairline is enough to make a box, and the caveat
+                should be quieter than the thing it qualifies. Centred and
+                narrow, or a caveat at the full width of the claims above reads
+                as a fifth claim. */}
+            <p className="mx-auto mt-12 max-w-2xl rounded-xl border border-lp-stage-line p-4 text-center text-sm leading-relaxed text-lp-stage-body">
+              <strong className="text-lp-stage-ink">About the PDF.</strong> A
+              clean interior file at your trim size with fonts embedded — not a
+              pre-press file. No bleed, no crop marks, no CMYK, because it comes
+              from your browser’s print engine.
+            </p>
           </div>
         </section>
 
@@ -1202,21 +1239,44 @@ function Head({
   eyebrow,
   title,
   lead,
+  center = false,
+  stage = false,
 }: {
   eyebrow: string;
   title: string;
   lead?: string;
+  /** For a section that stacks rather than splits — the header then owns the
+   *  full width and has to sit over the middle of it, not at the left edge. */
+  center?: boolean;
+  /** On the black panel, where every ink is a different token — see the stage
+   *  note in globals.css. The type scale is identical; only the colours move,
+   *  which is exactly why this is a flag here rather than a second Head. */
+  stage?: boolean;
 }) {
   return (
-    <div className="max-w-2xl">
-      <p className="font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
+    <div className={center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}>
+      <p
+        className={`font-code text-[0.6875rem] tracking-[0.18em] uppercase ${
+          stage ? "text-lp-stage-faint" : "text-lp-faint"
+        }`}
+      >
         {eyebrow}
       </p>
-      <h2 className="oc-heading mt-4 font-serif text-4xl leading-tight text-lp-ink sm:text-[2.75rem]">
+      <h2
+        className={`oc-heading mt-4 font-serif text-4xl leading-tight sm:text-[2.75rem] ${
+          stage ? "text-lp-stage-ink" : "text-lp-ink"
+        }`}
+      >
         {title}
       </h2>
       {lead && (
-        <p className="oc-lead mt-4 font-serif text-xl leading-relaxed">{lead}</p>
+        <p
+          className={`oc-lead mt-4 font-serif text-xl leading-relaxed ${
+            stage ? "text-lp-stage-body" : ""
+          }`}
+        >
+          {lead}
+        </p>
       )}
     </div>
   );

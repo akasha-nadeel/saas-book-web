@@ -9,6 +9,7 @@ import {
   signupTo,
   type FileFindings,
 } from "@/lib/file-check";
+import { AppWindow } from "@/components/landing/app-window";
 import type { Fix } from "@/lib/checkup";
 import type { ImportedBook } from "@/lib/import/split";
 
@@ -175,10 +176,48 @@ export function BookCheck() {
     );
   };
 
+  const done = state.phase === "done";
+
   return (
     <div className="mx-auto mt-14 max-w-4xl">
-      <div className="overflow-hidden rounded-2xl border border-lp-edge bg-lp-ground shadow-[0_24px_60px_-30px_rgba(15,15,16,0.35)]">
-        {state.phase === "done" ? (
+      {/* The frame is shared with the two figures further down the page — see
+          `app-window.tsx`. This is the one that holds a working control
+          rather than a drawing, so it passes no `label`: a screen reader has
+          to meet the file input, not a sentence describing a picture of one.
+
+          The badge is the answer to the question a reader actually has at this
+          moment, put where the eye lands first rather than in a caption under
+          the frame, which is where it used to be and where it read as small
+          print about the thing rather than as part of it. */}
+      <AppWindow
+        title="Manuscript check"
+        badge={
+          <span
+            className="rounded-full border px-2.5 py-1 text-[0.6875rem] font-semibold"
+            style={{
+              color: INK_TEXT,
+              borderColor: "var(--color-lp-edge)",
+              backgroundColor:
+                "color-mix(in srgb, var(--color-lp-accent) 8%, transparent)",
+            }}
+          >
+            Free · no sign-up
+          </span>
+        }
+      >
+        {/* The instruction sits *in* the window rather than in a line under
+            it. Under the frame it arrived after the reader had already
+            decided whether to hand over a manuscript, which is the wrong side
+            of the decision for the sentence that settles it. */}
+        {!done && (
+          <p className="px-5 pt-5 text-center text-sm leading-relaxed text-lp-ink sm:px-6">
+            <span className="font-semibold">
+              Test your own manuscript for the problems a shop would find.
+            </span>
+          </p>
+        )}
+
+        {done ? (
           <Result
             result={state.result}
             cover={state.cover}
@@ -192,23 +231,23 @@ export function BookCheck() {
             }}
           />
         ) : (
-          <Dropzone
-            state={state}
-            dragging={dragging}
-            setDragging={setDragging}
-            onPick={onPick}
-          />
+          <>
+            <Dropzone
+              state={state}
+              dragging={dragging}
+              setDragging={setDragging}
+              onPick={onPick}
+            />
+            {/* The caveat, and it belongs only before there is a result —
+                once there is one the card's own foot makes the offer with the
+                book attached, and two sign-in prompts in one window is one
+                too many. */}
+            <p className="border-t border-lp-line bg-lp-well px-5 py-3 text-center text-[0.8125rem] leading-relaxed text-lp-body sm:px-6">
+              You are only asked to sign in if you want to fix what it finds.
+            </p>
+          </>
         )}
-      </div>
-
-      {/* Under the card rather than in it: it is a promise about the whole
-          exchange, not a caption on the drop zone, and a reader deciding
-          whether to hand over a manuscript should be able to read it without
-          having engaged with anything yet. */}
-      <p className="mt-4 text-center text-[0.8125rem] leading-relaxed text-lp-body">
-        Free, and no account needed to run the check. You are only asked to sign
-        in if you want to fix something.
-      </p>
+      </AppWindow>
     </div>
   );
 }
@@ -227,7 +266,7 @@ function Dropzone({
   const reading = state.phase === "reading";
 
   return (
-    <div className="p-4 sm:p-5">
+    <div className="px-4 pt-4 pb-5 sm:px-6 sm:pt-4 sm:pb-6">
       {/*
        * A label wrapping a hidden input, not a div with a click handler.
        *
@@ -246,10 +285,10 @@ function Dropzone({
           setDragging(false);
           onPick(event.dataTransfer.files);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors sm:py-16 ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors sm:py-14 ${
           dragging
             ? "border-[var(--color-lp-accent)] bg-lp-tint"
-            : "border-lp-edge bg-lp-well hover:border-lp-edge-strong"
+            : "border-lp-edge bg-lp-well/60 hover:border-lp-edge-strong"
         }`}
       >
         <input

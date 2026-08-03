@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AppWindow } from "@/components/landing/app-window";
 
 /**
  * The store-listing form, filling itself in.
@@ -575,21 +576,21 @@ export function StoreListingDemo() {
     // big soft blur a template reaches for — a diffuse shadow reads as a
     // sticker floating above the page, a short one reads as an object resting
     // on it, and the second is the impression worth having.
-    <div
-      ref={hostRef}
-      role="img"
-      aria-label="A store-listing form filling itself in — ISBN, language, publisher, publication date, series and number in series — and then being submitted."
-      className="rounded-[1.75rem] border border-lp-device-edge bg-lp-device p-3 select-none
-                 shadow-[0_2px_0_var(--color-lp-device-edge),0_10px_18px_-8px_rgba(15,15,16,0.30),0_30px_46px_-18px_rgba(15,15,16,0.55)]"
+    // The page's one screen — see `app-window.tsx`. This was a tablet slab
+    // and so was the check demo; the hero was a bare card. Three devices on
+    // one page reads as three products.
+    //
+    // `label` marks it as a picture, so the frame takes `role="img"` and every
+    // drawn field inside is hidden behind that description rather than read
+    // out as a list of stray words. `screenRef` still wraps the same box the
+    // pointer's measurements are taken relative to, so adding a title bar
+    // above it moves the whole figure and changes nothing about the maths.
+    <AppWindow
+      label="A store-listing form filling itself in — ISBN, language, publisher, publication date, series and number in series — and then being submitted."
+      hostRef={hostRef}
+      screenRef={screenRef}
+      screenClassName="relative overflow-hidden bg-lp-ground"
     >
-      {/* The screen carries its own hairline: bezel and screen are both pale,
-          and without it the glass has no edge and the whole thing reads as one
-          flat card again. */}
-      <div
-        ref={screenRef}
-        aria-hidden="true"
-        className="relative overflow-hidden rounded-[1.25rem] border border-lp-edge bg-lp-ground"
-      >
         {/* Everything the camera moves lives in here, padding included — the
             push has to be able to crop into the margin rather than into the
             fields. */}
@@ -750,7 +751,6 @@ export function StoreListingDemo() {
             </svg>
           </div>
         </div>
-      </div>
-    </div>
+    </AppWindow>
   );
 }

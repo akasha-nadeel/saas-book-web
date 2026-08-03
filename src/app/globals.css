@@ -273,6 +273,30 @@
   --color-lp-wordmark: #8c88ff; /* "Chapter" — the accent, lightness lifted */
   --color-lp-accent-pale: #eae9ff; /* dimmed text *on* the accent fill */
   --color-lp-device: #2a2a33; /* the drawn tablet's shell */
+
+  /* ------------------------------------------------------------------------
+     The stage: the one section that goes dark in both themes.
+
+     "Before you upload" is where the product is actually shown working, and it
+     is set on a black panel inset from the page with rounded corners — the
+     shape a keynote uses when it stops talking and starts demonstrating. The
+     drawn dashboard inside it keeps its own theme, so by day it is a white app
+     on black, which is the contrast the whole section is built on.
+
+     **These do not invert, and that is the point.** Everything else in the
+     `lp-*` set crosses over between the two blocks; these six are stated twice
+     with the same values because the surface they sit on is dark in both
+     themes, so the ink on it has the same job in both. Same reasoning as
+     `--color-stop-solid` above. The one that does move is the ground itself:
+     pure black against a white page by day, and a shade *above* the page at
+     night, since on a near-black ground a panel separates by being lighter —
+     a darker one would be a hole. */
+  --color-lp-stage: #14141c;
+  --color-lp-stage-ink: #f5f5f7; /* 16.8:1 */
+  --color-lp-stage-body: #a8a8b4; /* 7.8:1 */
+  --color-lp-stage-faint: #8a8a99; /* 5.4:1 — eyebrows and captions */
+  --color-lp-stage-accent: #9b98f5; /* the accent, at a lightness black allows */
+  --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #14141a; /* and its lower edge */
 
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
@@ -448,6 +472,17 @@
   --color-lp-wordmark: #423ead;
   --color-lp-accent-pale: #c7d2fe;
   --color-lp-device: #e2e2e8;
+
+  /* The stage — see the note in the dark block. Only the ground differs
+     between the two: black under a white page, where at night it lifts off a
+     near-black one instead. The ink on it is identical in both, because what
+     it sits on is dark either way. */
+  --color-lp-stage: #0b0b0f;
+  --color-lp-stage-ink: #f5f5f7; /* 18.0:1 */
+  --color-lp-stage-body: #a8a8b4; /* 8.4:1 */
+  --color-lp-stage-faint: #8a8a99; /* 5.8:1 */
+  --color-lp-stage-accent: #9b98f5;
+  --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #b9b9c4;
 }
 
