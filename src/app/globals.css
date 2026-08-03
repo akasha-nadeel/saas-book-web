@@ -269,7 +269,17 @@
      daylight they are the same indigo, because a white ground gives both
      directions all the room they need. */
   --color-lp-accent-text: #9b98f5;
-  --color-lp-accent-soft: #9b98cf; /* the quiet half of the headline */
+  /* The first line of the hero headline, and the one token in this set whose
+     two values are not the same colour at two brightnesses.
+
+     By day it is a muted indigo: the headline is one sentence at two volumes,
+     the quiet half setting up the loud one, and a grey first line with a
+     coloured answer under it reads as two separate thoughts. At night that
+     inverts — the line goes plain white and the *answer* keeps the hue. On
+     black a muted indigo has nowhere to sit (it is neither bright enough to
+     lead nor dark enough to recede), and white against the accent below it
+     draws the same two-volume sentence with the volumes swapped. */
+  --color-lp-accent-soft: #ffffff;
   --color-lp-wordmark: #8c88ff; /* "Chapter" — the accent, lightness lifted */
   --color-lp-accent-pale: #eae9ff; /* dimmed text *on* the accent fill */
   --color-lp-device: #2a2a33; /* the drawn tablet's shell */
@@ -525,17 +535,39 @@
      No veil fixes that: one strong enough to cover the arc also hides it,
      which is the whole reason the image was chosen.
 
-     So the framing does the work instead. `100% 185%` anchored to the top
+     So the framing does the work instead. `100% 110%` anchored at `y 90%`
      stretches it to the full width — which removes the crop entirely, and with
-     it the viewport-to-viewport variance — and puts the horizon at about 92%
-     of the hero. That number is chosen twice over. It is well clear of the
-     text, and it is *below the check card*, which is opaque and about 900px
-     wide: at 82% the arc was behind the card and all a reader saw was a black
-     section. Sitting under it, the glow spills across the full width along the
-     section's bottom edge and blooms up around the card's shoulders, which is
-     the only place on this hero the picture can actually be seen. A gradient
-     is the one kind of image that can be stretched like this without anyone
-     seeing it, and a shallower arc reads as a wider horizon anyway.
+     it the viewport-to-viewport variance — and puts the horizon at 46% of the
+     hero, just above its middle. The multiplier *is* the vertical position: the arc sits at
+     the middle of the picture, so at `100% k%` anchored top it lands at `k/2`
+     down the hero, and nothing else needs to change to move it.
+
+     It started at 92%, which was below the fold on a laptop — the picture
+     existed and nobody ever saw it. At 57% the arc crosses behind the upper
+     half of the check window, which is opaque and about 900px wide, so the
+     bright line emerges either side of it and the bloom fills the space
+     between the buttons and the window: the glow reads as a light source
+     *behind* the product rather than a strip under it.
+
+     **This is the floor, and it is a cliff rather than a slope.** 100% is the
+     smallest value that still covers the box: below it the picture is shorter
+     than the hero, the bottom strip falls back to the section's own ground,
+     and the seam shows because the image ends in black and the ground is not
+     quite black. It is also where the arc stops being safely below the text —
+     4.6:1 against the page's ink across the whole text band, just inside
+     legible, where at 115% it was 11:1. Push the arc any higher and it climbs
+     into the deck and then the headline, where it measures **1.0:1**: white
+     text on white light, which is invisible.
+
+     To go higher than this the image has to be re-anchored rather than
+     re-sized — `100% 150%` with a `background-position-y` of about 65% puts
+     the arc near 40% while still covering — and the text above it would need
+     moving, or a much heavier veil, or both. Re-measure if the headline ever
+     grows a third line.
+
+     A gradient is the one kind of image that can be stretched like this
+     without anyone seeing it, and a shallower arc reads as a wider horizon
+     anyway.
 
      The light image needs none of that — its worst band is 5.1:1 against
      near-black ink, safe wherever it lands — so it keeps `cover`, which
@@ -550,13 +582,54 @@
 
      Re-measure before swapping either picture. The framing above is fitted to
      these two, not to any two. */
-  --lp-hero: url("/hero-dark.webp") top center / 100% 185% no-repeat;
+  --lp-hero: url("/hero-dark.webp") center 90% / 100% 110% no-repeat;
   --lp-hero-veil: linear-gradient(
     to bottom,
     #0b0b0e 0%,
     rgba(11, 11, 14, 0.6) 22%,
     rgba(11, 11, 14, 0) 52%
   );
+}
+
+/* ---------------------------------------------------------------------------
+   The hero backdrop on a phone.
+
+   The framing above is fitted to a desktop hero, where the text ends around
+   37% and the arc rides at 46% just under it. A phone is a different picture
+   of the same section: the headline wraps to three lines and the deck to
+   three more, so the hero grows to about 1170px and everything moves down
+   with it — but the *buttons* stack, and buttons are filled. They carry their
+   own ground, so glow behind them costs nothing.
+
+   That is what buys the extra room. The band needing protection on a phone is
+   only the headline and the deck, which end at 28%, not the whole text block —
+   so the arc can come up to 40% and still measure 8:1 against the white
+   headline. It is the ceiling: 35% drops it to 3.1:1, because the bloom
+   reaches the deck before the arc does.
+
+   **The width is pinned to the screen, as on the desktop.** Letting it run
+   free — `auto` height-first — keeps the picture's proportions and spills it
+   about six times the viewport width off both edges, which sounds better and
+   shows worse: at six times over you are looking at the dead centre of the
+   arc, where it is flattest and brightest, and the curve that makes it read as
+   a horizon is entirely off-screen. Pinned, the whole sweep fits and the glow
+   has ends. The 1.78 picture is squashed into a tall box to do it, and on an
+   abstract gradient that costs nothing anybody can see.
+
+   `y 100%` is the highest anchor that still covers the box — coverage needs
+   `offset + height >= height`, which caps the position at 100% whatever the
+   size — so the arc's height is set by the size alone: it lands at `1 - k/2`.
+   1.30 puts it at 35% and 4.4:1, right on the limit. 1.25 is the working value
+   at 37.5% and 6.5:1, which leaves room for the deck to wrap to a fourth line
+   on a narrow phone without the glow reaching it.
+
+   Scoped by width rather than by pointer type on purpose: this is about how
+   the *section* wraps, not about what the reader is holding.
+   -------------------------------------------------------------------------- */
+@media (max-width: 40rem) {
+  :root {
+    --lp-hero: url("/hero-dark.webp") center 100% / 100% 125% no-repeat;
+  }
 }
 
 :root[data-theme="light"] {

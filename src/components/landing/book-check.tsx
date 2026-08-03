@@ -285,7 +285,7 @@ function Dropzone({
           setDragging(false);
           onPick(event.dataTransfer.files);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-10 text-center transition-colors sm:py-14 ${
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6 sm:py-14 ${
           dragging
             ? "border-[var(--color-lp-accent)] bg-lp-tint"
             : "border-lp-edge bg-lp-well/60 hover:border-lp-edge-strong"
@@ -331,7 +331,7 @@ function Dropzone({
                 <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
               </svg>
             </span>
-            <p className="oc-heading mt-4 font-serif text-2xl text-lp-ink sm:text-3xl">
+            <p className="oc-heading mt-4 font-serif text-xl text-lp-ink sm:text-3xl">
               Drop your manuscript here
             </p>
             <p className="mt-2 text-[0.9375rem]">
@@ -405,7 +405,7 @@ function Result({
           The book named back, with two counts and nothing else. They are
           facts out of the file, which is the only kind of number this app
           prints — no score, no readiness percentage, no grade. */}
-      <div className="flex items-center gap-4 border-b border-lp-line bg-lp-well px-5 py-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-lp-line bg-lp-well px-4 py-4 sm:flex-nowrap sm:px-5">
         {cover ? (
           // Real artwork out of the reader's own EPUB. It is also the proof
           // that the file was read rather than sampled: nobody's mock has
@@ -425,7 +425,7 @@ function Result({
           </span>
         )}
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           <p className="oc-heading truncate font-serif text-xl text-lp-ink">
             {result.title}
           </p>
@@ -494,7 +494,7 @@ function Result({
               return (
                 <li
                   key={finding.id}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border px-4 py-3.5"
+                  className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border px-3.5 py-3.5 sm:px-4"
                   style={{
                     borderColor: stop ? "var(--color-stop-line)" : "var(--color-note-line)",
                     backgroundColor: stop ? "var(--color-stop-bg)" : "var(--color-note-bg)",
@@ -532,7 +532,7 @@ function Result({
                     </svg>
                   </span>
 
-                  <span className="min-w-[12rem] flex-1">
+                  <span className="min-w-[10rem] flex-1">
                     <span
                       className="block text-[0.9375rem] font-semibold"
                       style={{ color: ink }}

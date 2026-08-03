@@ -539,8 +539,15 @@ export function LandingPage() {
 
                 Line one is muted indigo rather than grey, so the two read as one
                 sentence at two volumes rather than as grey text with a coloured
-                answer stapled underneath. */}
-            <h1 className="oc-display font-serif text-[2.5rem] leading-[1.08] font-semibold sm:text-[3.5rem]">
+                answer stapled underneath.
+
+                At night the two swap: line one goes plain white and line two
+                keeps the hue. A muted indigo has nowhere to sit on black —
+                neither bright enough to lead nor dark enough to recede — so
+                the same two-volume sentence is drawn with the volumes the
+                other way round. Both values live on `lp-accent-soft`; see the
+                note there. */}
+            <h1 className="oc-display font-serif text-[2rem] leading-[1.1] font-semibold sm:text-[2.75rem] sm:leading-[1.08] lg:text-[3.5rem]">
               <span className="block text-lp-accent-soft">
                 Find out what&rsquo;s wrong with your book
               </span>
@@ -560,7 +567,7 @@ export function LandingPage() {
                 the qualifying ones ("eleven characters", "with a bad check
                 digit") — precision the reader does not need to feel the point,
                 and which is made properly further down where there is room. */}
-            <p className="oc-lead mx-auto mt-7 max-w-2xl font-serif text-xl leading-relaxed">
+            <p className="oc-lead mx-auto mt-6 max-w-2xl font-serif text-lg leading-relaxed sm:mt-7 sm:text-xl">
               A missing cover. A bad ISBN digit. A blurb over the limit. Every
               one of them is knowable before you upload.
             </p>
@@ -572,11 +579,19 @@ export function LandingPage() {
                 arrived ready to sign up still finds them first; a reader who
                 arrived sceptical — which the research says is most of them —
                 gets to test the claim before being asked for anything. */}
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            {/* On a phone they stack and go full width, capped at `max-w-xs`
+                so they do not run the whole way across a tablet held upright.
+                Two pills of *different* widths centred one above the other is
+                the commonest tell of a desktop layout that was never looked at
+                on a phone — the eye reads the ragged left edges as a mistake
+                before it reads either label. `items-stretch` is what does it:
+                the Google control renders its own `<form>`, so the button
+                inside can only fill the width the form is given. */}
+            <div className="mx-auto mt-8 flex w-full max-w-xs flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:items-center sm:justify-center">
               <Link
                 href="/signup"
                 style={{ backgroundColor: INK }}
-                className="rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
+                className="w-full rounded-full px-6 py-3 text-center text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90 sm:w-auto"
               >
                 Start free
               </Link>
@@ -588,7 +603,7 @@ export function LandingPage() {
                 action={signInWithGoogle}
                 next="/"
                 label="Continue with Google"
-                className="inline-flex items-center justify-center gap-2.5 rounded-full border border-lp-edge bg-lp-ground px-6 py-3 text-[0.9375rem] font-semibold text-lp-ink hover:border-lp-edge-strong"
+                className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge bg-lp-ground px-6 py-3 text-[0.9375rem] font-semibold text-lp-ink hover:border-lp-edge-strong sm:w-auto"
               />
             </div>
 
@@ -633,7 +648,7 @@ export function LandingPage() {
             from `works-with.tsx`, where the sourcing and licences for each one
             are recorded. Nominative use: these are programs that open our
             exports, not partners or customers. */}
-        <section className="border-b border-lp-line px-6 py-10">
+        <section className="border-b border-lp-line px-6 py-8 sm:py-10">
           <div className="mx-auto max-w-5xl">
             <p className="text-center font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
               Your book comes back out — and opens in
@@ -675,7 +690,7 @@ export function LandingPage() {
             The slot a SaaS page fills with users and downloads. Every figure
             here is counted out of the source at build time, so the row cannot
             drift and cannot flatter. */}
-        <section className="border-b border-lp-line px-6 py-14">
+        <section className="border-b border-lp-line px-6 py-10 sm:py-14">
           <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 text-center md:grid-cols-4">
             <Counted icon="steps" n={String(STEPS.length)} label="steps, in order" />
             <Counted
@@ -692,7 +707,7 @@ export function LandingPage() {
         </section>
 
         {/* ---- Three up, one lit ---------------------------------------- */}
-        <section id="does" className="border-b border-lp-line px-6 py-20">
+        <section id="does" className="border-b border-lp-line px-6 py-14 sm:py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="What it does"
@@ -832,8 +847,10 @@ export function LandingPage() {
               exists to show. `max-w-4xl` (896) puts it at 1.18, comfortably
               clear of that and still well short of about 1100, past which it
               stops reading as a screen and starts reading as the page. */}
-            <div className="mx-auto mt-12 max-w-4xl sm:mt-14">
-              <CheckDemo />
+            <div className="mx-auto mt-10 max-w-4xl sm:mt-14">
+              <WideFigure>
+                <CheckDemo />
+              </WideFigure>
             </div>
 
           {/* **The four headings are the list; the notes are the footnotes.**
@@ -867,7 +884,7 @@ export function LandingPage() {
                     />
                   </span>
                   <div className="min-w-0">
-                    <p className="oc-heading font-serif text-2xl leading-snug text-lp-stage-ink">
+                    <p className="oc-heading font-serif text-xl leading-snug text-lp-stage-ink sm:text-2xl">
                       {name}
                     </p>
                     <p className="mt-1.5 text-sm leading-relaxed text-lp-stage-body">
@@ -905,7 +922,11 @@ export function LandingPage() {
         <Split
           eyebrow="The tedious part"
           title="Every field a shop asks for, and why"
-          figure={<StoreListingDemo />}
+          figure={
+            <WideFigure>
+              <StoreListingDemo />
+            </WideFigure>
+          }
           flip
         >
           <p className="oc-lead font-serif text-xl leading-relaxed">
@@ -952,7 +973,7 @@ export function LandingPage() {
             a tool that does not exist or miss one that does. Cards of two
             sizes, the way the reference mixes them, with the group that answers
             the most expensive question given the wide cell. */}
-        <section id="tools" className="border-b border-lp-line px-6 py-20">
+        <section id="tools" className="border-b border-lp-line px-6 py-14 sm:py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="All of it included"
@@ -1049,7 +1070,7 @@ export function LandingPage() {
             unfolds into stacked pairs and the hidden column header comes back
             per row. The alternative — a horizontally scrolling table on a
             phone — is the one thing on this page that would need explaining. */}
-        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-20">
+        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Straight answer"
@@ -1144,7 +1165,7 @@ export function LandingPage() {
         </section>
 
         {/* ---- Still to come -------------------------------------------- */}
-        <section className="border-b border-lp-line px-6 py-20">
+        <section className="border-b border-lp-line px-6 py-14 sm:py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Not built yet"
@@ -1172,7 +1193,7 @@ export function LandingPage() {
 
 
         {/* ---- FAQ ------------------------------------------------------ */}
-        <section className="border-b border-lp-line px-6 py-20">
+        <section className="border-b border-lp-line px-6 py-14 sm:py-20">
           <div className="mx-auto max-w-4xl">
             <Head eyebrow="Questions" title="Reasonable suspicion, answered" />
             <div className="mt-12 flex flex-col">
@@ -1193,9 +1214,9 @@ export function LandingPage() {
         </section>
 
         {/* ---- Close ---------------------------------------------------- */}
-        <section className="px-6 py-24 text-center" style={{ backgroundColor: INK }}>
+        <section className="px-6 py-16 text-center sm:py-24" style={{ backgroundColor: INK }}>
           <div className="mx-auto max-w-2xl">
-            <h2 className="oc-heading font-serif text-4xl leading-tight text-lp-accent-ink sm:text-5xl">
+            <h2 className="oc-heading font-serif text-[1.75rem] leading-tight text-lp-accent-ink sm:text-4xl md:text-5xl">
               You have the book.
               <br />
               Take the order for free.
@@ -1263,7 +1284,7 @@ function Head({
         {eyebrow}
       </p>
       <h2
-        className={`oc-heading mt-4 font-serif text-4xl leading-tight sm:text-[2.75rem] ${
+        className={`oc-heading mt-4 font-serif text-[1.75rem] leading-tight sm:text-4xl md:text-[2.75rem] ${
           stage ? "text-lp-stage-ink" : "text-lp-ink"
         }`}
       >
@@ -1310,7 +1331,7 @@ function Split({
   return (
     <section
       {...(id ? { id } : {})}
-      className={`border-b border-lp-line px-6 py-20 ${
+      className={`border-b border-lp-line px-6 py-14 sm:py-20 ${
         tint ? "bg-lp-tint-soft" : ""
       }`}
     >
@@ -1374,6 +1395,35 @@ function Point({
  * `tone` is for the one that is a verdict rather than a tally. Colouring all
  * four would make the row decorative and the green would stop meaning "passed".
  */
+/**
+ * A drawn screen, on a screen too narrow to draw it on.
+ *
+ * Both figures are fixed designs — 760 CSS px for the dashboard — scaled to
+ * whatever width their column gives them. That is exactly right down to about
+ * a tablet and falls apart below it: on a 390px phone the dashboard renders at
+ * 0.47, which takes its 11px labels to 5px. Those labels *are* the content
+ * (the finding, and the button that fixes it), so shrinking them to noise
+ * leaves a section arguing for something the reader cannot see.
+ *
+ * So below `sm` the figure keeps a floor of 34rem and the container scrolls
+ * sideways to it — about 0.72 scale, labels near 8px, a swipe of 150-odd
+ * pixels on a normal phone. Sideways scrolling is a real cost and it is worth
+ * it here: the alternative is not a smaller figure, it is a figure that
+ * carries nothing.
+ *
+ * The scrollbar is deliberately left alone. It is the only thing on a desktop
+ * narrow window that says the figure continues, and phones hide it anyway.
+ * `overflow-visible` above `sm` so the frame's shadow is not clipped by a
+ * scroll container that has nothing left to scroll.
+ */
+function WideFigure({ children }: { children: ReactNode }) {
+  return (
+    <div className="overflow-x-auto pb-3 sm:overflow-visible sm:pb-0">
+      <div className="min-w-[34rem] sm:min-w-0">{children}</div>
+    </div>
+  );
+}
+
 function Counted({
   icon,
   n,

@@ -148,7 +148,7 @@ export function LandingHeader({ ink }: { ink: string }) {
             : "border-transparent opacity-0"
         }`}
       />
-      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-6 px-6 py-3.5">
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6 sm:py-3.5">
         {/* The same wordmark the dashboard sidebar carries, at the same size:
             a visitor who signs up should not have to learn a second mark on
             the other side of the door.
@@ -167,11 +167,11 @@ export function LandingHeader({ ink }: { ink: string }) {
             of as the second half of a mark. */}
         <Link
           href="/"
-          className="text-2xl font-bold tracking-tight text-lp-ink"
+          className="text-xl font-bold tracking-tight text-lp-ink sm:text-2xl"
         >
           Open<span className="text-lp-wordmark">Chapter</span>
         </Link>
-        <nav className="flex items-center gap-6 font-sans text-sm text-lp-body">
+        <nav className="flex items-center gap-4 font-sans text-sm text-lp-body sm:gap-6">
           <a href="#order" className="hidden sm:inline hover:text-lp-ink">
             The order
           </a>
@@ -187,7 +187,7 @@ export function LandingHeader({ ink }: { ink: string }) {
           <Link
             href="/signup"
             style={{ backgroundColor: ink }}
-            className="rounded-full px-4 py-2 font-semibold text-lp-accent-ink hover:opacity-90"
+            className="rounded-full px-3.5 py-1.5 font-semibold text-lp-accent-ink hover:opacity-90 sm:px-4 sm:py-2"
           >
             Start free
           </Link>
