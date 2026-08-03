@@ -8,6 +8,7 @@ import {
   IMPORT_FORMATS,
   ImportError,
   importFile,
+  setupFromImport,
 } from "@/lib/import";
 import type { ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
@@ -55,7 +56,11 @@ export function ImportBook() {
   const create = () => {
     if (!proposal) return;
 
-    const result = createBookFromImport(title, proposal.chapters);
+    const result = createBookFromImport(
+      title,
+      proposal.chapters,
+      setupFromImport(proposal),
+    );
     if (!result) {
       setError(
         "This book could not be saved — it is too large for this browser's storage. Nothing was added to your library.",

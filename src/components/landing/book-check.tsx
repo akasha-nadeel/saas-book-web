@@ -1,0 +1,561 @@
+"use client";
+
+import { useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  checkFile,
+  fixDestination,
+  signupTo,
+  type FileFindings,
+} from "@/lib/file-check";
+import type { Fix } from "@/lib/checkup";
+import type { ImportedBook } from "@/lib/import/split";
+
+/**
+ * The check, run on the reader's own book, before they have an account.
+ *
+ * The hero above this says *find out what is wrong with your book before you
+ * upload it*. Everything else on the page argues for that claim; this is the
+ * page keeping it. A visitor drops the manuscript they already have and gets
+ * the real readiness check — the same findings, in the same order, with the
+ * same words — for nothing, with no account and no email address.
+ *
+ * **Why this replaced a drawing of the dashboard.** The hero used to carry a
+ * still of Overview with an invented book on it, which is a screenshot's
+ * argument: *here is a product, imagine it working on yours*. This audience
+ * has been shown convincing screenshots by people who then took their money.
+ * A check they can run on the book sitting on their desk, in the four seconds
+ * before they decide whether to read the rest of the page, is the only claim
+ * on this page that cannot be faked — and it is aimed at exactly the person
+ * the research describes, who has a finished manuscript and no idea what is
+ * standing between it and a shop.
+ *
+ * **Nothing is uploaded, and that is not a privacy footnote — it is the
+ * feature.** Every parser this reaches for runs in the browser (see
+ * `lib/import`), so the manuscript never leaves the machine. A writer who has
+ * been told to hand a stranger's website their unpublished novel has a
+ * perfectly good reason to close the tab, and the sentence that keeps them is
+ * the true one, said at the drop zone rather than in a footer.
+ *
+ * **Results are never held back for an email.** The whole list is shown,
+ * worst first, whether or not anybody signs up — gating findings behind a form
+ * is the pattern this reader has been burned by, and it converts the ones who
+ * were going to convert anyway while confirming everybody else's suspicion.
+ * What needs an account is *fixing* something, because a fix has to be saved
+ * somewhere, and the buttons say so before they are pressed.
+ *
+ * **The book comes with them.** Pressing any fix writes the parsed book into
+ * this browser and sends the writer to sign-up with the destination attached,
+ * so they arrive signed in, on the tool that fixes the thing they pressed,
+ * with their manuscript already on the shelf. `syncWithServer` was built for
+ * exactly this case — a library that existed before the account did is
+ * uploaded and claimed on the first sign-in — so nothing extra is needed to
+ * make it survive. Nothing is written until they press something: a visitor
+ * who only wanted the check leaves no trace in their own browser either.
+ */
+
+/*
+ * The page's colours, as tokens rather than values, so this card follows
+ * `data-theme` with the rest of the landing page. The two severities are
+ * picked per finding down in `Result` — a status needs a *fill* token and a
+ * *text* token, and they are not the same one.
+ */
+const INK = "var(--color-lp-accent)";
+const STOP = "var(--color-stop-fg)";
+const PASS = "var(--color-ok-fg)";
+const INK_TEXT = "var(--color-lp-accent-text)";
+
+type State =
+  | { phase: "idle" }
+  | { phase: "reading"; name: string }
+  | { phase: "error"; message: string }
+  | { phase: "done"; result: FileFindings; cover?: string };
+
+export function BookCheck() {
+  const router = useRouter();
+  const [state, setState] = useState<State>({ phase: "idle" });
+  const [dragging, setDragging] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
+
+  /*
+   * The parsed file, kept out of React state on purpose.
+   *
+   * It holds an entire manuscript as ProseMirror JSON — a 90,000-word novel is
+   * megabytes of it — and nothing rendered here reads a word of the prose.
+   * Putting it in state would re-render the page around it for no benefit.
+   */
+  const parsed = useRef<ImportedBook | null>(null);
+  /** The book, once one has been made. Reused, so two presses are one book. */
+  const saved = useRef<string | null>(null);
+
+  const read = async (file: File) => {
+    setState({ phase: "reading", name: file.name });
+    setSaveFailed(false);
+    saved.current = null;
+
+    try {
+      // Loaded on demand: the parsers pull in JSZip, and a reader who never
+      // drops a file should never download it. This is a landing page.
+      const { importFile, ImportError } = await import("@/lib/import");
+      try {
+        const book = await importFile(file);
+        parsed.current = book;
+        setState({
+          phase: "done",
+          result: checkFile(book),
+          ...(book.cover ? { cover: book.cover } : {}),
+        });
+      } catch (err) {
+        // The import errors are written for writers already — which format to
+        // save as, what to do about a PDF. Anything else is a bug of ours, and
+        // saying so plainly beats blaming their file.
+        setState({
+          phase: "error",
+          message:
+            err instanceof ImportError
+              ? err.message
+              : "That file could not be read. It may be damaged, or not the format its name suggests.",
+        });
+      }
+    } catch {
+      setState({
+        phase: "error",
+        message:
+          "The reader could not be loaded. Check your connection and try again.",
+      });
+    }
+  };
+
+  const onPick = (files: FileList | null) => {
+    const file = files?.[0];
+    if (file) void read(file);
+  };
+
+  /**
+   * Keep the book, then send them to sign up with somewhere to land.
+   *
+   * The write happens here rather than at parse time so that a visitor who
+   * only wanted the check leaves nothing behind in their own browser.
+   *
+   * **Every way out of this card comes through here**, including the plain
+   * "Start free" at the foot — because that button sits under a sentence
+   * promising the book comes with them, and a CTA that signed them up and left
+   * the manuscript on the floor would make this page do the one thing it is
+   * built to argue nobody else should: say something untrue about a book.
+   *
+   * A failed write stays put rather than navigating. The failure is a full
+   * browser, and the writer needs to be told that here, where the file still
+   * is — sending them on would land them signed up, on an empty shelf, with no
+   * idea what happened to their novel.
+   */
+  const start = async (target: Fix | null) => {
+    const book = parsed.current;
+    if (!book) return;
+
+    if (!saved.current) {
+      const [{ createBookFromImport }, { setupFromImport }] = await Promise.all([
+        import("@/lib/library-store"),
+        import("@/lib/import"),
+      ]);
+      const made = createBookFromImport(
+        book.title,
+        book.chapters,
+        setupFromImport(book),
+      );
+      if (!made) {
+        setSaveFailed(true);
+        return;
+      }
+      saved.current = made.bookId;
+    }
+
+    router.push(
+      signupTo(target ? fixDestination(target, saved.current) : "/"),
+    );
+  };
+
+  return (
+    <div className="mx-auto mt-14 max-w-4xl">
+      <div className="overflow-hidden rounded-2xl border border-lp-edge bg-lp-ground shadow-[0_24px_60px_-30px_rgba(15,15,16,0.35)]">
+        {state.phase === "done" ? (
+          <Result
+            result={state.result}
+            cover={state.cover}
+            saveFailed={saveFailed}
+            onStart={start}
+            onReset={() => {
+              parsed.current = null;
+              saved.current = null;
+              setSaveFailed(false);
+              setState({ phase: "idle" });
+            }}
+          />
+        ) : (
+          <Dropzone
+            state={state}
+            dragging={dragging}
+            setDragging={setDragging}
+            onPick={onPick}
+          />
+        )}
+      </div>
+
+      {/* Under the card rather than in it: it is a promise about the whole
+          exchange, not a caption on the drop zone, and a reader deciding
+          whether to hand over a manuscript should be able to read it without
+          having engaged with anything yet. */}
+      <p className="mt-4 text-center text-[0.8125rem] leading-relaxed text-lp-body">
+        Free, and no account needed to run the check. You are only asked to sign
+        in if you want to fix something.
+      </p>
+    </div>
+  );
+}
+
+function Dropzone({
+  state,
+  dragging,
+  setDragging,
+  onPick,
+}: {
+  state: State;
+  dragging: boolean;
+  setDragging: (value: boolean) => void;
+  onPick: (files: FileList | null) => void;
+}) {
+  const reading = state.phase === "reading";
+
+  return (
+    <div className="p-4 sm:p-5">
+      {/*
+       * A label wrapping a hidden input, not a div with a click handler.
+       *
+       * The whole area is then the file picker's own control: it takes focus,
+       * answers the space bar, and is announced as a file input, none of which
+       * a div can be given without rebuilding all three by hand.
+       */}
+      <label
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          onPick(event.dataTransfer.files);
+        }}
+        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors sm:py-16 ${
+          dragging
+            ? "border-[var(--color-lp-accent)] bg-lp-tint"
+            : "border-lp-edge bg-lp-well hover:border-lp-edge-strong"
+        }`}
+      >
+        <input
+          type="file"
+          accept=".docx,.epub,.md,.markdown,.txt,.html,.htm"
+          className="sr-only"
+          disabled={reading}
+          onChange={(event) => {
+            onPick(event.target.files);
+            // Cleared so choosing the same file twice fires a change event —
+            // otherwise a second attempt after an error does nothing at all.
+            event.target.value = "";
+          }}
+        />
+
+        {reading ? (
+          <>
+            <p className="oc-heading font-serif text-2xl text-lp-ink">
+              Reading your book…
+            </p>
+            <p className="mt-2 max-w-md text-sm text-lp-body">
+              {state.name}
+            </p>
+          </>
+        ) : (
+          <>
+            <span style={{ color: INK_TEXT }}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="h-9 w-9"
+              >
+                <path d="M12 16V4" />
+                <path d="m7.5 8.5 4.5-4.5 4.5 4.5" />
+                <path d="M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15" />
+              </svg>
+            </span>
+            <p className="oc-heading mt-4 font-serif text-2xl text-lp-ink sm:text-3xl">
+              Drop your manuscript here
+            </p>
+            <p className="mt-2 text-[0.9375rem]">
+              or{" "}
+              <span className="font-semibold underline" style={{ color: INK_TEXT }}>
+                choose a file
+              </span>{" "}
+              — Word, EPUB, Markdown, plain text or HTML
+            </p>
+
+            {/* The sentence that decides whether a stranger hands over an
+                unpublished novel, so it is stated where the decision is made
+                and it is stated exactly. Every parser runs in the browser. */}
+            <p className="mt-6 flex items-center gap-2 text-[0.8125rem] font-medium text-lp-soft">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.7}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+                className="h-[18px] w-[18px] shrink-0"
+                style={{ color: PASS }}
+              >
+                <path d="M6 11V8a6 6 0 0 1 12 0v3" />
+                <rect x="4.5" y="11" width="15" height="9.5" rx="2" />
+              </svg>
+              Nothing is uploaded. Your book is read in this browser.
+            </p>
+          </>
+        )}
+      </label>
+
+      {state.phase === "error" && (
+        <p
+          role="alert"
+          className="mt-3 rounded-xl border px-4 py-3 text-sm leading-relaxed"
+          style={{
+            borderColor: "var(--color-stop-line)",
+            backgroundColor: "var(--color-stop-bg)",
+            color: STOP,
+          }}
+        >
+          {state.message}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Result({
+  result,
+  cover,
+  saveFailed,
+  onStart,
+  onReset,
+}: {
+  result: FileFindings;
+  cover?: string;
+  saveFailed: boolean;
+  /** Null for "just take me in"; a `Fix` to land on the tool that mends it. */
+  onStart: (fix: Fix | null) => void;
+  onReset: () => void;
+}) {
+  const clean = result.findings.length === 0;
+
+  return (
+    <div aria-live="polite">
+      {/* ---- What was read ------------------------------------------------
+          The book named back, with two counts and nothing else. They are
+          facts out of the file, which is the only kind of number this app
+          prints — no score, no readiness percentage, no grade. */}
+      <div className="flex items-center gap-4 border-b border-lp-line bg-lp-well px-5 py-4">
+        {cover ? (
+          // Real artwork out of the reader's own EPUB. It is also the proof
+          // that the file was read rather than sampled: nobody's mock has
+          // their cover in it.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cover}
+            alt=""
+            className="h-16 w-11 shrink-0 rounded-sm border border-lp-edge object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-16 w-11 shrink-0 items-center justify-center rounded-sm border border-lp-edge bg-lp-ground"
+          >
+            <span className="h-9 w-px bg-[var(--color-lp-edge)]" />
+          </span>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <p className="oc-heading truncate font-serif text-xl text-lp-ink">
+            {result.title}
+          </p>
+          <p className="mt-0.5 truncate text-[0.8125rem] text-lp-body">
+            {result.author ? `${result.author} · ` : ""}
+            {result.words.toLocaleString()} words ·{" "}
+            {result.chapters === 1 ? "1 chapter" : `${result.chapters} chapters`}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onReset}
+          className="shrink-0 rounded-full border border-lp-edge px-4 py-2 text-[0.8125rem] font-semibold text-lp-soft hover:border-lp-edge-strong"
+        >
+          Check another
+        </button>
+      </div>
+
+      <div className="px-5 py-5">
+        {/* The app's own summary line, word for word. Two counts, worst
+            first, and a verdict on neither. */}
+        <p className="text-[0.9375rem]">
+          {clean ? (
+            <span className="font-semibold" style={{ color: PASS }}>
+              Nothing here would stop a shop taking this file.
+            </span>
+          ) : (
+            <>
+              <span className="font-semibold text-lp-ink">
+                {result.fix === 1 ? "1 thing" : `${result.fix} things`}
+              </span>{" "}
+              would stop a shop taking this
+              {result.note > 0 && <> · {result.note} worth doing</>}
+            </>
+          )}
+        </p>
+
+        {clean ? (
+          <p className="mt-3 text-sm leading-relaxed">
+            That is the upload checked — the parts a shop refuses files over.
+            What it cannot tell you is whether the blurb sells, which categories
+            put you on the right shelf, or whether your advance readers were
+            lined up early enough to matter. That is the rest of the job.
+          </p>
+        ) : (
+          <ul className="mt-4 flex flex-col gap-2">
+            {result.findings.map((finding) => {
+              const stop = finding.level === "fix";
+              /*
+               * A fill and a text colour, and they are not the same token.
+               *
+               * `-solid` keeps one value in both themes because it is a block
+               * carrying white; `-fg` crosses over, because #b91c1c as *text*
+               * on a near-black ground is unreadable and its night value is a
+               * light red. Using one for both would give either a pale block
+               * with white on it, or text nobody can read — depending on which
+               * one you picked.
+               */
+              const fill = stop
+                ? "var(--color-stop-solid)"
+                : "var(--color-note-solid)";
+              const ink = stop
+                ? "var(--color-stop-fg)"
+                : "var(--color-note-fg)";
+              return (
+                <li
+                  key={finding.id}
+                  className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border px-4 py-3.5"
+                  style={{
+                    borderColor: stop ? "var(--color-stop-line)" : "var(--color-note-line)",
+                    backgroundColor: stop ? "var(--color-stop-bg)" : "var(--color-note-bg)",
+                  }}
+                >
+                  {/* Severity is carried by the ground and the mark. The
+                      button stays indigo — it is the way *out* of the
+                      problem, and a red button says the pressing is the
+                      dangerous part. Same rule the dashboard runs on. */}
+                  <span
+                    aria-hidden="true"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] text-lp-accent-ink"
+                    style={{ backgroundColor: fill }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.8}
+                      strokeLinecap="round"
+                      aria-hidden="true"
+                      className="h-3 w-3"
+                    >
+                      {stop ? (
+                        <>
+                          <path d="m6 6 12 12" />
+                          <path d="m18 6-12 12" />
+                        </>
+                      ) : (
+                        <>
+                          <path d="M12 5v9" />
+                          <path d="M12 18.5v.5" />
+                        </>
+                      )}
+                    </svg>
+                  </span>
+
+                  <span className="min-w-[12rem] flex-1">
+                    <span
+                      className="block text-[0.9375rem] font-semibold"
+                      style={{ color: ink }}
+                    >
+                      {finding.title}
+                    </span>
+                    {finding.why && (
+                      <span className="mt-0.5 block text-sm text-lp-body">
+                        {finding.why}
+                      </span>
+                    )}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => onStart(finding.fix)}
+                    style={{ color: "var(--color-lp-accent)", borderColor: "var(--color-lp-edge)" }}
+                    className="shrink-0 rounded-lg border bg-lp-ground px-3.5 py-2 text-[0.8125rem] font-semibold hover:bg-lp-raised"
+                  >
+                    {finding.fix.action} <span aria-hidden="true">→</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* ---- The one place an account is asked for ------------------------
+          After the value, never before it, and it says what it will do with
+          the book rather than only what it wants from the reader. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-t border-lp-line bg-lp-well px-5 py-4">
+        <p className="max-w-md text-[0.8125rem] leading-relaxed text-lp-body">
+          {saveFailed ? (
+            <span style={{ color: STOP }}>
+              This browser has no room to keep the book — it stores them
+              locally. Sign up and import it there instead; nothing has been
+              lost.
+            </span>
+          ) : (
+            <>Nothing left this browser. Sign up free and the book comes with you.</>
+          )}
+        </p>
+        {saveFailed ? (
+          <Link
+            href={signupTo("/")}
+            style={{ backgroundColor: INK }}
+            className="shrink-0 rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
+          >
+            Sign up free
+          </Link>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onStart(null)}
+            style={{ backgroundColor: INK }}
+            className="shrink-0 rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
+          >
+            {clean ? "Start free" : "Fix these — free"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

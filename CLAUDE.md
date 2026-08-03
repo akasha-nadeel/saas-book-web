@@ -168,6 +168,17 @@ it with `useSearchParams` — a lazy initialiser reading `window.location` sees
 the *previous* URL during a client navigation, which was tried and is why the
 area kept arriving as Overview.
 
+**Place a writer can be sent back to lives in the query string**, and there are
+four of them: `?area=` on the dashboard, `?phase=` and `?open=` on the roadmap
+(which phase is expanded, which step's tool is open beside the road), and
+`?from=` on any link *into* a tool. That last one is why `src/lib/areas.ts`
+exists — `areaLabel()` turns the id back into the words the back control says.
+A tool is reached from the book cards, from Prepare and from the roadmap, so a
+back link that always said "All tools" returned a writer working through a list
+to the launcher instead of to the list. Link to a tool without `?from=` and it
+falls back to that launcher, which is the wrong answer more often than not. The
+`useSearchParams` rule above applies to all four.
+
 **Fifteen per-book tools, described in one place.** `src/lib/book-tools.ts`
 holds every tool's path, name and one-line description, in four groups with a
 colour each. The dashboard's Tools grid (`tool-grid.tsx`, glyphs in
@@ -188,14 +199,40 @@ Each tool is the same three pieces, and the split is the convention:
 - a thin `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`;
 - a client component in `src/components/<tool>/`.
 
-Every one of them mounts **`ToolHeader`** (`src/components/tool-header.tsx`):
-breadcrumb, the book as a chip *with its cover*, and the tool's own name as the
-`h1`. The cover is load-bearing — the Tools area lets a writer pick a book
-before opening a tool, so landing on the wrong manuscript is a real way to lose
-ten minutes — and the heading is the tool rather than the book, or every screen
-looks like the same screen with different contents. The `width` prop must match
-the page's own container or the two left edges disagree. The export screen is
-the one that never took this header; TODO.md records the decision as open.
+Every one of them mounts **`ToolHeader`** (`src/components/tool-header.tsx`)
+when it owns the window: breadcrumb, the book as a chip *with its cover*, and
+the tool's own name as the `h1`. The cover is load-bearing — the Tools area lets
+a writer pick a book before opening a tool, so landing on the wrong manuscript
+is a real way to lose ten minutes — and the heading is the tool rather than the
+book, or every screen looks like the same screen with different contents. The
+`width` prop must match the page's own container or the two left edges disagree.
+The export screen is the one that never took this header; TODO.md records the
+decision as open.
+
+**A tool screen has two frames, and `src/lib/tool-page.ts` is the contract.**
+The roadmap opens six of them *beside* the road rather than instead of it, so a
+writer can do a step without losing their place — which a component assuming it
+owns the viewport cannot do. So every tool component takes `ToolPageProps`
+(`bookId`, `embedded`, `heading`) rather than a bare `bookId`, and `embedded`
+says exactly two things, both about the frame: **no `ToolHeader`** (a second
+heading under the panel's own title bar, and a breadcrumb pointing out of a
+panel with a Close button beside it), and **`h-full` rather than `h-dvh`** (a
+child claiming the viewport inside a flex panel overflows by the height of the
+title bar). `toolShell()` writes that class pair so the six cannot drift.
+Nothing else may hang off the flag: the moment `embedded` starts hiding
+*features* there are two products in one file and the panel is the lesser one,
+which is what makes a writer navigate away to "the real screen".
+
+`src/components/roadmap/step-panel.tsx` is the registry — comps, title-check,
+blurb, categories, covers, export — keyed by **URL segment**, so it is checked
+against the step's own `href` rather than a second list of names that could
+disagree with it. Each is a `dynamic` import with `ssr: false`: they read the
+library out of `localStorage`, and one of them reaches for `docx` and `jszip`,
+which a writer only reading the road should never download. Anything absent
+(the editor, the reading view) is absent on purpose and keeps navigating away —
+the reading view measures its own column, so in a panel it would faithfully
+typeset the book at half the width somebody wanted to read it at. `panelToolFor`
+returning null is how the roadmap knows to draw an ordinary link.
 
 **These screens share a house style, and tests enforce it.** No score, no grade,
 no number invented to look like an answer. Facts rather than verdicts ("you
@@ -345,6 +382,22 @@ half that has to read the manuscript, which is why it is not in the pure module.
   transcriber. `index.ts` dispatches by extension and refuses `.doc`/`.pdf` *by
   name* with what to do instead; `split.ts` breaks a flat block stream into
   chapters.
+
+  **A file's own metadata is read and kept** (`metadata.ts`, `epubMetadata()`,
+  `docxMetadata()`, `cover.ts`): an EPUB carries an author, an ISBN, a blurb,
+  categories and usually cover artwork, and all of it used to be dropped at the
+  door. That was survivable while import only fed an editor and stopped being
+  survivable the moment the app started *reporting* on a book — a check that
+  tells a writer their complete file has no author, no cover and no ISBN is not
+  a strict check, it is a wrong one. `setupFromImport()` is what carries it into
+  `createBookFromImport`, used by all three import screens so one of them cannot
+  quietly forget. Three details are load-bearing: the ISBN is picked out of
+  `dc:identifier` by **check digit** rather than by a `urn:isbn:` prefix, since
+  a UUID sits in that same field; `dc:date` is cut to `YYYY-MM-DD` or a valid
+  EPUB would import and then report a *blocking* date problem of our own making;
+  and Word's machine account names ("Windows User") are refused as authors,
+  because a wrong pass is quieter than a wrong alarm and nobody goes looking for
+  a problem the check said they did not have.
 
 **The small pure modules** are where the conventions of the trade live, kept out
 of components so they can be tested and changed in one place: `book-kinds.ts`
@@ -575,6 +628,30 @@ the fonts land a second in, so measuring through a live push records where a
 field currently appears rather than where it sits and the pointer clicks air.
 Same rule as `pagination.ts`.
 
+**The hero carries the real check, not a picture of one.**
+`book-check.tsx` over the pure `file-check.ts`: a signed-out visitor drops the
+manuscript they already have, it is parsed *in their browser* by the ordinary
+`importFile` path, and `storeReadiness()` reports what a shop would refuse —
+the same findings, in the same order, in the same words as the dashboard. Four
+rules hold it together.
+
+`checkFile()` **invents no rules**; it goes through `fromReadiness()` like every
+other screen, so there is no second, louder list of shop rules written for
+marketing. It **raises the advisories** that `checkup()` gates by phase, on the
+same reasoning as the Prepare screen: somebody who has dropped a finished
+manuscript on a page about uploading has asked the publishing question. Findings
+are **never held back for an email** — the whole list shows whether or not
+anybody signs up, because gating them is the pattern this reader has been burned
+by; what needs an account is *fixing* something, and the buttons say so before
+they are pressed. And **the book comes with them**: pressing a fix writes it to
+`localStorage` and sends them to `/signup?next=` the tool that mends it, which
+works because `syncWithServer` already handles a library that existed before the
+account did. Nothing is written until they press, so a visitor who only wanted
+the check leaves no trace either.
+
+This is why the file's metadata had to be read (see the import note above): the
+landing page and the dashboard must not say different things about one file.
+
 **Its positioning is "nobody tells you the order"** — the sharpest thing in the
 writer research and the one claim a competitor cannot answer by shipping a
 feature, because it is the shape of the problem rather than a part of it. So the
@@ -582,18 +659,45 @@ page leads with the order, proves it by naming where the ARC step sits, and only
 then says what the software does. It opened on a feature for a while, which is
 an answer to a question the reader has not been asked yet.
 
-**It is always light**, whichever theme the app is wearing, and it states its
-colours literally rather than using the `@theme` tokens: a shop front that
-changed colour depending on a setting made inside the product would not be the
-page somebody linked to. A palette change therefore does *not* reach it and has
-to be made here too.
+**It follows the theme, through its own token set.** It used to be always light
+and state every colour literally, on the argument that a shop front should not
+change because of a setting made inside the product. That was right about brand
+consistency and wrong about whose setting it is: a reader on a dark machine has
+not expressed a view about our marketing, and the one page ignoring them was the
+first one they ever saw. So the page reads `data-theme` like the app does, off
+the `--color-lp-*` block in `globals.css` — stated in both theme blocks, with
+the light values it shipped with, so daylight is unchanged to the pixel. The
+`prefers-color-scheme` bootstrap in `layout.tsx` already runs on `/`, so a
+signed-out visitor gets the right page with no flash.
+
+Four things about that palette are worth knowing:
+
+- **It reuses the app's tokens wherever the two mean the same thing** — `fg`,
+  `muted`, `line`, `raised`, and the whole `ok`/`note`/`stop` family, whose
+  light values already *were* the landing page's reds and ambers. The `lp-*`
+  names exist only for what the chrome has no word for: two tinted grounds,
+  the drawn tablet's shell, and the accent shades below.
+- **`lp-accent` is the fill and `lp-accent-text` is the same colour as type**,
+  and at night they must be two values: white has to sit on the fill and a link
+  has to sit on near-black, and no single indigo clears 4.5:1 in both
+  directions. In daylight they are identical. Use the fill for anything filled
+  and the text one for anything read.
+- **The accent keeps its hue at night**, where the chrome's accent goes white.
+  The chrome's reason does not transfer: this page's largest element is a
+  full-bleed block *of* the accent, so following `--color-accent` would have
+  put a white slab across a dark page.
+- **The drawn artwork stays literal in both themes** — the book covers in the
+  figures, and the brand marks in `works-with.tsx`. A cover is a picture of an
+  object and a trademark is a trademark. Only the drawn *interface* inside
+  those figures follows the theme, because it is a picture of this app.
 
 Three things in it are load-bearing:
 
-- **The figures are drawn in markup, never screenshotted** — the dashboard, the
-  phase list, the pre-upload check, the money panel. A screenshot is an asset
-  that goes stale silently while the app moves, on the one page whose whole
-  pitch is being checkable.
+- **The figures are drawn in markup, never screenshotted** — the phase list,
+  the pre-upload check, the money panel. A screenshot is an asset that goes
+  stale silently while the app moves, on the one page whose whole pitch is
+  being checkable. The hero is the exception and goes further: it carries the
+  **real check**, not a drawing of one — see `book-check.tsx`.
 - **Everything countable is imported and counted**: `STEPS`, `PHASES`,
   `ALL_TOOLS`, `TOOL_GROUPS`, the price from `plans.ts`. The ARC step's title,
   its number and its phase are all derived, because the page quotes them.
@@ -750,9 +854,13 @@ Three more things follow from the palette, and each has bitten already:
   set as type beside a near-black "Open" reads as more near-black, and a
   brighter indigo off the shelf would be a second brand colour pretending to
   be the first. The landing header draws the
-  same wordmark at the same size but states that indigo *literally*: that page
-  is always light whatever the app is wearing, and the token would turn white
-  on it. The two are kept in step by hand.
+  same wordmark at the same size, off its own `--color-lp-wordmark`, and the
+  two are kept in step by hand. They agree in daylight and part at night on
+  purpose: the app's token goes plain white because it sits in a black sidebar
+  with nothing else near it, while the landing mark sits beside a page whose
+  every link and button is indigo, where a white "Chapter" would read as a
+  third colour rather than as the brand. So that one stays the accent's hue,
+  lifted — the same relationship, at a different brightness.
 
 The writer-facing looks stored in `prefs` are each applied their own way:
 `theme` as `[data-theme]` on `<html>` (above), `paper` as `[data-paper]` on the

@@ -1,4 +1,11 @@
 import { paragraph, type Block, type Inline } from "./blocks";
+import {
+  clean,
+  personName,
+  publishingFrom,
+  subjectsFrom,
+  type FileMetadata,
+} from "./metadata";
 
 /**
  * .docx into blocks.
@@ -69,6 +76,58 @@ function runInline(run: Element): Inline | null {
     text,
     ...(bold ? { bold: true as const } : {}),
     ...(italic ? { italic: true as const } : {}),
+  };
+}
+
+/**
+ * What Word recorded about the document, from `docProps/core.xml`.
+ *
+ * Far less than an EPUB carries — there is no ISBN, no publisher and no cover
+ * in a manuscript — but the two fields that are there are the two a shop
+ * refuses a book without. Word fills the title from the Properties panel and
+ * the creator from whoever the copy of Office belongs to, which for a writer
+ * working on their own novel is their own name.
+ *
+ * The whole thing is best-effort: `core.xml` is optional, some tools omit it,
+ * and none of it is worth failing an import over. A file with no properties
+ * imports exactly as it did before this existed.
+ */
+export async function docxMetadata(data: ArrayBuffer): Promise<FileMetadata> {
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(data);
+
+  const entry = zip.file("docProps/core.xml");
+  if (!entry) return {};
+
+  const doc = new DOMParser().parseFromString(
+    await entry.async("string"),
+    "application/xml",
+  );
+  if (doc.getElementsByTagName("parsererror").length) return {};
+
+  // By local name: the prefixes are `dc:`, `cp:` and `dcterms:`, and which one
+  // holds a given field varies with the tool that wrote the file.
+  const value = (local: string): string | undefined => {
+    const found = Array.from(doc.getElementsByTagName("*")).find(
+      (el) => el.localName === local,
+    );
+    return clean(found?.textContent);
+  };
+
+  return {
+    title: value("title"),
+    author: personName(value("creator")),
+    publishing: publishingFrom({
+      description: value("description"),
+      language: value("language"),
+      // Word has one keywords string and one subject line, and writers use
+      // both for the same thing. `subjectsFrom` splits and de-duplicates.
+      subjects: subjectsFrom(
+        [value("keywords"), value("subject")].filter(
+          (v): v is string => v !== undefined,
+        ),
+      ),
+    }),
   };
 }
 

@@ -77,7 +77,7 @@ type Step = {
   closeAt: number;
 };
 
-const INK = "#312e81"; // the page's one action colour — see landing-page.tsx
+const INK = "var(--color-lp-accent)"; // the page's one action colour — see landing-page.tsx
 
 /*
  * The pace. Deliberately slower than a real hand: this runs beside three
@@ -251,7 +251,7 @@ const HX = (4.5 / 24) * CUR_W;
 const HY = (2.4 / 24) * CUR_W;
 
 const BOX =
-  "flex h-[38px] w-full items-center rounded-lg border border-[#dcdce0] bg-white px-3 text-sm leading-none text-[#0f0f10]";
+  "flex h-[38px] w-full items-center rounded-lg border border-lp-edge bg-lp-ground px-3 text-sm leading-none text-lp-ink";
 const RING = "pointer-events-none absolute -inset-[3px] rounded-[11px] opacity-0";
 const RING_SHADOW = { boxShadow: `0 0 0 2px ${INK}, 0 0 0 5px rgba(49,46,129,0.13)` };
 
@@ -579,8 +579,8 @@ export function StoreListingDemo() {
       ref={hostRef}
       role="img"
       aria-label="A store-listing form filling itself in — ISBN, language, publisher, publication date, series and number in series — and then being submitted."
-      className="rounded-[1.75rem] border border-[#b9b9c4] bg-[#e2e2e8] p-3 select-none
-                 shadow-[0_2px_0_#b9b9c4,0_10px_18px_-8px_rgba(15,15,16,0.30),0_30px_46px_-18px_rgba(15,15,16,0.55)]"
+      className="rounded-[1.75rem] border border-lp-device-edge bg-lp-device p-3 select-none
+                 shadow-[0_2px_0_var(--color-lp-device-edge),0_10px_18px_-8px_rgba(15,15,16,0.30),0_30px_46px_-18px_rgba(15,15,16,0.55)]"
     >
       {/* The screen carries its own hairline: bezel and screen are both pale,
           and without it the glass has no edge and the whole thing reads as one
@@ -588,24 +588,24 @@ export function StoreListingDemo() {
       <div
         ref={screenRef}
         aria-hidden="true"
-        className="relative overflow-hidden rounded-[1.25rem] border border-[#d8d8de] bg-white"
+        className="relative overflow-hidden rounded-[1.25rem] border border-lp-edge bg-lp-ground"
       >
         {/* Everything the camera moves lives in here, padding included — the
             push has to be able to crop into the margin rather than into the
             fields. */}
         <div ref={camRef} className="relative origin-top-left will-change-transform">
           <div className="px-7 pt-7 pb-6">
-            <p className="oc-heading font-serif text-xl text-[#0f0f10]">
+            <p className="oc-heading font-serif text-xl text-lp-ink">
               What a shop asks for
             </p>
-            <p className="mt-1 text-sm text-[#8a8a92]">
+            <p className="mt-1 text-sm text-lp-faint">
               Saved to the book, so you answer these once rather than once per export.
             </p>
 
             <div className="mt-6 grid gap-x-5 gap-y-5 sm:grid-cols-2">
               {FIELDS.map((f, i) => (
                 <div key={f.label} className={f.type === "select" ? "relative z-20" : "relative"}>
-                  <p className="text-xs font-medium text-[#0f0f10]">{f.label}</p>
+                  <p className="text-xs font-medium text-lp-ink">{f.label}</p>
                   <div
                     ref={(el) => {
                       boxRefs.current[i] = el;
@@ -622,20 +622,20 @@ export function StoreListingDemo() {
                         {lens[i] > 0 ? (
                           f.value.slice(0, lens[i])
                         ) : (
-                          <span className="text-[#b0b0b8]">{f.placeholder}</span>
+                          <span className="text-lp-faint">{f.placeholder}</span>
                         )}
                         <span
                           ref={(el) => {
                             caretRefs.current[i] = el;
                           }}
-                          className="ml-px h-[15px] w-[1.5px] shrink-0 rounded-full bg-[#312e81] opacity-0"
+                          className="ml-px h-[15px] w-[1.5px] shrink-0 rounded-full bg-[var(--color-lp-accent)] opacity-0"
                         />
                       </span>
                       {f.suffix === "chevron" ? (
                         <svg width="11" height="7" viewBox="0 0 14 9" fill="none">
                           <path
                             d="M1 1.5 7 7.5 13 1.5"
-                            stroke="#0f0f10"
+                            stroke="var(--color-lp-ink)"
                             strokeWidth="1.6"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -650,12 +650,12 @@ export function StoreListingDemo() {
                             width="13.2"
                             height="11.7"
                             rx="2"
-                            stroke="#0f0f10"
+                            stroke="var(--color-lp-ink)"
                             strokeWidth="1.4"
                           />
                           <path
                             d="M1.4 6.4h13.2M5 1.4v2.6M11 1.4v2.6"
-                            stroke="#0f0f10"
+                            stroke="var(--color-lp-ink)"
                             strokeWidth="1.4"
                             strokeLinecap="round"
                           />
@@ -675,7 +675,7 @@ export function StoreListingDemo() {
                       <span
                         ref={ddRef}
                         className="pointer-events-none absolute top-[44px] right-0 left-0 z-30 block
-                                   origin-top rounded-lg border border-[#e6e6e8] bg-white p-1 opacity-0
+                                   origin-top rounded-lg border border-lp-edge bg-lp-ground p-1 opacity-0
                                    shadow-[0_1px_2px_rgba(15,15,16,0.10),0_6px_12px_-4px_rgba(15,15,16,0.18)]
                                    will-change-transform"
                       >
@@ -683,11 +683,11 @@ export function StoreListingDemo() {
                           <span
                             key={l}
                             ref={li === 0 ? optRef : undefined}
-                            className="relative flex h-[30px] items-center rounded-md px-2 text-xs text-[#0f0f10]"
+                            className="relative flex h-[30px] items-center rounded-md px-2 text-xs text-lp-ink"
                           >
                             <span
                               ref={li === 0 ? optHiRef : undefined}
-                              className="absolute inset-0 rounded-md bg-[#312e81] opacity-0"
+                              className="absolute inset-0 rounded-md bg-[var(--color-lp-accent)] opacity-0"
                             />
                             <span className="relative">{l}</span>
                           </span>
@@ -695,7 +695,7 @@ export function StoreListingDemo() {
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-1.5 text-xs leading-relaxed text-[#8a8a92]">{f.hint}</p>
+                  <p className="mt-1.5 text-xs leading-relaxed text-lp-faint">{f.hint}</p>
                 </div>
               ))}
             </div>
@@ -706,17 +706,17 @@ export function StoreListingDemo() {
             <div
               ref={btnRef}
               className="relative mt-6 flex h-[42px] w-full items-center justify-center
-                         rounded-lg text-sm font-semibold text-white will-change-transform"
+                         rounded-lg text-sm font-semibold text-lp-accent-ink will-change-transform"
               style={{ backgroundColor: INK }}
             >
               <span
                 ref={btnGlowRef}
-                className="pointer-events-none absolute inset-0 rounded-lg bg-white opacity-0"
+                className="pointer-events-none absolute inset-0 rounded-lg bg-lp-ground opacity-0"
               />
               <span className="relative">Continue</span>
             </div>
 
-            <p className="mt-3 text-center text-xs text-[#8a8a92]">
+            <p className="mt-3 text-center text-xs text-lp-faint">
               Skip — you can add this later
             </p>
           </div>
@@ -730,7 +730,7 @@ export function StoreListingDemo() {
                 rippleRefs.current[i] = el;
               }}
               className="pointer-events-none absolute top-0 left-0 z-40 h-[34px] w-[34px]
-                         rounded-full bg-[#312e81] opacity-0 will-change-transform"
+                         rounded-full bg-[var(--color-lp-accent)] opacity-0 will-change-transform"
             />
           ))}
 
@@ -742,8 +742,8 @@ export function StoreListingDemo() {
             <svg width={CUR_W} height={CUR_H} viewBox="0 0 24 26" fill="none">
               <path
                 d="M4.5 2.4 L4.5 20.6 L9.6 16.1 L12.7 23.2 L16.1 21.7 L13.1 14.8 L19.5 14.8 Z"
-                fill="#0f0f10"
-                stroke="#ffffff"
+                fill="var(--color-lp-ink)"
+                stroke="var(--color-lp-ground)"
                 strokeWidth="1.6"
                 strokeLinejoin="round"
               />

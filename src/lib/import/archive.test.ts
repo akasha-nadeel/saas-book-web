@@ -1,7 +1,8 @@
 import { expect, it } from "vitest";
 import JSZip from "jszip";
 import { parseDocx } from "@/lib/import/docx";
-import { epubTitle, parseEpub } from "@/lib/import/epub";
+import { coverHrefFrom, epubMetadata, parseEpub } from "@/lib/import/epub";
+import { docxMetadata } from "@/lib/import/docx";
 
 /**
  * The two zip formats, exercised against archives built here.
@@ -148,7 +149,177 @@ it("resolves hrefs relative to the opf, not the zip root", async () => {
 });
 
 it("prefers the epub's own title over the file name", async () => {
-  expect(await epubTitle(await epubWith())).toBe("The Salt Road");
+  expect((await epubMetadata(await epubWith())).title).toBe("The Salt Road");
+});
+
+// --- what a file says about itself -----------------------------------------
+
+/*
+ * The listing fields, which the check on the landing page reports on.
+ *
+ * These matter more than they look: a finding is only worth printing if it is
+ * true, and an EPUB out of Vellum or Atticus carries an author, a blurb, an
+ * ISBN and a cover. Reading none of them would have the landing page telling
+ * a writer with a complete file that they have none of it — the one kind of
+ * mistake this product cannot afford to make on the first screen.
+ */
+
+async function richEpub() {
+  const zip = new JSZip();
+  zip.file(
+    "META-INF/container.xml",
+    `<?xml version="1.0"?>
+     <container xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+       <rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles>
+     </container>`,
+  );
+  zip.file(
+    "OEBPS/content.opf",
+    `<?xml version="1.0"?>
+     <package xmlns="http://www.idpf.org/2007/opf">
+       <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+         <dc:title>The Salt Road</dc:title>
+         <dc:creator>Ada Vane</dc:creator>
+         <dc:identifier id="uid">urn:uuid:9f1c8a2e-0000-4000-8000-000000000000</dc:identifier>
+         <dc:identifier>urn:isbn:978-0-306-40615-7</dc:identifier>
+         <dc:publisher>Long Shore</dc:publisher>
+         <dc:description>&lt;p&gt;A road made of &lt;i&gt;salt&lt;/i&gt;.&lt;/p&gt;</dc:description>
+         <dc:subject>Fantasy</dc:subject>
+         <dc:subject>fantasy</dc:subject>
+         <dc:subject>Epic</dc:subject>
+         <dc:date>2019-03-04T00:00:00Z</dc:date>
+         <dc:language>en-GB</dc:language>
+       </metadata>
+       <manifest>
+         <item id="c1" href="one.xhtml"/>
+       </manifest>
+       <spine><itemref idref="c1"/></spine>
+     </package>`,
+  );
+  zip.file("OEBPS/one.xhtml", "<html><body><p>First.</p></body></html>");
+  return zip.generateAsync({ type: "arraybuffer" });
+}
+
+it("reads the listing details an epub carries", async () => {
+  const meta = await epubMetadata(await richEpub());
+
+  expect(meta.author).toBe("Ada Vane");
+  expect(meta.publishing).toMatchObject({
+    publisher: "Long Shore",
+    language: "en-GB",
+  });
+});
+
+it("takes the identifier that is a real ISBN, not the file's uuid", async () => {
+  const meta = await epubMetadata(await richEpub());
+  // The uuid comes first in the manifest, and only the check digit can tell
+  // the two apart — a `urn:isbn:` prefix is a label, not a proof.
+  expect(meta.publishing?.isbn).toBe("9780306406157");
+});
+
+it("cuts a dc:date down to the date a shop will accept", async () => {
+  // A full timestamp is legal in an EPUB and refused by storeReadiness, so
+  // passing it through would import a good file and then report a *blocking*
+  // problem of our own making.
+  expect((await epubMetadata(await richEpub())).publishing?.published).toBe(
+    "2019-03-04",
+  );
+});
+
+it("takes the blurb as text, and de-duplicates the subjects", async () => {
+  const meta = await epubMetadata(await richEpub());
+  expect(meta.publishing?.description).toBe("A road made of salt.");
+  expect(meta.publishing?.subjects).toEqual(["Fantasy", "Epic"]);
+});
+
+it("reports no cover when the manifest declares none", async () => {
+  // The fixture has a cover *page* in the spine but no cover image, which is
+  // exactly what a shop's validator concludes too.
+  expect((await epubMetadata(await epubWith())).hasCover).toBeUndefined();
+});
+
+// `coverHrefFrom` is pure, so the rules about which item is the cover can be
+// exercised without building a zip around them.
+function opf(manifest: string, meta = ""): Document {
+  return new DOMParser().parseFromString(
+    `<package xmlns="http://www.idpf.org/2007/opf">
+       <metadata>${meta}</metadata>
+       <manifest>${manifest}</manifest>
+     </package>`,
+    "application/xml",
+  );
+}
+
+it("finds an epub 3 cover by its properties", () => {
+  const doc = opf(
+    `<item id="c" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image"/>`,
+  );
+  expect(coverHrefFrom(doc, "OEBPS/content.opf")).toBe("OEBPS/images/cover.jpg");
+});
+
+it("finds an epub 2 cover through the legacy meta pointer", () => {
+  const doc = opf(
+    `<item id="cov" href="cover.png" media-type="image/png"/>`,
+    `<meta name="cover" content="cov"/>`,
+  );
+  expect(coverHrefFrom(doc, "OEBPS/content.opf")).toBe("OEBPS/cover.png");
+});
+
+it("refuses a cover pointer aimed at the cover page rather than the art", () => {
+  // Plenty of files point `meta name="cover"` at the XHTML that *shows* the
+  // cover. Packaging that as artwork gives a broken picture rather than none.
+  const doc = opf(
+    `<item id="cov" href="cover.xhtml" media-type="application/xhtml+xml"/>`,
+    `<meta name="cover" content="cov"/>`,
+  );
+  expect(coverHrefFrom(doc, "OEBPS/content.opf")).toBeNull();
+});
+
+it("reads what Word recorded about a document", async () => {
+  const zip = new JSZip();
+  zip.file(
+    "docProps/core.xml",
+    `<?xml version="1.0"?>
+     <cp:coreProperties
+        xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+        xmlns:dc="http://purl.org/dc/elements/1.1/">
+       <dc:title>The Drowned Coast</dc:title>
+       <dc:creator>Ada Vane</dc:creator>
+       <cp:keywords>fantasy; epic</cp:keywords>
+     </cp:coreProperties>`,
+  );
+
+  const meta = await docxMetadata(await zip.generateAsync({ type: "arraybuffer" }));
+  expect(meta.title).toBe("The Drowned Coast");
+  expect(meta.author).toBe("Ada Vane");
+  expect(meta.publishing?.subjects).toEqual(["fantasy", "epic"]);
+});
+
+it("does not take Word's machine account as the author", async () => {
+  // A wrong author is worse than none: it would settle the one question every
+  // shop refuses a book over, and nobody goes looking for a problem the check
+  // said they did not have.
+  const zip = new JSZip();
+  zip.file(
+    "docProps/core.xml",
+    `<?xml version="1.0"?>
+     <cp:coreProperties
+        xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
+        xmlns:dc="http://purl.org/dc/elements/1.1/">
+       <dc:creator>Windows User</dc:creator>
+     </cp:coreProperties>`,
+  );
+
+  const meta = await docxMetadata(await zip.generateAsync({ type: "arraybuffer" }));
+  expect(meta.author).toBeUndefined();
+});
+
+it("survives a docx with no properties at all", async () => {
+  const zip = new JSZip();
+  zip.file("word/document.xml", "<x/>");
+  expect(
+    await docxMetadata(await zip.generateAsync({ type: "arraybuffer" })),
+  ).toEqual({});
 });
 
 it("refuses an epub with no container", async () => {

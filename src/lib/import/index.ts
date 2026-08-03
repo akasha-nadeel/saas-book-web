@@ -1,4 +1,6 @@
+import type { BookSetup } from "../library-store";
 import type { Block } from "./blocks";
+import type { FileMetadata } from "./metadata";
 import { splitIntoChapters, type ImportedBook } from "./split";
 
 /**
@@ -53,6 +55,23 @@ export function titleFromFileName(name: string): string {
 
 const SUPPORTED = "Supported: .docx, .epub, .md, .txt, .html";
 
+/**
+ * What a parsed file contributes to the book made from it.
+ *
+ * Here, and used by all three callers, because "keep the author" is the kind
+ * of line that gets added to one import screen and forgotten on the other two
+ * — and the failure is silent, since a book with no author looks exactly like
+ * a book whose file never had one. The screens differ in what *they* add on
+ * top (the dialog offers a kind and a genre); none of them differ in this.
+ */
+export function setupFromImport(book: ImportedBook): BookSetup {
+  return {
+    ...(book.author ? { author: book.author } : {}),
+    ...(book.cover ? { cover: book.cover } : {}),
+    ...(book.publishing ? { publishing: book.publishing } : {}),
+  };
+}
+
 export async function importFile(file: File): Promise<ImportedBook> {
   const extension = extensionOf(file.name);
 
@@ -65,6 +84,15 @@ export async function importFile(file: File): Promise<ImportedBook> {
   const fallbackTitle = titleFromFileName(file.name) || "Untitled Book";
   let blocks: Block[];
   let title = fallbackTitle;
+  /*
+   * What the file said about itself, for the formats that say anything.
+   *
+   * Read here rather than inside each parser because it is not part of turning
+   * a file into prose — it is the answer to a different question, and the one
+   * the readiness check asks. See `metadata.ts`: an EPUB that carries a cover,
+   * an author and an ISBN must not be told it has none of them.
+   */
+  let metadata: FileMetadata = {};
 
   switch (extension) {
     case ".txt": {
@@ -85,15 +113,21 @@ export async function importFile(file: File): Promise<ImportedBook> {
       break;
     }
     case ".docx": {
-      const { parseDocx } = await import("./docx");
-      blocks = await parseDocx(await file.arrayBuffer());
+      const data = await file.arrayBuffer();
+      const { parseDocx, docxMetadata } = await import("./docx");
+      blocks = await parseDocx(data);
+      metadata = await docxMetadata(data);
+      // Word's Properties title is filled in about as often as it is left at
+      // the file name, so it is only believed when the document has one.
+      title = metadata.title ?? fallbackTitle;
       break;
     }
     case ".epub": {
       const data = await file.arrayBuffer();
-      const { parseEpub, epubTitle } = await import("./epub");
+      const { parseEpub, epubMetadata } = await import("./epub");
       blocks = await parseEpub(data);
-      title = (await epubTitle(data)) ?? fallbackTitle;
+      metadata = await epubMetadata(data);
+      title = metadata.title ?? fallbackTitle;
       break;
     }
     case ".doc":
@@ -120,6 +154,16 @@ export async function importFile(file: File): Promise<ImportedBook> {
   }
 
   const book = splitIntoChapters(blocks, title);
-  // The EPUB's own metadata title beats a heading guessed from the text.
-  return extension === ".epub" ? { ...book, title } : book;
+
+  return {
+    ...book,
+    // A title the file *declared* beats one guessed out of its own text. The
+    // guess is good — a lone H1 above H2 chapters really is the book's title —
+    // but it is still a guess, and `dc:title` is not.
+    ...(metadata.title ? { title: metadata.title } : {}),
+    ...(metadata.author ? { author: metadata.author } : {}),
+    ...(metadata.cover ? { cover: metadata.cover } : {}),
+    ...(metadata.hasCover ? { hasCover: true } : {}),
+    ...(metadata.publishing ? { publishing: metadata.publishing } : {}),
+  };
 }

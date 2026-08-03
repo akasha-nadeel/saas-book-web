@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
+import { BookCheck } from "@/components/landing/book-check";
 import { CheckDemo } from "@/components/landing/check-demo";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { StoreListingDemo } from "@/components/landing/store-listing-demo";
@@ -38,10 +39,20 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * formats, EPUBCheck errors. Never put a user count, a rating or a testimonial
  * in that row until there is one to count.
  *
- * **It is always light**, whichever theme the app is wearing, and it states its
- * colours literally rather than using the `@theme` tokens. A shop front that
- * changed colour depending on a setting made inside the product would be a
- * different page to the one someone linked to.
+ * **It follows the theme, like everything else.** It used to be always light
+ * and state every colour literally, on the argument that a shop front should
+ * not change because of a setting made inside the product. That was right
+ * about brand consistency and wrong about who the setting belongs to: a reader
+ * whose machine is dark has not expressed a view about our marketing, they
+ * have told their whole screen how bright to be — and the one page ignoring
+ * them was the first one they ever saw. So the page reads `data-theme` like
+ * the app does, through the `--color-lp-*` tokens in `globals.css`, which are
+ * stated in both blocks with the light values it shipped with. Daylight is
+ * unchanged to the pixel.
+ *
+ * Two things stay literal on purpose, and neither is chrome: the drawn book
+ * covers in the figures, because a cover is a picture of an object, and the
+ * marks in `works-with.tsx`, because a trademark is a trademark.
  *
  * **Every claim has to be true of the code, in both directions** — nothing
  * claims what the app cannot do, and nothing stays under the "Not built yet"
@@ -63,6 +74,11 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * - `INK` is the brand action — a deep indigo rather than the SaaS blue.
  *   It is ink on paper, it reads as institution rather than startup, and it is
  *   the colour of a decision: every CTA and every link is this and nothing else.
+ * - `INK_TEXT` is the same colour *as type*, and it is a second value only at
+ *   night. White has to sit on the fill and a link has to sit on near-black,
+ *   and at those two ends one indigo cannot clear 4.5:1 in both directions —
+ *   the windows do not overlap. In daylight the two are identical. Use `INK`
+ *   for anything filled and `INK_TEXT` for anything read.
  * - `STOP` and `PASS` are two thirds of the semantic ladder the app itself
  *   uses (`stop` / `note` / `ok` tokens). Red is *would be refused*, green is
  *   *free, passed, nothing owed*. They never appear as decoration, only as
@@ -76,26 +92,33 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * amber where the cost is, green where something has passed or been earned,
  * indigo on every way forward.
  */
-const INK = "#312e81"; // indigo-900 — actions and links
-const STOP = "#b91c1c"; // would be refused
-const PASS = "#15803d"; // free, passed, earned
+const INK = "var(--color-lp-accent)"; // the brand action — actions and links
+const STOP = "var(--color-stop-fg)"; // would be refused
+const PASS = "var(--color-ok-fg)"; // free, passed, earned
+const INK_TEXT = "var(--color-lp-accent-text)";
 
 /*
  * The two tinted grounds, and both are `INK` with the volume down.
  *
- * `#eeeef5` is INK at about 8% on white and backs the hero; `#f7f7fb` is the
- * same at about 4% and backs the alternating bands. Tinting the *brand* colour
- * rather than reaching for a neutral is what makes a page feel designed instead
- * of assembled: the hero, the lit card and the section grounds are then one
- * colour at four volumes, and the eye reads that as intent.
+ * `lp-tint` is the accent at about 8% on white and backs the hero; `lp-tint-soft`
+ * is the same at about 4% and backs the alternating bands. Tinting the *brand*
+ * colour rather than reaching for a neutral is what makes a page feel designed
+ * instead of assembled: the hero, the lit card and the section grounds are then
+ * one colour at four volumes, and the eye reads that as intent.
  *
  * They were a warm paper grey, which was pleasant and wrong — a warm ground
  * under a cool indigo card is two colour systems in one viewport, and it is the
  * kind of mismatch nobody can name but everybody feels.
  *
- * Written at each site as literal classes rather than held here as constants:
- * Tailwind reads class names as literals and would ship no rule for a name
- * built at runtime.
+ * At night the same relationship is kept by lifting rather than tinting: the
+ * bands are a shade *above* the page instead of below it, which is the same
+ * inversion the app's own `raised` makes, and for the same reason — a shadow
+ * on black is invisible, so elevation has to be carried by lightness.
+ *
+ * Used through Tailwind classes (`bg-lp-tint`) rather than these constants
+ * wherever a class will do: Tailwind reads class names as literals and would
+ * ship no rule for a name built at runtime. The constants exist for the
+ * handful of places that set colour in a `style` object.
  */
 
 /**
@@ -421,10 +444,12 @@ export function LandingPage() {
     // `<body>` is overflow-hidden for the editor shell, so this page owns its
     // own scrolling. `min-h-dvh` would put the footer out of reach.
     //
-    // Colours stated literally, so the page is the same page whichever theme
-    // the reader has chosen inside the app — including a reader who has never
-    // been inside it.
-    <div className="h-dvh overflow-y-auto bg-white text-[#5b5b63] [scroll-behavior:smooth]">
+    // Colours come from the `lp-*` tokens, so the page follows `data-theme`
+    // like the app does — including for a reader who has never been inside it,
+    // whose machine has already said which it wants through
+    // `prefers-color-scheme`. The bootstrap in layout.tsx resolves that before
+    // the first paint, so there is no flash of the wrong page.
+    <div className="h-dvh overflow-y-auto bg-lp-ground text-lp-body [scroll-behavior:smooth]">
       <LandingHeader ink={INK} />
 
       <main>
@@ -434,8 +459,46 @@ export function LandingPage() {
             the references use, and the right one: a reader who has been
             promised things by four other tools wants to see the thing before
             they read another adjective. */}
-        <section className="-mt-16 overflow-hidden border-b border-[#ececee] bg-[#eeeef5] px-6 pt-28 sm:pt-32">
-          <div className="mx-auto max-w-5xl text-center">
+        {/* `pb-*` where the hero used to have none: what sits under the deck is
+            now a control rather than a picture, and a tool cropped by the fold
+            is a tool the reader has to go looking for the bottom of. The old
+            figure was *meant* to be cut off — a screenshot bleeding past the
+            edge is the standard way of saying "there is more of this". A drop
+            zone has to be whole. */}
+        <section className="relative -mt-16 overflow-hidden border-b border-lp-line bg-lp-tint px-6 pt-28 pb-16 sm:pt-32 sm:pb-20">
+          {/* ---- The backdrop ------------------------------------------
+
+              Two images, one per theme, swapped through `--lp-hero` rather
+              than by rendering both and hiding one: a `<picture>` with a
+              media query would key off `prefers-color-scheme` and so ignore a
+              reader who chose against their system, which is the whole point
+              of the setting. A CSS variable follows `data-theme` instead, and
+              costs one request either way.
+
+              `bg-lp-tint` stays underneath as the floor. It is what shows
+              while the image is still arriving and if it never does, and it
+              is the colour the rest of the page is built on, so the failure
+              looks like the old hero rather than like a broken one.
+
+              Each var carries the whole `background` shorthand, position and
+              size included, because the two images want different framing —
+              see globals.css, where the measurement behind that is written
+              down. Setting them here as separate utilities would let a theme
+              inherit the other one's position.
+
+              Decorative, so `aria-hidden` and no `alt` to write: it carries
+              no information a reader would miss. Both are ~9KB WebP — a
+              smooth gradient is almost nothing once it is not a PNG. */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 [background:var(--lp-hero)]"
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 [background-image:var(--lp-hero-veil)]"
+          />
+
+          <div className="relative mx-auto max-w-5xl text-center">
             {/* Two-tone, the way both references split a headline. There is no
                 accent hue in this product to split on, so the two lines split
                 on weight of ink: the quiet half sets up the loud one.
@@ -478,10 +541,10 @@ export function LandingPage() {
                 sentence at two volumes rather than as grey text with a coloured
                 answer stapled underneath. */}
             <h1 className="oc-display font-serif text-[2.5rem] leading-[1.08] font-semibold sm:text-[3.5rem]">
-              <span className="block text-[#6e6c96]">
+              <span className="block text-lp-accent-soft">
                 Find out what&rsquo;s wrong with your book
               </span>
-              <span className="block" style={{ color: INK }}>
+              <span className="block" style={{ color: INK_TEXT }}>
                 before you upload it.
               </span>
             </h1>
@@ -502,11 +565,18 @@ export function LandingPage() {
               one of them is knowable before you upload.
             </p>
 
-            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            {/* Smaller and quieter than they were, because they are no longer
+                the only way forward on this screen: the check below is, and
+                two full-sized pills directly above a drop zone made three
+                primary actions competing inside one viewport. A reader who
+                arrived ready to sign up still finds them first; a reader who
+                arrived sceptical — which the research says is most of them —
+                gets to test the claim before being asked for anything. */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/signup"
                 style={{ backgroundColor: INK }}
-                className="rounded-full px-7 py-3.5 font-semibold text-white hover:opacity-90"
+                className="rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
               >
                 Start free
               </Link>
@@ -518,13 +588,35 @@ export function LandingPage() {
                 action={signInWithGoogle}
                 next="/"
                 label="Continue with Google"
-                className="inline-flex items-center justify-center gap-2.5 rounded-full border border-[#dcdce0] bg-white px-7 py-3.5 font-semibold text-[#0f0f10] hover:border-[#b9b9c0]"
+                className="inline-flex items-center justify-center gap-2.5 rounded-full border border-lp-edge bg-lp-ground px-6 py-3 text-[0.9375rem] font-semibold text-lp-ink hover:border-lp-edge-strong"
               />
             </div>
 
           </div>
 
-          <DashboardFigure />
+          {/* ---- The claim, kept ------------------------------------------
+
+              The headline promises the reader they can find out what is wrong
+              with their book before they upload it. This is that, working, on
+              their book, four inches below the promise — the real readiness
+              check out of `checkup.ts`, running in their browser, with no
+              account and nothing uploaded.
+
+              It replaced a drawn still of the Overview screen. The still was
+              honest and well made, but it was making a screenshot's argument
+              — *here is a product, imagine it on yours* — to a reader who has
+              been shown convincing screenshots by people who then sold them a
+              course that taught nothing. Every other claim on this page is
+              checkable by reading it; this is the one that is checkable by
+              using it, and it is the only block here a competitor cannot
+              answer with a nicer illustration.
+
+              It is also the page's own rule turned on itself: the figures are
+              drawn from the source so they cannot go stale, and this one
+              cannot go stale at all, because it *is* the source. */}
+          <div className="relative">
+            <BookCheck />
+          </div>
         </section>
 
         {/* ---- The logo strip -------------------------------------------
@@ -541,9 +633,9 @@ export function LandingPage() {
             from `works-with.tsx`, where the sourcing and licences for each one
             are recorded. Nominative use: these are programs that open our
             exports, not partners or customers. */}
-        <section className="border-b border-[#ececee] px-6 py-10">
+        <section className="border-b border-lp-line px-6 py-10">
           <div className="mx-auto max-w-5xl">
-            <p className="text-center font-code text-[0.6875rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+            <p className="text-center font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
               Your book comes back out — and opens in
             </p>
             {/* Tight enough that seven sit on one line at desktop widths — a
@@ -566,10 +658,10 @@ export function LandingPage() {
                       <path key={path.d} d={path.d} fill={path.fill} />
                     ))}
                   </svg>
-                  <span className="text-[0.8125rem] font-medium text-[#3f3f46]">
+                  <span className="text-[0.8125rem] font-medium text-lp-soft">
                     {destination.name}
                   </span>
-                  <span className="hidden font-code text-[0.625rem] tracking-wider text-[#b0b0b8] uppercase xl:inline">
+                  <span className="hidden font-code text-[0.625rem] tracking-wider text-lp-faint uppercase xl:inline">
                     {destination.format}
                   </span>
                 </li>
@@ -583,7 +675,7 @@ export function LandingPage() {
             The slot a SaaS page fills with users and downloads. Every figure
             here is counted out of the source at build time, so the row cannot
             drift and cannot flatter. */}
-        <section className="border-b border-[#ececee] px-6 py-14">
+        <section className="border-b border-lp-line px-6 py-14">
           <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 text-center md:grid-cols-4">
             <Counted icon="steps" n={String(STEPS.length)} label="steps, in order" />
             <Counted
@@ -600,7 +692,7 @@ export function LandingPage() {
         </section>
 
         {/* ---- Three up, one lit ---------------------------------------- */}
-        <section id="does" className="border-b border-[#ececee] px-6 py-20">
+        <section id="does" className="border-b border-lp-line px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="What it does"
@@ -647,7 +739,7 @@ export function LandingPage() {
             least of it; the sequence is the thing nobody hands you.
           </p>
           <p className="mt-5 leading-relaxed">
-            <strong className="text-[#0f0f10]">
+            <strong className="text-lp-ink">
               “{ARC_STEP.title}” is step {ARC_INDEX + 1}, in phase {ARC_PHASE}.
             </strong>{" "}
             Before you publish, not after. That single placement is why this
@@ -659,7 +751,7 @@ export function LandingPage() {
             is. If it ever moves, the build fails.
           </p>
           <p className="mt-6 leading-relaxed">
-            <strong className="text-[#0f0f10]">
+            <strong className="text-lp-ink">
               {SELF_TICKING} of the {SELF_TICKING + YOURS_TO_TICK} tick
               themselves
             </strong>{" "}
@@ -702,7 +794,7 @@ export function LandingPage() {
             list. The still could show that the app lists problems; only the
             moving one shows the fix sitting *on* the problem, which is the
             claim this section is actually making. */}
-        <section className="border-b border-[#ececee] bg-[#eeeef5] px-6 py-20">
+        <section className="border-b border-lp-line bg-lp-tint px-6 py-20">
           <div className="mx-auto grid max-w-6xl items-start gap-12 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
             <div>
               <Head
@@ -732,7 +824,7 @@ export function LandingPage() {
               <ul className="mt-8 flex flex-col gap-7">
                 {PREPARE.slice(0, 4).map(([name, note], i) => (
                   <li key={name} className="flex gap-4">
-                    <span className="mt-1 shrink-0" style={{ color: INK }}>
+                    <span className="mt-1 shrink-0" style={{ color: INK_TEXT }}>
                       <Icon
                         name={PREPARE_MARKS[i]!}
                         className="h-7 w-7"
@@ -740,7 +832,7 @@ export function LandingPage() {
                       />
                     </span>
                     <div className="min-w-0">
-                      <p className="oc-heading font-serif text-2xl leading-snug text-[#0f0f10]">
+                      <p className="oc-heading font-serif text-2xl leading-snug text-lp-ink">
                         {name}
                       </p>
                       <p className="mt-1.5 text-sm leading-relaxed">{note}</p>
@@ -748,11 +840,11 @@ export function LandingPage() {
                   </li>
                 ))}
               </ul>
-              {/* White, where every other instance of this box is `#f7f7fb`:
+              {/* White, where every other instance of this box is `var(--color-lp-tint-soft)`:
                   on the hero's tinted ground that fill has nowhere to stand
                   and the box stops reading as a box. */}
-              <p className="mt-7 rounded-xl border border-[#e0e0ea] bg-white p-4 text-sm leading-relaxed">
-                <strong className="text-[#0f0f10]">About the PDF.</strong> A
+              <p className="mt-7 rounded-xl border border-lp-edge bg-lp-ground p-4 text-sm leading-relaxed">
+                <strong className="text-lp-ink">About the PDF.</strong> A
                 clean interior file at your trim size with fonts embedded — not
                 a pre-press file. No bleed, no crop marks, no CMYK, because it
                 comes from your browser’s print engine.
@@ -810,7 +902,7 @@ export function LandingPage() {
           <ul className="mt-6 flex flex-col gap-3">
             {TRACK.slice(0, 4).map(([name, note]) => (
               <li key={name}>
-                <p className="oc-heading font-serif text-lg text-[#0f0f10]">{name}</p>
+                <p className="oc-heading font-serif text-lg text-lp-ink">{name}</p>
                 <p className="text-sm leading-relaxed">{note}</p>
               </li>
             ))}
@@ -823,7 +915,7 @@ export function LandingPage() {
             a tool that does not exist or miss one that does. Cards of two
             sizes, the way the reference mixes them, with the group that answers
             the most expensive question given the wide cell. */}
-        <section id="tools" className="border-b border-[#ececee] px-6 py-20">
+        <section id="tools" className="border-b border-lp-line px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="All of it included"
@@ -838,7 +930,7 @@ export function LandingPage() {
                   // "the parts a shop sees" is the question this audience
                   // arrives with, so it is the one that should be read first.
                   className={`rounded-2xl border p-6 ${
-                    i === 0 ? "text-[#c7d2fe] md:col-span-2" : "border-[#e6e6e8]"
+                    i === 0 ? "text-lp-accent-pale md:col-span-2" : "border-lp-edge"
                   }`}
                   style={
                     i === 0
@@ -848,7 +940,7 @@ export function LandingPage() {
                 >
                   <p
                     className={`oc-heading font-serif text-xl ${
-                      i === 0 ? "text-white" : "text-[#0f0f10]"
+                      i === 0 ? "text-lp-accent-ink" : "text-lp-ink"
                     }`}
                   >
                     {group.title}
@@ -860,8 +952,8 @@ export function LandingPage() {
                         key={tool.path}
                         className={`rounded-full border px-3 py-1 text-xs ${
                           i === 0
-                            ? "border-white/20 text-white"
-                            : "border-[#e2e2e5] text-[#0f0f10]"
+                            ? "border-lp-accent-ink/20 text-lp-accent-ink"
+                            : "border-lp-edge text-lp-ink"
                         }`}
                       >
                         {tool.name}
@@ -920,7 +1012,7 @@ export function LandingPage() {
             unfolds into stacked pairs and the hidden column header comes back
             per row. The alternative — a horizontally scrolling table on a
             phone — is the one thing on this page that would need explaining. */}
-        <section className="border-b border-[#ececee] bg-[#f7f7fb] px-6 py-20">
+        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Straight answer"
@@ -932,7 +1024,7 @@ export function LandingPage() {
                 <tr>
                   <th
                     scope="col"
-                    className="w-1/2 rounded-tl-2xl border-x border-t border-[#e6b0b0] bg-[#fdf2f2] px-7 pt-6 pb-4 align-bottom"
+                    className="w-1/2 rounded-tl-2xl border-x border-t border-stop-line bg-stop-bg px-7 pt-6 pb-4 align-bottom"
                   >
                     <span
                       className="font-code flex items-center gap-3 text-[0.9375rem] font-semibold tracking-[0.12em] uppercase"
@@ -948,7 +1040,7 @@ export function LandingPage() {
                   </th>
                   <th
                     scope="col"
-                    className="rounded-tr-2xl border-x border-t border-[#add2bb] bg-[#f1f8f3] px-7 pt-6 pb-4 align-bottom"
+                    className="rounded-tr-2xl border-x border-t border-ok-line bg-ok-bg px-7 pt-6 pb-4 align-bottom"
                   >
                     <span
                       className="font-code flex items-center gap-3 text-[0.9375rem] font-semibold tracking-[0.12em] uppercase"
@@ -970,9 +1062,9 @@ export function LandingPage() {
                   return (
                     <tr key={name} className="max-md:block max-md:pt-4">
                       <td
-                        className={`bg-[#fdf2f2] px-7 py-7 align-top max-md:block max-md:rounded-2xl max-md:border max-md:border-[#e6b0b0] md:border-x md:border-t md:border-x-[#e6b0b0] md:border-t-[#f5e2e2] ${
+                        className={`bg-stop-bg px-7 py-7 align-top max-md:block max-md:rounded-2xl max-md:border max-md:border-stop-line md:border-x md:border-t md:border-x-stop-line md:border-t-stop-line ${
                           last
-                            ? "md:rounded-bl-2xl md:border-b md:border-b-[#e6b0b0]"
+                            ? "md:rounded-bl-2xl md:border-b md:border-b-stop-line"
                             : ""
                         }`}
                       >
@@ -984,9 +1076,9 @@ export function LandingPage() {
                         />
                       </td>
                       <td
-                        className={`bg-[#f1f8f3] px-7 py-7 align-top max-md:mt-4 max-md:block max-md:rounded-2xl max-md:border max-md:border-[#add2bb] md:border-x md:border-t md:border-x-[#add2bb] md:border-t-[#dfeee4] ${
+                        className={`bg-ok-bg px-7 py-7 align-top max-md:mt-4 max-md:block max-md:rounded-2xl max-md:border max-md:border-ok-line md:border-x md:border-t md:border-x-ok-line md:border-t-ok-line ${
                           last
-                            ? "md:rounded-br-2xl md:border-b md:border-b-[#add2bb]"
+                            ? "md:rounded-br-2xl md:border-b md:border-b-ok-line"
                             : ""
                         }`}
                       >
@@ -1015,7 +1107,7 @@ export function LandingPage() {
         </section>
 
         {/* ---- Still to come -------------------------------------------- */}
-        <section className="border-b border-[#ececee] px-6 py-20">
+        <section className="border-b border-lp-line px-6 py-20">
           <div className="mx-auto max-w-5xl">
             <Head
               eyebrow="Not built yet"
@@ -1026,12 +1118,12 @@ export function LandingPage() {
               {LATER.map(([name, note]) => (
                 <div
                   key={name}
-                  className="rounded-2xl border border-dashed border-[#dcdce0] p-6"
+                  className="rounded-2xl border border-dashed border-lp-edge p-6"
                 >
-                  <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
+                  <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
                     Not built
                   </p>
-                  <p className="oc-heading mt-3 font-serif text-lg text-[#0f0f10]">
+                  <p className="oc-heading mt-3 font-serif text-lg text-lp-ink">
                     {name}
                   </p>
                   <p className="mt-2 text-sm leading-relaxed">{note}</p>
@@ -1043,7 +1135,7 @@ export function LandingPage() {
 
 
         {/* ---- FAQ ------------------------------------------------------ */}
-        <section className="border-b border-[#ececee] px-6 py-20">
+        <section className="border-b border-lp-line px-6 py-20">
           <div className="mx-auto max-w-4xl">
             <Head eyebrow="Questions" title="Reasonable suspicion, answered" />
             <div className="mt-12 flex flex-col">
@@ -1051,9 +1143,9 @@ export function LandingPage() {
                 <details
                   key={q}
                   open={i === 0}
-                  className="border-t border-[#e6e6e8] py-5 first:border-t-0 first:pt-0"
+                  className="border-t border-lp-edge py-5 first:border-t-0 first:pt-0"
                 >
-                  <summary className="oc-heading cursor-pointer font-serif text-lg text-[#0f0f10] marker:text-[#c8c8ce]">
+                  <summary className="oc-heading cursor-pointer font-serif text-lg text-lp-ink marker:text-[var(--color-lp-edge-strong)]">
                     {q}
                   </summary>
                   <p className="mt-3 leading-relaxed">{a}</p>
@@ -1066,12 +1158,12 @@ export function LandingPage() {
         {/* ---- Close ---------------------------------------------------- */}
         <section className="px-6 py-24 text-center" style={{ backgroundColor: INK }}>
           <div className="mx-auto max-w-2xl">
-            <h2 className="oc-heading font-serif text-4xl leading-tight text-white sm:text-5xl">
+            <h2 className="oc-heading font-serif text-4xl leading-tight text-lp-accent-ink sm:text-5xl">
               You have the book.
               <br />
               Take the order for free.
             </h2>
-            <p className="oc-lead mt-6 font-serif text-xl leading-relaxed text-[#c7d2fe]">
+            <p className="oc-lead mt-6 font-serif text-xl leading-relaxed text-lp-accent-pale">
               Import the manuscript you already have and the first screen tells
               you what stands between it and a shop. If any of it does not work,
               you have lost an afternoon.
@@ -1079,13 +1171,13 @@ export function LandingPage() {
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href="/signup"
-                className="rounded-full bg-white px-7 py-3.5 font-semibold text-[#0f0f10] hover:bg-[#e6e6e8]"
+                className="rounded-full bg-lp-ground px-7 py-3.5 font-semibold text-lp-ink hover:opacity-90"
               >
                 Start free
               </Link>
               <Link
                 href="/signin"
-                className="rounded-full border border-white/25 px-7 py-3.5 font-semibold text-white hover:border-white/50"
+                className="rounded-full border border-lp-accent-ink/25 px-7 py-3.5 font-semibold text-lp-accent-ink hover:border-lp-accent-ink/50"
               >
                 Log in
               </Link>
@@ -1095,7 +1187,7 @@ export function LandingPage() {
       </main>
 
       <footer className="px-6 py-10">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 font-code text-xs tracking-wider text-[#9a9aa2] uppercase">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 font-code text-xs tracking-wider text-lp-faint uppercase">
           <span>© {new Date().getFullYear()} OpenChapter</span>
           <span>Your manuscript stays in your browser</span>
         </div>
@@ -1117,10 +1209,10 @@ function Head({
 }) {
   return (
     <div className="max-w-2xl">
-      <p className="font-code text-[0.6875rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
+      <p className="font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
         {eyebrow}
       </p>
-      <h2 className="oc-heading mt-4 font-serif text-4xl leading-tight text-[#0f0f10] sm:text-[2.75rem]">
+      <h2 className="oc-heading mt-4 font-serif text-4xl leading-tight text-lp-ink sm:text-[2.75rem]">
         {title}
       </h2>
       {lead && (
@@ -1158,8 +1250,8 @@ function Split({
   return (
     <section
       {...(id ? { id } : {})}
-      className={`border-b border-[#ececee] px-6 py-20 ${
-        tint ? "bg-[#f7f7fb]" : ""
+      className={`border-b border-lp-line px-6 py-20 ${
+        tint ? "bg-lp-tint-soft" : ""
       }`}
     >
       <div className="mx-auto grid max-w-5xl items-center gap-12 md:grid-cols-2">
@@ -1207,7 +1299,7 @@ function Point({
         <Icon name={mark} className="h-[28px] w-[28px]" weight={2.3} />
       </span>
       <div>
-        <p className="oc-heading font-serif text-xl leading-snug text-[#0f0f10]">
+        <p className="oc-heading font-serif text-xl leading-snug text-lp-ink">
           {title}
         </p>
         <p className="mt-2 text-sm leading-relaxed">{note}</p>
@@ -1246,7 +1338,7 @@ function Counted({
       </span>
       <p
         className="oc-heading mt-3 font-serif text-4xl"
-        style={{ color: tone ?? "#0f0f10" }}
+        style={{ color: tone ?? "var(--color-lp-ink)" }}
       >
         {n}
       </p>
@@ -1275,33 +1367,48 @@ function Phase({
       className="rounded-2xl border p-7"
       style={
         lit
-          ? { borderColor: INK, backgroundColor: INK, color: "#c7d2fe" }
-          : { borderColor: "#e6e6e8", backgroundColor: "#fff" }
+          ? { borderColor: INK, backgroundColor: INK, color: "var(--color-lp-accent-pale)" }
+          : { borderColor: "var(--color-lp-edge)", backgroundColor: "var(--color-lp-ground)" }
       }
     >
       {/* The lit card is the brand indigo rather than black: it is the phase
           most readers are standing in, and indigo says "you are here" where
-          black said "this one is heavier than the others". */}
+          black said "this one is heavier than the others".
+
+          The tile behind the glyph is a wash of whatever it sits on — the ink
+          on the lit card, the accent on the unlit one — through `color-mix`
+          rather than an eight-digit hex. A hex carries its own alpha and a
+          token cannot: `var(--x)1f` is not a colour, it is a string with two
+          characters stuck on the end, and CSS drops the whole declaration
+          without saying so. */}
       <span
         className="flex h-10 w-10 items-center justify-center rounded-xl"
         style={
           lit
-            ? { backgroundColor: "#ffffff1f", color: "#fff" }
-            : { backgroundColor: `${INK}12`, color: INK }
+            ? {
+                backgroundColor:
+                  "color-mix(in srgb, var(--color-lp-accent-ink) 12%, transparent)",
+                color: "var(--color-lp-accent-ink)",
+              }
+            : {
+                backgroundColor:
+                  "color-mix(in srgb, var(--color-lp-accent) 7%, transparent)",
+                color: INK_TEXT,
+              }
         }
       >
         <Icon name={icon} className="h-5 w-5" />
       </span>
       <p
         className={`mt-5 font-code text-xs tracking-[0.18em] uppercase ${
-          lit ? "text-white/60" : "text-[#9a9aa2]"
+          lit ? "text-lp-accent-ink/60" : "text-lp-faint"
         }`}
       >
         {n}
       </p>
       <p
         className={`oc-heading mt-4 font-serif text-2xl ${
-          lit ? "text-white" : "text-[#0f0f10]"
+          lit ? "text-lp-accent-ink" : "text-lp-ink"
         }`}
       >
         {title}
@@ -1309,7 +1416,7 @@ function Phase({
       <p className="oc-lead mt-2 font-serif text-lg leading-relaxed">{note}</p>
       <p
         className={`mt-5 font-code text-xs tracking-wider uppercase ${
-          lit ? "text-white/60" : "text-[#9a9aa2]"
+          lit ? "text-lp-accent-ink/60" : "text-lp-faint"
         }`}
       >
         {items} things it does
@@ -1327,112 +1434,11 @@ function Phase({
  * does, so they can only go wrong if the product does.
  * ------------------------------------------------------------------------- */
 
-/** The Overview, cropped by the fold. */
-function DashboardFigure() {
-  return (
-    <div className="mx-auto mt-16 max-w-5xl" aria-hidden="true">
-      <div className="rounded-t-2xl border-x border-t border-[#e6e6e8] bg-white p-2 shadow-[0_-24px_60px_-30px_rgba(15,15,16,0.25)]">
-        <div className="flex gap-px overflow-hidden rounded-t-xl bg-[#ececee]">
-          <div className="hidden w-44 shrink-0 flex-col gap-1 bg-white p-4 sm:flex">
-            <span className="mb-3 font-serif text-sm text-[#0f0f10]">
-              OpenChapter
-            </span>
-            {["Overview", "Write", "Prepare", "Track", "Tools"].map(
-              (item, i) => (
-                <span
-                  key={item}
-                  className={`rounded-md px-2.5 py-1.5 text-xs ${
-                    i === 0
-                      ? "bg-[#f1f1f3] font-medium text-[#0f0f10]"
-                      : "text-[#9a9aa2]"
-                  }`}
-                >
-                  {item}
-                </span>
-              ),
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1 bg-white p-5 sm:p-6">
-            <p className="font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
-              Getting it ready
-            </p>
-            <p className="oc-heading mt-1.5 font-serif text-xl text-[#0f0f10]">
-              The Drowned Coast
-            </p>
-            <p className="mt-3 text-sm">
-              <span className="font-semibold text-[#0f0f10]">2 things</span>{" "}
-              would stop a shop taking this · 3 worth doing
-            </p>
-
-            <div className="mt-4 flex flex-col gap-2">
-              {[
-                [
-                  "No cover.",
-                  "It is the only thing most readers ever see.",
-                  "Add a cover",
-                ],
-                [
-                  "No blurb.",
-                  "The text under the cover is what decides the sale.",
-                  "Work on the blurb",
-                ],
-              ].map(([title, why, action]) => (
-                <div
-                  key={title}
-                  className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-[#e6e6e8] bg-[#f7f7fb] px-3.5 py-3"
-                >
-                  <span className="min-w-[10rem] flex-1">
-                    <span className="block text-sm font-semibold text-[#0f0f10]">
-                      {title}
-                    </span>
-                    <span className="block text-sm">{why}</span>
-                  </span>
-                  <span
-                    className="shrink-0 rounded-md px-3 py-1.5 text-xs font-semibold text-white"
-                    style={{ backgroundColor: INK }}
-                  >
-                    {action}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 flex items-center gap-2 border-t border-[#ececee] pt-4">
-              {PHASES.map((phase, i) => (
-                <span key={phase.id} className="flex flex-1 items-center gap-2">
-                  {/* Filled = done, ringed = where the book is, hollow = ahead.
-                      Three states from one shape and one colour, which is what
-                      the real dials do — a second hue here would imply a
-                      severity that a phase does not have. */}
-                  <span
-                    className="h-4 w-4 shrink-0 rounded-full border-2"
-                    style={{
-                      borderColor: i <= 2 ? INK : "#dcdce0",
-                      backgroundColor: i < 2 ? INK : "transparent",
-                    }}
-                  />
-                  {i < PHASES.length - 1 && (
-                    <span className="h-px flex-1 bg-[#ececee]" />
-                  )}
-                </span>
-              ))}
-            </div>
-            <p className="mt-3 font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
-              Next · {ARC_STEP.title}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /** The five phases, with the ARC step marked where it actually sits. */
 function OrderFigure() {
   return (
     <div
-      className="rounded-2xl border border-[#e6e6e8] bg-white p-7"
+      className="rounded-2xl border border-lp-edge bg-lp-ground p-7"
       aria-hidden="true"
     >
       <ol className="flex flex-col">
@@ -1441,15 +1447,15 @@ function OrderFigure() {
           return (
             <li
               key={phase.id}
-              className="flex gap-4 border-t border-[#f1f1f3] py-4 first:border-t-0 first:pt-0"
+              className="flex gap-4 border-t border-[var(--color-lp-raised)] py-4 first:border-t-0 first:pt-0"
             >
-              <span className="font-code text-xs text-[#c0c0c6]">
+              <span className="font-code text-xs text-[var(--color-lp-edge-strong)]">
                 {String(i + 1).padStart(2, "0")}
               </span>
               <span className="min-w-0">
                 <span
                   className={`block font-serif text-lg ${
-                    here ? "text-[#0f0f10]" : "text-[#5b5b63]"
+                    here ? "text-lp-ink" : "text-lp-body"
                   }`}
                 >
                   {phase.label}
@@ -1459,7 +1465,7 @@ function OrderFigure() {
                   // arguing about, and the brand colour is what every other
                   // "here is the answer" on the page is set in.
                   <span
-                    className="mt-2 block rounded-lg px-3 py-2 text-xs font-semibold text-white"
+                    className="mt-2 block rounded-lg px-3 py-2 text-xs font-semibold text-lp-accent-ink"
                     style={{ backgroundColor: INK }}
                   >
                     {ARC_STEP.title}
@@ -1482,12 +1488,12 @@ function OrderFigure() {
 function MoneyFigure() {
   return (
     <div
-      className="rounded-2xl border border-[#e6e6e8] bg-white p-7"
+      className="rounded-2xl border border-lp-edge bg-lp-ground p-7"
       aria-hidden="true"
     >
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl bg-[#f7f7fb] p-4">
-          <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
+        <div className="rounded-xl bg-lp-tint-soft p-4">
+          <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
             Spent
           </p>
           <p className="oc-heading mt-2 font-serif text-2xl" style={{ color: STOP }}>
@@ -1495,8 +1501,8 @@ function MoneyFigure() {
           </p>
           <p className="mt-1 text-xs">Cover · editing · ads · proofs</p>
         </div>
-        <div className="rounded-xl bg-[#f7f7fb] p-4">
-          <p className="font-code text-[0.625rem] tracking-[0.16em] text-[#9a9aa2] uppercase">
+        <div className="rounded-xl bg-lp-tint-soft p-4">
+          <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
             Earned
           </p>
           <p className="oc-heading mt-2 font-serif text-2xl" style={{ color: PASS }}>
@@ -1505,8 +1511,8 @@ function MoneyFigure() {
           <p className="mt-1 text-xs">From your own sales report</p>
         </div>
       </div>
-      <div className="mt-4 rounded-xl border border-[#e6e6e8] p-4">
-        <p className="text-sm text-[#0f0f10]">
+      <div className="mt-4 rounded-xl border border-lp-edge p-4">
+        <p className="text-sm text-lp-ink">
           <strong>412 more copies</strong> gets you level.
         </p>
         <p className="mt-1 text-xs leading-relaxed">

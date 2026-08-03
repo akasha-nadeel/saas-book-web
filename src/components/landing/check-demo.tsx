@@ -304,7 +304,7 @@ const PATHS = {
 function Ico({
   name,
   size = 13,
-  color = "#5b5b63",
+  color = "var(--color-lp-body)",
   sw = 1.7,
 }: {
   name: keyof typeof PATHS;
@@ -392,12 +392,12 @@ function NavRow({
         borderRadius: 7,
       }}
     >
-      <Ico name={icon} size={13} color={on ? "#312e81" : "#5b5b63"} />
+      <Ico name={icon} size={13} color={on ? "var(--color-lp-accent)" : "var(--color-lp-body)"} />
       <span
         style={{
           fontSize: 11,
           fontWeight: on ? 600 : 500,
-          color: on ? "#312e81" : "#45454d",
+          color: on ? "var(--color-lp-accent)" : "var(--color-lp-soft)",
           whiteSpace: "nowrap",
         }}
       >
@@ -410,9 +410,9 @@ function NavRow({
             fontSize: 7,
             fontWeight: 700,
             letterSpacing: "0.06em",
-            color: "#8a8a92",
-            background: "#eeeef5",
-            border: "1px solid #e2e2e5",
+            color: "var(--color-lp-faint)",
+            background: "var(--color-lp-tint)",
+            border: "1px solid var(--color-lp-edge)",
             borderRadius: 4,
             padding: "2px 4px",
             lineHeight: 1,
@@ -426,7 +426,7 @@ function NavRow({
 }
 
 function Divider() {
-  return <div style={{ height: 1, background: "#e2e2e5", margin: "0 14px" }} />;
+  return <div style={{ height: 1, background: "var(--color-lp-edge)", margin: "0 14px" }} />;
 }
 
 /* ------------------------------ phase rail ------------------------------ */
@@ -434,21 +434,21 @@ function Ring({ pct, lit }: { pct: number; lit?: boolean }) {
   const c = 2 * Math.PI * 8.2;
   return (
     <svg viewBox="0 0 22 22" width={20} height={20} style={{ display: "block" }}>
-      <circle cx="11" cy="11" r="8.2" fill="none" stroke="#e2e2e5" strokeWidth="2" />
+      <circle cx="11" cy="11" r="8.2" fill="none" stroke="var(--color-lp-edge)" strokeWidth="2" />
       {pct > 0 ? (
         <circle
           cx="11"
           cy="11"
           r="8.2"
           fill="none"
-          stroke="#312e81"
+          stroke="var(--color-lp-accent-text)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeDasharray={c * pct + " " + c}
           transform="rotate(-90 11 11)"
         />
       ) : null}
-      {lit ? <circle cx="11" cy="11" r="2.4" fill="#312e81" opacity=".18" /> : null}
+      {lit ? <circle cx="11" cy="11" r="2.4" fill="var(--color-lp-accent-text)" opacity=".18" /> : null}
     </svg>
   );
 }
@@ -481,7 +481,7 @@ function PhaseRail() {
               left: "calc(" + (i + 0.5) * 20 + "% + 14px)",
               width: "calc(20% - 28px)",
               height: 1,
-              background: "#e2e2e5",
+              background: "var(--color-lp-edge)",
             }}
           />
         ))}
@@ -502,7 +502,7 @@ function PhaseRail() {
               style={{
                 fontSize: 9.5,
                 fontWeight: s.lit ? 600 : 500,
-                color: s.lit ? "#0f0f10" : "#8a8a92",
+                color: s.lit ? "var(--color-lp-ink)" : "var(--color-lp-faint)",
                 whiteSpace: "nowrap",
               }}
             >
@@ -526,14 +526,14 @@ function Chip({ icon, label }: { icon: keyof typeof PATHS; label: string }) {
         gap: 6,
         padding: "0 10px",
         borderRadius: 7,
-        background: "#ffffff",
-        border: "1px solid #e2e2e5",
+        background: "var(--color-lp-ground)",
+        border: "1px solid var(--color-lp-edge)",
         boxShadow: "0 1px 1px rgba(15,15,16,.03)",
       }}
     >
-      <Ico name={icon} size={12} color="#5b5b63" />
+      <Ico name={icon} size={12} color="var(--color-lp-body)" />
       <span
-        style={{ fontSize: 10.5, fontWeight: 500, color: "#0f0f10", whiteSpace: "nowrap" }}
+        style={{ fontSize: 10.5, fontWeight: 500, color: "var(--color-lp-ink)", whiteSpace: "nowrap" }}
       >
         {label}
       </span>
@@ -548,9 +548,9 @@ function Stat({ tone, label }: { tone: "red" | "amber"; label: string }) {
       style={{
         fontSize: 9.5,
         fontWeight: 700,
-        color: red ? "#b91c1c" : "#b45309",
-        background: red ? "#fef2f2" : "#fffbeb",
-        border: "1px solid " + (red ? "#fecaca" : "#fde68a"),
+        color: red ? "var(--color-stop-fg)" : "var(--color-note-fg)",
+        background: red ? "var(--color-stop-bg)" : "var(--color-note-bg)",
+        border: "1px solid " + (red ? "var(--color-stop-line)" : "var(--color-note-line)"),
         borderRadius: 6,
         padding: "4px 7px",
         whiteSpace: "nowrap",
@@ -577,22 +577,22 @@ function OverviewPanel() {
         style={{
           fontSize: 21,
           fontWeight: 700,
-          color: "#0f0f10",
+          color: "var(--color-lp-ink)",
           letterSpacing: "-0.015em",
           lineHeight: 1,
         }}
       >
         Overview
       </div>
-      <div style={{ marginTop: 9, fontSize: 11, color: "#5b5b63" }}>
+      <div style={{ marginTop: 9, fontSize: 11, color: "var(--color-lp-body)" }}>
         What stands between your book and a shop, and what to do about it.
       </div>
 
       <div
         style={{
           marginTop: 14,
-          background: "#ffffff",
-          border: "1px solid #e2e2e5",
+          background: "var(--color-lp-ground)",
+          border: "1px solid var(--color-lp-edge)",
           borderRadius: 10,
           boxShadow: "0 1px 2px rgba(15,15,16,.04)",
         }}
@@ -609,7 +609,7 @@ function OverviewPanel() {
                     fontSize: 8.5,
                     fontWeight: 700,
                     letterSpacing: "0.09em",
-                    color: "#8a8a92",
+                    color: "var(--color-lp-faint)",
                   }}
                 >
                   DRAFTING
@@ -619,13 +619,13 @@ function OverviewPanel() {
                     marginTop: 5,
                     fontSize: 16.5,
                     fontWeight: 700,
-                    color: "#0f0f10",
+                    color: "var(--color-lp-ink)",
                     letterSpacing: "-0.015em",
                   }}
                 >
                   The Salt Road
                 </div>
-                <div style={{ marginTop: 5, fontSize: 10.5, color: "#8a8a92" }}>
+                <div style={{ marginTop: 5, fontSize: 10.5, color: "var(--color-lp-faint)" }}>
                   1 chapter · 0 words · opened 3 minutes ago
                 </div>
               </div>
@@ -641,10 +641,10 @@ function OverviewPanel() {
                 justifyContent: "space-between",
               }}
             >
-              <span style={{ fontSize: 10.5, fontWeight: 700, color: "#0f0f10" }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "var(--color-lp-ink)" }}>
                 0% of target
               </span>
-              <span style={{ fontSize: 10.5, color: "#8a8a92" }}>0 of 10,000</span>
+              <span style={{ fontSize: 10.5, color: "var(--color-lp-faint)" }}>0 of 10,000</span>
             </div>
             <div
               style={{
@@ -652,7 +652,7 @@ function OverviewPanel() {
                 maxWidth: 362,
                 height: 4,
                 borderRadius: 2,
-                background: "#e2e2e5",
+                background: "var(--color-lp-edge)",
               }}
             />
 
@@ -669,19 +669,19 @@ function OverviewPanel() {
                   justifyContent: "center",
                   gap: 2.5,
                   borderRadius: 7,
-                  background: "#ffffff",
-                  border: "1px solid #e2e2e5",
+                  background: "var(--color-lp-ground)",
+                  border: "1px solid var(--color-lp-edge)",
                 }}
               >
-                <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "#5b5b63" }} />
-                <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "#5b5b63" }} />
-                <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "#5b5b63" }} />
+                <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "var(--color-lp-body)" }} />
+                <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "var(--color-lp-body)" }} />
+                <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "var(--color-lp-body)" }} />
               </div>
             </div>
           </div>
         </div>
 
-        <div style={{ height: 1, background: "#e2e2e5" }} />
+        <div style={{ height: 1, background: "var(--color-lp-edge)" }} />
         <PhaseRail />
 
         <div style={{ padding: "0 14px 14px" }}>
@@ -693,7 +693,7 @@ function OverviewPanel() {
               gap: 12,
               padding: "0 8px 0 14px",
               borderRadius: 8,
-              background: "#eeeef5",
+              background: "var(--color-lp-tint)",
             }}
           >
             <span
@@ -701,12 +701,12 @@ function OverviewPanel() {
                 fontSize: 8.5,
                 fontWeight: 700,
                 letterSpacing: "0.1em",
-                color: "#5b5b63",
+                color: "var(--color-lp-body)",
               }}
             >
               NEXT
             </span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#0f0f10" }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "var(--color-lp-ink)" }}>
               Start the draft
             </span>
             <span style={{ flex: "1 1 auto" }} />
@@ -718,29 +718,29 @@ function OverviewPanel() {
                 gap: 6,
                 padding: "0 10px",
                 borderRadius: 6,
-                background: "#312e81",
+                background: "var(--color-lp-accent)",
               }}
             >
-              <span style={{ fontSize: 10, fontWeight: 700, color: "#ffffff" }}>Do this</span>
-              <Ico name="arrow" size={11} color="#ffffff" sw={2} />
+              <span style={{ fontSize: 10, fontWeight: 700, color: "var(--color-lp-accent-ink)" }}>Do this</span>
+              <Ico name="arrow" size={11} color="var(--color-lp-accent-ink)" sw={2} />
             </span>
-            <span style={{ fontSize: 9.5, color: "#8a8a92" }}>1 of 18</span>
+            <span style={{ fontSize: 9.5, color: "var(--color-lp-faint)" }}>1 of 18</span>
           </div>
         </div>
 
-        <div style={{ height: 1, background: "#e2e2e5" }} />
+        <div style={{ height: 1, background: "var(--color-lp-edge)" }} />
         <div style={{ padding: "12px 14px 0" }}>
           <div
             style={{
               fontSize: 8.5,
               fontWeight: 700,
               letterSpacing: "0.09em",
-              color: "#8a8a92",
+              color: "var(--color-lp-faint)",
             }}
           >
             GET IT OUT
           </div>
-          <div style={{ marginTop: 6, fontSize: 10.5, color: "#5b5b63" }}>
+          <div style={{ marginTop: 6, fontSize: 10.5, color: "var(--color-lp-body)" }}>
             The parts a shop sees.
           </div>
           <div style={{ marginTop: 10, display: "flex", gap: 12 }}>
@@ -751,8 +751,8 @@ function OverviewPanel() {
                   flex: "1 1 0",
                   height: 58,
                   borderRadius: 8,
-                  background: "#f4f4f5",
-                  border: "1px solid #e2e2e5",
+                  background: "var(--color-lp-raised)",
+                  border: "1px solid var(--color-lp-edge)",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
@@ -761,9 +761,9 @@ function OverviewPanel() {
                 }}
               >
                 <span
-                  style={{ width: 16, height: 16, borderRadius: 8, border: "1.6px solid #d6d6da" }}
+                  style={{ width: 16, height: 16, borderRadius: 8, border: "1.6px solid var(--color-lp-edge)" }}
                 />
-                <span style={{ fontSize: 9.5, fontWeight: 500, color: "#8a8a92" }}>{t}</span>
+                <span style={{ fontSize: 9.5, fontWeight: 500, color: "var(--color-lp-faint)" }}>{t}</span>
               </div>
             ))}
           </div>
@@ -806,7 +806,7 @@ function BookRow({
         gap: 11,
         padding: "9px 10px",
         borderRadius: open ? "8px 8px 0 0" : 8,
-        background: "#f4f4f5",
+        background: "var(--color-lp-raised)",
       }}
     >
       <Cover kind={kind} w={26} />
@@ -815,13 +815,13 @@ function BookRow({
           style={{
             fontSize: 11.5,
             fontWeight: 700,
-            color: "#0f0f10",
+            color: "var(--color-lp-ink)",
             letterSpacing: "-0.01em",
           }}
         >
           {title}
         </div>
-        <div style={{ marginTop: 4, fontSize: 10, color: "#5b5b63" }}>{note}</div>
+        <div style={{ marginTop: 4, fontSize: 10, color: "var(--color-lp-body)" }}>{note}</div>
       </div>
       <span data-cam={marked ? "badge" : undefined} style={{ display: "block", flex: "0 0 auto" }}>
         <Stat tone={tone} label={badge} />
@@ -846,12 +846,12 @@ function BookRow({
             position: "absolute",
             inset: 0,
             borderRadius: 10,
-            background: "#dedee4",
+            background: "var(--color-lp-edge)",
             opacity: 0,
           }}
         />
         <span style={{ position: "relative" }}>
-          <Ico name="chev" size={13} color="#8a8a92" sw={2} />
+          <Ico name="chev" size={13} color="var(--color-lp-faint)" sw={2} />
         </span>
       </span>
     </div>
@@ -872,7 +872,18 @@ function Finding({
   innerRef?: (el: HTMLDivElement | null) => void;
 }) {
   const red = tone === "red";
-  const ink = red ? "#b91c1c" : "#b45309";
+  /*
+   * A status is two tokens, not one, and which is which decides legibility.
+   *
+   * `-fg` is the *text* colour and crosses over between the themes: #b91c1c
+   * reads on white and disappears on black, so the dark set answers with a
+   * light red. `-solid` is the *fill*, and keeps one value in both, because a
+   * block carrying white text has the same job whatever is behind it. Using
+   * the text colour as a fill gives a pale block with white on it at night,
+   * which is the failure this pair exists to prevent.
+   */
+  const ink = red ? "var(--color-stop-fg)" : "var(--color-note-fg)";
+  const fill = red ? "var(--color-stop-solid)" : "var(--color-note-solid)";
   return (
     <div
       ref={innerRef}
@@ -883,8 +894,8 @@ function Finding({
         gap: 10,
         padding: "5px 5px 5px 8px",
         borderRadius: 8,
-        background: red ? "#fef2f2" : "#fffbeb",
-        border: "1px solid " + (red ? "#fecaca" : "#fde68a"),
+        background: red ? "var(--color-stop-bg)" : "var(--color-note-bg)",
+        border: "1px solid " + (red ? "var(--color-stop-line)" : "var(--color-note-line)"),
         willChange: "transform, opacity",
       }}
     >
@@ -893,14 +904,14 @@ function Finding({
           width: 15,
           height: 15,
           borderRadius: 4,
-          background: ink,
+          background: fill,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flex: "0 0 auto",
         }}
       >
-        <Ico name={red ? "x" : "bang"} size={10} color="#ffffff" sw={2.6} />
+        <Ico name={red ? "x" : "bang"} size={10} color="var(--color-lp-accent-ink)" sw={2.6} />
       </span>
       <span
         style={{
@@ -924,16 +935,16 @@ function Finding({
           gap: 6,
           padding: "0 9px",
           borderRadius: 6,
-          background: ink,
+          background: fill,
           flex: "0 0 auto",
         }}
       >
         <span
-          style={{ fontSize: 10, fontWeight: 700, color: "#ffffff", whiteSpace: "nowrap" }}
+          style={{ fontSize: 10, fontWeight: 700, color: "var(--color-lp-accent-ink)", whiteSpace: "nowrap" }}
         >
           {action}
         </span>
-        <Ico name="arrow" size={11} color="#ffffff" sw={2} />
+        <Ico name="arrow" size={11} color="var(--color-lp-accent-ink)" sw={2} />
       </span>
     </div>
   );
@@ -968,28 +979,28 @@ function PreparePanel({
           style={{
             fontSize: 21,
             fontWeight: 700,
-            color: "#0f0f10",
+            color: "var(--color-lp-ink)",
             letterSpacing: "-0.015em",
             lineHeight: 1,
           }}
         >
           Prepare
         </div>
-        <div style={{ marginTop: 9, fontSize: 11, color: "#5b5b63" }}>
+        <div style={{ marginTop: 9, fontSize: 11, color: "var(--color-lp-body)" }}>
           Get it out without paying to find out what was wrong.
         </div>
 
         <div
           style={{
             marginTop: 14,
-            background: "#ffffff",
-            border: "1px solid #e2e2e5",
+            background: "var(--color-lp-ground)",
+            border: "1px solid var(--color-lp-edge)",
             borderRadius: 10,
             padding: "13px 14px 14px",
             boxShadow: "0 1px 2px rgba(15,15,16,.04)",
           }}
         >
-          <div style={{ fontSize: 11.5, color: "#0f0f10" }}>
+          <div style={{ fontSize: 11.5, color: "var(--color-lp-ink)" }}>
             <span style={{ fontWeight: 700 }}>1 of 2</span> books have their listing details
             in order.
           </div>
@@ -998,7 +1009,7 @@ function PreparePanel({
               marginTop: 7,
               fontSize: 10.5,
               lineHeight: 1.5,
-              color: "#5b5b63",
+              color: "var(--color-lp-body)",
               maxWidth: 520,
             }}
           >
@@ -1010,8 +1021,8 @@ function PreparePanel({
         <div
           style={{
             marginTop: 12,
-            background: "#ffffff",
-            border: "1px solid #e2e2e5",
+            background: "var(--color-lp-ground)",
+            border: "1px solid var(--color-lp-edge)",
             borderRadius: 10,
             padding: "13px 14px 14px",
             boxShadow: "0 1px 2px rgba(15,15,16,.04)",
@@ -1021,7 +1032,7 @@ function PreparePanel({
             style={{
               fontSize: 13,
               fontWeight: 700,
-              color: "#0f0f10",
+              color: "var(--color-lp-ink)",
               letterSpacing: "-0.01em",
             }}
           >
@@ -1032,7 +1043,7 @@ function PreparePanel({
               marginTop: 7,
               fontSize: 10.5,
               lineHeight: 1.5,
-              color: "#5b5b63",
+              color: "var(--color-lp-body)",
               maxWidth: 520,
             }}
           >
@@ -1063,7 +1074,7 @@ function PreparePanel({
               {open ? (
                 <div
                   style={{
-                    background: "#f4f4f5",
+                    background: "var(--color-lp-raised)",
                     borderRadius: "0 0 8px 8px",
                     padding: "4px 12px 12px",
                     display: "flex",
@@ -1084,10 +1095,10 @@ function PreparePanel({
                   <div
                     style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}
                   >
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#312e81" }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-lp-accent)" }}>
                       Check and export this book
                     </span>
-                    <Ico name="arrow" size={12} color="#312e81" sw={2} />
+                    <Ico name="arrow" size={12} color="var(--color-lp-accent-text)" sw={2} />
                   </div>
                 </div>
               ) : null}
@@ -1415,8 +1426,8 @@ export function CheckDemo() {
       ref={hostRef}
       role="img"
       aria-label={LABEL}
-      className="rounded-[1.1rem] border border-[#b9b9c4] bg-[#e2e2e8] p-3 select-none
-                 shadow-[0_2px_0_#b9b9c4,0_10px_18px_-8px_rgba(15,15,16,0.30),0_30px_46px_-18px_rgba(15,15,16,0.55)]"
+      className="rounded-[1.1rem] border border-lp-device-edge bg-lp-device p-3 select-none
+                 shadow-[0_2px_0_var(--color-lp-device-edge),0_10px_18px_-8px_rgba(15,15,16,0.30),0_30px_46px_-18px_rgba(15,15,16,0.55)]"
     >
       {/* The screen carries its own hairline: bezel and screen are both pale,
           and without it the glass has no edge. */}
@@ -1424,7 +1435,7 @@ export function CheckDemo() {
         ref={screenRef}
         aria-hidden="true"
         style={{ aspectRatio: `${W} / ${H}` }}
-        className="relative overflow-hidden rounded-[0.55rem] border border-[#d8d8de] bg-white"
+        className="relative overflow-hidden rounded-[0.55rem] border border-lp-edge bg-lp-ground"
       >
         <div
           ref={stageRef}
@@ -1437,7 +1448,7 @@ export function CheckDemo() {
             transformOrigin: "0 0",
             fontSize: 12,
             lineHeight: 1.35,
-            color: "#0f0f10",
+            color: "var(--color-lp-ink)",
           }}
         >
           <div
@@ -1460,8 +1471,8 @@ export function CheckDemo() {
                 left: 0,
                 width: 148,
                 height: H,
-                background: "#ffffff",
-                borderRight: "1px solid #e2e2e5",
+                background: "var(--color-lp-ground)",
+                borderRight: "1px solid var(--color-lp-edge)",
                 display: "flex",
                 flexDirection: "column",
               }}
@@ -1474,10 +1485,11 @@ export function CheckDemo() {
                   letterSpacing: "-0.02em",
                 }}
               >
-                <span style={{ color: "#17171a" }}>Open</span>
-                {/* The wordmark's own indigo, stated literally: this page is
-                    always light, where the token turns white at night. */}
-                <span style={{ color: "#423ead" }}>Chapter</span>
+                <span style={{ color: "var(--color-lp-ink)" }}>Open</span>
+                {/* The landing page's wordmark, not the app's — this is a
+                    drawing of the product on a marketing page, and it has to
+                    match the mark in the header a few inches above it. */}
+                <span style={{ color: "var(--color-lp-wordmark)" }}>Chapter</span>
               </div>
 
               <div data-cam="nav" style={{ position: "relative", padding: "8px 8px 0" }}>
@@ -1490,7 +1502,7 @@ export function CheckDemo() {
                     right: 8,
                     height: 25,
                     borderRadius: 7,
-                    background: "#eeeef5",
+                    background: "var(--color-lp-tint)",
                     transform: "translate3d(0," + sel0 + "px,0)",
                   }}
                 />
@@ -1503,7 +1515,7 @@ export function CheckDemo() {
                     right: 8,
                     height: 25,
                     borderRadius: 7,
-                    background: "#f4f4f5",
+                    background: "var(--color-lp-raised)",
                     opacity: 0,
                   }}
                 />
@@ -1583,8 +1595,8 @@ export function CheckDemo() {
                     width: 22,
                     height: 22,
                     borderRadius: 11,
-                    background: "#d9d9e3",
-                    color: "#4b4b57",
+                    background: "var(--color-lp-edge)",
+                    color: "var(--color-lp-soft)",
                     fontSize: 10,
                     fontWeight: 600,
                     display: "flex",
@@ -1603,7 +1615,7 @@ export function CheckDemo() {
                       display: "block",
                       fontSize: 10,
                       fontWeight: 600,
-                      color: "#0f0f10",
+                      color: "var(--color-lp-ink)",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -1611,12 +1623,12 @@ export function CheckDemo() {
                   >
                     Elena Rosa
                   </span>
-                  <span style={{ display: "block", fontSize: 9, color: "#8a8a92" }}>Pro plan</span>
+                  <span style={{ display: "block", fontSize: 9, color: "var(--color-lp-faint)" }}>Pro plan</span>
                 </span>
                 <span style={{ display: "flex", gap: 2 }}>
-                  <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "#8a8a92" }} />
-                  <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "#8a8a92" }} />
-                  <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "#8a8a92" }} />
+                  <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "var(--color-lp-faint)" }} />
+                  <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "var(--color-lp-faint)" }} />
+                  <span style={{ width: 2.5, height: 2.5, borderRadius: 2, background: "var(--color-lp-faint)" }} />
                 </span>
               </div>
             </div>
@@ -1629,8 +1641,8 @@ export function CheckDemo() {
                 left: 148,
                 width: W - 148,
                 height: 42,
-                background: "#ffffff",
-                borderBottom: "1px solid #e2e2e5",
+                background: "var(--color-lp-ground)",
+                borderBottom: "1px solid var(--color-lp-edge)",
                 display: "flex",
                 alignItems: "center",
                 padding: "0 14px 0 16px",
@@ -1642,16 +1654,16 @@ export function CheckDemo() {
                   width: 250,
                   height: 23,
                   borderRadius: 7,
-                  background: "#f4f4f5",
-                  border: "1px solid #e2e2e5",
+                  background: "var(--color-lp-raised)",
+                  border: "1px solid var(--color-lp-edge)",
                   display: "flex",
                   alignItems: "center",
                   gap: 7,
                   padding: "0 6px 0 8px",
                 }}
               >
-                <Ico name="search" size={11} color="#8a8a92" />
-                <span style={{ flex: "1 1 auto", fontSize: 10.5, color: "#8a8a92" }}>
+                <Ico name="search" size={11} color="var(--color-lp-faint)" />
+                <span style={{ flex: "1 1 auto", fontSize: 10.5, color: "var(--color-lp-faint)" }}>
                   Search your books
                 </span>
                 <span
@@ -1659,10 +1671,10 @@ export function CheckDemo() {
                     width: 13,
                     height: 13,
                     borderRadius: 3,
-                    background: "#eeeef5",
-                    border: "1px solid #e2e2e5",
+                    background: "var(--color-lp-tint)",
+                    border: "1px solid var(--color-lp-edge)",
                     fontSize: 8,
-                    color: "#8a8a92",
+                    color: "var(--color-lp-faint)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -1678,19 +1690,19 @@ export function CheckDemo() {
                   display: "flex",
                   alignItems: "center",
                   borderRadius: 7,
-                  background: "#312e81",
+                  background: "var(--color-lp-accent)",
                   overflow: "hidden",
                 }}
               >
                 <span
                   style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 10px" }}
                 >
-                  <Ico name="plus" size={11} color="#ffffff" sw={2.2} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "#ffffff" }}>New book</span>
+                  <Ico name="plus" size={11} color="var(--color-lp-accent-ink)" sw={2.2} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--color-lp-accent-ink)" }}>New book</span>
                 </span>
                 <span style={{ width: 1, height: 24, background: "rgba(255,255,255,.24)" }} />
                 <span style={{ display: "flex", alignItems: "center", padding: "0 6px" }}>
-                  <Ico name="caret" size={11} color="#ffffff" sw={2.2} />
+                  <Ico name="caret" size={11} color="var(--color-lp-ground)" sw={2.2} />
                 </span>
               </div>
             </div>
@@ -1703,7 +1715,7 @@ export function CheckDemo() {
                 left: 148,
                 width: W - 148,
                 height: H - 42,
-                background: "#f4f4f5",
+                background: "var(--color-lp-raised)",
                 overflow: "hidden",
               }}
             >
@@ -1762,7 +1774,7 @@ export function CheckDemo() {
               width: 44,
               height: 44,
               borderRadius: 22,
-              border: "2px solid #312e81",
+              border: "2px solid var(--color-lp-accent)",
               opacity: 0,
               willChange: "transform, opacity",
             }}
@@ -1788,8 +1800,8 @@ export function CheckDemo() {
             >
               <path
                 d="M3 1.8L3 19.4L7.6 15.1L10.4 21.4L13.3 20.1L10.6 14L16.7 13.6Z"
-                fill="#0f0f10"
-                stroke="#ffffff"
+                fill="var(--color-lp-ink)"
+                stroke="var(--color-lp-ground)"
                 strokeWidth="1.4"
                 strokeLinejoin="round"
               />

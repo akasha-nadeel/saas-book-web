@@ -621,6 +621,12 @@ export interface BookSetup {
   author?: string;
   /** A data URL. Stored at its own key, not in the shelf — see COVER_PREFIX. */
   cover?: string;
+  /**
+   * Listing details a file arrived with. Only import fills this in: a book made
+   * at `/book/new` has nothing to say about ISBNs yet, and asking would be four
+   * more fields between a writer and their first sentence.
+   */
+  publishing?: PublishingMeta;
 }
 
 /**
@@ -650,6 +656,7 @@ export function createBook(
     ...(setup?.kind ? { kind: setup.kind } : {}),
     ...(setup?.genre ? { genre: setup.genre } : {}),
     ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
+    ...(setup?.publishing ? { publishing: setup.publishing } : {}),
     chapters: [{ id: chapterId, title: "Chapter One", words: 0 }],
     lastOpenedId: chapterId,
     lastOpenedAt: Date.now(),
@@ -871,13 +878,31 @@ export function createBookFromImport(
   const book: Book = {
     id: bookId,
     title: title.trim() || "Untitled Book",
+    ...(setup?.subtitle ? { subtitle: setup.subtitle } : {}),
+    ...(setup?.author ? { author: setup.author } : {}),
     ...(setup?.kind ? { kind: setup.kind } : {}),
     ...(setup?.genre ? { genre: setup.genre } : {}),
     ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
+    ...(setup?.publishing ? { publishing: setup.publishing } : {}),
     chapters: metas,
     lastOpenedId: metas[0].id,
     lastOpenedAt: Date.now(),
   };
+
+  /*
+   * Artwork and byline the *file* carried, kept rather than dropped.
+   *
+   * An EPUB knows its author, its blurb, its categories and usually its cover;
+   * importing one used to take the chapters and the title and lose the rest, so
+   * a writer whose file was complete was met by a book the app called
+   * anonymous and coverless — and, now that the readiness check runs on the
+   * landing page, met by two screens disagreeing about the same file.
+   *
+   * `setCover` enforces its own size cap and fails cleanly, which is all the
+   * handling this needs: a cover that will not fit leaves a book without one,
+   * and the app already knows how to say that.
+   */
+  if (setup?.cover) setCover(bookId, setup.cover);
 
   commit({
     ...shelf,

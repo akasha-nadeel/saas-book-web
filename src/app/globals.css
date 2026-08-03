@@ -211,6 +211,70 @@
   --color-step-line: #2c2764;
   --color-step-fg: #a9a4ee;
 
+  /* ------------------------------------------------------------------------
+     The landing page.
+
+     It used to state its colours literally and stay white whatever the app was
+     wearing, on the argument that a shop front should not change colour because
+     of a setting made inside the product. The argument was wrong about one
+     thing, and it is the thing that matters: a reader who keeps their machine
+     dark is not expressing a preference about our marketing, they are telling
+     their whole screen how bright to be, and the one page that ignored it was
+     ours. A white page arriving at night is not brand consistency, it is a
+     flashbang.
+
+     So the page follows `data-theme` like everything else, and these are the
+     names it needs that the chrome has none for. Everything the app already has
+     a word for — `panel`, `line`, `fg`, `muted`, `raised`, and the whole
+     ok/note/stop family — the page now uses directly rather than restating in
+     hex, which is what stops the two drifting. The light values below are the
+     ones the page shipped with, so daylight is unchanged to the pixel.
+
+     Two of these deserve their reasoning written down.
+
+     **`lp-accent` keeps its hue at night, where the chrome's accent goes
+     white.** That inversion is right for the app and wrong here. The accent is
+     a *fill* on this page at poster size — the closing banner is a full-bleed
+     block of it — and `--color-accent`'s night value is #ffffff, so following
+     the chrome would have detonated a white slab across a dark page. It is
+     also the only thing on the page carrying the brand. So the indigo is
+     lifted instead: same hue, same intent, enough lightness to hold white text
+     on black. The chrome's problem (a hue dark enough for white text vanishes
+     into a black sidebar) does not arise on a surface where the fill is the
+     largest thing in the viewport.
+
+     **The drawn artwork is not in here on purpose.** The book covers in the
+     figures and the brand marks in `works-with.tsx` stay literal in both
+     themes, because a cover is a picture of an object and a trademark is a
+     trademark. Only the drawn *interface* inside those figures follows the
+     theme — it is a picture of this app, and this app changes with it. */
+  --color-lp-ground: #0b0b0e; /* the page, and the cards on it */
+  --color-lp-tint: #14141b; /* the lit band: hero, and the check beside it */
+  --color-lp-tint-soft: #101015; /* the alternating band */
+  --color-lp-well: #16161d; /* inset wells — drop zones, quoted boxes */
+  --color-lp-raised: #1e1e26; /* chips and hovers */
+  --color-lp-line: #23232b; /* section rules */
+  --color-lp-edge: #2d2d38; /* card borders */
+  --color-lp-edge-strong: #3b3b48; /* button borders, and any border's hover */
+  --color-lp-ink: #f1f1f4; /* headings and anything load-bearing */
+  --color-lp-soft: #c6c6d0; /* strong secondary text */
+  --color-lp-body: #a2a2ad; /* body copy */
+  --color-lp-faint: #85858f; /* eyebrows, format tags, captions */
+  --color-lp-accent: #5f5bd0; /* the fill: buttons, the closing banner */
+  --color-lp-accent-ink: #ffffff; /* what rides on that fill */
+  /* The same colour as *type on the page*, and it has to be a second value.
+     One token cannot do both jobs at night: white needs the fill dark enough
+     to sit on (luminance under ~0.18) and a link needs to be light enough to
+     sit on near-black (over ~0.19), and those two windows do not overlap. In
+     daylight they are the same indigo, because a white ground gives both
+     directions all the room they need. */
+  --color-lp-accent-text: #9b98f5;
+  --color-lp-accent-soft: #9b98cf; /* the quiet half of the headline */
+  --color-lp-wordmark: #8c88ff; /* "Chapter" — the accent, lightness lifted */
+  --color-lp-accent-pale: #eae9ff; /* dimmed text *on* the accent fill */
+  --color-lp-device: #2a2a33; /* the drawn tablet's shell */
+  --color-lp-device-edge: #14141a; /* and its lower edge */
+
   --font-serif: var(--font-fraunces), ui-serif, Georgia, serif;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
@@ -356,6 +420,35 @@
   --color-step-bg: #eeeefb;
   --color-step-line: #d8d8f4;
   --color-step-fg: #312e81;
+
+  /* The landing page in daylight — see the long note in the dark block.
+
+     These are the exact values the page shipped with while it was always
+     light, so nothing about it has moved for a reader who has never chosen a
+     theme on a machine that has never asked for one. The tinted grounds are
+     the accent at about 8% and 4% on white: one colour at four volumes, which
+     is what makes the page read as designed rather than assembled, and the
+     reason they are not a warm neutral. */
+  --color-lp-ground: #ffffff;
+  --color-lp-tint: #eeeef5;
+  --color-lp-tint-soft: #f7f7fb;
+  --color-lp-well: #fafafd;
+  --color-lp-raised: #f1f1f3;
+  --color-lp-line: #ececee;
+  --color-lp-edge: #e2e2e5;
+  --color-lp-edge-strong: #dcdce0;
+  --color-lp-ink: #0f0f10;
+  --color-lp-soft: #45454d;
+  --color-lp-body: #5b5b63;
+  --color-lp-faint: #9a9aa2;
+  --color-lp-accent: #312e81;
+  --color-lp-accent-ink: #ffffff;
+  --color-lp-accent-text: #312e81;
+  --color-lp-accent-soft: #6e6c96;
+  --color-lp-wordmark: #423ead;
+  --color-lp-accent-pale: #c7d2fe;
+  --color-lp-device: #e2e2e8;
+  --color-lp-device-edge: #b9b9c4;
 }
 
 /* App shell. Layout constants, not part of the design language.
@@ -375,6 +468,69 @@
      since it opens as an overlay there rather than sitting beside the page. */
   --rail-width: 3.25rem;
   --sidebar-width: 15rem;
+
+  /* ------------------------------------------------------------------------
+     The landing hero's backdrop, one image per theme.
+
+     Declared here rather than in `@theme` because they are not colours and
+     generate no utility — `@theme` is for the things Tailwind turns into class
+     names, and a URL is not one. Each holds the whole `background` shorthand
+     rather than an image alone, so a theme carries its own framing: one var,
+     one declaration, and no way for the image to arrive with another theme's
+     position stuck to it.
+
+     **The two are framed differently because only one of them can hurt.**
+
+     The dark image is a horizon — black above, a near-white arc across the
+     middle, black below — and measured against the page's own near-white ink
+     that arc comes out at **1.0:1**. Invisible text. Under `cover` it lands
+     dead centre of the hero at every viewport, because the arc is at the
+     centre of the image and `center` keeps those two together, and the centre
+     of the hero is roughly where the headline stops being safely above it.
+     No veil fixes that: one strong enough to cover the arc also hides it,
+     which is the whole reason the image was chosen.
+
+     So the framing does the work instead. `100% 185%` anchored to the top
+     stretches it to the full width — which removes the crop entirely, and with
+     it the viewport-to-viewport variance — and puts the horizon at about 92%
+     of the hero. That number is chosen twice over. It is well clear of the
+     text, and it is *below the check card*, which is opaque and about 900px
+     wide: at 82% the arc was behind the card and all a reader saw was a black
+     section. Sitting under it, the glow spills across the full width along the
+     section's bottom edge and blooms up around the card's shoulders, which is
+     the only place on this hero the picture can actually be seen. A gradient
+     is the one kind of image that can be stretched like this without anyone
+     seeing it, and a shallower arc reads as a wider horizon anyway.
+
+     The light image needs none of that — its worst band is 5.1:1 against
+     near-black ink, safe wherever it lands — so it keeps `cover`, which
+     preserves the wave the way it was drawn.
+
+     **The veils are kept deliberately weak.** An earlier pair (0.92 and 0.55,
+     fading out past halfway) were belt-and-braces from before the framing was
+     worked out, and between them and the card they left both images invisible
+     — which is a strange way to treat a picture somebody chose. They now do
+     one job: settle the first inch under the transparent header so the
+     headline starts on clean ground. Everything below that is the image.
+
+     Re-measure before swapping either picture. The framing above is fitted to
+     these two, not to any two. */
+  --lp-hero: url("/hero-dark.webp") top center / 100% 185% no-repeat;
+  --lp-hero-veil: linear-gradient(
+    to bottom,
+    #0b0b0e 0%,
+    rgba(11, 11, 14, 0.6) 22%,
+    rgba(11, 11, 14, 0) 52%
+  );
+}
+
+:root[data-theme="light"] {
+  --lp-hero: url("/hero-light.webp") center center / cover no-repeat;
+  --lp-hero-veil: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0) 34%
+  );
 }
 
 @media (min-width: 768px) {

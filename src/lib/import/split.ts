@@ -1,3 +1,4 @@
+import type { PublishingMeta } from "../publishing";
 import {
   blockText,
   countWords,
@@ -27,9 +28,24 @@ export interface ImportedChapter {
   words: number;
 }
 
+/**
+ * A parsed file, ready to be checked or made into a book.
+ *
+ * `splitIntoChapters` fills in the first two. The rest are what the file said
+ * about itself and are added by `importFile` on top — absent for the formats
+ * that carry nothing (a .txt is prose and nothing else), and absent field by
+ * field for the ones that carry some of it. See `metadata.ts` for why they are
+ * kept rather than dropped at the door.
+ */
 export interface ImportedBook {
   title: string;
   chapters: ImportedChapter[];
+  author?: string;
+  /** A data URL inside the cover budget. */
+  cover?: string;
+  /** Whether the file has cover artwork, storable or not. */
+  hasCover?: boolean;
+  publishing?: PublishingMeta;
 }
 
 /**

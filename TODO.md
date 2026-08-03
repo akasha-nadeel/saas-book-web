@@ -674,6 +674,58 @@ Ranked. The first and third together are most of it.
       *Left:* `suggestTarget(kind, genre)` could fill the target length in at the
       same moment, which would close the "No length to aim at" finding in the
       same click.
+- [x] **Run the check before the sign-in wall.** Done 2026-08-03. The landing
+      hero carried a drawn still of the Overview screen with an invented book on
+      it. It was honest and well made and it was still a *screenshot's*
+      argument — here is a product, imagine it working on yours — aimed at
+      readers who have been shown convincing screenshots by people who then sold
+      them a course that taught nothing.
+
+      It is now the real check. `book-check.tsx` over the pure `file-check.ts`:
+      drop a manuscript, it is parsed in the browser by the ordinary
+      `importFile` path, and `storeReadiness()` reports what a shop would
+      refuse — same findings, same order, same words as the dashboard. No
+      account, no email, nothing uploaded. Pressing any fix keeps the book in
+      this browser and goes to `/signup?next=` the tool that mends it, so the
+      writer lands signed in, on the right screen, with their book on the shelf;
+      `syncWithServer` already uploads a library that predates the account.
+
+      The half that was not obvious going in: **an EPUB's own metadata had to be
+      read first.** A finished EPUB carries an author, an ISBN, a blurb,
+      categories and a cover, and import dropped all of it — so the check would
+      have opened by telling a writer with a complete file that five things were
+      wrong with it, on the first screen they ever saw. `metadata.ts` +
+      `epubMetadata()` + `docxMetadata()` + `cover.ts` read it, and
+      `setupFromImport()` carries it into the book, which also quietly fixes the
+      in-app import: an EPUB brought in through the shelf keeps its author and
+      its cover now.
+
+      *Left:* the check runs on one file at a time and says nothing about the
+      prose. That is correct — the prose report is a Pro tool and this is the
+      shop's own checklist — but "check another" makes a fresh card rather than
+      a list, so somebody with a series compares by memory.
+- [x] **Let the landing page follow the theme.** Done 2026-08-03. It was always
+      light on the argument that a shop front should not change colour because
+      of a setting made inside the product. Right about brand consistency, wrong
+      about whose setting it is: a reader on a dark machine has told their whole
+      screen how bright to be, and the one page ignoring them was the first one
+      they ever saw — arriving as a white flashbang at night.
+
+      It now reads `data-theme` off the `--color-lp-*` block in `globals.css`,
+      stated in both theme blocks with the light values it shipped with, so
+      daylight is unchanged to the pixel. Where the app already had a word for
+      something — `fg`, `muted`, `line`, `raised`, the whole ok/note/stop family
+      whose light values already *were* these reds and ambers — the page uses
+      the app's token rather than restating it in hex, which is what stops the
+      two drifting again.
+
+      Two things came out of doing it that are worth not re-deriving. The accent
+      needs **two values at night** (`lp-accent` for fills, `lp-accent-text` for
+      type): white must sit on the fill and a link must sit on near-black, and
+      no single indigo clears 4.5:1 in both directions. And a status needs a
+      `-solid` for fills and a `-fg` for text for the same reason — using one
+      for both gives either a pale block with white on it or text nobody can
+      read. Every pair was checked by contrast rather than by eye.
 - [ ] **One readiness model, not two.** Prepare says "3 to fix"; the roadmap
       says "1 of 18". Same question — is this book ready — two scores, and
       nothing reconciles them. The roadmap is the one with an opinion about
