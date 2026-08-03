@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
+import { CheckDemo } from "@/components/landing/check-demo";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { StoreListingDemo } from "@/components/landing/store-listing-demo";
 import { DESTINATIONS } from "@/components/landing/works-with";
@@ -62,10 +63,12 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  * - `INK` is the brand action — a deep indigo rather than the SaaS blue.
  *   It is ink on paper, it reads as institution rather than startup, and it is
  *   the colour of a decision: every CTA and every link is this and nothing else.
- * - `STOP` / `WARN` / `PASS` are the semantic three, and they are the same
- *   ladder the app itself uses (`stop` / `note` / `ok` tokens). Red is
- *   *would be refused*, amber is *costs you readers*, green is *free, passed,
- *   nothing owed*. They never appear as decoration, only as verdicts.
+ * - `STOP` and `PASS` are two thirds of the semantic ladder the app itself
+ *   uses (`stop` / `note` / `ok` tokens). Red is *would be refused*, green is
+ *   *free, passed, nothing owed*. They never appear as decoration, only as
+ *   verdicts. The amber middle — *costs you readers* — is on the page too, but
+ *   only inside `check-demo.tsx`, which is the one place that has both
+ *   verdicts side by side and is where the distinction is being made.
  * - The tinted grounds are `INK` itself with the volume down — see the note
  *   under the constants. One colour at four volumes, not a hue plus a neutral.
  *
@@ -75,7 +78,6 @@ import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
  */
 const INK = "#312e81"; // indigo-900 — actions and links
 const STOP = "#b91c1c"; // would be refused
-const WARN = "#b45309"; // costs you readers
 const PASS = "#15803d"; // free, passed, earned
 
 /*
@@ -148,6 +150,35 @@ const icons = {
     <>
       <path d="m6 6 12 12" />
       <path d="m18 6-12 12" />
+    </>
+  ),
+  /* The three below are for the Prepare points, and each draws the *noun* in
+     its heading rather than an abstraction of it: a shelf of spines for the
+     books yours sits beside, lines of text with a short last one for a blurb,
+     a magnifier for going looking. A reader should be able to name the glyph
+     without reading the line beside it. */
+  /* One book standing and one leaning against it, on a shelf. Three even
+     spines was the first draft and reads as a bar chart at 20px — equal
+     vertical bars on a baseline is a chart before it is anything else, and
+     this page has real charts elsewhere. The lean is what makes it books. */
+  shelf: (
+    <>
+      <path d="M4 20h16" />
+      <path d="M6.6 7.4h3.8v12.6H6.6z" />
+      <path d="M12.6 20 15.4 8.3l3.4.8L16.4 20Z" />
+    </>
+  ),
+  blurb: (
+    <>
+      <path d="M4.5 7h15" />
+      <path d="M4.5 12h15" />
+      <path d="M4.5 17h9" />
+    </>
+  ),
+  search: (
+    <>
+      <path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" />
+      <path d="m16.2 16.2 3.8 3.8" />
     </>
   ),
 } as const;
@@ -225,22 +256,33 @@ const WRITE = [
   ],
 ] as const;
 
+/*
+ * The first four are the ones the Prepare section prints, and they are written
+ * short on purpose.
+ *
+ * They ran to three and four lines each, which stacked to a wall of grey beside
+ * a figure that is the actual argument — a reader skims that and takes none of
+ * it. What went in every case was the *qualifying* clause, not a claim: the
+ * checks are still named, the comps are still found by reading the blurb, the
+ * blurb is still counted and still not written for you. Same rule the hero deck
+ * was cut under. Anything that would have removed a claim stayed.
+ */
 const PREPARE = [
   [
     "A pre-upload check",
-    "It names what a store would refuse — missing cover, malformed ISBN, blurb over the limit — and says which problems would actually stop the upload as against the ones that only cost you readers. It never blocks your export.",
+    "Missing cover, malformed ISBN, blurb over the limit — and which of them would actually stop the upload. It never blocks your export.",
   ],
   [
     "The books yours sits beside",
-    "Real comparable titles, found by reading your blurb rather than matching one word — and from them, what your genre is filed under, how long those books run, and what their covers look like at the size a reader meets them.",
+    "Real comps, found by reading your blurb — and from them your categories, the length those books run, and the covers yours has to sit against.",
   ],
   [
     "Your blurb, counted against real ones",
-    "The shops' limit, five actual blurbs from books like yours, and the length they run to. We do not write it.",
+    "The shops' limit, five real blurbs from books like yours, and how long they run. We do not write it.",
   ],
   [
-    "Is the title taken, and will the cover be refused",
-    "Whether somebody else's book turns up first when a reader searches for yours; and whether your artwork is the right size, shape and weight to upload.",
+    "Is the title taken, will the cover be refused",
+    "Whether another book turns up first when a reader searches yours, and whether your artwork is the right size, shape and weight.",
   ],
   [
     "Paperback numbers, worked out",
@@ -251,6 +293,20 @@ const PREPARE = [
     "EPUB, DOCX, PDF at your trim size, and Markdown. No watermark, no export cap, and the EPUB is checked against EPUBCheck 5.3 with no errors and no warnings.",
   ],
 ] as const;
+
+/**
+ * A mark for each of the four Prepare points the page shows, positionally.
+ *
+ * **They are all one colour, and that colour is `INK`.** The temptation with
+ * four icons is to give each a hue, and on this page that would be a lie by
+ * decoration: red and amber are *verdicts* here — would be refused, costs you
+ * readers — and they are spent, twice, inside the figure beside these points
+ * where they carry real findings. A red mark on "A pre-upload check" would say
+ * the check itself is the problem. So the marks take the way-forward indigo,
+ * the colour every other "here is the answer" on this page is set in, and the
+ * status hues keep meaning what they mean everywhere else.
+ */
+const PREPARE_MARKS = ["prepare", "shelf", "blurb", "search"] as const;
 
 const TRACK = [
   [
@@ -612,33 +668,102 @@ export function LandingPage() {
           </p>
         </Split>
 
-        {/* ---- Prepare, mirrored ---------------------------------------- */}
-        <Split
-          eyebrow="Before you upload"
-          title="Find out from us, not from a rejection"
-          flip
-          figure={<CheckFigure />}
-        >
-          <p className="oc-lead font-serif text-xl leading-relaxed">
-            A shop refusing your upload is a slow, silent thing. The check names
-            what would actually stop it — and separates that from what merely
-            costs you readers.
-          </p>
-          <ul className="mt-6 flex flex-col gap-3">
-            {PREPARE.slice(0, 4).map(([name, note]) => (
-              <li key={name}>
-                <p className="oc-heading font-serif text-lg text-[#0f0f10]">{name}</p>
-                <p className="text-sm leading-relaxed">{note}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-6 rounded-xl border border-[#e6e6e8] bg-[#f7f7fb] p-4 text-sm leading-relaxed">
-            <strong className="text-[#0f0f10]">About the PDF.</strong> A clean
-            interior file at your trim size with fonts embedded — not a
-            pre-press file. No bleed, no crop marks, no CMYK, because it comes
-            from your browser’s print engine.
-          </p>
-        </Split>
+        {/* ---- Prepare --------------------------------------------------
+
+            Words left, the product working on the right — but written out
+            rather than handed to `Split`, for two reasons that are both about
+            `CheckDemo`.
+
+            **It is not on a half.** The figure is a whole dashboard at 760
+            design px with 11px labels on it, and those labels *are* the
+            content — a finding, and the button that fixes it. On an even half
+            of `max-w-5xl` it scales to about 0.6 and they stop being readable,
+            so this section takes the wider container and gives the figure the
+            larger column. That is the whole difference between a screenshot of
+            a product and a screenshot of a product you can read.
+
+            **And the ground is the hero's**, not the alternating tint the rest
+            of the page uses. This is where the promise the hero makes is shown
+            being kept, and the two are the same colour so they read as one
+            claim made twice.
+
+            **The figure is pinned and the words scroll past it.** The left
+            column is four points and a caveat — taller than the tablet by half
+            again — so centred it left the figure adrift in whitespace and, worse,
+            out of the frame for most of the reading. Sticky is the honest
+            arrangement: the claims go by while the thing making them stays on
+            screen, and the reader can look up from any one of them at a product
+            that is still working. `items-start` is what makes it possible —
+            a stretched grid item has nothing to stick inside — and it is
+            `md:` only, because on one column the figure would pin over the very
+            text it belongs to. `top-24` clears the sticky header above it.
+
+            The figure replaced a drawn still of the export screen's readiness
+            list. The still could show that the app lists problems; only the
+            moving one shows the fix sitting *on* the problem, which is the
+            claim this section is actually making. */}
+        <section className="border-b border-[#ececee] bg-[#eeeef5] px-6 py-20">
+          <div className="mx-auto grid max-w-6xl items-start gap-12 md:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+            <div>
+              <Head
+                eyebrow="Before you upload"
+                title="Find out from us, not from a rejection"
+              />
+              <p className="oc-lead mt-6 font-serif text-xl leading-relaxed">
+                A shop refusing your upload is a slow, silent thing. The check
+                names what would actually stop it — and separates that from what
+                merely costs you readers.
+              </p>
+              {/* **The four headings are the list; the notes are the
+                  footnotes.** Set a step apart on the page's own scale — 24px
+                  serif against 14px sans — they can be read on their own, in
+                  order, without a word of the small text, which is how a reader
+                  who has just met a lit screen beside them actually arrives.
+                  Closing that gap made four paragraphs with bold first lines,
+                  and the eye had nowhere to land.
+
+                  **The marks carry no tile.** A boxed icon is a *control* —
+                  the same shape as the chips inside the figure beside it — and
+                  four of them down the margin promised four buttons. Naked,
+                  they are what they are: a mark on the paper, in the way-forward
+                  indigo. Bigger and heavier to earn that (28px at weight 2),
+                  because stroke width is in user units and a glyph scaled up
+                  keeps its hairline and quietly reads lighter. */}
+              <ul className="mt-8 flex flex-col gap-7">
+                {PREPARE.slice(0, 4).map(([name, note], i) => (
+                  <li key={name} className="flex gap-4">
+                    <span className="mt-1 shrink-0" style={{ color: INK }}>
+                      <Icon
+                        name={PREPARE_MARKS[i]!}
+                        className="h-7 w-7"
+                        weight={2}
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="oc-heading font-serif text-2xl leading-snug text-[#0f0f10]">
+                        {name}
+                      </p>
+                      <p className="mt-1.5 text-sm leading-relaxed">{note}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              {/* White, where every other instance of this box is `#f7f7fb`:
+                  on the hero's tinted ground that fill has nowhere to stand
+                  and the box stops reading as a box. */}
+              <p className="mt-7 rounded-xl border border-[#e0e0ea] bg-white p-4 text-sm leading-relaxed">
+                <strong className="text-[#0f0f10]">About the PDF.</strong> A
+                clean interior file at your trim size with fonts embedded — not
+                a pre-press file. No bleed, no crop marks, no CMYK, because it
+                comes from your browser’s print engine.
+              </p>
+            </div>
+
+            <div className="md:sticky md:top-24">
+              <CheckDemo />
+            </div>
+          </div>
+        </section>
 
         {/* ---- The metadata, which is where people actually give up ------
 
@@ -1349,53 +1474,9 @@ function OrderFigure() {
   );
 }
 
-/** The pre-upload check, as it reads on the export screen. */
-function CheckFigure() {
-  return (
-    <div
-      className="rounded-2xl border border-[#e6e6e8] bg-white p-7"
-      aria-hidden="true"
-    >
-      <p className="font-code text-[0.625rem] tracking-[0.18em] text-[#9a9aa2] uppercase">
-        Before you upload
-      </p>
-      <ul className="mt-5 flex flex-col gap-3">
-        {[
-          ["Would be refused", "Cover missing", true],
-          ["Would be refused", "ISBN check digit does not add up", true],
-          ["Costs you readers", "No categories chosen", false],
-          ["Costs you readers", "No publisher named", false],
-        ].map(([weight, what, blocking]) => (
-          <li
-            key={what as string}
-            className="flex items-start gap-3 border-b border-[#f1f1f3] pb-3 last:border-b-0 last:pb-0"
-          >
-            <span
-              // The badge *is* the verdict, so it is the one place on the page
-              // where red and amber are load-bearing: filled red for what a
-              // shop refuses, outlined amber for what merely costs you readers.
-              // Weight carries it too — filled against outlined — so a reader
-              // who cannot separate the two hues still reads the difference.
-              className="mt-0.5 shrink-0 rounded-md px-2 py-1 font-code text-[0.5625rem] tracking-wider uppercase"
-              style={
-                blocking
-                  ? { backgroundColor: STOP, color: "#fff" }
-                  : { border: `1px solid ${WARN}55`, color: WARN }
-              }
-            >
-              {weight as string}
-            </span>
-            <span className="text-sm text-[#0f0f10]">{what as string}</span>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-5 text-xs leading-relaxed text-[#9a9aa2]">
-        It never blocks the export. The file is yours whether or not a shop
-        would take it.
-      </p>
-    </div>
-  );
-}
+/* The pre-upload check used to be drawn here as a still of the export
+   screen's readiness list. `check-demo.tsx` replaced it — same red/amber
+   verdict, on the real screen, with the fix beside each problem. */
 
 /** Cost against earnings, the way the Track screen puts it. */
 function MoneyFigure() {
