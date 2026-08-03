@@ -64,7 +64,7 @@ export function ProgressPage({ bookId }: { bookId: string }) {
         question is about you rather than about one manuscript.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         <section className="mt-8 grid gap-3 sm:grid-cols-3">
           <Stat
             value={stats.streak === 0 ? "—" : String(stats.streak)}
@@ -106,7 +106,7 @@ export function ProgressPage({ bookId }: { bookId: string }) {
               />
             ))}
           </div>
-          <p className="mt-3 text-sm text-muted">
+          <p className="max-w-prose mt-3 text-sm text-muted">
             {stats.month.words >= 0
               ? `${stats.month.words.toLocaleString()} words net across the month.`
               : `${Math.abs(stats.month.words).toLocaleString()} words shorter than a month ago — which is what revising looks like.`}
@@ -148,12 +148,19 @@ export function ProgressPage({ bookId }: { bookId: string }) {
           )}
         </section>
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-          A day of cutting counts as a day of writing here, because it is one.
-          Nothing on this page is a target you have missed, and there is no
-          streak to protect — writers finish books in five years and in twelve,
-          and the ones who finish are not the ones with the tidiest chart.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs leading-relaxed text-muted">
+            A day of cutting counts as a day of writing here, because it is one.
+            Nothing on this page is a target you have missed, and there is no
+            streak to protect — writers finish books in five years and in twelve,
+            and the ones who finish are not the ones with the tidiest chart.
+          </p>
+        </div>
       </div>
     </div>
   );

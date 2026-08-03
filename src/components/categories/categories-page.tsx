@@ -123,7 +123,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {heading}
         {/* ---- What is chosen --------------------------------------------
             A strip rather than the card this was. Before the first search a
@@ -229,7 +229,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
         {state === "idle" && (
           <section className="mt-8 rounded-xl border border-line bg-panel p-5">
             <h2 className="font-bold text-fg">What these are, exactly</h2>
-            <p className="mt-1.5 text-sm text-muted">
+            <p className="max-w-prose mt-1.5 text-sm text-muted">
               Not a shop&rsquo;s category list. These are the subjects two
               public catalogues file comparable books under — the answer to
               &ldquo;what is this book, to a librarian&rdquo;. Shops run their
@@ -237,7 +237,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
               typed; what they give you is the right shape of answer, and the
               vocabulary to match against theirs.
             </p>
-            <p className="mt-3 text-sm text-muted">
+            <p className="max-w-prose mt-3 text-sm text-muted">
               Search, and each suggestion says how many comparable books carry
               it. A subject one book in twenty is filed under is that book
               rather than a pattern, which is why those are left out.
@@ -259,7 +259,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
               <h2 className="font-bold text-fg">
                 {suggestions.length} worth considering
               </h2>
-              <p className="text-sm text-muted">
+              <p className="max-w-prose text-sm text-muted">
                 From {books.length} comparable books · tap to add
               </p>
             </div>
@@ -278,13 +278,20 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
           </>
         )}
 
-        <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
-          These are the subjects two public catalogues file comparable books
-          under, not official shop categories — shops use their own scheme, and
-          the box on their form may not accept these words as typed. Treat them
-          as the answer to &ldquo;what is this book, to a librarian&rdquo;, and
-          match them to the shop&rsquo;s own list yourself.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs text-muted">
+            These are the subjects two public catalogues file comparable books
+            under, not official shop categories — shops use their own scheme, and
+            the box on their form may not accept these words as typed. Treat them
+            as the answer to &ldquo;what is this book, to a librarian&rdquo;, and
+            match them to the shop&rsquo;s own list yourself.
+          </p>
+        </div>
       </div>
     </div>
   );

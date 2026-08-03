@@ -386,11 +386,20 @@ function MenuBody({
                 Pro
               </span>
               <span className="font-sans text-xs text-muted">
-                {plan.period === "annual" ? "Annual" : "Monthly"}
+                {plan.period === "lifetime"
+                  ? "Lifetime"
+                  : plan.period === "annual"
+                    ? "Annual"
+                    : "Monthly"}
               </span>
             </div>
             <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
-              {plan.status === "cancelled" ? (
+              {/* Bought outright, so there is no date and nothing to renew.
+                  Checked first: a lifetime row has no `currentPeriodEnd`, and
+                  every other branch here is written around having one. */}
+              {plan.period === "lifetime" && plan.status !== "cancelled" ? (
+                <>Bought outright. Nothing renews and nothing expires.</>
+              ) : plan.status === "cancelled" ? (
                 <>Cancelled{until ? <> — runs until {until}</> : null}.</>
               ) : plan.status === "past_due" ? (
                 // Not "expired". PayHere retries a failed renewal on its own

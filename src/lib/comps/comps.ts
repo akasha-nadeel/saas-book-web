@@ -18,9 +18,10 @@
  * **What this deliberately does not do is judge.** A keyword search returns
  * forty books of which perhaps five are genuinely comparable, and picking those
  * five is a fuzzy judgement rather than a query. That is the one place a model
- * earns its cost, and it is a later step that reads what this produces — see
- * TODO.md. Nothing here calls one, so the whole feature works, for free, with
- * the model switched off.
+ * earns its cost, and it lives in `rank.ts` reading what this produces —
+ * a separate module behind a separate button behind a separate route. Nothing
+ * here calls one, so everything in this file works, for free, with the model
+ * switched off.
  */
 
 // Not a runtime cycle: subjects.ts imports only the *type* from here, and a

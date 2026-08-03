@@ -56,6 +56,12 @@ const WIDTHS = {
   "3xl": "max-w-3xl",
   "4xl": "max-w-4xl",
   "5xl": "max-w-5xl",
+  /* For a screen that is a grid of pictures rather than a column of prose.
+     Reading wants a narrow measure; twenty covers want the room, and at 4xl
+     they sat in a 56rem column with a third of a wide window empty on either
+     side. Only comps takes this so far — the covers wall is bare artwork at a
+     size the writer sets, so it still reads at 5xl. */
+  "6xl": "max-w-6xl",
   /* No cap at all, for a screen whose own column is already narrow — the
      roadmap when a step's tool is open beside it. Centring a 48rem column
      inside a 24rem one does nothing, but the `mx-auto` would still push the
@@ -72,8 +78,18 @@ export function ToolHeader({
    * does. Defaults to `tool`, which is right for most of them.
    */
   title,
-  /** Must match the page's own container, or the two edges disagree. */
-  width = "3xl",
+  /**
+   * Must match the page's own container, or the two edges disagree.
+   *
+   * **The default is a page width, not a reading measure.** It was `3xl` — 768
+   * pixels — which is right for a column of prose and wrong for what these
+   * screens actually hold: forms, stat rows, card grids and drawn figures. On
+   * an ordinary laptop that left a third of the window empty down each side
+   * while the content crowded itself in the middle. The deck below is capped
+   * separately at `2xl`, so widening the page does not stretch the one thing
+   * here that *is* prose.
+   */
+  width = "5xl",
   /** One line under the heading, if the tool has something to say up front. */
   children,
 }: {

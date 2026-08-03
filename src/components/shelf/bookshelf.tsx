@@ -52,7 +52,9 @@ import {
   summarise as summariseArc,
   type ArcSummary,
 } from "@/lib/arc";
-import { totals, type Ledger } from "@/lib/ledger";
+import { totals, type Entry, type Ledger } from "@/lib/ledger";
+import { curveOf, MIN_WINDOW_DAYS, type LeftOut } from "@/lib/curve";
+import { ProGate, useEntitled } from "@/components/upgrade/pro-gate";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { PHASES, progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
@@ -2711,6 +2713,8 @@ function Track({ books }: { books: Book[] }) {
         </section>
       )}
 
+      {anyMoney && <BookCurve books={books} ledger={ledger} />}
+
       <section className="rounded-2xl border border-line bg-panel p-5">
         <h2 className="font-bold text-fg">Every book</h2>
         <p className="mt-1 mb-4 text-muted">
@@ -2738,6 +2742,151 @@ function Track({ books }: { books: Book[] }) {
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * The book-three curve: whether each book did better than the last.
+ *
+ * The folklore is everywhere in the research and nobody can check it — *no
+ * traction until your third book* — and a writer two books in cannot tell
+ * whether they are on it or whether it is a story people tell each other. That
+ * decides whether they write a third, which makes it worth answering properly
+ * or not at all.
+ *
+ * **Everything difficult about it is in `curve.ts`**, and the hard part is the
+ * refusing: like-for-like windows, no publication date means no place on the
+ * curve, a book out for a fortnight is left off, and a book with no sales rows
+ * is a gap in the record rather than a zero. This component draws what
+ * survives that and says what did not.
+ *
+ * **The folklore is quoted, never applied.** It is stated as a thing writers
+ * report, next to the writer's own figures, and no sentence here tells them
+ * which side of it they are on — that would be a prediction off two or three
+ * points, which is exactly the kind of number this product refuses. "Each
+ * earned more than the last" is a fact about four figures; "you are on the
+ * curve" is a forecast, and we do not sell those.
+ *
+ * It renders only where there is money recorded at all — see the call site.
+ * A writer three chapters into a first draft has not asked this question.
+ */
+function BookCurve({ books, ledger }: { books: Book[]; ledger: Entry[] }) {
+  const curve = useMemo(() => curveOf(books, ledger), [books, ledger]);
+  const entitled = useEntitled();
+
+  // Part of Pro, with the money screens it reads from. Drawn as its own
+  // section rather than hidden, because the row above it already shows the
+  // library's totals — a gap where a named section was is harder to read than
+  // a card saying what belongs there.
+  if (!entitled) {
+    return (
+      <ProGate
+        title="Book over book"
+        what="Whether each book did better than the last, measured over the same stretch of each one's own life — so a book out for three years is not compared against one out for three months. It answers what writers repeat to each other about there being no traction until a third book, with your own figures rather than a forecast."
+      >
+        {null}
+      </ProGate>
+    );
+  }
+
+  const missing: Record<LeftOut, string> = {
+    "no-date": "no publication date set",
+    "too-new": "out too recently to compare",
+    "no-sales": "no sales recorded",
+  };
+
+  if (!curve.ready) {
+    return (
+      <section className="rounded-2xl border border-line bg-panel p-5">
+        <h2 className="font-bold text-fg">Book over book</h2>
+        <p className="mt-1 text-muted">
+          Writers report little traction until a third book. Whether you are on
+          that curve should be something you can look at rather than something
+          you feel — but it takes two books measured the same way, and there
+          {curve.placed === 1 ? " is one" : " are none"} here so far.
+        </p>
+        {curve.left.length > 0 && (
+          <ul className="mt-3 flex flex-col gap-1">
+            {curve.left.map(({ title, why }) => (
+              <li key={`${title}:${why}`} className="text-sm text-muted">
+                <span className="text-fg">{title}</span> — {missing[why]}
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-xs text-muted">
+          A book joins this once it has a publication date in its listing
+          details, a sales report imported, and {MIN_WINDOW_DAYS} days behind
+          it.
+        </p>
+      </section>
+    );
+  }
+
+  const most = Math.max(...curve.books.map((b) => b.earned), 1);
+  const months = Math.round(curve.windowDays / 30);
+
+  return (
+    <section className="rounded-2xl border border-line bg-panel p-5">
+      <h2 className="font-bold text-fg">Book over book</h2>
+      <p className="mt-1 mb-4 text-muted">
+        What each earned in its first{" "}
+        {months >= 2 ? `${months} months` : `${curve.windowDays} days`} on sale
+        — the same stretch of each book&rsquo;s own life, because a book that
+        has been out for three years has earned more than one out for three
+        months whatever else is true.
+      </p>
+
+      <ol className="flex flex-col gap-3">
+        {curve.books.map((entry, i) => (
+          <li key={entry.bookId} className="flex items-center gap-3">
+            <span className="w-5 shrink-0 text-sm text-muted tabular-nums">
+              {i + 1}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-baseline justify-between gap-3">
+                <span className="truncate text-sm font-medium text-fg">
+                  {entry.title}
+                </span>
+                <span className="shrink-0 text-sm font-bold text-fg tabular-nums">
+                  {entry.earned.toLocaleString()}
+                </span>
+              </span>
+              <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-raised">
+                <span
+                  className="block h-full rounded-full bg-accent"
+                  style={{ width: `${Math.max((entry.earned / most) * 100, 1)}%` }}
+                />
+              </span>
+              <span className="mt-1 block text-xs text-muted">
+                from {entry.rows} {entry.rows === 1 ? "row" : "rows"}
+                {entry.units > 0
+                  ? `, ${entry.units.toLocaleString()} ${entry.units === 1 ? "copy" : "copies"}`
+                  : ", no copy counts recorded"}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className="mt-4 text-sm text-fg">
+        {curve.eachAboveTheLast
+          ? `Each of these earned more than the one before it in the same ${months >= 2 ? `${months} months` : `${curve.windowDays} days`}.`
+          : "These do not rise book over book."}{" "}
+        <span className="text-muted">
+          {curve.books.length < 3
+            ? "Two books is a comparison rather than a curve; the third is the one the folklore is about."
+            : "Writers commonly report little traction until a third book. This is your own record of it, not a forecast."}
+        </span>
+      </p>
+
+      {curve.left.length > 0 && (
+        <p className="mt-3 text-xs text-muted">
+          Not on this:{" "}
+          {curve.left.map(({ title, why }) => `${title} (${missing[why]})`).join(", ")}.
+        </p>
+      )}
+    </section>
   );
 }
 

@@ -183,7 +183,7 @@ function CoverChecker() {
             />
           )}
           <div className="min-w-[16rem] flex-1">
-            <p className="text-sm text-muted">
+            <p className="max-w-prose text-sm text-muted">
               {facts.width.toLocaleString()} × {facts.height.toLocaleString()}{" "}
               pixels · {(facts.bytes / 1024).toFixed(0)}KB ·{" "}
               {(facts.height / facts.width).toFixed(2)}:1
@@ -214,7 +214,7 @@ function CoverChecker() {
                       </span>
                       <span className="font-bold text-fg">{finding.label}</span>
                     </span>
-                    <p className="mt-1.5 text-sm text-muted">
+                    <p className="max-w-prose mt-1.5 text-sm text-muted">
                       {finding.detail}
                     </p>
                   </li>
@@ -453,7 +453,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                   </button>
                 ))}
               </div>
-              <p className="text-sm text-muted">
+              <p className="max-w-prose text-sm text-muted">
                 {SIZES.find((s) => s.id === size)!.note} · {wall.length} covers
               </p>
             </div>
@@ -516,12 +516,19 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
             and the fact that it is not scored, with nothing on screen it could
             be about. */}
         {wall.length > 0 && (
-        <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
-          Covers are shown from Google Books and Open Library, at the size a
-          reader meets them. The wall is not scored — a number comparing your
-          cover to a genre would be invented to look like an answer. Look at the
-          wall, then look at yours.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs text-muted">
+            Covers are shown from Google Books and Open Library, at the size a
+            reader meets them. The wall is not scored — a number comparing your
+            cover to a genre would be invented to look like an answer. Look at the
+            wall, then look at yours.
+          </p>
+        </div>
         )}
         </div>
 

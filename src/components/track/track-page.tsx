@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
 import {
   copiesToLevel,
   guessColumns,
@@ -37,6 +38,10 @@ import { useHydrated, useLedger, useShelf } from "@/lib/use-library";
  * figure somebody would plan a year around.
  */
 export function TrackPage({ bookId }: { bookId: string }) {
+  // Read here with the other hooks rather than beside the early return
+  // below: hooks cannot sit after a conditional, and this screen has
+  // several of its own already.
+  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const ledger = useLedger();
@@ -143,6 +148,25 @@ export function TrackPage({ bookId }: { bookId: string }) {
     );
   }
 
+  // The gate stands *after* the not-found guard above: a writer who
+  // followed a stale link to a deleted book should be told the book is
+  // gone, not asked to pay for one that does not exist.
+  if (!entitled) {
+    return (
+      <GatedTool
+        book={book}
+        tool="Track"
+        what="What this book cost against what it earned. Record what you spent, import a sales report as CSV — you say which column is which — and it works out how many more copies get you level, from the per-copy figure your own rows show rather than a royalty rate we invented."
+        deck={
+          <>
+            What this book cost against what it earned. Nobody keeps this, which is
+        why the total is always a shock.
+          </>
+        }
+      />
+    );
+  }
+
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
       <ToolHeader book={book} tool="Track">
@@ -150,7 +174,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
         why the total is always a shock.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
@@ -254,7 +278,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
           Or import a sales report
         </h2>
         <section className="mt-4 rounded-xl border border-line bg-panel p-5">
-          <p className="text-sm text-muted">
+          <p className="max-w-prose text-sm text-muted">
             KDP has no public API, so nothing can be fetched — but it will let
             you download your sales. Save the report as CSV and drop it here.
             You tell us which column is which, so this works whatever the shop
@@ -371,12 +395,19 @@ export function TrackPage({ bookId }: { bookId: string }) {
           </>
         )}
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-          Amounts are in whatever currency you work in — this does not convert,
-          because a rate applied silently to a total about money would be a
-          worse error than none. Nothing here is sent anywhere; the ledger is
-          stored in this browser like the rest of your library.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs leading-relaxed text-muted">
+            Amounts are in whatever currency you work in — this does not convert,
+            because a rate applied silently to a total about money would be a
+            worse error than none. Nothing here is sent anywhere; the ledger is
+            stored in this browser like the rest of your library.
+          </p>
+        </div>
       </div>
     </div>
   );

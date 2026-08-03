@@ -93,7 +93,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: "comps",
         icon: "shelf",
         name: "Comp titles",
-        what: "The published books yours sits beside, which every listing form and query letter asks for.",
+        what: "The published books yours sits beside, which every listing form and query letter asks for — ranked, on request, by a model that reads your opening.",
       },
       {
         path: "blurb",

@@ -8,6 +8,11 @@ import { parseLedger, type Entry } from "./ledger";
 import { parseHistory, type Snapshot } from "./history";
 import { parseIdeas, type Idea } from "./ideas";
 import {
+  mergeSeriesBible,
+  type SeriesBook,
+  type SeriesEntry,
+} from "./series";
+import {
   getBody,
   getBodyReload,
   getCover,
@@ -15,8 +20,11 @@ import {
   getServerBody,
   getServerBodyReload,
   getBibleRaw,
+  getBiblesRaw,
   getServerBibleRaw,
+  getServerBiblesRaw,
   subscribeToBible,
+  subscribeToBibles,
   getArcRaw,
   getServerArcRaw,
   subscribeToArc,
@@ -128,6 +136,49 @@ export function useBible(bookId: string): BibleEntry[] {
   const snapshot = useCallback(() => getBibleRaw(bookId), [bookId]);
   const raw = useSyncExternalStore(subscribe, snapshot, getServerBibleRaw);
   return useMemo(() => parseBible(raw), [raw]);
+}
+
+/**
+ * A whole series' bible, merged — every book's people, places and things as
+ * one cast, each carrying the books that wrote it down.
+ *
+ * The books are passed in rather than looked up, because working out what is
+ * in a series is `seriesOf()`'s job and the caller has the shelf already. They
+ * must arrive in **reading order**: `mergeSeriesBible` takes the first book
+ * that names someone as the one that introduced them.
+ *
+ * Both callbacks are keyed on the books serialised to a string, and rebuild
+ * the list from that string rather than closing over the caller's array — an
+ * array literal is a new value every render, which would resubscribe on each
+ * one. JSON rather than a joined string, because a book title contains spaces
+ * and very nearly anything else, and splitting one on a separator shreds it.
+ */
+export function useSeriesBible(books: readonly SeriesBook[]): SeriesEntry[] {
+  const key = JSON.stringify(books);
+
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToBibles(idsIn(key), onStoreChange),
+    [key],
+  );
+  const snapshot = useCallback(() => getBiblesRaw(idsIn(key)), [key]);
+  const raw = useSyncExternalStore(subscribe, snapshot, getServerBiblesRaw);
+
+  return useMemo(() => {
+    // The snapshot carries the stored bibles as well as the ids, so the merge
+    // is built out of `raw` itself rather than reading storage a second time —
+    // which also keeps the memo honest about what it depends on.
+    const stored = new Map(JSON.parse(raw) as [string, string | null][]);
+    return mergeSeriesBible(
+      (JSON.parse(key) as SeriesBook[]).map((book) => ({
+        book,
+        entries: parseBible(stored.get(book.id) ?? null),
+      })),
+    );
+  }, [key, raw]);
+}
+
+function idsIn(key: string): string[] {
+  return (JSON.parse(key) as SeriesBook[]).map((b) => b.id);
 }
 
 /** One book's advance readers, the ones to chase first. */

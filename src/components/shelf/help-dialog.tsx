@@ -118,8 +118,16 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Check the real file rather than the copy stored here, which is compressed to fit in your browser. Measured in your browser and never uploaded. Whether the cover is any good is the wall's job, not a number's.",
       },
       {
+        name: "Comp titles",
+        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key.",
+      },
+      {
         name: "Track",
         desc: "What a book cost against what it earned. Add what you spent on covers, editing and ads, then import a sales report as CSV — you say which column is which, so it works whatever the shop calls things. It tells you how many more copies get you level, using the per-copy figure your own rows show rather than a royalty rate we made up. Amazon has no public API, so nothing is fetched and nothing is sent.",
+      },
+      {
+        name: "Book over book",
+        desc: "On the Track area of your dashboard, once there is money recorded: what each book earned in the same stretch of its own life — the first so many months on sale — so that a book out for three years is not compared against one out for three months. It answers the thing writers repeat to each other, that there is no traction until a third book, with your own figures rather than a forecast. It refuses more often than it answers, and says why: a book with no publication date has no day one to count from, a book out for less than a month would only be telling you it is new, and a book with no sales rows is a gap in the record rather than a zero. Every book left off is named.",
       },
       {
         name: "Writing record",
@@ -155,7 +163,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Story bible",
-        desc: "People, places and things, kept beside the manuscript — with the aliases each answers to, so a character who is Elizabeth to the narrator and Lizzie to her brother is one person. The panel opens with who is in the chapter you have open, which is a search over what you have written rather than something you have to keep current. Per book for now; a series bible is still to come.",
+        desc: "People, places and things, kept beside the manuscript — with the aliases each answers to, so a character who is Elizabeth to the narrator and Lizzie to her brother is one person. The panel opens with who is in the chapter you have open, which is a search over what you have written rather than something you have to keep current. Give two books the same series name in their listing details and the panel reads across the whole series: the lookup finds the people you wrote down two books ago, each entry says which book introduced them, and every book's own description sits under it rather than being merged into one. Adding always writes to the book you are in. Series are read from the books on this machine, and bibles do not sync.",
       },
       {
         name: "Ideas",
@@ -245,15 +253,15 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Plans",
-        desc: "Writing, syncing and the four file formats are free. The Assistant, the audiobook and the Bookmarks panel are what Pro covers — the first two spend a model's time per use. See Pricing in the header.",
+        desc: "Writing a book and getting it out are free, whole: unlimited books, every import, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly, yearly, or bought outright once. See Pricing in the header.",
       },
       {
         name: "Paying",
-        desc: "Card details are entered on PayHere and never reach OpenChapter. Pro starts the moment PayHere confirms, usually a few seconds after you pay, and renews on the same date each cycle until you cancel.",
+        desc: "Card details are entered on PayHere and never reach OpenChapter. Pro starts the moment PayHere confirms, usually a few seconds after you pay. Monthly and yearly renew on the same date each cycle until you cancel; the one-off purchase never renews and there is nothing to cancel, which is why no Cancel button appears on it.",
       },
       {
         name: "Cancelling",
-        desc: "In your account, from the chip in the shelf header. You keep Pro until the period you have already paid for runs out, and nothing is deleted — your books are yours on either plan.",
+        desc: "In your account, from the chip in the shelf header. You keep Pro until the period you have already paid for runs out, and nothing is deleted — your books are yours on either plan, and so is everything the paid screens hold. A ledger, an advance-copy list or a series bible written on Pro stays on your machine if the plan lapses, and is there again the moment you come back.",
       },
       {
         name: "Forgotten password",

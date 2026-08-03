@@ -61,7 +61,7 @@ export function MoneyPage({ bookId }: { bookId: string }) {
         spend; we are not, which is the only reason you are reading this.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {/* ---- The numbers -------------------------------------------- */}
         <h2 className="mt-10 text-xl font-extrabold text-fg">
           What usually happens
@@ -168,14 +168,21 @@ export function MoneyPage({ bookId }: { bookId: string }) {
           ))}
         </ul>
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-          No company is named here. Several come up by name in what writers
-          post, and calling a named business a scam is a legal matter rather
-          than a feature — the checks above describe the shape of the thing,
-          which is more use anyway, because next year it will have a different
-          name. None of this is financial advice, and spending money on your
-          book can be exactly the right decision. It should just be a decision.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs leading-relaxed text-muted">
+            No company is named here. Several come up by name in what writers
+            post, and calling a named business a scam is a legal matter rather
+            than a feature — the checks above describe the shape of the thing,
+            which is more use anyway, because next year it will have a different
+            name. None of this is financial advice, and spending money on your
+            book can be exactly the right decision. It should just be a decision.
+          </p>
+        </div>
       </div>
     </div>
   );

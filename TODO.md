@@ -162,9 +162,45 @@ than replacing it.
       are derived, this is what the writer typed, and losing it silently on a
       money screen is the worst kind of failure.
 
-      *Left:* the book-three curve, which needs more than one book's ledger to
-      say anything. And `.xlsx` — KDP's default download — still has to be
-      saved as CSV by hand; reading the zip is a later job.
+      *Left:* `.xlsx` — KDP's default download — still has to be saved as CSV
+      by hand; reading the zip is a later job.
+- [x] **The book-three curve.** Done 2026-08-03. `src/lib/curve.ts` (pure, 17
+      tests) and a section in the dashboard's Track area, under the strip that
+      adds the library up — the same class of question as "am I down overall",
+      which no per-book page can answer.
+
+      The folklore is everywhere in the research and nobody can check it:
+      *no traction until your third book*. A writer two books in cannot tell
+      whether they are on that curve or whether it is a story people tell each
+      other, and the answer decides whether they write a third.
+
+      **The comparison is like-for-like or it is nothing.** Every book is
+      measured over the same number of days *from its own publication date*,
+      and the window is the age of the youngest book that qualifies, so the
+      older ones are cut back to match. A first book out three years has earned
+      more than a second out three months, and saying so proves only that time
+      passes.
+
+      **It refuses far more often than it answers, and that is the feature.**
+      Fewer than two placeable books and it draws nothing; a book with no
+      publication date has no day nought to count from; a book out less than 30
+      days is left off rather than compared over six; and a book with no sales
+      rows is a gap in the record, not a zero — those two read identically on a
+      money screen and mean opposite things. Every book left off is named with
+      why, because a quiet exclusion here would be a curve drawn through
+      whichever books happened to qualify. `curveOf` returns the accounting
+      rather than null for the same reason: "one book is on this so far" is
+      worth being told where a blank space is not.
+
+      **The folklore is quoted, never applied.** "Each earned more than the one
+      before" is a fact about four figures; "you are on the curve" is a
+      forecast off three points, and forecasts are what this product refuses to
+      sell. Costs are ignored — money the writer chose to spend says nothing
+      about whether readers turned up.
+
+      *Left:* it can only see what has been imported, so it is as good as the
+      writer's sales reports and no better. And it shares the sync hole: the
+      ledger is local, so a second machine has a different curve.
 - [x] **Genre beat sheets.** Done 2026-08-01. `/book/[bookId]/structure`,
       backed by `src/lib/beats.ts` (pure, 14 tests). Eleven beats as shares of
       the finished length, with the writer's own word count placed on them.
@@ -218,10 +254,55 @@ than replacing it.
       bible is empty — a writer who has not made one does not need telling what
       they are missing every time they open a book.
 
-      *Left:* **across a series**, which is how it was asked for. The shape here
-      would carry, but a series needs a notion of series the store does not
-      have. And the assistant filling it in by reading chapters, which is the
+      *Left:* the assistant filling it in by reading chapters, which is the
       "AI reads, never writes" job.
+- [x] **The bible across a series.** Done 2026-08-03. `src/lib/series.ts`
+      (pure, 27 tests) and a scope toggle in the same panel. The blocker
+      recorded here — "a series needs a notion of series the store does not
+      have" — had quietly gone away: `publishing.series` and `seriesIndex`
+      arrived with the listing details, because a shop asks for them.
+
+      **So a series is derived, never declared.** No series object, no "create
+      a series" screen, no migration: books are in a series when their listings
+      say the same thing. A second place to record it is a second place to keep
+      in step, which is the lesson the store already learned about word counts.
+
+      **Entries stay at their own book's key and nothing new is written.** The
+      series bible is a read across the sibling books' bibles, merged on the
+      way through. A shared `bible:series:<name>` key was the obvious other
+      answer and loses on three counts: renaming the series orphans it, a book
+      leaving takes nothing with it, and an entry loses the fact that makes the
+      merged view worth having — which book wrote it down.
+
+      **It opens on the series when there is one**, and that default is the
+      argument rather than a preference. A writer on book three whose panel
+      says "none of them, by name at least" about a chapter full of book one's
+      cast has been told something false by the half of the feature that was
+      supposed to be reliable whether or not anyone maintained a list.
+
+      **Merging is exact and refuses to be clever.** Same name or same alias,
+      case-insensitively, and nothing fuzzier — the same refusal `subjects.ts`
+      makes about "Fantasy" and "Fantasy fiction". Every rule smart enough to
+      see that Beth is Elizabeth also welds two different Toms together, and a
+      duplicate is visible to the writer where a bad merge is not. Matching
+      *is* transitive, so Elizabeth–Lizzie in book one and Lizzie–Beth in book
+      two make one person without anyone stating the pair that closes it. Kind
+      is part of identity: a character called Ash and a place called Ash stay
+      two things, because a town named after its founder is ordinary.
+
+      **Differing details are shown, not flagged.** Book one's description sits
+      above book three's, each labelled, rather than being merged or marked as
+      a contradiction. Details accumulate across a series far more often than
+      they conflict, so a warning badge would fire on nearly every character
+      and mean nothing by book two; putting both sets of words on screen is the
+      one thing the writer has never been able to do, and they can see it
+      themselves. Adding always writes to the book being written; removing
+      names the book it removes from, since an unlabelled Remove in the series
+      view would delete out of a manuscript nobody is looking at.
+
+      *Left:* the sync hole gets worse here, not better — none of these keys
+      sync, so a series read on a second machine is a series of whichever books
+      that machine holds. The panel says so.
 - [x] **Blurb workshop.** Done 2026-08-01. `/book/[bookId]/blurb`, backed by
       `src/lib/blurb.ts` (pure, 25 tests). Explicitly *not* "AI writes your
       blurb": writers in this research describe an AI-written blurb as the thing
@@ -480,23 +561,64 @@ from them as *what is out there*, never as *the answer*.
 
       *Left:* the ranking step below.
 
-- [ ] **Rank the comps with a model.**
+- [x] **Rank the comps with a model.** Done 2026-08-03.
+      `src/lib/comps/rank.ts` (pure, 29 tests), `/api/comps/rank`, and a card
+      on the comps screen.
 
       **This is the one place in the cluster where AI earns its cost:
       *deciding which books are actually like yours*.** Everything else here is
       a plain request and some arithmetic — no key, no model, no bill. But a
       keyword search returns forty books of which five are genuinely
       comparable, and sorting those five out is a fuzzy judgement, which is
-      what a model is for. Three jobs and no more: turn the writer's blurb and
-      opening chapter into a good search, rank and filter what comes back, and
-      name the pattern across them ("blurbs in this genre usually open with a
-      question").
+      what a model is for. It picks at most five, best first, each with a
+      reason in a sentence, and names the pattern across them.
 
-      Use it for the judgement, never the fetching. The APIs are free and every
-      model call is not, and a feature that calls a model to read a page count
-      is one that gets switched off when the invoice arrives. All three jobs
-      stay inside the standing position — the assistant reads and reports, and
-      never writes into the book.
+      **A separate route, and that split is the design.** `/api/comps` stays
+      free, keyless and cached for a day; the ranking is its own POST behind
+      `requirePro()` and its own button. Folding them together would have made
+      the whole feature need a key and a plan for the sake of a step most
+      searches do not want — and a feature that spends a model call to read a
+      page count is one that gets switched off when the invoice arrives. Sonnet
+      rather than the assistant's Opus, for the same reason: this is a bounded
+      classification over twenty short records.
+
+      **There is no score, and there is no field to put one in.** Not a
+      percentage, not stars, not a confidence. It would be invented, and it
+      would be the most believable invented number in the app because it would
+      sit in a list of real books. A test asserts the parsed shape carries
+      nothing but the book and the reason, and it is one of the tests not to
+      "fix".
+
+      **The model may only choose from books that were fetched.** It is handed
+      a numbered list and answers with numbers; anything out of range is
+      dropped rather than guessed at, and the parser enforces it server-side
+      where a reader with devtools cannot edit it. A model asked about books
+      will happily produce a plausible title that does not exist, and a made-up
+      comp on a screen somebody is about to paste into a query letter is the
+      worst failure this feature has available.
+
+      The parser assumes hostile input generally, because generated text is
+      neither our input nor the user's: prose preambles, code fences, bare
+      arrays, duplicate ids, reasons four paragraphs long and reasons missing
+      entirely are all handled, and each has a test. The one that bit during
+      the build is worth keeping: scanning a bare array for `{` finds the first
+      *element's* brace and silently parses one pick as the whole reply, so the
+      clean parse is tried first and the bracket shapes in the order they
+      appear.
+
+      **This is the second route that sends prose**, after the assistant. The
+      opening of the manuscript is what answers the question a keyword search
+      cannot — does this *sound* like that book — so it goes, capped at a
+      couple of pages, only on a press, and the card lists exactly what leaves
+      before the button. Same shape as the feedback dialog. Images are dropped
+      on the way out, and the sample is cut at a paragraph rather than
+      mid-sentence, since a severed clause is a false signal about how the
+      writer ends their sentences.
+
+      *Left:* the first of the three jobs — turning the blurb and opening into
+      a *better search* — is not done. `buildQuery()` still builds the query
+      out of keywords, and the model only sees what that fetched. Worth doing
+      when the ranking's answers show the search is what is limiting them.
 - [ ] **Blurb benchmarking.** Google Books returns the real blurb of every
       published book, so the blurb tool can show five actual blurbs from books
       like yours and the average length, instead of giving advice. This is what
@@ -1021,13 +1143,64 @@ should either ship or lose the card.
       cannot. So a root domain is not a launch nicety here, it is a hard
       dependency of taking a single payment.
 
-- [ ] **The two rows the pricing page still promises.** "Books 50" and
-      "Imports 10 files" on the Starter card are not enforced anywhere —
-      nothing counts a shelf or an import. Every other row on that page is now
-      real. Either wire the counters (they need a home: the shelf count is
-      local and cheap, the import count needs somewhere durable to live) or
-      change the two rows to what the app actually does. Leaving them is the
-      one bit of that page still ahead of the code.
+- [x] **The two rows the pricing page promised.** Done 2026-08-03, by
+      deleting them. "Books 50" and "Imports 10 files" were never enforced
+      anywhere — nothing counted a shelf or an import — and wiring the
+      counters would have been building a limit to keep a sentence honest,
+      which is the wrong way round. Neither limit is part of the plan now:
+      books and imports are unlimited on both sides, which is what the code has
+      always done. Every row on that page is true of the app again.
+
+- [x] **A new plan, and a lifetime tier.** Done 2026-08-03.
+      $9 monthly, $72 a year, **$199 once**. `plans.ts`, a migration widening
+      the two `period` CHECK constraints, and gates moved to match.
+
+      **The lifetime tier exists because this market does not subscribe.**
+      Scrivener is $59.99 bought once, Atticus $147, Vellum $199–250,
+      Publisher Rocket $199 — all one-time. A writer comparing us against
+      those is being asked to accept a model the category has trained them to
+      distrust, and no amount of being cheaper answers that. The outright
+      purchase sits in the billing toggle beside the cycles, where the
+      objection is formed.
+
+      Four things about it are load-bearing, and each is a real failure if
+      missed. **PayHere is sent no `recurrence` and no `duration`** — those
+      two fields are the whole of what makes a charge repeat, so shipping them
+      against a $199 order would bill somebody $199 a month; `recurrenceOf`
+      returns null and the checkout spreads the keys in conditionally rather
+      than setting them empty, because an empty string is still a field.
+      **`periodEnd` returns null**, since a far-future sentinel would have
+      every screen tell a writer their outright purchase renews in 2999.
+      **`isPro` checks the period before the missing-date guard**, or every
+      writer who paid would be refused — that guard reads a null end as "the
+      first payment has not landed". And **`canCancel` is already false** for
+      it, because PayHere issues no subscription id for a one-off; do not
+      loosen that, since offering to cancel something bought outright is
+      offering to take it away for nothing.
+
+      **The split is by what a row costs to run and who it is for.** Writing a
+      book and getting it out stays free and whole — unlimited books, every
+      import, all four exports, sync, the check and the roadmap, comps, blurb,
+      categories, covers, structure, progress. Every competitor charges for
+      formatting, so giving it away is the wedge, and the landing page has
+      promised it in those words since it was written. Pro is the metered
+      routes and the business layer: money, readers, the curve, the evidence
+      document, the prose report, and the series read of the story bible.
+
+      **Bookmarks came off Pro.** It was the weakest paid row the app had —
+      a filtered view of stars already set, computed in the browser, gated by a
+      client-side check on data sitting in `localStorage`. A paid feature whose
+      gate is visibly decorative teaches a reader that the rest are too.
+
+      *Left:* the enforcement is uneven and the pricing page's own comment now
+      says which is which. Four rows are checked server-side by `requirePro()`;
+      the rest are computed in the browser and gated there. That is normal for
+      local-first software, but it means **the honest hard lever is syncing the
+      Pro data** — the ledger, the ARC list and the bible do not sync at all
+      yet, and building that sync as Pro-only would move those rows behind a
+      check a reader cannot edit. A free-tier book limit on sync was considered
+      for this and rejected: it undermines the one promise this product cannot
+      afford to weaken, which is that your books are safe here.
 
 - [ ] **A receipt of their own.** PayHere emails one, and that is what a writer
       is told to trust. A payments list in the account dialog — read straight

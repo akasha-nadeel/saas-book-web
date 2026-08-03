@@ -4,12 +4,27 @@ import { useMemo, useState } from "react";
 import {
   KINDS,
   mentionedIn,
+  parseBible,
   type BibleEntry,
   type EntryKind,
 } from "@/lib/bible";
-import { saveBibleRaw } from "@/lib/library-store";
+import { getBibleRaw, saveBibleRaw } from "@/lib/library-store";
 import { chapterText } from "@/lib/search";
-import { useBible, useChapterBody } from "@/lib/use-library";
+import {
+  introducedIn,
+  isSeries,
+  seriesMentions,
+  seriesNameOf,
+  seriesOf,
+  type SeriesBook,
+} from "@/lib/series";
+import { ProGate, useEntitled } from "@/components/upgrade/pro-gate";
+import {
+  useBible,
+  useChapterBody,
+  useSeriesBible,
+  useShelf,
+} from "@/lib/use-library";
 
 /**
  * The story bible, in the rail beside the manuscript.
@@ -29,6 +44,20 @@ import { useBible, useChapterBody } from "@/lib/use-library";
  * Aliases matter more than they look. A character who is Elizabeth to the
  * narrator and Lizzie to her brother is one person, and a lookup that missed
  * the second would be worse than no lookup at all.
+ *
+ * **The series scope is the same panel reading wider**, and it opens on the
+ * series when there is one. That default is the whole point rather than a
+ * preference: a writer on book three whose panel answers "none of them, by
+ * name at least" about a chapter full of book one's cast has been told
+ * something false by a feature that was supposed to be the reliable half. See
+ * `series.ts` for what a series is and how two books' entries become one.
+ *
+ * Two things about scope are decided here rather than in the module. **Adding
+ * always writes to the book being written**, whichever scope is showing,
+ * because that is where the writer just invented whoever it is. And
+ * **removing names the book it removes from**, since in the series view an
+ * entry can belong to a book that is not open — an unlabelled Remove there
+ * would delete something out of a manuscript the writer is not looking at.
  */
 export function BiblePanel({
   bookId,
@@ -37,8 +66,33 @@ export function BiblePanel({
   bookId: string;
   chapterId: string;
 }) {
-  const entries = useBible(bookId);
+  const shelf = useShelf();
+  const own = useBible(bookId);
   const body = useChapterBody(chapterId);
+
+  const series = useMemo(
+    () => seriesOf(shelf.books, bookId),
+    [shelf.books, bookId],
+  );
+  const hasSeries = isSeries(series);
+  const merged = useSeriesBible(series);
+  const self = shelf.books.find((b) => b.id === bookId);
+  const seriesName = self ? seriesNameOf(self) : null;
+
+  const [scope, setScope] = useState<"book" | "series">("series");
+  const entitled = useEntitled();
+
+  /*
+   * Reading across a series is the paid half; one book's bible is not.
+   *
+   * The toggle is drawn either way and pressing it does something either way —
+   * a control that greys out tells a writer nothing about what they are
+   * missing, and the whole argument for this feature is one paragraph long.
+   * `wide` stays false while it is gated so the merge is never computed for a
+   * list nobody is going to see.
+   */
+  const wide = hasSeries && scope === "series" && entitled;
+  const gated = hasSeries && scope === "series" && !entitled;
 
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -47,35 +101,82 @@ export function BiblePanel({
   const [kind, setKind] = useState<EntryKind>("character");
   const [open, setOpen] = useState<string | null>(null);
 
-  const here = useMemo(
-    () => mentionedIn(chapterText("", body), entries),
-    [body, entries],
+  const rows: Row[] = useMemo(
+    () =>
+      wide
+        ? merged.map((entry) => ({
+            id: entry.id,
+            kind: entry.kind,
+            name: entry.name,
+            aka: entry.aka,
+            wrote: entry.in,
+            from: introducedIn(entry),
+          }))
+        : own.map((entry) => ({
+            id: entry.id,
+            kind: entry.kind,
+            name: entry.name,
+            aka: entry.aka,
+            wrote: [{ book: null, entry }],
+            from: null,
+          })),
+    [wide, merged, own],
   );
 
-  function commit(next: BibleEntry[]) {
-    saveBibleRaw(bookId, JSON.stringify(next));
-  }
+  const here: Mentioned[] = useMemo(() => {
+    const text = chapterText("", body);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const found = wide
+      ? seriesMentions(text, merged).map((m) => ({
+          id: m.entry.id,
+          count: m.count,
+        }))
+      : mentionedIn(text, own).map((m) => ({ id: m.entry.id, count: m.count }));
+    return found.flatMap(({ id, count }) => {
+      const row = byId.get(id);
+      return row ? [{ ...row, count }] : [];
+    });
+  }, [body, rows, wide, merged, own]);
+
+  /** Of the names in this chapter, how many were written down elsewhere. */
+  const borrowed = here.filter((r) => r.from && r.from.id !== bookId).length;
 
   function add() {
     if (!name.trim()) return;
-    commit([
-      ...entries,
-      {
-        id: crypto.randomUUID(),
-        kind,
-        name: name.trim(),
-        aka: aka
-          .split(",")
-          .map((a) => a.trim())
-          .filter(Boolean),
-        detail: detail.trim(),
-        at: Date.now(),
-      },
-    ]);
+    // Always into the book being written, whichever scope is on screen.
+    saveBibleRaw(
+      bookId,
+      JSON.stringify([
+        ...own,
+        {
+          id: crypto.randomUUID(),
+          kind,
+          name: name.trim(),
+          aka: aka
+            .split(",")
+            .map((a) => a.trim())
+            .filter(Boolean),
+          detail: detail.trim(),
+          at: Date.now(),
+        },
+      ]),
+    );
     setName("");
     setAka("");
     setDetail("");
     setAdding(false);
+  }
+
+  /**
+   * Removing reads that book's own list back rather than filtering the merged
+   * one: what is written to `bible:<id>` has to be that book's entries and
+   * nobody else's, and the merged view is several books at once.
+   */
+  function removeFrom(book: SeriesBook | null, entryId: string) {
+    const id = book?.id ?? bookId;
+    const from = id === bookId ? own : parseBible(getBibleRaw(id));
+    saveBibleRaw(id, JSON.stringify(from.filter((e) => e.id !== entryId)));
+    setOpen(null);
   }
 
   return (
@@ -92,6 +193,40 @@ export function BiblePanel({
           {adding ? "Cancel" : "Add"}
         </button>
       </div>
+
+      {hasSeries && (
+        <div className="border-b border-line px-3 py-2.5">
+          <div className="flex rounded-md border border-line p-0.5">
+            {(
+              [
+                ["book", "This book"],
+                ["series", "The series"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setScope(id)}
+                aria-pressed={scope === id}
+                className={`flex-1 rounded px-2 py-1 font-sans text-xs font-medium ${
+                  scope === id
+                    ? "bg-raised text-fg"
+                    : "text-muted hover:text-fg"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {wide && (
+            <p className="mt-2 font-sans text-[11px] leading-relaxed text-muted">
+              {seriesName ?? "This series"} — {series.length} books on this
+              machine. Bibles are not synced, so a series read elsewhere is
+              whatever that machine holds.
+            </p>
+          )}
+        </div>
+      )}
 
       {adding && (
         <form
@@ -144,16 +279,24 @@ export function BiblePanel({
             className="rounded-md bg-accent px-3 py-1.5 font-sans text-xs font-semibold
                        text-accent-ink disabled:opacity-40"
           >
-            Add to the bible
+            Add to this book
           </button>
         </form>
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {entries.length === 0 ? (
+        {gated ? (
+          <ProGate
+            title="The series bible"
+            what="Every book in the series read as one cast, so the lookup finds the people you wrote down two books ago — each entry saying which book introduced them, with every book's own description under it rather than merged into one."
+          >
+            {null}
+          </ProGate>
+        ) : rows.length === 0 ? (
           <p className="font-sans text-sm text-muted">
-            Nothing here yet. Add the people, places and things you will have
-            forgotten the details of by the time they come back.
+            {wide
+              ? "Nothing written down in any of these books yet. Add the people, places and things that will have to be the same three books from now."
+              : "Nothing here yet. Add the people, places and things you will have forgotten the details of by the time they come back."}
           </p>
         ) : (
           <>
@@ -167,27 +310,34 @@ export function BiblePanel({
                 None of them, by name at least.
               </p>
             ) : (
-              <ul className="mb-5 flex flex-wrap gap-1.5">
-                {here.map(({ entry, count }) => (
-                  <li key={entry.id}>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setOpen(open === entry.id ? null : entry.id)
-                      }
-                      className="rounded-full bg-accent/10 px-2.5 py-1 font-sans text-xs
-                                 font-medium text-accent"
-                    >
-                      {entry.name}
-                      <span className="ml-1 opacity-70">{count}</span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="mb-2 flex flex-wrap gap-1.5">
+                  {here.map((row) => (
+                    <li key={row.id}>
+                      <button
+                        type="button"
+                        onClick={() => setOpen(open === row.id ? null : row.id)}
+                        className="rounded-full bg-accent/10 px-2.5 py-1 font-sans text-xs
+                                   font-medium text-accent"
+                      >
+                        {row.name}
+                        <span className="ml-1 opacity-70">{row.count}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {borrowed > 0 && (
+                  <p className="mb-5 font-sans text-[11px] text-muted">
+                    {borrowed} of {here.length} first written down in an earlier
+                    book.
+                  </p>
+                )}
+                {borrowed === 0 && <div className="mb-5" />}
+              </>
             )}
 
             {KINDS.map((k) => {
-              const inKind = entries.filter((e) => e.kind === k.id);
+              const inKind = rows.filter((e) => e.kind === k.id);
               if (inKind.length === 0) return null;
               return (
                 <div key={k.id} className="mb-4">
@@ -195,47 +345,59 @@ export function BiblePanel({
                     {k.label}
                   </p>
                   <ul className="flex flex-col gap-1">
-                    {inKind.map((entry) => (
-                      <li key={entry.id}>
+                    {inKind.map((row) => (
+                      <li key={row.id}>
                         <button
                           type="button"
                           onClick={() =>
-                            setOpen(open === entry.id ? null : entry.id)
+                            setOpen(open === row.id ? null : row.id)
                           }
                           className="w-full rounded-md px-2 py-1.5 text-left font-sans
                                      text-sm text-fg hover:bg-raised"
                         >
-                          {entry.name}
-                          {entry.aka.length > 0 && (
+                          {row.name}
+                          {row.aka.length > 0 && (
                             <span className="text-muted">
                               {" "}
-                              · {entry.aka.join(", ")}
+                              · {row.aka.join(", ")}
                             </span>
                           )}
                         </button>
-                        {open === entry.id && (
-                          <div className="mt-1 rounded-md bg-raised p-2.5">
-                            {entry.detail ? (
-                              <p className="font-sans text-xs leading-relaxed whitespace-pre-wrap text-fg">
-                                {entry.detail}
-                              </p>
-                            ) : (
-                              <p className="font-sans text-xs text-muted">
-                                No detail written.
-                              </p>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                commit(
-                                  entries.filter((e) => e.id !== entry.id),
-                                );
-                                setOpen(null);
-                              }}
-                              className="mt-2 font-sans text-[11px] text-muted"
-                            >
-                              Remove
-                            </button>
+                        {open === row.id && (
+                          <div className="mt-1 flex flex-col gap-2">
+                            {row.wrote.map(({ book, entry }) => (
+                              <div
+                                key={`${book?.id ?? bookId}:${entry.id}`}
+                                className="rounded-md bg-raised p-2.5"
+                              >
+                                {book && (
+                                  <p className="mb-1 font-sans text-[11px] tracking-wide text-muted uppercase">
+                                    {book.index === undefined
+                                      ? book.title
+                                      : `${book.index}. ${book.title}`}
+                                    {book.id === bookId && " · open"}
+                                  </p>
+                                )}
+                                {entry.detail ? (
+                                  <p className="font-sans text-xs leading-relaxed whitespace-pre-wrap text-fg">
+                                    {entry.detail}
+                                  </p>
+                                ) : (
+                                  <p className="font-sans text-xs text-muted">
+                                    No detail written.
+                                  </p>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => removeFrom(book, entry.id)}
+                                  className="mt-2 font-sans text-[11px] text-muted hover:text-fg"
+                                >
+                                  {book && book.id !== bookId
+                                    ? `Remove from ${book.title}`
+                                    : "Remove"}
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </li>
@@ -251,3 +413,25 @@ export function BiblePanel({
   );
 }
 
+/**
+ * One list shape for both scopes, so the panel has one render path.
+ *
+ * `wrote` is why it exists: in the series view an entry is several books'
+ * entries, each with its own words, and the writer wants to read book one's
+ * description beside book three's rather than a merge of the two.
+ */
+interface Row {
+  id: string;
+  kind: EntryKind;
+  name: string;
+  aka: string[];
+  /** `book` is null in the one-book scope, where there is nothing to attribute. */
+  wrote: { book: SeriesBook | null; entry: BibleEntry }[];
+  /** Where the reader met them. Null in the one-book scope. */
+  from: SeriesBook | null;
+}
+
+/** A row the open chapter actually names, and how often. */
+interface Mentioned extends Row {
+  count: number;
+}

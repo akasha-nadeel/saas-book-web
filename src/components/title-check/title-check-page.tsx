@@ -101,7 +101,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {heading}
 
         {/* `ToolHeader` is suppressed in the roadmap's panel and it was the
@@ -221,7 +221,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
                       </span>
                       <span className="font-bold text-fg">{other.title}</span>
                     </span>
-                    <p className="mt-1 text-sm text-muted">
+                    <p className="max-w-prose mt-1 text-sm text-muted">
                       {other.authors.join(", ")}
                       {other.year ? ` · ${other.year}` : ""}
                     </p>
@@ -245,12 +245,19 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
         {/* Only alongside results. It is advice about *reading* a list, and
             it ran on an empty screen where there was no list to read. */}
         {state === "done" && !error && (
-          <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
-            We do not tell you whether to change it. Sharing a title with an
-            obscure book from 1974 is nothing; sharing one with a bestseller in
-            your genre is a real problem — and you can tell which you are
-            looking at faster than any rule we could write.
-          </p>
+          <div className="mt-10 border-t border-line pt-6">
+            {/* The rule spans the page and the sentence does not.
+                They were one element while a tool page was 3xl wide,
+                where the two widths happened to agree; at 5xl a line of
+                text run to the full container is about 160 characters,
+                which is twice a readable measure. */}
+            <p className="max-w-3xl text-xs text-muted">
+              We do not tell you whether to change it. Sharing a title with an
+              obscure book from 1974 is nothing; sharing one with a bestseller in
+              your genre is a real problem — and you can tell which you are
+              looking at faster than any rule we could write.
+            </p>
+          </div>
         )}
       </div>
     </div>

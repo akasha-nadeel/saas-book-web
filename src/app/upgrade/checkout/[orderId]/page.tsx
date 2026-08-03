@@ -10,9 +10,10 @@ import {
   siteUrl,
 } from "@/lib/billing/payhere";
 import {
-  DURATION,
   asPeriod,
+  cycleLabel,
   displayPrice,
+  durationOf,
   itemNameOf,
   payhereAmount,
   recurrenceOf,
@@ -88,7 +89,7 @@ export default async function CheckoutPage(
       summary={{
         item: itemNameOf(period),
         price: displayPrice(Number(order.amount), currency === "LKR" ? "LKR" : "USD"),
-        cycle: period === "annual" ? "a year" : "a month",
+        cycle: cycleLabel(period),
       }}
       email={typeof claims.email === "string" ? claims.email : ""}
       /* Everything PayHere is signed against, plus the two fields it hands back
@@ -105,8 +106,15 @@ export default async function CheckoutPage(
         currency,
         amount,
         hash,
-        recurrence: recurrenceOf(period),
-        duration: DURATION,
+        /* Spread rather than set, because for a lifetime purchase these two
+           must be *absent* and not empty. PayHere reads the presence of
+           `recurrence` and `duration` as "make this repeat" — an empty string
+           is still a field, and shipping one against a $199 order would set up
+           a $199 monthly authorisation. `recurrenceOf` returns null for
+           exactly this, so the object below has no such keys at all. */
+        ...(recurrenceOf(period) && durationOf(period)
+          ? { recurrence: recurrenceOf(period)!, duration: durationOf(period)! }
+          : {}),
         custom_1: String(claims.sub),
         custom_2: period,
       }}

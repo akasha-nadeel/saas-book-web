@@ -210,6 +210,15 @@ export async function POST(request: Request) {
  * The new period runs from wherever the paid-up one ended, not from now — a
  * renewal that lands a day early would otherwise quietly cost the writer a day
  * every cycle. From now only when there is nothing left to run from.
+ *
+ * **A lifetime purchase writes a null `current_period_end`**, which is what
+ * `periodEnd` returns for it: there is no date, and putting a far-future
+ * sentinel there would have every screen tell the writer their outright
+ * purchase renews in the year 2999. `isPro` reads the period for that one and
+ * never looks at the date, so the null is safe. It also means a lifetime row
+ * cannot be renewed into — there is nothing to extend, and PayHere will never
+ * send a second notification for it because the checkout carried no
+ * recurrence.
  */
 async function grant(
   supabase: NonNullable<ReturnType<typeof createAdminClient>>,
@@ -232,6 +241,7 @@ async function grant(
       : null;
 
   const from = previous && previous > now ? previous : now;
+  const end = periodEnd(from, period);
 
   const { error } = await supabase.from("subscriptions").upsert(
     {
@@ -241,7 +251,7 @@ async function grant(
       status: "active",
       payhere_subscription_id: subscriptionId,
       payhere_order_id: orderId,
-      current_period_end: periodEnd(from, period).toISOString(),
+      current_period_end: end ? end.toISOString() : null,
       // A renewal on a subscription the writer had cancelled would be a
       // contradiction, but clearing this is right either way: what is being
       // written here is an active plan.

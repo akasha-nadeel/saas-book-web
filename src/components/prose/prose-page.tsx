@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
 import { findBook, getBody, orderedChapters } from "@/lib/library-store";
 import { proseReport } from "@/lib/prose";
 import { chapterText } from "@/lib/search";
@@ -28,6 +29,10 @@ import { useHydrated, useShelf } from "@/lib/use-library";
  * to run a report the writer asked for once would cost more than it saves.
  */
 export function ProsePage({ bookId }: { bookId: string }) {
+  // Read here with the other hooks rather than beside the early return
+  // below: hooks cannot sit after a conditional, and this screen has
+  // several of its own already.
+  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -62,6 +67,25 @@ export function ProsePage({ bookId }: { bookId: string }) {
     );
   }
 
+  // The gate stands *after* the not-found guard above: a writer who
+  // followed a stale link to a deleted book should be told the book is
+  // gone, not asked to pay for one that does not exist.
+  if (!entitled) {
+    return (
+      <GatedTool
+        book={book}
+        tool="Prose report"
+        what="What is in a chapter, counted: dialogue tags that are not “said”, words ending in -ly, filter words, runs of sentences that open the same way, and very long sentences. There is no score and it never changes a word — none of these is a fault, and the service is showing you where yours are."
+        deck={
+          <>
+            What is in the chapter, counted. Nothing here is a fault and nothing
+        here changes a word — the decisions are all yours.
+          </>
+        }
+      />
+    );
+  }
+
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
       <ToolHeader book={book} tool="Prose report">
@@ -69,7 +93,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
         here changes a word — the decisions are all yours.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {chapters.length === 0 ? (
           <p className="mt-8 text-muted">
             Nothing written yet. There is nothing to count.
@@ -123,13 +147,13 @@ export function ProsePage({ bookId }: { bookId: string }) {
                       >
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <p className="font-bold text-fg">{finding.label}</p>
-                          <p className="text-sm text-muted">
+                          <p className="max-w-prose text-sm text-muted">
                             {finding.count.toLocaleString()}
                             {finding.per1000 !== undefined &&
                               ` · ${finding.per1000} per 1,000 words`}
                           </p>
                         </div>
-                        <p className="mt-2 text-sm leading-relaxed text-muted">
+                        <p className="max-w-prose mt-2 text-sm leading-relaxed text-muted">
                           {finding.note}
                         </p>
                         {finding.examples.length > 0 && (
@@ -146,13 +170,20 @@ export function ProsePage({ bookId }: { bookId: string }) {
           </>
         )}
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-          There is no score here, and there will not be one. A number out of a
-          hundred for prose is invented to look like an answer. Adverbs are not
-          a fault, filter words are not a fault, and a long sentence is a style
-          — these are things writers are widely advised about, and the only
-          useful service is showing you where yours are.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs leading-relaxed text-muted">
+            There is no score here, and there will not be one. A number out of a
+            hundred for prose is invented to look like an answer. Adverbs are not
+            a fault, filter words are not a fault, and a long sentence is a style
+            — these are things writers are widely advised about, and the only
+            useful service is showing you where yours are.
+          </p>
+        </div>
       </div>
     </div>
   );

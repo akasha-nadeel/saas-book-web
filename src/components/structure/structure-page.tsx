@@ -59,7 +59,7 @@ export function StructurePage({ bookId }: { bookId: string }) {
         A convention, not a rule — good novels break every line below.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {!placements ? (
           <section className="mt-8 rounded-xl border border-line bg-panel p-5">
             <p className="font-bold text-fg">This book has no target length</p>
@@ -128,7 +128,7 @@ export function StructurePage({ bookId }: { bookId: string }) {
                       {beat.toWords.toLocaleString()} words
                     </p>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">
+                  <p className="max-w-prose mt-2 text-sm leading-relaxed text-muted">
                     {beat.what.replace(/\*\*/g, "")}
                   </p>
                 </li>
@@ -137,13 +137,20 @@ export function StructurePage({ bookId }: { bookId: string }) {
           </>
         )}
 
-        <p className="mt-10 border-t border-line pt-6 text-xs text-muted">
-          These names are ours and deliberately plain. The famous beat sheets
-          are somebody&rsquo;s copyrighted framework, and their vocabulary is a
-          barrier of its own — you should not have to read a book about
-          structure before you can use a page about structure. Nothing here is a
-          rule, and no part of your book is wrong for being somewhere else.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs text-muted">
+            These names are ours and deliberately plain. The famous beat sheets
+            are somebody&rsquo;s copyrighted framework, and their vocabulary is a
+            barrier of its own — you should not have to read a book about
+            structure before you can use a page about structure. Nothing here is a
+            rule, and no part of your book is wrong for being somewhere else.
+          </p>
+        </div>
       </div>
     </div>
   );

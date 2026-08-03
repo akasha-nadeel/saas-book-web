@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
 import { parseHistory } from "@/lib/history";
 import {
   findBook,
@@ -42,6 +43,10 @@ import { useActivity, useHydrated, useShelf } from "@/lib/use-library";
  * frightened people that does not do what they were told it does.
  */
 export function ProvenancePage({ bookId }: { bookId: string }) {
+  // Read here with the other hooks rather than beside the early return
+  // below: hooks cannot sit after a conditional, and this screen has
+  // several of its own already.
+  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const activity = useActivity();
@@ -123,6 +128,28 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
     );
   }
 
+  // The gate stands *after* the not-found guard above: a writer who
+  // followed a stale link to a deleted book should be told the book is
+  // gone, not asked to pay for one that does not exist.
+  if (!entitled) {
+    return (
+      <GatedTool
+        book={book}
+        tool="Writing record"
+        what="The trail your work left while it was being done — which days you wrote on, how the count moved, every draft saved along the way — gathered into a plain-text document you can send if you are ever accused of not having written your own book, with a SHA-256 fingerprint of the manuscript."
+        deck={
+          <>
+            If someone accuses you of not having written your own book, there is no
+        test that settles it — and the detectors sold for the job are known to
+        misfire on plain prose and on writers whose first language is not
+        English. What people actually reach for is the trail the work left while
+        it was being done. This is yours, in a document you can send.
+          </>
+        }
+      />
+    );
+  }
+
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
       <ToolHeader book={book} tool="Writing record">
@@ -133,7 +160,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
         it was being done. This is yours, in a document you can send.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
@@ -162,7 +189,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
                 label="net words"
               />
             </section>
-            <p className="mt-3 text-sm text-muted">
+            <p className="max-w-prose mt-3 text-sm text-muted">
               {record.firstDay} to {record.lastDay}.
             </p>
           </>
@@ -178,7 +205,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
               {imports.length} {imports.length === 1 ? "day is" : "days are"}{" "}
               larger than anyone types
             </p>
-            <p className="mt-2 text-sm text-muted">
+            <p className="max-w-prose mt-2 text-sm text-muted">
               {imports.map((d) => d.day).join(", ")} — that is a file arriving,
               not a day of drafting. If you imported a manuscript you wrote
               elsewhere, this is what it looks like, and it is evidence of
@@ -218,7 +245,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
                     timestamped establishes nothing, and we must not be the
                     ones holding the timestamp — a notary that is also the
                     accused party is not a notary. */}
-                <p className="mt-3 text-sm text-muted">
+                <p className="max-w-prose mt-3 text-sm text-muted">
                   Anyone with the same text gets the same number. On its own it
                   dates nothing. Put it somewhere outside your own control now —
                   email it to yourself, post it, commit it — so there is a
@@ -293,12 +320,19 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
           </Limit>
         </ul>
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-          Nothing on this page is sent anywhere. The fingerprint is computed in
-          your browser and we never see it — which is also why we cannot vouch
-          for it, and why the document tells whoever reads it to check the
-          number themselves.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs leading-relaxed text-muted">
+            Nothing on this page is sent anywhere. The fingerprint is computed in
+            your browser and we never see it — which is also why we cannot vouch
+            for it, and why the document tells whoever reads it to check the
+            number themselves.
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -82,7 +82,7 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
         all depend on the page count, which is why this takes people an evening.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {/* ---- The two things it needs ---------------------------------- */}
         <section className="grid gap-4 rounded-xl border border-line bg-panel p-5 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
@@ -144,7 +144,7 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
 
         {/* ---- The wrap, to scale --------------------------------------- */}
         <h2 className="mt-8 font-bold text-fg">The cover you send</h2>
-        <p className="mt-1 text-sm text-muted">
+        <p className="max-w-prose mt-1 text-sm text-muted">
           One image, this shape — not three files. Drawn to scale from the
           numbers below.
         </p>
@@ -175,7 +175,7 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
           />
         </section>
 
-        <p className="mt-4 text-sm text-muted">
+        <p className="max-w-prose mt-4 text-sm text-muted">
           Trim size is {size.label}, from this book&rsquo;s page setup. Outside
           margins need at least {spec.outsideMargin}″.
         </p>

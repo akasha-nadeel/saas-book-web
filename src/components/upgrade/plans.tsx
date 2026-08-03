@@ -10,29 +10,45 @@ import { displayPrice, perMonthOf, priceOf } from "@/lib/billing/plans";
  * The two plans, presented as a pricing section rather than a settings screen:
  * a chip, a headline, a period switch, then the cards.
  *
- * Both cards run the same eight lines with a value against each, rather than
- * each listing only what it includes. It is the longer of the two shapes, and
- * it is the one that answers the question actually being asked: not "what does
- * Pro have" but "what do I lose by staying". A row missing from one side breaks
- * the line the eye reads across, so a row is never dropped — it is answered.
+ * Both cards run the same lines with a value against each, rather than each
+ * listing only what it includes. It is the longer of the two shapes, and it is
+ * the one that answers the question actually being asked: not "what does Pro
+ * have" but "what do I lose by staying". A row missing from one side breaks the
+ * line the eye reads across, so a row is never dropped — it is answered.
  *
  * The paid card is `bg-fg`/`text-surface`, not a fixed colour. Stated as the
  * two tokens it inverts with the palette rather than against it — which is what
  * keeps it a card standing off the page instead of a hole cut in one, and is
  * the whole of why the palette is written as jobs rather than as hues.
  *
- * Two of the lines below are still the plan the app intends rather than the app
- * as it stands: nothing counts a shelf to fifty or an eleventh import. The
- * other six are real — the assistant and the audiobook check the subscription
- * server-side, and the bookmark panel checks it in the browser. Where a row is
- * ahead of the code it is a promise, and TODO.md records which two.
+ * **Every line below is true of the code.** The two that were not — a shelf
+ * counted to fifty and an eleventh import refused — are gone rather than
+ * reworded, because nothing ever counted either, and a limit promised on a
+ * pricing page that no code enforces is the same failure as a feature claim the
+ * app cannot back.
+ *
+ * The rows differ in *how* they are enforced, and it is worth knowing which is
+ * which. The four metered ones — assistant, ranked comps, audiobook, audio
+ * import — are checked server-side by `requirePro()`, which is the only check a
+ * reader with devtools cannot edit. The rest are computed in the browser and
+ * are therefore gated in the browser: the prose report, the money screens, the
+ * advance-copy list, the writing record and the series bible. That is normal
+ * for local-first software and it is not a secret, but do not add a row here
+ * whose value depends on the gate being unbreakable.
  *
  * The figures are not written here. They come from lib/billing/plans.ts, which
  * is also what signs the amount into the PayHere checkout, so the number on the
  * card and the number on the card statement cannot drift apart.
  */
 
-type Period = "monthly" | "annual";
+/*
+ * Imported rather than restated. This file used to declare its own
+ * `type Period = "monthly" | "annual"`, which is the same drift the note above
+ * warns about with prices, one level up: adding a third way to buy in
+ * `plans.ts` left this copy two-valued, and the toggle could not offer what the
+ * checkout was perfectly able to charge for.
+ */
+import type { Period } from "@/lib/billing/plans";
 
 /**
  * The one value that means "no". Named, because the mark in front of a row is
@@ -48,30 +64,63 @@ const NOT_INCLUDED = "Not included";
  * and the three have to be indistinguishable — a button that changes shape as
  * the page learns what plan you are on reads as a glitch.
  *
- * The ring is offset onto the card's own ground rather than drawn against the
- * button: the pill is bg-surface, and a surface ring touching it would only
- * make it look bigger. Both colours are tokens, so it inverts with the card.
+ * **Filled with the accent, which is what now separates the two cards.** The
+ * Pro card used to be inverted — near-black ground, pale button — and both
+ * cards are the same card now, so the hierarchy has to come from somewhere
+ * that means something. The accent is the app's one reserved hue and it means
+ * exactly this: the way forward. The free card's button is an outline, because
+ * two filled buttons side by side ask the reader to choose between two equals.
+ *
+ * `text-accent-ink` rather than a fixed white: the fill is white at night and
+ * near-black by day, so a hardcoded colour is invisible in exactly one theme.
  */
-const PRO_BUTTON = `block rounded-xl bg-surface px-5 py-3 text-center font-sans
-  text-sm font-semibold text-fg outline-none transition-opacity
-  hover:opacity-90 focus-visible:ring-2 focus-visible:ring-surface
-  focus-visible:ring-offset-2 focus-visible:ring-offset-fg`;
+const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
+  text-sm font-semibold text-accent-ink outline-none transition-opacity
+  hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent/60`;
 
-/** The comparison, read across a line: label, what Starter gives, what Pro does. */
+/**
+ * The comparison, read across a line: label, what Starter gives, what Pro does.
+ *
+ * **The split is by what a row costs to run and who it is for**, not by what
+ * would squeeze hardest. Three lines govern it:
+ *
+ * - **Writing a book and getting it out is free, whole.** All four exports, the
+ *   pre-upload check and the roadmap included. Every competitor charges for
+ *   formatting — Scrivener at $60, Atticus at $147, Vellum at $200 and up — so
+ *   giving it away is the wedge, and the landing page has already promised it
+ *   in those words: get it out without paying to find out what was wrong.
+ * - **Anything with a bill attached is Pro.** The four metered routes cost real
+ *   money per use and are the only things here that do.
+ * - **The business layer is Pro.** Earnings, advance readers, the curve, the
+ *   evidence document: a drafting writer has no money and a selling one does.
+ *
+ * Two rows were removed rather than reworded. "Books 50" and "Imports 10 files"
+ * were limits the code has never enforced — a promise on a pricing page that
+ * nothing implements is the same failure as a claim the code cannot back, and
+ * this is the page a sceptical reader checks hardest.
+ */
 const ROWS: { label: string; starter: string; pro: string }[] = [
-  { label: "Books", starter: "50", pro: "Unlimited" },
-  { label: "Sync", starter: "Every device", pro: "Every device" },
+  { label: "Books and words", starter: "Unlimited", pro: "Unlimited" },
   { label: "Exports", starter: "All four", pro: "All four" },
-  { label: "Imports", starter: "10 files", pro: "Unlimited" },
+  { label: "Imports", starter: "Unlimited", pro: "Unlimited" },
+  { label: "Pre-upload check & roadmap", starter: "Included", pro: "Included" },
+  { label: "Comp search, blurb, categories, covers", starter: "Included", pro: "Included" },
+  { label: "Structure & progress", starter: "Included", pro: "Included" },
+  { label: "Story bible", starter: "Per book", pro: "Across a series" },
   // Free on both because it costs nothing to run: dictation is the browser's
   // own SpeechRecognition, not the paid transcriber. The value says which
   // browsers rather than "Included" — it is a Chrome and Edge feature, the
   // button hides itself elsewhere, and a plan row is the wrong place to find
   // that out later.
   { label: "Voice typing", starter: "Chrome & Edge", pro: "Chrome & Edge" },
-  { label: "Bookmarks", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Sync", starter: "Every device", pro: "Every device" },
   { label: "Assistant", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Audiobook", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Audiobook & audio import", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Prose report", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Money tracking & the curve", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Advance copies", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Writing record", starter: NOT_INCLUDED, pro: "Included" },
 ];
 
 export function Plans({
@@ -101,11 +150,23 @@ export function Plans({
     {},
   );
 
-  const perMonth = displayPrice(perMonthOf(period));
+  /*
+   * What the big figure says, and what sits under it.
+   *
+   * The two cycles show a per-month rate with the real total underneath,
+   * because a reader compares plans by the month. Lifetime shows the whole
+   * price, because `perMonthOf` returns null for it on purpose — dividing a
+   * one-off purchase by an assumed number of months would invent a rate out of
+   * a guess about how long somebody keeps writing.
+   */
+  const rate = perMonthOf(period);
+  const headline = displayPrice(rate ?? priceOf(period));
   const note =
-    period === "annual"
-      ? `${displayPrice(priceOf("annual"))} billed annually`
-      : undefined;
+    period === "lifetime"
+      ? "paid once, yours from then on"
+      : period === "annual"
+        ? `${displayPrice(priceOf("annual"))} billed annually`
+        : undefined;
 
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
@@ -190,12 +251,13 @@ export function Plans({
           />
 
           <PlanCard
-            dark
-            badge="Popular"
+            featured
+            badge="Ideal once the book is going out"
             mark={<StackIcon className="h-6 w-6" />}
             name="Pro"
-            blurb="For the assistant, the bookmarks and the book read aloud."
-            price={perMonth}
+            blurb="For the assistant, the money, the readers and the book read aloud."
+            price={headline}
+            unit={period === "lifetime" ? null : "/month"}
             note={note}
             rows={ROWS.map((r) => ({ label: r.label, value: r.pro }))}
             action={
@@ -281,9 +343,20 @@ function PeriodToggle({
   period: Period;
   onChange: (next: Period) => void;
 }) {
+  /*
+   * Three, and the third is not a cycle.
+   *
+   * "Once" sits in a billing-period toggle because that is where a reader
+   * looks for it, and because this market buys software outright: Scrivener,
+   * Atticus, Vellum and Publisher Rocket are all one-time purchases, and a
+   * writer comparing us against those is being asked to accept a model the
+   * category has taught them to distrust. Putting the outright purchase beside
+   * the cycles answers that in the place the objection is formed.
+   */
   const options: { value: Period; label: string }[] = [
     { value: "monthly", label: "Monthly" },
     { value: "annual", label: "Annually" },
+    { value: "lifetime", label: "Once" },
   ];
 
   return (
@@ -319,124 +392,219 @@ function PeriodToggle({
 }
 
 /**
- * One plan.
+ * One plan, as a card.
  *
- * `dark` inverts the whole card rather than restyling its parts, which is why
- * every colour below is written as a pair. Once the ground flips, a hairline
- * that stayed `border-line` would vanish and muted text would go illegible, so
- * the secondary ink and the divider ride on the card's own ink at low alpha.
+ * **Both cards are the same card**, which is the change worth explaining. The
+ * paid one used to be inverted — near-black ground, pale type, lifted a few
+ * pixels above its neighbour — and that is a perfectly good way to push a
+ * plan, but it makes the two sides of a comparison two different objects. A
+ * reader running their eye down one column and across to the other is doing
+ * arithmetic, and it is easier when the rows sit at the same height in the same
+ * ink. What marks the recommended one now is the badge, the accent border and
+ * the one filled button on the page — a hue this palette reserves for exactly
+ * this, so it carries the emphasis without spending a second design on it.
+ *
+ * The shape, top to bottom: the mark beside the name rather than stacked above
+ * it, the blurb, the figure, the action, a rule, then the lines. Everything is
+ * a token, so it holds in both themes.
  */
 function PlanCard({
-  dark = false,
+  featured = false,
   badge,
   mark,
   name,
   blurb,
   price,
+  unit = "/month",
   note,
   rows,
   action,
 }: {
-  dark?: boolean;
-  /** The flag on the card being pushed. Absent on the others. */
+  /** The one being recommended. Gets the shell below; layout is unchanged. */
+  featured?: boolean;
+  /**
+   * The line written along the top of the featured card's shell. Absent on the
+   * others, which have no shell to write on.
+   */
   badge?: string;
   mark: React.ReactNode;
   name: string;
   blurb: string;
   price: string;
+  /** What follows the figure. Null on a price that is not per anything. */
+  unit?: string | null;
   /** Shown under the price when the cycle needs explaining. */
   note?: string;
   rows: { label: string; value: string }[];
   action: React.ReactNode;
 }) {
-  const secondary = dark ? "text-surface/60" : "text-muted";
-  const rule = dark ? "bg-surface/15" : "bg-line";
-
-  return (
+  const card = (
     <section
-      className={`flex flex-col rounded-3xl p-7 sm:p-8 ${
-        dark
-          ? // Lifted a little at the top and given a deeper shadow: the pushed
-            // card in the reference sits proud of the row. Only from sm up,
-            // since stacked on a phone there is no row to sit proud of.
-            "bg-fg text-surface shadow-xl sm:-mt-5"
-          : "border border-line bg-panel text-fg shadow-sm"
+      className={`flex h-full flex-col bg-panel p-7 text-fg sm:p-8 ${
+        featured
+          ? // Inside the shell, so it carries no border of its own and takes a
+            // tighter radius — a card curving as hard as the thing holding it
+            // leaves a crescent of colour showing at every corner.
+            "rounded-xl"
+          : "rounded-2xl border border-line shadow-sm"
       }`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <span className={dark ? "text-surface" : "text-fg"}>{mark}</span>
-        {badge && (
-          <span
-            className={`rounded-full px-3 py-1 font-sans text-xs font-medium ${
-              dark ? "bg-surface/15 text-surface" : "bg-raised text-muted"
-            }`}
-          >
-            {badge}
-          </span>
-        )}
+      <div className="flex items-center gap-3">
+        {/* The mark sits in a tile rather than loose, so a 20px line drawing
+            has some weight beside 24px type. Tinted on the featured card and
+            plain grey on the other, which is the same distinction the button
+            makes, one size down. */}
+        <span
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${
+            featured ? "bg-accent/12 text-accent" : "bg-raised text-fg"
+          }`}
+        >
+          {mark}
+        </span>
+        <h2 className="font-display text-2xl font-semibold tracking-tight">
+          {name}
+        </h2>
       </div>
 
-      <h2 className="mt-6 font-display text-2xl font-semibold tracking-tight">
-        {name}
-      </h2>
-      <p className={`mt-1.5 font-sans text-sm leading-relaxed ${secondary}`}>
+      {/* Two lines held whether or not both are used. The cards sit side by
+          side and their blurbs are different lengths, so without this the two
+          prices land at different heights and the comparison reads as sloppy
+          before it reads as anything. */}
+      <p className="mt-4 min-h-10 font-sans text-sm leading-relaxed text-muted">
         {blurb}
       </p>
 
       {/* The number, at the size the reference sets it: big enough to be the
           thing you land on after the name, with the unit small beside it so the
           figure keeps the weight. */}
-      <p className="mt-6 font-display text-5xl font-bold tracking-tight">
+      <p className="mt-5 font-display text-5xl font-bold tracking-tight">
         {price}
-        <span className={`ml-1.5 text-base font-medium ${secondary}`}>
-          /month
-        </span>
+        {/* Absent on a one-off purchase rather than reading "/month" beside a
+            figure nobody pays monthly. The free card keeps it, because "$0 a
+            month" is what the comparison is being made against. */}
+        {unit !== null && (
+          <span className="ml-1.5 text-base font-medium text-muted">{unit}</span>
+        )}
       </p>
       {/* Reserved whether or not it is filled, so the two cards' buttons stay on
           one line as the period switches. */}
-      <p className={`mt-1.5 h-5 font-sans text-xs ${secondary}`}>{note}</p>
+      <p className="mt-1.5 h-5 font-sans text-xs text-muted">{note}</p>
 
-      <div className="mt-6">{action}</div>
+      <div className="mt-5">{action}</div>
 
-      <div aria-hidden="true" className={`mt-8 h-px ${rule}`} />
+      <div aria-hidden="true" className="mt-7 h-px bg-line" />
 
-      <h3 className="mt-6 font-sans text-sm font-semibold">Features</h3>
-      <dl className="mt-4 space-y-3.5">
+      {/* No "Features" heading. The rule already says a new part of the card
+          has started, and the reference reads better without a word between
+          the button and the list. */}
+      <dl className="mt-6 space-y-3.5">
         {rows.map((row) => {
           // What the plan gives you is set in the card's own ink — mark, label
           // and value alike — and what it withholds is the only thing faded.
-          // The greyed-back row was doing the opposite: on Starter, five of the
-          // eight lines are the reason to stay, and they were the quietest
-          // thing on the card.
           const has = row.value !== NOT_INCLUDED;
 
           return (
             <div
               key={row.label}
-              className={`flex items-center gap-2.5 ${has ? "" : secondary}`}
+              className={`flex items-center gap-2.5 ${has ? "" : "text-muted"}`}
             >
               {/* The same circle either way, so the column of marks stays a
                   column. Only what is inside it changes: a tick for a line the
                   plan gives you, a cross for one it does not — because a tick
                   against the words "Not included" is a yes drawn on top of a
-                  no. */}
+                  no.
+
+                  Both take the status family's own tokens rather than literal
+                  shades — `ok-fg` and `stop-fg` — which is what makes them
+                  legible in both themes: saturated ink at night, darker ink by
+                  day. A hex green tuned against black is a smudge on white.
+
+                  Drawn at 20px and a heavier stroke than the card marks above
+                  them, because these are read as a column at a glance rather
+                  than looked at one at a time, and at 16px and hairline weight
+                  the tick and the cross are the same grey smudge until you
+                  lean in. */}
               {has ? (
-                <CheckIcon className="h-4 w-4 shrink-0" />
+                <CheckIcon className="h-5 w-5 shrink-0 text-ok-fg" />
               ) : (
-                <CrossIcon className="h-4 w-4 shrink-0 opacity-70" />
+                <CrossIcon className="h-5 w-5 shrink-0 text-stop-fg" />
               )}
               <dt className="font-sans text-sm">{row.label}</dt>
               {/* ml-auto rather than a two-column grid: the value is set
                   against the right edge the way a price list is, and a long one
-                  wraps under itself instead of squeezing the label. */}
-              <dd className="ml-auto text-right font-sans text-sm">
-                {row.value}
-              </dd>
+                  wraps under itself instead of squeezing the label.
+
+                  "Included" and "Not included" are dropped rather than printed:
+                  the mark in front has already said both, and a word repeating
+                  a glyph is the kind of line a reader learns to skip — which
+                  costs the rows that do carry a value. */}
+              {row.value !== "Included" && !has === false && (
+                <dd className="ml-auto text-right font-sans text-sm text-muted">
+                  {row.value}
+                </dd>
+              )}
             </div>
           );
         })}
       </dl>
     </section>
+  );
+
+  if (!featured) {
+    /*
+     * The same shell, empty and transparent.
+     *
+     * Reserved rather than left off, so the two cards' names, prices and rows
+     * sit on the same lines: side by side, a strip on one and not the other
+     * offsets every row of the comparison by the depth of the strip, and a
+     * reader checking one column against the other has to keep finding their
+     * place. Built from the same markup as the real one so the two heights
+     * cannot drift — a hand-measured `pt-11` here would be wrong the first time
+     * anybody changed the strip's padding.
+     *
+     * Only from `sm` up. Stacked on a phone there is nothing to line up with,
+     * and a blank band above the free card would just be a gap.
+     */
+    return (
+      <div className="rounded-2xl p-1.5 pt-0">
+        <p
+          aria-hidden="true"
+          className="hidden py-2.5 text-center font-sans text-xs font-medium sm:block"
+        >
+          &nbsp;
+        </p>
+        {card}
+      </div>
+    );
+  }
+
+  /*
+   * The shell: a filled block with a line written along the top and the card
+   * set into the rest of it.
+   *
+   * **It replaces a badge, and it does that job better.** A chip in the card's
+   * own corner is read after the name and the price, by which point the reader
+   * has already worked out what they are looking at. A strip above the card is
+   * read first, and it has room for a sentence rather than a word — so it can
+   * say *who the plan is for*, where "Popular" is a claim about other people
+   * rather than about the reader.
+   *
+   * The fill is `bg-accent` and the writing on it is `text-accent-ink`, which
+   * is the pair that inverts correctly: the accent is the brand indigo by day
+   * and white at night, and its ink is the opposite of whichever it is. A
+   * fixed white here would be invisible in daylight — the half nobody tests.
+   *
+   * `p-1.5 pt-0` is the whole geometry: no padding above, so the strip's own
+   * line-height sets the band's depth, and a hairline of colour on the other
+   * three sides.
+   */
+  return (
+    <div className="rounded-2xl bg-accent p-1.5 pt-0 shadow-md">
+      <p className="py-2.5 text-center font-sans text-xs font-medium text-accent-ink">
+        {badge}
+      </p>
+      {card}
+    </div>
   );
 }
 
@@ -452,9 +620,12 @@ function PlanCard({
 
 function Stroke({
   className,
+  weight = 1.5,
   children,
 }: {
   className?: string;
+  /** Heavier for the row marks, which are read at a glance down a column. */
+  weight?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -463,7 +634,7 @@ function Stroke({
       viewBox="0 0 20 20"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth={weight}
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
@@ -475,7 +646,7 @@ function Stroke({
 
 function CheckIcon({ className }: { className?: string }) {
   return (
-    <Stroke className={className}>
+    <Stroke className={className} weight={2}>
       <circle cx="10" cy="10" r="7.5" />
       <path d="m6.75 10.25 2.25 2.25 4.25-4.75" />
     </Stroke>
@@ -485,7 +656,7 @@ function CheckIcon({ className }: { className?: string }) {
 /** The same circle, crossed. */
 function CrossIcon({ className }: { className?: string }) {
   return (
-    <Stroke className={className}>
+    <Stroke className={className} weight={2}>
       <circle cx="10" cy="10" r="7.5" />
       <path d="m7.5 7.5 5 5M12.5 7.5l-5 5" />
     </Stroke>

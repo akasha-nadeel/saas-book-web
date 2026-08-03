@@ -13,10 +13,11 @@
  * in the chapter you have open — and that is a search, which is free, which
  * means it is right whether or not the writer has maintained anything.
  *
- * **Per book rather than per series, for now.** The research asked for a series
- * bible and this is one book's; the shape here would carry, but a series needs
- * a notion of series that the store does not have yet. Recorded in TODO.md
- * rather than half-built.
+ * **One book's, and that is still the unit that is stored.** The research asked
+ * for a series bible and `series.ts` is it — but it is a *read across* these
+ * lists rather than a store of its own, so everything below stays the shape it
+ * was and an entry never loses the book it was written in. Nothing here knows
+ * about series, deliberately; the merge is somebody else's job.
  */
 
 export type EntryKind = "character" | "place" | "thing" | "note";

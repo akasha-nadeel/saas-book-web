@@ -49,7 +49,10 @@ not tested — jsdom is there for `localStorage`, not for a DOM.
 
 Several tests assert *positions* rather than behaviour, and they are the ones
 not to "fix" when they fail: that the ARC step sorts before publishing, that
-the middle beat straddles 50%, that the prose report has no score, that the
+the middle beat straddles 50%, that the prose report has no score, that a
+ranked comp carries nothing but the book and the reason, that the curve leaves
+out a book with no sales rows instead of drawing it at zero, that the series
+bible refuses to merge on anything fuzzier than an exact name, and that the
 money page names no company and every figure carries its provenance. If one of
 those goes red the feature has lost the thing it was built to say.
 
@@ -75,10 +78,17 @@ fine; awaiting `params` is not optional.
 
 **Persistence is one module.** `src/lib/library-store.ts` is the *only* file that
 touches `localStorage`; everything else goes through it. That boundary is what
-let Supabase arrive *behind* the store (`sync.ts`) without any of the ~40 files
-that read it changing a line — and it is what any future storage change will
-need again. Keep it intact: a screen reaching for `localStorage` directly is a
-bug even when it works.
+let Supabase arrive *behind* the store (`sync.ts`) without any of the sixty-odd
+files that read it changing a line — and it is what any future storage change
+will need again. Keep it intact: a screen reaching for `localStorage` directly
+is a bug even when it works.
+
+There is **exactly one exception, and grepping will find it**: the
+`THEME_BOOTSTRAP` string in `src/app/layout.tsx` reads `openchapter:prefs` by
+hand. It has to — it is an inline `<script>` that runs before React, before any
+module loads, because resolving the theme *after* hydration is the flash it
+exists to prevent. Nothing else may follow it. (Other files mention
+`localStorage` in prose comments; those are not accesses.)
 
 **The store is split by write-cost, not by type:**
 - **shelf** (`openchapter:shelf`) — one document holding every book with its
@@ -95,7 +105,10 @@ bug even when it works.
   `ideas` — same reasoning, plus one shared caveat: **none of them sync.**
   `sync.ts` maps a book's *columns* by name and these are not columns, so a
   writer on two machines keeps two ledgers. Every screen with one says so on the
-  page; don't quietly drop that line.
+  page; don't quietly drop that line. The two features that read *across* these
+  keys make it worse rather than better and say so for themselves: a series
+  bible is a merge of whichever books this machine holds, and the book-three
+  curve is drawn from whichever sales reports were imported here.
 
 Book/chapter totals are summed on read, never stored, so they can't drift.
 Deleting a chapter is a soft delete: its meta moves to the book's `trash` list in
@@ -193,7 +206,12 @@ Each tool is the same three pieces, and the split is the convention:
   `roadmap.ts`, `paperback.ts`, `blurb.ts`, `beats.ts` (structure), `prose.ts`,
   `activity.ts` (progress), `provenance.ts`, `money.ts`, `ledger.ts` (track),
   `arc.ts`, `cover-check.ts` (covers), and `comps/` —
-  `comps.ts`, `length.ts`, `subjects.ts` (categories), `title-check.ts`.
+  `comps.ts`, `length.ts`, `subjects.ts` (categories), `rank.ts`,
+  `title-check.ts`. Two more sit beside them without a tool screen of their
+  own, because neither question belongs to one book: `series.ts` (the bible
+  across a series, read in the editor's rail) and `curve.ts` (the book-three
+  curve, drawn in the dashboard's Track area beside the strip that adds the
+  library up).
   Export is the exception and predates the pattern: it is the whole of
   `src/lib/export/`;
 - a thin `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`;
@@ -205,7 +223,13 @@ the tool's own name as the `h1`. The cover is load-bearing — the Tools area le
 a writer pick a book before opening a tool, so landing on the wrong manuscript
 is a real way to lose ten minutes — and the heading is the tool rather than the
 book, or every screen looks like the same screen with different contents. The
-`width` prop must match the page's own container or the two left edges disagree.
+`width` prop must match the page's own container or the two left edges disagree
+— it defaults to **`5xl`**, which is a page width rather than a reading measure:
+these screens hold forms, stat rows and card grids, and the `3xl` it used to be
+left a third of an ordinary laptop window empty down each side. The header's
+deck is capped separately at `2xl`, and the tool pages cap their own prose at
+`max-w-prose`, so widening the page never widens a line of text. Comps is the
+one screen wider still (`6xl`), because it is a five-column grid of covers.
 The export screen is the one that never took this header; TODO.md records the
 decision as open.
 
@@ -257,6 +281,35 @@ every writer), the feature degrades to Open Library alone, and the screen says
 Google did not answer rather than implying the genre is empty. **The manuscript
 never goes**: what leaves is a query built from the book's genre and blurb.
 
+**Ranking those comps is a separate route, and the split is the design.**
+`/api/comps/rank` (POST, `requirePro()`, `ANTHROPIC_API_KEY`, Sonnet) over the
+pure `src/lib/comps/rank.ts` is the one place in the cluster where a model
+earns its cost — a keyword search returns forty books of which five are really
+comparable, and sorting those out is a judgement rather than a query. Folding
+it into `/api/comps` would make the *whole* feature need a key and a plan for a
+step most searches do not want; kept apart, everything above the button works
+free and keyless. Three rules hold it: **there is no score and no field to put
+one in** (a number here would be invented and would be the most believable
+invented number in the app, sitting in a list of real books — a test asserts
+the parsed pick carries nothing but the book and the reason); **the model may
+only choose from books that were fetched**, by numbered id, with anything out
+of range dropped rather than guessed at and the parser enforcing it
+*server-side*, because a model asked about books will produce a plausible title
+that does not exist and a made-up comp is about to be pasted into a query
+letter; and **generated text is treated as hostile input** — preambles, code
+fences, bare arrays, duplicate ids and missing reasons each have a test. The
+clean parse is tried before any bracket scan, since scanning a bare array for
+`{` finds the first *element's* brace and silently parses one pick as the whole
+reply.
+
+**This is the second route that sends prose**, after the assistant: the opening
+of the manuscript goes, because whether a book *sounds* like another is what a
+keyword search cannot answer. Capped at a couple of pages, cut at a paragraph
+(a severed clause is a false signal about how the writer ends sentences),
+images dropped, sent only on a press — and the card lists exactly what leaves
+*before* the button, the same shape the feedback dialog uses. Add a field to
+what is sent and add it to that list.
+
 **The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. The surface
 is keyed on `${chapterId}:${storedText}` so a save from another tab reloads it
 instead of leaving it stale. Autosave is `src/lib/use-autosave.ts`; body is
@@ -301,6 +354,29 @@ chapter under a 400KB budget, taken at most every ten minutes and only when the
 text really changed — a safety net, not an archive, and the panel says so.
 `rememberVersion` runs after the body is written and swallows every error: a
 full origin means no history, never a failed save.
+
+**The bible reads across a series, and `src/lib/series.ts` is that half.**
+Three things in it are load-bearing. **A series is derived, never declared** —
+books are in one when their `publishing.series` fields match, because a shop
+asks for that field anyway; there is no series object and no migration, and a
+second place to record it would be a second place to keep in step. **Entries
+stay at their own book's key and nothing new is written**: the series bible is
+a *read across* the sibling books' bibles (`useSeriesBible`, over
+`getBiblesRaw`, whose snapshot is one JSON string carrying ids *and* payload so
+`useSyncExternalStore` settles and the hook never re-reads storage). A shared
+`bible:series:<name>` key loses on three counts — renaming the series orphans
+it, a book leaving takes nothing with it, and an entry loses which book wrote
+it down. And **merging is exact**: same name or same alias, case-insensitively,
+nothing fuzzier, with kind part of identity — the same refusal `subjects.ts`
+makes, because a rule clever enough to see that Beth is Elizabeth also welds
+two different Toms together, and a writer can see a duplicate but not a merge.
+Matching is transitive, so an alias chain closes without anyone stating its
+ends. The panel **opens on the series when there is one**, which is the
+argument rather than a preference: a writer on book three told "none of them,
+by name at least" about a chapter full of book one's cast has been failed by
+the reliable half of the feature. Differing details are *shown, attributed and
+never flagged* — details accumulate far more often than they conflict, so a
+badge would fire on every character by book two.
 
 The chapter editor and the book overview mount the *same three parts* — rail,
 tool panel, book panel — so a change lands on both screens at once:
@@ -503,7 +579,8 @@ drift between them.
 **Persistence is Supabase behind localStorage, not instead of it.**
 `library-store.ts` still reads and writes `localStorage` synchronously — that is
 what lets `useSyncExternalStore` read a snapshot during render, and why none of
-the 37 files that read the store changed. `src/lib/sync.ts` is the async half:
+the sixty-odd files that read the store changed. `src/lib/sync.ts` is the async
+half:
 `commit()` diffs the shelf and pushes what moved, and `syncWithServer()`
 reconciles once per load. Reading through Supabase directly would make
 `getShelf()` async, which unpicks all of it — and would cost offline, which for a
@@ -540,9 +617,10 @@ the push silently rejects the unknown column.
 
 **Payments are PayHere, and optional in the same way everything else is.** Set
 `PAYHERE_MERCHANT_ID` and `PAYHERE_MERCHANT_SECRET` and the app grows plans;
-leave them unset and there are no plans *and nothing is held back* — the
-assistant, the audiobook and the bookmarks panel all work, and the Upgrade
-button says why there is nothing to buy. `isBillingConfigured()` is checked
+leave them unset and there are no plans *and nothing is held back* — every
+paid screen works, and the Upgrade button says why there is nothing to buy.
+That falls out of the subscription route answering `pro: true` when there is no
+gateway, which `ProGate` and `requirePro()` both read. `isBillingConfigured()` is checked
 first everywhere, and `requirePro()` passes everyone when it is false, so a
 self-hosted copy running on its owner's API keys behaves exactly as it did
 before billing existed.
@@ -553,11 +631,52 @@ the status codes) — all tested. `payhere.ts` holds the credentials and is
 server-only by naming: none of it carries a `NEXT_PUBLIC_` prefix, so an
 accidental client import reads empty strings and `isBillingConfigured()`
 answers false rather than leaking a secret. `server.ts` is `requirePro()`, the
-gate in front of `/api/chat`, `/api/narrate` and `/api/transcribe` — 401 when
-signed out, **402** when signed in and unpaid, and the three are different
-messages because "sign in" shown to someone already signed in is a loop.
+gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe` and
+`/api/comps/rank` — 401 when signed out, **402** when signed in and unpaid,
+and the three are different messages because "sign in" shown to someone already
+signed in is a loop.
 
-Four things in there are load-bearing.
+**There are three ways to buy and the third is not a cycle.** $9 monthly, $72 a
+year, $199 once. The lifetime tier is there because this market buys software
+outright — Scrivener, Atticus, Vellum and Publisher Rocket are all one-time
+purchases — so a subscription-only page argues with the reader before it
+describes anything. Four things about it are load-bearing and each is a real
+failure if missed:
+
+- **PayHere is sent no `recurrence` and no `duration`.** Those two fields are
+  the whole of what makes a charge repeat, so shipping them against a one-off
+  order bills $199 a month. `recurrenceOf`/`durationOf` return null for it and
+  the checkout spreads the keys in conditionally — an empty string is still
+  a field.
+- **`periodEnd` returns null for it.** A far-future sentinel was the easy wrong
+  answer: every screen rendering `currentPeriodEnd` would tell the writer their
+  outright purchase renews in 2999.
+- **`isPro` checks the period *before* the missing-date guard**, because that
+  guard reads a null end as "the first payment has not landed yet". Ordered the
+  other way round, every writer who paid is refused.
+- **`canCancel` is already false for it**, because PayHere issues no
+  subscription id for a one-off. Do not loosen that — offering to cancel
+  something bought outright is offering to take it away for nothing.
+
+**What is free is what a book needs to exist and leave.** Unlimited books and
+imports, all four exports, sync, the pre-upload check and the roadmap, comps
+search, blurb, categories, covers, structure, progress, and one book's story
+bible. Pro is the metered routes plus the business layer — money, advance
+readers, the book-three curve, the writing record, the prose report, and the
+*series* read of the bible. Every competitor charges for formatting, which is
+why export is the one thing that must never move.
+
+**The gates are of two kinds and the pricing page's own comment says which.**
+The four metered rows are `requirePro()` on the server, which is the only check
+a reader with devtools cannot edit. The rest are computed in the browser and
+gated there by `ProGate` / `useEntitled` (`src/components/upgrade/pro-gate.tsx`)
+— one component so six screens cannot drift into six tones of upsell, and it
+renders children untouched while the plan is still loading, because half a
+second of a paywall shown to a paying writer is the screenshot nobody wants.
+Do not add a Pro row whose value depends on a browser gate being unbreakable;
+the honest lever for those is syncing their data, which is server-side.
+
+Four more things in there are load-bearing.
 
 **Only the webhook grants Pro.** `/api/billing/notify` is a POST from PayHere's
 *servers*, with no session and no cookies, and it is the one caller that writes
@@ -616,17 +735,32 @@ with it — and `AppLoader`, the held splash. `AppLoader` skips `/` deliberately
 and is *seeded* to "gone" there rather than switched off in an effect, or it
 paints and is taken away, which is the flash it exists to prevent.
 
-**The landing page is one file:** `src/components/landing/landing-page.tsx`,
-what a signed-out visitor sees at `/`. It is a Server Component, so the one
-thing it cannot hold is the one thing that had to move out:
-`store-listing-demo.tsx`, the listing form filling itself in beside "Every field
-a shop asks for". Two rules govern anything else that animates there. It runs
-only while on screen and stops with the tab, because a landing page is a page
-somebody leaves open. And **it measures with the camera parked** — the pointer
-aims at real rects, `getBoundingClientRect` reports the *transformed* rect, and
-the fonts land a second in, so measuring through a live push records where a
-field currently appears rather than where it sits and the pointer clicks air.
-Same rule as `pagination.ts`.
+**The landing page is one Server Component** —
+`src/components/landing/landing-page.tsx`, what a signed-out visitor sees at
+`/` — **plus four client pieces it cannot hold itself**: `landing-header.tsx`,
+and the three things that go in a window (below).
+
+**There is one window, and `app-window.tsx` is it.** The page had a tablet slab
+under the check demo, another under the listing form and a bare card in the
+hero; three frames on one page read as three products. So one frame takes all
+three, and its `label` prop is the load-bearing part — the two demos are
+*pictures* (they pass a label, take `role="img"`, and hide their contents behind
+that one description), while the hero passes none, because what is inside it is
+a real file input and a screen reader has to meet the control rather than a
+sentence about a picture of one. Get that backwards and the only working thing
+on the page goes invisible to the people who most need it announced.
+
+The two pictures are `check-demo.tsx` (the dashboard working: Overview →
+Prepare → a book's findings, each with its fix beside it) and
+`store-listing-demo.tsx` (the listing form filling itself in beside "Every
+field a shop asks for"). Both quote the real screens' strings, so they can only
+go wrong if the product does. Two rules govern anything that animates there. It
+runs only while on screen and stops with the tab, because a landing page is a
+page somebody leaves open. And **it measures with the camera parked** — the
+pointer aims at real rects, `getBoundingClientRect` reports the *transformed*
+rect, and the fonts land a second in, so measuring through a live push records
+where a field currently appears rather than where it sits and the pointer clicks
+air. Same rule as `pagination.ts`.
 
 **The hero carries the real check, not a picture of one.**
 `book-check.tsx` over the pure `file-check.ts`: a signed-out visitor drops the
@@ -697,7 +831,14 @@ Three things in it are load-bearing:
   the pre-upload check, the money panel. A screenshot is an asset that goes
   stale silently while the app moves, on the one page whose whole pitch is
   being checkable. The hero is the exception and goes further: it carries the
-  **real check**, not a drawing of one — see `book-check.tsx`.
+  **real check**, not a drawing of one — see `book-check.tsx`. The one bitmap
+  on the page is the hero *backdrop* (`public/hero-{dark,light}.webp`, per
+  theme, behind `--lp-hero`), which is abstract artwork rather than a picture
+  of the product, so it cannot go stale. Its framing is *measured*, not
+  eyeballed: the long comment above it in `globals.css` records the contrast
+  ratio each anchor and size buys against the headline, and there is a separate
+  phone framing because the text block ends higher there. Re-measure before
+  swapping either image — the numbers are fitted to these two pictures.
 - **Everything countable is imported and counted**: `STEPS`, `PHASES`,
   `ALL_TOOLS`, `TOOL_GROUPS`, the price from `plans.ts`. The ARC step's title,
   its number and its phase are all derived, because the page quotes them.
@@ -716,11 +857,19 @@ The page reads `SELF_TICKING` / `YOURS_TO_TICK` out of `roadmap.ts` and prices
 out of `billing/plans.ts` rather than restating either, which is the shape to
 prefer for any new figure on it.
 
+**`works-with.tsx` is half-live, and the half that lives is the data.** The
+current page imports `DESTINATIONS` from it — the shops and readers our exports
+open in, each with the format named beside it so the claim stays checkable —
+while the `WorksWith()` component that used to draw them is left over from the
+previous design and has no caller. Do not delete the file when tidying that
+design away, and do not add a destination there without an export that actually
+opens in it.
+
 The **previous** design — `landing-nav.tsx`, `publishing-check.tsx`,
-`works-with.tsx`, `sections.ts`, `path-scroller.tsx` and the drawn figures
-(`landing-figures`, `toolkit-figures`, `laptop-mockup`, `book-fan`,
-`formats-flow`, `path-figures`) — is still in that folder and **nothing imports
-any of it now**; the rewrite left it behind, and `font-brand` and the
+`sections.ts`, `path-scroller.tsx` and the drawn figures (`landing-figures`,
+`toolkit-figures`, `laptop-mockup`, `book-fan`, `formats-flow`,
+`path-figures`) — is still in that folder and **nothing imports any of it
+now**; the rewrite left it behind, and `font-brand` and the
 "OpenChapter Landing v2" palette live only in those files. It is the finished
 visual design of the *old* positioning, so treat it as reference rather than as
 something to wire back up unchanged. One lesson in there is general and worth
@@ -748,8 +897,10 @@ The fifteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
-`/api/comps` · `/api/billing/*`. The first three are metered and gated by
-`requirePro()`; `/api/comps` is free and stays free.
+`/api/comps` · `/api/comps/rank` · `/api/billing/*`. All of those except
+`/api/comps` are metered and gated by `requirePro()`; `/api/comps` itself is
+free, keyless and stays that way — which is the whole reason the ranking is a
+route of its own rather than a flag on it.
 
 ## Styling
 

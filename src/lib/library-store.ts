@@ -1763,6 +1763,48 @@ export function saveBibleRaw(bookId: string, json: string) {
   for (const listener of bibleListeners) listener();
 }
 
+/**
+ * Several books' bibles at once — the series read.
+ *
+ * The snapshot is **one string** rather than a list of raws, and that is the
+ * whole trick: `useSyncExternalStore` compares snapshots with `Object.is` and
+ * re-renders forever if handed a fresh array each time. A string of the same
+ * characters is the same value, so this settles.
+ *
+ * It carries the whole payload — ids *and* their stored bibles — so the hook
+ * parses this one string and never re-reads storage. Stamping the ids in is
+ * what makes adding a book to a series change the snapshot even when the book
+ * arriving has no bible of its own.
+ */
+export function getBiblesRaw(bookIds: readonly string[]): string {
+  return JSON.stringify(bookIds.map((id) => [id, readRaw(bibleKey(id))]));
+}
+
+export function getServerBiblesRaw(): string {
+  return "[]";
+}
+
+/**
+ * Local writes fan out to every listener, as one book's does — a bible is
+ * edited in the panel that reads it, and the series view is often the same
+ * panel. Cross-tab is filtered to the keys asked for.
+ */
+export function subscribeToBibles(
+  bookIds: readonly string[],
+  onStoreChange: () => void,
+) {
+  bibleListeners.add(onStoreChange);
+  const keys = new Set(bookIds.map(bibleKey));
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || keys.has(event.key)) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    bibleListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Advance copies
 //

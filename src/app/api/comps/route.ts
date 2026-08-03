@@ -24,8 +24,9 @@ import {
  * has to stay inside that promise.
  *
  * No plan gate. This is the free half of the feature and it stays free; the
- * model that ranks these is the part that costs money, and it is a separate
- * step that has not been built.
+ * model that ranks these is the part that costs money, and it lives at
+ * `/api/comps/rank` — a separate route so that this one needs no key, no
+ * account and no plan, and so a writer with none of those still gets comps.
  *
  * **Google Books works without a key and rate-limits hard without one** — an
  * anonymous quota is per IP, and a server is one IP for every writer using it,

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
 import {
   fromDay,
   isOverdue,
@@ -40,6 +41,10 @@ import { useArc, useHydrated, useShelf } from "@/lib/use-library";
  * out a send-by date from the publication date the book already carries.
  */
 export function ArcPage({ bookId }: { bookId: string }) {
+  // Read here with the other hooks rather than beside the early return
+  // below: hooks cannot sit after a conditional, and this screen has
+  // several of its own already.
+  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const readers = useArc(bookId);
@@ -122,6 +127,25 @@ export function ArcPage({ bookId }: { bookId: string }) {
     );
   }
 
+  // The gate stands *after* the not-found guard above: a writer who
+  // followed a stale link to a deleted book should be told the book is
+  // gone, not asked to pay for one that does not exist.
+  if (!entitled) {
+    return (
+      <GatedTool
+        book={book}
+        tool="Advance copies"
+        what="Who holds an advance copy, who read it and who is late — one list instead of six sites and a spreadsheet. Late readers sort to the top, and if the book has a publication date it works back to when copies need to go out."
+        deck={
+          <>
+            Who has the book, who read it, and who is late. One list instead of six
+        sites and a spreadsheet.
+          </>
+        }
+      />
+    );
+  }
+
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
       <ToolHeader book={book} tool="Advance copies">
@@ -129,7 +153,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
         sites and a spreadsheet.
       </ToolHeader>
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
@@ -142,7 +166,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
             would be the invented number this app keeps refusing to print. */}
         <section className="mt-8 rounded-xl border border-line bg-panel px-5 py-4">
           {publishAt === null ? (
-            <p className="text-sm text-muted">
+            <p className="max-w-prose text-sm text-muted">
               Set a publication date on the{" "}
               <Link href={`/book/${bookId}/export`} className="text-accent">
                 export screen
@@ -228,7 +252,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
             <h2 className="mt-10 text-xl font-extrabold text-fg">
               {sorted.length} {sorted.length === 1 ? "reader" : "readers"}
             </h2>
-            <p className="mt-1 text-sm text-muted">
+            <p className="max-w-prose mt-1 text-sm text-muted">
               Late first, then whoever is due soonest.
             </p>
             <ul className="mt-4 flex flex-col gap-2">
@@ -252,11 +276,18 @@ export function ArcPage({ bookId }: { bookId: string }) {
           </p>
         )}
 
-        <p className="mt-10 border-t border-line pt-6 text-xs leading-relaxed text-muted">
-          This does not find readers for you and does not send anything. It is a
-          list of the people you found, kept in one place with the dates
-          attached. Like the rest of your library it lives in this browser.
-        </p>
+        <div className="mt-10 border-t border-line pt-6">
+          {/* The rule spans the page and the sentence does not.
+              They were one element while a tool page was 3xl wide,
+              where the two widths happened to agree; at 5xl a line of
+              text run to the full container is about 160 characters,
+              which is twice a readable measure. */}
+          <p className="max-w-3xl text-xs leading-relaxed text-muted">
+            This does not find readers for you and does not send anything. It is a
+            list of the people you found, kept in one place with the dates
+            attached. Like the rest of your library it lives in this browser.
+          </p>
+        </div>
       </div>
     </div>
   );

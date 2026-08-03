@@ -354,18 +354,30 @@ const TRACK = [
   ],
 ] as const;
 
+/**
+ * What is genuinely not built, and nothing that is.
+ *
+ * This list had the series bible, ranked comps and the book-three curve on it
+ * until all three shipped, and the rule that matters here is the one that
+ * fails quietly: **nothing stays under this badge once it exists.** A page
+ * still promising a shipped feature is a page saying something untrue, in the
+ * one section whose whole job is being trustworthy about the difference
+ * between a plan and a product. Walk it whenever a feature lands — and when
+ * something comes off, put something real in its place rather than shortening
+ * the list, because three honest absences buy more than two do.
+ */
 const LATER = [
   [
-    "A story bible across a series",
-    "People, places and things travel between books in a series. Today they stop at the one book they were written in.",
+    "A real print-ready PDF",
+    "Today's PDF is the browser's print engine, which we say wherever it appears: no bleed, no crop marks, no CMYK. A printer's file needs a real PDF library and is a project of its own.",
   ],
   [
-    "Comps ranked, not just found",
-    "A model reading your opening chapter to say which five of twenty are genuinely like your book, rather than which forty matched a word.",
+    "Sales reports without a detour",
+    "Track reads CSV, and KDP downloads .xlsx — so today you open it and save it again. Reading the spreadsheet directly is the whole of the difference.",
   ],
   [
-    "The book-three curve",
-    "Writers report no traction until their third book. Whether you are on that curve should not be a feeling — but it needs more than one book of history to say anything.",
+    "Your tools on your second machine",
+    "Your books and chapters sync. The ledger, the story bible and the advance-copy list do not yet, so a writer on a laptop and a desktop keeps two of each. Every screen with one says so on it.",
   ],
 ] as const;
 
