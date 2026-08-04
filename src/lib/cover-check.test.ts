@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   checkCover,
+  enlarge,
+  IDEAL_RATIO,
+  reshape,
   contrastOf,
   IDEAL_HEIGHT,
   IDEAL_WIDTH,
@@ -113,5 +116,78 @@ describe("contrastOf", () => {
 
   it("has nothing to say about no pixels at all", () => {
     expect(contrastOf(new Uint8ClampedArray(0))).toBe(0);
+  });
+});
+
+describe("reshape", () => {
+  // The screenshot case: 736×1308 is 1.78:1 against a 1.6:1 shelf.
+  it("crops a tall cover by trimming its height", () => {
+    const out = reshape(736, 1308, "crop");
+    expect(out.width).toBe(736);
+    expect(out.height).toBe(1178);
+    expect(out.changed).toBe(130);
+  });
+
+  it("pads a tall cover by widening it, keeping every pixel", () => {
+    const out = reshape(736, 1308, "pad");
+    expect(out.height).toBe(1308);
+    expect(out.width).toBe(818);
+    expect(out.changed).toBe(82);
+  });
+
+  it("crops a squat cover by trimming its width", () => {
+    const out = reshape(1600, 2000, "crop");
+    expect(out.height).toBe(2000);
+    expect(out.width).toBe(1250);
+  });
+
+  it("pads a squat cover by making it taller", () => {
+    const out = reshape(1600, 2000, "pad");
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(2560);
+  });
+
+  it("lands on the ideal ratio either way", () => {
+    for (const mode of ["crop", "pad"] as const) {
+      const out = reshape(736, 1308, mode);
+      expect(out.height / out.width).toBeCloseTo(IDEAL_RATIO, 2);
+    }
+  });
+
+  // Cropping removes pixels, so it can push a marginal cover under the floor.
+  // The screen has to be able to say so rather than hand back a worse file.
+  it("says when cropping drops the result below what a shop accepts", () => {
+    // 600×1400 crops to 600×960 — under the 1000px floor — while padding it
+    // to 875×1400 keeps it over.
+    expect(reshape(600, 1400, "crop").tooSmall).toBe(true);
+    expect(reshape(600, 1400, "pad").tooSmall).toBe(false);
+  });
+
+  it("never upscales — the kept edge keeps its own pixels", () => {
+    const crop = reshape(736, 1308, "crop");
+    expect(crop.width).toBeLessThanOrEqual(736);
+    expect(crop.height).toBeLessThanOrEqual(1308);
+  });
+});
+
+describe("enlarge", () => {
+  it("covers the recommended frame", () => {
+    const out = enlarge(1447, 1087);
+    expect(out.width).toBe(1600);
+    expect(out.height).toBe(2560);
+    expect(out.drawWidth).toBeGreaterThanOrEqual(1600);
+    expect(out.drawHeight).toBeGreaterThanOrEqual(2560);
+  });
+
+  // The number the screen has to be honest about: anything above 1 means the
+  // result is interpolated and no sharper than what went in.
+  it("reports the factor it scaled by", () => {
+    expect(enlarge(1447, 1087).factor).toBeGreaterThan(1);
+    expect(enlarge(3200, 5120).factor).toBeLessThan(1);
+  });
+
+  it("does not distort — one factor drives both edges", () => {
+    const out = enlarge(1000, 800);
+    expect(out.drawWidth / 1000).toBeCloseTo(out.drawHeight / 800, 5);
   });
 });

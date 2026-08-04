@@ -142,3 +142,120 @@ export function contrastOf(pixels: Uint8ClampedArray, step = 4 * 37): number {
     values.reduce((sum, v) => sum + Math.abs(v - mean), 0) / values.length;
   return Math.round(deviation * 1000) / 1000;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Putting the shape right                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The size a cover of the wrong shape becomes, without inventing a pixel.
+ *
+ * **Upscaling is deliberately not offered anywhere here**, and that is the
+ * whole reason this is arithmetic rather than a slider. A 554×841 cover scaled
+ * to 1600×2560 passes the shop's pixel check and looks worse doing it — the
+ * interpolation cannot add detail that was never photographed, and the soft
+ * result is the thing the trade press calls an amateur cover. A tool that
+ * makes a warning disappear while making the book harder to sell has helped
+ * nobody. So the only fix on offer is the one that is honestly available: put
+ * the *shape* right, and leave the resolution question to be answered where it
+ * can actually be answered, in the original artwork.
+ *
+ * Both modes draw the source at 1:1 — `crop` takes a sub-rectangle, `pad` lays
+ * the whole image on a larger canvas — so neither resamples the artwork.
+ *
+ * `crop` trims the long edge and therefore *loses* picture, which on a cover is
+ * usually a title or a byline near the edge; `pad` keeps everything and adds
+ * bars. Neither is right in general, which is why the screen offers both and
+ * shows what each one costs rather than picking for the writer.
+ */
+export interface Reshape {
+  width: number;
+  height: number;
+  /** Pixels lost off the long edge (crop), or added as bars (pad). */
+  changed: number;
+  /** True when the result drops under what a shop will accept. */
+  tooSmall: boolean;
+}
+
+export function reshape(
+  width: number,
+  height: number,
+  mode: "crop" | "pad",
+  ratio: number = IDEAL_RATIO,
+): Reshape {
+  const tall = height / width > ratio;
+  let out: { width: number; height: number };
+
+  if (mode === "crop") {
+    // Trim whichever edge is too long, keeping the other whole.
+    out = tall
+      ? { width, height: Math.round(width * ratio) }
+      : { width: Math.round(height / ratio), height };
+  } else {
+    // Grow the short edge instead, so every pixel of the artwork survives.
+    out = tall
+      ? { width: Math.round(height / ratio), height }
+      : { width, height: Math.round(width * ratio) };
+  }
+
+  const changed =
+    mode === "crop"
+      ? tall
+        ? height - out.height
+        : width - out.width
+      : tall
+        ? out.width - width
+        : out.height - height;
+
+  return {
+    ...out,
+    changed: Math.abs(changed),
+    tooSmall: Math.max(out.width, out.height) < MIN_LONG_EDGE,
+  };
+}
+
+/**
+ * The scaled size that covers the recommended 1600×2560, for the one fix that
+ * *does* resample.
+ *
+ * **This is the exception to the rule above, and it is deliberate rather than a
+ * lapse.** Everything else on this screen refuses to invent pixels; enlarging
+ * invents every pixel it adds. It exists because a writer whose only file is
+ * 1447×1087 has no other route to the size shops recommend, and because
+ * refusing to do it did not stop them wanting it — it stopped them doing it
+ * *here*, where the screen can at least say what the trade-off is.
+ *
+ * So the arithmetic returns `factor` as well as the size, and the screen says
+ * it out loud: a factor above 1 means the result is interpolated and no sharper
+ * than the original, whatever its pixel count claims.
+ *
+ * Scales to **cover** rather than to fit, so the frame fills and the writer
+ * chooses which part survives — the same positioning the crop uses.
+ */
+export interface Enlarged {
+  width: number;
+  height: number;
+  /** Rendered size of the artwork inside that frame. */
+  drawWidth: number;
+  drawHeight: number;
+  /** Above 1 means pixels were invented. */
+  factor: number;
+}
+
+export function enlarge(
+  width: number,
+  height: number,
+  target: { width: number; height: number } = {
+    width: IDEAL_WIDTH,
+    height: IDEAL_HEIGHT,
+  },
+): Enlarged {
+  const factor = Math.max(target.width / width, target.height / height);
+  return {
+    width: target.width,
+    height: target.height,
+    drawWidth: Math.round(width * factor),
+    drawHeight: Math.round(height * factor),
+    factor,
+  };
+}

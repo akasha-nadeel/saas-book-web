@@ -87,7 +87,16 @@ export const TOOL_GROUPS: ToolGroup[] = [
   GET_IT_OUT,
   {
     title: "Find your shelf",
-    note: "Read from Google Books and Open Library. Nothing you have written is sent.",
+    /* **Was "Nothing you have written is sent", which this group cannot
+       promise.** Two of its screens send words the writer wrote: a comps or
+       blurb search carries up to five keywords lifted from the saved blurb,
+       and the Pro ranking sends the blurb and the opening of the manuscript —
+       the second route in the whole app that sends prose. A blanket assurance
+       here is read before any of those screens is opened, which is the worst
+       place to be wrong about it.
+       So the guarantee moves to where it can be kept: each screen lists what
+       leaves, above the button, before it is pressed. */
+    note: "Read from Google Books and Open Library. Each screen says what it sends before you press.",
     tools: [
       {
         path: "comps",
@@ -104,13 +113,21 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: "blurb",
         icon: "quote",
         name: "Blurb",
-        what: "Counted against the shops’ limits, and shown real blurbs from books like yours.",
+        // No longer "and shown real blurbs from books like yours": those
+        // examples were removed on 2026-08-04 for returning classics rather
+        // than comparable titles. A tile promising a panel that is not there
+        // is the tile version of dead UI.
+        what: "Counted against the shops’ limits, with what is unusual about it named.",
       },
       {
         path: "categories",
         icon: "tag",
         name: "Categories & keywords",
-        what: "Which shelf you land on, worked out from where comparable books are filed — and the seven keyword boxes a shop’s form asks for.",
+        // The subject search was pulled on 2026-08-04 to get a release out;
+        // what ships is the list you keep and the seven boxes counted. Put the
+        // "worked out from where comparable books are filed" half back only
+        // when the search is back.
+        what: "The categories you will type into a shop's form, kept in one place — and the seven keyword boxes counted.",
       },
       {
         path: "covers",

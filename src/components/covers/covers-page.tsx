@@ -6,8 +6,21 @@ import { BookCover } from "@/components/shelf/book-cover";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { buildQuery, coversOf, type CompTitle } from "@/lib/comps/comps";
-import { checkCover, contrastOf, type CoverFacts } from "@/lib/cover-check";
-import { bookWordCount, findBook } from "@/lib/library-store";
+import {
+  checkCover,
+  contrastOf,
+  enlarge,
+  IDEAL_HEIGHT,
+  IDEAL_RATIO,
+  reshape,
+  type CoverFacts,
+} from "@/lib/cover-check";
+import { bookWordCount, findBook, setCover } from "@/lib/library-store";
+import {
+  COVER_MAX_BYTES,
+  COVER_MAX_EDGE,
+  importImage,
+} from "@/lib/image-import";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
@@ -40,6 +53,236 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  */
 
 /**
+ * Choose what shows, before anything is written.
+ *
+ * Pressing "Crop to fit" used to download immediately, which is the wrong
+ * shape of interaction for the one operation on this screen that *throws part
+ * of a cover away*: a crop takes 1,084 pixels off a 1,672px-wide picture, and
+ * which 1,084 is the entire question. Centred is a guess, and on a cover whose
+ * subject sits left of frame it is usually the wrong one.
+ *
+ * So it opens where every tool that crops for a living opens — a frame at the
+ * target shape with the picture live inside it and the picture draggable. What
+ * you see in the frame is what gets written; there is no second interpretation
+ * step between the preview and the file.
+ *
+ * **Padding is draggable too**, which is less obvious and still right: the bars
+ * fall somewhere, and a cover with its title near the top wants them below it
+ * rather than split evenly.
+ *
+ * `place` is the image's top-left on the output canvas, in output pixels —
+ * negative for a crop, positive for a pad — so the preview and `writeShape`
+ * share one number and cannot disagree about what was shown.
+ */
+function ShapeDialog({
+  src,
+  out,
+  label,
+  onCancel,
+  onCreate,
+  onUse,
+}: {
+  src: string;
+  /** The plan: frame size, the artwork's rendered size, and the scale used. */
+  out: {
+    id: "crop" | "pad" | "enlarge";
+    width: number;
+    height: number;
+    drawWidth: number;
+    drawHeight: number;
+    factor: number;
+    tooSmall: boolean;
+  };
+  label: string;
+  onCancel: () => void;
+  onCreate: (place: { x: number; y: number }) => void;
+  onUse: (place: { x: number; y: number }) => void;
+}) {
+  /* The slack in each axis, and the direction it runs. A crop has the image
+     larger than the frame, so the offset is negative; a pad has it smaller, so
+     the offset is positive. Both are "somewhere between 0 and D". */
+  const dx = out.width - out.drawWidth;
+  const dy = out.height - out.drawHeight;
+  const bounds = {
+    minX: Math.min(0, dx),
+    maxX: Math.max(0, dx),
+    minY: Math.min(0, dy),
+    maxY: Math.max(0, dy),
+  };
+
+  const [place, setPlace] = useState({ x: dx / 2, y: dy / 2 });
+  const dragging = useRef<{ x: number; y: number } | null>(null);
+
+  // Esc closes, like every other dialog in this app.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  /* The frame is drawn at a readable size and the picture scaled to match, so
+     one factor converts a pointer movement in CSS pixels into output pixels.
+     Everything else is arithmetic in output pixels. */
+  const FRAME = 260;
+  const scale = FRAME / out.width;
+
+  function clamp(next: { x: number; y: number }) {
+    return {
+      x: Math.min(bounds.maxX, Math.max(bounds.minX, next.x)),
+      y: Math.min(bounds.maxY, Math.max(bounds.minY, next.y)),
+    };
+  }
+
+  const canDrag = dx !== 0 || dy !== 0;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={label}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-line bg-panel p-5 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-sm font-bold text-fg">{label}</h3>
+        <p className="mt-1 text-sm text-muted">
+          {canDrag
+            ? "Drag the picture to choose what shows. This frame is the file."
+            : "This is the file."}
+        </p>
+
+        <div className="mt-4 flex justify-center">
+          <div
+            onPointerDown={(e) => {
+              if (!canDrag) return;
+              dragging.current = { x: e.clientX, y: e.clientY };
+              e.currentTarget.setPointerCapture(e.pointerId);
+            }}
+            onPointerMove={(e) => {
+              const from = dragging.current;
+              if (!from) return;
+              setPlace((current) =>
+                clamp({
+                  x: current.x + (e.clientX - from.x) / scale,
+                  y: current.y + (e.clientY - from.y) / scale,
+                }),
+              );
+              dragging.current = { x: e.clientX, y: e.clientY };
+            }}
+            onPointerUp={() => {
+              dragging.current = null;
+            }}
+            style={{ width: FRAME, height: out.height * scale }}
+            className={`relative overflow-hidden rounded border border-line bg-surface ${
+              canDrag ? "cursor-grab active:cursor-grabbing" : ""
+            }`}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={src}
+              alt=""
+              draggable={false}
+              style={{
+                position: "absolute",
+                left: place.x * scale,
+                top: place.y * scale,
+                width: out.drawWidth * scale,
+                height: out.drawHeight * scale,
+                maxWidth: "none",
+              }}
+            />
+          </div>
+        </div>
+
+        <p className="mt-3 text-center text-xs text-muted tabular-nums">
+          {out.width} × {out.height}
+          {out.tooSmall ? " · under the 1000px a shop asks for" : ""}
+        </p>
+        {/* Said in the dialog as well as on the button, because this is the
+            last screen before the file exists and it is the one claim a writer
+            could otherwise take the wrong way: the pixel count goes up and the
+            picture does not get sharper. */}
+        {out.factor > 1 && (
+          <p className="mt-1.5 text-center text-xs text-muted">
+            Scaled up {out.factor.toFixed(1)}× — passes the size check, carries
+            no more detail.
+          </p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-fg"
+          >
+            Cancel
+          </button>
+          {/* Two destinations, and the file is the primary one: this screen
+              exists to prepare artwork for a shop, and the copy on the shelf
+              here is a compressed thumbnail rather than the thing that gets
+              uploaded. Setting it as the cover is genuinely useful and is the
+              quieter of the two on purpose. */}
+          <button
+            type="button"
+            onClick={() => onUse(place)}
+            className="rounded-lg border border-line px-4 py-2 text-sm font-semibold text-fg
+                       hover:border-accent/40"
+          >
+            Use as my cover
+          </button>
+          <button
+            type="button"
+            onClick={() => onCreate(place)}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
+          >
+            Download it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A fill for the bars, taken from the cover's own corners.
+ *
+ * White bars round a dark cover read as a rendering fault in a shop's grid,
+ * and black ones round a pale cover do the same. Averaging the four corners
+ * lands close enough on almost every cover that the padding stops announcing
+ * itself. Returns null when the canvas cannot be read — a cross-origin source
+ * taints it — and the caller falls back to white rather than failing.
+ */
+function edgeColour(image: HTMLImageElement): string | null {
+  try {
+    const probe = document.createElement("canvas");
+    probe.width = 2;
+    probe.height = 2;
+    const context = probe.getContext("2d", { willReadFrequently: true });
+    if (!context) return null;
+    // Squashing the whole image to 2×2 averages each quadrant for us.
+    context.drawImage(image, 0, 0, 2, 2);
+    const { data } = context.getImageData(0, 0, 2, 2);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      r += data[i];
+      g += data[i + 1];
+      b += data[i + 2];
+    }
+    const n = data.length / 4;
+    return `rgb(${Math.round(r / n)} ${Math.round(g / n)} ${Math.round(b / n)})`;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * The other half: whether the *file* will be refused.
  *
  * Checks the artwork the writer is about to upload, not the copy this app
@@ -51,15 +294,31 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * contrast and then discarded; nothing is uploaded, which is both the honest
  * default and the only one consistent with the rest of the page.
  */
-function CoverChecker() {
+function CoverChecker({ bookId }: { bookId: string }) {
   const [facts, setFacts] = useState<CoverFacts | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  /** Which reshape is being previewed, or null when no dialog is open. */
+  /** Which fix is being previewed. `draw` is the artwork's rendered size in
+      output pixels — equal to its natural size for crop and pad, larger for an
+      enlarge, which is the only mode that resamples. */
+  const [shaping, setShaping] = useState<{
+    id: "crop" | "pad" | "enlarge";
+    width: number;
+    height: number;
+    drawWidth: number;
+    drawHeight: number;
+    factor: number;
+    tooSmall: boolean;
+  } | null>(null);
+  /** What was just put right, shown in green until the next file or fix. */
+  const [done, setDone] = useState<string | null>(null);
 
   async function read(file: File) {
     setError(null);
+    setDone(null);
     const url = URL.createObjectURL(file);
     try {
       const image = new Image();
@@ -108,69 +367,287 @@ function CoverChecker() {
     }
   }
 
+  /**
+   * The reshaped copy, as bytes. One renderer, two destinations.
+   *
+   * **Nothing is uploaded** — the source is already in the browser as an object
+   * URL and the result is a canvas. What happens to it afterwards is the
+   * caller's business: a download, or the book's own cover.
+   *
+   * **One `drawImage` covers both modes**, which is why `place` is the image's
+   * top-left *on the output canvas* rather than a source rectangle. Cropping is
+   * a negative offset with the canvas clipping; padding a positive one. The
+   * first version used the nine-argument form for both and put a negative
+   * *source* offset into the pad case, which silently draws nothing.
+   *
+   * The destination size is the image's natural size either way, so the artwork
+   * is copied 1:1 and never resampled.
+   *
+   * PNG: this re-wraps somebody's finished artwork, and re-encoding it lossily
+   * here would throw away the quality they came to protect. The cover store
+   * does its own compressing, to its own budget, further down.
+   */
+  async function renderShape(
+    plan: NonNullable<typeof shaping>,
+    place: { x: number; y: number },
+  ): Promise<Blob | null> {
+    if (!facts || !preview) return null;
+    const out = plan;
+
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("unreadable"));
+      image.src = preview;
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = out.width;
+    canvas.height = out.height;
+    const context = canvas.getContext("2d");
+    if (!context) return null;
+
+    if (plan.id === "pad") {
+      context.fillStyle = edgeColour(image) ?? "#ffffff";
+      context.fillRect(0, 0, out.width, out.height);
+    }
+    /* Four-argument form: the artwork is drawn at `draw`, which equals its
+       natural size for crop and pad — 1:1, no resampling — and is larger only
+       for an enlarge, where interpolating is the entire point. */
+    context.drawImage(
+      image,
+      Math.round(place.x),
+      Math.round(place.y),
+      plan.drawWidth,
+      plan.drawHeight,
+    );
+
+    return new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+  }
+
+  async function downloadShape(
+    plan: NonNullable<typeof shaping>,
+    place: { x: number; y: number },
+  ) {
+    const blob = await renderShape(plan, place);
+    if (!blob || !facts) return;
+    const out = plan;
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `cover-${out.width}x${out.height}.png`;
+    link.click();
+    URL.revokeObjectURL(href);
+
+    /* **Re-check the file that was just made, not the one that made it.**
+
+       The findings describe whatever is loaded, so after a fix they described
+       the *source* — a 396×605 cover still reading "Too small to upload"
+       directly under an Enlarge button that had just produced a 1600×2560 one.
+       Both statements were true and together they read as the fix having done
+       nothing. Loading the result makes the check catch up with it, which is
+       also what every crop tool does: what you are looking at afterwards is
+       what you made. */
+    const made = `cover-${out.width}x${out.height}.png`;
+    setName(made);
+    await read(new File([blob], made));
+    setDone(
+      plan.factor > 1
+        ? `Written at ${out.width} × ${out.height}. It now passes the size check — but it was scaled up ${plan.factor.toFixed(1)}×, so it carries no more detail than the file you started with.`
+        : `Written at ${out.width} × ${out.height}, ${IDEAL_RATIO}:1. Check the download and upload that file, not this one.`,
+    );
+  }
+
+  /**
+   * Put the reshaped picture on the book, without a round trip through disk.
+   *
+   * **Through `importImage`, not straight into the store.** That is the same
+   * path the shelf's own cover picker uses, so this file gets the same
+   * shrinking to the same 250KB budget and the same refusal message when it
+   * cannot get there — rather than a second, slightly different upload route
+   * that drifts from the first. `setCover` returns false when the write fails
+   * and that is honoured rather than assumed.
+   *
+   * The full-resolution copy is still worth downloading: what lands on the book
+   * is a compressed thumbnail for this app's own shelf, and the file a shop
+   * wants is the one the Download button writes.
+   */
+  /* Not `useAsCover`: the `use` prefix makes the hooks rule read it as a hook
+     and refuse the call inside a callback. */
+  async function applyAsCover(
+    plan: NonNullable<typeof shaping>,
+    place: { x: number; y: number },
+  ) {
+    const blob = await renderShape(plan, place);
+    if (!blob) return;
+
+    const result = await importImage(
+      new File([blob], "cover.png", { type: "image/png" }),
+      { maxEdge: COVER_MAX_EDGE, maxBytes: COVER_MAX_BYTES },
+    );
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    if (!setCover(bookId, result.src)) {
+      setError("There was no room to save that cover in this browser.");
+      return;
+    }
+    const made = `cover-${plan.width}x${plan.height}.png`;
+    setName(made);
+    await read(new File([blob], made));
+    setDone(
+      "Set as this book's cover. That copy is compressed for the shelf here — download the file for a shop.",
+    );
+  }
+
   const findings = facts ? checkCover(facts) : [];
 
+  /* Named rather than inlined twice: the panel's visibility and each button's
+     own visibility are the same two questions, and they must not drift. */
+  const shapeOff = facts
+    ? Math.abs(facts.height / facts.width - IDEAL_RATIO) > 0.05
+    : false;
+  const smallerThanIdeal = facts
+    ? Math.max(facts.width, facts.height) < IDEAL_HEIGHT
+    : false;
+
   return (
-    <section className="mt-6">
-      <h2 className="text-xl font-extrabold text-fg">Check the file</h2>
-      <p className="mt-2 max-w-2xl text-muted">
+    /* Sized for the card it now sits in. It was written as a standalone
+       section — `mt-6` and a `text-xl font-extrabold` heading — which inside a
+       panel titled "Yours" at `text-sm` put the sub-part in larger type than
+       the thing containing it. The divider above supplies the gap, and the
+       heading drops to the card's own scale. */
+    <section>
+      <h2 className="text-sm font-bold text-fg">Check the file</h2>
+      <p className="mt-1.5 max-w-2xl text-sm text-muted">
         Whether a shop would refuse the artwork. Use your original file, not
         the compressed copy stored here — that one would fail on size.
       </p>
 
-      {/* A real drop target, because the sentence above promises one.
-          
-          This was a bare `<input type="file">`, which the browser draws as
-          "Choose File | No file chosen" — the one undesigned control on a
-          screen about how things look, under a line inviting the writer to
-          *drop* a file on something that could not be dropped on. The words
-          and the control now agree, and clicking still opens the picker,
-          because the label wraps the input rather than replacing it. */}
-      <label
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          const file = e.dataTransfer.files?.[0];
-          if (file) {
-            setName(file.name);
-            void read(file);
-          }
-        }}
-        className={`mt-4 flex cursor-pointer flex-col items-center gap-1.5 rounded-xl
-                    border-2 border-dashed px-6 py-7 text-center transition-colors ${
-                      dragging
-                        ? "border-accent bg-accent/8"
-                        : "border-line bg-surface hover:border-accent/50"
-                    }`}
-      >
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
+      {/* **The drop zone goes once a file is in, and comes back on Remove.**
+          Carbon writes this one down: once a file is uploaded the drop area is
+          removed, so the control shows the single file it holds rather than an
+          invitation to add another beside it. Ours kept both on screen, which
+          left a screen-wide dashed rectangle saying "drop another to check it
+          instead" directly above the file it had already checked — two ways to
+          do the same thing, and the larger of them was the one that was no
+          longer the point.
+
+          Removing is now the only way back to it, which is why that control is
+          named and coloured rather than quiet. */}
+      {/* A real drop target, because the sentence above promises one. This was
+          a bare `<input type="file">`, which the browser draws as "Choose File |
+          No file chosen" — the one undesigned control on a screen about how
+          things look, under a line inviting the writer to *drop* a file on
+          something that could not be dropped on. The words and the control now
+          agree, and clicking still opens the picker, because the label wraps
+          the input rather than replacing it. */}
+      {!facts && (
+        <label
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            const file = e.dataTransfer.files?.[0];
             if (file) {
               setName(file.name);
               void read(file);
             }
           }}
-          className="sr-only"
-        />
-        <span className="text-sm font-semibold text-fg">
-          {name ?? "Drop your cover here, or choose a file"}
-        </span>
-        <span className="text-xs text-muted">
-          {name
-            ? "Drop another to check it instead."
-            : "The file you are about to upload — not the copy stored here."}
-        </span>
-      </label>
+          className={`mt-4 flex cursor-pointer flex-col items-center gap-1.5 rounded-xl
+                      border-2 border-dashed px-6 py-7 text-center transition-colors ${
+                        dragging
+                          ? "border-accent bg-accent/8"
+                          : "border-line bg-surface hover:border-accent/50"
+                      }`}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                setName(file.name);
+                void read(file);
+              }
+            }}
+            className="sr-only"
+          />
+          <span className="text-sm font-semibold text-fg">
+            {name ?? "Drop your cover here, or choose a file"}
+          </span>
+          <span className="text-xs text-muted">
+            {name
+              ? "Drop another to check it instead."
+              : "The file you are about to upload — not the copy stored here."}
+          </span>
+        </label>
+      )}
 
       {error && <p className="mt-4 text-sm text-fg">{error}</p>}
+
+      {/* **Green, and only ever for something that happened.** The status
+          family in this app is red for refused, amber for worth doing, green
+          for passed or earned — so a fix that has actually been written is the
+          one thing on this screen entitled to it. It clears when a new file is
+          read or the file is removed, because a confirmation outliving the
+          thing it confirms is how a screen ends up congratulating somebody for
+          work they have since undone. */}
+      {done && (
+        <p
+          role="status"
+          className="mt-4 rounded-lg border border-ok-line bg-ok-bg px-3.5 py-2.5 text-sm text-ok-fg"
+        >
+          {done}
+        </p>
+      )}
+
+      {/* **A way back out, which there was not one of.**
+
+          Once a file was checked it stayed checked: the only escape was
+          dropping a different one, and nothing on screen said so except a line
+          of small print inside the drop zone. Every design system that has
+          written this pattern down puts a named file and an explicit remove
+          beside it — Carbon removes the drop zone once a file is in and gives
+          the entry a close control; the Image Upload pattern lists *select,
+          preview, validate, replace* as the four things the control has to
+          let somebody do. Ours did three.
+
+          The row names the file as well, because "the file you checked" is
+          otherwise a picture at 80px and a writer with three exports in a
+          folder cannot tell which one this was. */}
+      {facts && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface px-3.5 py-2.5">
+          <span className="min-w-0 truncate text-sm text-fg">
+            {name ?? "Checked file"}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setFacts(null);
+              setPreview(null);
+              setName(null);
+              setError(null);
+              setDone(null);
+            }}
+            /* Red, because it is now the only way out of this state and it
+               throws the checked file away. Grey read as a secondary label
+               rather than a control. */
+            className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-danger
+                       hover:bg-stop-bg focus-visible:ring-2
+                       focus-visible:ring-accent/50 focus-visible:outline-none"
+          >
+            Remove
+          </button>
+        </div>
+      )}
 
       {facts && (
         <div className="mt-6 flex flex-wrap gap-6">
@@ -188,6 +665,128 @@ function CoverChecker() {
               pixels · {(facts.bytes / 1024).toFixed(0)}KB ·{" "}
               {(facts.height / facts.width).toFixed(2)}:1
             </p>
+
+            {/* **Putting the shape right, and only the shape.**
+
+                Offered when the ratio is off, which is the one complaint on
+                this screen that can be answered honestly without inventing
+                pixels: both modes draw the artwork at 1:1, so nothing is
+                resampled. "Too small" gets no button on purpose — scaling a
+                554px cover up to 1600 would clear the shop's check and hand
+                back a softer picture, and a tool that makes its own warning
+                disappear while making the book worse has helped nobody.
+
+                Both choices are shown with what each costs, rather than one
+                being picked: cropping trims the long edge and on a cover that
+                is usually a byline near the border, while padding keeps every
+                pixel and adds bars. Neither is right in general.
+
+                Nothing is uploaded and the original is untouched — the result
+                is drawn in a canvas and handed straight to the writer as a
+                download. */}
+            {/* **Every fix the file has, in one panel.** Shape when the ratio
+                is off; size when it is under what shops recommend. The panel
+                appears when either applies and hides when neither does, so a
+                clean file gets no repair shop it does not need.
+
+                The enlarge is the one that resamples, and it took two asks to
+                add. It is here because refusing it did not stop anyone wanting
+                a 1600×2560 file — it only stopped them getting one where the
+                screen could say what it costs. So the cost is on the button, in
+                the dialog, and in the confirmation afterwards, and it is the
+                only fix whose green message declines to call the result
+                better. */}
+            {(shapeOff || smallerThanIdeal) && (
+              <div className="mt-3 rounded-lg border border-line bg-panel p-4">
+                <p className="text-sm font-bold text-fg">Fix the file</p>
+                <p className="mt-1 max-w-prose text-sm text-muted">
+                  You choose what shows before anything is written. Nothing is
+                  uploaded and this file is not changed — you get a copy.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {shapeOff &&
+                    (["crop", "pad"] as const).map((mode) => {
+                      const out = reshape(facts.width, facts.height, mode);
+                      return (
+                        <button
+                          key={mode}
+                          type="button"
+                          onClick={() =>
+                            setShaping({
+                              id: mode,
+                              width: out.width,
+                              height: out.height,
+                              // Crop and pad draw the artwork at its own size:
+                              // 1:1, nothing invented.
+                              drawWidth: facts.width,
+                              drawHeight: facts.height,
+                              factor: 1,
+                              tooSmall: out.tooSmall,
+                            })
+                          }
+                          className="rounded-lg border border-line bg-surface px-3.5 py-2 text-left
+                                     hover:border-accent/40 focus-visible:ring-2
+                                     focus-visible:ring-accent/50 focus-visible:outline-none"
+                        >
+                          <span className="block text-sm font-semibold text-fg">
+                            {mode === "crop" ? "Crop to fit" : "Pad with bars"}
+                          </span>
+                          <span className="block text-xs text-muted tabular-nums">
+                            {out.width} × {out.height} ·{" "}
+                            {mode === "crop"
+                              ? `${out.changed}px trimmed`
+                              : `${out.changed}px added`}
+                            {out.tooSmall ? " · falls under 1000px" : ""}
+                          </span>
+                        </button>
+                      );
+                    })}
+
+                  {smallerThanIdeal &&
+                    (() => {
+                      const big = enlarge(facts.width, facts.height);
+                      return (
+                        <button
+                          type="button"
+                          /* **Straight to the file, no dialog.** The other two
+                             open one because they ask a question — which part
+                             of the picture survives a crop, where the bars
+                             fall. Enlarging asks nothing: the artwork is
+                             scaled to cover the frame and, when the shape is
+                             already right, there is not a pixel of slack to
+                             drag. A modal whose only content is a preview of
+                             the single possible answer is a step that exists
+                             to be dismissed.
+
+                             Centred, which is exact when the ratio matches and
+                             the sane default when it does not — and a writer
+                             who wants to choose has Crop and Pad, which appear
+                             for exactly that case. */
+                          onClick={() =>
+                            void downloadShape(
+                              { id: "enlarge", ...big, tooSmall: false },
+                              {
+                                x: (big.width - big.drawWidth) / 2,
+                                y: (big.height - big.drawHeight) / 2,
+                              },
+                            )
+                          }
+                          className="rounded-lg border border-line bg-surface px-3.5 py-2 text-left
+                                     hover:border-accent/40 focus-visible:ring-2
+                                     focus-visible:ring-accent/50 focus-visible:outline-none"
+                        >
+                          <span className="block text-sm font-semibold text-fg">
+                            Enlarge to {big.width} × {big.height}
+                          </span>
+                          <span className="block text-xs text-muted tabular-nums">
+                            scaled up {big.factor.toFixed(1)}× · adds no detail
+                          </span>
+                        </button>
+                      );
+                    })()}
+                </div>
+              </div>
+            )}
 
             {findings.length === 0 ? (
               <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
@@ -231,6 +830,34 @@ function CoverChecker() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Opened by the shape buttons rather than downloading on the press —
+          see `ShapeDialog`. Mounted here so it is torn down with the checker,
+          and keyed on the mode so switching from crop to pad starts from that
+          mode's own centred position rather than inheriting the last one. */}
+      {shaping && facts && preview && (
+        <ShapeDialog
+          key={shaping.id}
+          src={preview}
+          out={shaping}
+          label={
+            shaping.id === "crop"
+              ? "Crop to fit"
+              : shaping.id === "pad"
+                ? "Pad with bars"
+                : "Enlarge"
+          }
+          onCancel={() => setShaping(null)}
+          onCreate={(place) => {
+            void downloadShape(shaping, place);
+            setShaping(null);
+          }}
+          onUse={(place) => {
+            void applyAsCover(shaping, place);
+            setShaping(null);
+          }}
+        />
       )}
     </section>
   );
@@ -333,14 +960,22 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   return (
     <div className={toolShell(embedded)}>
       {!embedded && (
-        <ToolHeader book={book} tool="Covers" width="5xl">
+        <ToolHeader
+          book={book}
+          tool="Covers"
+          /* Matched to the container below. This screen's whole content is a
+             wall of covers, and at 5xl the wall stopped a long way short of
+             the window on both sides — the one page where extra width buys
+             another column of the thing you came to look at. */
+          width="6xl"
+        >
           Your cover, next to the shelf it has to sit on. We do not design covers
           and we will not generate one — this is the thing you would do yourself
           in a bookshop, if you had the afternoon.
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-6xl px-6 pt-6 pb-16">
         {heading}
 
         {/* The line the header carries when this screen owns the window.
@@ -355,83 +990,161 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
             Your cover, next to the shelf it has to sit on.
           </p>
         )}
-        <div
-          role="tablist"
-          aria-label="Cover tools"
-          className="mt-6 flex gap-1 rounded-lg border border-line bg-panel p-1"
-        >
-          {(
-            [
-              ["shelf", "The shelf"],
-              ["file", "Check a file"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={half === id}
-              onClick={() => setHalf(id)}
-              className={`flex-1 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                half === id
-                  ? "bg-accent text-accent-ink"
-                  : "text-muted hover:text-fg"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {/* **Yours is on screen from the start, not summoned by a search.**
+            It used to sit inside `wall.length > 0`, so a writer arriving on
+            this tool saw a search box and a dashed box of instructions — and
+            the one thing the screen could show them without asking anything,
+            their own cover, was hidden behind a button. The shelf needs a
+            query; this does not.
+
+            The space beside it was empty because the cover is a fixed width
+            and the panel is not. What fills it is what a writer is deciding
+            *about* — the words printed on the artwork, at the size they are
+            actually read — plus whether this is real artwork or the generated
+            stand-in. Facts off the book, not advice about it. */}
+        <section className="mt-8 rounded-xl border border-line bg-panel p-5">
+          <h2 className="text-sm font-bold text-fg">Yours</h2>
+          <div className="mt-3 flex flex-wrap items-start gap-6">
+            <div className="shrink-0" style={{ width }}>
+              <BookCover
+                title={book.title}
+                subtitle={book.subtitle}
+                author={book.author}
+                words={bookWordCount(book)}
+                image={myCover ?? undefined}
+                bare={book.bareCover}
+                seed={book.id}
+              />
+            </div>
+
+            {/* **The controls live in the card, beside what they act on.**
+                They were stacked above it — a tab strip, then a search row,
+                then the cover — so the screen read as three unrelated bands
+                and the widest element on it was a text field. Put beside the
+                cover they explain themselves: this is yours, and this is how
+                you want to look at it.
+
+                The metadata that briefly sat here (title, subtitle, author,
+                artwork) is gone. It was true and it was the wrong thing: a
+                writer on this screen is not checking their own title, they are
+                deciding whether the artwork survives a shelf, and four rows
+                restating the fields printed on the picture beside them is a
+                caption nobody needs.
+
+                `w-full` under the fold and `flex-1` beside it, so on a phone
+                the controls sit under the cover at full width rather than
+                squeezing into whatever the cover leaves. */}
+            <div className="w-full min-w-[16rem] flex-1">
+              <div
+                role="tablist"
+                aria-label="Cover tools"
+                className="flex gap-1 rounded-lg border border-line bg-surface p-1"
+              >
+                {(
+                  [
+                    ["shelf", "The shelf"],
+                    ["file", "Check a file"],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="tab"
+                    aria-selected={half === id}
+                    onClick={() => setHalf(id)}
+                    className={`flex-1 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                      half === id
+                        ? "bg-accent text-accent-ink"
+                        : "text-muted hover:text-fg"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {half === "shelf" ? (
+                <>
+                  <form
+                    className="mt-3 flex flex-wrap gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void search(query);
+                    }}
+                  >
+                    <input
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Words that describe your book"
+                      aria-label="Search for comparable books"
+                      className="min-w-[10rem] flex-1 rounded-lg border border-line bg-surface px-4 py-2.5
+                                 text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                    />
+                    <button
+                      type="submit"
+                      disabled={state === "loading" || query.trim().length < 2}
+                      className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
+                    >
+                      {state === "loading" ? "Looking…" : "Show me the shelf"}
+                    </button>
+                  </form>
+                  <p className="mt-3 max-w-prose text-xs text-muted">
+                    {myCover
+                      ? "Shown at the size a reader meets it. Whether the title still reads at thumbnail size is what the shelf below answers."
+                      : "No artwork on this book yet, so that is the generated one. Search, and compare it with the shelf."}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 max-w-prose text-xs text-muted">
+                  Drop the file you are about to upload just here. It is measured in
+                  your browser and never sent anywhere.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* **The half's own content, inside the same box.** The card held the
+              controls and then handed off to a separate block underneath — so
+              choosing "Check a file" lit a tab in one container and drew the
+              answer in another, with desk showing between them. A tab strip
+              and the thing it switches belong to one surface; that is what
+              makes it read as a switch rather than as two features that happen
+              to be stacked.
+
+              Divided rather than boxed again: a nested card inside a card is
+              the pattern this page has just finished removing elsewhere. */}
+          {/* Tightened twice now. The gap above this rule is set by the cover's
+              height rather than by the controls beside it — in file mode the
+              right column is a tab strip and two lines, so the row is as tall
+              as the picture and the divider lands well under the text. Trimming
+              the margins is the part that is ours to trim. */}
+          <div className="mt-2 border-t border-line pt-3">
+            {half === "shelf" ? (
+              wall.length === 0 &&
+              state !== "loading" &&
+              !error && (
+                <>
+                  <p className="text-sm font-semibold text-fg">
+                    We do not design covers.
+                  </p>
+                  <p className="mt-1.5 max-w-2xl text-sm text-muted">
+                    Press <strong className="text-fg">Show me the shelf</strong>{" "}
+                    to see yours beside the covers already selling in your
+                    genre, at the size a reader meets them.
+                  </p>
+                </>
+              )
+            ) : (
+              <CoverChecker bookId={book.id} />
+            )}
+          </div>
+        </section>
 
         <div hidden={half !== "shelf"}>
-        <form
-          className="mt-6 flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void search(query);
-          }}
-        >
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Words that describe your book"
-            aria-label="Search for comparable books"
-            className="min-w-[14rem] flex-1 rounded-lg border border-line bg-panel px-4 py-2.5
-                       text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-          />
-          <button
-            type="submit"
-            disabled={state === "loading" || query.trim().length < 2}
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
-          >
-            {state === "loading" ? "Looking…" : "Show me the shelf"}
-          </button>
-        </form>
-
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}
           </p>
-        )}
-
-        {/* What the button is for, before it has been pressed.
-        
-            The screen opened on a heading, a search box and nothing else — so
-            a writer arriving from "Get a cover made" was shown a text field
-            and left to guess what searching had to do with it. The wall is the
-            whole point of this tool and it was invisible until you had already
-            worked out how to summon it. */}
-        {wall.length === 0 && state !== "loading" && !error && (
-          <div className="mt-6 rounded-xl border border-dashed border-line bg-surface p-5">
-            <p className="text-sm font-semibold text-fg">
-              We do not design covers.
-            </p>
-            <p className="mt-1.5 max-w-2xl text-sm text-muted">
-              Press <strong className="text-fg">Show me the shelf</strong> to
-              see yours beside the covers already selling in your genre, at the
-              size a reader meets them.
-            </p>
-          </div>
         )}
 
         {wall.length > 0 && (
@@ -454,53 +1167,47 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                 ))}
               </div>
               <p className="max-w-prose text-sm text-muted">
-                {SIZES.find((s) => s.id === size)!.note} · {wall.length} covers
+                {/* The count moved onto the shelf panel's own heading, where
+                    it is beside the thing it counts. Said in both places it
+                    read as two figures a reader had to reconcile. */}
+                {SIZES.find((s) => s.id === size)!.note}
               </p>
             </div>
 
-            <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-              <h2 className="text-sm font-bold text-fg">Yours</h2>
-              <div className="mt-3" style={{ width }}>
-                <BookCover
-                  title={book.title}
-                  subtitle={book.subtitle}
-                  author={book.author}
-                  words={bookWordCount(book)}
-                  image={myCover ?? undefined}
-                  bare={book.bareCover}
-                  seed={book.id}
-                />
+            {/* **The shelf, boxed like Yours.** It was a bare heading over a
+                loose grid, so the two halves of the one comparison — your
+                cover and the wall it has to survive — were drawn as different
+                kinds of thing. Same panel, same padding: the eye reads them as
+                a pair, which is the entire point of the screen. */}
+            <section className="mt-8 rounded-xl border border-line bg-panel p-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <h2 className="text-sm font-bold text-fg">The shelf</h2>
+                <span className="text-xs text-muted tabular-nums">
+                  {wall.length} covers
+                </span>
               </div>
-              {!myCover && (
-                <p className="mt-3 text-xs text-muted">
-                  No artwork on this book yet, so that is the generated one.
-                  Compare it with the wall below and see what it is missing.
-                </p>
-              )}
+              <ul className="mt-3 flex flex-wrap gap-4">
+                {wall.map((comp) => (
+                  <li key={comp.key} style={{ width }}>
+                    {/* A plain img: two third-party hosts whose URLs we do not
+                        control, and next/image would mean a config file listing
+                        them that goes stale. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={comp.coverUrl}
+                      alt={`Cover of ${comp.title}`}
+                      style={{ width }}
+                      className="rounded shadow-sm"
+                    />
+                    {size !== "thumb" && (
+                      <p className="mt-1.5 line-clamp-2 text-xs text-muted">
+                        {comp.title}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </section>
-
-            <h2 className="mt-8 text-sm font-bold text-fg">The shelf</h2>
-            <ul className="mt-3 flex flex-wrap gap-4">
-              {wall.map((comp) => (
-                <li key={comp.key} style={{ width }}>
-                  {/* A plain img: two third-party hosts whose URLs we do not
-                      control, and next/image would mean a config file listing
-                      them that goes stale. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={comp.coverUrl}
-                    alt={`Cover of ${comp.title}`}
-                    style={{ width }}
-                    className="rounded shadow-sm"
-                  />
-                  {size !== "thumb" && (
-                    <p className="mt-1.5 line-clamp-2 text-xs text-muted">
-                      {comp.title}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
           </>
         )}
 
@@ -532,9 +1239,6 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
         )}
         </div>
 
-        <div hidden={half !== "file"}>
-          <CoverChecker />
-        </div>
 
       </div>
     </div>

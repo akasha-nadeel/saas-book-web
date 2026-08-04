@@ -4,19 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { GENRES } from "@/lib/book-kinds";
-import { buildQuery, type CompTitle } from "@/lib/comps/comps";
 import {
   matchHeadings,
   mergeHeadings,
   rankHeadings,
-  rankSubjects,
-  worthSuggesting,
-  type SubjectCount,
   type SubjectHeading,
 } from "@/lib/comps/subjects";
 import { COMMON_SUBJECTS } from "@/lib/comps/common-subjects";
-import { seedSubjects, type Shelf } from "@/lib/comps/shelves";
 import { keywordReport, SLOTS, SLOT_MAX, type Issue } from "@/lib/keywords";
 import { ProGate } from "@/components/upgrade/pro-gate";
 import { findBook, setPublishing } from "@/lib/library-store";
@@ -75,90 +69,13 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
 
-  const [query, setQuery] = useState("");
-  const [books, setBooks] = useState<CompTitle[]>([]);
-  const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
-    "idle",
-  );
-  const [error, setError] = useState<string | null>(null);
-
   /** What the writer is typing into the list themselves. */
   const [own, setOwn] = useState("");
-
-  // The shop's own categories, once asked for.
-  const [shelves, setShelves] = useState<Shelf[] | null>(null);
-  const [shelfNote, setShelfNote] = useState<string | null>(null);
-  const [matching, setMatching] = useState(false);
-  const [matchError, setMatchError] = useState<string | null>(null);
 
   const chosen = useMemo(
     () => book?.publishing?.subjects ?? [],
     [book?.publishing?.subjects],
   );
-
-  const seeded = useRef(false);
-  useEffect(() => {
-    if (!book || seeded.current) return;
-    seeded.current = true;
-    setQuery(
-      buildQuery({ genre: book.genre, blurb: book.publishing?.description }),
-    );
-  }, [book]);
-
-  const suggestions = useMemo(
-    () => worthSuggesting(rankSubjects(books), books.length),
-    [books],
-  );
-
-  async function search(q: string) {
-    if (q.trim().length < 2) return;
-    setState("loading");
-    setError(null);
-    try {
-      const response = await fetch(`/api/comps?q=${encodeURIComponent(q)}`);
-      const data = await response.json();
-      if (!response.ok) {
-        setError(data?.error ?? "That search did not work.");
-        setState("error");
-        return;
-      }
-      setBooks(data.books ?? []);
-      setState("done");
-    } catch {
-      setError("Could not reach the search. Check your connection.");
-      setState("error");
-    }
-  }
-
-  /**
-   * Ask which of the shop's own categories these subjects point at.
-   *
-   * Only the subject names and their counts go — no manuscript and no blurb.
-   * The answer is parsed on the server, where the rule that counts come from
-   * our data rather than the model cannot be edited by a reader.
-   */
-  async function matchToShop(seeds: SubjectCount[]) {
-    setMatching(true);
-    setMatchError(null);
-    try {
-      const response = await fetch("/api/comps/categories", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subjects: seeds, genre: book?.genre ?? "" }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setMatchError(data?.error ?? "That did not work.");
-        return;
-      }
-      setShelves(data.shelves ?? []);
-      setShelfNote(typeof data.note === "string" ? data.note : null);
-    } catch {
-      setMatchError("Could not reach it. Check your connection.");
-    } finally {
-      setMatching(false);
-    }
-  }
 
   /** One of the seven, written back in place so slot four stays slot four. */
   function setKeyword(index: number, text: string) {
@@ -241,30 +158,77 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
 
   return (
     <div className={toolShell(embedded)}>
+      {/* The trail keeps the trade word, the heading asks the writer's own
+          question — the split comps, the title check and the blurb screen all
+          make. "Categories" is the word on the shop's own form and in the
+          launcher, so it stays where a writer goes looking for it; as the `h1`
+          it names the field rather than saying what the screen is for. */}
       {!embedded && (
-        <ToolHeader book={book} tool="Categories">
-          Which shelf your book lands on — worked out from where books like yours
-          are actually filed, rather than from a list we made up.
+        <ToolHeader
+          book={book}
+          tool="Categories"
+          title="Which shelf does your book go on?"
+          /* Matched to the page's own container below. The default 5xl left a
+             band of empty desk down both sides of a screen whose widest block
+             is a row of seven full-width keyword fields, and `ToolHeader`'s
+             own note is explicit that the two must agree or the left edges
+             disagree. The deck stays capped at 2xl inside it, so widening the
+             page never widens a line of prose. */
+          width="6xl"
+        >
+          {/* **The problem before the method.** The old deck opened on "which
+              shelf your book lands on", which describes the output; a writer
+              arrives here because a shop's form is asking them for three
+              categories out of a vocabulary nobody has memorised, and that is
+              the pressure the deck should meet.
+
+              The last clause is the one that cannot be dropped. A made-up
+              category list is the obvious way to build this screen and the one
+              thing it refuses — BISAC is licensed, and a list of our own would
+              be exactly the invented vocabulary the tool exists to avoid. */}
+          Every shop makes you choose categories before it will list your book,
+          and they decide which shelf a reader finds you on. Nobody knows that
+          vocabulary by heart, so this reads it off where books like yours are
+          actually filed — never off a list we made up.
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-6xl px-6 pt-6 pb-16">
         {heading}
         {/* ---- What is chosen --------------------------------------------
             A strip rather than the card this was. Before the first search a
             writer cannot have chosen anything, so a panel headed "On this
             book" containing one sentence of apology was the largest thing on
             the screen and the least useful thing on it. */}
-        <div className="rounded-2xl bg-accent p-1.5 pt-0 shadow-md">
-          {/* The count belongs on the strip rather than inside the card: it is
-              the first thing a writer wants off this block, and a strip is
-              read before what it sits above. Same shell as the pricing page
-              and the note below the search. */}
-          <p className="py-2.5 text-center font-sans text-xs font-medium text-accent-ink">
-            On this book · {chosen.length}
-          </p>
+        {/* **The indigo shells are gone, and that is a rule rather than a
+            preference.** Two blocks on this screen were wrapped in a
+            `bg-accent` frame with a centred white label — the chosen list and
+            an explainer. In daylight `--color-accent` is the brand indigo this
+            app reserves for *"this is the way forward"*, and `globals.css`
+            says in as many words that nothing else in the chrome may spend a
+            hue. Spending it on two containers cost twice: the real buttons
+            (Add, Suggest categories) had to compete with the colour of their
+            own box, and the loudest thing on the screen became a paragraph
+            explaining what subjects are.
 
-          <section className="rounded-xl bg-panel p-4">
+            What replaces it is the pattern the lower half of this page was
+            already using and the one every settings screen worth copying uses
+            — heading, one line of deck, then the control on a plain panel. The
+            page now has one section rhythm instead of three, and the only
+            indigo left is on things you can press. */}
+        <section>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-xl font-bold tracking-tight text-fg">
+              On this book
+            </h2>
+            {/* The count reads as a figure about the heading, not as part of
+                it — same treatment as the shelves on the title check. */}
+            <span className="text-sm text-muted tabular-nums">
+              {chosen.length} chosen
+            </span>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-line bg-panel p-4">
             {chosen.length > 0 ? (
               <ul className="flex flex-wrap gap-2">
                 {chosen.map((name) => (
@@ -309,242 +273,55 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
                 whatever its selector gave you.
               </p>
             </div>
-          </section>
-        </div>
-
-        {/* ---- Find some -------------------------------------------------- */}
-        <form
-          className="mt-6 flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void search(query);
-          }}
-        >
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Words that describe your book"
-            aria-label="Search for comparable books"
-            className="min-w-[14rem] flex-1 rounded-lg border border-line bg-panel px-4 py-2.5
-                       text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-          />
-          <button
-            type="submit"
-            disabled={state === "loading" || query.trim().length < 2}
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
-          >
-            {state === "loading" ? "Looking…" : "Suggest categories"}
-          </button>
-        </form>
-
-        {/* With no genre and no blurb the seed is empty, which left the box
-            blank and the button dead. Same fix as the comps screen: the app's
-            own genres as starting points, which search rather than save. */}
-        {!book.genre && (
-          <div className="mt-3">
-            <p className="text-xs text-muted">
-              This book has no genre set, so there was nothing to seed the box
-              with. Start from one of these, or describe the story above.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {GENRES.filter((g) => g !== "Other").map((genre) => (
-                <button
-                  key={genre}
-                  type="button"
-                  onClick={() => {
-                    const seed = `subject:"${genre}"`;
-                    setQuery(seed);
-                    void search(seed);
-                  }}
-                  className="rounded-full border border-line bg-panel px-3 py-1 text-xs
-                             font-medium text-fg hover:border-accent/40"
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
           </div>
-        )}
+        </section>
 
-        {error && (
-          <p className="mt-6 rounded-lg border border-note-line bg-note-bg p-4 text-sm text-fg">
-            {error}
-          </p>
-        )}
+        {/* ---- The seven boxes --------------------------------------------
+            Boxed like the two panels above it. Seven full-width fields sitting
+            loose on the desk were the one block on the page with no edge, so
+            the longest section read as the least finished — and on a `6xl`
+            page a bare row of inputs has nothing holding it to the column the
+            rest of the screen is aligned to.
 
-        {/* ---- What these are ---------------------------------------------
-            The pricing page's shell: an accent block with a line written along
-            the top and the card set into the rest. It is used here for the
-            same reason it is used there — the strip is read *before* the card,
-            so it can carry the one thing that has to land first, where a
-            heading inside the card is read after it.
-
-            Two paragraphs became two sentences. Everything cut was true and
-            none of it was load-bearing on a screen a writer has not searched
-            on yet: what a shop does with the words is answered by the "What a
-            shop would file it under" section further down, and the one-in-
-            twenty rule explains itself the moment a count appears beside a row.
-        ------------------------------------------------------------------ */}
-        {state === "idle" && (
-          <div className="mt-8 rounded-2xl bg-accent p-1.5 pt-0 shadow-md">
-            <p className="py-2.5 text-center font-sans text-xs font-medium text-accent-ink">
-              What these are, exactly
-            </p>
-            <section className="rounded-xl bg-panel p-5">
-              <p className="max-w-prose text-sm text-muted">
-                Not a shop&rsquo;s own list. These are the subjects two public
-                catalogues file comparable books under — the answer to
-                &ldquo;what is this book, to a librarian&rdquo;.
-              </p>
-              <p className="max-w-prose mt-2.5 text-sm text-muted">
-                Search, and each suggestion says how many comparable books
-                carry it.
-              </p>
-            </section>
-          </div>
-        )}
-
-        {state === "done" && suggestions.length === 0 && (
-          <p className="mt-8 text-muted">
-            Nothing came back often enough to be worth suggesting. One book out
-            of twenty filed under something is that book, not a pattern — try a
-            broader search.
-          </p>
-        )}
-
-        {suggestions.length > 0 && (
-          <>
-            <div className="mt-8 flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="font-bold text-fg">
-                {suggestions.length} worth considering
-              </h2>
-              <p className="max-w-prose text-sm text-muted">
-                From {books.length} comparable books · tap to add
-              </p>
-            </div>
-            <ul className="mt-3 flex flex-col gap-1.5">
-              {suggestions.map((subject) => (
-                <SuggestionRow
-                  key={subject.name}
-                  name={subject.name}
-                  count={subject.count}
-                  total={books.length}
-                  on={has(subject.name)}
-                  onToggle={() => toggle(subject.name)}
-                />
-              ))}
-            </ul>
-          </>
-        )}
-
-        {/* ---- The shop's own categories ---------------------------------
-            After the subjects, because it is a reading *of* them: a writer who
-            wants the mapping has already seen what it was mapped from.
-        ------------------------------------------------------------------ */}
-        {suggestions.length > 0 && (
-          <section className="mt-10">
-            <h2 className="text-lg font-bold text-fg">
-              What a shop would file it under
-            </h2>
-            <p className="mt-1 max-w-prose text-sm text-muted">
-              The list above is what a <em>librarian</em> files these books
-              under. A shop asks you to pick three out of its own tree, which is
-              a different vocabulary. This is the translation.
-            </p>
-
-            <ProGate
-              title="Matching to a shop's categories"
-              what="Turns the librarian subjects above into the category paths a shop's own selector uses, each saying which subjects it came from and how many comparable books carried them."
-            >
-              <div className="mt-4">
-                {shelves === null ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => void matchToShop(seedSubjects(suggestions))}
-                      disabled={matching}
-                      className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold
-                                 text-accent-ink disabled:opacity-50"
-                    >
-                      {matching ? "Matching\u2026" : "Match these to a shop"}
-                    </button>
-                    <p className="mt-2 max-w-prose text-xs text-muted">
-                      Only the subject names above and their counts are sent \u2014
-                      not your book. Nothing from Amazon is read, so no search
-                      volume or ranking comes back: these are paths to look up
-                      in the shop\u2019s own selector.
-                    </p>
-                  </>
-                ) : shelves.length === 0 ? (
-                  <p className="text-sm text-muted">
-                    Nothing came back that was worth showing.
-                  </p>
-                ) : (
-                  <>
-                    {shelfNote && (
-                      <p className="mb-3 max-w-prose text-sm text-fg">{shelfNote}</p>
-                    )}
-                    <ol className="flex flex-col gap-2.5">
-                      {shelves.map((shelf) => (
-                        <li
-                          key={shelf.path}
-                          className="rounded-xl border border-line bg-panel p-4"
-                        >
-                          <p className="font-mono text-sm font-bold text-fg">
-                            {shelf.path}
-                          </p>
-                          <p className="mt-1.5 max-w-prose text-sm text-muted">
-                            {shelf.reason}
-                          </p>
-                          {shelf.from.length > 0 && (
-                            <p className="mt-2 text-xs text-muted">
-                              from{" "}
-                              {shelf.from
-                                .map((c) => `${c.name} (${c.count})`)
-                                .join(", ")}
-                            </p>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                    <p className="mt-3 max-w-prose text-xs text-muted">
-                      Candidates, not confirmed paths. Only the shop knows its
-                      own tree and it changes \u2014 type these into its selector
-                      to see which exist. You get three.
-                    </p>
-                  </>
-                )}
-                {matchError && (
-                  <p className="mt-3 max-w-prose text-sm text-fg">{matchError}</p>
-                )}
-              </div>
-            </ProGate>
-          </section>
-        )}
-
-        {/* ---- The seven boxes -------------------------------------------- */}
+            The deck moved inside the panel and the count moved up beside the
+            heading, which is the shape "On this book" and "Find some" both
+            use: heading and its figure, then a panel whose first line explains
+            it, a divider, and the control. Three sections, one pattern. */}
         <section className="mt-12">
-          <h2 className="text-lg font-bold text-fg">Your seven keywords</h2>
-          <p className="mt-1 max-w-prose text-sm text-muted">
-            A shop\u2019s listing form gives you seven boxes of {SLOT_MAX}{" "}
-            characters. They are not tags \u2014 they are extra words the shop
-            indexes the book under, so the whole game is spending them on words
-            your listing does not already carry.
-          </p>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-xl font-bold tracking-tight text-fg">
+              Your seven keywords
+            </h2>
+            <span className="text-sm text-muted tabular-nums">
+              {(book.publishing?.keywords ?? []).filter((k) => k.trim()).length}{" "}
+              of {SLOTS} used
+            </span>
+          </div>
 
-          <ProGate
-            title="The seven keyword boxes"
-            what="The seven backend keyword fields a shop's listing form asks for, counted: which are over the limit, which repeat words your title already owns, which spend the same word twice, and which use phrases shops reject."
-          >
-            <KeywordBoxes
-              keywords={book.publishing?.keywords ?? []}
-              title={book.title}
-              subtitle={book.subtitle}
-              author={book.author}
-              series={book.publishing?.series}
-              onChange={setKeyword}
-            />
-          </ProGate>
+          <div className="mt-3 rounded-xl border border-line bg-panel p-4">
+            <p className="max-w-prose text-sm text-muted">
+              A shop&rsquo;s listing form gives you seven boxes of {SLOT_MAX}{" "}
+              characters. They are not tags &mdash; they are extra words the
+              shop indexes the book under, so the whole game is spending them on
+              words your listing does not already carry.
+            </p>
+
+            <div className="mt-3.5 border-t border-line pt-3.5">
+              <ProGate
+                title="The seven keyword boxes"
+                what="The seven backend keyword fields a shop's listing form asks for, counted: which are over the limit, which repeat words your title already owns, which spend the same word twice, and which use phrases shops reject."
+              >
+                <KeywordBoxes
+                  keywords={book.publishing?.keywords ?? []}
+                  title={book.title}
+                  subtitle={book.subtitle}
+                  author={book.author}
+                  series={book.publishing?.series}
+                  onChange={setKeyword}
+                />
+              </ProGate>
+            </div>
+          </div>
         </section>
 
         <div className="mt-10 border-t border-line pt-6">
@@ -576,81 +353,6 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
  * screen prints the count is that a subject carried by two books and one
  * carried by nine are different advice.
  */
-function SuggestionRow({
-  name,
-  count,
-  total,
-  on,
-  onToggle,
-}: {
-  name: string;
-  count: number;
-  total: number;
-  on: boolean;
-  onToggle: () => void;
-}) {
-  const share = total > 0 ? (count / total) * 100 : 0;
-
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-pressed={on}
-        className={`flex w-full items-center gap-3 rounded-lg border px-4 py-2.5 text-left
-                    transition-colors ${
-                      on
-                        ? "border-accent bg-accent/8"
-                        : "border-line bg-panel hover:border-accent/40"
-                    }`}
-      >
-        <span
-          aria-hidden="true"
-          className={`grid h-5 w-5 shrink-0 place-items-center rounded text-[11px]
-                      font-bold ${
-                        on
-                          ? "bg-accent text-accent-ink"
-                          : "border-2 border-line text-transparent"
-                      }`}
-        >
-          ✓
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-fg">
-            {name}
-          </span>
-          <span className="mt-1 block h-1 overflow-hidden rounded-full bg-raised">
-            <span
-              className={`block h-full rounded-full ${on ? "bg-accent" : "bg-fg/25"}`}
-              style={{ width: `${share}%` }}
-            />
-          </span>
-        </span>
-
-        <span className="shrink-0 text-xs whitespace-nowrap text-muted tabular-nums">
-          {count} of {total}
-        </span>
-      </button>
-    </li>
-  );
-}
-
-/**
- * The seven boxes, with what is wrong with them underneath.
- *
- * **Everything here is counted and nothing is scored.** No "keyword strength",
- * no traffic light, no percentage. The figure a writer actually wants is
- * search volume, and it cannot be had honestly — a shop publishes none, and
- * the tools that quote one buy scraped data. Printed beside real categories on
- * a screen about selling, an invented volume would be the most believable
- * invented number in the app.
- *
- * The character count is the one live figure, and it turns red only when the
- * field is genuinely past the limit — a box the shop will refuse. Amber for
- * "getting long" would be a judgement about a field the writer is mid-way
- * through typing.
- */
 function KeywordBoxes({
   keywords,
   title,
@@ -673,35 +375,62 @@ function KeywordBoxes({
 
   return (
     <div className="mt-4">
+      {/* **The count moved inside the field.** It used to sit in a fixed
+          14-unit column at the far right, so on a wide page the number was a
+          hand's width from the text it counted and the eye had to travel the
+          whole row to check it — seven rows of that is seven journeys. Inside
+          the box it is read in the same glance as the words, which is the
+          pattern every listing form and every character-limited field settled
+          on.
+
+          Each row is a `relative` box with a padded input rather than a flex of
+          three children, because the count has to sit *over* the field to be
+          inside its border. `pr-16` reserves the space so a long keyword runs
+          under the number rather than behind it, and the border takes the stop
+          colour at the limit so the row says so twice. */}
       <ol className="flex flex-col gap-2">
         {report.slots.map((slot) => (
           <li key={slot.index} className="flex items-center gap-3">
             <span className="w-4 shrink-0 text-xs text-muted tabular-nums">
               {slot.index + 1}
             </span>
-            <input
-              value={slot.text}
-              onChange={(e) => onChange(slot.index, e.target.value)}
-              aria-label={`Keyword ${slot.index + 1}`}
-              placeholder="Words your title does not already use"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-3 py-2
-                         text-sm text-fg outline-none
-                         focus-visible:ring-2 focus-visible:ring-accent/50"
-            />
-            <span
-              className={`w-14 shrink-0 text-right text-xs tabular-nums ${
-                slot.over ? "font-bold text-stop-fg" : "text-muted"
-              }`}
-            >
-              {slot.chars}/{SLOT_MAX}
-            </span>
+            <div className="relative min-w-0 flex-1">
+              <input
+                value={slot.text}
+                onChange={(e) => onChange(slot.index, e.target.value)}
+                aria-label={`Keyword ${slot.index + 1}`}
+                placeholder="Words your title does not already use"
+                /* `bg-surface`, not `bg-panel`: these now sit *inside* a panel,
+                   and a field the same colour as the card under it is a field
+                   with only a hairline to prove it exists. The desk colour
+                   reads as a well — the same treatment the "type your own" box
+                   in the panel opposite already used. */
+                className={`w-full rounded-lg border bg-surface py-2 pr-16 pl-3 text-sm
+                            text-fg outline-none focus-visible:ring-2
+                            focus-visible:ring-accent/50 ${
+                              slot.over ? "border-stop-line" : "border-line"
+                            }`}
+              />
+              <span
+                aria-hidden="true"
+                className={`pointer-events-none absolute inset-y-0 right-3 flex
+                            items-center text-xs tabular-nums ${
+                              slot.over
+                                ? "font-bold text-stop-fg"
+                                : "text-muted/70"
+                            }`}
+              >
+                {slot.chars}/{SLOT_MAX}
+              </span>
+            </div>
           </li>
         ))}
       </ol>
 
-      <p className="mt-3 text-xs text-muted">
-        {report.filled} of {SLOTS} used. Saved as you type.
-      </p>
+      {/* The count moved up beside the heading, where every other section on
+          this page carries its figure. Saying it twice, four hundred pixels
+          apart, made the reader check whether they were two different counts. */}
+      <p className="mt-3 text-xs text-muted">Saved as you type.</p>
 
       {report.issues.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
