@@ -56,6 +56,10 @@ const WIDTHS = {
   "3xl": "max-w-3xl",
   "4xl": "max-w-4xl",
   "5xl": "max-w-5xl",
+  /* Wider still, for a grid whose whole job is to be scanned at once — the
+     title check puts a shelf of covers under a one-line answer, and every
+     extra column is a book a reader takes in without scrolling. */
+  "7xl": "max-w-7xl",
   /* For a screen that is a grid of pictures rather than a column of prose.
      Reading wants a narrow measure; twenty covers want the room, and at 4xl
      they sat in a 56rem column with a third of a wide window empty on either
@@ -202,15 +206,32 @@ export function ToolHeader({
               </span>
             </p>
 
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-fg">
+            {/* A step up from 2xl. This is the name of the screen a writer
+                deliberately navigated to, and it was sitting at the same size
+                as a section heading inside the page under it — the thing that
+                says where you are should not be the same weight as the things
+                that say what is on the shelf. Held back on a phone, where 3xl
+                wraps a two-word tool name onto two lines. */}
+            <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">
               {title ?? tool}
             </h1>
 
             {/* Capped at a readable measure. Running the full width of a 5xl
                 page gave a line nobody wants to read twice, and it was most of
-                why this header looked loose. */}
+                why this header looked loose. At `text-base` that cap is about
+                eighty characters, which is shorter than it was at `text-sm` —
+                bigger type in the same column is fewer words per line, not
+                more.
+
+                **Not `text-muted`**, which is the grey this app spends on
+                metadata: a chapter count, a date, a figure's provenance. This
+                is the sentence the heading is asking to be read, and on most
+                of these screens it is the only explanation of what the tool is
+                for. So it takes the page's own ink held slightly back, the
+                same treatment the pricing page's deck already uses, with the
+                weight lifted to match. */}
             {children && (
-              <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
+              <p className="mt-2 max-w-2xl text-base leading-relaxed font-medium text-fg/75">
                 {children}
               </p>
             )}

@@ -93,7 +93,12 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: "comps",
         icon: "shelf",
         name: "Comp titles",
-        what: "The published books yours sits beside, which every listing form and query letter asks for — ranked, on request, by a model that reads your opening.",
+        // Names the job, not the term. "The published books yours sits beside"
+        // was the old opening here and in the screen's own deck, and it only
+        // reads to somebody who already knows what a comp is — who is exactly
+        // the writer not looking for this tile. This line is read *before* the
+        // screen is opened, so it is the one place the jargon costs most.
+        what: "Real published books like yours, for the two or three every listing form and agent letter makes you name — ranked, on request, by a model that reads your opening.",
       },
       {
         path: "blurb",

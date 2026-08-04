@@ -377,3 +377,99 @@ export function summarise(books: CompTitle[]): CompSummary {
     subjects: rankSubjects(books).slice(0, 12),
   };
 }
+
+/**
+ * The shelves a writer can browse from the comps screen.
+ *
+ * **Separate from `GENRES` on purpose.** That list is what a *book* can be —
+ * it feeds the new-book form, the word-count targets and the checkup — so
+ * adding "Cozy mystery" to it would offer a word-count target for a shelf and
+ * change what every book in the library can call itself. These are only search
+ * seeds: pressing one runs `subject:"…"`, which is a query rather than a claim
+ * about anybody's manuscript.
+ *
+ * **Every entry was run against the live catalogues before it was added**, and
+ * one candidate was cut for failing: `subject:"Middle grade"` returns nothing,
+ * because the trade's word for that age band is not the shelf a librarian
+ * files it under. A chip that leads to an empty screen is worse than a missing
+ * chip — the writer reads it as their genre being empty rather than as our
+ * vocabulary being wrong. Re-run a new one before adding it.
+ *
+ * `GENRES` leads, minus "Other", so the book's own genre is always present and
+ * its chip can light up.
+ */
+export const BROWSE_SHELVES: readonly string[] = [
+  "Fantasy",
+  "Science fiction",
+  "Romance",
+  "Mystery",
+  "Thriller",
+  "Historical fiction",
+  "Literary fiction",
+  "Young adult",
+  "Horror",
+  "Memoir",
+  // Verified above, in the order a writer is likeliest to recognise them.
+  "Adventure",
+  "Crime",
+  "Suspense",
+  "Cozy mystery",
+  "Epic fantasy",
+  "Urban fantasy",
+  "Paranormal",
+  "Magical realism",
+  "Dystopian",
+  "Coming of age",
+  "Espionage",
+  "Westerns",
+  "Short stories",
+  "Humor",
+  "Poetry",
+  "Biography",
+  "Self-help",
+];
+
+/**
+ * The same question in Open Library's dialect.
+ *
+ * The two catalogues take different field prefixes for the same idea, and
+ * nothing said so until the title check went looking: Google wants
+ * `intitle:"…"`, Open Library wants `title:"…"`, and Open Library answers a
+ * query it does not understand with **zero results rather than an error**.
+ *
+ * That is the failure worth naming. The title-check screen was sending
+ * `intitle:` to both, so every result it has ever shown came from Google
+ * alone — while the page said, in its own words, "From Google Books and Open
+ * Library". It looked like it worked, because Google carries the popular
+ * titles and Google was answering. Measured: `intitle:"The Silent Patient"`
+ * finds nothing on Open Library, `title:"The Silent Patient"` finds thirteen.
+ *
+ * Only the prefixes actually used are translated. A query with none — which is
+ * every ordinary comps search — passes through untouched.
+ */
+export function openLibraryQuery(query: string): string {
+  return query
+    .replace(/\bintitle:/g, "title:")
+    .replace(/\binauthor:/g, "author:")
+    .replace(/\binpublisher:/g, "publisher:");
+}
+
+
+/**
+ * How many the source says exist, as against how many it handed over.
+ *
+ * Worth carrying because the difference is enormous and invisible: a search
+ * for `intitle:"spider man"` yields seventeen records here and Google reports
+ * about three hundred. A screen that counts what it fetched and prints the
+ * figure plainly reads as a count of the world, which is the invented-number
+ * problem arriving by accident rather than by choice.
+ *
+ * Google's `totalItems` is an estimate and wobbles between identical requests
+ * — so it is reported as an approximation and never used in arithmetic.
+ */
+export function reportedTotal(payload: unknown): number | null {
+  const total = (payload as { totalItems?: unknown })?.totalItems;
+  return typeof total === "number" && Number.isFinite(total) && total >= 0
+    ? total
+    : null;
+}

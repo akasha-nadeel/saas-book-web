@@ -1,14 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { BookCover } from "@/components/ui/book-cover";
 import {
+  BROWSE_SHELVES,
   buildQuery,
   type CompSummary,
   type CompTitle,
 } from "@/lib/comps/comps";
+import { looksPlain } from "@/lib/comps/query";
 import {
   compareLength,
   lengthFromPages,
@@ -30,7 +40,7 @@ import {
   orderedChapters,
   setTargetWords,
 } from "@/lib/library-store";
-import { GENRES, suggestTarget } from "@/lib/book-kinds";
+import { suggestTarget } from "@/lib/book-kinds";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
@@ -76,6 +86,11 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
 
+  /* Generated, not a literal: the roadmap mounts this tool in a panel, so the
+     page can hold this screen and the road at once and a hard-coded id would
+     be a duplicate the label points at by chance. */
+  const queryId = useId();
+
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
   const [summary, setSummary] = useState<CompSummary | null>(null);
@@ -83,6 +98,15 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     google: boolean;
     openLibrary: boolean;
   } | null>(null);
+  /** Whether Google was ever able to answer — see the route's own note. */
+  const [googleKeyed, setGoogleKeyed] = useState(true);
+  /** How each source failed, when it did — `SourceFailure` from the route. */
+  const [why, setWhy] = useState<{
+    google: string | null;
+    openLibrary: string | null;
+  } | null>(null);
+  /** Whether the worked example is showing in the empty box. */
+  const [hint, setHint] = useState(true);
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );
@@ -117,7 +141,34 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     return "";
   }, [book]);
 
-  const search = useCallback(async (q: string) => {
+  /**
+   * The query the result on screen belongs to.
+   *
+   * `query` is the box, which the writer can edit after a search; this is what
+   * was actually asked. The empty state reads it rather than the box, or
+   * clearing the field would rewrite the explanation of a result that is still
+   * on screen — the same fault the title check had with its own answer.
+   */
+  const [searched, setSearched] = useState("");
+
+
+  /**
+   * Search, translating the writer's words into a catalogue query first.
+   *
+   * **The translation is the fix for the wrong-books problem**, and it has to
+   * happen here rather than in the ranking: `Rank these` reorders what was
+   * fetched, so a fetch that brought back a comedian's memoir and a devotional
+   * about dessert stays wrong however well it is sorted.
+   *
+   * Three things keep it honest. It runs **only on plain words** — a shelf chip
+   * or a hand-written `subject:"…"` is already a query, and rewriting it would
+   * spend a model call to change nothing. It **puts the query it used in the
+   * box**, so what was searched is on screen and can be edited or undone. And
+   * **every failure falls through to the raw words**: no plan, no key, a bad
+   * parse or a dead model all end in the search that would have run anyway,
+   * because a free keyless search is the thing this screen may never lose.
+   */
+  const search = useCallback(async (q: string, genre?: string) => {
     if (q.trim().length < 2) return;
     setState("loading");
     setError(null);
@@ -126,8 +177,29 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     setPicks(null);
     setPattern(null);
     setRankError(null);
+
+    let asked = q;
+    if (looksPlain(q)) {
+      try {
+        const response = await fetch("/api/comps/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ words: q, genre }),
+        });
+        if (response.ok) {
+          const built = (await response.json())?.query;
+          if (typeof built === "string" && built.trim()) {
+            asked = built.trim();
+            setQuery(asked);
+          }
+        }
+      } catch {
+        // The words themselves are a working search. Never block on this.
+      }
+    }
+
     try {
-      const response = await fetch(`/api/comps?q=${encodeURIComponent(q)}`);
+      const response = await fetch(`/api/comps?q=${encodeURIComponent(asked)}`);
       const data = await response.json();
       if (!response.ok) {
         setError(data?.error ?? "That search did not work.");
@@ -137,6 +209,12 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
       setBooks(data.books ?? []);
       setSummary(data.summary ?? null);
       setSources(data.sources ?? null);
+      setGoogleKeyed(data.googleKeyed !== false);
+      setWhy(data.why ?? null);
+      // What was actually asked, which is the translated query when there was
+      // one. The empty state explains a result, so it has to name the search
+      // that produced it rather than the words that were typed.
+      setSearched(asked);
       setState("done");
     } catch {
       setError("Could not reach the search. Check your connection.");
@@ -173,7 +251,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
    * the caption can name it with confidence.
    */
   const shownShelf = useMemo(
-    () => GENRES.find((g) => query === `subject:"${g}"`) ?? null,
+    () => BROWSE_SHELVES.find((g) => query === `subject:"${g}"`) ?? null,
     [query],
   );
 
@@ -186,7 +264,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
       blurb: book.publishing?.description,
     });
     setQuery(seed);
-    void search(seed);
+    void search(seed, book.genre);
   }, [book, search]);
 
   /**
@@ -253,12 +331,42 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
 
   return (
     <div className={toolShell(embedded)}>
+      {/* The trail keeps the trade word, the heading asks the writer's own
+          question. "Comp titles" is what this is called in the launcher and on
+          a query letter, so it stays where a writer goes looking for it — but
+          as the `h1` it names the thing rather than saying what the screen
+          does, and somebody who does not yet know the term reads the page's
+          most prominent line and learns nothing. The title check made the same
+          split first: trail "Title check", heading "Is this title taken?". */}
       {!embedded && (
-        <ToolHeader book={book} tool="Comp titles" width="6xl">
-          The published books yours sits beside — what a reader who liked yours
-          would also have bought, which every listing form and every query
-          letter asks for. Not a book you admire and not a bestseller: a shop
-          reads &ldquo;like Tolkien&rdquo; as somebody who has not looked.
+        <ToolHeader
+          book={book}
+          tool="Comp titles"
+          title="What books is yours like?"
+          width="6xl"
+        >
+          {/* **The problem before the definition.** This used to open by
+              defining the term — "the published books yours sits beside" —
+              which only lands for somebody who already knew what a comp was
+              and had therefore not come here to find out. A writer arrives at
+              this screen because a form asked them a question they cannot
+              answer, so the deck now opens on that form.
+
+              Three sentences, in the order the writer meets the problem: what
+              is being asked of them, how it goes wrong, what this screen hands
+              back. The Tolkien line survived the rewrite because it is the one
+              sentence writers repeat to each other — it names the specific
+              mistake rather than warning about mistakes in general.
+
+              Every claim in the last sentence is a thing on the page below:
+              the shelf of real records, the median length, the Filed under
+              row. Nothing here promises the ranking, which is gated. */}
+          Every listing form and every letter to an agent asks the same thing:
+          name two or three published books like yours. Most writers either do
+          not know what is out there or reach for a bestseller — and a shop
+          reads &ldquo;like Tolkien&rdquo; as somebody who has not looked. This
+          searches two catalogues for real ones you can name, how long they
+          run, and what shelf they sit on.
         </ToolHeader>
       )}
 
@@ -267,20 +375,106 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           panel at about half a screen. See the note in `blurb-page.tsx`. */}
       <div className="@container mx-auto max-w-6xl px-6 pt-6 pb-16">
         {heading}
+
+        {/* **A label, because the field was teaching the wrong thing.**
+            The box arrived seeded and unlabelled, with a placeholder that a
+            seeded field never shows — so the only instruction on screen was
+            the button, and "Find comps" tells somebody who does not know the
+            word nothing at all. What a writer does next is type the one thing
+            they are certain of: the name of their book. That search cannot
+            work, and the screen was letting them make it before saying so.
+
+            So the instruction goes *above* the input, where it is read before
+            the first keystroke rather than after the empty result. The example
+            is the load-bearing half — "describe the story" is abstract until
+            somebody sees the shape of an answer, and one concrete phrase
+            teaches the register faster than a sentence of guidance.
+
+            A real `<label>` rather than the `aria-label` it replaces: that
+            attribute was doing this job for screen readers only, which is the
+            wrong half of the audience to help when the fault is that nobody
+            can see what to type. */}
+        <label
+          htmlFor={queryId}
+          /* **An instruction, not a question.** "What is your book about?" was
+             the wrong shape for a label sitting on top of an empty field: a
+             question invites an answer in the writer's head, where what is
+             needed is the one thing they should do next. It also duplicated
+             the page's `h1`, which is already a question — two on one screen
+             and neither is clearly the one being asked.
+
+             A step under that `h1` and no further. At `text-sm` this was set
+             smaller than the book titles in the results below and read as a
+             field label rather than as the thing to do. */
+          className="block text-lg font-semibold tracking-tight text-fg"
+        >
+          Type a few words about your book
+        </label>
+        {/* **Says what to type, not what the machine does with it.** The
+            translation step is deliberately unadvertised: it needs a plan and
+            a model key, so a line promising that your words become a proper
+            search would be false for anyone without either — and this screen's
+            free half is the part that may never come with an asterisk. The
+            query it lands on is visible in the box afterwards, which is a
+            demonstration rather than a claim.
+
+            "Plain words are fine" is the sentence that earns its place now,
+            because before the translation they were not fine: a sentence went
+            to the catalogue verbatim and came back with a comedian's memoir.
+            *Not the title* stays, since that is still the commonest mistake
+            and no amount of translating fixes it. */}
+        <p className="mt-1.5 mb-3 max-w-prose text-sm leading-relaxed text-muted">
+          Plain words are fine — the kind of story, who it is for, where it is
+          set. Not the title, though: comps are books <em>like</em> yours.
+        </p>
+
         <form
           className="flex flex-wrap gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            void search(query);
+            void search(query, book.genre);
           }}
         >
           <input
+            id={queryId}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Words that describe your book"
-            aria-label="Search for comparable titles"
+            /* **The example, where it is needed and only then.** The box is
+               seeded on load, so this shows the moment a writer clears it to
+               type their own — which is the one instant they are looking at an
+               empty field wondering what shape of thing goes in it. "Words
+               that describe your book" was the old text and it restates the
+               label; a worked example teaches the register instead.
+
+               **Cleared on focus rather than left to the browser.** A native
+               placeholder survives the click and only goes on the first
+               keystroke, so it sits under the caret while somebody is deciding
+               what to write. It comes back on blur if nothing was typed, so
+               the hint is not spent by a stray click. */
+            /* **Chosen by running the candidates, not by taste.** An example
+               in a field is an instruction, so it has to be a search that
+               actually works — measured against the live catalogues, three
+               words beat a sentence and a *shape* beat a plot:
+
+                 second chance romance  → romance novels, every one
+                 witch academy          → YA fantasy novels
+                 haunted house horror   → a film study and a how-to build one
+                 small town murder      → The Dark Half, a comic, a computing book
+                 young adult fantasy    → books *about* the genre: criticism,
+                                          "Language Arts & Disciplines"
+
+               That last row is the trap worth knowing: a bare genre name
+               matches the titles of academic books written about the genre,
+               because that is where those words appear as a title. What
+               survives is [hook] + [genre] — narrow enough to miss the
+               criticism, plain enough that a writer recognises the form and
+               can copy it with their own hook. */
+            placeholder={hint ? "Eg : second chance romance" : ""}
+            onFocus={() => setHint(false)}
+            onBlur={() => setHint(true)}
             className="min-w-[14rem] flex-1 rounded-lg border border-line bg-panel px-4 py-2.5
-                       text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                       text-fg outline-none placeholder:text-muted/70
+                       focus-visible:ring-2 focus-visible:ring-accent/50"
           />
           <button
             type="submit"
@@ -316,7 +510,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
                 : "This book has no genre set. Pick a shelf to look at, or describe the story in your own words above."}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {GENRES.filter((g) => g !== "Other").map((genre) => {
+            {BROWSE_SHELVES.map((genre) => {
               const seed = `subject:"${genre}"`;
               const on = query === seed;
               return (
@@ -326,7 +520,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
                   aria-pressed={on}
                   onClick={() => {
                     setQuery(seed);
-                    void search(seed);
+                    void search(seed, book.genre);
                   }}
                   className={`rounded-full border px-3 py-1 text-xs font-medium ${
                     on
@@ -388,10 +582,10 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
             is no version of this where the arithmetic outranks the covers.
         ---------------------------------------------------------------- */}
 
+        {/* Why nothing came back — see `emptyReason`. */}
         {state === "done" && books.length === 0 && (
-          <p className="mt-8 text-muted">
-            Nothing came back for that. Try fewer words, or describe the story
-            rather than naming the genre.
+          <p className="mt-8 max-w-prose text-muted">
+            {emptyReason(searched, book.title, sources, googleKeyed, why)}
           </p>
         )}
 
@@ -411,12 +605,25 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
         {/* Said plainly rather than left as a short list. A writer who sees ten
             results instead of twenty should know a service was down, not
             conclude that their genre is nearly empty. */}
-        {state === "done" && sources && !sources.google && (
-          <p className="mt-3 text-xs text-muted">
-            Google Books did not answer, so these are Open Library&rsquo;s
-            records only and carry no blurbs. It rate-limits without an API key.
-          </p>
-        )}
+        {/* Gated on there being records for "these" to refer to. With none, it
+            sat under "Nothing came back" and announced that the nothing was
+            Open Library's records only, carrying no blurbs — describing the
+            shape of an empty list. The zero case is now said once, above, and
+            said as what it is: half a search. */}
+        {state === "done" &&
+          books.length > 0 &&
+          sources &&
+          (!sources.google || !sources.openLibrary) && (
+            <p className="mt-3 text-xs text-muted">
+              {!sources.google
+                ? `Google Books did not answer, so these are Open Library’s
+                   records only and carry no blurbs. It rate-limits without an
+                   API key.`
+                : `Open Library did not answer, so these are Google Books’
+                   records only — thinner on covers, and the shelves below are
+                   Google’s broad categories rather than librarians’ subjects.`}
+            </p>
+          )}
 
         {picks && picks.length > 0 && (
           <CompGrid comps={picks.map((p) => p.book)} reasons={picks} />
@@ -502,6 +709,81 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
       </div>
     </div>
   );
+}
+
+/**
+ * Why nothing came back — the reason, not one line for every cause.
+ *
+ * This started as a single sentence ("try fewer words, or describe the story
+ * rather than naming the genre") shown whatever had happened: advice about
+ * naming a genre, given to somebody who had searched their own book's title,
+ * under a search where the catalogues were down.
+ *
+ * **The load-bearing rule is that an empty result is only an answer when the
+ * search actually ran.** A failure and a genuine nothing are identical in the
+ * data — zero records either way — so the source flags are the only thing that
+ * can tell them apart, and a screen that stays quiet about them reports an
+ * outage as a fact about the world. Same rule as the title check's all-clear.
+ *
+ * The order matters. **Neither-answered is checked first among the failures**,
+ * because the version that only asked `!sources.google` told a writer that
+ * "only one of the two catalogues answered" at a moment when *none* had — a
+ * sentence that is not merely unhelpful but false, and reassuringly so.
+ *
+ * The own-title case leads because it is a predictable dead end rather than a
+ * fault: the title check next door seeds with the book's own name, so a writer
+ * crossing between the two screens does the one search that cannot work.
+ */
+function emptyReason(
+  searched: string,
+  bookTitle: string,
+  sources: { google: boolean; openLibrary: boolean } | null,
+  googleKeyed: boolean,
+  why: { google: string | null; openLibrary: string | null } | null,
+): string {
+  const asked = searched.trim();
+
+  if (asked && asked.toLowerCase() === bookTitle.trim().toLowerCase()) {
+    return `Nothing came back — that was this book’s own title. A comp search
+            looks for books like yours, so it wants the kind of story rather
+            than the name: pick a shelf above, or describe it in a few words.`;
+  }
+
+  // A quota is the one failure the button makes worse. Checked before the
+  // others because it is the case where "try again" is the wrong instruction:
+  // every press while limited spends the allowance the next press needs, which
+  // is exactly the loop a writer falls into when the screen will not say why.
+  if (why?.google === "limited" || why?.openLibrary === "limited") {
+    return `Nothing came back — the catalogue is rate-limiting us, which is a
+            cap on how often it will answer rather than anything to do with
+            your words. Pressing again spends the same allowance, so give it a
+            minute and it will come back on its own.`;
+  }
+
+  if (sources && !sources.google && !sources.openLibrary) {
+    return `Neither catalogue answered, so nothing was actually searched — this
+            is not an empty result, it is a failed one. Try again in a moment.`;
+  }
+
+  // Only when Google is the one missing *and* could never have answered. A
+  // keyed deployment losing Google is weather; an unkeyed one loses it every
+  // time, and "try again in a moment" would be a retry that cannot succeed.
+  if (sources && !sources.google && !googleKeyed) {
+    return `Nothing came back, and Google Books did not answer — it rate-limits
+            without an API key, so only Open Library was searched. Open Library
+            matches titles and shelves rather than what a book is about, so
+            describing the story finds little there. Pick a shelf above.`;
+  }
+
+  if (sources && (!sources.google || !sources.openLibrary)) {
+    const down = sources.google ? "Open Library" : "Google Books";
+    return `Nothing came back, but ${down} did not answer — so only half the
+            search ran, and this is not a reliable empty. Try again in a
+            moment, or pick a shelf above.`;
+  }
+
+  return `Nothing came back for that. Try fewer words, or describe the story
+          rather than naming the genre.`;
 }
 
 /**
@@ -682,26 +964,7 @@ function CompCard({ comp, reason }: { comp: CompTitle; reason?: string }) {
 
   const inner = (
     <>
-      <span className="block overflow-hidden rounded-lg border border-line bg-raised">
-        {comp.coverUrl ? (
-          // A plain img, not next/image: these are two third-party hosts whose
-          // URLs we do not control, and adding them to the image config to gain
-          // a resize on a thumbnail is a configuration file that goes stale.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={comp.coverUrl}
-            alt=""
-            loading="lazy"
-            className="aspect-[2/3] w-full object-cover"
-          />
-        ) : (
-          <span className="flex aspect-[2/3] w-full items-center justify-center p-3">
-            <span className="line-clamp-4 text-center text-xs font-medium text-muted">
-              {comp.title}
-            </span>
-          </span>
-        )}
-      </span>
+      <BookCover src={comp.coverUrl} />
 
       {/* The line is kept even when it is empty, so titles sit on one baseline
           across a row. A record with nothing usable left after cleaning is

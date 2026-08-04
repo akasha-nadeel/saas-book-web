@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import {
   mergeComps,
+  openLibraryQuery,
   parseGoogle,
+  reportedTotal,
   parseOpenLibrary,
   summarise,
   type CompTitle,
@@ -70,27 +72,131 @@ const PER_SOURCE = 40;
  * the screen can tell the writer the list is short rather than implying the
  * genre is empty.
  */
+/**
+ * **The retry is here rather than in the writer's fingers.**
+ *
+ * Both of these fail *transiently* and often: Google rate-limits a burst — and
+ * a burst is what walking the shelf chips looks like, one request per click —
+ * while Open Library goes away for stretches and times out. Without a retry
+ * the screen handed that straight to the writer, who learned to press Find
+ * comps two or three times because the third one usually worked. That is a
+ * user performing the machine's error handling, and it is worse than a wait:
+ * the failure is invisible, so the lesson learnt is "this button is unreliable"
+ * rather than "the catalogue was busy".
+ *
+ * One press now covers the retries, and the screen stays in its loading state
+ * across them, which is the honest picture — the search really is still going.
+ *
+ * **Only what a retry can fix is retried.** A 429 or a 5xx is the service
+ * saying "not now", and a timeout is no answer at all; those come back. Any
+ * other 4xx is the request itself being wrong, and asking again identically
+ * changes nothing but the bill.
+ *
+ * **The deadline is the safety rail.** Attempts are cheap when a service fails
+ * fast (a 429 answers in milliseconds) and expensive when it hangs, so a fixed
+ * attempt count can mean twenty-odd seconds of dead screen on the bad path.
+ * The budget below bounds the whole chain instead, and the two sources run in
+ * parallel, so it bounds the request.
+ */
+const ATTEMPTS = 3;
+const ATTEMPT_TIMEOUT_MS = 5000;
+/** Total budget for one source, retries included, when it is the only hope. */
+const SOURCE_BUDGET_MS = 8000;
+/** Short, and growing: a rate limit wants a pause, not a hammering. */
+const BACKOFF_MS = [300, 900];
+
+/**
+ * How long a source that has *already lost* is allowed to keep the writer.
+ *
+ * The retries above fixed the three-clicks problem and immediately bought a
+ * worse one: with Open Library down and Google answering in half a second,
+ * every search still took **12.5 seconds**, measured — because waiting on both
+ * means waiting for the slowest, and the slowest was a service spending its
+ * whole budget failing. The writer paid the full price of a retry whose result
+ * could no longer change what they were about to see.
+ *
+ * So once *either* source has come back with something, the other gets this
+ * long to finish and is then given up on. Both healthy is unaffected: they
+ * answer together in well under a second. Both struggling is unaffected too —
+ * nothing has succeeded, so nothing is being cut short, and the full budget
+ * applies. It is only the lopsided case that is capped, which is the one that
+ * was hurting.
+ */
+const STRAGGLER_MS = 2500;
+
+/**
+ * Why a source came back empty-handed, in the few words the screen can use.
+ *
+ * A failure is not one thing, and the difference decides what a writer should
+ * do next. `limited` is a quota — pressing the button again is what *caused*
+ * it, and the honest instruction is to wait. `slow` and `down` are the service,
+ * where trying again shortly is exactly right. Collapsing them into "did not
+ * answer" is what taught a writer to click five times into a rate limit.
+ */
+export type SourceFailure = "limited" | "slow" | "down" | null;
+
 async function fetchSource(
   url: string,
   parse: (payload: unknown) => CompTitle[],
-): Promise<{ books: CompTitle[]; ok: boolean }> {
-  try {
-    const response = await fetch(url, {
-      headers: {
-        // Both services ask callers to identify themselves. Open Library's
-        // documentation is explicit that anonymous bulk traffic gets blocked.
-        "User-Agent": "OpenChapter (comparable-titles; contact via openchapter)",
-        Accept: "application/json",
-      },
-      // Slower than this and the writer has stopped waiting anyway.
-      signal: AbortSignal.timeout(8000),
-      next: { revalidate: CACHE_SECONDS },
-    });
-    if (!response.ok) return { books: [], ok: false };
-    return { books: parse(await response.json()), ok: true };
-  } catch {
-    return { books: [], ok: false };
+): Promise<{
+  books: CompTitle[];
+  ok: boolean;
+  reported: number | null;
+  why: SourceFailure;
+}> {
+  const started = Date.now();
+  let why: SourceFailure = "down";
+
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          // Both services ask callers to identify themselves. Open Library's
+          // documentation is explicit that anonymous bulk traffic gets blocked.
+          "User-Agent":
+            "OpenChapter (comparable-titles; contact via openchapter)",
+          Accept: "application/json",
+        },
+        // Slower than this and the writer has stopped waiting anyway.
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+        next: { revalidate: CACHE_SECONDS },
+      });
+
+      if (response.ok) {
+        const payload = await response.json();
+        return {
+          books: parse(payload),
+          ok: true,
+          reported: reportedTotal(payload),
+          why: null,
+        };
+      }
+
+      // 429 is a quota, and Google's is per short window rather than per
+      // request — so it outlasts anything worth waiting for inside one
+      // response. Recorded so the screen can say "wait" instead of "retry".
+      why = response.status === 429 ? "limited" : "down";
+
+      // Refused rather than overloaded: the query is the problem, so the same
+      // query will be refused again.
+      if (response.status !== 429 && response.status < 500) {
+        return { books: [], ok: false, reported: null, why };
+      }
+    } catch {
+      // Timeout or network — no answer, which is exactly what a retry is for.
+      why = "slow";
+    }
+
+    const backoff = BACKOFF_MS[attempt] ?? BACKOFF_MS[BACKOFF_MS.length - 1];
+    // Checked before sleeping, so the budget is never spent on a pause before
+    // an attempt there is no room left to make.
+    if (Date.now() - started + backoff >= SOURCE_BUDGET_MS) break;
+    if (attempt < ATTEMPTS - 1) {
+      await new Promise((resolve) => setTimeout(resolve, backoff));
+    }
   }
+
+  return { books: [], ok: false, reported: null, why };
 }
 
 export async function GET(request: Request) {
@@ -111,19 +217,57 @@ export async function GET(request: Request) {
     );
   }
 
+  /* Resolves the moment either source comes back with records, which is what
+     starts the straggler's clock. Never rejects: a source that fails simply
+     does not resolve it, so two failures leave both on the full budget. */
+  let announceFirst: () => void = () => {};
+  const somethingArrived = new Promise<void>((resolve) => {
+    announceFirst = resolve;
+  });
+
+  const raced = (
+    pending: ReturnType<typeof fetchSource>,
+  ): ReturnType<typeof fetchSource> => {
+    const watched = pending.then((result) => {
+      if (result.ok) announceFirst();
+      return result;
+    });
+    return Promise.race([
+      watched,
+      somethingArrived
+        .then(() => new Promise((r) => setTimeout(r, STRAGGLER_MS)))
+        // Given up on, not failed — but it contributed nothing either way, and
+        // `ok: false` is what makes the screen say which catalogue is missing.
+        // "slow" is the literal truth: it was still going when we stopped.
+        .then(() => ({
+          books: [],
+          ok: false,
+          reported: null,
+          why: "slow" as SourceFailure,
+        })),
+    ]);
+  };
+
   const [google, openLibrary] = await Promise.all([
-    fetchSource(
-      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-        query,
-      )}&maxResults=${PER_SOURCE}&printType=books&orderBy=relevance` +
-        (GOOGLE_KEY ? `&key=${encodeURIComponent(GOOGLE_KEY)}` : ""),
-      parseGoogle,
+    raced(
+      fetchSource(
+        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+          query,
+        )}&maxResults=${PER_SOURCE}&printType=books&orderBy=relevance` +
+          (GOOGLE_KEY ? `&key=${encodeURIComponent(GOOGLE_KEY)}` : ""),
+        parseGoogle,
+      ),
     ),
-    fetchSource(
-      `https://openlibrary.org/search.json?q=${encodeURIComponent(
-        query,
-      )}&limit=${PER_SOURCE}&fields=key,title,author_name,first_publish_year,publisher,number_of_pages_median,subject,isbn,cover_i`,
-      parseOpenLibrary,
+    raced(
+      fetchSource(
+        // Translated, not passed through: the two catalogues use different
+        // field prefixes and Open Library answers one it does not know with
+        // zero results rather than an error. See `openLibraryQuery`.
+        `https://openlibrary.org/search.json?q=${encodeURIComponent(
+          openLibraryQuery(query),
+        )}&limit=${PER_SOURCE}&fields=key,title,author_name,first_publish_year,publisher,number_of_pages_median,subject,isbn,cover_i`,
+        parseOpenLibrary,
+      ),
     ),
   ]);
 
@@ -137,6 +281,19 @@ export async function GET(request: Request) {
       // Named so the screen can say "Open Library did not answer" rather than
       // leaving a writer to conclude that nothing like their book exists.
       sources: { google: google.ok, openLibrary: openLibrary.ok },
+      // Not just *that* a source failed but how, because "wait a minute" and
+      // "try again now" are opposite instructions and the wrong one is what
+      // makes a writer press the button into a quota.
+      why: { google: google.why, openLibrary: openLibrary.why },
+      // Whether Google *could* have answered, which is a different fact from
+      // whether it did. Unkeyed, it 429s under any real traffic — so a screen
+      // telling the writer to try again in a moment is promising a retry that
+      // fails identically every time. With a key, a failure really is weather.
+      googleKeyed: Boolean(GOOGLE_KEY),
+      // How many the catalogue says exist, against the handful it handed over.
+      // Without it a screen counting what it fetched reads as counting the
+      // world, which is the invented-number problem arriving by accident.
+      reported: google.reported,
     },
     {
       headers: {

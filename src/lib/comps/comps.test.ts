@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { GENRES } from "../book-kinds";
 import {
+  BROWSE_SHELVES,
   buildQuery,
   keywords,
   mergeComps,
+  openLibraryQuery,
   parseGoogle,
   parseOpenLibrary,
   coversOf,
@@ -310,5 +313,53 @@ describe("summarise", () => {
       comp({ key: "1", subjects: ["Fantasy", "Fantasy"] }),
     ]);
     expect(summary.subjects[0].count).toBe(1);
+  });
+});
+
+describe("openLibraryQuery", () => {
+  // The bug this exists for: the title check sent Google's `intitle:` to both
+  // catalogues, and Open Library answers a prefix it does not know with zero
+  // results rather than an error. So every result that screen ever showed came
+  // from Google alone, while the page said it read both.
+  it("translates the field prefixes Open Library spells differently", () => {
+    expect(openLibraryQuery('intitle:"The Silent Patient"')).toBe(
+      'title:"The Silent Patient"',
+    );
+    expect(openLibraryQuery('inauthor:"Ruth Ware"')).toBe('author:"Ruth Ware"');
+    expect(openLibraryQuery("inpublisher:Penguin")).toBe("publisher:Penguin");
+  });
+
+  it("leaves an ordinary search alone", () => {
+    expect(openLibraryQuery('subject:"Mystery" haunted house')).toBe(
+      'subject:"Mystery" haunted house',
+    );
+    expect(openLibraryQuery("")).toBe("");
+  });
+
+  // A prefix is a word, not a substring: a book about painting should not have
+  // its query rewritten because "intitle" appears inside something else.
+  it("only translates a prefix at a word boundary", () => {
+    expect(openLibraryQuery("printitle:x")).toBe("printitle:x");
+  });
+});
+
+describe("BROWSE_SHELVES", () => {
+  // Not a style preference: the caption and the lit chip are both matched
+  // against this list, so a genre missing from it means a writer whose book is
+  // that genre arrives with the seeded search running and no chip lit — the
+  // screen silently disagreeing with itself about what it is showing.
+  it("contains every genre a book can be, so the book's own chip lights", () => {
+    for (const genre of GENRES) {
+      if (genre === "Other") continue;
+      expect(BROWSE_SHELVES).toContain(genre);
+    }
+  });
+
+  it("does not offer Other, which is not a shelf anybody files under", () => {
+    expect(BROWSE_SHELVES).not.toContain("Other");
+  });
+
+  it("has no duplicates, which would draw two identical chips", () => {
+    expect(new Set(BROWSE_SHELVES).size).toBe(BROWSE_SHELVES.length);
   });
 });

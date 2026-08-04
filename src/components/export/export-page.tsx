@@ -507,7 +507,14 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
             <h1 className="font-serif text-2xl text-fg md:text-[1.75rem]">
               {step.title}
             </h1>
-            <p className="mt-2 font-sans text-sm leading-relaxed text-muted">
+            {/* The same lift the shared `ToolHeader` took, so the one tool
+                that never adopted that header does not read as a quieter
+                product. Not `text-muted`, which this app spends on metadata:
+                on a wizard step this line is the only thing saying what the
+                step is for. The serif heading above is left alone — at 28px it
+                is already a size up, and it is a deliberately different type
+                treatment rather than a smaller version of the others. */}
+            <p className="mt-2 font-sans text-base leading-relaxed font-medium text-fg/75">
               {step.blurb}
             </p>
 

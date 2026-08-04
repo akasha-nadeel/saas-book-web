@@ -206,8 +206,9 @@ Each tool is the same three pieces, and the split is the convention:
   `roadmap.ts`, `paperback.ts`, `blurb.ts`, `beats.ts` (structure), `prose.ts`,
   `activity.ts` (progress), `provenance.ts`, `money.ts`, `ledger.ts` (track),
   `arc.ts`, `cover-check.ts` (covers), and `comps/` —
-  `comps.ts`, `length.ts`, `subjects.ts` and `shelves.ts` (categories),
-  `rank.ts`, `title-check.ts`, and `keywords.ts` beside them. Two more sit beside them without a tool screen of their
+  `comps.ts`, `length.ts`, `subjects.ts`, `common-subjects.ts` and
+  `shelves.ts` (categories), `rank.ts` and `title-check.ts`, with
+  `keywords.ts` beside them in `src/lib/` rather than in `comps/`. Two more sit beside them without a tool screen of their
   own, because neither question belongs to one book: `series.ts` (the bible
   across a series, read in the editor's rail) and `curve.ts` (the book-three
   curve, drawn in the dashboard's Track area beside the strip that adds the
@@ -228,8 +229,10 @@ book, or every screen looks like the same screen with different contents. The
 these screens hold forms, stat rows and card grids, and the `3xl` it used to be
 left a third of an ordinary laptop window empty down each side. The header's
 deck is capped separately at `2xl`, and the tool pages cap their own prose at
-`max-w-prose`, so widening the page never widens a line of text. Comps is the
-one screen wider still (`6xl`), because it is a five-column grid of covers.
+`max-w-prose`, so widening the page never widens a line of text. Two screens go
+wider because they are grids of pictures rather than columns of prose: comps at
+`6xl`, and the title check at `7xl` — it puts a shelf of covers under a
+one-line answer, and every extra column is a book taken in without scrolling.
 The export screen is the one that never took this header; TODO.md records the
 decision as open.
 
@@ -266,6 +269,12 @@ the two that cannot be detected honestly (finishing a draft, commissioning a
 cover) are hand-ticked and say so. Every figure carries its provenance. And a
 measurement is reported *with how many records carried the field*, because a
 median from three books and the same median from eighteen are different claims.
+And **an empty result is never rendered as a good one** unless the search that
+produced it actually ran: the title check draws "nothing published under this
+name" from zero records, so it must carry which catalogues answered, or Open
+Library returning 503 for a few minutes tells a writer their title is free when
+it is on the shelf below. A failure and a clean result look identical in the
+data; only the source flags tell them apart.
 
 **Two free catalogues sit behind `/api/comps`** — Google Books and Open Library.
 Server-side not for secrecy (neither needs a key) but for a shared cache, so one
@@ -281,8 +290,39 @@ every writer), the feature degrades to Open Library alone, and the screen says
 Google did not answer rather than implying the genre is empty. **The manuscript
 never goes**: what leaves is a query built from the book's genre and blurb.
 
+**The two catalogues take the same question in different dialects**, and
+`openLibraryQuery()` translates it. Google wants `intitle:`, Open Library wants
+`title:` — and Open Library answers a prefix it does not know with **zero
+results rather than an error**, which is the failure mode worth naming: the
+title check sent `intitle:` to both for its whole life, so every result it ever
+showed came from Google alone while the page said it read both. It looked like
+it worked because Google carries the popular titles. Anything with no prefix —
+every ordinary comps search — passes through untouched. `reportedTotal()` is
+the other half of honesty here: Google's `totalItems` says how many the
+catalogue claims exist against the handful it handed over, because a screen
+counting what it fetched reads as counting the world. It is an estimate, wobbles
+between identical requests, and so is shown as an approximation and never used
+in arithmetic.
+
+**A fourth route feeds the category box as it is typed into.**
+`/api/comps/subjects` (GET, **free and keyless**, like `/api/comps` and for the
+same reasons — it is a lookup rather than a judgement) queries Open Library's
+subject index so the suggestions are real shelves with real sizes. It is not a
+hard-coded list on purpose: BISAC is licensed, and inventing our own list of
+"all book categories" is the exact failure the categories screen exists to
+avoid. Two measured details drive its shape. Nothing is fetched below **two
+characters** — `m*` is an HTTP 500 on their side and plain `m` matches middle
+initials, returning Nixon and Kennedy — so the first keystroke is answered
+locally from `common-subjects.ts`, 900 of Open Library's own headings with
+Open Library's own counts, harvested once and shipped (CC0; caching their
+answers is not inventing them). And the query goes as **both the plain word and
+a wildcard, joined by OR**: the index is stemmed, so `cozy*` matches nothing
+against terms stored as "cozi", while a bare `myst` finds the computer game and
+no mystery shelf. A failed lookup returns an empty list, never an error — a
+dropdown that cannot suggest is just the text box it was before.
+
 **Ranking those comps is a separate route, and the split is the design.**
-`/api/comps/rank` (POST, `requirePro()`, `ANTHROPIC_API_KEY`, Sonnet) over the
+`/api/comps/rank` (POST, `requirePro()`, a model via `ai.ts`) over the
 pure `src/lib/comps/rank.ts` is the one place in the cluster where a model
 earns its cost — a keyword search returns forty books of which five are really
 comparable, and sorting those out is a judgement rather than a query. Folding
@@ -303,7 +343,7 @@ clean parse is tried before any bracket scan, since scanning a bare array for
 reply.
 
 **A third route answers the shop’s form rather than the librarian’s.**
-`/api/comps/categories` (POST, `requirePro()`, Sonnet) over the pure
+`/api/comps/categories` (POST, `requirePro()`, a model via `ai.ts`) over the pure
 `src/lib/comps/shelves.ts` translates the librarian subjects `subjects.ts`
 ranks into the category paths a shop’s own selector uses — a translation no
 table can do, since Amazon dropped BISAC for its own tree in 2023. It sends
@@ -312,6 +352,27 @@ counts are *ours*, re-attached after parsing, because a model asked for a
 number produces a plausible one and a plausible count cannot be told from a
 real one; and a path is a **candidate**, not a fact, because only the shop
 knows its own tree — the screen says to confirm each in the selector.
+
+**Those two routes ask a model through `src/lib/ai.ts`, and which model is a
+deployment decision.** Both want the same shape — a system prompt, one user
+message, JSON back — and neither cares who answers, so `askModel()` is the one
+way to ask: `ANTHROPIC_API_KEY` makes it Claude, `GOOGLE_GENERATIVE_AI_API_KEY`
+makes it Gemini, both set and Claude wins, `OPENCHAPTER_MODEL` overrides the
+model name without a deploy. `modelProvider()` returning null is how a route
+answers 501 with a message saying so, the same shape as everything else here.
+Three things about it are deliberate. **The assistant is not routed through
+it** — `/api/chat` streams, caches the chapter in a system block across turns,
+and stays on the Anthropic SDK directly; this is for short, bounded, one-shot
+calls. **Nor is the gateway used**, though narration and transcription go
+through it on `AI_GATEWAY_API_KEY` and it would have been the tidier home: it
+was tried, and the gateway refuses every request without a card on file. And
+**Gemini is written out over its REST API** rather than pulled in via
+`@ai-sdk/google`, because the whole of what it does is one POST and one field
+lookup, and it keeps the dependency list honest about a provider expected to be
+temporary. Its key rides in a header, not the query string, so it stays out of
+anything that logs a URL. Budget generously on Gemini 3 — thinking tokens count
+against `maxOutputTokens`, so a ceiling that comfortably fits the answer still
+truncates it.
 
 **No search volume, no competition score, no rank — anywhere in this
 cluster.** That is the figure a writer wants and it cannot be had honestly:
@@ -906,11 +967,11 @@ The fifteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
-`/api/comps` · `/api/comps/rank` · `/api/comps/categories` ·
-`/api/billing/*`. All of those except
-`/api/comps` are metered and gated by `requirePro()`; `/api/comps` itself is
-free, keyless and stays that way — which is the whole reason the ranking is a
-route of its own rather than a flag on it.
+`/api/comps` · `/api/comps/subjects` · `/api/comps/rank` ·
+`/api/comps/categories` · `/api/billing/*`. All of those except
+`/api/comps` and `/api/comps/subjects` are metered and gated by `requirePro()`;
+those two are free, keyless and stay that way — which is the whole reason the
+ranking is a route of its own rather than a flag on it.
 
 ## Styling
 
@@ -923,6 +984,16 @@ attribute. Body type is the same shape: `src/lib/page-setup.ts` and
 `src/lib/typography.ts` turn a book's page-and-type settings into `--ms-*` custom
 properties on the manuscript container, which the editor and the reading view
 both read — so one setting styles the writing surface and the read-through alike.
+
+**`src/components/ui/` is the shared-primitive shelf, and it is deliberately
+two files wide** — `menu.tsx` and `spinner.tsx`. Things land there on the third
+copy, not the first: `Spinner` was extracted once a tool screen needed the ring
+the checkout result already drew, because that is how one product ends up with
+two loading states spinning at different weights. Both take `currentColor` and
+inherit whatever they sit on; a fixed colour is invisible in exactly one theme.
+The spinner also carries the standing Tailwind v4 warning in miniature — its
+first draft used `border-current/25`, which v4 silently drops, so it would have
+shipped as a plain circle. Check the built CSS, per the build note above.
 
 **One greyscale palette in two values.** No hue anywhere except the status
 family below. The dark set is the `@theme` block and the default — `surface`
