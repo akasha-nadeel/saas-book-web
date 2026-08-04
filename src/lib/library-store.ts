@@ -21,6 +21,7 @@
  */
 
 import type { BookKind } from "./book-kinds";
+import type { CoverFacts } from "./cover-check";
 import {
   parseActivity,
   record as recordActivity,
@@ -54,6 +55,22 @@ const NOTES_PREFIX = "openchapter:notes:";
 // kilobytes of base64 per book into it would make opening the library the
 // most expensive thing the app does.
 const COVER_PREFIX = "openchapter:cover:";
+/**
+ * What the cover checker measured, kept so other screens can report it.
+ *
+ * **Not the cover — the cover's dimensions.** The artwork stored at
+ * `COVER_PREFIX` is compressed to 700px and 250KB to fit a browser, so
+ * measuring *it* would tell every book it was too small to upload: a true
+ * statement about a file no shop will ever see, and a false one about the
+ * writer's. The checker is the only place that ever holds the real artwork,
+ * for as long as it takes to read it, and it was throwing the numbers away.
+ *
+ * Four integers, so this costs nothing and cannot go stale in the dangerous
+ * direction: it is written when a file is checked and cleared when the check
+ * is cleared, so the dashboard either reports a real measurement or says
+ * nothing at all.
+ */
+const COVER_FACTS_PREFIX = "openchapter:coverfacts:";
 
 /**
  * Which of a book's three parts a chapter belongs to. Absent means the body —
@@ -293,6 +310,7 @@ const EMPTY_SHELF: Shelf = Object.freeze({
 const bodyKey = (id: string) => `${BODY_PREFIX}${id}`;
 const notesKey = (id: string) => `${NOTES_PREFIX}${id}`;
 const coverKey = (id: string) => `${COVER_PREFIX}${id}`;
+const coverFactsKey = (id: string) => `${COVER_FACTS_PREFIX}${id}`;
 
 function newId(): string {
   // randomUUID needs a secure context; plain http://<lan-ip>:3000 isn't one.
@@ -339,6 +357,12 @@ export function subscribeToShelf(onStoreChange: () => void) {
   const onStorage = (event: StorageEvent) => {
     // A null key means the whole store was cleared, which affects everyone.
     if (event.key === null || event.key === SHELF_KEY) onStoreChange();
+    // A cover written in another tab changes what this one renders without
+    // touching the shelf, exactly as a local `setCover` does.
+    else if (event.key.startsWith(COVER_PREFIX)) {
+      coverEpoch += 1;
+      onStoreChange();
+    }
   };
   window.addEventListener("storage", onStorage);
 
@@ -459,6 +483,59 @@ export function getServerCover(): string | null {
  * `in` tests for the key rather than fetching the value, because a Storage
  * object exposes its keys as named properties.
  */
+/**
+ * How many times a cover has changed in this tab.
+ *
+ * **`setCover` already fans out on the shelf channel, and that was not
+ * enough.** Covers live at their own key, so writing one leaves the shelf
+ * document byte-for-byte identical — `useSyncExternalStore` reads the same
+ * snapshot it read before, React correctly decides nothing changed, and every
+ * `useMemo` keyed on `books` keeps its old answer.
+ *
+ * What that looked like: a writer pressed "Add a cover" on the dashboard's own
+ * "No cover" finding, chose a file, and the finding stayed. Nothing was wrong
+ * with the data — `hasCover` was true the moment it was asked — but nothing
+ * asked it again until some *other* edit happened to change the shelf, so the
+ * screen kept telling them to do the thing they had just done. It came right on
+ * its own later, which is the worst version of this bug: intermittent, and
+ * invisible in whatever you were looking at when it cleared.
+ *
+ * A counter gives those readers something that *does* change, so they can name
+ * it as a dependency. See `useCoverEpoch`.
+ */
+let coverEpoch = 0;
+
+export function getCoverEpoch(): number {
+  return coverEpoch;
+}
+
+export function getCoverFacts(bookId: string): CoverFacts | null {
+  if (typeof window === "undefined") return null;
+  const raw = window.localStorage.getItem(coverFactsKey(bookId));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed?.width === "number" && typeof parsed?.height === "number"
+      ? (parsed as CoverFacts)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCoverFacts(bookId: string, facts: CoverFacts | null): void {
+  try {
+    if (facts === null) window.localStorage.removeItem(coverFactsKey(bookId));
+    else window.localStorage.setItem(coverFactsKey(bookId), JSON.stringify(facts));
+  } catch (err) {
+    // A full origin costs the dashboard a warning, never the check itself.
+    console.error("[store] could not write cover facts", err);
+    return;
+  }
+  coverEpoch += 1;
+  emitShelf();
+}
+
 export function hasCover(bookId: string): boolean {
   if (typeof window === "undefined") return false;
   return coverKey(bookId) in window.localStorage;
@@ -494,8 +571,34 @@ export function setCover(bookId: string, dataUrl: string | null): boolean {
     console.error("[store] could not write cover", err);
     return false;
   }
-  // The shelf did not change, but what the shelf *renders* did.
+  // The shelf did not change, but what the shelf *renders* did — and since the
+  // shelf snapshot is identical, the fan-out alone moves nothing. Bump first,
+  // so listeners woken by `emitShelf` read the new value.
+  coverEpoch += 1;
   emitShelf();
+
+  /*
+   * **The book first, then its cover.**
+   *
+   * `book_covers.book_id` is a foreign key, so a cover row for a book the
+   * server has never seen is rejected outright:
+   *
+   *   [23503] insert or update on table "book_covers" violates foreign key
+   *   constraint — Key is not present in table "books".
+   *
+   * Which is exactly what a book made on the landing page does. It is created
+   * while signed out, so its own push no-ops for want of an owner; the writer
+   * signs in and sets a cover, and the cover is the *first* thing that tries
+   * to go up. The parent is still missing and the write is thrown away.
+   *
+   * The queue keeps insertion order, so enqueuing the book here puts the row
+   * in front of the cover in the same flush. It is an upsert, so a book the
+   * server already has costs one harmless round trip on a rare action.
+   */
+  const book = findBook(getShelf(), bookId);
+  if (book) {
+    pushBook(book, getShelf().books.findIndex((b) => b.id === bookId));
+  }
   pushCover(bookId, dataUrl);
   return true;
 }
@@ -737,12 +840,59 @@ export function touchLastOpenedBook(bookId: string) {
  */
 function nextChapterTitle(chapters: readonly ChapterMeta[]): string {
   const body = chapters.filter((c) => chapterMatterOf(c) === "body");
+
   let highest = body.length;
+  let digits = 0;
+  let spelled = 0;
+
   for (const c of body) {
-    const match = /^Chapter (\d+)$/.exec(c.title);
-    if (match) highest = Math.max(highest, Number(match[1]));
+    const asDigits = /^Chapter (\d+)$/.exec(c.title);
+    if (asDigits) {
+      digits += 1;
+      highest = Math.max(highest, Number(asDigits[1]));
+      continue;
+    }
+    const asWords = /^Chapter ([A-Za-z-]+)$/.exec(c.title);
+    if (asWords) {
+      const n = numberFromWords(asWords[1]);
+      if (n) {
+        spelled += 1;
+        highest = Math.max(highest, n);
+      }
+    }
   }
-  return `Chapter ${highest + 1}`;
+
+  /*
+   * **Follow the book's own convention rather than imposing one.**
+   *
+   * This used to emit digits always, while the first chapter of every book is
+   * created as "Chapter One" — so a two-chapter book listed "Chapter One,
+   * Chapter 2" in its own contents page, which is the first thing a reader
+   * notices and the last thing a writer thinks to check.
+   *
+   * Answering it by spelling everything would have been just as wrong in the
+   * other direction: a writer who has renamed their chapters "Chapter 12" is
+   * using digits on purpose, and the next one should be "Chapter 13". So the
+   * count decides, and a fresh book — whose only chapter is "Chapter One" —
+   * gets words.
+   */
+  return digits > spelled
+    ? `Chapter ${highest + 1}`
+    : chapterLabel(highest + 1);
+}
+
+/** "Twenty-One" back to 21, for reading the titles this file writes. */
+function numberFromWords(words: string): number | null {
+  const key = words.toLowerCase();
+  const direct = CARDINALS.findIndex((w) => w.toLowerCase() === key);
+  if (direct > 0) return direct;
+
+  const [tens, ones] = key.split("-");
+  const tensAt = TENS.findIndex((w) => w && w.toLowerCase() === tens);
+  if (tensAt < 0) return null;
+  if (!ones) return tensAt * 10;
+  const onesAt = CARDINALS.findIndex((w) => w.toLowerCase() === ones);
+  return onesAt > 0 ? tensAt * 10 + onesAt : null;
 }
 
 export function createChapter(bookId: string, title?: string): string {
@@ -2419,5 +2569,57 @@ export async function syncWithServer(): Promise<void> {
     }
   }
 
-  applyRemote(await fetchLibrary());
+  /*
+   * Case 3, with the one exception that case 2 does not cover.
+   *
+   * **A book can be here and never have been on the server**, and the claim
+   * flag cannot see it: the flag is per *account*, so a writer who has synced
+   * before is "claimed" forever, and the branch above is skipped for them.
+   * Then `applyRemote` writes the server's shelf over this browser's and any
+   * local-only book is gone.
+   *
+   * That is not a hypothetical. It is the landing page's own promise failing:
+   * a visitor drops a manuscript on the hero check, presses a fix, the book is
+   * written here, they sign in to an account they already had — and the book
+   * they were promised would come with them is deleted on arrival. It works
+   * only for accounts created on the spot, which is the case that gets tested
+   * and the smaller half of the traffic.
+   *
+   * So the strays are found by id and pushed before the download. Comparing
+   * ids rather than trusting the flag is the fix: the server's list is the
+   * truth about what has been uploaded, and anything here that is missing from
+   * it is unsaved work rather than a stale copy.
+   *
+   * A failed push leaves the book alone and returns, exactly as the upload
+   * failure above does. Losing a manuscript to a network error is the one
+   * outcome this function exists to prevent.
+   */
+  const remote = await fetchLibrary();
+  if (remote) {
+    const onServer = new Set(remote.shelf.books.map((b) => b.id));
+    const strays = getShelf().books.filter((b) => !onServer.has(b.id));
+
+    if (strays.length > 0) {
+      const { bodies, notes, covers } = collectLocal();
+      const kept: Book[] = [];
+      for (const book of strays) {
+        const only: Shelf = { books: [book], lastOpenedBookId: null };
+        // Prefs stay null: see `uploadLibrary`. A rescue must not carry this
+        // browser's settings into an account that already has its own.
+        if (await uploadLibrary(only, bodies, notes, covers, null)) {
+          kept.push(book);
+        }
+      }
+      if (kept.length !== strays.length) return; // Something did not land; keep it here.
+
+      // Put them back on the shelf the server just handed us, so the download
+      // below does not undo the upload that has only just happened.
+      remote.shelf = {
+        ...remote.shelf,
+        books: [...kept, ...remote.shelf.books],
+      };
+    }
+  }
+
+  applyRemote(remote);
 }

@@ -65,16 +65,24 @@ books of that *kind*, not books containing their words.
 
 Write ONE query line. Rules:
 
-- Prefer subject terms. "subject:" is the strongest tool you have, because it
-  searches how a book is shelved rather than what is printed in it.
-- Use at most three subject terms, quoted: subject:"Young adult"
-- Add a very few plain words only when they name a real subgenre or setting a
-  catalogue would hold — boarding school, small town, second chance.
+- EVERY TERM NARROWS THE SEARCH. The catalogue ANDs them, so each one you add
+  throws away books. Four terms usually finds nothing at all. Fewer is better.
+- Use ONE subject term, quoted, naming the shelf the book belongs on:
+  subject:"Cozy mystery". Two only when the book genuinely needs both, and
+  never three.
+- Add at most one plain word, and only when it names something a catalogue
+  would actually hold — a real subgenre or setting. When in doubt, leave it
+  out: the subject term alone finds books, and a book too many is easier to
+  ignore than none at all.
+- Prefer the most specific shelf that is still a real one. "Cozy mystery" beats
+  "Mystery" plus three describing words.
 - Never quote a phrase from the writer's own sentence. Their words describe a
   book that has not been published; no catalogue holds them.
 - Fix obvious misspellings silently.
 - Never use any prefix other than subject:, intitle:, inauthor:.
-- If the writer named a genre, keep it as a subject term.
+- The writer's genre is context, not a term to add. Use it to choose the right
+  shelf; do not put it in the query beside another subject, which would ask the
+  catalogue for books on both shelves at once and find neither.
 
 Answer with the query line and nothing else — no explanation, no code fence.
 
@@ -104,7 +112,32 @@ export function buildPrompt({ words, genre }: QuerySeed): string {
  * term costs a slightly looser search, while a term carrying an unknown prefix
  * costs the entire result set, silently.
  */
-export function parseQuery(reply: string): string | null {
+export function parseQuery(
+  reply: string,
+  /**
+   * Real subject headings, lowercased. A `subject:` term naming anything else
+   * is dropped.
+   *
+   * **Models invent shelves, and an invented shelf is the worst possible
+   * output here.** Measured: asked for "cozy village mystery with a nosy
+   * librarian" on a book whose genre is Fantasy, the reply was
+   * `subject:"Fantasy mystery" librarian`. No catalogue has a Fantasy mystery
+   * shelf, so that term matched nothing at all — which left "librarian" to
+   * carry the search alone, and the screen filled with the catalogues of
+   * actual libraries, several of them from the 1890s.
+   *
+   * That failure is invisible from the outside: the query looks expert, the
+   * search succeeds, and fifteen real books come back. Only a reader who knows
+   * the genre can tell they are the wrong fifteen — which is precisely the
+   * reader this feature is for.
+   *
+   * So the shelf is checked against the catalogue's own vocabulary rather than
+   * trusted. Unknown means dropped, not corrected: the plain words survive and
+   * the search degrades to what it would have been without the model, which is
+   * the floor this whole feature promised never to go below.
+   */
+  known?: ReadonlySet<string>,
+): string | null {
   if (typeof reply !== "string") return null;
 
   let text = reply.trim();
@@ -126,9 +159,40 @@ export function parseQuery(reply: string): string | null {
 
   if (!line) return null;
 
-  const kept = split(line).filter(
-    (term) => !term.includes(":") || ALLOWED.test(term),
-  );
+  /*
+   * **Prose anywhere means the whole reply is refused, not trimmed.**
+   *
+   * Salvaging the good half was tried and is what let this through:
+   * `subject:"Haunted houses"? Or haunted` kept a real shelf and searched the
+   * rest as words. The parser cannot tell a query with a stray word in it from
+   * a sentence with a query in it, and guessing wrong sends somebody a shelf
+   * of the wrong books that looks like it worked.
+   *
+   * Sentence punctuation outside quotes is the tell — no catalogue query needs
+   * `?`, `!`, `;` or a full stop. Refusing outright costs a translation the
+   * caller can do without; accepting costs a search nobody can tell is wrong.
+   */
+  if (/[?!;](?=(?:[^"]*"[^"]*")*[^"]*$)/.test(line)) return null;
+
+  const kept = split(line)
+    /* Backticks are never part of a catalogue query, and a model asked for one
+       line of syntax reaches for inline code. Observed:
+       `` `subject:"Portal fantasy"` `` came back with the closing backtick
+       still attached, which Google then searched for literally — one book
+       returned where the clean term finds a shelf. The fence rule above only
+       catches triple backticks; this catches the single ones. */
+    .map((term) => term.replace(/`/g, "").trim())
+    .filter(Boolean)
+    .filter((term) => {
+    if (!term.includes(":")) return true;
+    if (!ALLOWED.test(term)) return false;
+    if (!known) return true;
+
+    // Only `subject:` is checked. A title or author is the writer's own words
+    // rather than a shelf, and there is no list to check those against.
+    const subject = term.match(/^subject:"?([^"]+)"?$/i);
+    return subject ? known.has(subject[1].trim().toLowerCase()) : true;
+  });
   if (kept.length === 0) return null;
 
   return kept.join(" ").slice(0, MAX_QUERY).trim() || null;

@@ -2,7 +2,7 @@
  * Every per-book tool, named and explained, in one list.
  *
  * Two screens need this: the sheet a book card's ⋯ menu opens, and the Tools
- * area of the dashboard. They were about to hold two copies of the same fifteen
+ * area of the dashboard. They were about to hold two copies of the same sixteen
  * descriptions, which is two copies to keep in step and one to forget — the
  * kind of duplication that goes stale silently and then tells a writer a
  * feature does something it stopped doing a release ago.
@@ -73,6 +73,14 @@ export const GET_IT_OUT: ToolGroup = {
       icon: "compass",
       name: "What to do next",
       what: `Every step in the order it happens, with the ${SELF_TICKING} that tick themselves from your book already marked.`,
+    },
+    {
+      path: "listing",
+      icon: "form",
+      name: "Listing details",
+      // Was reachable only through the export flow, four steps in and behind a
+      // format choice. These are facts about the book, not about an export.
+      what: "The ISBN, language, publisher, date and series a shop asks for — answered once, on the book.",
     },
     {
       path: "paperback",

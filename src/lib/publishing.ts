@@ -1,4 +1,5 @@
 import type { Book } from "./library-store";
+import { checkCover, type CoverFacts } from "./cover-check";
 
 /**
  * The details a shop asks for that writing a book does not.
@@ -161,6 +162,16 @@ export interface ReadinessInput {
   brokenImages: number;
   /** Images carrying no alt text. */
   undescribedImages?: number;
+  /**
+   * What the cover checker measured of the writer's *original* artwork.
+   *
+   * Optional because most callers have no way to know it: the copy this app
+   * stores is compressed to fit a browser, so it cannot be measured for this
+   * purpose, and the real file only ever exists in the checker for as long as
+   * it takes to read. Absent means the cover has not been checked, and the
+   * findings say nothing rather than guessing.
+   */
+  coverFacts?: CoverFacts | null;
 }
 
 /**
@@ -178,6 +189,7 @@ export function storeReadiness({
   chapterCount,
   brokenImages,
   undescribedImages = 0,
+  coverFacts,
 }: ReadinessInput): ReadinessIssue[] {
   const issues: ReadinessIssue[] = [];
   const blocking = (field: string, message: string) =>
@@ -212,6 +224,46 @@ export function storeReadiness({
       "cover",
       "No cover. A shop will reject the upload, and a reader scrolling past will not stop.",
     );
+  }
+
+  /*
+   * The cover *file's* own findings, once it has been measured.
+   *
+   * These are the same findings the covers screen shows, from the same
+   * `checkCover` — not a second opinion written for this list. A writer whose
+   * artwork is the wrong shape should not have to remember to visit another
+   * screen to be told, and a check that only speaks where you happen to be
+   * standing is a check that gets missed.
+   *
+   * **Each keeps its own field** rather than collapsing into one "cover" row,
+   * because the field is what `DESTINATIONS` maps to a button — one row per
+   * problem, each landing on the thing that fixes it, which is the shape the
+   * rest of this list already has.
+   *
+   * Levels are carried across as the cover check set them: its `problem` is a
+   * shop refusing the file, which is blocking, and its notes are advisory.
+   */
+  if (coverFacts) {
+    for (const finding of checkCover(coverFacts)) {
+      const field = `cover-${finding.id}`;
+
+      /*
+       * **Label first, like every other line on this list.**
+       *
+       * The covers screen draws the label as a heading with the detail under
+       * it; a readiness issue is one sentence, so sending only the detail lost
+       * the heading and the row began "This is 0.56:1;" — a pronoun with no
+       * subject, on a list where every neighbour opens by naming the problem
+       * ("No cover.", "No ISBN.", "No categories."). A reader scanning the
+       * column could not tell what the sentence was even about.
+       *
+       * Joined here rather than in `cover-check.ts` because the two-part shape
+       * is what the covers screen needs; this list needs the sentence.
+       */
+      const message = `${finding.label}. ${finding.detail}`;
+      if (finding.level === "problem") blocking(field, message);
+      else advisory(field, message);
+    }
   }
 
   if (brokenImages > 0) {

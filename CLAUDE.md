@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 OpenChapter is a book-writing *and* self-publishing app. It began as a shelf of
 books, a distraction-light chapter editor, and import/export to the formats a
 writer actually hands off; **as of 2026-08-01 it is aimed at the whole job** —
-fifteen per-book tools around the manuscript (comps, blurb, categories, covers,
+sixteen per-book tools around the manuscript (comps, blurb, categories, covers,
 paperback setup, structure, prose, progress, money, ARC readers, a publishing
 roadmap) with the editor as one part rather than the whole. It runs almost
 entirely in the browser: the manuscript never leaves the machine except for the
@@ -70,7 +70,7 @@ Gateway (speech and transcription) · `docx` + `jszip` for exports. Path alias
 This is a newer Next.js than your training data (see AGENTS.md). Two things that
 bite: `params` is a `Promise` and must be awaited, and route components can be
 typed with the generated helpers `PageProps<"/route">` / `LayoutProps<"/route">`.
-Both shapes are in the tree — the older routes use the helpers, the fifteen tool
+Both shapes are in the tree — the older routes use the helpers, the sixteen tool
 routes write `props: { params: Promise<{ bookId: string }> }` by hand. Either is
 fine; awaiting `params` is not optional.
 
@@ -192,7 +192,7 @@ to the launcher instead of to the list. Link to a tool without `?from=` and it
 falls back to that launcher, which is the wrong answer more often than not. The
 `useSearchParams` rule above applies to all four.
 
-**Fifteen per-book tools, described in one place.** `src/lib/book-tools.ts`
+**Sixteen per-book tools, described in one place.** `src/lib/book-tools.ts`
 holds every tool's path, name and one-line description, in four groups with a
 colour each. The dashboard's Tools grid (`tool-grid.tsx`, glyphs in
 `tool-marks.tsx`) and the sheet behind a book card's ⋯ (`book-tools-dialog.tsx`)
@@ -961,8 +961,8 @@ PayHere · `/upgrade/done` PayHere's return_url, which polls ·
 overview (lands here, not on a chapter) ·
 `/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view.
 
-The fifteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
-`paperback` · `comps`, `blurb`, `categories`, `covers`, `title-check` ·
+The sixteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
+`paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`, `title-check` ·
 `structure`, `prose`, `progress`, `provenance` · `money`, `track`, `arc` —
 grouped there the way `book-tools.ts` groups them.
 
@@ -1074,8 +1074,8 @@ Three more things follow from the palette, and each has bitten already:
   shade tuned for black is a dark blob on white: near-black ground with
   saturated ink at night, pale ground with dark ink by day, squared rather than
   a capsule. A translucent wash with pale ink was tried first and reads as a
-  faded sticker. The other is the fifteen tool marks (`tool-marks.tsx`), which
-  are product marks rather than chrome — fifteen grey marks are fifteen grey
+  faded sticker. The other is the sixteen tool marks (`tool-marks.tsx`), which
+  are product marks rather than chrome — sixteen grey marks are sixteen grey
   squares — and whose tile is a theme token, so the colour stays inside the mark.
 - **The wordmark is the third exception, and it is one token wide.**
   `--color-wordmark` colours the "Chapter" in OpenChapter and nothing else —

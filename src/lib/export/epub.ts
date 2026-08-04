@@ -102,10 +102,20 @@ function accessibility(
   const features = ["structuralNavigation", "tableOfContents", "readingOrder"];
   if (hasImages && allImagesDescribed) features.push("alternativeText");
 
+  /* **"any order of presentation" was wrong, and it was a claim.**
+
+     `schema:accessibilitySummary` is read by shops and by readers deciding
+     whether a book is usable, so it is held to the same rule as everything
+     else here: it may not say something the book does not do. A novel is
+     sequential — its chapters are an order, not a menu — and telling an
+     accessibility reader they may start anywhere is a straightforwardly
+     unhelpful thing to tell them. What is true and worth saying is that the
+     text is all text, that there is a real table of contents, and that the
+     chapters can be moved between. */
   const summary = !hasImages
-    ? "This publication is entirely text and can be read in any order of presentation, with navigation by chapter."
+    ? "This publication is entirely textual, with a structured table of contents and sequential chapter navigation."
     : allImagesDescribed
-      ? "This publication is text with described illustrations, and can be navigated by chapter."
+      ? "This publication is textual with described illustrations, and has a structured table of contents and sequential chapter navigation."
       : "This publication is text with illustrations that have no text alternative; those images are not available to a reader who cannot see them.";
 
   return [
@@ -338,18 +348,41 @@ export function pageXhtml(
   title: string,
   inner: string,
   language = DEFAULT_LANGUAGE,
+  /**
+   * What this page *is*, in EPUB's own vocabulary — `titlepage`, `copyright-page`,
+   * `toc`.
+   *
+   * **A reading system cannot tell a copyright page from a chapter by looking
+   * at it.** `epub:type` is how it knows: it is what lets a reader jump to the
+   * table of contents from a menu, what keeps front matter out of the page
+   * count on devices that offer one, and what a screen reader announces when
+   * it enters the section. Without it every generated page is an anonymous
+   * body of text that happens to come first.
+   *
+   * The `epub` namespace has to be declared on `<html>` for the attribute to
+   * be legal, which is why it is added alongside rather than on its own.
+   */
+  semantics?: string,
 ): string {
+  const typed = semantics ? ` epub:type="${escapeXml(semantics)}"` : "";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
   <head>
     <title>${escapeXml(title)}</title>
     <link rel="stylesheet" type="text/css" href="style.css"/>
   </head>
-  <body>
+  <body${typed}>
     ${inner}
   </body>
 </html>`;
 }
+
+/** EPUB's own word for each generated front page. */
+const FRONT_SEMANTICS: Record<string, string> = {
+  title: "titlepage",
+  copyright: "copyright-page",
+  contents: "toc",
+};
 
 export function chapterXhtml(
   title: string,
@@ -359,13 +392,17 @@ export function chapterXhtml(
   number?: number,
   language = DEFAULT_LANGUAGE,
 ): string {
+  /* `bodymatter chapter`: the first says this is the book proper rather than
+     front or back matter, the second says what kind of division it is. Both
+     are standard EPUB structural semantics and both are what a reading system
+     looks for when it offers "go to the start of the book". */
   return `<?xml version="1.0" encoding="UTF-8"?>
-<html xmlns="http://www.w3.org/1999/xhtml" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
   <head>
     <title>${escapeXml(title)}</title>
     <link rel="stylesheet" type="text/css" href="style.css"/>
   </head>
-  <body>
+  <body epub:type="bodymatter chapter">
     ${number ? `<p class="chapter-number">${number}</p>` : ""}
     <h1>${escapeXml(title)}</h1>
 ${body}
@@ -417,7 +454,8 @@ export async function buildEpub(
   const cover = packageCover(options.cover ?? null);
 
   // Generated title / copyright / contents pages, before the chapters.
-  const front = frontSections(book, chapters, typeset);
+  // The contents page links to the chapter files this builder writes.
+  const front = frontSections(book, chapters, typeset, (i) => `${chapterId(i)}.xhtml`);
 
   zip.file("OEBPS/style.css", typesetCss(typeset, false));
   zip.file(
@@ -448,7 +486,7 @@ export async function buildEpub(
   for (const section of front) {
     zip.file(
       `OEBPS/${section.id}.xhtml`,
-      pageXhtml(book.title, section.html, language),
+      pageXhtml(book.title, section.html, language, FRONT_SEMANTICS[section.id]),
     );
   }
 

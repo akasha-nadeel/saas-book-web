@@ -229,3 +229,20 @@ describe("storeReadiness", () => {
     expect(issues.filter((i) => i.level === "blocking").length).toBe(4);
   });
 });
+
+describe("cover findings on the readiness list", () => {
+  const facts = { width: 1672, height: 941, bytes: 200_000 };
+
+  // Sending only the detail produced "This is 0.56:1; shops set…" — a sentence
+  // with no subject, in a column where every neighbour names its problem first.
+  it("opens with the label, like every other line", () => {
+    const issues = storeReadiness({ ...READY, coverFacts: facts });
+    const shape = issues.find((i) => i.field === "cover-shape");
+    expect(shape?.message.startsWith("Squarer than usual.")).toBe(true);
+  });
+
+  it("says nothing about the cover file when it has not been measured", () => {
+    const issues = storeReadiness(READY);
+    expect(issues.some((i) => i.field.startsWith("cover-"))).toBe(false);
+  });
+});

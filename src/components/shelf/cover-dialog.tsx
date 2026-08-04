@@ -8,10 +8,12 @@ import {
   COVER_MAX_EDGE,
   importImage,
 } from "@/lib/image-import";
+import { contrastOf } from "@/lib/cover-check";
 import {
   bookWordCount,
   setBookDetails,
   setCover,
+  setCoverFacts,
   type Book,
 } from "@/lib/library-store";
 import { useCover } from "@/lib/use-library";
@@ -28,6 +30,59 @@ import { useCover } from "@/lib/use-library";
  * repainting the shelf on every keystroke, and would leave Cancel with nothing
  * to undo.
  */
+/**
+ * Record what the writer's chosen file actually is, before it is compressed.
+ *
+ * Same measurement the covers screen's checker takes, written to the same
+ * place, so a cover set here and a cover checked there produce the same
+ * findings on the dashboard. Failing quietly is correct: a cover that cannot
+ * be measured is still a cover, and losing the picture over a canvas error
+ * would be a poor trade for a warning.
+ */
+async function measureCover(bookId: string, file: File): Promise<void> {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve();
+      image.onerror = () => reject(new Error("unreadable"));
+      image.src = url;
+    });
+
+    let contrast: number | undefined;
+    const canvas = document.createElement("canvas");
+    canvas.width = 120;
+    canvas.height = Math.max(
+      1,
+      Math.round((image.naturalHeight / image.naturalWidth) * 120),
+    );
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (context) {
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      try {
+        contrast = contrastOf(
+          context.getImageData(0, 0, canvas.width, canvas.height).data,
+          4,
+        );
+      } catch {
+        // A tainted canvas costs the contrast note and nothing else.
+      }
+    }
+
+    setCoverFacts(bookId, {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      bytes: file.size,
+      ...(contrast !== undefined ? { contrast } : {}),
+    });
+  } catch {
+    // Not an image we can read. Leave whatever was there rather than writing
+    // a measurement of nothing.
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function CoverDialog({
   book,
   onClose,
@@ -183,6 +238,8 @@ export function CoverDialog({
                   type="button"
                   onClick={() => {
                     setNextCover(null);
+                    // The measurement described the picture being removed.
+                    setCoverFacts(book.id, null);
                     setError(null);
                   }}
                   className="rounded-md px-3 py-2 font-sans text-sm text-muted
@@ -210,6 +267,16 @@ export function CoverDialog({
             if (!file) return;
 
             setError(null);
+            /* **Measure the original before it is shrunk.**
+               `importImage` compresses to 700px and 250KB to fit a browser, so
+               after this line the writer's real artwork is gone and its
+               dimensions are unknowable. Reading them here is the only chance:
+               without it, setting a cover through this dialog left the
+               dashboard with nothing to check, and a writer who had just
+               chosen a cover saw no cover findings at all — which reads as the
+               check having passed rather than as never having run. */
+            void measureCover(book.id, file);
+
             const result = await importImage(file, {
               maxEdge: COVER_MAX_EDGE,
               maxBytes: COVER_MAX_BYTES,

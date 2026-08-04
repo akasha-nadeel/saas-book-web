@@ -93,6 +93,23 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
     </>
   ),
 
+  /**
+   * A form with its fields filled — the details a shop asks for.
+   *
+   * Its own mark rather than the `tag` the categories tool carries. Two tools
+   * wearing one glyph defeats the whole point of these being marks: they are
+   * what a writer learns to find a tool by without reading, and a duplicate
+   * sends them to the wrong screen and teaches them not to trust the icons.
+   */
+  form: (
+    <>
+      <rect x="3.8" y="2.6" width="16.4" height="18.8" rx="2.6" fill="#0d9488" />
+      <rect x="6.8" y="6.4" width="10.4" height="1.9" rx="0.95" fill="#ffffff" />
+      <rect x="6.8" y="10.2" width="10.4" height="1.9" rx="0.95" fill="#5eead4" />
+      <rect x="6.8" y="14" width="6.2" height="1.9" rx="0.95" fill="#5eead4" />
+    </>
+  ),
+
   /** A picture, at the size a shop shows it. */
   image: (
     <>

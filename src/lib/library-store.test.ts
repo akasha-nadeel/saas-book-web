@@ -345,7 +345,9 @@ it("appends chapters in order", () => {
 it("numbers an unnamed chapter by its position", () => {
   const { bookId } = createBook();
   createChapter(bookId);
-  expect(titlesOf(bookId)).toEqual(["Chapter One", "Chapter 2"]);
+  // Spelled, matching the first chapter's own name — "Chapter One, Chapter 2"
+  // was the mismatch a reader met on the contents page.
+  expect(titlesOf(bookId)).toEqual(["Chapter One", "Chapter Two"]);
 });
 
 it("renames a chapter", () => {
@@ -419,9 +421,9 @@ it("never names two chapters the same after a delete", () => {
   deleteChapter(bookId, two);
   createChapter(bookId);
 
-  // Numbering off the count would say "Chapter 3" here, which already exists.
+  // Numbering off the count would say "Chapter Three" here, which already exists.
   const titles = titlesOf(bookId);
-  expect(titles).toEqual(["Chapter One", "Chapter 3", "Chapter 4"]);
+  expect(titles).toEqual(["Chapter One", "Chapter Three", "Chapter Four"]);
   expect(new Set(titles).size).toBe(titles.length);
 });
 
@@ -442,7 +444,7 @@ it("leaves a named chapter out of the numbering", () => {
   expect(titlesOf(bookId)).toEqual([
     "Chapter One",
     "The Salt Flats",
-    "Chapter 3",
+    "Chapter Three",
   ]);
 });
 
@@ -1334,6 +1336,8 @@ it("numbers a new chapter past the body, ignoring front matter", () => {
 
   const next = createChapter(bookId);
   // Two front-matter chapters do not push the number to 3.
+  // Digits, because the writer renamed the opening chapter "Chapter 1" — the
+  // new title follows the book's own convention rather than imposing one.
   expect(findBook(getShelf(), bookId)!.chapters.find((c) => c.id === next)!.title)
     .toBe("Chapter 2");
 });

@@ -199,12 +199,39 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     }
 
     try {
-      const response = await fetch(`/api/comps?q=${encodeURIComponent(asked)}`);
-      const data = await response.json();
+      let response = await fetch(`/api/comps?q=${encodeURIComponent(asked)}`);
+      let data = await response.json();
       if (!response.ok) {
         setError(data?.error ?? "That search did not work.");
         setState("error");
         return;
+      }
+
+      /*
+       * **A translation that finds nothing loses to the words it replaced.**
+       *
+       * Measured, and it is not a rare edge: "cozy village mystery with a nosy
+       * librarian" came back as `subject:"Fantasy" subject:"Cozy mystery"
+       * librarian village` — four terms, which the catalogue ANDs, and
+       * therefore **0 books**. The same words sent raw found 6, and the single
+       * term `subject:"Cozy mystery"` found 20. The clever step had made the
+       * screen worse than not having it, which is the one thing a clever step
+       * may never do.
+       *
+       * The prompt was tightened to stop stacking terms, but a prompt is a
+       * request rather than a guarantee, so this is the guarantee: if the
+       * rewritten query finds nothing, the writer's own words run instead and
+       * the box goes back to showing what was actually searched.
+       */
+      if ((data.books ?? []).length === 0 && asked !== q) {
+        const plain = await fetch(`/api/comps?q=${encodeURIComponent(q)}`);
+        const fallback = await plain.json();
+        if (plain.ok && (fallback.books ?? []).length > 0) {
+          asked = q;
+          setQuery(q);
+          response = plain;
+          data = fallback;
+        }
       }
       setBooks(data.books ?? []);
       setSummary(data.summary ?? null);
@@ -256,8 +283,22 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   );
 
   const seeded = useRef(false);
+  /**
+   * Whether the writer has touched the box.
+   *
+   * The seed runs when `book` arrives, which is *after* hydration and can be
+   * after somebody has started typing — the shelf is read from storage on the
+   * client, so on a slow load the field is live for a moment before the effect
+   * fires. Observed: a search typed and submitted, then silently replaced by
+   * the seeded query, which then ran its own search. The writer's words were
+   * gone and the results were for something they never asked.
+   *
+   * A seed is a starting point. Once there is anything of the writer's in the
+   * box, there is nothing left to start.
+   */
+  const touched = useRef(false);
   useEffect(() => {
-    if (!book || seeded.current) return;
+    if (!book || seeded.current || touched.current) return;
     seeded.current = true;
     const seed = buildQuery({
       genre: book.genre,
@@ -438,7 +479,10 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           <input
             id={queryId}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              touched.current = true;
+              setQuery(e.target.value);
+            }}
             /* **The example, where it is needed and only then.** The box is
                seeded on load, so this shows the moment a writer clears it to
                type their own — which is the one instant they are looking at an

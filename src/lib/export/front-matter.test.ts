@@ -53,11 +53,51 @@ it("dates the copyright and names the author as holder", () => {
 });
 
 it("numbers only the body chapters in the contents", () => {
-  const sections = frontSections(book, chapters, { ...opts, titlePage: false, copyright: false });
+  const sections = frontSections(
+    book,
+    [
+      { title: "Dedication", number: null, doc: { type: "doc", content: [] } },
+      { title: "The Last Lamp", number: 1, doc: { type: "doc", content: [] } },
+      { title: "Epilogue", number: null, doc: { type: "doc", content: [] } },
+    ],
+    { ...opts, titlePage: false, copyright: false },
+  );
   const html = sections[0].html;
   // Body chapters carry a number; front and back matter are listed by name.
-  expect(html).toContain("1. Chapter One");
-  expect(html).toContain("2. Chapter Two");
+  expect(html).toContain("1. The Last Lamp");
   expect(html).toContain("<li>Dedication</li>");
   expect(html).toContain("<li>Epilogue</li>");
+});
+
+// "1. Chapter One" was what shipped, and it says the same thing twice. The
+// numeral is the app's, the word is the writer's, and the writer's wins.
+it("drops the numeral when the title already carries the number", () => {
+  const sections = frontSections(book, chapters, {
+    ...opts,
+    titlePage: false,
+    copyright: false,
+  });
+  expect(sections[0].html).toContain("<li>Chapter One</li>");
+  expect(sections[0].html).not.toContain("1. Chapter One");
+});
+
+// A contents page nobody can tap is a page read once. Paper gets none, because
+// an anchor on paper is a dead blue word.
+it("links each chapter when the format has somewhere to link to", () => {
+  const sections = frontSections(
+    book,
+    chapters,
+    { ...opts, titlePage: false, copyright: false },
+    (i) => `chapter-${String(i + 1).padStart(2, "0")}.xhtml`,
+  );
+  expect(sections[0].html).toContain('<a href="chapter-02.xhtml">Chapter One</a>');
+});
+
+it("leaves the contents unlinked when no target is given", () => {
+  const sections = frontSections(book, chapters, {
+    ...opts,
+    titlePage: false,
+    copyright: false,
+  });
+  expect(sections[0].html).not.toContain("<a href=");
 });

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
@@ -15,7 +16,14 @@ import {
   reshape,
   type CoverFacts,
 } from "@/lib/cover-check";
-import { bookWordCount, findBook, setCover } from "@/lib/library-store";
+import {
+  bookWordCount,
+  findBook,
+  getCover,
+  getCoverFacts,
+  setCover,
+  setCoverFacts,
+} from "@/lib/library-store";
 import {
   COVER_MAX_BYTES,
   COVER_MAX_EDGE,
@@ -295,6 +303,38 @@ function edgeColour(image: HTMLImageElement): string | null {
  * default and the only one consistent with the rest of the page.
  */
 function CoverChecker({ bookId }: { bookId: string }) {
+  /**
+   * Why the writer came, from the dashboard's own link.
+   *
+   * They pressed "Fix the shape" on a finding and were sent here, so the crop
+   * window is what they were promised. It cannot be opened on arrival — the
+   * artwork is not kept, and there is nothing to crop until they hand it over
+   * — so the intent waits in a ref and is spent on the first file that is
+   * read. Spent once: a second file is a second decision, and re-opening the
+   * window under somebody who has moved on is the kind of help that has to be
+   * dismissed.
+   */
+  const askedFor = useSearchParams().get("fix") ?? "";
+  const [intent, setIntent] = useState(askedFor);
+
+  /**
+   * True when the picture loaded is the copy stored on the book rather than a
+   * file the writer just handed over.
+   *
+   * The dashboard's "Fix the shape" used to land on an empty drop zone, which
+   * is the wrong answer when the app is *already holding* a cover: it asked
+   * the writer to go and find a file to fix a problem it could see, in a
+   * picture it had. So the stored copy is opened instead.
+   *
+   * It is not the same picture and the screen has to say so. What is stored is
+   * compressed to 700px to fit a browser, so cropping it puts the shape right
+   * everywhere this app draws the book — the shelf, and the cover inside the
+   * EPUB, which is the one that actually ships — while still being too small
+   * for a shop's own upload. Fixing that needs the original, which is not
+   * kept. Both halves are true and the writer is told both.
+   */
+  const [fromStored, setFromStored] = useState(false);
+
   const [facts, setFacts] = useState<CoverFacts | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -352,18 +392,55 @@ function CoverChecker({ bookId }: { bookId: string }) {
         }
       }
 
-      setFacts({
+      const measured: CoverFacts = {
         width: image.naturalWidth,
         height: image.naturalHeight,
         bytes: file.size,
         ...(contrast !== undefined ? { contrast } : {}),
-      });
+      };
+      setFacts(measured);
       setPreview(url);
+      setFromStored(false);
+      /* Kept so the dashboard can report the same findings. This is the only
+         place the writer's real artwork is ever held — the copy on the book is
+         compressed to fit a browser — so if these numbers are not written down
+         here they cannot be known anywhere else. */
+      setCoverFacts(bookId, measured);
+
+      /* The window the dashboard promised, now that there is something to put
+         in it — **but only if the file still has the problem it was promised
+         for**.
+
+         Spent on the first file either way, so it cannot fire on a later one.
+         Opened only when the shape is actually off: a writer who fixed the
+         cover elsewhere and dropped the corrected file was shown a crop window
+         reading "This is the file", with nothing to drag and nothing to
+         decide, over a check that had just told them the file was fine. A fix
+         offered for a problem that is not there is worse than no offer — it
+         makes the reader doubt the check that cleared it. */
+      const stillOff =
+        Math.abs(measured.height / measured.width - IDEAL_RATIO) > 0.05;
+      if (intent === "shape") {
+        setIntent("");
+        if (stillOff) {
+          const out = reshape(measured.width, measured.height, "crop");
+          setShaping({
+            id: "crop",
+            width: out.width,
+            height: out.height,
+            drawWidth: measured.width,
+            drawHeight: measured.height,
+            factor: 1,
+            tooSmall: out.tooSmall,
+          });
+        }
+      }
     } catch {
       URL.revokeObjectURL(url);
       setError("That file could not be read as an image.");
       setFacts(null);
       setPreview(null);
+      setCoverFacts(bookId, null);
     }
   }
 
@@ -503,15 +580,92 @@ function CoverChecker({ bookId }: { bookId: string }) {
     );
   }
 
-  const findings = facts ? checkCover(facts) : [];
+  /**
+   * The last measurement, for arriving from the dashboard.
+   *
+   * The findings there are links into this screen, and pressing one used to
+   * land on an empty drop zone: the writer had just been told their cover is
+   * the wrong shape, pressed the button offering to fix it, and arrived
+   * somewhere that said nothing about a cover at all. The artwork itself is
+   * deliberately never kept — it is the one file this app refuses to store —
+   * but the numbers were, so the *findings* can be shown again even when the
+   * picture cannot.
+   *
+   * Read once on mount. It only changes when this screen writes it, and this
+   * screen has `facts` by then.
+   */
+  const stored = useMemo(() => getCoverFacts(bookId), [bookId]);
+
+  /* What is on screen: the file just checked, or the last one measured. */
+  const shown = facts ?? stored;
+  const findings = shown ? checkCover(shown) : [];
+
+  /*
+   * Open the promised window on the cover the book already has.
+   *
+   * Runs once, only when sent here by a finding, and only when the stored
+   * cover really does have the problem the finding named — the same guard the
+   * dropped-file path uses, for the same reason.
+   */
+  useEffect(() => {
+    if ((intent !== "shape" && intent !== "enlarge") || facts) return;
+    const dataUrl = getCover(bookId);
+    if (!dataUrl) return;
+
+    let cancelled = false;
+    const image = new Image();
+    image.onload = () => {
+      if (cancelled) return;
+      /* Spent here rather than in the effect body: a synchronous setState in
+         an effect cascades renders, and this is a callback from an external
+         system, which is what effects are actually for. Spent whether or not
+         the window opens — the stored cover has been examined either way. */
+      setIntent("");
+      const w = image.naturalWidth;
+      const h = image.naturalHeight;
+
+      /* Load the stored cover for either errand, but only *open* a window for
+         the one that has a decision in it. An enlarge has none — it is a
+         single button on the panel below — and running it unasked would
+         replace somebody's cover with a blurrier one before they had read why
+         that is what enlarging does. */
+      const wantsShape = intent === "shape";
+      if (wantsShape && Math.abs(h / w - IDEAL_RATIO) <= 0.05) return;
+
+      /* Shown, not stored: `setCoverFacts` is deliberately not called here.
+         These are the compressed copy's dimensions, and writing them over the
+         original's measurement would make the dashboard report the wrong
+         file — the exact confusion this screen warns about. */
+      setFromStored(true);
+      setPreview(dataUrl);
+      setFacts({ width: w, height: h, bytes: 0 });
+
+      if (wantsShape) {
+        const out = reshape(w, h, "crop");
+        setShaping({
+          id: "crop",
+          width: out.width,
+          height: out.height,
+          drawWidth: w,
+          drawHeight: h,
+          factor: 1,
+          tooSmall: out.tooSmall,
+        });
+      }
+    };
+    image.src = dataUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [intent, facts, bookId]);
 
   /* Named rather than inlined twice: the panel's visibility and each button's
      own visibility are the same two questions, and they must not drift. */
-  const shapeOff = facts
-    ? Math.abs(facts.height / facts.width - IDEAL_RATIO) > 0.05
+  const shapeOff = shown
+    ? Math.abs(shown.height / shown.width - IDEAL_RATIO) > 0.05
     : false;
-  const smallerThanIdeal = facts
-    ? Math.max(facts.width, facts.height) < IDEAL_HEIGHT
+  const smallerThanIdeal = shown
+    ? Math.max(shown.width, shown.height) < IDEAL_HEIGHT
     : false;
 
   return (
@@ -636,6 +790,10 @@ function CoverChecker({ bookId }: { bookId: string }) {
               setName(null);
               setError(null);
               setDone(null);
+              setFromStored(false);
+              // The measurement goes with the file it measured; the dashboard
+              // must not keep reporting a cover nobody is checking any more.
+              setCoverFacts(bookId, null);
             }}
             /* Red, because it is now the only way out of this state and it
                throws the checked file away. Grey read as a secondary label
@@ -649,7 +807,7 @@ function CoverChecker({ bookId }: { bookId: string }) {
         </div>
       )}
 
-      {facts && (
+      {shown && (
         <div className="mt-6 flex flex-wrap gap-6">
           {preview && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -661,10 +819,27 @@ function CoverChecker({ bookId }: { bookId: string }) {
           )}
           <div className="min-w-[16rem] flex-1">
             <p className="max-w-prose text-sm text-muted">
-              {facts.width.toLocaleString()} × {facts.height.toLocaleString()}{" "}
-              pixels · {(facts.bytes / 1024).toFixed(0)}KB ·{" "}
-              {(facts.height / facts.width).toFixed(2)}:1
+              {shown.width.toLocaleString()} × {shown.height.toLocaleString()}{" "}
+              pixels
+              {/* No weight for the stored copy: its size on disk is an artefact
+                  of this app's own compression, not a fact about the writer's
+                  artwork, and printing it beside a shop's 50MB limit would
+                  invite exactly the wrong conclusion. */}
+              {shown.bytes > 0
+                ? ` · ${(shown.bytes / 1024).toFixed(0)}KB`
+                : ""}{" "}
+              · {(shown.height / shown.width).toFixed(2)}:1
             </p>
+
+            {fromStored && (
+              /* Which picture this is, said before anything is done to it. */
+              <p className="mt-2 max-w-prose rounded-lg border border-note-line bg-note-bg px-3.5 py-2.5 text-sm text-note-fg">
+                This is the cover already on the book, not your original — the
+                copy kept here is compressed to fit a browser. Putting its shape
+                right fixes the cover in your EPUB and on the shelf. For the
+                file you upload to a shop, fix the original and check that.
+              </p>
+            )}
 
             {/* **Putting the shape right, and only the shape.**
 
@@ -696,14 +871,26 @@ function CoverChecker({ bookId }: { bookId: string }) {
                 the dialog, and in the confirmation afterwards, and it is the
                 only fix whose green message declines to call the result
                 better. */}
-            {(shapeOff || smallerThanIdeal) && (
+            {facts && (shapeOff || smallerThanIdeal) && (
               <div className="mt-3 rounded-lg border border-line bg-panel p-4">
                 <p className="text-sm font-bold text-fg">Fix the file</p>
                 <p className="mt-1 max-w-prose text-sm text-muted">
                   You choose what shows before anything is written. Nothing is
                   uploaded and this file is not changed — you get a copy.
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                {/* **Banners, not chips.** These were small boxes in a row
+                    while the findings under them were full-width bordered
+                    rows, so the *actions* were the smallest thing in a panel
+                    of statements — and on a narrow window the third one
+                    wrapped onto its own line and looked like a different kind
+                    of control from the two beside it.
+
+                    Stacked and full width, each reads as one line: what it
+                    will do on the left, what it costs on the right. Same shape
+                    as the rows they sit above, which is what makes the panel
+                    read as answer-then-consequence rather than as two
+                    unrelated lists. */}
+                <div className="mt-3 flex flex-col gap-2">
                   {shapeOff &&
                     (["crop", "pad"] as const).map((mode) => {
                       const out = reshape(facts.width, facts.height, mode);
@@ -724,14 +911,15 @@ function CoverChecker({ bookId }: { bookId: string }) {
                               tooSmall: out.tooSmall,
                             })
                           }
-                          className="rounded-lg border border-line bg-surface px-3.5 py-2 text-left
+                          className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1
+                                     rounded-lg border border-line bg-surface px-4 py-3 text-left
                                      hover:border-accent/40 focus-visible:ring-2
                                      focus-visible:ring-accent/50 focus-visible:outline-none"
                         >
-                          <span className="block text-sm font-semibold text-fg">
+                          <span className="text-sm font-semibold text-fg">
                             {mode === "crop" ? "Crop to fit" : "Pad with bars"}
                           </span>
-                          <span className="block text-xs text-muted tabular-nums">
+                          <span className="text-xs text-muted tabular-nums">
                             {out.width} × {out.height} ·{" "}
                             {mode === "crop"
                               ? `${out.changed}px trimmed`
@@ -771,14 +959,15 @@ function CoverChecker({ bookId }: { bookId: string }) {
                               },
                             )
                           }
-                          className="rounded-lg border border-line bg-surface px-3.5 py-2 text-left
+                          className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1
+                                     rounded-lg border border-line bg-surface px-4 py-3 text-left
                                      hover:border-accent/40 focus-visible:ring-2
                                      focus-visible:ring-accent/50 focus-visible:outline-none"
                         >
-                          <span className="block text-sm font-semibold text-fg">
+                          <span className="text-sm font-semibold text-fg">
                             Enlarge to {big.width} × {big.height}
                           </span>
-                          <span className="block text-xs text-muted tabular-nums">
+                          <span className="text-xs text-muted tabular-nums">
                             scaled up {big.factor.toFixed(1)}× · adds no detail
                           </span>
                         </button>
@@ -786,6 +975,18 @@ function CoverChecker({ bookId }: { bookId: string }) {
                     })()}
                 </div>
               </div>
+            )}
+
+            {!facts && (shapeOff || smallerThanIdeal) && (
+              /* Arrived from the dashboard: the numbers survived, the picture
+                 did not. Saying which is better than either hiding the
+                 findings — the writer came here *because* of them — or showing
+                 fix buttons that have nothing to work on. */
+              <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-muted">
+                Measured when you last checked this file. The artwork itself is
+                never kept here, so drop the same file again to put any of this
+                right.
+              </p>
             )}
 
             {findings.length === 0 ? (
@@ -900,7 +1101,22 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
    * The shelf leads because it is what the step is called: "Get a cover made"
    * is answered by looking at the ones that sell, not by validating a PNG.
    */
-  const [half, setHalf] = useState<"shelf" | "file">("shelf");
+  /**
+   * Which half is open, seeded from `?check=1`.
+   *
+   * The dashboard's cover findings link here to be fixed, and every one of
+   * them is fixed on the *file* side — a button reading "Fix the shape" that
+   * delivered a search box for other people's covers would be the dead end
+   * this app's own destination rule exists to prevent.
+   *
+   * Read with `useSearchParams`, not `window.location`: a lazy initialiser
+   * reading the URL during a client navigation sees the *previous* one, which
+   * is the mistake the dashboard's `?area=` already made once.
+   */
+  const params = useSearchParams();
+  const [half, setHalf] = useState<"shelf" | "file">(
+    params.get("check") ? "file" : "shelf",
+  );
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );

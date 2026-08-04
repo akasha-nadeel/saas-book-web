@@ -43,12 +43,41 @@ function copyrightPage(book: Book): string {
   </section>`;
 }
 
-function contentsPage(chapters: LoadedChapter[]): string {
+/**
+ * Whether the title already says which chapter this is.
+ *
+ * "Chapter One" numbered "1." reads as a stutter, and it is the app's own
+ * default title, so nearly every book shipped it. Matches both the spelled and
+ * the digit form, since a writer can type either.
+ */
+function titleCarriesNumber(title: string): boolean {
+  return /^chapter\s+([a-z-]+|\d+)$/i.test(title.trim());
+}
+
+/**
+ * The visible contents.
+ *
+ * **`href` is what makes this a table of contents rather than a list of
+ * names.** In a printed book the page number is the link; on an e-reader there
+ * are no page numbers, so a contents page that cannot be tapped is one a
+ * reader looks at once and never opens again. The EPUB passes each chapter's
+ * own file; the print PDF passes nothing, because paper has nowhere to go and
+ * an anchor there would be a dead blue word.
+ *
+ * The numeral is dropped when the title already carries it — "1. Chapter One"
+ * says the same thing twice, and "Chapter One" is this app's own default
+ * title, so nearly every book exported it that way.
+ */
+function contentsPage(
+  chapters: LoadedChapter[],
+  href?: (index: number) => string,
+): string {
   const items = chapters
-    .map(
-      (c) =>
-        `      <li>${c.number !== null ? `${c.number}. ` : ""}${escapeXml(c.title)}</li>`,
-    )
+    .map((c, i) => {
+      const numbered = c.number !== null && !titleCarriesNumber(c.title);
+      const label = `${numbered ? `${c.number}. ` : ""}${escapeXml(c.title)}`;
+      return `      <li>${href ? `<a href="${href(i)}">${label}</a>` : label}</li>`;
+    })
     .join("\n");
   return `<section class="front-page contents">
     <h1>Contents</h1>
@@ -67,12 +96,14 @@ export function frontSections(
   book: Book,
   chapters: LoadedChapter[],
   options: TypesetOptions,
+  /** Where each chapter lives, when the format has somewhere to link to. */
+  href?: (index: number) => string,
 ): FrontSection[] {
   const sections: FrontSection[] = [];
   if (options.titlePage) sections.push({ id: "title", html: titlePage(book) });
   if (options.copyright)
     sections.push({ id: "copyright", html: copyrightPage(book) });
   if (options.contents)
-    sections.push({ id: "contents", html: contentsPage(chapters) });
+    sections.push({ id: "contents", html: contentsPage(chapters, href) });
   return sections;
 }

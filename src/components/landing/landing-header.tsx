@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { HERO_CHECK_ANCHOR, HERO_FILE_INPUT } from "./book-check";
 
 /**
  * The landing page's header: invisible over the hero, and it gets out of the
@@ -171,26 +172,85 @@ export function LandingHeader({ ink }: { ink: string }) {
         >
           Open<span className="text-lp-wordmark">Chapter</span>
         </Link>
-        <nav className="flex items-center gap-4 font-sans text-sm text-lp-body sm:gap-6">
-          <a href="#order" className="hidden sm:inline hover:text-lp-ink">
-            The order
-          </a>
-          <a href="#does" className="hidden sm:inline hover:text-lp-ink">
-            What it does
-          </a>
-          <a href="#tools" className="hidden sm:inline hover:text-lp-ink">
-            Tools
-          </a>
-          <Link href="/signin" className="hover:text-lp-ink">
-            Log in
-          </Link>
-          <Link
-            href="/signup"
-            style={{ backgroundColor: ink }}
-            className="rounded-full px-3.5 py-1.5 font-semibold text-lp-accent-ink hover:opacity-90 sm:px-4 sm:py-2"
-          >
-            Start free
-          </Link>
+        {/* `text-base`, not `text-sm`. The links sat a size under the two
+            buttons at the end of the bar, so the row read as small print with
+            two controls stuck on it rather than as one navigation. The buttons
+            inherit it and grow with them, which keeps the pair the anchor of
+            the bar rather than making it shout. */}
+        <nav className="flex items-center gap-5 font-sans text-base text-lp-body sm:gap-7">
+          {/* **Where you are on the page, then what you can do about it.**
+              The bar used to run order · what it does · tools · log in, then
+              the two buttons — so an account link sat in the middle of a group
+              of anchors to sections of this page, and the row had no seam
+              between "navigation" and "action". Now the anchors are one group
+              and the buttons are another.
+
+              **Log in is gone at the user's request.** Worth knowing what it
+              costs: a returning writer arriving at the marketing page has no
+              way back to their books from this bar, and has to go through
+              "Start free" to find the sign-in link on the signup screen. */}
+          <span className="hidden items-center gap-5 sm:flex sm:gap-7">
+            <a href="#order" className="hover:text-lp-ink">
+              The order
+            </a>
+            <a href="#does" className="hover:text-lp-ink">
+              What it does
+            </a>
+            <a href="#tools" className="hover:text-lp-ink">
+              Tools
+            </a>
+          </span>
+
+          {/* **A label, not a button or a link.** It is bound to the hero
+              check's own file input, so pressing it opens the picker and the
+              file lands in the check exactly as if it had been dropped on the
+              box. No second input, no ref, no shared state — and it cannot
+              drift out of step with the thing it feeds, because it *is* the
+              thing that feeds it.
+
+              The scroll is the other half: the header outlives the hero, so
+              this can be pressed from halfway down the page, and a check that
+              ran off screen would look like nothing happened. Bringing the
+              card back first means the picker closes onto the answer.
+
+              **Secondary, and that is the point.** "Start free" is the way
+              forward and keeps the only fill on the bar; this is the way
+              forward for somebody who has a manuscript and wants to see the
+              check before they will hear about an account. Border and type in
+              the same ink, no ground — so it reads as the same family, one
+              step quieter. */}
+          {/* The two actions are one group, and the nav's own `gap-6` was
+              spacing them as if they were two more links. Wrapped, they sit at
+              `gap-2.5` from each other and keep the wider gap from "Log in" —
+              so the bar reads as *links, then a pair of buttons* rather than
+              as five evenly spaced things of three different kinds. */}
+          <span className="flex items-center gap-2.5">
+            <label
+              htmlFor={HERO_FILE_INPUT}
+              onClick={() =>
+                document
+                  .getElementById(HERO_CHECK_ANCHOR)
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              style={{ borderColor: ink, color: ink }}
+              /* `border-2`: at one pixel the outline was lighter than the type
+                 inside it and the button read as a hairline box round a word.
+                 Two matches the weight of the filled button beside it, which
+                 is what makes the pair look like two of the same thing. */
+              className="hidden cursor-pointer rounded-full border-2 px-3.5 py-1.5
+                         font-semibold transition-colors hover:bg-lp-tint
+                         sm:inline-block sm:px-4 sm:py-2"
+            >
+              Check your book
+            </label>
+            <Link
+              href="/signup"
+              style={{ backgroundColor: ink }}
+              className="rounded-full px-3.5 py-1.5 font-semibold text-lp-accent-ink hover:opacity-90 sm:px-4 sm:py-2"
+            >
+              Start free
+            </Link>
+          </span>
         </nav>
       </div>
     </header>

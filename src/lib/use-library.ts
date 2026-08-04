@@ -51,6 +51,7 @@ import {
   subscribeToIdeas,
   subscribeToNotes,
   subscribeToPrefs,
+  getCoverEpoch,
   subscribeToShelf,
   type Prefs,
   type Shelf,
@@ -120,6 +121,22 @@ export function useCover(bookId: string): string | null {
   );
   const snapshot = useCallback(() => getCover(bookId), [bookId]);
   return useSyncExternalStore(subscribe, snapshot, getServerCover);
+}
+
+/**
+ * A number that moves whenever any cover changes.
+ *
+ * For screens that read `hasCover` for a *list* of books. `useCover` is the
+ * right hook for one book's artwork; this is for the case where the cover is
+ * not the thing being rendered but is an input to something that is — the
+ * dashboard's readiness findings, which are memoised on `books` and so cannot
+ * see a write that leaves the shelf untouched.
+ *
+ * Name it as a dependency beside `books` and the memo recomputes when a cover
+ * arrives. See `getCoverEpoch` for what the counter is for.
+ */
+export function useCoverEpoch(): number {
+  return useSyncExternalStore(subscribeToShelf, getCoverEpoch, () => 0);
 }
 
 /** How the writer likes the editor to behave. Persisted, and shared across tabs. */

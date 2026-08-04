@@ -22,6 +22,7 @@ import {
   booksIn,
   deleteBook,
   getArcRaw,
+  getCoverFacts,
   hasCover,
   migrateLegacy,
   restoreBook,
@@ -43,6 +44,7 @@ import {
   useCover,
   useHydrated,
   useLedger,
+  useCoverEpoch,
   useShelf,
 } from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
@@ -878,12 +880,16 @@ function Overview({
    */
   const [waved, setWaved] = useState<string | null>(null);
 
+  /* Same staleness as the list below: the badge counts a missing cover, and a
+     cover written after this ran leaves `book` unchanged. */
+  const coverEpoch = useCoverEpoch();
   const counts = useMemo(() => {
     if (!book) return { fix: 0, note: 0 };
     const issues = storeReadiness({
       book,
       ...(book.publishing ? { meta: book.publishing } : {}),
       hasCover: hasCover(book.id),
+      coverFacts: getCoverFacts(book.id),
       chapterCount: book.chapters.filter((c) => c.words > 0).length,
       // The two that need the manuscript are the export screen's job.
       brokenImages: 0,
@@ -892,7 +898,13 @@ function Overview({
       fix: issues.filter((i) => i.level === "blocking").length,
       note: issues.filter((i) => i.level === "advisory").length,
     };
-  }, [book]);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps --
+       `coverEpoch` is not read in the body and the rule is right about that.
+       It is here because `hasCover` reads `localStorage`, which the rule
+       cannot see: the epoch is the only value that changes when a cover is
+       written, so removing it as "unnecessary" is precisely what left the
+       "No cover" finding on screen after the cover arrived. */
+  }, [book, coverEpoch]);
 
   const steps = useMemo(
     () => (book ? roadmapFor(book, book.roadmapDone ?? []) : []),
@@ -2194,6 +2206,10 @@ function Prepare({
    * `hasCover` tests for the key instead of fetching a 250KB data URL — but it
    * is a loop over every book and there is no reason to run it on a keystroke.
    */
+  /* Covers live at their own key, so adding one leaves `books` untouched and
+     this memo would keep its old answer — the "No cover" finding surviving the
+     cover that fixed it. See `useCoverEpoch`. */
+  const coverEpoch = useCoverEpoch();
   const rows = useMemo(
     () =>
       books.map((book) => ({
@@ -2202,6 +2218,9 @@ function Prepare({
           book,
           ...(book.publishing ? { meta: book.publishing } : {}),
           hasCover: hasCover(book.id),
+          // Measured from the writer's real artwork by the cover checker; null
+          // until they have checked one, and the findings stay silent.
+          coverFacts: getCoverFacts(book.id),
           // Chapters with prose in them. The count is denormalised into the
           // shelf, so this needs no chapter bodies.
           chapterCount: book.chapters.filter((c) => c.words > 0).length,
@@ -2209,7 +2228,13 @@ function Prepare({
           brokenImages: 0,
         }),
       })),
-    [books],
+    /* eslint-disable-next-line react-hooks/exhaustive-deps --
+       `coverEpoch` is not read in the body and the rule is right about that.
+       It is here because `hasCover` reads `localStorage`, which the rule
+       cannot see: the epoch is the only value that changes when a cover is
+       written, so removing it as "unnecessary" is precisely what left the
+       "No cover" finding on screen after the cover arrived. */
+    [books, coverEpoch],
   );
 
   const ready = rows.filter(

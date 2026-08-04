@@ -62,6 +62,16 @@ import type { ImportedBook } from "@/lib/import/split";
  * picked per finding down in `Result` — a status needs a *fill* token and a
  * *text* token, and they are not the same one.
  */
+/**
+ * The hero file input's id, and the anchor for the card that holds it.
+ *
+ * Exported so the header can bind a `<label>` to the one file input on the
+ * page rather than growing a second, and so a control that is off screen when
+ * pressed can bring the check back into view before the picker returns.
+ */
+export const HERO_FILE_INPUT = "hero-manuscript";
+export const HERO_CHECK_ANCHOR = "check";
+
 const INK = "var(--color-lp-accent)";
 const STOP = "var(--color-stop-fg)";
 const PASS = "var(--color-ok-fg)";
@@ -179,7 +189,7 @@ export function BookCheck() {
   const done = state.phase === "done";
 
   return (
-    <div className="mx-auto mt-14 max-w-4xl">
+    <div id={HERO_CHECK_ANCHOR} className="mx-auto mt-14 max-w-4xl scroll-mt-24">
       {/* The frame is shared with the two figures further down the page — see
           `app-window.tsx`. This is the one that holds a working control
           rather than a drawing, so it passes no `label`: a screen reader has
@@ -292,6 +302,12 @@ function Dropzone({
         }`}
       >
         <input
+          /* Named so the header's own upload control can be a plain
+             `<label htmlFor>` pointing at it. A label opens the picker it is
+             bound to wherever it sits in the document, so the button up there
+             needs no state, no ref and no second file input — the file lands
+             in this check exactly as if it had been dropped on the box. */
+          id={HERO_FILE_INPUT}
           type="file"
           accept=".docx,.epub,.md,.markdown,.txt,.html,.htm"
           className="sr-only"

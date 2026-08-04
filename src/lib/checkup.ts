@@ -85,6 +85,52 @@ const DESTINATIONS: Record<string, Fix> = {
   author: { kind: "identity", action: "Add the author" },
   chapters: { kind: "route", path: "", action: "Open the book" },
   cover: { kind: "cover", action: "Add a cover" },
+
+  /*
+   * The cover *file's* own findings, one destination each.
+   *
+   * All five land on the covers screen's file checker — `?check=1` opens it on
+   * that half rather than on the shelf, so a writer pressing "Fix the shape"
+   * arrives at the controls that fix it instead of at a search box. The
+   * wording differs per row because the action does: this list's promise is
+   * that a button says what pressing it will do.
+   */
+  "cover-too-small": {
+    kind: "route",
+    path: "covers?check=1&fix=enlarge",
+    action: "Enlarge the cover",
+  },
+  "cover-too-heavy": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Shrink the file",
+  },
+  "cover-shape": {
+    /* `fix=shape` is an *intent*, not a command: the crop window needs the
+       artwork and this app never keeps it, so the button cannot open the
+       window on its own. It carries the reason for coming instead, and the
+       covers screen opens the window the moment a file is supplied. One step
+       that cannot be removed, and none of the ones that could. */
+    kind: "route",
+    path: "covers?check=1&fix=shape",
+    action: "Fix the shape",
+  },
+  "cover-small-ish": {
+    kind: "route",
+    path: "covers?check=1&fix=enlarge",
+    action: "Enlarge the cover",
+  },
+  /* Lands on the checker like the other four rather than on the shelf.
+     "See it on the wall" was the honest instruction — contrast is judged by
+     looking, not measured — but it sent a writer somewhere different from
+     every other cover row on this list, and a set of buttons that mostly go
+     one place and quietly go another is how a reader stops trusting any of
+     them. The label follows the destination. */
+  "cover-flat": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the cover",
+  },
   description: { kind: "route", path: "blurb", action: "Work on the blurb" },
   subjects: {
     kind: "route",
@@ -99,17 +145,20 @@ const DESTINATIONS: Record<string, Fix> = {
    * had to guess that picking EPUB was the way to an ISBN box four screens
    * later. A destination is a promise about where you land; these now keep it.
    */
-  isbn: { kind: "route", path: "export?step=listing", action: "Set the ISBN" },
+  /*
+   * These pointed into the export flow's listing step, which was a deep link
+   * invented because the fields lived nowhere else. They have their own tool
+   * now, so the destination is the tool: a button reading "Set the ISBN" lands
+   * on a page whose whole subject is the ISBN, rather than starting an export
+   * the writer did not ask for.
+   */
+  isbn: { kind: "route", path: "listing", action: "Set the ISBN" },
   publisher: {
     kind: "route",
-    path: "export?step=listing",
+    path: "listing",
     action: "Set the publisher",
   },
-  published: {
-    kind: "route",
-    path: "export?step=listing",
-    action: "Fix the date",
-  },
+  published: { kind: "route", path: "listing", action: "Fix the date" },
   /*
    * These two stay at the front door on purpose. Both are found by reading the
    * manuscript, which only happens once a format is chosen and the export runs

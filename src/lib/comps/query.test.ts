@@ -124,3 +124,82 @@ describe("the prompt", () => {
     expect(SYSTEM).not.toMatch(/\bscore\b|bestseller rank|search volume/i);
   });
 });
+
+describe("parseQuery against real shelves", () => {
+  const known = new Set(["cozy mystery", "fantasy", "romance"]);
+
+  // The measured failure: a shelf the model made up by merging two genres.
+  // It matches nothing, so the plain words carry the search and the screen
+  // fills with the wrong books while looking entirely successful.
+  it("drops a subject no catalogue actually has", () => {
+    expect(parseQuery('subject:"Fantasy mystery" librarian', known)).toBe(
+      "librarian",
+    );
+  });
+
+  it("keeps a subject that is a real shelf", () => {
+    expect(parseQuery('subject:"Cozy mystery" librarian', known)).toBe(
+      'subject:"Cozy mystery" librarian',
+    );
+  });
+
+  it("matches case-insensitively, as the catalogue does", () => {
+    expect(parseQuery('subject:"FANTASY"', known)).toBe('subject:"FANTASY"');
+  });
+
+  it("returns null when the invented shelf was the whole query", () => {
+    expect(parseQuery('subject:"Fantasy mystery"', known)).toBeNull();
+  });
+
+  // Without a list nothing is checked, which is what the parser's other
+  // callers and every existing test rely on.
+  it("checks nothing when no list is given", () => {
+    expect(parseQuery('subject:"Fantasy mystery"')).toBe(
+      'subject:"Fantasy mystery"',
+    );
+  });
+
+  it("leaves title and author terms alone — they are not shelves", () => {
+    expect(parseQuery('intitle:"The Silent Patient"', known)).toBe(
+      'intitle:"The Silent Patient"',
+    );
+  });
+});
+
+describe("stray formatting", () => {
+  // A model asked for one line of syntax reaches for inline code. The closing
+  // backtick survived and was searched for literally.
+  it("strips backticks left on a term", () => {
+    expect(parseQuery('subject:"Portal fantasy"`')).toBe(
+      'subject:"Portal fantasy"',
+    );
+  });
+
+  it("strips backticks wrapping the whole line", () => {
+    expect(parseQuery('`subject:"Fantasy" quest`')).toBe(
+      'subject:"Fantasy" quest',
+    );
+  });
+});
+
+describe("prose leaking in beside a real term", () => {
+  const known = new Set(["haunted houses", "fantasy"]);
+
+  // Measured: a valid shelf with a question mark and a stray clause after it.
+  // Salvaging the shelf and searching the rest as words is how a wrong result
+  // arrives looking like a right one.
+  it("refuses a reply that is part query, part sentence", () => {
+    expect(parseQuery('subject:"Haunted houses"? Or haunted', known)).toBeNull();
+  });
+
+  it("refuses an exclamation or a semicolon", () => {
+    expect(parseQuery('subject:"Fantasy"! quest', known)).toBeNull();
+    expect(parseQuery('subject:"Fantasy"; quest', known)).toBeNull();
+  });
+
+  // Punctuation *inside* a quoted shelf is the catalogue's own, not prose.
+  it("allows punctuation inside a quoted subject", () => {
+    const ok = new Set(['children"s stories', "who? me"]);
+    expect(parseQuery('subject:"who? me"', ok)).toBe('subject:"who? me"');
+  });
+});

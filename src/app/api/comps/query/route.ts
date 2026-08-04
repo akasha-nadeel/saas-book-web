@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
+import { COMMON_SUBJECTS } from "@/lib/comps/common-subjects";
 import { buildPrompt, parseQuery, SYSTEM } from "@/lib/comps/query";
 
 /**
@@ -24,6 +25,22 @@ import { buildPrompt, parseQuery, SYSTEM } from "@/lib/comps/query";
  */
 
 export const maxDuration = 30;
+
+/**
+ * The shelves that actually exist, for checking the model's answer against.
+ *
+ * `common-subjects.ts` is Open Library's own headings with Open Library's own
+ * counts — the catalogue's vocabulary rather than one of ours, which is what
+ * makes it usable as a test of whether a shelf is real. Built once at module
+ * scope: it is 900 strings and does not change between requests.
+ *
+ * It is a floor, not the whole language — a real heading outside these 900 is
+ * dropped along with the invented ones. That costs a slightly looser search
+ * and never costs a wrong one, which is the right direction to be wrong in.
+ */
+const REAL_SHELVES = new Set(
+  COMMON_SUBJECTS.map((s) => s.name.trim().toLowerCase()),
+);
 
 /** One line out. Generous for Gemini, whose thinking counts against it. */
 const MAX_TOKENS = 400;
@@ -74,7 +91,35 @@ export async function POST(request: Request) {
       maxTokens: MAX_TOKENS,
     });
 
-    const query = parseQuery(reply);
+    const parsed = parseQuery(reply, REAL_SHELVES);
+
+    /*
+     * **A translation is only worth having if it names a real shelf.**
+     *
+     * Everything this route can add over the writer's own words is the
+     * `subject:` term — the one thing they could not have written, because it
+     * needs the catalogue's vocabulary. A reply with no verified shelf in it
+     * has contributed nothing but rewording, and rewording somebody's search
+     * without improving it is how the three failures found in testing all
+     * happened:
+     *
+     *   - four terms ANDed to nothing, and the screen said the genre was empty
+     *   - `subject:"Fantasy mystery"`, a shelf no catalogue has, which matched
+     *     nothing and left "librarian" to return the catalogues of actual
+     *     libraries, several from the 1890s
+     *   - a line of this file's own prompt — "Use ONE subject term, quoted,
+     *     naming the shelf the book belongs on" — echoed back and searched for
+     *
+     * The last one is the reason this is a rule rather than a nudge. Generated
+     * text is hostile input; a parser that accepts anything shaped like words
+     * will eventually search the instructions. Requiring a shelf that exists
+     * in Open Library's own list is a test none of those three can pass.
+     *
+     * Null is not a failure. The caller runs the writer's words, which is what
+     * would have happened without this route at all.
+     */
+    const query = parsed && /(^|\s)subject:/i.test(parsed) ? parsed : null;
+
     if (!query) {
       // Nothing usable came back. The caller searches the writer's own words,
       // which is what it would have done anyway — never an error on a path

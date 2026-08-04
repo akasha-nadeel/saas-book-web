@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   buildEpub,
   chapterXhtml,
@@ -6,6 +6,7 @@ import {
   contentOpf,
   coverXhtml,
   navXhtml,
+  pageXhtml,
   tocNcx,
 } from "@/lib/export/epub";
 import type { PackagedImage } from "@/lib/export/epub-images";
@@ -366,4 +367,46 @@ it("writes mimetype as the first entry, uncompressed", async () => {
   const nameLength = bytes[26] | (bytes[27] << 8);
   expect(ascii(30, nameLength)).toBe("mimetype");
   expect(ascii(30 + nameLength, 20)).toBe("application/epub+zip");
+});
+
+describe("structural semantics", () => {
+  // A reading system cannot tell a copyright page from a chapter by looking at
+  // it. Without `epub:type` every generated page is an anonymous body of text
+  // that happens to come first.
+  it("names each generated front page in EPUB's own vocabulary", () => {
+    expect(pageXhtml("T", "<p/>", "en", "titlepage")).toContain(
+      'epub:type="titlepage"',
+    );
+    expect(pageXhtml("T", "<p/>", "en", "toc")).toContain('epub:type="toc"');
+  });
+
+  it("declares the epub namespace, or the attribute is not legal", () => {
+    expect(pageXhtml("T", "<p/>", "en", "titlepage")).toContain(
+      'xmlns:epub="http://www.idpf.org/2007/ops"',
+    );
+  });
+
+  it("adds no type when there is nothing true to say", () => {
+    expect(pageXhtml("T", "<p/>")).not.toContain("epub:type");
+  });
+
+  it("marks a chapter as body matter", () => {
+    const html = chapterXhtml("Chapter One", "<p>x</p>", 1);
+    expect(html).toContain('epub:type="bodymatter chapter"');
+    expect(html).toContain('xmlns:epub="http://www.idpf.org/2007/ops"');
+  });
+
+  // The summary is read by shops and by readers deciding whether a book is
+  // usable, so it may not claim something the book does not do. A novel is
+  // sequential; "any order of presentation" was simply untrue.
+  it("does not tell a reader a novel can be read in any order", () => {
+    // No images, so the text-only summary is the one written.
+    const opf = contentOpf(
+      { title: "T", author: "A" },
+      [{ id: "chapter-01", title: "One" }],
+      "urn:uuid:x",
+    );
+    expect(opf).not.toMatch(/any order of presentation/i);
+    expect(opf).toMatch(/sequential chapter navigation/i);
+  });
 });
