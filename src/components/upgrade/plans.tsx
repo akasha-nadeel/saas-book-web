@@ -150,23 +150,13 @@ export function Plans({
     {},
   );
 
-  /*
-   * What the big figure says, and what sits under it.
-   *
-   * The two cycles show a per-month rate with the real total underneath,
-   * because a reader compares plans by the month. Lifetime shows the whole
-   * price, because `perMonthOf` returns null for it on purpose — dividing a
-   * one-off purchase by an assumed number of months would invent a rate out of
-   * a guess about how long somebody keeps writing.
-   */
-  const rate = perMonthOf(period);
-  const headline = displayPrice(rate ?? priceOf(period));
+  // Both cycles show a per-month rate, because a reader compares plans by the
+  // month whatever they are billed on. The annual one names the real total.
+  const headline = displayPrice(perMonthOf(period));
   const note =
-    period === "lifetime"
-      ? "paid once, yours from then on"
-      : period === "annual"
-        ? `${displayPrice(priceOf("annual"))} billed annually`
-        : undefined;
+    period === "annual"
+      ? `${displayPrice(priceOf("annual"))} billed annually`
+      : undefined;
 
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
@@ -257,7 +247,6 @@ export function Plans({
             name="Pro"
             blurb="For the assistant, the money, the readers and the book read aloud."
             price={headline}
-            unit={period === "lifetime" ? null : "/month"}
             note={note}
             rows={ROWS.map((r) => ({ label: r.label, value: r.pro }))}
             action={
@@ -343,20 +332,9 @@ function PeriodToggle({
   period: Period;
   onChange: (next: Period) => void;
 }) {
-  /*
-   * Three, and the third is not a cycle.
-   *
-   * "Once" sits in a billing-period toggle because that is where a reader
-   * looks for it, and because this market buys software outright: Scrivener,
-   * Atticus, Vellum and Publisher Rocket are all one-time purchases, and a
-   * writer comparing us against those is being asked to accept a model the
-   * category has taught them to distrust. Putting the outright purchase beside
-   * the cycles answers that in the place the objection is formed.
-   */
   const options: { value: Period; label: string }[] = [
     { value: "monthly", label: "Monthly" },
     { value: "annual", label: "Annually" },
-    { value: "lifetime", label: "Once" },
   ];
 
   return (
@@ -415,7 +393,6 @@ function PlanCard({
   name,
   blurb,
   price,
-  unit = "/month",
   note,
   rows,
   action,
@@ -431,8 +408,6 @@ function PlanCard({
   name: string;
   blurb: string;
   price: string;
-  /** What follows the figure. Null on a price that is not per anything. */
-  unit?: string | null;
   /** Shown under the price when the cycle needs explaining. */
   note?: string;
   rows: { label: string; value: string }[];
@@ -479,12 +454,7 @@ function PlanCard({
           figure keeps the weight. */}
       <p className="mt-5 font-display text-5xl font-bold tracking-tight">
         {price}
-        {/* Absent on a one-off purchase rather than reading "/month" beside a
-            figure nobody pays monthly. The free card keeps it, because "$0 a
-            month" is what the comparison is being made against. */}
-        {unit !== null && (
-          <span className="ml-1.5 text-base font-medium text-muted">{unit}</span>
-        )}
+        <span className="ml-1.5 text-base font-medium text-muted">/month</span>
       </p>
       {/* Reserved whether or not it is filled, so the two cards' buttons stay on
           one line as the period switches. */}

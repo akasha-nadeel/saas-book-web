@@ -42,8 +42,24 @@ const GOOGLE_KEY = process.env.GOOGLE_BOOKS_API_KEY;
 /** How long an answer is worth keeping. Published books do not move quickly. */
 const CACHE_SECONDS = 60 * 60 * 24;
 
-/** Enough to summarise from, few enough to read. */
-const PER_SOURCE = 20;
+/**
+ * Enough to summarise from, few enough to read.
+ *
+ * **40 is Google's own ceiling**, not a preference: `maxResults` above it is a
+ * rejected request, so this is the most one call can return and asking for it
+ * costs nothing extra. In practice Google under-delivers — a live search for
+ * `subject:"Mystery"` returns 20 items against a claimed 300, and paging with
+ * `startIndex` runs dry around 200 — so the real yield is nearer 50–70 books
+ * once the two sources are merged and authorless records dropped.
+ *
+ * **Deeper is worse, which is why there is no pagination here.** Open Library
+ * alone would serve thousands, and results are ordered by relevance: at offset
+ * 400 a mystery search is returning 1971 children's series books. Every answer
+ * on these screens is a *count* — "17 of 34 are filed under Mystery" — so a
+ * larger, looser sample does not sharpen the figure, it drags it toward a fact
+ * about the whole genre. The covers wall has the same problem in pictures.
+ */
+const PER_SOURCE = 40;
 
 /**
  * One source, and its failure is its own.

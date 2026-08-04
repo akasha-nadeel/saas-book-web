@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
 import type { CompTitle } from "@/lib/comps/comps";
 import {
@@ -28,16 +28,15 @@ import {
  * writer presses the button; and the screen lists exactly what leaves before
  * they press it. Same shape as the assistant and the feedback dialog.
  *
- * Sonnet rather than the assistant's Opus. The assistant is reasoning about
- * somebody's prose in an open-ended conversation; this is a bounded
- * classification over twenty short records, which is what the cheaper model is
- * good at — and the cost of this feature is the whole reason it took this long
- * to build.
+ * The cheap tier of whichever family is configured, rather than the
+ * assistant's Opus. The assistant reasons about somebody's prose in an
+ * open-ended conversation; this is a bounded classification over twenty short
+ * records, which is what a small model is good at — and the cost of this
+ * feature is the whole reason it took so long to build. Which provider answers
+ * is `lib/ai.ts`'s business, not this route's.
  */
 
 export const maxDuration = 120;
-
-const MODEL = "claude-sonnet-5";
 
 const SYSTEM = `You judge which published books are genuinely comparable to a
 writer's unpublished one, for use in a query letter or a store listing.
@@ -74,11 +73,11 @@ interface Incoming {
 }
 
 export async function POST(request: Request) {
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!modelProvider()) {
     return Response.json(
       {
         error:
-          "No ANTHROPIC_API_KEY is set, so ranking is off. The search above works without it.",
+          "No model is configured, so ranking is off. The search above works without it.",
       },
       { status: 501 },
     );
@@ -122,8 +121,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const client = new Anthropic();
-
   const prompt = [
     blurb ? `The writer's blurb:\n\n${blurb}` : "The writer has no blurb yet.",
     opening
@@ -133,16 +130,9 @@ export async function POST(request: Request) {
   ].join("\n\n---\n\n");
 
   try {
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2000,
-      system: SYSTEM,
-      messages: [{ role: "user", content: prompt }],
-    });
-
-    const raw = message.content
-      .map((block) => (block.type === "text" ? block.text : ""))
-      .join("");
+    // Generous, because on some models the thinking counts against this and a
+    // budget that fits the answer still truncates it. See `Ask` in lib/ai.ts.
+    const raw = await askModel({ system: SYSTEM, prompt, maxTokens: 4000 });
 
     // Parsed here rather than in the browser so a malformed answer costs a
     // 502 rather than a broken list — and so the "never a book we did not
@@ -165,17 +155,9 @@ export async function POST(request: Request) {
       pattern: ranking.pattern,
     });
   } catch (err) {
-    if (err instanceof Anthropic.AuthenticationError) {
-      return Response.json(
-        { error: "That ANTHROPIC_API_KEY was rejected." },
-        { status: 401 },
-      );
-    }
-    if (err instanceof Anthropic.RateLimitError) {
-      return Response.json(
-        { error: "Rate limited. Try again in a moment." },
-        { status: 429 },
-      );
+    if (err instanceof ModelError) {
+      const status = err.kind === "auth" ? 401 : err.kind === "rate" ? 429 : 502;
+      return Response.json({ error: err.message }, { status });
     }
     console.error("[comps/rank] request failed", err);
     return Response.json(

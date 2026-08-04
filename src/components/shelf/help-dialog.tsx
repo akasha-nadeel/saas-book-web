@@ -118,6 +118,14 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Check the real file rather than the copy stored here, which is compressed to fit in your browser. Measured in your browser and never uploaded. Whether the cover is any good is the wall's job, not a number's.",
       },
       {
+        name: "Blurb",
+        desc: "The two hundred words that decide whether anybody opens the book. It writes nothing — writers in this research describe an AI-written blurb as the thing that hurt their sales — so instead it counts what you have written against the shops’ limits and shows five real blurbs from published books in your genre, with the length each runs to and the median across them. Only two things on the screen are rules: an empty blurb, and one over 4,000 characters, which shops refuse. Everything else is a measurement. The five come back in the catalogue’s own order, which is a keyword match — so a mystery search can return Crime and Punishment. Pro adds a second press that asks a model which of them are genuinely like your book and keeps those five with the reason each was chosen; the free five are unaffected.",
+      },
+      {
+        name: "Categories & keywords",
+        desc: "Which shelf your book lands on, read from where comparable books are actually filed rather than from a code list. Every suggestion says how many of those books carry it, because “9 of 20” and “2 of 20” are different kinds of advice. Two further parts are Pro, and both answer the shop’s form rather than the librarian’s: matching those subjects to the category paths a shop’s own selector uses (you pick three), and the seven keyword boxes of 50 characters each. The keyword half counts what you have typed and says what it is costing you — boxes over the limit, words your title already owns so the shop indexes them anyway, the same word spent in two boxes, and phrases shops reject like “bestseller” or “new”. There is no search volume and no ranking anywhere: Amazon publishes none, its data API closed in 2026, and the tools that quote a figure buy scraped data. Nothing here reads Amazon, so the category paths are candidates to confirm in the selector.",
+      },
+      {
         name: "Comp titles",
         desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key.",
       },
@@ -253,11 +261,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Plans",
-        desc: "Writing a book and getting it out are free, whole: unlimited books, every import, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly, yearly, or bought outright once. See Pricing in the header.",
+        desc: "Writing a book and getting it out are free, whole: unlimited books, every import, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly or yearly. See Pricing in the header.",
       },
       {
         name: "Paying",
-        desc: "Card details are entered on PayHere and never reach OpenChapter. Pro starts the moment PayHere confirms, usually a few seconds after you pay. Monthly and yearly renew on the same date each cycle until you cancel; the one-off purchase never renews and there is nothing to cancel, which is why no Cancel button appears on it.",
+        desc: "Card details are entered on PayHere and never reach OpenChapter. Pro starts the moment PayHere confirms, usually a few seconds after you pay, and renews on the same date each cycle until you cancel.",
       },
       {
         name: "Cancelling",

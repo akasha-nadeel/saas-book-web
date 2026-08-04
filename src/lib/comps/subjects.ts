@@ -176,3 +176,181 @@ export function worthSuggesting(
   const floor = Math.max(2, Math.round(bookCount * 0.15));
   return subjects.filter((s) => s.count >= floor);
 }
+
+/* -------------------------------------------------------------------------- */
+/* The subject index, for typing into                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One heading out of Open Library's subject index, with how many works carry it.
+ *
+ * Different from `SubjectCount` above, and the difference matters on screen:
+ * that one counts *the comparable books we fetched* ("17 of 56"), this one is
+ * how big the shelf is in the whole catalogue ("61,392 works"). Naming them
+ * apart keeps a component from printing one and captioning it as the other.
+ */
+export interface SubjectHeading {
+  name: string;
+  /** Works catalogued under it. Open Library's figure, not ours. */
+  works: number;
+}
+
+/**
+ * Read Open Library's `/search/subjects.json`.
+ *
+ * **Headings are shown whole, not split.** `subjectParts` exists to break a
+ * per-book subject list into usable pieces, because a *book* is filed under
+ * "Fiction, mystery & detective, general" alongside "Protected DAISY". These
+ * are the index's own headings — that compound string *is* the shelf's name,
+ * and a writer copying a category wants it as the catalogue writes it.
+ *
+ * The cleaning is still applied as a *filter*: a heading with nothing usable
+ * left after `subjectParts` is administrative noise, so it goes. That keeps
+ * one definition of what counts as a category rather than two.
+ *
+ * Only `subject_type: "subject"` survives. The index also carries people,
+ * places and periods — "Hercule Poirot" is a real heading and a useless
+ * category, and it is exactly the noise the categories screen already fights.
+ */
+export function parseSubjectIndex(payload: unknown): SubjectHeading[] {
+  const docs = (payload as { docs?: unknown })?.docs;
+  if (!Array.isArray(docs)) return [];
+
+  const out: SubjectHeading[] = [];
+  const seen = new Set<string>();
+
+  for (const row of docs) {
+    const r = row as Record<string, unknown>;
+    if (r?.subject_type !== "subject") continue;
+
+    const name = typeof r.name === "string" ? r.name.replace(/\s+/g, " ").trim() : "";
+    if (!name) continue;
+    if (subjectParts(name).length === 0) continue;
+
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const works = typeof r.work_count === "number" && Number.isFinite(r.work_count)
+      ? r.work_count
+      : 0;
+    out.push({ name, works });
+  }
+
+  // Commonest shelf first: a writer typing "myst" wants the mystery shelf
+  // before a heading three books are filed under.
+  return out.sort((a, b) => b.works - a.works);
+}
+
+/**
+ * Order headings by how well they answer what was typed, blended with size.
+ *
+ * **Two wrong answers sit either side of this, and both were built before the
+ * right one.** Sorting by size alone put "Fiction, thrillers, general" (38,368
+ * works) above "Thriller" (2,075) for `thri`, because the order knew nothing
+ * about the query. Sorting by match *first* and size second put **"Thrips"** —
+ * an insect, 118 works — above both, because it happens to begin with those
+ * four letters. A reader typing four letters wants neither the biggest shelf
+ * that merely contains them nor the most literal match in the catalogue.
+ *
+ * So the two are added rather than nested. Match quality is worth a fixed step
+ * per tier; size is worth its **logarithm**, so ten times the works is a
+ * bounded nudge rather than a landslide. A near-miss on an enormous shelf can
+ * outrank a literal hit on a tiny one — "Fiction, thrillers, general" above
+ * "Thrips" — while a literal hit on a decent shelf still beats a bigger
+ * near-miss, which is "Thriller" above both.
+ *
+ * The lowest tier is not empty and cannot be dropped: the index is stemmed, so
+ * a search for "cozy" legitimately returns headings matching on a stem rather
+ * than on any prefix of the string.
+ */
+export function rankHeadings(
+  headings: readonly SubjectHeading[],
+  query: string,
+): SubjectHeading[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [...headings];
+
+  /** Typed in full, so it was meant. Never outranked, whatever the sizes. */
+  const exact = (name: string) => name.toLowerCase() === q;
+
+  /** 1 begins with what was typed; 4 matched only through the stemmer. */
+  const tierOf = (name: string): number => {
+    const lower = name.toLowerCase();
+    if (lower === q) return 0;
+    if (lower.startsWith(q)) return 1;
+    // A word inside the heading: "Fiction, thrillers, general" for "thri".
+    if (lower.split(/[^\p{L}\p{N}]+/u).some((w) => w.startsWith(q))) return 2;
+    if (lower.includes(q)) return 3;
+    return 4;
+  };
+
+  /**
+   * What one tier is worth in size. At 1.5 a step is a shade over thirty times
+   * the works: enough that a literal hit beats a near-miss of ordinary size,
+   * not so much that it beats one of a different order of magnitude.
+   */
+  const TIER = 1.5;
+
+  const scoreOf = (h: SubjectHeading) =>
+    (4 - tierOf(h.name)) * TIER + Math.log10(Math.max(h.works, 1));
+
+  return [...headings].sort((a, b) => {
+    // The one thing the blend may not overturn. Somebody who typed the whole
+    // name wants that shelf, and a bigger neighbour is not a better answer to
+    // a question they have already finished asking.
+    if (exact(a.name) !== exact(b.name)) return exact(a.name) ? -1 : 1;
+    return scoreOf(b) - scoreOf(a);
+  });
+}
+
+
+/**
+ * Which of a set of headings answer what has been typed.
+ *
+ * **Word-prefix, not substring.** Typing "war" should offer "War stories" and
+ * "Civil war", not "Warehouse management" — well, it offers that too, since
+ * the word begins with it — but it must not offer "Steward". Matching anywhere
+ * inside a word is how an autocomplete starts returning things the reader
+ * cannot see the reason for, which reads as broken rather than generous.
+ *
+ * A multi-word query matches when the heading contains the earlier words
+ * somewhere and a word beginning with the last one, so "small tow" finds
+ * "Fiction, small town & rural" while the reader is still typing.
+ */
+export function matchHeadings(
+  headings: readonly SubjectHeading[],
+  query: string,
+): SubjectHeading[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+
+  const words = q.split(/\s+/).filter(Boolean);
+  const last = words[words.length - 1];
+  const earlier = words.slice(0, -1);
+
+  return headings.filter((h) => {
+    const lower = h.name.toLowerCase();
+    if (!earlier.every((w) => lower.includes(w))) return false;
+    return lower.split(/[^\p{L}\p{N}]+/u).some((w) => w.startsWith(last));
+  });
+}
+
+/**
+ * One list from two, without saying the same shelf twice.
+ *
+ * The local index and the live one overlap heavily by design — the local one
+ * was harvested from the live one — so a naive concatenation shows "Thriller"
+ * twice the moment the network answers. First writer wins, which is the local
+ * copy, and its count is the same figure anyway.
+ */
+export function mergeHeadings(
+  ...lists: readonly SubjectHeading[][]
+): SubjectHeading[] {
+  const by = new Map<string, SubjectHeading>();
+  for (const heading of lists.flat()) {
+    const key = heading.name.toLowerCase();
+    if (!by.has(key)) by.set(key, heading);
+  }
+  return [...by.values()];
+}

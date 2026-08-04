@@ -619,10 +619,24 @@ from them as *what is out there*, never as *the answer*.
       a *better search* — is not done. `buildQuery()` still builds the query
       out of keywords, and the model only sees what that fetched. Worth doing
       when the ranking's answers show the search is what is limiting them.
-- [ ] **Blurb benchmarking.** Google Books returns the real blurb of every
-      published book, so the blurb tool can show five actual blurbs from books
-      like yours and the average length, instead of giving advice. This is what
-      makes the blurb workshop teach rather than lecture.
+- [x] **Blurb benchmarking.** Done — the blurb screen has shown five real
+      blurbs and the median length since it shipped, which is what makes it
+      teach rather than lecture. This entry was simply never ticked.
+
+      **Ranked, as of 2026-08-04.** The five arrived in the catalogue's own
+      order, which is a keyword match: a search for a modern mystery handed
+      back *Crime and Punishment* — a real blurb, and no use as a model for
+      yours. A second press now sends the books that *have* blurbs through
+      `/api/comps/rank` and keeps the five judged closest, each with its
+      reason. Only books carrying a description are sent, because a pick with
+      no blurb is no use as an example here.
+
+      **The free five stay free**, which is why it is a second press rather
+      than part of the first: five real blurbs off the shelf is the feature,
+      having them sorted is the paid refinement. It judges against the draft in
+      the box, falling back to the opening chapter — which matters, since a
+      writer arrives here *because* they have no blurb, and judging on the
+      blurb alone would refuse exactly the person the screen is for.
 - [x] **Category suggestions without licensing BISAC.** Done 2026-08-01.
       `/book/[bookId]/categories`, backed by `src/lib/comps/subjects.ts` (pure,
       18 tests). Reads what comparable books are filed under and ranks it, so
@@ -650,9 +664,48 @@ from them as *what is out there*, never as *the answer*.
       `summarise()` in `comps.ts` now runs through the same ranking, so the
       comps screen stopped showing "Fiction" as its top subject too.
 
-      *Left:* these are what a *librarian* files a book under, not a shop's own
-      category list, and the screen says so. Matching them to KDP's own scheme
-      is still the writer's job.
+      *Left:* nothing. The two halves that were left are done — see below.
+- [x] **The shop's own categories, and the seven keyword boxes.** Done
+      2026-08-04. `src/lib/keywords.ts` (pure, 22 tests) and
+      `src/lib/comps/shelves.ts` (pure, 19 tests), a Pro route at
+      `/api/comps/categories`, and two sections on the categories screen.
+
+      **Amazon's data is not available and this does not pretend otherwise.**
+      Researched properly first: PA-API 5.0 was deprecated 30 April 2026 and
+      shut down 15 May, and stopped taking new customers before that. Its
+      replacement, the Creators API, needs an Associates account with **10
+      qualifying sales in the last 30 days** — a gate nobody can pass before
+      they have an affiliate business. Publisher Rocket has no special access
+      either: it buys scraped data from Traject Data. Scraping Amazon is
+      arguably legal in the US after *hiQ v. LinkedIn* but is explicitly
+      forbidden by Amazon's Conditions of Use, breaks constantly, and puts the
+      civil risk on us. So: **no search volume, no competition score, no rank,
+      anywhere.** Both modules have a test asserting the shape carries none,
+      and they are two of the tests not to "fix".
+
+      **What is buildable is the form itself.** Amazon dropped BISAC for its
+      own store tree in 2023; a writer now picks 3 categories from that tree
+      and fills 7 keyword fields of 50 characters. The seven are the half
+      nobody explains, and most are wasted: the shop already indexes the title,
+      subtitle, author and series, so a keyword repeating any of them buys
+      nothing. `keywordReport` counts that, plus fields over 50, the same word
+      spent in two boxes, and the phrases Amazon publishes a rule against.
+      Every finding names its box, because a writer looking at seven near
+      identical fields cannot act on "one of these repeats your title".
+
+      **The mapping is the second place a model earns its cost**, after the
+      comp ranking. Librarian subjects to shop categories is a translation no
+      table can do. Two rules hold it: **the counts are ours, re-attached after
+      parsing** — asked for a number a model produces a plausible one, and a
+      plausible count is indistinguishable from a real one — and **a path is
+      a candidate, not a fact**, because only the shop knows its own tree. The
+      screen says to confirm each in the selector. Nothing about the book is
+      sent: subject names and counts only.
+
+      **Free stays free.** The subject ranking is what a book needs to be filed
+      at all; matching to a shop and spending the seven boxes well is
+      optimising a listing, which is work for a book that is going out. Both
+      new sections are `ProGate`d.
 - [x] **A cover wall for the genre.** Done 2026-08-01. `/book/[bookId]/covers`.
       The writer's cover beside the shelf it has to sit on — the thing they
       would do themselves given a bookshop and an afternoon, which is all we can
@@ -1151,32 +1204,18 @@ should either ship or lose the card.
       books and imports are unlimited on both sides, which is what the code has
       always done. Every row on that page is true of the app again.
 
-- [x] **A new plan, and a lifetime tier.** Done 2026-08-03.
+- [x] **A new plan.** Done 2026-08-03.
       $9 monthly, $72 a year, **$199 once**. `plans.ts`, a migration widening
       the two `period` CHECK constraints, and gates moved to match.
 
-      **The lifetime tier exists because this market does not subscribe.**
-      Scrivener is $59.99 bought once, Atticus $147, Vellum $199–250,
-      Publisher Rocket $199 — all one-time. A writer comparing us against
-      those is being asked to accept a model the category has trained them to
-      distrust, and no amount of being cheaper answers that. The outright
-      purchase sits in the billing toggle beside the cycles, where the
-      objection is formed.
-
-      Four things about it are load-bearing, and each is a real failure if
-      missed. **PayHere is sent no `recurrence` and no `duration`** — those
-      two fields are the whole of what makes a charge repeat, so shipping them
-      against a $199 order would bill somebody $199 a month; `recurrenceOf`
-      returns null and the checkout spreads the keys in conditionally rather
-      than setting them empty, because an empty string is still a field.
-      **`periodEnd` returns null**, since a far-future sentinel would have
-      every screen tell a writer their outright purchase renews in 2999.
-      **`isPro` checks the period before the missing-date guard**, or every
-      writer who paid would be refused — that guard reads a null end as "the
-      first payment has not landed". And **`canCancel` is already false** for
-      it, because PayHere issues no subscription id for a one-off; do not
-      loosen that, since offering to cancel something bought outright is
-      offering to take it away for nothing.
+      **A lifetime tier was built and removed the same day.** Selling
+      outright is what this market mostly does — Scrivener, Atticus, Vellum
+      and Publisher Rocket are all one-time — but it trades recurring revenue
+      for a support obligation with no end date, and that is a business call
+      rather than a pricing one. The code is back to two cycles and the
+      migration that would have widened the `period` CHECK was deleted
+      unapplied, so no row can carry the value. `asPeriod` still refuses it,
+      which is the guard if one ever did.
 
       **The split is by what a row costs to run and who it is for.** Writing a
       book and getting it out stays free and whole — unlimited books, every

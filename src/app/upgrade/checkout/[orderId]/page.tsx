@@ -106,15 +106,11 @@ export default async function CheckoutPage(
         currency,
         amount,
         hash,
-        /* Spread rather than set, because for a lifetime purchase these two
-           must be *absent* and not empty. PayHere reads the presence of
-           `recurrence` and `duration` as "make this repeat" — an empty string
-           is still a field, and shipping one against a $199 order would set up
-           a $199 monthly authorisation. `recurrenceOf` returns null for
-           exactly this, so the object below has no such keys at all. */
-        ...(recurrenceOf(period) && durationOf(period)
-          ? { recurrence: recurrenceOf(period)!, duration: durationOf(period)! }
-          : {}),
+        /* The two fields that make PayHere repeat the charge. Every plan here
+           is a subscription, so both are always sent — leave either out and it
+           takes the money once and never renews. */
+        recurrence: recurrenceOf(period),
+        duration: durationOf(),
         custom_1: String(claims.sub),
         custom_2: period,
       }}

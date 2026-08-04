@@ -206,8 +206,8 @@ Each tool is the same three pieces, and the split is the convention:
   `roadmap.ts`, `paperback.ts`, `blurb.ts`, `beats.ts` (structure), `prose.ts`,
   `activity.ts` (progress), `provenance.ts`, `money.ts`, `ledger.ts` (track),
   `arc.ts`, `cover-check.ts` (covers), and `comps/` —
-  `comps.ts`, `length.ts`, `subjects.ts` (categories), `rank.ts`,
-  `title-check.ts`. Two more sit beside them without a tool screen of their
+  `comps.ts`, `length.ts`, `subjects.ts` and `shelves.ts` (categories),
+  `rank.ts`, `title-check.ts`, and `keywords.ts` beside them. Two more sit beside them without a tool screen of their
   own, because neither question belongs to one book: `series.ts` (the bible
   across a series, read in the editor's rail) and `curve.ts` (the book-three
   curve, drawn in the dashboard's Track area beside the strip that adds the
@@ -301,6 +301,28 @@ fences, bare arrays, duplicate ids and missing reasons each have a test. The
 clean parse is tried before any bracket scan, since scanning a bare array for
 `{` finds the first *element's* brace and silently parses one pick as the whole
 reply.
+
+**A third route answers the shop’s form rather than the librarian’s.**
+`/api/comps/categories` (POST, `requirePro()`, Sonnet) over the pure
+`src/lib/comps/shelves.ts` translates the librarian subjects `subjects.ts`
+ranks into the category paths a shop’s own selector uses — a translation no
+table can do, since Amazon dropped BISAC for its own tree in 2023. It sends
+**subject names and counts only**, never the book. Two rules hold it: the
+counts are *ours*, re-attached after parsing, because a model asked for a
+number produces a plausible one and a plausible count cannot be told from a
+real one; and a path is a **candidate**, not a fact, because only the shop
+knows its own tree — the screen says to confirm each in the selector.
+
+**No search volume, no competition score, no rank — anywhere in this
+cluster.** That is the figure a writer wants and it cannot be had honestly:
+Amazon’s Product Advertising API shut down in May 2026, its replacement needs
+ten affiliate sales a month, and the tools quoting a figure buy scraped data
+from a vendor. Scraping is forbidden by Amazon’s own terms and would put the
+risk on us. `keywords.ts` and `shelves.ts` each have a test asserting their
+shape carries no such number, and both are tests not to "fix". What is offered
+instead is `keywordReport()`: the seven backend keyword boxes counted — over
+the 50-character limit, words the title already owns so the shop indexes them
+anyway, the same word spent twice, and phrases shops publish a rule against.
 
 **This is the second route that sends prose**, after the assistant: the opening
 of the manuscript goes, because whether a book *sounds* like another is what a
@@ -631,32 +653,19 @@ the status codes) — all tested. `payhere.ts` holds the credentials and is
 server-only by naming: none of it carries a `NEXT_PUBLIC_` prefix, so an
 accidental client import reads empty strings and `isBillingConfigured()`
 answers false rather than leaking a secret. `server.ts` is `requirePro()`, the
-gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe` and
-`/api/comps/rank` — 401 when signed out, **402** when signed in and unpaid,
+gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe`,
+`/api/comps/rank` and `/api/comps/categories` — 401 when signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
 
-**There are three ways to buy and the third is not a cycle.** $9 monthly, $72 a
-year, $199 once. The lifetime tier is there because this market buys software
-outright — Scrivener, Atticus, Vellum and Publisher Rocket are all one-time
-purchases — so a subscription-only page argues with the reader before it
-describes anything. Four things about it are load-bearing and each is a real
-failure if missed:
-
-- **PayHere is sent no `recurrence` and no `duration`.** Those two fields are
-  the whole of what makes a charge repeat, so shipping them against a one-off
-  order bills $199 a month. `recurrenceOf`/`durationOf` return null for it and
-  the checkout spreads the keys in conditionally — an empty string is still
-  a field.
-- **`periodEnd` returns null for it.** A far-future sentinel was the easy wrong
-  answer: every screen rendering `currentPeriodEnd` would tell the writer their
-  outright purchase renews in 2999.
-- **`isPro` checks the period *before* the missing-date guard**, because that
-  guard reads a null end as "the first payment has not landed yet". Ordered the
-  other way round, every writer who paid is refused.
-- **`canCancel` is already false for it**, because PayHere issues no
-  subscription id for a one-off. Do not loosen that — offering to cancel
-  something bought outright is offering to take it away for nothing.
+**Two cycles, and both renew.** $9 monthly, $72 a year. A lifetime tier was
+built on 2026-08-03 and removed the same day — worth knowing only because the
+removal is a decision rather than an omission: selling outright is what this
+market mostly does, and it trades recurring revenue for a support obligation
+with no end date. If it ever returns, the expensive parts in code are that
+PayHere must be sent **no `recurrence` and no `duration`** or it bills the
+one-off price every month, that there is no period end to store, and that
+`isPro` has to answer without a date.
 
 **What is free is what a book needs to exist and leave.** Unlimited books and
 imports, all four exports, sync, the pre-upload check and the roadmap, comps
@@ -897,7 +906,8 @@ The fifteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
-`/api/comps` · `/api/comps/rank` · `/api/billing/*`. All of those except
+`/api/comps` · `/api/comps/rank` · `/api/comps/categories` ·
+`/api/billing/*`. All of those except
 `/api/comps` are metered and gated by `requirePro()`; `/api/comps` itself is
 free, keyless and stays that way — which is the whole reason the ranking is a
 route of its own rather than a flag on it.

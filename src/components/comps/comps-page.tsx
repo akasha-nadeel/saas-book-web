@@ -163,6 +163,20 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
    * Once, and never again: a writer who has edited the query does not want it
    * rewritten under them on a re-render.
    */
+  /**
+   * Which shelf the covers below are from, or null for a query of the writer's
+   * own words.
+   *
+   * Read off the query rather than off the book, because the shelf chips
+   * change the query and the book's genre never moves. `GENRES` is the closed
+   * list those chips are built from, so a match here means a chip is lit and
+   * the caption can name it with confidence.
+   */
+  const shownShelf = useMemo(
+    () => GENRES.find((g) => query === `subject:"${g}"`) ?? null,
+    [query],
+  );
+
   const seeded = useRef(false);
   useEffect(() => {
     if (!book || seeded.current) return;
@@ -284,10 +298,22 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
             one is only a search: nothing is written to the book, which is why
             these read as places to go rather than as a form to fill in. */}
         <div className="mt-3">
+          {/* What is *on screen*, not what the book says it is.
+              This read "Showing Mystery, from this book’s genre" while the
+              Fantasy shelf was open and its chip lit, because it was written
+              from `book.genre` and the genre never changes. A caption that
+              contradicts the covers under it is worse than no caption: the
+              reader has to work out which of the two is lying. */}
           <p className="text-xs text-muted">
-            {book.genre
-              ? `Showing ${book.genre}, from this book’s genre${book.publishing?.description ? " and blurb" : ""}. Look at another shelf:`
-              : "This book has no genre set. Pick a shelf to look at, or describe the story in your own words above."}
+            {shownShelf
+              ? `Showing ${shownShelf}${
+                  shownShelf === book.genre
+                    ? `, from this book’s genre${book.publishing?.description ? " and blurb" : ""}`
+                    : ""
+                }. Look at another shelf:`
+              : book.genre
+                ? `Searching your own words. Or look at a shelf:`
+                : "This book has no genre set. Pick a shelf to look at, or describe the story in your own words above."}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {GENRES.filter((g) => g !== "Other").map((genre) => {

@@ -6,7 +6,20 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { blurbReport } from "@/lib/blurb";
 import { buildQuery, type CompTitle } from "@/lib/comps/comps";
-import { findBook, setPublishing } from "@/lib/library-store";
+import {
+  openingFrom,
+  proseFrom,
+  type RankedComp,
+} from "@/lib/comps/rank";
+import { toBlocks } from "@/lib/export/blocks";
+import { ProGate } from "@/components/upgrade/pro-gate";
+import {
+  chapterMatterOf,
+  findBook,
+  getBody,
+  orderedChapters,
+  setPublishing,
+} from "@/lib/library-store";
 import { BLURB_MAX } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
@@ -18,6 +31,17 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * is a chatbot — after which they report that the AI-written blurb hurt their
  * sales. So this writes nothing. It counts, and it shows what published books
  * in the same genre did.
+ *
+ * **The examples can be ranked, and that is a second press.** What the
+ * catalogue returns first is a keyword match, so a search for a modern mystery
+ * hands back *Crime and Punishment* — a real blurb, and no use as a model for
+ * yours. Pressing again asks whether these books are actually like this one and
+ * keeps the five closest, with the reason each was chosen.
+ *
+ * **The free five stay free**, which is the point of it being a second press
+ * rather than part of the first. Five real blurbs off the shelf is the feature;
+ * having them sorted by a model is the paid refinement, the same shape the
+ * comps screen uses. A writer with no plan loses nothing they had.
  *
  * **Learning from examples rather than from advice** is the whole design. The
  * panel on the right is not a set of rules about blurbs; it is five real ones,
@@ -67,6 +91,41 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
     ? buildQuery({ genre: book.genre, blurb: book.publishing?.description })
     : "";
 
+  /**
+   * Everything the search returned that carries a blurb, not just the five
+   * shown. Kept because the ranking needs candidates to choose *from*, and
+   * re-fetching to rank would be a second trip for records already in hand.
+   */
+  const [pool, setPool] = useState<CompTitle[]>([]);
+  const [reasons, setReasons] = useState<Map<string, string>>(new Map());
+  const [ranking, setRanking] = useState(false);
+  const [rankError, setRankError] = useState<string | null>(null);
+
+  /**
+   * What the ranking judges against.
+   *
+   * The draft in the box first — it is the most direct statement of what this
+   * book is, and on this screen it is usually where the writer's attention
+   * already is. Falling back to the opening prose matters more than it looks:
+   * a writer arrives here *because* they have no blurb, so judging on the
+   * blurb alone would refuse exactly the person the feature is for.
+   */
+  const opening = useMemo(() => {
+    if (!book) return "";
+    for (const chapter of orderedChapters(book)) {
+      if (chapterMatterOf(chapter) !== "body") continue;
+      const raw = getBody(chapter.id);
+      if (!raw) continue;
+      try {
+        const text = openingFrom(proseFrom(toBlocks(JSON.parse(raw))));
+        if (text) return text;
+      } catch {
+        // A corrupt body contributes nothing, as it does to search.
+      }
+    }
+    return "";
+  }, [book]);
+
   async function loadExamples() {
     if (!book || !seedQuery.trim()) return;
     setState("loading");
@@ -82,12 +141,63 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
       const withBlurbs = (data.books as CompTitle[]).filter(
         (b) => b.description && b.description.length > 120,
       );
+      setPool(withBlurbs);
+      // A ranking belongs to the list it was made from; a new search invalidates it.
+      setReasons(new Map());
+      setRankError(null);
       setExamples(withBlurbs.slice(0, 5));
       setBenchmark(data.summary?.medianBlurbChars ?? undefined);
       setGoogleDown(data.sources?.google === false);
       setState("done");
     } catch {
       setState("error");
+    }
+  }
+
+  /**
+   * Ask which of these are really like this book, and keep those five.
+   *
+   * Only books that *have* a blurb are sent, which is both cheaper and the
+   * only honest thing to do here: a pick with no description is no use as an
+   * example, so offering it as one of the five would be a worse answer than
+   * the keyword order it replaced.
+   */
+  async function rankExamples() {
+    if (!book || pool.length === 0) return;
+    setRanking(true);
+    setRankError(null);
+    try {
+      const response = await fetch("/api/comps/rank", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blurb: draft || book.publishing?.description || "",
+          opening,
+          books: pool,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setRankError(data?.error ?? "That did not work.");
+        return;
+      }
+      const byKey = new Map(pool.map((b) => [b.key, b]));
+      const picked: RankedComp[] = (data.picks ?? []).flatMap(
+        (p: { key?: string; reason?: string }) => {
+          const found = p.key ? byKey.get(p.key) : undefined;
+          return found && p.reason ? [{ book: found, reason: p.reason }] : [];
+        },
+      );
+      if (picked.length === 0) {
+        setRankError("None of these came back as close enough to be worth copying.");
+        return;
+      }
+      setExamples(picked.map((p) => p.book));
+      setReasons(new Map(picked.map((p) => [p.book.key, p.reason])));
+    } catch {
+      setRankError("Could not reach it. Check your connection.");
+    } finally {
+      setRanking(false);
     }
   }
 
@@ -302,6 +412,48 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                   {state === "loading" ? "Looking…" : "Show me five"}
                 </button>
               )}
+
+              {/* The refinement, and only once there is something to refine.
+                  Separate from the button above so the free five stay free:
+                  what the catalogue returned is the feature, having it judged
+                  is the paid part. Same shape as the comps screen. */}
+              {state === "done" && pool.length > 0 && reasons.size === 0 && (
+                <div className="mt-3">
+                  <ProGate
+                    title="The five closest"
+                    what="Asks a model which of these books are genuinely like yours — same shelf, same register, same reader — and keeps those five with the reason each was chosen. A keyword search returns real blurbs from books that merely share a word."
+                  >
+                    <button
+                      type="button"
+                      onClick={rankExamples}
+                      disabled={ranking || (!draft.trim() && !opening)}
+                      className="w-full rounded-lg border border-line px-4 py-2.5 text-sm
+                                 font-semibold text-fg disabled:opacity-40"
+                    >
+                      {ranking ? "Reading…" : "Pick the five closest"}
+                    </button>
+                    <p className="mt-2 text-xs text-muted">
+                      {!draft.trim() && !opening
+                        ? "Needs something of yours to judge against — a draft above, or prose in your first chapter."
+                        : `Sends ${draft.trim() ? "your draft" : "the opening of your first chapter"} and these ${pool.length} titles, only on this press.`}
+                    </p>
+                  </ProGate>
+                </div>
+              )}
+
+              {reasons.size > 0 && (
+                <p className="mt-3 text-xs text-muted">
+                  The {reasons.size} judged closest of {pool.length}, best
+                  first. A judgement, not a measurement — worth disagreeing
+                  with.
+                </p>
+              )}
+
+              {rankError && (
+                <p className="mt-3 rounded-lg border border-line bg-panel p-3 text-sm text-fg">
+                  {rankError}
+                </p>
+              )}
             </div>
 
             {benchmark && (
@@ -348,6 +500,12 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                       ? ` · ${example.description.length} characters`
                       : ""}
                   </p>
+                  {reasons.get(example.key) && (
+                    <p className="mt-1.5 border-l-2 border-accent/40 pl-2 text-xs
+                                  leading-relaxed text-fg">
+                      {reasons.get(example.key)}
+                    </p>
+                  )}
                   <p className="mt-2 text-sm leading-relaxed text-muted">
                     {example.description}
                   </p>

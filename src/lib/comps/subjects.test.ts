@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { rankSubjects, subjectParts, worthSuggesting } from "./subjects";
+import { COMMON_SUBJECTS } from "./common-subjects";
+import { matchHeadings, mergeHeadings, parseSubjectIndex, rankHeadings, rankSubjects, subjectParts, worthSuggesting } from "./subjects";
 import type { CompTitle } from "./comps";
 
 const book = (subjects: string[], key = String(Math.random())): CompTitle => ({
@@ -150,5 +151,236 @@ describe("worthSuggesting", () => {
 
   it("never lets the bar fall below two", () => {
     expect(worthSuggesting([{ name: "Fantasy", count: 1 }], 2)).toEqual([]);
+  });
+});
+
+describe("parseSubjectIndex", () => {
+  const doc = (over: Record<string, unknown> = {}) => ({
+    key: "/subjects/x",
+    name: "Mystery",
+    subject_type: "subject",
+    work_count: 4679,
+    ...over,
+  });
+
+  it("reads the index's own headings", () => {
+    const found = parseSubjectIndex({ docs: [doc()] });
+    expect(found).toEqual([{ name: "Mystery", works: 4679 }]);
+  });
+
+  // Compound headings are shown whole here, unlike a per-book subject list:
+  // that string *is* the shelf's name, and a writer copying a category wants
+  // it as the catalogue writes it.
+  it("keeps a compound heading intact rather than splitting it", () => {
+    const found = parseSubjectIndex({
+      docs: [doc({ name: "Fiction, mystery & detective, general" })],
+    });
+    expect(found[0].name).toBe("Fiction, mystery & detective, general");
+  });
+
+  it("puts the biggest shelf first", () => {
+    const found = parseSubjectIndex({
+      docs: [doc({ name: "Small", work_count: 12 }), doc({ name: "Big", work_count: 900 })],
+    });
+    expect(found.map((s) => s.name)).toEqual(["Big", "Small"]);
+  });
+
+  // The index carries people, places and periods. "Hercule Poirot" is a real
+  // heading and a useless category — the same noise this screen already fights.
+  it("drops anything that is not a subject", () => {
+    const found = parseSubjectIndex({
+      docs: [doc(), doc({ name: "Hercule Poirot", subject_type: "person" })],
+    });
+    expect(found.map((s) => s.name)).toEqual(["Mystery"]);
+  });
+
+  it("drops administrative headings, by the same rule as everywhere else", () => {
+    const found = parseSubjectIndex({
+      docs: [doc(), doc({ name: "Protected DAISY" }), doc({ name: "In library" })],
+    });
+    expect(found.map((s) => s.name)).toEqual(["Mystery"]);
+  });
+
+  it("names each shelf once", () => {
+    const found = parseSubjectIndex({ docs: [doc(), doc({ name: "mystery" })] });
+    expect(found).toHaveLength(1);
+  });
+
+  it("survives a payload of the wrong shape", () => {
+    expect(parseSubjectIndex(null)).toEqual([]);
+    expect(parseSubjectIndex({})).toEqual([]);
+    expect(parseSubjectIndex({ docs: "nope" })).toEqual([]);
+    expect(parseSubjectIndex({ docs: [null, 1, {}] })).toEqual([]);
+  });
+
+  it("treats a missing work count as none rather than guessing", () => {
+    expect(parseSubjectIndex({ docs: [doc({ work_count: undefined })] })[0].works).toBe(0);
+  });
+});
+
+describe("rankHeadings", () => {
+  const h = (name: string, works: number) => ({ name, works });
+
+  // The one that prompted this: typing "thri" put "Fiction, thrillers,
+  // general" (38,368 works) on top and "Thriller" (2,075) fifth, because the
+  // sort knew nothing about the query. Four letters typed is a name, not a
+  // request for the biggest shelf containing them.
+  it("puts what was typed above whatever is biggest", () => {
+    const found = rankHeadings(
+      [
+        h("Fiction, thrillers, general", 38368),
+        h("Fiction, thrillers, suspense", 37640),
+        h("Thriller", 2075),
+        h("Thrillers", 866),
+      ],
+      "thri",
+    );
+    expect(found[0].name).toBe("Thriller");
+  });
+
+  // The other half of the same rule, and the reason size is not merely a
+  // tie-break: "Thrips" is an insect that happens to begin with those four
+  // letters, and it must not sit above the shelf 38,000 thrillers are on.
+  it("keeps a tiny literal match below a huge near-miss", () => {
+    const found = rankHeadings(
+      [h("Thrips", 118), h("Fiction, thrillers, general", 38368)],
+      "thri",
+    );
+    expect(found.map((s) => s.name)).toEqual([
+      "Fiction, thrillers, general",
+      "Thrips",
+    ]);
+  });
+
+  // Exact is the one thing size may not overturn: somebody who typed the whole
+  // name has finished asking, and a bigger neighbour is not a better answer.
+  it("puts an exact hit first however small the shelf", () => {
+    const found = rankHeadings([h("Thrillers", 90000), h("Thriller", 5)], "thriller");
+    expect(found[0].name).toBe("Thriller");
+  });
+
+  it("does not care about case", () => {
+    const found = rankHeadings([h("Fiction, romance", 900), h("ROMANCE", 5)], "romance");
+    expect(found[0].name).toBe("ROMANCE");
+  });
+
+  it("keeps the bigger shelf first inside one tier", () => {
+    const found = rankHeadings([h("Mystery fiction", 10), h("Mystery", 4000)], "myst");
+    expect(found.map((s) => s.name)).toEqual(["Mystery", "Mystery fiction"]);
+  });
+
+  // The index is stemmed, so a search for "cozy" legitimately returns headings
+  // that match on a stem rather than on any prefix. Those must still appear.
+  it("keeps a heading that matched on a stem rather than a prefix", () => {
+    const found = rankHeadings([h("Cosy crime", 40)], "cozy");
+    expect(found).toHaveLength(1);
+  });
+
+  it("falls back to size when nothing was typed", () => {
+    const found = rankHeadings([h("Small", 5), h("Big", 900)], "  ");
+    expect(found.map((s) => s.name)).toEqual(["Small", "Big"]);
+  });
+
+  it("does not modify the list it was given", () => {
+    const list = [h("A", 1), h("B", 2)];
+    rankHeadings(list, "b");
+    expect(list.map((s) => s.name)).toEqual(["A", "B"]);
+  });
+});
+
+const h2 = (name: string, works: number) => ({ name, works });
+
+describe("matchHeadings", () => {
+  const list = [
+    h2("War stories", 5000),
+    h2("Civil war", 4000),
+    h2("Warehouse management", 300),
+    h2("Steward", 100),
+    h2("Fiction, small town & rural", 630),
+  ];
+
+  it("matches a word beginning with what was typed, anywhere in the heading", () => {
+    expect(matchHeadings(list, "war").map((s) => s.name)).toEqual([
+      "War stories",
+      "Civil war",
+      "Warehouse management",
+    ]);
+  });
+
+  // The line between generous and broken: a reader typing "war" cannot see
+  // why "Steward" would be offered, so it reads as a bug rather than a help.
+  it("does not match inside a word", () => {
+    expect(matchHeadings(list, "war").map((s) => s.name)).not.toContain("Steward");
+  });
+
+  it("matches a phrase still being typed", () => {
+    expect(matchHeadings(list, "small tow").map((s) => s.name)).toEqual([
+      "Fiction, small town & rural",
+    ]);
+  });
+
+  it("answers a single letter, which is the whole reason it is local", () => {
+    // "Civil war" is in there because its second word begins with w. That is
+    // the rule working, not leaking: the reader can see why it was offered.
+    expect(matchHeadings(list, "w").map((s) => s.name)).toEqual([
+      "War stories",
+      "Civil war",
+      "Warehouse management",
+    ]);
+  });
+
+  it("is empty for an empty query", () => {
+    expect(matchHeadings(list, "  ")).toEqual([]);
+  });
+});
+
+describe("mergeHeadings", () => {
+  it("keeps the first of a repeated heading", () => {
+    const merged = mergeHeadings([h2("Thriller", 2075)], [h2("Thriller", 2075)]);
+    expect(merged).toHaveLength(1);
+  });
+
+  it("does not care about case when spotting a repeat", () => {
+    expect(mergeHeadings([h2("Thriller", 1)], [h2("THRILLER", 9)])).toHaveLength(1);
+  });
+
+  it("keeps the local order, then appends what is new", () => {
+    const merged = mergeHeadings([h2("A", 1)], [h2("B", 2), h2("A", 1)]);
+    expect(merged.map((s) => s.name)).toEqual(["A", "B"]);
+  });
+});
+
+describe("the shipped index", () => {
+  it("is real catalogue data, not a list somebody typed", () => {
+    // Every row carries a work count, which is the tell: an invented taxonomy
+    // has no counts because nobody counted anything.
+    expect(COMMON_SUBJECTS.length).toBeGreaterThan(500);
+    expect(COMMON_SUBJECTS.every((s) => s.works > 0)).toBe(true);
+    expect(COMMON_SUBJECTS.every((s) => s.name.trim() !== "")).toBe(true);
+  });
+
+  // The point of shipping it: a reader typing one character gets something,
+  // where the live index answers a single letter with an HTTP 500 or with
+  // middle initials. "x" is the honest exception — the catalogue has no book
+  // subjects beginning with it, and inventing one to fill the gap would be
+  // the invented vocabulary this whole screen refuses.
+  it("answers every letter of the alphabet except x", () => {
+    const missing = "abcdefghijklmnopqrstuvwyz"
+      .split("")
+      .filter((letter) => matchHeadings(COMMON_SUBJECTS, letter).length === 0);
+    expect(missing).toEqual([]);
+  });
+
+  it("holds the shelves this app's own genres name", () => {
+    for (const genre of ["mystery", "thriller", "romance", "fantasy", "horror"]) {
+      expect(matchHeadings(COMMON_SUBJECTS, genre).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("carries none of the noise the cleaning drops", () => {
+    const names = COMMON_SUBJECTS.map((s) => s.name.toLowerCase());
+    expect(names).not.toContain("fiction");
+    expect(names.some((n) => n.includes("protected daisy"))).toBe(false);
+    expect(names.some((n) => n.includes("accessible book"))).toBe(false);
   });
 });

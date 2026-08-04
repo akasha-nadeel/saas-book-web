@@ -11,27 +11,19 @@
  */
 
 /**
- * The three ways to buy, and the third one is not a cycle at all.
+ * The two ways to buy. Both are cycles: everything here renews until somebody
+ * cancels, and nothing in this file describes a one-off purchase.
  *
- * **`lifetime` is a one-off payment**, and it is here because of what this
- * market actually does: Scrivener is bought once, Atticus is bought once,
- * Vellum and Publisher Rocket are bought once. A writer looking at those and
- * then at a monthly bill is being asked to accept a model the whole category
- * has trained them to distrust. Offering the subscription *and* the outright
- * purchase is how this competes on its own terms rather than on price.
- *
- * It costs more in code than a third price, and the cost is worth naming
- * because every place that branches on `Period` has to know: PayHere is sent
- * **no recurrence and no duration** for it (those two fields are what make a
- * charge repeat), nothing ever renews it, `isPro` never checks a date against
- * it, and there is nothing to cancel. See each of those in turn.
+ * A lifetime tier was built and then removed, and the removal is worth a line
+ * because it is not a gap waiting to be filled. Selling a book tool outright is
+ * what this market mostly does, but it trades recurring revenue for a support
+ * obligation with no end date, which is a business decision rather than a
+ * pricing one. If it ever comes back, the things that made it expensive in code
+ * are: PayHere must be sent no `recurrence` and no `duration` or it bills the
+ * one-off price every month, there is no period end to store, and `isPro` has
+ * to answer without a date.
  */
-export type Period = "monthly" | "annual" | "lifetime";
-
-/** True for the one that does not come round again. */
-export function isOneOff(period: Period): boolean {
-  return period === "lifetime";
-}
+export type Period = "monthly" | "annual";
 
 /**
  * The currencies PayHere will take on a *recurring* payment. It settles more
@@ -49,34 +41,19 @@ export const CURRENCY: Currency =
   process.env.NEXT_PUBLIC_PAYHERE_CURRENCY === "LKR" ? "LKR" : "USD";
 
 /**
- * The prices. `total` is what PayHere charges; `perMonth` is what the card
- * shows, because a reader compares plans by the month whatever the cycle. The
- * annual rate is the monthly one less a third, and `total` is exactly twelve
- * times it, so the two figures cannot disagree.
- *
- * **Lifetime has no monthly figure**, and the null is load-bearing rather than
- * a gap: dividing a one-off purchase by an assumed number of months would be
- * inventing a rate out of a guess about how long somebody keeps writing, which
- * is the sort of number this product refuses everywhere else. The card prints
- * the whole figure and the word "once".
- *
- * The lifetime price is set against what this market charges for a single
- * purchase — Atticus at $147, Publisher Rocket at $199, Vellum at $199–250 —
- * rather than against a multiple of the subscription.
+ * The prices. `total` is what PayHere charges on each cycle; `perMonth` is what
+ * the card shows, because a reader compares plans by the month whatever the
+ * cycle. The annual rate is the monthly one less a third, and `total` is
+ * exactly twelve times it, so the two figures cannot disagree.
  */
-const PRICES: Record<
-  Currency,
-  Record<Period, { total: number; perMonth: number | null }>
-> = {
+const PRICES: Record<Currency, Record<Period, { total: number; perMonth: number }>> = {
   USD: {
     monthly: { total: 9.0, perMonth: 9.0 },
     annual: { total: 72.0, perMonth: 6.0 },
-    lifetime: { total: 199.0, perMonth: null },
   },
   LKR: {
     monthly: { total: 2900, perMonth: 2900 },
     annual: { total: 23400, perMonth: 1950 },
-    lifetime: { total: 64000, perMonth: null },
   },
 };
 
@@ -90,11 +67,7 @@ export function priceOf(period: Period, currency: Currency = CURRENCY): number {
   return PRICES[currency][period].total;
 }
 
-/** Null for lifetime, which has no per-month rate that is not invented. */
-export function perMonthOf(
-  period: Period,
-  currency: Currency = CURRENCY,
-): number | null {
+export function perMonthOf(period: Period, currency: Currency = CURRENCY): number {
   return PRICES[currency][period].perMonth;
 }
 
@@ -123,45 +96,33 @@ export function payhereAmount(amount: number): string {
 }
 
 /**
- * What PayHere calls the cycle, or null for the purchase that has none.
+ * What PayHere calls the cycle. A number and a unit, space-separated.
  *
- * **Null is what makes lifetime a one-off.** PayHere decides whether a payment
- * repeats from the presence of `recurrence` and `duration` on the checkout —
- * send them and it sets up an authorisation that charges again; leave them out
- * and it takes the money once. So a lifetime checkout that shipped these by
- * accident would bill somebody $199 a month, which is the worst mistake
- * available in this file and the reason the type is nullable rather than
- * defaulted.
+ * This and `durationOf` are the two fields that make a charge repeat at all —
+ * PayHere takes the money once if either is missing. Every checkout here is a
+ * subscription, so both are always sent.
  */
-export function recurrenceOf(period: Period): string | null {
-  if (period === "lifetime") return null;
+export function recurrenceOf(period: Period): string {
   return period === "annual" ? "1 Year" : "1 Month";
 }
 
 /**
  * How long the recurrence runs for. "Forever" means it keeps renewing until
  * somebody cancels, which is what a subscription is — a fixed duration would
- * silently stop charging and silently stop the plan. Null alongside a null
- * recurrence, for the same reason.
+ * silently stop charging and silently stop the plan.
  */
-export function durationOf(period: Period): string | null {
-  return period === "lifetime" ? null : "Forever";
+export function durationOf(): string {
+  return "Forever";
 }
 
 /** What the writer is buying, shown on PayHere's own page. */
 export function itemNameOf(period: Period): string {
-  const how =
-    period === "lifetime" ? "lifetime" : period === "annual" ? "annual" : "monthly";
-  return `OpenChapter Pro (${how})`;
+  return `OpenChapter Pro (${period === "annual" ? "annual" : "monthly"})`;
 }
 
 /** How the cycle reads in a sentence, on the checkout summary. */
 export function cycleLabel(period: Period): string {
-  return period === "lifetime"
-    ? "once"
-    : period === "annual"
-      ? "a year"
-      : "a month";
+  return period === "annual" ? "a year" : "a month";
 }
 
 /**
@@ -170,16 +131,8 @@ export function cycleLabel(period: Period): string {
  * Calendar arithmetic, not 30 days: a month added to the 31st lands on a month
  * that has no 31st, so the day is clamped rather than rolled into the next
  * month — which is also how PayHere's own cycle behaves.
- *
- * **Lifetime returns null**, because there is no such date, and a sentinel far
- * in the future would have been the easy wrong answer: every screen that
- * renders `currentPeriodEnd` would then tell a writer their plan "renews on 1
- * January 2999", which is a lie about something they paid for outright.
- * `isPro` reads the period rather than the date for that one.
  */
-export function periodEnd(from: Date, period: Period): Date | null {
-  if (period === "lifetime") return null;
-
+export function periodEnd(from: Date, period: Period): Date {
   const end = new Date(from.getTime());
   const day = end.getUTCDate();
 
@@ -198,7 +151,5 @@ export function periodEnd(from: Date, period: Period): Date | null {
 
 /** Narrows whatever came back off a URL or a database row. */
 export function asPeriod(value: unknown): Period | null {
-  return value === "monthly" || value === "annual" || value === "lifetime"
-    ? value
-    : null;
+  return value === "monthly" || value === "annual" ? value : null;
 }

@@ -88,24 +88,6 @@ export function isPro(
 ): boolean {
   if (!subscription) return false;
 
-  /*
-   * Bought outright, so there is no date to be past.
-   *
-   * This is checked before the null guard below and not after, which is the
-   * whole of the difference: a lifetime row legitimately has no
-   * `currentPeriodEnd` — `periodEnd()` returns null for it because inventing
-   * one would put a fictional renewal date on screen — and the guard below
-   * reads a missing date as "the first payment has not landed yet". Ordered
-   * the other way round, every writer who paid $199 would be refused.
-   *
-   * A chargeback still ends it: the webhook writes `cancelled` and stamps
-   * `cancelled_at`, and that is what this reads. Nothing else cancels a
-   * lifetime, because there is no authorisation to stop.
-   */
-  if (subscription.period === "lifetime") {
-    return subscription.status !== "cancelled";
-  }
-
   const end = subscription.currentPeriodEnd;
   // An active subscription with no end date recorded is one whose first
   // notification has not arrived. It is not yet paid for, so it is not yet Pro.

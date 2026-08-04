@@ -69,12 +69,7 @@ export async function GET(request: Request) {
     // credentials are a separate pair from the checkout ones and may well not
     // be set, in which case a button here could not do anything — so the dialog
     // shows how to cancel by hand instead of a control that fails when pressed.
-    //
-    // A **lifetime** purchase falls out of this correctly and by accident worth
-    // naming: PayHere issues no `subscription_id` for a one-off charge, so
-    // there is no authorisation to stop and the first clause is already false.
-    // Do not "fix" that by loosening it — offering to cancel something bought
-    // outright is offering to take it away for nothing.
+
     canCancel: Boolean(
       subscription?.payhereSubscriptionId &&
         subscription.status !== "cancelled" &&

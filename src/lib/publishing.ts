@@ -28,6 +28,16 @@ export interface PublishingMeta {
   rights?: string;
   /** Shelf categories and keywords — BISAC codes are welcome but not required. */
   subjects?: readonly string[];
+  /**
+   * The seven backend keyword fields a shop's listing form asks for, in order,
+   * with empty slots kept as empty strings so slot four stays slot four.
+   *
+   * Separate from `subjects` because they are a different thing in the same
+   * form: subjects are the shelf, these are extra text the shop indexes. See
+   * `lib/keywords.ts` — nothing here validates them, because a half-written
+   * keyword is a normal state to save in.
+   */
+  keywords?: readonly string[];
   /** ISO date, `YYYY-MM-DD`. Absent means unpublished. */
   published?: string;
   /** Series title, for the shops that group a shelf by it. */

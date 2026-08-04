@@ -104,8 +104,8 @@ export const TOOL_GROUPS: ToolGroup[] = [
       {
         path: "categories",
         icon: "tag",
-        name: "Categories",
-        what: "Which shelf you land on, worked out from where comparable books are filed.",
+        name: "Categories & keywords",
+        what: "Which shelf you land on, worked out from where comparable books are filed — and the seven keyword boxes a shop’s form asks for.",
       },
       {
         path: "covers",
