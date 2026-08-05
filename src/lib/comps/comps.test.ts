@@ -229,6 +229,64 @@ describe("mergeComps", () => {
     expect(book.coverUrl).toBe("https://c/1.jpg");
   });
 
+  /**
+   * The bug this pair was written for, and the reason the ISBN test above is
+   * not enough on its own: it passes fixtures that share a title, so it would
+   * still have passed with the ISBN never being consulted — which is exactly
+   * what `identity()` used to do.
+   *
+   * A catalogue routinely carries one edition with the subtitle and one
+   * without under the same ISBN. Left unmerged they reach a screen that keys
+   * its list on `isbn13`, and React is handed two children with one key.
+   */
+  it("matches on ISBN when the titles disagree about the subtitle", () => {
+    const merged = mergeComps(
+      [comp({ key: "978", isbn13: "978", title: "The Salt Ledger" })],
+      [comp({ key: "978", isbn13: "978", title: "The Salt Ledger: A Novel" })],
+    );
+    expect(merged).toHaveLength(1);
+  });
+
+  it("leaves no two records sharing an ISBN", () => {
+    const merged = mergeComps(
+      [
+        comp({ key: "978", isbn13: "978", title: "The Salt Ledger" }),
+        comp({ key: "978", isbn13: "978", title: "Salt Ledger, The" }),
+      ],
+      [comp({ key: "978", isbn13: "978", title: "The Salt Ledger: A Novel" })],
+    );
+    const isbns = merged.map((b) => b.isbn13);
+    expect(new Set(isbns).size).toBe(isbns.length);
+  });
+
+  /**
+   * A record can be reached by either name, so a third can bridge two that
+   * were already apart: an ISBN-less Open Library record joins the plain
+   * title, a second edition carries the ISBN *and* the subtitle, and only
+   * fusing the two slots gets one book out. A merge that kept whichever slot
+   * it found first would depend on which service answered first.
+   */
+  it("fuses two records a later one proves are the same book", () => {
+    const merged = mergeComps([
+      comp({ key: "a", isbn13: "978", title: "The Salt Ledger" }),
+      comp({ key: "b", title: "The Salt Ledger: A Novel", subjects: ["Rural"] }),
+      comp({ key: "c", isbn13: "978", title: "The Salt Ledger: A Novel" }),
+    ]);
+    expect(merged).toHaveLength(1);
+    // The survivor keeps the first result's identity, and the subjects the
+    // middle record was the only one carrying.
+    expect(merged[0].key).toBe("a");
+    expect(merged[0].subjects).toEqual(["Rural"]);
+  });
+
+  it("keeps two different books that share nothing", () => {
+    const merged = mergeComps([
+      comp({ key: "a", isbn13: "1", title: "One" }),
+      comp({ key: "b", isbn13: "2", title: "Two" }),
+    ]);
+    expect(merged).toHaveLength(2);
+  });
+
   it("drops records with no author — those are catalogue entries, not comps", () => {
     expect(mergeComps([comp({ authors: [] })])).toEqual([]);
   });

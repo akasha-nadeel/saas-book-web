@@ -247,19 +247,62 @@ export function parseOpenLibrary(payload: unknown): CompTitle[] {
 /* Merging                                                                     */
 /* -------------------------------------------------------------------------- */
 
-/** Title and first author, flattened enough that punctuation cannot split a pair. */
-function identity(book: CompTitle): string {
+/**
+ * The names one record answers to.
+ *
+ * **Two of them, not one, and that is the whole of this fix.** This module's
+ * own documentation has always said the merge matches "on ISBN where both have
+ * one and on title-plus-author where they do not" — and `identity()` returned
+ * only the second. So two records for one book whose titles differ by a
+ * subtitle ("The Salt Ledger" and "The Salt Ledger: A Novel") survived the
+ * merge under the same ISBN, and the screens that key a list on `isbn13` were
+ * handed two children with the same key.
+ *
+ * It looked correct because the ISBN half was never exercised: the test that
+ * claims to match on ISBN passes fixtures that share a title as well.
+ *
+ * Title and first author are flattened enough that punctuation cannot split a
+ * pair — "The Drowned Coast!" and "the drowned coast" are one book.
+ */
+function names(book: CompTitle): string[] {
   const author = (book.authors[0] ?? "").toLowerCase().replace(/[^a-z]/g, "");
   const title = book.title.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return `${title}|${author}`;
+  const out = [`ta:${title}|${author}`];
+  if (book.isbn13) out.unshift(`isbn:${book.isbn13}`);
+  return out;
+}
+
+function fuse(seen: CompTitle, book: CompTitle): CompTitle {
+  return {
+    ...seen,
+    description: seen.description ?? book.description,
+    pageCount: seen.pageCount ?? book.pageCount,
+    coverUrl: seen.coverUrl ?? book.coverUrl,
+    isbn13: seen.isbn13 ?? book.isbn13,
+    publisher: seen.publisher ?? book.publisher,
+    year: seen.year ?? book.year,
+    infoUrl: seen.infoUrl ?? book.infoUrl,
+    subjects: [...new Set([...seen.subjects, ...book.subjects])],
+  };
 }
 
 /**
  * One list from both services, with the same book appearing once.
  *
- * Matched on ISBN where both have one and on title-plus-author where they do
- * not — the second is the case that matters, because Open Library search
- * results often carry no ISBN at all.
+ * Matched on ISBN where both have one **and** on title-plus-author where they
+ * do not. Both halves are needed and neither subsumes the other: Open Library
+ * search results often carry no ISBN at all, so title-plus-author is the only
+ * thing that can join those — while two records that *do* both carry an ISBN
+ * frequently disagree about the title, because one of them has the subtitle on
+ * it and the other does not.
+ *
+ * Which means a record can be reached by either name, and a third record can
+ * turn out to bridge two that were already apart — Google's "Salt Ledger"
+ * under ISBN X, Open Library's "Salt Ledger: A Novel" under no ISBN, and then
+ * a second Google edition carrying ISBN X *and* the subtitle, which is the
+ * same book as both. So the map is from name to a *slot*, several names may
+ * point at one slot, and a book that lands on two slots fuses them. Anything
+ * less is a merge that depends on which service answered first.
  *
  * **Merged field by field rather than by preferring a source**, because neither
  * source is better: Google has the blurb and Open Library has the subjects and
@@ -271,30 +314,44 @@ function identity(book: CompTitle): string {
  * is a comparable title.
  */
 export function mergeComps(...lists: CompTitle[][]): CompTitle[] {
-  const byId = new Map<string, CompTitle>();
+  /** Slot per book. A fused-away slot becomes null and is dropped at the end. */
+  const slots: (CompTitle | null)[] = [];
+  const at = new Map<string, number>();
 
   for (const book of lists.flat()) {
     if (book.authors.length === 0) continue;
-    const id = identity(book);
-    const seen = byId.get(id);
-    if (!seen) {
-      byId.set(id, { ...book });
+
+    const keys = names(book);
+    /* Every slot this book can already be reached by. Usually none or one;
+       two means it has just proved that two slots are the same book. */
+    const hit = [...new Set(keys.map((k) => at.get(k)).filter((i) => i !== undefined))];
+
+    if (hit.length === 0) {
+      const index = slots.push({ ...book }) - 1;
+      for (const key of keys) at.set(key, index);
       continue;
     }
-    byId.set(id, {
-      ...seen,
-      description: seen.description ?? book.description,
-      pageCount: seen.pageCount ?? book.pageCount,
-      coverUrl: seen.coverUrl ?? book.coverUrl,
-      isbn13: seen.isbn13 ?? book.isbn13,
-      publisher: seen.publisher ?? book.publisher,
-      year: seen.year ?? book.year,
-      infoUrl: seen.infoUrl ?? book.infoUrl,
-      subjects: [...new Set([...seen.subjects, ...book.subjects])],
-    });
+
+    /* The lowest wins, so the record keeps the position — and therefore the
+       `key` — of the first search result that mentioned it. */
+    const [keep, ...rest] = hit.sort((a, b) => a - b);
+    let merged = slots[keep]!;
+    for (const other of rest) {
+      merged = fuse(merged, slots[other]!);
+      slots[other] = null;
+    }
+    slots[keep] = fuse(merged, book);
+
+    /* Repoint every name that led anywhere that has just been folded in,
+       including the incoming book's own. A stale index would leave a later
+       record merging into a hole. */
+    for (const [key, index] of at) {
+      if (rest.includes(index)) at.set(key, keep);
+    }
+    for (const key of keys) at.set(key, keep);
   }
 
-  return [...byId.values()];
+  return slots.filter((book): book is CompTitle => book !== null);
 }
 
 /* -------------------------------------------------------------------------- */
