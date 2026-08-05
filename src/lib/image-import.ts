@@ -19,8 +19,26 @@ export const MAX_BYTES = 900_000;
 
 export const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
 
+/**
+ * What to re-encode as, when a resize forces a re-encode at all.
+ *
+ * **WebP is right inside the manuscript and wrong on a cover.** An inline
+ * illustration is stored a dozen times over against a 5MB budget, and WebP is
+ * meaningfully smaller at the same quality; no shop has ever objected to one.
+ * A cover is different: it is the single image a shop's converter looks at
+ * first, and while WebP is a legal EPUB 3 core media type, KDP's pipeline is
+ * not a safe bet for it. One cover per book is not where bytes are won.
+ */
+export type Encoding = "webp" | "jpeg";
+
 export type ImportResult =
-  | { ok: true; src: string; bytes: number }
+  | {
+      ok: true;
+      src: string;
+      bytes: number;
+      /** The pixel size of the file the writer picked, before any resize. */
+      natural: { width: number; height: number };
+    }
   | { ok: false; error: string };
 
 /**
@@ -84,10 +102,11 @@ export const COVER_MAX_BYTES = 250_000;
 
 export async function importImage(
   file: File,
-  limits: { maxEdge?: number; maxBytes?: number } = {},
+  limits: { maxEdge?: number; maxBytes?: number; encode?: Encoding } = {},
 ): Promise<ImportResult> {
   const maxEdge = limits.maxEdge ?? MAX_EDGE;
   const maxBytes = limits.maxBytes ?? MAX_BYTES;
+  const encode = limits.encode ?? "webp";
 
   if (!file.type.startsWith("image/")) {
     return { ok: false, error: "That file isn’t an image." };
@@ -109,11 +128,19 @@ export async function importImage(
   if (!context) return { ok: false, error: "That image couldn’t be resized." };
   context.drawImage(img, 0, 0, size.width, size.height);
 
-  // WebP where it is available, JPEG otherwise. PNG is not offered: a
-  // photograph as PNG is several times larger for no visible gain, and this is
-  // a strict storage budget.
-  let src = canvas.toDataURL("image/webp", 0.82);
-  if (!src.startsWith("data:image/webp")) {
+  /*
+   * WebP where it is asked for and available, JPEG otherwise.
+   *
+   * PNG is never offered: a photograph as PNG is several times larger for no
+   * visible gain, and this is a strict storage budget. The fallback is not
+   * hypothetical — `toDataURL` returns a PNG data URL for a type the browser
+   * cannot encode, which is why the result is *checked* rather than trusted.
+   */
+  let src =
+    encode === "webp"
+      ? canvas.toDataURL("image/webp", 0.82)
+      : canvas.toDataURL("image/jpeg", 0.9);
+  if (encode === "webp" && !src.startsWith("data:image/webp")) {
     src = canvas.toDataURL("image/jpeg", 0.82);
   }
 
@@ -125,5 +152,74 @@ export async function importImage(
     };
   }
 
-  return { ok: true, src, bytes };
+  return {
+    ok: true,
+    src,
+    bytes,
+    natural: { width: img.naturalWidth, height: img.naturalHeight },
+  };
+}
+
+/**
+ * A picked file as a data URL, unchanged.
+ *
+ * For the cover's full-size copy, which goes into the EPUB: re-encoding
+ * artwork somebody has already exported at the size a shop asks for can only
+ * lose something, and the storage that holds it is measured in hundreds of
+ * megabytes rather than five. So the writer's own bytes are kept when the
+ * format is one an EPUB can carry, and only a format EPUB will not take —
+ * WebP has patchy converter support, and anything exotic — is re-encoded.
+ *
+ * Reads the pixel size too, because the caller needs it and has the image
+ * decoded anyway.
+ */
+export async function originalImage(
+  file: File,
+  maxEdge: number,
+): Promise<
+  { src: string; width: number; height: number } | null
+> {
+  let img: HTMLImageElement;
+  try {
+    img = await loadImage(file);
+  } catch {
+    return null;
+  }
+
+  const keepAsIs =
+    (file.type === "image/jpeg" || file.type === "image/png") &&
+    Math.max(img.naturalWidth, img.naturalHeight) <= maxEdge;
+
+  if (keepAsIs) {
+    const src = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve(typeof reader.result === "string" ? reader.result : null);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+    if (src) {
+      return { src, width: img.naturalWidth, height: img.naturalHeight };
+    }
+  }
+
+  // Anything else: down to the ceiling if it is over it, and out as JPEG.
+  const size = targetSize(img.naturalWidth, img.naturalHeight, maxEdge);
+  const canvas = document.createElement("canvas");
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  // A transparent PNG re-encoded to JPEG goes black where it was clear, which
+  // on a cover is the whole background. White is what paper is.
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, size.width, size.height);
+  context.drawImage(img, 0, 0, size.width, size.height);
+
+  return {
+    src: canvas.toDataURL("image/jpeg", 0.92),
+    width: size.width,
+    height: size.height,
+  };
 }

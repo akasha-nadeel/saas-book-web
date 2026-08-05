@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { ListingDetails } from "@/components/export/publishing-card";
-import { findBook } from "@/lib/library-store";
+import { ToolSaveBar } from "@/components/ui/tool-save";
+import { findBook, setPublishing } from "@/lib/library-store";
+import { tidyPublishing, type PublishingMeta } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -31,6 +35,39 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
 
+  /*
+   * Held on screen until Save, rather than written field by field on blur.
+   *
+   * Inside the export wizard those blur-commits are fine: the fields sit above
+   * a Continue button, which is the closure. Here there is no next step, so
+   * the screen used to end on a sentence promising it had saved and nothing
+   * else — and a form that only *claims* to have worked is the thing a writer
+   * checks by leaving and coming back.
+   *
+   * Two of the road's steps read straight off these fields ("Sort out an
+   * ISBN", "Decide the name on the cover"), and both are detected rather than
+   * stored, so pressing Save is what ticks them.
+   */
+  const stored = book?.publishing;
+  /* `null` while the store has not been read, which an empty object cannot
+     say — and saying it with a `seeded` ref meant reading that ref during
+     render to work out whether the form had been touched. */
+  const [draft, setDraft] = useState<PublishingMeta | null>(null);
+  /* Untouched, so the form shows the book. No effect copies it in — that
+     would be a second render for something the first one already knew. */
+  const fields = draft ?? stored ?? {};
+
+  const save = useToolSave({
+    book,
+    tool: "listing",
+    /* Through `tidyPublishing` rather than a plain stringify: a box the writer
+       cleared is `""` here and *absent* once stored, so the raw comparison
+       would leave the form permanently unsaved. See that function. */
+    dirty: draft !== null && tidyPublishing(draft) !== tidyPublishing(stored),
+    commit: () => book && setPublishing(book.id, fields),
+    discard: () => setDraft(null),
+  });
+
   // The app's splash is for the app; an embedded tool waits silently.
   if (!hydrated)
     return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
@@ -45,6 +82,8 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
 
   return (
     <div className={toolShell(embedded)}>
+      {/* At the foot of the window, and only once a field has been changed. */}
+      <ToolSaveBar state={save} />
       {/* The trail keeps the trade words, the heading asks the writer's own
           question — the split comps, the title check, the blurb and the
           categories screens all make. */}
@@ -67,21 +106,25 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
             5xl the tool pages default to would run a two-column layout of
             short fields across most of a laptop with nothing holding them
             together. */}
-        <ListingDetails book={book} />
+        <ListingDetails
+          book={book}
+          meta={fields}
+          onChange={(patch) =>
+            setDraft((current) => ({ ...(current ?? stored ?? {}), ...patch }))
+          }
+        />
 
-        {/* **Says that it saved, because nothing else does.**
+        {/* **Says where the answers go, since the Save button now says when.**
 
-            Inside the export flow these fields sat above a "Continue" button,
-            which was the closure: you pressed it and moved on. On a screen of
-            their own there is no next step, so a writer filled six boxes and
-            got no acknowledgement of any kind — and the honest reading of a
-            form that says nothing is that it did nothing.
-
-            Placed under the fields rather than beside each one: the commit is
-            per field and on blur, but the reassurance is about the screen. */}
+            This used to promise "saved as you go", which was the whole of the
+            acknowledgement on a screen with no next step — a claim a writer
+            can only check by leaving and coming back. The button at the top
+            right answers that question directly, so what is left here is the
+            part it cannot say: these are facts about the book, they travel
+            into every export, and none of it leaves the machine. */}
         <p className="mt-5 text-xs text-muted">
-          Saved as you go, and carried into every export. Nothing here is sent
-          anywhere until you upload the file yourself.
+          Carried into every export. Nothing here is sent anywhere until you
+          upload the file yourself.
         </p>
       </div>
     </div>

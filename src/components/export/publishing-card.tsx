@@ -51,8 +51,33 @@ const LANGUAGES: [code: string, label: string][] = [
   ["ko", "Korean"],
 ];
 
-export function ListingDetails({ book }: { book: Book }) {
-  const meta = book.publishing;
+/**
+ * The form, over either the book or a draft of it.
+ *
+ * It wrote straight through to the store for its whole life, which is right
+ * inside the export wizard — the fields sit above a Continue button, so the
+ * commit and the closure are the same gesture. On the listing *tool* they are
+ * not: there is no next step, so six boxes were filled and nothing on the page
+ * said whether any of it landed.
+ *
+ * So the values and the sink are both optional. Pass neither and it behaves
+ * exactly as it did (the wizard); pass a draft and a setter and the screen
+ * owns the commit (the tool, whose Save button writes the lot). Two callers,
+ * one form — the point of extracting it in the first place.
+ */
+export function ListingDetails({
+  book,
+  meta = book.publishing,
+  onChange,
+}: {
+  book: Book;
+  /** What the fields show. Defaults to what is stored on the book. */
+  meta?: PublishingMeta | undefined;
+  /** Where a committed field goes. Defaults to straight to the book. */
+  onChange?: (patch: Partial<PublishingMeta>) => void;
+}) {
+  const write =
+    onChange ?? ((patch: Partial<PublishingMeta>) => setPublishing(book.id, patch));
 
   return (
     <div className="space-y-4">
@@ -62,7 +87,7 @@ export function ListingDetails({ book }: { book: Book }) {
           hint="13 digits. Amazon assigns its own; Apple and Kobo want yours."
           value={meta?.isbn ?? ""}
           placeholder="978-0-306-40615-7"
-          onCommit={(isbn) => setPublishing(book.id, { isbn })}
+          onCommit={(isbn) => write({ isbn })}
           // Checked as you leave the field rather than at the end, because a
           // mistyped digit is invisible to read back.
           validate={(v) =>
@@ -78,7 +103,7 @@ export function ListingDetails({ book }: { book: Book }) {
           </span>
           <select
             value={meta?.language ?? DEFAULT_LANGUAGE}
-            onChange={(e) => setPublishing(book.id, { language: e.target.value })}
+            onChange={(e) => write({ language: e.target.value })}
             className="mt-1.5 w-full rounded-md border border-line bg-panel px-3
                        py-2.5 font-sans text-sm text-fg outline-none
                        focus-visible:border-accent focus-visible:ring-2
@@ -100,7 +125,7 @@ export function ListingDetails({ book }: { book: Book }) {
           hint="Your own name is the usual answer when self-publishing."
           value={meta?.publisher ?? ""}
           placeholder={book.author ?? "Your imprint"}
-          onCommit={(publisher) => setPublishing(book.id, { publisher })}
+          onCommit={(publisher) => write({ publisher })}
         />
 
         <Field
@@ -108,7 +133,7 @@ export function ListingDetails({ book }: { book: Book }) {
           hint="Leave empty until it has one."
           type="date"
           value={meta?.published ?? ""}
-          onCommit={(published) => setPublishing(book.id, { published })}
+          onCommit={(published) => write({ published })}
         />
 
         <Field
@@ -116,7 +141,7 @@ export function ListingDetails({ book }: { book: Book }) {
           hint="The shelf this book belongs to, if any."
           value={meta?.series ?? ""}
           placeholder="The Salt Cycle"
-          onCommit={(series) => setPublishing(book.id, { series })}
+          onCommit={(series) => write({ series })}
         />
 
         <Field
@@ -127,7 +152,7 @@ export function ListingDetails({ book }: { book: Book }) {
           placeholder="2"
           onCommit={(raw) => {
             const n = Number(raw);
-            setPublishing(book.id, {
+            write({
               seriesIndex:
                 raw.trim() && Number.isFinite(n) && n > 0 ? Math.round(n) : undefined,
             });

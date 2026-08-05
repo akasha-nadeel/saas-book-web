@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { ToolSaveBar } from "@/components/ui/tool-save";
 import { blurbReport } from "@/lib/blurb";
 import { findBook, setPublishing } from "@/lib/library-store";
 import { BLURB_MAX } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -52,21 +54,40 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
 
-  const [draft, setDraft] = useState("");
-
-  // Fill the box once, from what is stored. After that it is the writer's, and
-  // rewriting it under them on a re-render would eat an edit.
-  const seeded = useRef(false);
-  useEffect(() => {
-    if (!book || seeded.current) return;
-    seeded.current = true;
-    setDraft(book.publishing?.description ?? "");
-  }, [book]);
+  /*
+   * `null` means "the writer has not typed", which is not the same as an
+   * empty blurb — and the box falls back to what is on the book.
+   *
+   * This used to be an empty string copied out of the store by an effect,
+   * behind a `seeded` ref that said whether the copy had happened. Two things
+   * were wrong with that and one of them is a real bug: the ref had to be read
+   * *during render* to work out whether the box differed from the book, and an
+   * effect that seeds state is a second render for something the first one
+   * already knew. Falling back needs neither. There is no effect on this
+   * screen at all now.
+   */
+  const stored = book?.publishing?.description ?? "";
+  const [draft, setDraft] = useState<string | null>(null);
+  const text = draft ?? stored;
 
   const report = useMemo(
-    () => blurbReport(draft, { title: book?.title }),
-    [draft, book?.title],
+    () => blurbReport(text, { title: book?.title }),
+    [text, book?.title],
   );
+
+  /* Saved on a press now, not on blur.
+     "Saved when you click away" was true and nobody believed it — this is the
+     one screen where a writer redrafts the same two hundred words a dozen
+     times, and a save they cannot see is a save they assume did not happen.
+     The step it ticks is "Write the blurb", which is detected rather than
+     stored: it ticks because the description is now on the book. */
+  const save = useToolSave({
+    book,
+    tool: "blurb",
+    dirty: draft !== null && draft !== stored,
+    commit: () => book && setPublishing(book.id, { description: text }),
+    discard: () => setDraft(null),
+  });
 
   // The app's splash is for the app. In the roadmap's panel it would take
   // over half the window with a logo, so an embedded tool waits silently —
@@ -91,6 +112,10 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
 
   return (
     <div className={toolShell(embedded)}>
+      {/* At the foot of the window, and only once there is something to lose.
+          Outside the scrolling column on purpose: this screen scrolls, and a
+          control that scrolls away is not there at the moment it matters. */}
+      <ToolSaveBar state={save} />
       {/* The trail keeps the trade word, the heading asks the writer's own
           question — the split comps and the title check already make. "Blurb"
           is what this is called in the launcher and on a shop's own form, so it
@@ -136,7 +161,11 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
         {/* `ToolHeader` is suppressed in the roadmap's panel and it was the
             only place this screen said what it will and will not do — so the
             panel opened on a title and an empty box, which is the one thing a
-            writer stuck on a blurb does not need more of. */}
+            writer stuck on a blurb does not need more of.
+
+            The Save control rides with it, because `embedded` may hide the
+            *frame* and may never hide a feature — a panel whose draft cannot
+            be saved is the lesser product `tool-page.ts` warns about. */}
         {embedded && (
           <p className="-mt-2 mb-5 max-w-2xl text-sm text-muted">
             The two hundred words that decide whether anybody opens the book.
@@ -163,11 +192,14 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                 a character count that does its job after the fact. */}
             <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/50">
               <textarea
-                value={draft}
+                value={text}
                 onChange={(e) => setDraft(e.target.value)}
-                // Saved on blur rather than on every keystroke: the shelf is one
-                // document and a write per character is a write per character.
-                onBlur={() => setPublishing(book.id, { description: draft })}
+                /* No `onBlur` commit. The shelf is one document and a write
+                   per character is a write per character, but a write per
+                   *click away* was the other extreme: a writer who tabbed to
+                   the counter had saved, and one who redrafted for ten
+                   minutes without leaving the box had not, and the screen
+                   read the same either way. Save is a press now. */
                 /* Six in the panel, twelve on the page — the old flat six was
                    the panel's answer applied to both.
 
@@ -218,7 +250,9 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                     {report.stats.paragraphs === 1 ? "" : "s"}
                   </span>
                 </span>
-                <span className="text-muted">Saved when you click away</span>
+                <span className={save.dirty ? "text-note-fg" : "text-muted"}>
+                  {save.dirty ? "Not saved yet" : "Saved"}
+                </span>
               </div>
             </div>
 

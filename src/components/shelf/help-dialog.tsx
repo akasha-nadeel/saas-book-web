@@ -41,7 +41,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Covers",
-        desc: "Add your own cover art, or edit the title, subtitle, and author printed on a typeset cover.",
+        desc: "Add your own cover art, or edit the title, subtitle, and author printed on a typeset cover. Your artwork is kept at full size for your exports — upload it at 1600×2560 and that is exactly what goes into your EPUB — while a small copy is what the shelf draws. The full-size copy stays on this machine and is not synced, so if you sign in on another computer, upload the artwork again there before exporting.",
       },
     ],
   },
@@ -70,7 +70,19 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Front & back matter",
-        desc: "The book panel holds a card for each of a book’s three parts, in the order they are bound, each in its own colour — and the page you write on takes the colour of the part it belongs to. Front matter opens a page templated with a book’s opening sections (half-title, title page, copyright, dedication, epigraph, contents, preface, prologue); Back matter opens one with its closing sections (epilogue, acknowledgements, about the author, about the book, other books). Write under the sections you want, delete the rest. These pages are named, never numbered.",
+        desc: "The book panel holds a card for each of a book’s three parts, in the order they are bound, each in its own colour — and the page you write on takes the colour of the part it belongs to. All three open into a list. Press Start on Front matter and you get a page for each of a book’s opening sections — half-title, title page, copyright, dedication, epigraph, contents, preface, prologue — and on Back matter one for each of its closing ones: epilogue, afterword, acknowledgements, about the author, also by the author, a word about reviews, an excerpt from the next book, glossary. Click a page to write on it, Add page for one more, ⋯ to rename or delete. These pages are named, never numbered.",
+      },
+      {
+        name: "Choosing your pages",
+        desc: "The first time you open a book you are asked which of those pages it needs, with a line explaining each one — tick them and they appear in the two cards. Skip for now if you would rather not decide yet; you are only asked once per book, and Start on either card still makes the whole set whenever you want it.",
+      },
+      {
+        name: "Which of those pages you actually need",
+        desc: "None of them. No shop requires a dedication, an epigraph or an acknowledgements page — what they want is a cover, a title page, working navigation, honest details and a book you own. Your export already builds a title page, a copyright page and a contents list, so you only need those pages if you would rather write your own. Add the ones your book really has and leave the rest: an empty epigraph or an invented “also by the author” list makes a book look less finished, not more.",
+      },
+      {
+        name: "Why a page says Draft",
+        desc: "Each front- and back-matter page arrives with the shape of the real thing and your own details left in [square brackets] — “For [name].” for a dedication. While any brackets are left on a page, or the page is blank, it is marked Draft and is left out of your exports, so a half-filled template can never end up inside your finished book. Fill it in and it joins the book; delete the pages you do not want. The export screen names every page it is leaving out before you press the button.",
       },
       {
         name: "Import into a book",
@@ -115,7 +127,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
         name: "Cover checker",
-        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Check the real file rather than the copy stored here, which is compressed to fit in your browser. Measured in your browser and never uploaded. Whether the cover is any good is the wall's job, not a number's.",
+        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Checks the file you drop in, which is also the one your exports use. Measured in your browser and never uploaded. Whether the cover is any good is the wall's job, not a number's.",
       },
       {
         name: "Blurb",
@@ -220,8 +232,16 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     ],
   },
   {
-    title: "Exporting",
+    title: "The publishing tools",
     items: [
+      {
+        name: "Saving your work",
+        desc: "A tool that holds something you typed — the blurb, the categories and keywords, the listing details, a new advance reader — keeps it on screen until you press Save. A bar appears at the foot of the window the moment you change anything and stays there until you do, with Discard beside it to put the form back. Try leaving with it up and you are asked first.",
+      },
+      {
+        name: "Ticking the roadmap from the tool",
+        desc: "Saving also ticks the roadmap step the tool finishes, so you do not have to go to the road and say you did it. Most steps work themselves out from the book — write the blurb and “Write the blurb” ticks itself — and the few nothing can detect, like getting a cover made or settling on a title, have a “Mark step done” button at the top of the screen where the work happens.",
+      },
       {
         name: "Formats",
         desc: "Export to Markdown, Word (.docx), or EPUB, or print to PDF.",
@@ -236,7 +256,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Generated front matter",
-        desc: "For EPUB and PDF, switch on a title page, a copyright page, and a contents list — built from your book and placed at the front.",
+        desc: "For EPUB and PDF, a title page, a copyright page and a contents list are built from your book and placed at the front — all three on unless you switch them off. The copyright page needs an author’s name and is left out when the book has none, rather than naming the wrong rights holder.",
       },
       {
         name: "Store listing",

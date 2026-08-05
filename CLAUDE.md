@@ -77,7 +77,9 @@ fine; awaiting `params` is not optional.
 ## Architecture
 
 **Persistence is one module.** `src/lib/library-store.ts` is the *only* file that
-touches `localStorage`; everything else goes through it. That boundary is what
+touches `localStorage`; everything else goes through it. (There is one *other*
+storage backend, `cover-store.ts` on IndexedDB, and it is scoped so tightly it
+does not weaken this rule — see the cover note below.) That boundary is what
 let Supabase arrive *behind* the store (`sync.ts`) without any of the sixty-odd
 files that read it changing a line — and it is what any future storage change
 will need again. Keep it intact: a screen reaching for `localStorage` directly
@@ -166,6 +168,30 @@ book has reached prepare/launch/publish. Keeping all of it off the dashboard
 was the earlier answer, and it was right about chapter three and wrong as a
 blanket ban — a writer standing in Prepare came here to be told. The fix was
 the trigger, not the rule.
+
+**A roadmap tick is local-only, and `keepLocalOnly` is why it survives.**
+`roadmapDone` has no column and no mapping in `sync.ts`, and `applyRemote`
+writes the downloaded shelf straight over the local one — so every hand-ticked
+step came back absent on the next load. Thirteen of the nineteen steps are
+ticked by hand, so that was most of the road, silently, for anyone signed in.
+The download is merged rather than replaced now: the server wins on every field
+it has an answer for, and a field it cannot store survives. Any future
+local-only field is covered by the same merge. The cost is that ticks stay on
+the machine that made them, like the tool stores.
+
+**The marker on a step is a control, and for a while it did not look like
+one.** An unticked one was drawn in `line` — the same hairline as the rail
+behind it — holding a `text-transparent` tick, so it was pixel-identical to the
+non-interactive marker on a step that ticks itself. Now an unticked
+*hand-tickable* marker carries a faint tick and a `muted` border, and the
+*next* step also carries the words **Already done** on the row, matching the
+dashboard's card. An unticked **automatic** marker stays empty, which is the
+half that matters: the first attempt filled it grey with a faint tick to say
+"not yours to press", and a filled circle with a tick in it is what *done*
+looks like — "Write the blurb · ticks itself" read as finished on a book with
+no blurb. A marker with no affordance merely fails to invite; one that reads as
+ticked states something untrue about the book. One control per action: the row button
+is `aria-hidden` because the marker beside it already announces the same toggle.
 
 Under the findings sit the five phase dials and the roadmap's next step, in
 that order: the findings are what is wrong with the *book*, the step is where
@@ -260,6 +286,58 @@ which a writer only reading the road should never download. Anything absent
 the reading view measures its own column, so in a panel it would faithfully
 typeset the book at half the width somebody wanted to read it at. `panelToolFor`
 returning null is how the roadmap knows to draw an ordinary link.
+
+**A tool that holds something the writer typed saves it on a press, and the
+press ticks the road behind it.** Three modules and two controls:
+`src/lib/tool-steps.ts` works out which roadmap steps a tool finishes —
+**derived from the step's own `href`**, the same thing `step-panel.tsx` keys on,
+so this cannot become a second roadmap that disagrees with the first;
+`src/lib/use-tool-save.ts` holds what both controls need, taking the screen's
+own `dirty`/`commit`/`discard` because a draft blurb is a string and a draft
+listing is six fields; and `src/lib/unsaved.ts` is a one-slot module-level
+guard, not context — the roadmap page is the *parent* of the tool holding the
+draft, so context would have to be provided above the thing that fills it in.
+
+Four things in there are load-bearing.
+
+- **`ticksForTool` writes only the steps with no detector**, because
+  `roadmapFor` ignores a stored tick on a detected step by design. That is not
+  a gap: the detected ones are detected *from the very thing the screen saves*,
+  so saving a blurb ticks "Write the blurb" without anything being written
+  down. A tick stored there would change nothing and read as if it did work.
+- **The bar appears only once there is something to lose**, and lives at the
+  *foot of the window*. A Save that is always on screen is furniture and stops
+  being read; one that arrives when you change something is impossible to walk
+  past. It is at the bottom because these screens scroll — the keyword boxes,
+  the category list and the ARC form are below the fold on an ordinary laptop,
+  and a control anchored to the top of the document is not on screen at the
+  moment it becomes relevant.
+- **Four ways out, three mechanisms, and none of them covers the fourth.**
+  Links are caught by one capture-phase listener on `document` (a `<Link>` is
+  an anchor, so the breadcrumb, the back control and every link a tool draws
+  are covered at once); the tab closing is `beforeunload`; the browser's back
+  button has no cancellable event, so a spare history entry is pushed **once
+  per mount** and a `popstate` lands on it. Anything that leaves without
+  navigating — the roadmap panel's Close, and swapping the panel to another
+  step — calls `confirmLeave`, which falls straight through when nothing is
+  pending. A `leaving` ref short-circuits all of them once the writer has
+  chosen to go, or "leave without saving" walks back onto the sentinel, fires
+  `popstate`, and asks the question again forever.
+- **`ToolStepDone` is the other control, for the four tools with no draft** —
+  covers, comps, the title check, export. Nothing on those can be unsaved, so
+  a Save bar would never be true; what they have is a step no detector can
+  tick, and it says "Mark step done" rather than "Save", because a Save button
+  with nothing to save is the dead UI the house rules forbid.
+
+Two consequences worth knowing. A screen holding a draft must **fall back to
+the store rather than seed itself in an effect** (`draft ?? stored`, with
+`null` meaning untouched) — the seeding version needed a `seeded` ref read
+during render, which is a lint error for a real reason, and cost a second
+render for something the first one already knew. And a draft compared against
+`book.publishing` goes through `tidyPublishing`, because `setPublishing` drops
+every empty field on the way in: a box the writer cleared is `""` on screen
+and *absent* in the store, so a plain `JSON.stringify` comparison leaves the
+form permanently unsaved.
 
 **These screens share a house style, and tests enforce it.** No score, no grade,
 no number invented to look like an answer. Facts rather than verdicts ("you
@@ -472,14 +550,129 @@ would be, and passes no `dictation`, so the panel's microphone hides rather than
 appearing with nowhere to put the words.
 
 `book-panel.tsx` is the navigator proper: the book's three parts as cards
-(front/body/back), each in its own colour, the chapter list inside the body one.
-Its face is the stored `bookPanel` pref rather than component state, so a reload
-does not put the writer back on the cover; the list's own open/shut lives in
-`useBodyOpen`, exported from that file and called by the *screen* rather than the
-panel, because the manuscript needs the same answer — the page sheet's edge takes
-the colour of whichever part the panel has selected (`data-matter`, and the
-`--paper-edge-*` tokens in `globals.css`), and pressing Chapters selects the body.
-Two copies of that state would be two answers to one question.
+(front/body/back), each in its own colour, and **each opening into a list of
+pages** — chapters in the body, named pages in the other two. Its face is the
+stored `bookPanel` pref rather than component state, so a reload does not put
+the writer back on the cover; *which* card is open lives in `useOpenPart`,
+exported from that file and called by the *screen* rather than the panel,
+because the manuscript needs the same answer — the page sheet's edge takes the
+colour of whichever part the panel has selected (`data-matter`, and the
+`--paper-edge-*` tokens in `globals.css`). Two copies of that state would be two
+answers to one question. It returns a part rather than a boolean, and one part
+is open at a time: an open list takes the height the other two cards give up, so
+two at once would be three rows and a scrollbar each.
+
+**Front and back matter are lists of pages, and `src/lib/matter.ts` is the
+whole of what they offer.** They used to be *one page each*, whose template
+carried every standard division as a heading — so a writer met eight printer's
+terms stacked on one sheet, could not open one, could not delete the six they
+did not want, and was told nothing about what belongs under any of them. Worse,
+left alone that sheet exported: a reader opening the finished EPUB found a bare
+list of terms between the cover and Chapter One. Now each division is a page:
+`startMatter` makes the standard set, `createMatterPage` adds one, and
+`deleteChapter`/`renameChapter` already did the rest. Three things in there are
+load-bearing:
+
+- **Every template line a writer must replace carries a `[bracket]`**, and that
+  is the mechanism rather than a house style. It is the only mark the export has
+  to tell a page somebody wrote from a page nobody has touched, and it survives
+  what a stored flag would not — a rename, a sync to another machine, a round
+  trip out through an EPUB and back. A stored flag would mean a new column in
+  Postgres, and a page that lost it would either ship as scaffolding or vanish
+  with somebody's dedication in it.
+- **`isUntouchedMatter` in `export/blocks.ts` is the one rule, and the panel
+  calls it too.** A page with a placeholder left anywhere on it, or with no
+  prose at all, does not go in the file — and the row in the panel says *Draft*
+  from the same call, because a mark that agrees most of the time is worse than
+  no mark. The export screen then **names every page it left out**: a filter
+  nobody can see is worse than the problem it solves.
+- **A page added later lands where it is bound**, not at the end
+  (`matterSectionIndex`), and a page the writer named themselves sorts last —
+  `Infinity` rather than -1, or an unknown page jumps to the front of the book.
+- **None of the sixteen is required by any shop, and the app says so.** What a
+  shop wants is a cover, a title page, working navigation, honest metadata and
+  content the writer owns; Amazon names "About the author" as an *example* of
+  back matter, and Kobo refuses listings that look unfinished — so a book
+  carrying an empty epigraph and an invented also-by list is worse off than one
+  carrying neither. Sixteen identical checkboxes read as a list to complete, so
+  three things counter that, all at the moment of choice rather than in a popup
+  afterwards: the dialog states that a page left empty is left out of the
+  export, the front column says the export *already builds* a title page, a
+  copyright page and a contents list (`isGeneratedPage`), and the few pages
+  most books have are marked `usual` — which is also what splits the panel's
+  Add-page menu into "Most books have" and "If your book needs one". The marker
+  is deliberately a label rather than two groups behind a disclosure: hiding
+  thirteen real choices behind a click to fix a problem of *framing* is the
+  wrong trade on a list this short.
+
+**The question is put once per book, on the way in.**
+`matter-setup-dialog.tsx`, mounted by the panel because both screens that draw
+those cards mount it, shown when `shouldAskMatter(book)` — no matter pages at
+all, and not asked before. It exists because the cards have nowhere to explain
+themselves: Start makes all sixteen, which is right for somebody who does not
+know what any of them are and wrong for everybody else, and "Epigraph" on a
+button teaches nothing. Four things about it are deliberate. **Skip is a real
+answer**, a button rather than a cross, and Escape means the same thing — asking
+again next Tuesday would make it a nag. **Nothing is created until they press**,
+so skipping leaves the book exactly as it was and Start still works later.
+Whether the question was put is a **note in `prefs.matterAsked`, not a field on
+the book**: it records nothing a reader of the manuscript would want, and a
+field on the book would need a Postgres column to survive `sync.ts` at all.
+And `createMatterPages` takes the whole list in **one commit** — a dozen pages
+through a single-page function would be a dozen shelf writes, fan-outs and
+pushes for one gesture.
+
+**Where the generated pages and the written ones meet.** Three of the front
+sections — title, copyright, contents — can now come from either side, and a
+book carrying both got two title pages on consecutive sheets. `writtenPages()`
+in `front-matter.ts` matches by title and the *written* page wins: ours is the
+fallback, assembled from fields so that a book which said nothing still opens
+properly, and there is nothing left for it to add once somebody has set their
+own words there. Renaming the page hands the job back to us, which is the safe
+direction to be wrong in.
+
+**Four pages are apparatus, and the flag is in `matter.ts`.** A half-title, a
+title page, a copyright page and a contents list are furniture rather than
+divisions of the book, and three renderers ask the same question about them
+(`isApparatusPage`): they print **no heading** — no published book has a sheet
+headed "Copyright page"; the name exists so a writer can find the page in a
+list — and they are **left out of the contents**, both the generated page and
+the EPUB's nav and ncx, which is what the shops' own ingestion guidance asks
+for. A dedication, an epigraph, a prologue and an acknowledgements page are
+real divisions and get both. A page the writer named themselves is not
+apparatus: nothing is known about it, so it keeps its heading and is listed,
+which is the answer that loses nothing if wrong.
+
+**`spineOrder` binds the generated pages among the writer's own.** They used to
+be emitted first and the chapters after — right while front matter was a single
+page nobody made, and wrong the moment a book could carry its own half-title:
+the file opened on a generated title page, then the contents, and *then* the
+half-title that should have led the book. Each generated section now takes its
+slot in `MATTER_SECTIONS.front` and merges in by rank. Note that the *files*
+are named positionally (`chapter-03.xhtml` is the fourth loaded chapter), so
+neither the spine order nor the contents filter may renumber them — every
+filtered list carries the original index.
+
+**The chapter opener prints one thing, not two.** `chapterXhtml` emitted a
+standing numeral *and* the heading, and this app's own default titles **are**
+the number — so most exported books said "1" over "Chapter 1" on the opening
+line of every chapter. Both it and the contents page now ask
+`isGenericChapterTitle`, the store's own answer, which knows the digit and the
+spelled form; `front-matter.ts` used to carry a private near-duplicate that
+missed the spelled one.
+
+Two things fall out of this that are easy to get wrong. The seeded body carries
+**no heading**: the page's title is printed above it by the editor and by every
+exporter, so a seeded `h2` of the same words arrived in the EPUB twice, one
+under the other. And a matter page's `epub:type` is **its part and its
+division** (`chapterSemantics`) — every page used to be `bodymatter chapter`, so
+a dedication announced itself as a chapter of the novel and the `bodymatter`
+landmark, which is what Apple Books uses for "begin reading", pointed at it.
+
+`ChapterMeta.matterKey` is left over from the one-page design and is read by
+nothing. It is not tidied away: books written before the change still carry a
+combined page with the writer's prose in it, and it lists, opens, renames and
+exports like any other matter page.
 
 The panes live in the *pages* rather than in `book/[bookId]/layout.tsx`, because
 the left panel needs the chapter id and the assistant needs the editor instance,
@@ -509,6 +702,18 @@ dynamically imported so a writer who never exports never downloads them.
   orchestrates; `xhtml.ts` is the shared XHTML renderer behind epub, PDF and the
   reader; `typeset.ts` controls the look of the outputs that are ours;
   `front-matter.ts` generates the title/copyright/contents pages.
+
+  **The copyright page is on by default and left out when there is no author.**
+  It was off for a while, on the reasoning that it needs a name the writer may
+  not have set — the right worry and the wrong lever, since it meant every book
+  exported by somebody who never opened that step shipped with no copyright page
+  at all. The name is handled where it can be handled honestly: `frontSections`
+  drops the page rather than printing the *title* as the rights holder, which is
+  what the fallback used to do, and the toggle's hint says which field is
+  missing. The fiction disclaimer is printed only for a book that is fiction —
+  "the product of the author's imagination" at the front of somebody's memoir is
+  a statement that their life did not happen, so `Memoir` and `Other` get the
+  page without it.
 
 **The EPUB is built to be sold, not just opened**, and it is **verified against
 EPUBCheck 5.3 (EPUB 3.3): 0 errors, 0 warnings**, for both a fully-specified book
@@ -542,6 +747,24 @@ half that has to read the manuscript, which is why it is not in the pure module.
   name* with what to do instead; `split.ts` breaks a flat block stream into
   chapters.
 
+  **An EPUB says which page is which, and the importer believes it.**
+  `parseEpub` returns a section per spine document carrying the `epub:type` on
+  its body, and `importFile` lifts the ones typed `frontmatter`/`backmatter`
+  out as matter pages while the rest go through `splitIntoChapters` exactly as
+  before — so every other format, and an EPUB that types nothing, takes the
+  path it always did. It used to concatenate the whole spine into one block
+  stream and re-derive chapters from headings, which threw away the only thing
+  an EPUB is reliably good at saying. The cost showed the moment the app could
+  read a book it had just written: the half-title, title page and copyright
+  merged into a body chapter called *"Chapter 1 – Dedication"*, because
+  apparatus prints no heading to split on and a dedication does. Two details
+  are load-bearing. The **part can be inferred from the division** — plenty of
+  files write a bare `toc` with no `frontmatter` beside it, and our own
+  generated pages did until `FRONT_SEMANTICS` was fixed to name both. And an
+  apparatus page takes **the division's name over its `<title>`**, because a
+  generated title page's `<title>` is the *book's* title and importing a page
+  called "The Salt Ledger" is a page nobody can find in a list.
+
   **A file's own metadata is read and kept** (`metadata.ts`, `epubMetadata()`,
   `docxMetadata()`, `cover.ts`): an EPUB carries an author, an ISBN, a blurb,
   categories and usually cover artwork, and all of it used to be dropped at the
@@ -557,6 +780,38 @@ half that has to read the manuscript, which is why it is not in the pure module.
   and Word's machine account names ("Windows User") are refused as authors,
   because a wrong pass is quieter than a wrong alarm and nobody goes looking for
   a problem the check said they did not have.
+
+**A cover is three things, written together.** `cover-save.ts` is the one place
+that sets one, and `saveCover(bookId, file)` writes all three: a **700px JPEG
+thumbnail** to `localStorage` (what the shelf renders, and the only one small
+enough for `sync.ts`), the **original artwork** to IndexedDB via
+`cover-store.ts` (what the EPUB packages), and the **measurements** to
+`coverfacts:<bookId>` (what `cover-check.ts` reports, taken from the file the
+writer picked rather than from what survived the resize).
+
+This exists because the app was **checking a standard and then breaking it
+itself**: the check told a writer their cover had to be 1000px on the long edge
+and ideally 1600×2560, `image-import.ts` stored it at 700px as WebP, and the
+export packaged that — so perfect artwork shipped as a 495×700 picture with
+nothing on any screen saying so. `runExport` now reads `getPrintCover` first
+and falls back to `getCover`.
+
+Four things about it are load-bearing. **IndexedDB is forced, not preferred** —
+a 1600×2560 JPEG is a few hundred kilobytes and base64 in `localStorage`
+inflates it by a third against a budget the whole library shares; eight books
+would fill it and start failing autosaves on unrelated chapters. **Every
+failure resolves rather than throwing**, so Firefox in private browsing (which
+refuses IndexedDB outright) degrades to exactly the old behaviour instead of
+breaking the export. **Covers are JPEG, inline images stay WebP** — the size
+saving matters inside a manuscript and no shop has objected, while a cover is
+the one image a shop's converter meets first and KDP is not a safe bet for
+WebP; `importImage` takes an `encode` option, and `originalImage` keeps the
+writer's own bytes untouched when they are already JPEG or PNG. And **it does
+not sync** — `sync.ts` carries the thumbnail and knows nothing about this
+store, so a writer on a second machine exports at thumbnail quality until they
+upload the artwork again. The covers tool says so; don't quietly drop that line.
+`clearLocalLibrary` clears it too, or the second writer on a shared browser
+exports the first one's picture.
 
 **The small pure modules** are where the conventions of the trade live, kept out
 of components so they can be tested and changed in one place: `book-kinds.ts`
@@ -1040,6 +1295,23 @@ Three more things follow from the palette, and each has bitten already:
   each carry their own `-ink` token for the same reason.
 - **The three parts of a book are three values, not three hues** — front
   strongest, back palest, in binding order — and the five papers are five greys.
+  **In the book panel the ladder is down to two jobs: the card's border, and
+  the two rules that run from the selected card to the page.** It used to dress
+  every surface — the button, the shrunk strip, the open row, the focus ring —
+  which put three fills down a panel whose job is to list a book and made the
+  chrome louder than the contents. All of those take the app's own chrome now
+  (`CARD_BUTTON`, `CARD_OUTLINE`, `CARD_STRIP`, `ROW_ACTIVE` in
+  `book-panel.tsx`: a hairline and the raised value, the same as the four
+  controls at the top of the panel), so the panel has one button style top to
+  bottom. What is left is the one thing only the ladder can say — which part of
+  the book this card is, and that the sheet you are writing on belongs to it,
+  since the page's edge wears the same value. Note what that costs: charcoal on
+  near-black is almost nothing, so the *back* card's selected border is faint,
+  and the fact that it is the expanded one is what actually reads.
+  **`ROW_ACTIVE` carries three signals, not one**, because the hairline that
+  separates it from a hover is `line` against `raised` — a few percent apart in
+  daylight. The title also takes medium weight and the number comes up out of
+  muted into full ink.
   **The unpicked paper follows the theme** (`setTheme` in `library-store.ts`):
   a black page in a white app is something the writer would have to go and fix,
   having chosen nothing. `paperPicked`, stamped by `setPref("paper", …)`, is

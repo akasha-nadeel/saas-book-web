@@ -13,6 +13,7 @@ import {
   type BookKind,
 } from "@/lib/book-kinds";
 import { COVER_MAX_BYTES, COVER_MAX_EDGE, importImage } from "@/lib/image-import";
+import { saveCover } from "@/lib/cover-save";
 import { createBook } from "@/lib/library-store";
 import { BookCover } from "@/components/shelf/book-cover";
 
@@ -33,6 +34,9 @@ export function NewBookForm() {
   const [subtitle, setSubtitle] = useState("");
   const [author, setAuthor] = useState("");
   const [cover, setCover] = useState<string | null>(null);
+  /** The picked file, kept so the full-size copy can be stored once the book
+   *  has an id — see the submit handler. */
+  const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverError, setCoverError] = useState<string | null>(null);
   const coverInput = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<BookKind>(DEFAULT_KIND);
@@ -59,6 +63,14 @@ export function NewBookForm() {
       // A cleared or nonsense field means no goal rather than a goal of zero.
       targetWords: Number.isFinite(words) && words > 0 ? words : undefined,
     });
+
+    /* **The full-size artwork, once there is a book to hang it on.**
+       `createBook` takes the thumbnail because that is what the shelf needs
+       synchronously; the copy the EPUB packages goes to IndexedDB and needs
+       the id that only exists on this line. Deliberately not awaited — the
+       writer is on their way to the editor, the thumbnail is already stored,
+       and a failure here costs export resolution rather than a cover. */
+    if (coverFile) void saveCover(bookId, coverFile);
 
     router.push(`/book/${bookId}/chapter/${chapterId}`);
   };
@@ -153,6 +165,7 @@ export function NewBookForm() {
                       type="button"
                       onClick={() => {
                         setCover(null);
+                        setCoverFile(null);
                         setCoverError(null);
                       }}
                       className="rounded-md px-3 py-2 font-sans text-sm
@@ -194,12 +207,19 @@ export function NewBookForm() {
                 if (!file) return;
 
                 setCoverError(null);
+                /* The book does not exist yet, so there is nowhere to put the
+                   full-size artwork — `saveCover` needs an id. The thumbnail
+                   is held in component state and the file with it; both are
+                   handed to `saveCover` once the book has been created. */
                 const result = await importImage(file, {
                   maxEdge: COVER_MAX_EDGE,
                   maxBytes: COVER_MAX_BYTES,
+                  encode: "jpeg",
                 });
-                if (result.ok) setCover(result.src);
-                else setCoverError(result.error);
+                if (result.ok) {
+                  setCover(result.src);
+                  setCoverFile(file);
+                } else setCoverError(result.error);
               }}
             />
           </div>

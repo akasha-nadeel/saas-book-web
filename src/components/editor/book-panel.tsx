@@ -9,13 +9,28 @@ import {
   chapterMatterOf,
   chapterNumberOf,
   createChapter,
-  createMatterSection,
+  createMatterPage,
+  createMatterPages,
   deleteChapter,
   importIntoBook,
+  orderedChapters,
+  rememberMatterAsked,
   renameChapter,
+  shouldAskMatter,
+  startMatter,
   toggleBookmark,
   type Book,
+  type ChapterMatter,
+  type ChapterMeta,
 } from "@/lib/library-store";
+import { missingSections, type MatterPart } from "@/lib/matter";
+import { isDraftMatter } from "@/lib/export/blocks";
+import {
+  Menu,
+  MenuButton,
+  MenuLabel,
+  MenuSeparator,
+} from "@/components/ui/menu";
 import type { Dictation } from "@/lib/editor/use-dictation";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
 import {
@@ -25,6 +40,7 @@ import {
 } from "@/components/sidebar/row-menu";
 import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
+import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
 export type BookPanelMode = "book" | "chapters";
@@ -49,18 +65,79 @@ export type BookPanelMode = "book" | "chapters";
  */
 
 /**
- * The three parts, each at its own value, so the panel is read by weight before
- * it is read by word — the writer who has learnt that the middle one holds the
- * chapters stops reading the headings at all.
+ * The card buttons, and they are the same on all three cards.
+ *
+ * They used to take the part's own fill — white on Front matter, mid-grey on
+ * Body, charcoal on Back — which put three differently-coloured slabs down the
+ * panel and made the *buttons* the loudest thing on a screen whose job is to
+ * list a book.
+ *
+ * The style is the header's own — a hairline and the panel's raised value — so
+ * the four controls at the top of the panel and the three down its side read as
+ * one set of chrome rather than two vocabularies.
+ *
+ * **`hover:bg-line` works in both themes, and that is not a coincidence.** The
+ * dark set lifts away from the ground (#1c1c1c → #262626) and the light set
+ * deepens towards it (#e9e9ec → #e2e2e5), because the two blocks cross over —
+ * which is the same reason `raised` means different things in each.
+ */
+const CARD_BUTTON = `border border-line bg-raised text-fg
+                     hover:border-accent/60 hover:bg-line
+                     focus-visible:ring-accent/50`;
+
+/** The second control, when a card has one. Outlined, so the pair is not two
+ *  identical slabs — the same relationship the header's controls have. */
+const CARD_OUTLINE = `border border-line bg-transparent text-fg
+                      hover:border-accent/60 hover:bg-raised
+                      focus-visible:ring-accent/50`;
+
+/**
+ * The open row in any of the three lists.
+ *
+ * Same chrome as the buttons, for the same reason: this used to take the part's
+ * own fill, so the chapter you were reading was a white slab on the
+ * front-matter list and a mid-grey one on the body's, and the panel had three
+ * ways of saying one thing.
+ *
+ * **The hairline is what separates it from a hover**, which is also `raised`.
+ * Two more signals back it up, because in daylight `line` and `raised` are a
+ * few percent apart: the title takes medium weight, and the number or Draft
+ * mark comes up out of muted into full ink. Selection is persistent and a hover
+ * is under the pointer, so the two are never really confusable in use — but the
+ * row has to be readable in a screenshot too.
+ */
+const ROW_ACTIVE = "border-line bg-raised font-medium text-fg";
+
+/**
+ * A card shrunk to a strip, when another part's list has the room.
+ *
+ * The strip is the whole control at that size, so it wore the part's fill to
+ * say which part it was — three strips, three colours. It says it in words
+ * instead now, which is what the label was always for, and the panel keeps one
+ * button style from top to bottom.
+ */
+const CARD_STRIP = `bg-raised text-fg hover:bg-line
+                    focus-visible:ring-accent/50`;
+
+/**
+ * What is left of the three parts' colour ladder: the card's border, and the
+ * two rules that run from the selected card to the page.
+ *
+ * It used to dress every surface on the card — the button, the shrunk strip,
+ * the open row, the focus ring — which put three fills down a panel whose job
+ * is to list a book and made the chrome louder than the contents. All of that
+ * is the app's own chrome now (`CARD_BUTTON`, `CARD_STRIP`, `ROW_ACTIVE`), and
+ * the ladder is spent on the one thing only it can say: which part of the book
+ * this card is, and that the page you are writing on belongs to it — the edge
+ * of the sheet wears the same value.
  *
  * They were green, purple and near-black; the palette is greyscale now, so they
  * are the same ladder in white, mid-grey and charcoal — lightest first, in the
- * order a book is bound. Each states the ink that stays readable on it, which
- * is why `-ink` is a token per part rather than a fixed white.
+ * order a book is bound.
  *
  * Written out as whole class names rather than built from a part name, because
- * Tailwind finds its utilities by reading the source: `bg-matter-${part}` is a
- * string at runtime and an empty stylesheet at build time.
+ * Tailwind finds its utilities by reading the source: `border-matter-${part}`
+ * is a string at runtime and an empty stylesheet at build time.
  *
  * The border is a wash of the same colour so a card is placeable even when it
  * is not the one you are in; being *in* it takes the colour to full.
@@ -69,60 +146,34 @@ const MATTER_TONE = {
   front: {
     border: "border-matter-front/30",
     borderActive: "border-matter-front",
-    button: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
-             focus-visible:ring-matter-front/50`,
-    // Shrunk, the whole strip becomes the button, so it takes the fill the
-    // button had. Ink is a token too, because these three fills run from white
-    // to charcoal and a fixed white would be white on white at one end.
-    strip: `bg-matter-front text-matter-front-ink hover:bg-matter-front-strong
-            focus-visible:ring-matter-front-ink/60`,
-    outline: `border-matter-front text-matter-front hover:bg-matter-front/10
-              focus-visible:ring-matter-front/50`,
-    // The raw token, for the two rules that run from the selected card
-    // to the page. Those are drawn from an inline gradient rather than a
-    // utility, so they need the variable itself and not a class name.
+    // The raw token, for the two rules that run from the selected card to the
+    // page. Those are drawn inline rather than from a utility, so they need the
+    // variable itself and not a class name.
     cssVar: "--color-matter-front",
-    inkSoft: "text-matter-front-ink/70",
-    ringInk: "ring-matter-front-ink/60",
   },
   body: {
     border: "border-matter-body/30",
     borderActive: "border-matter-body",
-    button: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
-             focus-visible:ring-matter-body/50`,
-    strip: `bg-matter-body text-matter-body-ink hover:bg-matter-body-strong
-            focus-visible:ring-matter-body-ink/60`,
-    outline: `border-matter-body text-matter-body hover:bg-matter-body/10
-              focus-visible:ring-matter-body/50`,
     // The raw token, for the two rules that run from the selected card
     // to the page. Those are drawn from an inline gradient rather than a
     // utility, so they need the variable itself and not a class name.
     cssVar: "--color-matter-body",
-    inkSoft: "text-matter-body-ink/70",
-    ringInk: "ring-matter-body-ink/60",
   },
   back: {
     border: "border-matter-back/30",
     borderActive: "border-matter-back",
-    button: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
-             focus-visible:ring-matter-back/50`,
-    strip: `bg-matter-back text-matter-back-ink hover:bg-matter-back-strong
-            focus-visible:ring-matter-back-ink/60`,
-    outline: `border-matter-back text-matter-back hover:bg-matter-back/10
-              focus-visible:ring-matter-back/50`,
     // The raw token, for the two rules that run from the selected card
     // to the page. Those are drawn from an inline gradient rather than a
     // utility, so they need the variable itself and not a class name.
     cssVar: "--color-matter-back",
-    inkSoft: "text-matter-back-ink/70",
-    ringInk: "ring-matter-back-ink/60",
   },
 } as const;
 
 type MatterTone = keyof typeof MATTER_TONE;
 
 /**
- * Whether the body list is open, remembered at module scope.
+ * Which part's list is open, remembered at module scope. Null is all three
+ * shut, which is the panel's resting state.
  *
  * The panel is remounted every time the writer opens a different chapter, so
  * component state would put the list back to its default on each click —
@@ -130,14 +181,21 @@ type MatterTone = keyof typeof MATTER_TONE;
  * Same reason the panel's face is held this way in the editor.
  *
  * Shut to begin with. The panel's first face is the book's three parts, whole
- * and equal; the list is what you ask for, not what you arrive at. It used to
+ * and equal; a list is what you ask for, not what you arrive at. It used to
  * open itself whenever the writer was in a numbered chapter, which is nearly
  * always — so nearly always the panel opened straight past its own front page.
  *
- * Only the body has this. Front and back matter are one page each and are shown
- * as cards, which have nothing to expand.
+ * **One part at a time, and that is a layout fact rather than a preference.**
+ * An open list takes the height the other two cards give up; two of them open
+ * at once would each get half a panel, which on a laptop is three rows and a
+ * scrollbar apiece. Opening one shuts the others.
+ *
+ * This was a boolean for as long as front and back matter were a single page
+ * each — there was only ever the body's list to expand. They are lists of
+ * pages now, so all three cards open, and the question changed from "is it
+ * open" to "which one".
  */
-let bodyOpenMemory = false;
+let openPartMemory: ChapterMatter | null = null;
 
 /**
  * A shape change that has to survive a page opening.
@@ -154,27 +212,31 @@ let bodyOpenMemory = false;
  * is set a frame later. The transition then runs in full, on the far side of
  * the navigation, from exactly where it would have started.
  */
-let arriving: { from: boolean; to: boolean } | null = null;
+let arriving: {
+  from: ChapterMatter | null;
+  to: ChapterMatter | null;
+} | null = null;
 
-function toggleBody(): boolean {
-  bodyOpenMemory = !bodyOpenMemory;
-  return bodyOpenMemory;
+/** Open this part's list, or shut it if it is the one already open. */
+function togglePart(part: ChapterMatter): ChapterMatter | null {
+  openPartMemory = openPartMemory === part ? null : part;
+  return openPartMemory;
 }
 
-function closeBody(): boolean {
-  bodyOpenMemory = false;
-  return bodyOpenMemory;
+function closeParts(): null {
+  openPartMemory = null;
+  return null;
 }
 
 /**
- * The open/shut state of the chapter list, held above this panel.
+ * Which part's list is open, held above this panel.
  *
  * It lives up in the editor rather than in here because the manuscript needs it
  * too: the page's edge takes the colour of the part the panel says is selected,
  * and pressing Chapters selects the body. Two copies of this would be two
  * answers to the same question.
  */
-export function useBodyOpen() {
+export function useOpenPart() {
   /**
    * The move to finish, taken once and then held.
    *
@@ -192,7 +254,7 @@ export function useBodyOpen() {
 
   // Mounted wearing the shape the writer left, when there is a move to finish.
   const [open, setOpen] = useState(() =>
-    entrance && entrance.from !== entrance.to ? entrance.from : bodyOpenMemory,
+    entrance && entrance.from !== entrance.to ? entrance.from : openPartMemory,
   );
 
   useEffect(() => {
@@ -214,24 +276,25 @@ export function useBodyOpen() {
   }, [entrance]);
 
   return {
+    /** The part whose list is showing, or null when all three are shut. */
     open,
-    toggle: () => setOpen(toggleBody()),
-    close: () => setOpen(closeBody()),
+    toggle: (part: ChapterMatter) => setOpen(togglePart(part)),
+    close: () => setOpen(closeParts()),
     /**
      * Record a shape change that a page opening is about to interrupt.
      *
-     * Used by the two actions that navigate. Nothing moves in *this* mount —
-     * there would be no time — but the move is not lost: see `arriving`, which
-     * hands it to the next one to play out in full.
+     * Used by the actions that navigate. Nothing moves in *this* mount — there
+     * would be no time — but the move is not lost: see `arriving`, which hands
+     * it to the next one to play out in full.
      */
-    remember: (next: boolean) => {
-      arriving = { from: bodyOpenMemory, to: next };
-      bodyOpenMemory = next;
+    remember: (next: ChapterMatter | null) => {
+      arriving = { from: openPartMemory, to: next };
+      openPartMemory = next;
     },
   };
 }
 
-export type BodyOpen = ReturnType<typeof useBodyOpen>;
+export type OpenPart = ReturnType<typeof useOpenPart>;
 
 export function BookPanel({
   book,
@@ -260,8 +323,8 @@ export function BookPanel({
    * rather than appearing with nowhere to put the words.
    */
   dictation?: Dictation;
-  /** The chapter list’s open state, owned by the editor — see useBodyOpen. */
-  body: BodyOpen;
+  /** Which part's list is showing, owned by the editor — see useOpenPart. */
+  body: OpenPart;
   /** Play the entrance. Set only when this panel’s face changes, never on the
    *  remount that opening a different chapter causes. */
   entering?: boolean;
@@ -340,13 +403,16 @@ export function BookPanel({
 
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
-  const front = chapters.find((c) => c.matterKey === "front") ?? null;
-  const back = chapters.find((c) => c.matterKey === "back") ?? null;
+  const frontPages = chapters.filter((c) => chapterMatterOf(c) === "front");
+  const backPages = chapters.filter((c) => chapterMatterOf(c) === "back");
 
-  // Is the open chapter one of the numbered ones? Anything that is not the
-  // front or back matter page is, which is what "body" means here.
-  const inBody =
-    !!chapterId && front?.id !== chapterId && back?.id !== chapterId;
+  // Which part the open page belongs to. Read off the chapter itself rather
+  // than by elimination: front and back matter are lists now, so "not the one
+  // front page and not the one back page" no longer means body.
+  const openChapter = chapterId
+    ? (chapters.find((c) => c.id === chapterId) ?? null)
+    : null;
+  const openPart = openChapter ? chapterMatterOf(openChapter) : null;
 
   // Named once because it is both the tooltip and the accessible name, and a
   // toggle whose two labels disagree is a toggle screen readers misreport.
@@ -363,6 +429,22 @@ export function BookPanel({
 
   // The Book View flip-book: page 0 is the cover, 1…N the chapter's printed
   // pages. The preview reports its page count so the pager can clamp.
+  /**
+   * Whether to put the front/back-matter question, asked once per book.
+   *
+   * **Latched on mount rather than read each render**, which is what makes it a
+   * question rather than a flicker: `shouldAskMatter` goes false the instant
+   * the first page is created, so a live read would tear the dialog away
+   * mid-answer. Held here rather than in the two screens above because both
+   * mount this panel and the answer belongs to the cards it draws.
+   *
+   * The lazy initialiser reads storage during the first render, which is safe
+   * for the same reason `useSyncExternalStore` snapshots are: it is a read, and
+   * the server render never runs it — the panel is a client component that only
+   * paints once the library has been read.
+   */
+  const [askMatter, setAskMatter] = useState(() => shouldAskMatter(book));
+
   const [previewIndex, setPreviewIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const prevPage = () => setPreviewIndex((i) => Math.max(0, i - 1));
@@ -372,55 +454,113 @@ export function BookPanel({
 
   const handleCreate = () => open(createChapter(bookId));
 
-  // Front / back matter: open the page, seeding it from the template the first
-  // time it is asked for.
-  //
-  // The chapter list shuts on the way. Going to the front matter is leaving the
-  // body, and leaving it open would land the writer on a page whose card is a
-  // strip at the top of a list of somewhere else — three cards at full height
-  // is the panel's resting state, and this is a writer coming to rest.
   /**
-   * Opening the body: the list, and a chapter to go with it.
+   * Reveal a part's list — and, the first time, go to a page in it.
    *
    * Pressing Chapters used to reveal the list and leave the writer looking at
-   * whatever page they were already on — usually the front matter, since that
-   * is what the card above it opens. The panel said body and the page said
+   * whatever page they were already on. The panel said body and the page said
    * title page, which is exactly the disagreement the coloured edge exists to
-   * prevent.
+   * prevent. So opening a part the writer is not already inside takes them to
+   * its first page as well.
    *
-   * Only when they are not already in a chapter. A writer on Chapter Five who
+   * Only when they are not already in that part. A writer on Chapter Five who
    * opens the list wants the list, not to be sent back to the beginning of the
-   * book — and shutting the list is never a reason to go anywhere.
+   * book — and shutting a list is never a reason to go anywhere.
    */
-  const openBody = () => {
-    const first = bodyChapters[0];
-    const goingToChapter = !body.open && !inBody && !!first;
+  const pagesOf = (part: ChapterMatter) =>
+    part === "front" ? frontPages : part === "back" ? backPages : bodyChapters;
 
-    // Remembered rather than set when a chapter is about to open: the remount
-    // that follows would cut the collapse off mid-move. See `remember`.
-    if (goingToChapter) {
-      body.remember(true);
-      open(first.id);
+  const openPartList = (part: ChapterMatter) => {
+    const pages = pagesOf(part);
+    const goingToPage = body.open !== part && openPart !== part && !!pages[0];
+
+    // Remembered rather than set when a page is about to open: the remount that
+    // follows would cut the collapse off mid-move. See `remember`.
+    if (goingToPage) {
+      body.remember(part);
+      open(pages[0].id);
       return;
     }
-    body.toggle();
+    body.toggle(part);
   };
 
-  const openMatter = (matter: "front" | "back") => {
-    const existing = matter === "front" ? front : back;
-    const id = existing?.id ?? createMatterSection(bookId, matter);
-    if (!id) return;
+  /**
+   * Make a part's standard pages, for a book that has none.
+   *
+   * Front matter used to be one page carrying every division as a heading, and
+   * this made that one page. It makes eight now — see `src/lib/matter.ts` for
+   * why — and lands the writer on the first of them with the list open beside
+   * it, so the shape of what they just got is on screen rather than hidden
+   * behind a card they would have to press again.
+   */
+  const handleStartMatter = (part: MatterPart) => {
+    const first = startMatter(bookId, part);
+    if (!first) return;
+    body.remember(part);
+    open(first);
+  };
 
-    // Already on that page? Then nothing is going to remount, and setting the
-    // state is the only thing that shuts the list — with a proper animation,
-    // because it has the time to finish. Otherwise the shape is remembered and
-    // the chapter opened, and the next mount draws it. See `remember`.
-    if (id === chapterId) {
-      body.close();
+  /** One more page in a part, opened so the writer can fill it in. */
+  const handleAddMatterPage = (part: MatterPart, title: string) => {
+    const id = createMatterPage(bookId, part, title);
+    if (!id) return;
+    body.remember(part);
+    open(id);
+  };
+
+  /**
+   * Delete a page, and go somewhere if it was the one on screen.
+   *
+   * **Deleting used to leave the writer on the deleted page's URL**, which the
+   * editor answers with "This chapter isn't here. It may have been deleted, or
+   * the link may be wrong." Every word of that is true and the whole screen is
+   * wrong: they know it was deleted, they did it a moment ago, and being asked
+   * to press "Back to your books" sends them out of the manuscript entirely.
+   *
+   * So the neighbour takes its place. Only when the deleted page was the open
+   * one: deleting Chapter Nine from inside Chapter Two is not a reason to move
+   * Chapter Two off the screen.
+   *
+   * **Its neighbour within its own part, and only then anywhere.** Deleting a
+   * chapter should land on a chapter; deleting a dedication should land on
+   * another front-matter page. The first version took the neighbour from the
+   * *stored* array, which is one flat sequence — and since a restored chapter
+   * is appended to the end of it, deleting Chapter Two put the writer on the
+   * prologue. Reading order is what a reader would call next, and staying
+   * inside the part is what the writer meant.
+   *
+   * `replace` rather than `push`, so Back does not walk into the dead URL.
+   *
+   * The sidebar has always done a version of this
+   * (`chapter-sidebar.tsx`), which is why the missing case only showed up here
+   * — and it showed up much more often once front and back matter became lists
+   * of pages a writer deletes the ones they do not want from.
+   */
+  const handleDelete = (id: string, title: string) => {
+    if (
+      !window.confirm(
+        `Move “${title}” to this book's trash? You can restore it from there.`,
+      )
+    ) {
       return;
     }
-    body.remember(false);
-    open(id);
+
+    const part = pagesOf(openPart ?? "body");
+    const within = part.findIndex((c) => c.id === id);
+    const siblings = part.filter((c) => c.id !== id);
+
+    // The page that slid up into its position, or the one before it at the end
+    // of a list. With the part emptied, the next page in the book as a whole;
+    // with the book emptied, the overview.
+    const ordered = orderedChapters(book).filter((c) => c.id !== id);
+    const next = siblings[within] ?? siblings[within - 1] ?? ordered[0] ?? null;
+
+    deleteChapter(bookId, id);
+
+    if (id !== chapterId) return;
+    router.replace(
+      next ? `/book/${bookId}/chapter/${next.id}` : `/book/${bookId}`,
+    );
   };
 
   const handleImport = async (file: File) => {
@@ -582,7 +722,7 @@ export function BookPanel({
           </div>
         </div>
       ) : (
-        <div className="flex h-full min-h-0 flex-col px-5 py-6">
+        <div className="flex h-full min-h-0 flex-col px-5 pt-4 pb-5">
           {/* One row: the way out, the way to make a chapter, and the two ways
               to bring one in.
 
@@ -761,21 +901,30 @@ export function BookPanel({
               writer wants to reach them. */}
           <div
             ref={stackRef}
-            className={`mt-4 flex min-h-0 flex-1 flex-col gap-2 pr-1 ${
+            className={`mt-3 flex min-h-0 flex-1 flex-col gap-2 pr-1 ${
               entering ? "matter-stack" : ""
             }`}
           >
-            <MatterCard
+            <MatterPagesCard
               gapToPage={gapToPage}
-              tone="front"
+              part="front"
               label="Front matter"
-              description="The pages before Chapter 1: title, copyright, dedication."
-              action={front ? "Open" : "Start"}
-              // Yields to the body while its list is open, so exactly one part
-              // is ever marked and the page's edge always has a card to match.
-              active={!body.open && front?.id === chapterId}
-              onAction={() => openMatter("front")}
-              compact={body.open}
+              description="The pages before Chapter 1 — a title page, the copyright, a dedication."
+              bookId={bookId}
+              pages={frontPages}
+              chapterId={chapterId}
+              open={body.open === "front"}
+              // Yields to whichever list is open, so exactly one part is ever
+              // marked and the page's edge always has a card to match.
+              active={
+                body.open === "front" || (!body.open && openPart === "front")
+              }
+              compact={!!body.open && body.open !== "front"}
+              onToggle={() => openPartList("front")}
+              onStart={() => handleStartMatter("front")}
+              onAdd={(title) => handleAddMatterPage("front", title)}
+              onOpenPage={open}
+              onDelete={handleDelete}
             />
 
             <MatterCard
@@ -783,31 +932,34 @@ export function BookPanel({
               tone="body"
               label="Body matter"
               description={
-                body.open
+                body.open === "body"
                   ? undefined
                   : "The story itself, chapter by chapter, in reading order."
               }
               meta={`${bodyChapters.length} ${
                 bodyChapters.length === 1 ? "chapter" : "chapters"
               }`}
-              action={body.open ? "Hide chapters" : "Chapters"}
+              action={body.open === "body" ? "Hide chapters" : "Chapters"}
               // Open counts as selected, as well as being in a chapter. The
               // page's edge is driven from the same expression upstream, so
               // this border and that edge cannot disagree — which is the only
               // reason "open" is allowed to mean "selected" at all.
-              active={body.open || inBody}
-              onAction={openBody}
+              active={
+                body.open === "body" || (!body.open && openPart === "body")
+              }
+              onAction={() => openPartList("body")}
+              compact={!!body.open && body.open !== "body"}
               // Only once the list is open. Shut, the card has one thing to
               // offer — open me — and a second button beside it halves the
               // width of that one thing to sit next to a list nobody is looking
               // at. The new chapter appears in the list it was added to, so the
               // button belongs where the list is.
               secondary={
-                body.open
+                body.open === "body"
                   ? { label: "New chapter", onClick: handleCreate }
                   : undefined
               }
-              grow={body.open}
+              grow={body.open === "body"}
             >
               {bodyChapters.length > 0 ? (
                 bodyChapters.map((c) => (
@@ -842,15 +994,7 @@ export function BookPanel({
                         label: "Delete",
                         icon: menuIcons.trash,
                         danger: true,
-                        onSelect: () => {
-                          if (
-                            window.confirm(
-                              `Move “${c.title}” to this book's trash? You can restore it from there.`,
-                            )
-                          ) {
-                            deleteChapter(bookId, c.id);
-                          }
-                        },
+                        onSelect: () => handleDelete(c.id, c.title),
                       },
                     ]}
                   />
@@ -862,18 +1006,47 @@ export function BookPanel({
               )}
             </MatterCard>
 
-            <MatterCard
+            <MatterPagesCard
               gapToPage={gapToPage}
-              tone="back"
+              part="back"
               label="Back matter"
-              description="The pages after the story: acknowledgements, notes, an epilogue."
-              action={back ? "Open" : "Start"}
-              active={!body.open && back?.id === chapterId}
-              onAction={() => openMatter("back")}
-              compact={body.open}
+              description="The pages after the story — an epilogue, acknowledgements, about the author."
+              bookId={bookId}
+              pages={backPages}
+              chapterId={chapterId}
+              open={body.open === "back"}
+              active={
+                body.open === "back" || (!body.open && openPart === "back")
+              }
+              compact={!!body.open && body.open !== "back"}
+              onToggle={() => openPartList("back")}
+              onStart={() => handleStartMatter("back")}
+              onAdd={(title) => handleAddMatterPage("back", title)}
+              onOpenPage={open}
+              onDelete={handleDelete}
             />
           </div>
         </div>
+      )}
+
+      {askMatter && (
+        <MatterSetupDialog
+          onCreate={(picks) => {
+            setAskMatter(false);
+            rememberMatterAsked(bookId);
+            const first = createMatterPages(bookId, picks);
+            if (!first) return;
+            // Land on the first page they asked for, with its list open beside
+            // it — the same move Start makes, so what they just chose is on
+            // screen rather than behind a card.
+            body.remember(picks[0].part);
+            open(first);
+          }}
+          onSkip={() => {
+            setAskMatter(false);
+            rememberMatterAsked(bookId);
+          }}
+        />
       )}
 
       {pending && (
@@ -964,12 +1137,15 @@ function ChapterPill({
   active,
   onClick,
   menu,
+  mark,
 }: {
   number: number | null;
   title: string;
   active: boolean;
   onClick: () => void;
   menu: RowMenuItem[];
+  /** A word in place of the number — "Draft" on an unfilled matter page. */
+  mark?: string;
 }) {
   return (
     /* `group` and `relative` for the ⋯: it is laid over the row's right end
@@ -982,24 +1158,25 @@ function ChapterPill({
         aria-current={active ? "page" : undefined}
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
                     py-2 pr-9 pl-2.5 text-left font-sans text-sm outline-none
-                    transition-colors focus-visible:ring-2
-                    focus-visible:ring-matter-body/50 ${
+                    border transition-colors focus-visible:ring-2
+                    focus-visible:ring-accent/50 ${
                       active
-                        ? // The body part's own value, not the app accent: this
-                          // row sits inside the body card, and a white fill
-                          // there would read as belonging to something else.
-                          "bg-matter-body font-medium text-matter-body-ink"
-                        : "text-fg hover:bg-raised"
+                        ? ROW_ACTIVE
+                        : "border-transparent text-fg hover:bg-raised"
                     }`}
       >
         {/* Fixed width and right-aligned, so the titles line up whether the
-            number is 1 or 40 rather than stepping right as the book grows. */}
+            number is 1 or 40 rather than stepping right as the book grows.
+
+            A matter page has no number — it is named, not counted — so the
+            column carries the template mark instead, which is the one thing
+            about these pages worth seeing without opening them. */}
         <span
-          className={`w-5 shrink-0 text-right text-xs tabular-nums ${
-            active ? "text-matter-body-ink/70" : "text-muted"
-          }`}
+          className={`shrink-0 text-right text-[10px] tabular-nums ${
+            mark ? "w-10 tracking-wide uppercase" : "w-5 text-xs"
+          } ${active ? "text-fg" : "text-muted"}`}
         >
-          {number ?? ""}
+          {mark ?? number ?? ""}
         </span>
 
         <span className="min-w-0 flex-1 truncate">{title}</span>
@@ -1051,6 +1228,7 @@ function MatterCard({
   active,
   onAction,
   secondary,
+  secondaryNode,
   grow = false,
   compact = false,
   gapToPage = 0,
@@ -1076,6 +1254,18 @@ function MatterCard({
    * competing with the way out of the panel.
    */
   secondary?: { label: string; onClick: () => void };
+  /**
+   * The second control, when it opens a menu rather than doing something.
+   *
+   * Front and back matter offer *which page to add*, which is a list rather
+   * than an action — so the slot takes a node and the caller renders its own
+   * trigger with `matterOutlineClass` on it, instead of this card growing a
+   * second set of props describing somebody else's menu.
+   *
+   * Mutually exclusive with `secondary`; passing both draws both, which is a
+   * caller error rather than a state worth guarding.
+   */
+  secondaryNode?: React.ReactNode;
   grow?: boolean;
   /**
    * Shrink to a name and nothing else, because another card is using the room.
@@ -1135,13 +1325,13 @@ function MatterCard({
                   duration-500 ease-out
                   ${
                     compact
-                      ? `${paint.strip} ${paint.borderActive}`
+                      ? `${CARD_STRIP} border-line`
                       : `bg-panel/60 ${
                           active ? paint.borderActive : paint.border
                         }`
                   }
                   min-h-0
-                  ${listOpen ? "shrink grow" : "shrink-0 grow-0"}`}
+                  ${listOpen ? "shrink grow" : "shrink grow-0"}`}
     >
       {/* Two rules running out of the selected card towards the page, in that
           part's own colour — the page's edge is already wearing it, and these
@@ -1190,13 +1380,13 @@ function MatterCard({
       <div
         className={`flex shrink-0 items-center gap-2.5 px-3.5
                     transition-[padding] duration-500 ease-out ${
-                      compact ? "py-2.5" : "pt-3.5"
+                      compact ? "py-2" : "pt-3"
                     }`}
       >
         <h3
           className={`min-w-0 flex-1 truncate font-serif font-semibold
                       transition-[font-size,color,line-height] duration-500
-                      ease-out ${compact ? "text-sm" : "text-lg font-bold text-fg"}`}
+                      ease-out ${compact ? "text-sm" : "text-base font-bold text-fg"}`}
         >
           {label}
         </h3>
@@ -1209,7 +1399,7 @@ function MatterCard({
           className={`shrink-0 font-sans text-xs transition-opacity duration-500
                       ease-out ${
                         compact
-                          ? `${paint.inkSoft} opacity-100`
+                          ? "text-muted opacity-100"
                           : "w-0 overflow-hidden opacity-0"
                       }`}
         >
@@ -1222,7 +1412,14 @@ function MatterCard({
           to the content's own height, so the collapse is exact at any length of
           description and needs no number a longer sentence would break. */}
       <div
-        className={`grid shrink-0 transition-[grid-template-rows,opacity]
+        /* `shrink`, not `shrink-0`: this block is what gives way when three
+           cards are taller than the panel. Held rigid, the third card was
+           simply pushed off the bottom of the screen with no way to reach it
+           — a flex item that cannot shrink overflows its container rather
+           than fitting in it. The inner `overflow-hidden` does the clipping,
+           so a squeezed card loses the tail of its description and keeps its
+           heading and its button, which are the parts you need. */
+        className={`grid min-h-0 shrink transition-[grid-template-rows,opacity]
                     duration-500 ease-out ${
                       compact
                         ? "grid-rows-[0fr] opacity-0"
@@ -1230,7 +1427,7 @@ function MatterCard({
                     }`}
       >
         <div className="overflow-hidden">
-          <div className="px-3.5 pt-1.5 pb-3.5">
+          <div className="px-3.5 pt-1 pb-3">
             {/* Two lines at the panel's width: long enough to say what the part
                 is, short enough that the card stays a card and not a paragraph.
 
@@ -1239,13 +1436,13 @@ function MatterCard({
                 this is the one line on the card that has something to teach. It
                 should read like text, not like a caption. */}
             {description && (
-              <p className="font-sans text-sm leading-relaxed font-medium text-fg/75">
+              <p className="font-sans text-[13px] leading-snug font-medium text-fg/75">
                 {description}
               </p>
             )}
 
             {meta && (
-              <p className="mt-2 font-sans text-sm font-semibold text-fg">
+              <p className="mt-1.5 font-sans text-xs font-semibold text-fg">
                 {meta}
               </p>
             )}
@@ -1254,7 +1451,7 @@ function MatterCard({
                 primary with a smaller thing beside it: seeing the chapters and
                 adding one are both ordinary, frequent moves, and picking a
                 winner between them would only make the loser harder to hit. */}
-            <div className="mt-3 flex items-stretch gap-2">
+            <div className="mt-2.5 flex items-stretch gap-2">
               <button
                 type="button"
                 onClick={onAction}
@@ -1269,12 +1466,16 @@ function MatterCard({
                 // room and the pair reads better a step down.
                 className={`flex-1 cursor-pointer rounded-lg font-sans
                             font-semibold outline-none transition-colors
-                            focus-visible:ring-2 ${paint.button} ${
-                              secondary ? "py-1.5 text-xs" : "py-2 text-sm"
+                            focus-visible:ring-2 ${CARD_BUTTON} ${
+                              secondary || secondaryNode
+                                ? "py-1.5 text-xs"
+                                : "py-1.5 text-sm"
                             }`}
               >
                 {action}
               </button>
+
+              {secondaryNode}
 
               {secondary && (
                 <button
@@ -1284,10 +1485,10 @@ function MatterCard({
                   // Outlined in the card's own colour rather than filled: two
                   // solid blocks side by side fight, and this is the card's
                   // second thing.
-                  className={`flex-1 cursor-pointer rounded-lg border-2
-                              bg-transparent py-1.5 font-sans text-xs
-                              font-semibold outline-none transition-colors
-                              focus-visible:ring-2 ${paint.outline}`}
+                  className={`flex-1 cursor-pointer rounded-lg
+                              py-1.5 font-sans text-xs font-semibold outline-none
+                              transition-colors focus-visible:ring-2
+                              ${CARD_OUTLINE}`}
                 >
                   {secondary.label}
                 </button>
@@ -1355,5 +1556,241 @@ function MatterCard({
                     }`}
       />
     </section>
+  );
+}
+
+/**
+ * Front or back matter as a list of pages, the way the body is a list of
+ * chapters.
+ *
+ * **This card used to open a page. Now it opens a part.** Front matter was one
+ * page holding every standard division as a heading — Half-title, Title,
+ * Copyright, Dedication, Epigraph, Contents, Preface, Prologue, stacked on a
+ * single sheet with a blank line under each. A writer met eight printer's
+ * terms at once, could not open one of them, could not delete the six they did
+ * not want, and was told nothing about what belongs under any of them. Worse,
+ * left alone that sheet exported: a reader opening the finished EPUB found a
+ * bare list of terms between the cover and Chapter One.
+ *
+ * They are pages now. The card behaves exactly like the body's — press it and
+ * the list unfolds inside it, click a row to open that page, ⋯ to rename or
+ * delete, Add page for one more. Same card, same rows, same gestures, because
+ * the three parts of a book are three of the same kind of thing and the panel
+ * had been saying they were not.
+ *
+ * **The "draft" mark is the honest half.** Each page is seeded with the real
+ * shape of the thing — `For [name].` for a dedication — and every line the
+ * writer has to replace carries a `[bracket]`. A page with brackets left in it
+ * does not go into the export, so the list says so on the row rather than
+ * letting somebody discover it in the file. See `src/lib/matter.ts`.
+ */
+function MatterPagesCard({
+  part,
+  label,
+  description,
+  bookId,
+  pages,
+  chapterId,
+  open,
+  active,
+  compact,
+  gapToPage,
+  onToggle,
+  onStart,
+  onAdd,
+  onOpenPage,
+  onDelete,
+}: {
+  part: MatterPart;
+  label: string;
+  description: string;
+  bookId: string;
+  pages: readonly ChapterMeta[];
+  chapterId: string | null;
+  open: boolean;
+  active: boolean;
+  compact: boolean;
+  gapToPage: number;
+  onToggle: () => void;
+  onStart: () => void;
+  onAdd: (title: string) => void;
+  onOpenPage: (id: string) => void;
+  /** Confirms, deletes, and moves off the page when it was the open one. */
+  onDelete: (id: string, title: string) => void;
+}) {
+  const started = pages.length > 0;
+
+  /**
+   * Which of these pages is still all template.
+   *
+   * **Read during the render, and not memoised.** Bodies are read here and
+   * nowhere else in this panel — the shelf holds titles and counts precisely so
+   * that opening a book parses no prose — so this is a deliberate exception,
+   * and it is kept honest by being small: at most a dozen very short documents,
+   * only while the list is open, and a substring test rather than a parse.
+   *
+   * A memo was tried and was wrong in the one case that matters. There is no
+   * key that changes when a page stops being a draft: the ids do not move, and
+   * the word count does not either when `Copyright © [year] [author name]`
+   * becomes `Copyright © 2026 Marguerite Hale` — five words before and five
+   * after. `saveBody` skips the shelf write when the count is unchanged, so
+   * every cached answer went stale exactly where a writer had just finished a
+   * page and was looking at the list to see it.
+   */
+  const drafts = new Set<string>();
+  if (open) {
+    for (const page of pages) {
+      // The same call the export and the reading view make, so a row
+      // that says Draft and a file that leaves the page out can never
+      // disagree. See `isDraftMatter`.
+      if (isDraftMatter(page.id)) drafts.add(page.id);
+    }
+  }
+
+  const missing = missingSections(
+    part,
+    pages.map((p) => p.title),
+  );
+
+  return (
+    <MatterCard
+      gapToPage={gapToPage}
+      tone={part}
+      label={label}
+      description={open ? undefined : description}
+      meta={
+        started
+          ? `${pages.length} ${pages.length === 1 ? "page" : "pages"}`
+          : undefined
+      }
+      // "Start" only while there is nothing there. Once the pages exist the
+      // card does what the body's does, and says so in the same words.
+      action={started ? (open ? "Hide pages" : "Pages") : "Start"}
+      active={active}
+      onAction={started ? onToggle : onStart}
+      compact={compact}
+      grow={open}
+      // Same rule as the body's New chapter: only once the list is open. Shut,
+      // the card has one thing to offer and a second control beside it halves
+      // the width of that one thing.
+      secondaryNode={
+        open ? (
+          <Menu
+            label={`Add a page to ${label.toLowerCase()}`}
+            align="end"
+            width={264}
+            triggerClassName={`flex-1 cursor-pointer rounded-lg py-1.5
+                               font-sans text-xs font-semibold outline-none
+                               transition-colors focus-visible:ring-2
+                               ${CARD_OUTLINE}`}
+            trigger="Add page"
+          >
+            {(close) => (
+              <>
+                {/* **Two groups, because "the usual pages" was not true of all
+                    of them.** One heading over a list running from Dedication
+                    to Glossary tells a writer that a finished book has the
+                    lot — which is the reading that produces empty epigraphs
+                    and invented also-by pages, and no shop asks for any of
+                    them. The few most books have go first under their own
+                    heading; the rest are still one glance below.
+
+                    Named and explained either way: "Epigraph" is a word a
+                    first-time writer has no reason to know, and a menu of
+                    eight of them is a menu of eight guesses. */}
+                {missing.usual.length > 0 && (
+                  <>
+                    <MenuLabel>Most books have</MenuLabel>
+                    {missing.usual.map((section) => (
+                      <MenuButton
+                        key={section.title}
+                        onClick={() => {
+                          close();
+                          onAdd(section.title);
+                        }}
+                        hint={section.hint}
+                      >
+                        {section.title}
+                      </MenuButton>
+                    ))}
+                  </>
+                )}
+                {missing.rest.length > 0 && (
+                  <>
+                    <MenuLabel>If your book needs one</MenuLabel>
+                    {missing.rest.map((section) => (
+                      <MenuButton
+                        key={section.title}
+                        onClick={() => {
+                          close();
+                          onAdd(section.title);
+                        }}
+                        hint={section.hint}
+                      >
+                        {section.title}
+                      </MenuButton>
+                    ))}
+                  </>
+                )}
+                {(missing.usual.length > 0 || missing.rest.length > 0) && (
+                  <MenuSeparator />
+                )}
+                <MenuButton
+                  onClick={() => {
+                    close();
+                    const name = window.prompt(
+                      `What is this ${part === "front" ? "front" : "back"}-matter page called?`,
+                    );
+                    const trimmed = name?.trim();
+                    if (trimmed) onAdd(trimmed);
+                  }}
+                  hint="A page of your own, named by you."
+                >
+                  Something else…
+                </MenuButton>
+              </>
+            )}
+          </Menu>
+        ) : undefined
+      }
+    >
+      {started ? (
+        pages.map((page) => (
+          <ChapterPill
+            key={page.id}
+            number={null}
+            // Never a number — these pages are named, not counted. The column
+            // carries whether the page is still scaffolding instead, which is
+            // the one thing about it worth seeing from the list.
+            mark={drafts.has(page.id) ? "Draft" : undefined}
+            title={page.title}
+            active={page.id === chapterId}
+            onClick={() => onOpenPage(page.id)}
+            menu={[
+              {
+                label: "Rename",
+                icon: menuIcons.rename,
+                onSelect: () => {
+                  const next = window.prompt("Page title", page.title);
+                  if (next === null) return;
+                  const trimmed = next.trim();
+                  if (trimmed) renameChapter(bookId, page.id, trimmed);
+                },
+              },
+              {
+                label: "Delete",
+                icon: menuIcons.trash,
+                danger: true,
+                onSelect: () => onDelete(page.id, page.title),
+              },
+            ]}
+          />
+        ))
+      ) : (
+        <li className="px-1 py-2 font-sans text-xs text-muted italic">
+          No pages yet.
+        </li>
+      )}
+    </MatterCard>
   );
 }

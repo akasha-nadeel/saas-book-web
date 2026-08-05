@@ -21,13 +21,12 @@ import {
   findBook,
   getCover,
   getCoverFacts,
-  setCover,
   setCoverFacts,
 } from "@/lib/library-store";
+import { ToolStepDone } from "@/components/ui/tool-save";
+import { saveCover } from "@/lib/cover-save";
+import { useToolSave } from "@/lib/use-tool-save";
 import {
-  COVER_MAX_BYTES,
-  COVER_MAX_EDGE,
-  importImage,
 } from "@/lib/image-import";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
@@ -560,23 +559,28 @@ function CoverChecker({ bookId }: { bookId: string }) {
     const blob = await renderShape(plan, place);
     if (!blob) return;
 
-    const result = await importImage(
-      new File([blob], "cover.png", { type: "image/png" }),
-      { maxEdge: COVER_MAX_EDGE, maxBytes: COVER_MAX_BYTES },
+    const made = `cover-${plan.width}x${plan.height}.png`;
+    const result = await saveCover(
+      bookId,
+      new File([blob], made, { type: "image/png" }),
     );
     if (!result.ok) {
       setError(result.error);
       return;
     }
-    if (!setCover(bookId, result.src)) {
-      setError("There was no room to save that cover in this browser.");
-      return;
-    }
-    const made = `cover-${plan.width}x${plan.height}.png`;
     setName(made);
     await read(new File([blob], made));
+    /* **Says what the export will actually package.** The old wording —
+       "that copy is compressed for the shelf here" — was true of the *only*
+       copy this app kept, and told a writer their file was worse than it was
+       going to be. The full-size artwork is kept now (see cover-save.ts), so
+       the honest thing to report is the size of what goes into the EPUB. The
+       fallback case says so too rather than claiming a resolution it does not
+       have. */
     setDone(
-      "Set as this book's cover. That copy is compressed for the shelf here — download the file for a shop.",
+      result.printStored
+        ? `Set as this book's cover, at ${result.width}×${result.height} — that is what goes into your EPUB.`
+        : "Set as this book's cover. This browser would not store the full-size copy, so the export will use a smaller one — download the file and upload it to the shop yourself.",
     );
   }
 
@@ -1079,6 +1083,19 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   const book = findBook(shelf, bookId);
   const myCover = useCover(bookId);
 
+  /*
+   * No draft: attaching artwork is already its own press, and `saveCover`
+   * writes three stores the moment a file is chosen.
+   *
+   * What this control does is the *other* half — "Get a cover made" is the
+   * one step on the road that is deliberately not detected, because a
+   * generated placeholder is attached the same way a commissioned jacket is,
+   * and ticking off the most expensive step in the list on the strength of a
+   * gradient is the exact lie `roadmapFor` exists to prevent. So the writer
+   * says when it is done, from the screen where they did it.
+   */
+  const save = useToolSave({ book, tool: "covers" });
+
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
   const [size, setSize] = useState<SizeId>("thumb");
@@ -1184,6 +1201,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
              the window on both sides — the one page where extra width buys
              another column of the thing you came to look at. */
           width="6xl"
+          action={<ToolStepDone state={save} />}
         >
           Your cover, next to the shelf it has to sit on. We do not design covers
           and we will not generate one — this is the thing you would do yourself
@@ -1202,9 +1220,12 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
             screen called "Get a cover made" was asking to search. The panel
             gets the sentence too, since it is the frame that lost it. */}
         {embedded && (
-          <p className="-mt-2 mb-6 max-w-2xl text-sm text-muted">
-            Your cover, next to the shelf it has to sit on.
-          </p>
+          <div className="-mt-2 mb-6 flex items-start justify-between gap-4">
+            <p className="max-w-2xl text-sm text-muted">
+              Your cover, next to the shelf it has to sit on.
+            </p>
+            <ToolStepDone state={save} />
+          </div>
         )}
         {/* **Yours is on screen from the start, not summoned by a search.**
             It used to sit inside `wall.length > 0`, so a writer arriving on

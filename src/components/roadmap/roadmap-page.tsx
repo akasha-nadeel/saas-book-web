@@ -14,6 +14,7 @@ import {
   type Phase,
   type StepState,
 } from "@/lib/roadmap";
+import { confirmLeave } from "@/lib/unsaved";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -144,11 +145,21 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
    */
   const router = useRouter();
   const pathname = usePathname();
+  /*
+   * Guarded, because swapping the panel unmounts whatever is in it.
+   *
+   * Opening a *second* step's tool over the first is leaving the first, and it
+   * is a `router.replace` rather than a link — no anchor to intercept, no
+   * `popstate`, no unload. `confirmLeave` falls through when there is nothing
+   * pending, so every ordinary press behaves exactly as it did.
+   */
   const setPanel = (stepId: string | null) => {
-    const next = new URLSearchParams();
-    next.set("phase", open);
-    if (stepId) next.set("open", stepId);
-    router.replace(`${pathname}?${next}`, { scroll: false });
+    confirmLeave(() => {
+      const next = new URLSearchParams();
+      next.set("phase", open);
+      if (stepId) next.set("open", stepId);
+      router.replace(`${pathname}?${next}`, { scroll: false });
+    });
   };
 
   const openStep = steps.find((s) => s.id === params.get("open")) ?? null;
@@ -159,8 +170,19 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
   const current = phases[index] ?? phases[0];
   const previous = index > 0 ? phases[index - 1] : null;
   const following = index < phases.length - 1 ? phases[index + 1] : null;
-  /** Only worth offering when the writer has browsed away from their position. */
-  const skipTo = here && here !== open ? phases.find((p) => p.id === here) : null;
+  /*
+   * Only worth offering when the writer has browsed away from their position —
+   * *and* when it is not simply the next phase, which the primary button
+   * already goes to. Ticking the last step of the phase you are looking at put
+   * "Skip to Revise" and "Revise →" on the same row: two controls, one
+   * destination, two different words for it. Skip earns its place as a jump
+   * across several phases or backwards; as a synonym for Next it is noise on
+   * the row that matters most.
+   */
+  const skipTo =
+    here && here !== open && here !== following?.id
+      ? (phases.find((p) => p.id === here) ?? null)
+      : null;
 
   if (!hydrated) return <LoadingScreen />;
 
@@ -494,17 +516,35 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
               that scrolls out of reach is one a writer has to hunt for to get
               back to the road. */}
           <header className="flex shrink-0 items-center justify-end border-b border-line bg-panel px-5 py-2.5">
-            {/* `text-accent-ink`, never a fixed white: `danger` is a deep red
-                by day and a pale one at night, so the ink has to cross over
-                with it or the word vanishes in exactly one theme. Same rule as
-                every other filled action. */}
+            {/* **Not `danger`, which is what this was.**
+
+                Red is one of the four meanings this app's palette spends a hue
+                on, and it means *a shop would refuse this* — it is the colour
+                of the blocking findings and of Delete. Closing a panel throws
+                nothing away — the road is still there, and where the tool
+                does hold an unsaved draft `confirmLeave` asks before this
+                runs, which is the guarantee rather than the styling. A red
+                button says the opposite, and the cost of that is a writer who
+                hesitates over the only way back to the road, or who reads it
+                as "discard" and does not press it at all.
+
+                A quiet outline instead — the same shape the panel's own
+                secondary controls use. The one control on a bar of its own
+                does not need a fill to be found. */}
+            {/* Through `confirmLeave` because this is the one exit from a tool
+                that is not a navigation: no anchor to intercept, no `popstate`,
+                no unload. It falls straight through when nothing is pending,
+                so the ordinary press is unchanged. */}
             <button
               type="button"
               onClick={() => setPanel(null)}
-              className="rounded-lg bg-danger px-3.5 py-1.5 text-sm font-semibold
-                         text-accent-ink hover:opacity-90"
+              aria-label="Close this step and go back to the road"
+              className="rounded-lg border border-line px-3.5 py-1.5 text-sm
+                         font-semibold text-fg outline-none transition-colors
+                         hover:border-accent/60 hover:bg-raised
+                         focus-visible:ring-2 focus-visible:ring-accent/50"
             >
-              Close
+              Close ✕
             </button>
           </header>
 
@@ -570,11 +610,40 @@ function Row({
      that. */
   const panel = href ? panelToolFor(href, bookId) : null;
 
+  /*
+   * **The marker had no affordance, and thirteen of the nineteen steps need
+   * one.** An unticked marker was a 24px circle drawn in `line` — the faintest
+   * hairline in the palette, the same value as the decorative rail running
+   * through it — holding a tick set to `text-transparent`. So the one control
+   * on this page that writes anything was invisible, and pixel-identical to
+   * the non-interactive `<span>` on a step that ticks itself. A writer looking
+   * at "Finish the first draft · NEXT" had no way to see that the roadmap
+   * could be marked at all, which for a checklist is close to the whole
+   * feature. (The dashboard's next-step card grew an explicit "Already done"
+   * button for exactly this reason and the road never got one.)
+   *
+   * So an unticked *hand-tickable* marker carries a faint tick and a `muted`
+   * border: it reads as a box waiting to be checked, which is exactly what it
+   * is. Hover and focus take it to the accent, the app's one colour for a way
+   * forward.
+   *
+   * **An unticked automatic marker stays empty, and that is the load-bearing
+   * half.** The first attempt at this gave it a filled grey circle with a faint
+   * tick in it, to say "not yours to press" — and a filled circle with a tick
+   * in it is what *done* looks like. "Write the blurb · ticks itself" appeared
+   * finished on a book with no blurb at all, which is worse than the problem it
+   * was solving: a marker with no affordance merely fails to invite, while one
+   * that reads as ticked states something untrue about the book. The two kinds
+   * are told apart by the tick — a box you can check shows a faint one, a box
+   * that fills itself shows none — and the row says "ticks itself" beside it.
+   */
   const marker = `z-10 mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full
                   text-[11px] font-bold ${
                     step.done
                       ? "bg-accent text-accent-ink"
-                      : "border-2 border-line bg-panel text-transparent"
+                      : step.automatic
+                        ? "border-2 border-line bg-panel text-transparent"
+                        : "border-2 border-muted/60 bg-panel text-muted/45"
                   }`;
 
   return (
@@ -603,9 +672,13 @@ function Row({
               ? `Mark "${step.title}" as not done`
               : `Mark "${step.title}" as done`
           }
-          className={`${marker} transition-colors ${
-            step.done ? "" : "hover:border-accent hover:text-accent/40"
-          }`}
+          title={step.done ? "Mark as not done" : "Mark as done"}
+          className={`${marker} cursor-pointer outline-none transition-colors
+                      focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                        step.done
+                          ? "hover:opacity-80"
+                          : "hover:border-accent hover:text-accent"
+                      }`}
         >
           ✓
         </button>
@@ -640,12 +713,45 @@ function Row({
               already a real pressed-state toggle — two controls in one row
               claiming the same semantics is how a screen reader ends up
               describing "Open" as a checkbox for the step. */}
+          {/* **The step being asked for says how to answer it.**
+
+              A circle you have to guess is clickable is not an instruction, and
+              on the one row the page is actively pointing at — the NEXT badge,
+              the ring, the explanation left in place — a writer needs to be
+              told what to do rather than shown a bullet. So the next step, when
+              it is one only the writer can confirm, carries the words.
+
+              Only that row. Thirteen "Mark as done" buttons down a phase would
+              turn a road into a form, and the marker beside every other row
+              does the same job now that it can be seen. Same wording as the
+              dashboard's next-step card, which reached this conclusion first.
+
+              `aria-hidden` because the marker is already a labelled toggle for
+              the same state: two controls in one row both announcing "mark this
+              done" is a screen reader reading the row twice. Sighted writers
+              get the affordance; everyone else already had one. */}
+          {next && !step.automatic && !step.done && (
+            <button
+              type="button"
+              aria-hidden="true"
+              tabIndex={-1}
+              onClick={() => setRoadmapStep(bookId, step.id, true)}
+              className="ml-auto shrink-0 rounded-md border border-accent/40 px-2.5
+                         py-1 text-xs font-semibold text-accent outline-none
+                         transition-colors hover:bg-accent/10"
+            >
+              Already done
+            </button>
+          )}
+
           {panel && onOpen ? (
             <button
               type="button"
               onClick={onOpen}
               aria-expanded={Boolean(active)}
-              className="ml-auto text-xs font-semibold text-accent"
+              className={`text-xs font-semibold text-accent ${
+                next && !step.automatic && !step.done ? "" : "ml-auto"
+              }`}
             >
               {active ? "Open ✓" : "Open →"}
             </button>
@@ -659,7 +765,9 @@ function Row({
                  left rather than at step one. */
               <Link
                 href={`${href}${href.includes("?") ? "&" : "?"}from=roadmap&phase=${phase}`}
-                className="ml-auto text-xs font-semibold text-accent"
+                className={`text-xs font-semibold text-accent ${
+                  next && !step.automatic && !step.done ? "" : "ml-auto"
+                }`}
               >
                 Open →
               </Link>

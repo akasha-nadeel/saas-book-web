@@ -86,3 +86,44 @@ export function targetHint(kind: BookKind, genre: string): string {
 export function kindLabel(kind: BookKind): string {
   return BOOK_KINDS.find((k) => k.value === kind)?.label ?? "Novel";
 }
+
+/**
+ * The floor a form is generally understood to start at.
+ *
+ * Conventions of the trade, and the same numbers `BOOK_KINDS` shows the writer
+ * when they set the book up — which is the point: the app already told them a
+ * novel is "40,000+ words", so it can say when a book called a novel is not
+ * one without inventing a standard.
+ */
+const FORM_FLOOR: Record<BookKind, number> = {
+  novel: 40_000,
+  novella: 17_500,
+  "short-story": 0,
+};
+
+/**
+ * Whether a finished book is much shorter than the form it is sold as, and by
+ * how much. Null when it is not, which is nearly always.
+ *
+ * **The threshold is half the floor, not the floor itself.** A 38,000-word
+ * novel is a novel by any reasonable reading and nobody needs telling
+ * otherwise; a 4,000-word one is a short story with a novel's description on
+ * it, and a shop may refuse a listing that misrepresents what is being bought.
+ * Sitting the line well below the boundary is what keeps this from firing on
+ * books that are merely on the short side.
+ *
+ * Silent below `MIN_WORDS`, because a book at 900 words is being drafted
+ * rather than mislabelled, and there is already a check for a book with
+ * nothing in it.
+ */
+export function formShortfall(
+  kind: BookKind,
+  words: number,
+): { label: string; floor: number } | null {
+  const floor = FORM_FLOOR[kind];
+  if (!floor || words < MIN_WORDS || words >= floor / 2) return null;
+  return { label: kindLabel(kind), floor };
+}
+
+/** Under this a book is still being written, not mislabelled. */
+const MIN_WORDS = 2_000;

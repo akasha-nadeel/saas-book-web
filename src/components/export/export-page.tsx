@@ -16,7 +16,15 @@ import {
   Note,
   StoreReadiness,
 } from "@/components/export/publishing-card";
-import { loadChapters, runExport, type Format } from "@/lib/export";
+import {
+  loadChapters,
+  runExport,
+  skippedMatterPages,
+  type Format,
+} from "@/lib/export";
+import { ToolStepDone } from "@/components/ui/tool-save";
+import { useToolSave } from "@/lib/use-tool-save";
+import { writtenPages } from "@/lib/export/front-matter";
 import {
   DEFAULT_TYPESET,
   TEMPLATES,
@@ -25,7 +33,13 @@ import {
   trimById,
   type TypesetOptions,
 } from "@/lib/export/typeset";
-import { bookWordCount, findBook, type Book } from "@/lib/library-store";
+import {
+  bookChapterCount,
+  bookWordCount,
+  chapterMatterOf,
+  findBook,
+  type Book,
+} from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { BookCover } from "@/components/shelf/book-cover";
 import { storeReadiness } from "@/lib/publishing";
@@ -180,8 +194,7 @@ function stepsFor(output: Output | null): Step[] {
   steps.push({
     id: "export",
     group: "Export",
-    title:
-      output === "audiobook" ? "Read it aloud" : "Take it out of here",
+    title: output === "audiobook" ? "Read it aloud" : "Take it out of here",
     blurb:
       output === "audiobook"
         ? "One chapter at a time, so a long book is visible progress rather than one long wait."
@@ -233,7 +246,9 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const params = useSearchParams();
   const initial = params.get("step");
   const deepLink =
-    initial && STEP_DEEP_LINKS.has(initial as StepId) ? (initial as StepId) : null;
+    initial && STEP_DEEP_LINKS.has(initial as StepId)
+      ? (initial as StepId)
+      : null;
   /** Which dashboard area sent the writer here, for the rail's way back. */
   const from = params.get("from");
 
@@ -252,6 +267,33 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const [narrationError, setNarrationError] = useState<string | null>(null);
 
   const steps = useMemo(() => stepsFor(output), [output]);
+
+  /**
+   * Which matter pages this export would leave out.
+   *
+   * Reads every front- and back-matter body, so it is memoised rather than run
+   * per render — the same reasoning that keeps prose out of the shelf. Resolved
+   * from the shelf inside the memo because every hook has to sit above the
+   * early returns below, and `book` is found after them.
+   */
+  const skipped = useMemo(() => {
+    const b = findBook(shelf, bookId);
+    return b ? skippedMatterPages(b) : [];
+  }, [shelf, bookId]);
+
+  /**
+   * Which of the three generated pages the writer has already written.
+   *
+   * The switch above each one stays on and the *written* page wins — see
+   * `writtenPages`. That is the right outcome and the wrong thing to leave
+   * unsaid: a switch that is on and produces nothing is the dead UI this app
+   * refuses, and the writer would only find out by counting pages in the
+   * finished file. So the hint changes to say which page is being used.
+   */
+  const written = useMemo(() => {
+    const b = findBook(shelf, bookId);
+    return b ? writtenPages(loadChapters(b)) : new Set<string>();
+  }, [shelf, bookId]);
 
   /**
    * What a shop would refuse, for the rail to show from step one.
@@ -278,6 +320,18 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
       brokenImages: 0,
     }).filter((issue) => issue.level === "blocking").length;
   }, [shelf, bookId, cover]);
+
+  /*
+   * Two road steps end here — "Run the pre-upload check" and "Export the
+   * files" — and neither can be detected. Nothing in the library records that
+   * a writer read the readiness list, and a file that has been downloaded is
+   * gone from this app the moment the browser takes it.
+   *
+   * No draft: every field on this flow writes as it is filled, and the export
+   * itself is already the biggest button on the screen. This press is only
+   * the road.
+   */
+  const save = useToolSave({ book: findBook(shelf, bookId), tool: "export" });
 
   // Every hook is above the early returns on purpose — a book that is not there
   // must not change how many hooks this component runs.
@@ -436,7 +490,9 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
         {/* Above this screen's own Back/step header rather than inside it: the
             step name belongs to the whole export flow, and the header below
             changes with every step of it. */}
-        {heading && <div className="shrink-0 px-5 pt-5 md:px-12 md:pt-7">{heading}</div>}
+        {heading && (
+          <div className="shrink-0 px-5 pt-5 md:px-12 md:pt-7">{heading}</div>
+        )}
         <header className="flex shrink-0 items-center gap-4 px-5 pt-5 md:px-12 md:pt-7">
           {/* Back sits at the top, where you came in, rather than at the bottom
               where it would compete with the step's own action. Absent on the
@@ -491,12 +547,25 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           {/* The rail carries this where the rail exists. */}
           <Link
             href={`/book/${bookId}`}
-            className="ml-auto shrink-0 rounded-sm font-sans text-sm text-muted
+            className="shrink-0 rounded-sm font-sans text-sm text-muted
                        outline-none transition-colors hover:text-fg
                        focus-visible:ring-2 focus-visible:ring-accent/60 lg:hidden"
           >
             Back to writing
           </Link>
+
+          {/* This screen never took `ToolHeader` — it is a two-pane wizard
+              rather than a page with a heading — so the control the other
+              tools get from that component is placed by hand, on the one row
+              present in every frame and on every step.
+
+              The margin moved off the link and on to this: the link is
+              `lg:hidden`, and an auto margin on a `display:none` element
+              pushes nothing, so above `lg` the button would have sat next to
+              Previous. Two auto margins in one row is the other wrong answer —
+              the free space splits between them and neither lands where it
+              was aimed. */}
+          <ToolStepDone state={save} className="ml-auto" />
         </header>
 
         <div
@@ -556,26 +625,77 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
               )}
 
               {step.id === "frontmatter" && (
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <Toggle
-                    label="Title page"
-                    hint="The book’s title and author"
-                    on={typeset.titlePage}
-                    onChange={(v) => set("titlePage", v)}
-                  />
-                  <Toggle
-                    label="Copyright page"
-                    hint="© this year, in the author’s name"
-                    on={typeset.copyright}
-                    onChange={(v) => set("copyright", v)}
-                  />
-                  <Toggle
-                    label="Contents"
-                    hint="A list of the chapters"
-                    on={typeset.contents}
-                    onChange={(v) => set("contents", v)}
-                  />
-                </div>
+                <>
+                  {/* **Every hint says what will actually happen**, because
+                      each of these three switches has a case where it is on and
+                      produces nothing — and a switch that quietly does nothing
+                      is the dead UI this app refuses. Two such cases: the writer
+                      has a page of their own, which wins (see `writtenPages`),
+                      or the book has no author to put on a copyright notice. */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Toggle
+                      label="Title page"
+                      hint={
+                        written.has("title")
+                          ? "Your own page is used instead"
+                          : "The book’s title and author"
+                      }
+                      on={typeset.titlePage}
+                      onChange={(v) => set("titlePage", v)}
+                    />
+                    <Toggle
+                      label="Copyright page"
+                      hint={
+                        written.has("copyright")
+                          ? "Your own page is used instead"
+                          : book.author?.trim()
+                            ? "© this year, in the author’s name"
+                            : "Left out — this book has no author’s name yet"
+                      }
+                      on={typeset.copyright}
+                      onChange={(v) => set("copyright", v)}
+                    />
+                    <Toggle
+                      label="Contents"
+                      hint={
+                        written.has("contents")
+                          ? "Your own page is used instead"
+                          : "A list of the chapters"
+                      }
+                      on={typeset.contents}
+                      onChange={(v) => set("contents", v)}
+                    />
+                  </div>
+
+                  {/* **The filter, said out loud.**
+
+                    A front- or back-matter page still carrying its
+                    `[placeholders]` is left out of the file, because the
+                    alternative is a reader meeting "For [name]." on the page
+                    after the cover. But a page quietly disappearing from
+                    somebody's book is the same class of mistake as a template
+                    quietly shipping in one — the file does not match the book
+                    on screen, and only one of the two is discoverable. So they
+                    are named, in the writer's own page titles, with what to do.
+
+                    A note rather than a warning: nothing here is wrong. These
+                    are pages the writer has not got to yet, and the export is
+                    doing the right thing by them. */}
+                  {skipped.length > 0 && (
+                    <div className="mt-4 rounded-lg border border-note-line bg-note-bg px-3.5 py-3">
+                      <p className="font-sans text-sm font-semibold text-note-fg">
+                        {skipped.length === 1
+                          ? "One page is not going in"
+                          : `${skipped.length} pages are not going in`}
+                      </p>
+                      <p className="mt-1 font-sans text-xs leading-relaxed text-note-fg/85">
+                        {skipped.join(", ")} — still blank, or still holding the
+                        example text in [square brackets]. Fill one in and it
+                        joins the book; delete the ones you do not want.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
 
               {step.id === "listing" && <ListingDetails book={book} />}
@@ -596,6 +716,8 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                   narrating={narrating}
                   narrationLabel={narrationLabel}
                   narrationError={narrationError}
+                  skipped={skipped.length}
+                  written={written}
                   onRun={run}
                   onNarrate={narrate}
                 />
@@ -735,9 +857,14 @@ function Rail({
             <span className="block truncate font-sans text-sm font-semibold text-fg">
               {book.title}
             </span>
+            {/* `bookChapterCount`, not `chapters.length`: the second counts the
+                front- and back-matter pages too, so a two-chapter novel with
+                the standard matter read "18 chapters" here while the panel it
+                came from said two. One question, one answer — the store owns
+                it. */}
             <span className="mt-0.5 block font-sans text-xs text-muted">
-              {book.chapters.length}{" "}
-              {book.chapters.length === 1 ? "chapter" : "chapters"} ·{" "}
+              {bookChapterCount(book)}{" "}
+              {bookChapterCount(book) === 1 ? "chapter" : "chapters"} ·{" "}
               {bookWordCount(book).toLocaleString()} words
             </span>
           </span>
@@ -949,15 +1076,15 @@ function FormatStep({
       {output === "pdf" && (
         <Note>
           This opens your browser’s print dialog — choose “Save as PDF”. It sets
-          the interior at your trim size. It does not add bleed or crop marks, so
-          a printer may ask you for those separately.
+          the interior at your trim size. It does not add bleed or crop marks,
+          so a printer may ask you for those separately.
         </Note>
       )}
 
       {output === "audiobook" && (
         <Note>
-          Read by a speech model, one chapter at a time, and downloaded as a zip.
-          It needs a connection and is billed per minute of audio.
+          Read by a speech model, one chapter at a time, and downloaded as a
+          zip. It needs a connection and is billed per minute of audio.
         </Note>
       )}
 
@@ -1113,7 +1240,11 @@ function TemplateStep({
 }) {
   return (
     <div className="space-y-5">
-      <div role="radiogroup" aria-label="Template" className="grid gap-3 sm:grid-cols-3">
+      <div
+        role="radiogroup"
+        aria-label="Template"
+        className="grid gap-3 sm:grid-cols-3"
+      >
         {TEMPLATES.map((t) => (
           <TemplateCard
             key={t.id}
@@ -1389,6 +1520,8 @@ function ExportStep({
   narrating,
   narrationLabel,
   narrationError,
+  skipped,
+  written,
   onRun,
   onNarrate,
 }: {
@@ -1403,30 +1536,62 @@ function ExportStep({
   narrating: boolean;
   narrationLabel: string;
   narrationError: string | null;
+  /** How many matter pages the export is leaving out — see `skippedMatterPages`. */
+  skipped: number;
+  /** Generated pages the writer has a page of their own for — see `writtenPages`. */
+  written: ReadonlySet<string>;
   onRun: () => void;
   onNarrate: () => void;
 }) {
   // What the file will contain, said back in one place. A writer who clicked
   // through four screens should not have to click back to check what they set.
+  //
+  // **The body chapters, not every page in the book.** This counted
+  // `book.chapters.length`, which was near enough while front and back matter
+  // were one page each and the count was off by two. They are lists of pages
+  // now — a book with the standard set has sixteen of them — so the row read
+  // "20 chapters" for a three-chapter novel, and counted pages that were about
+  // to be left out for still being blank. The matter pages are reported on
+  // their own line, where they can say how many are actually going in.
+  const bodyCount = book.chapters.filter(
+    (c) => chapterMatterOf(c) === "body",
+  ).length;
+  const matterCount = book.chapters.length - bodyCount - skipped;
   const summary: [string, string][] = [
     ["Format", label],
-    [
-      "Chapters",
-      `${book.chapters.length} ${book.chapters.length === 1 ? "chapter" : "chapters"}`,
-    ],
+    ["Chapters", `${bodyCount} ${bodyCount === 1 ? "chapter" : "chapters"}`],
   ];
+  if (matterCount > 0) {
+    summary.push([
+      "Your own pages",
+      matterCount === 1
+        ? "1 page of front or back matter"
+        : `${matterCount} pages of front and back matter`,
+    ]);
+  }
   if (isTypeset(output)) {
     summary.push(["Template", templateById(typeset.template).name]);
     if (output === "pdf") summary.push(["Trim", trimById(typeset.trim).label]);
+    /* **What will actually be generated, not what is switched on.** This is
+       the last thing a writer reads before pressing the button, so it may not
+       promise a page that is about to stand down for one of their own — nor a
+       copyright notice for a book with nobody to name on it. Same three
+       conditions as `frontSections`, said in the same order. */
     const front = [
-      typeset.titlePage && "title page",
-      typeset.copyright && "copyright",
-      typeset.contents && "contents",
+      typeset.titlePage && !written.has("title") && "title page",
+      typeset.copyright &&
+        !written.has("copyright") &&
+        Boolean(book.author?.trim()) &&
+        "copyright",
+      typeset.contents && !written.has("contents") && "contents",
     ].filter(Boolean) as string[];
     summary.push(["Front matter", front.length ? front.join(", ") : "none"]);
   }
   if (output === "docx") {
-    summary.push(["Layout", manuscript ? "Standard manuscript" : "Clean document"]);
+    summary.push([
+      "Layout",
+      manuscript ? "Standard manuscript" : "Clean document",
+    ]);
   }
 
   return (

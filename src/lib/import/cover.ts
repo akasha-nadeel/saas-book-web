@@ -1,5 +1,12 @@
 import type JSZip from "jszip";
-import { COVER_MAX_BYTES, COVER_MAX_EDGE, importImage } from "../image-import";
+import {
+  COVER_MAX_BYTES,
+  COVER_MAX_EDGE,
+  importImage,
+  originalImage,
+} from "../image-import";
+import { PRINT_MAX_EDGE } from "../cover-save";
+import type { PrintCover } from "../cover-store";
 
 /**
  * The artwork inside an EPUB, resized to what a browser will hold.
@@ -9,12 +16,14 @@ import { COVER_MAX_BYTES, COVER_MAX_EDGE, importImage } from "../image-import";
  * rather than a parser reading a string, and jsdom has neither half. Keeping
  * it here leaves everything in `epub.ts` testable.
  *
- * The budget is the one every other cover in the app is held to
- * (`COVER_MAX_EDGE` / `COVER_MAX_BYTES` — the same numbers the cover dialog
- * passes), because this ends up at the same key, in the same five megabytes,
- * next to covers the writer chose by hand. A book's own artwork arriving at
- * full print resolution would quietly spend a fifth of the origin's storage on
- * pixels nothing ever draws: the shelf renders it about 150px wide.
+ * **Two copies come out, for the two jobs.** The thumbnail is held to the
+ * budget every other cover is (`COVER_MAX_EDGE` / `COVER_MAX_BYTES` — the same
+ * numbers the cover dialog passes), because it lands at the same key in the
+ * same five megabytes as covers chosen by hand, and the shelf renders it about
+ * 150px wide. The full-size copy goes to IndexedDB, where a few hundred
+ * kilobytes cost nothing, because it is what the *next* export packages — an
+ * imported book whose cover arrived at 1600×2560 and left at 495×700 is the
+ * same silent downgrade this whole change exists to stop.
  */
 
 const TYPES: Record<string, string> = {
@@ -38,7 +47,7 @@ const TYPES: Record<string, string> = {
 export async function epubCover(
   zip: JSZip,
   path: string,
-): Promise<string | null> {
+): Promise<{ thumb: string; print: PrintCover | null } | null> {
   const entry = zip.file(path);
   if (!entry) return null;
 
@@ -54,8 +63,20 @@ export async function epubCover(
     const result = await importImage(file, {
       maxEdge: COVER_MAX_EDGE,
       maxBytes: COVER_MAX_BYTES,
+      // JPEG for the same reason the cover dialog uses it: this copy is what
+      // the export falls back to, and a shop's converter should never have to
+      // take a format it might not know.
+      encode: "jpeg",
     });
-    return result.ok ? result.src : null;
+    if (!result.ok) return null;
+
+    const full = await originalImage(file, PRINT_MAX_EDGE);
+    return {
+      thumb: result.src,
+      print: full
+        ? { dataUrl: full.src, width: full.width, height: full.height }
+        : null,
+    };
   } catch {
     return null;
   }

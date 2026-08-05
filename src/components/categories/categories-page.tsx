@@ -13,8 +13,10 @@ import {
 import { COMMON_SUBJECTS } from "@/lib/comps/common-subjects";
 import { keywordReport, SLOTS, SLOT_MAX, type Issue } from "@/lib/keywords";
 import { ProGate } from "@/components/upgrade/pro-gate";
+import { ToolSaveBar } from "@/components/ui/tool-save";
 import { findBook, setPublishing } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -72,40 +74,120 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
   /** What the writer is typing into the list themselves. */
   const [own, setOwn] = useState("");
 
-  const chosen = useMemo(
+  /*
+   * The categories and the seven boxes are held on screen until Save.
+   *
+   * They used to write straight through on every toggle and every keystroke,
+   * which made a shelf write per character in a keyword field and — worse —
+   * gave a writer no way to try three arrangements and keep the one they
+   * liked. Both halves are one form on one screen, so they are one draft and
+   * one press.
+   */
+  const storedSubjects = useMemo(
     () => book?.publishing?.subjects ?? [],
     [book?.publishing?.subjects],
   );
+  const storedKeywords = useMemo(
+    () =>
+      Array.from({ length: SLOTS }, (_, i) =>
+        (book?.publishing?.keywords?.[i] ?? "").toString(),
+      ),
+    [book?.publishing?.keywords],
+  );
+
+  /*
+   * One state, `null` until the store has been read.
+   *
+   * Two pieces of form in one object rather than two `useState`s beside a
+   * `seeded` flag: the flag was a ref, and working out whether the form
+   * differed from the book meant reading it *during render*, which is the
+   * thing refs are not for. Null is the flag now, and it is the value.
+   */
+  const [form, setForm] = useState<{
+    chosen: string[];
+    keywords: string[];
+  } | null>(null);
+
+  /* Untouched, so the form falls back to the book. No effect copies it in:
+     an effect that seeds state is a second render for something the first one
+     already knew, and it forced a `seeded` flag to be read during render. */
+  const chosen = form?.chosen ?? storedSubjects;
+  const keywords = form?.keywords ?? storedKeywords;
+
+  const same = (a: readonly string[], b: readonly string[]) =>
+    a.length === b.length && a.every((v, i) => v === b[i]);
+
+  const save = useToolSave({
+    book,
+    tool: "categories",
+    dirty:
+      form !== null &&
+      (!same(form.chosen, storedSubjects) ||
+        !same(form.keywords, storedKeywords)),
+    commit: () =>
+      book &&
+      setPublishing(book.id, {
+        subjects: chosen,
+        /* Seven empty strings is not an answer, and `setPublishing` only
+           drops an array that is *empty* — so saving a book with no keywords
+           stored `["","","","","","",""]` on it, and pushed that to Postgres.
+           An empty array here is how the field is cleared. */
+        keywords: keywords.some((k) => k.trim()) ? keywords : [],
+      }),
+    discard: () => setForm(null),
+  });
+
+  /** Edit one half of the form, whichever half. */
+  function edit(patch: {
+    chosen?: (current: string[]) => string[];
+    keywords?: (current: string[]) => string[];
+  }) {
+    setForm((current) => {
+      const base = current ?? {
+        chosen: [...storedSubjects],
+        keywords: [...storedKeywords],
+      };
+      return {
+        chosen: patch.chosen ? patch.chosen(base.chosen) : base.chosen,
+        keywords: patch.keywords ? patch.keywords(base.keywords) : base.keywords,
+      };
+    });
+  }
 
   /** One of the seven, written back in place so slot four stays slot four. */
   function setKeyword(index: number, text: string) {
-    if (!book) return;
-    const next = Array.from(
-      { length: SLOTS },
-      (_, i) => (i === index ? text : (book.publishing?.keywords?.[i] ?? "")),
-    );
-    setPublishing(book.id, { keywords: next });
+    edit({
+      keywords: (current) =>
+        Array.from({ length: SLOTS }, (_, i) =>
+          i === index ? text : (current[i] ?? ""),
+        ),
+    });
   }
 
   /**
-   * Already on the book, however it was capitalised.
+   * Already on the list, however it was capitalised.
    *
    * Case-insensitive so a category typed as "mystery" ticks the "Mystery"
    * suggestion rather than sitting beside it as a near-duplicate — the shop
    * would treat those as one, and the writer would have to spot it.
+   *
+   * Takes the list rather than reading `chosen`, because both callers below
+   * work inside a state updater and have to test what is *current* there, not
+   * what was current when this render started.
    */
-  function has(name: string): boolean {
+  function holds(list: readonly string[], name: string): boolean {
     const key = name.trim().toLowerCase();
-    return chosen.some((s) => s.toLowerCase() === key);
+    return list.some((s) => s.toLowerCase() === key);
   }
 
   function toggle(name: string) {
-    if (!book) return;
     const key = name.trim().toLowerCase();
-    const next = has(name)
-      ? chosen.filter((s) => s.toLowerCase() !== key)
-      : [...chosen, name];
-    setPublishing(book.id, { subjects: next });
+    edit({
+      chosen: (current) =>
+        holds(current, name)
+          ? current.filter((s) => s.toLowerCase() !== key)
+          : [...current, name],
+    });
   }
 
   /**
@@ -118,18 +200,18 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
    * is the normal case, since we cannot see the shop's tree.
    */
   function addNames(names: readonly string[]) {
-    if (!book) return;
-    const added: string[] = [];
-    for (const raw of names) {
-      const name = raw.replace(/\s+/g, " ").trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      if (has(name) || added.some((a) => a.toLowerCase() === key)) continue;
-      added.push(name);
-    }
-    if (added.length > 0) {
-      setPublishing(book.id, { subjects: [...chosen, ...added] });
-    }
+    edit({
+      chosen: (current) => {
+        const added: string[] = [];
+        for (const raw of names) {
+          const name = raw.replace(/\s+/g, " ").trim();
+          if (!name) continue;
+          if (holds(current, name) || holds(added, name)) continue;
+          added.push(name);
+        }
+        return added.length > 0 ? [...current, ...added] : current;
+      },
+    });
     setOwn("");
   }
 
@@ -158,6 +240,11 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
 
   return (
     <div className={toolShell(embedded)}>
+      {/* At the foot of the window, and only once there is something to lose.
+          Outside the scrolling column: the keyword boxes are below the fold on
+          an ordinary laptop, and a Save that scrolls with them is not on
+          screen at the moment it becomes relevant. */}
+      <ToolSaveBar state={save} />
       {/* The trail keeps the trade word, the heading asks the writer's own
           question — the split comps, the title check and the blurb screen all
           make. "Categories" is the word on the shop's own form and in the
@@ -266,11 +353,15 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
                 onAdd={addOwn}
                 onPick={(name) => addNames([name])}
               />
+              {/* No longer "saved as you go" — this list is held until the bar
+                  at the foot of the window is pressed, and a hint promising
+                  otherwise is the kind of claim the house rules exist to
+                  catch. The comma trick is the part worth keeping. */}
               <p className="mt-2 max-w-prose text-xs text-muted">
-                Saved as you go, and several at once if you separate them with
-                commas. Suggestions come from Open Library&rsquo;s subject index;
-                nothing is checked against a shop&rsquo;s own list, so paste
-                whatever its selector gave you.
+                Several at once if you separate them with commas. Suggestions
+                come from Open Library&rsquo;s subject index; nothing is checked
+                against a shop&rsquo;s own list, so paste whatever its selector
+                gave you.
               </p>
             </div>
           </div>
@@ -293,8 +384,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
               Your seven keywords
             </h2>
             <span className="text-sm text-muted tabular-nums">
-              {(book.publishing?.keywords ?? []).filter((k) => k.trim()).length}{" "}
-              of {SLOTS} used
+              {keywords.filter((k) => k.trim()).length} of {SLOTS} used
             </span>
           </div>
 
@@ -312,7 +402,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
                 what="The seven backend keyword fields a shop's listing form asks for, counted: which are over the limit, which repeat words your title already owns, which spend the same word twice, and which use phrases shops reject."
               >
                 <KeywordBoxes
-                  keywords={book.publishing?.keywords ?? []}
+                  keywords={keywords}
                   title={book.title}
                   subtitle={book.subtitle}
                   author={book.author}

@@ -1,5 +1,7 @@
 import type { JSONContent } from "@tiptap/react";
 import { fontStack } from "@/lib/typography";
+import { hasPlaceholder } from "@/lib/matter";
+import { getBody } from "@/lib/library-store";
 
 /**
  * A format-neutral view of a Tiptap document.
@@ -50,6 +52,17 @@ export interface LoadedChapter {
   /** The body-chapter number, or null for front and back matter — which are
    *  named, so the exporters print no numeral above them. */
   number: number | null;
+  /**
+   * Which part of the book this page belongs to.
+   *
+   * Optional, and absent means the body. Front and back matter are lists of
+   * named pages (see `src/lib/matter.ts`), and the EPUB has to say which is
+   * which: a dedication labelled `bodymatter chapter` tells a reading system
+   * the novel begins there. `number` cannot answer it — a *blank* body chapter
+   * has a number and a dedication does not, but so does nothing else about
+   * them differ from the exporters' side.
+   */
+  matter?: "front" | "body" | "back";
 }
 
 export interface Block {
@@ -255,4 +268,73 @@ export function toBlocks(doc: JSONContent): Block[] {
   const out: Block[] = [];
   walk(doc.content ?? [], 0, out);
   return out;
+}
+
+/**
+ * Whether a front- or back-matter page is still scaffolding.
+ *
+ * **This is what stops a template shipping inside somebody's book.** Pressing
+ * Start on Front matter makes the eight standard pages, each seeded with the
+ * real shape of the thing and the writer's own details missing — `For [name].`
+ * for a dedication, `Copyright © [year] [author name]`. Left as they came, they
+ * used to export exactly like that: a reader opening the finished EPUB met
+ * bare publishing terms sitting in the contents between the cover and Chapter
+ * One, which is what a template looks like when somebody forgets to delete it.
+ *
+ * Two things count as scaffolding, and the second is the useful one:
+ *
+ * - **Nothing under the heading.** A page with no prose at all has nothing to
+ *   print but its own title.
+ * - **A `[placeholder]` left anywhere on it.** Deliberately unforgiving — a
+ *   copyright page with the year filled in and `[author name]` still in it is
+ *   half-done, and half-done is the state that actually ships by accident.
+ *
+ * The cost is a writer who genuinely wants square brackets in their front
+ * matter, which is why the export screen **names every page it left out**
+ * rather than dropping them silently. A filter nobody can see is worse than
+ * the problem it solves.
+ *
+ * Body chapters are never tested. An empty chapter is a chapter the writer has
+ * not written yet, and dropping it would hide a hole in their book.
+ */
+export function isUntouchedMatter(blocks: readonly Block[]): boolean {
+  let prose = false;
+  for (const b of blocks) {
+    // An image is content even with no words in it.
+    if (b.kind === "image") {
+      prose = true;
+      continue;
+    }
+    const text = b.runs.map((r) => r.text).join("");
+    if (hasPlaceholder(text)) return true;
+    if (b.kind !== "heading" && text.trim() !== "") prose = true;
+  }
+  return !prose;
+}
+
+/**
+ * Whether a stored matter page is still scaffolding — `isUntouchedMatter`
+ * against what is actually on the key.
+ *
+ * **Three screens ask this question and they must not answer it differently.**
+ * The export leaves these pages out of the file, the reading view leaves them
+ * out of the read-through, and the book panel marks their row *Draft* to say so
+ * in advance. A row that promises one thing while the file does another is
+ * worse than no row at all, so the reading is in one place rather than written
+ * out three times against the same rule.
+ *
+ * Lives here, beside the rule, rather than in `export/index.ts`: the panel and
+ * the reader would otherwise pull in the export orchestrator — and with it the
+ * dynamic imports of `docx` and `jszip` — to ask about one page.
+ */
+export function isDraftMatter(chapterId: string): boolean {
+  const raw = getBody(chapterId);
+  if (!raw) return true;
+  try {
+    return isUntouchedMatter(toBlocks(JSON.parse(raw) as JSONContent));
+  } catch {
+    // A body that will not parse is one the exporters render as empty, which is
+    // the same answer this gives.
+    return true;
+  }
 }

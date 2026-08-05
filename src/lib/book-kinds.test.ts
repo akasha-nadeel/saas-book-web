@@ -2,6 +2,7 @@ import { expect, it } from "vitest";
 import {
   BOOK_KINDS,
   GENRES,
+  formShortfall,
   kindLabel,
   suggestTarget,
   targetHint,
@@ -56,4 +57,38 @@ it("labels every kind", () => {
   for (const kind of BOOK_KINDS) {
     expect(kindLabel(kind.value)).toBe(kind.label);
   }
+});
+
+/**
+ * A book sold as one form and written as another.
+ *
+ * The threshold sits well below the boundary on purpose — see `formShortfall`.
+ * A 38,000-word novel is a novel; a 4,000-word one is a short story with a
+ * novel's description on it, which is the case a shop may refuse.
+ */
+it("says nothing about a novel that is merely on the short side", () => {
+  expect(formShortfall("novel", 38_000)).toBeNull();
+  expect(formShortfall("novel", 25_000)).toBeNull();
+});
+
+it("names the gap when a novel is a short story", () => {
+  const gap = formShortfall("novel", 4_200);
+  expect(gap).toEqual({ label: "Novel", floor: 40_000 });
+});
+
+it("says nothing about a book still being drafted", () => {
+  // Under the floor, but nobody has mislabelled anything yet — they have
+  // written two pages.
+  expect(formShortfall("novel", 900)).toBeNull();
+  expect(formShortfall("novel", 0)).toBeNull();
+});
+
+it("holds a novella to its own floor and a short story to none", () => {
+  expect(formShortfall("novella", 5_000)).toEqual({
+    label: "Novella",
+    floor: 17_500,
+  });
+  expect(formShortfall("novella", 12_000)).toBeNull();
+  // A short story has no floor to fall below.
+  expect(formShortfall("short-story", 2_100)).toBeNull();
 });

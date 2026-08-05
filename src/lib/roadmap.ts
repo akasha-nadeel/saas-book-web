@@ -163,6 +163,11 @@ export const STEPS: Step[] = [
     phase: "launch",
     title: "Line up ARC readers — now, not later",
     note: "Advance copies go out weeks before publication so the reviews are there on day one. Almost everybody learns this afterwards, and then spends months trying to get reviews for a book that is already out.",
+    /* The step the whole list was arranged around had no destination, while
+       the tool that does the work has existed since the Track group shipped.
+       No `done`: who holds a copy is a list the writer keeps, and a row in it
+       is not the same claim as "the readers are lined up". */
+    href: (id) => `/book/${id}/arc`,
   },
   {
     id: "check",
@@ -186,6 +191,22 @@ export const STEPS: Step[] = [
   },
 
   // ---- Publish -----------------------------------------------------------
+  {
+    /*
+     * **Before the upload, because the shop's own form asks on the way in.**
+     * A writer who meets this question for the first time in the middle of
+     * publishing has to answer it under pressure, about work they finished
+     * months ago, with a tick box that carries account-level consequences.
+     *
+     * No `done`: nothing in a manuscript can tell you how it was written, and
+     * guessing would be the worst kind of invented answer. This is the writer's
+     * to tick, like the two revision steps.
+     */
+    id: "ai",
+    phase: "publish",
+    title: "Answer the AI question honestly",
+    note: "Every shop now asks whether AI made any of the text, the images or a translation, and the answer is part of your account rather than the listing. Editing AI text heavily does not make it yours for this purpose. Using AI to brainstorm, research or proofread your own writing is not the same thing and does not have to be declared.",
+  },
   {
     id: "upload",
     phase: "publish",

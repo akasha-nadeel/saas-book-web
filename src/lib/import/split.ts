@@ -1,3 +1,4 @@
+import type { PrintCover } from "../cover-store";
 import type { PublishingMeta } from "../publishing";
 import {
   blockText,
@@ -26,6 +27,13 @@ export interface ImportedChapter {
   title: string;
   doc: ReturnType<typeof toDoc>;
   words: number;
+  /**
+   * Which part of the book, when the file said so.
+   *
+   * Only an EPUB does — `epub:type` names the part on every document — and
+   * only then is this set. Absent means the body, as everywhere else.
+   */
+  matter?: "front" | "back";
 }
 
 /**
@@ -43,6 +51,8 @@ export interface ImportedBook {
   author?: string;
   /** A data URL inside the cover budget. */
   cover?: string;
+  /** The same artwork at full size, for the export — see `cover-store.ts`. */
+  printCover?: PrintCover;
   /** Whether the file has cover artwork, storable or not. */
   hasCover?: boolean;
   publishing?: PublishingMeta;

@@ -42,6 +42,15 @@ import Link from "next/link";
 
 const EDGE = 8;
 
+/**
+ * The least a menu will shrink to before it hangs into the space instead.
+ *
+ * Roughly three plain rows. A trigger near the bottom of the window has a few
+ * pixels under it, and a menu that honoured that would be a sliver — so below
+ * this it stops shrinking and is pulled back up the screen far enough to fit.
+ */
+const MIN_HEIGHT = 140;
+
 export function Menu({
   trigger,
   triggerClassName,
@@ -62,7 +71,11 @@ export function Menu({
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+  const [at, setAt] = useState<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -83,23 +96,49 @@ export function Menu({
     if (!trigger || !menu) return;
 
     const rect = trigger.getBoundingClientRect();
-    const height = menu.offsetHeight;
+    // `scrollHeight`, not `offsetHeight`: once a previous pass has capped the
+    // element, its offset height *is* the cap, and measuring that would make
+    // every menu decide it fits perfectly wherever it happens to be.
+    const height = menu.scrollHeight;
+
+    const below = rect.bottom + 6;
+    const roomBelow = window.innerHeight - below - EDGE;
+    const roomAbove = rect.top - 6 - EDGE;
 
     // Below by default; above when below would run off the fold and above has
     // more room. Not simply "above if it does not fit", or a menu on a short
     // window flips to a spot that fits no better.
-    const below = rect.bottom + 6;
-    const wantsAbove =
-      below + height > window.innerHeight - EDGE && rect.top > height + EDGE;
+    const wantsAbove = height > roomBelow && roomAbove > roomBelow;
+
+    /*
+     * **A menu taller than the room it has scrolls; it does not run off the
+     * screen.**
+     *
+     * This capped nothing, on the reasonable assumption that a menu is four or
+     * five verbs. Then one grew a list — the front-matter Add-page menu offers
+     * eight sections with a line of explanation each — and the last three items
+     * were simply below the fold with no way to reach them. Flipping it above
+     * the trigger does not help: the list is taller than the window either way.
+     *
+     * The floor matters as much as the cap. A trigger near the bottom edge has
+     * almost no room under it, and a menu obediently drawn 12px tall is a menu
+     * nobody can use — so it takes at least a few rows and hangs into the space
+     * it was allotted, which is what the clamp on `top` below is for.
+     */
+    const maxHeight = Math.max(MIN_HEIGHT, wantsAbove ? roomAbove : roomBelow);
+    const shown = Math.min(height, maxHeight);
 
     const left = align === "end" ? rect.right - width : rect.left;
 
     setAt({
-      top: wantsAbove ? rect.top - height - 6 : below,
+      top: wantsAbove
+        ? Math.max(EDGE, rect.top - shown - 6)
+        : Math.min(below, Math.max(EDGE, window.innerHeight - shown - EDGE)),
       left: Math.min(
         Math.max(EDGE, left),
         Math.max(EDGE, window.innerWidth - width - EDGE),
       ),
+      maxHeight,
     });
   }, [open, align, width]);
 
@@ -108,7 +147,21 @@ export function Menu({
   // frame to solve a problem no writer has while a menu is open.
   useEffect(() => {
     if (!open) return;
-    const onDismiss = () => setOpen(false);
+    const onDismiss = (event: Event) => {
+      // **Except the menu's own scrolling.** The listener is on the capture
+      // phase so that it catches a scroll in any container, which now includes
+      // this one — and a menu that dismissed itself the moment you scrolled it
+      // would be a list you cannot reach the bottom of, which is the whole
+      // problem the cap above was added to solve.
+      if (
+        event.type === "scroll" &&
+        event.target instanceof Node &&
+        menuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+      setOpen(false);
+    };
     window.addEventListener("scroll", onDismiss, true);
     window.addEventListener("resize", onDismiss);
     return () => {
@@ -170,9 +223,20 @@ export function Menu({
               // frame.
               top: at?.top ?? -9999,
               left: at?.left ?? -9999,
+              // Bounded by the window on the *first* pass too, before anything
+              // has been measured. Without it a long menu is briefly laid out
+              // at its full height, which on a short window is a scrollbar
+              // appearing on the document for one frame.
+              maxHeight: at?.maxHeight ?? `calc(100dvh - ${EDGE * 2}px)`,
             }}
-            className="fixed z-50 overflow-hidden rounded-xl border border-line
-                       bg-panel p-1 shadow-xl shadow-black/10"
+            /* `overflow-y-auto` rather than `overflow-hidden`: the corners still
+               need clipping, and a menu longer than its room has to be
+               reachable. `overscroll-contain` stops a flick at the end of the
+               list turning into a scroll of the page behind it — which, since
+               scrolling the page dismisses the menu, would close it. */
+            className="scroll-slim fixed z-50 overflow-x-hidden overflow-y-auto
+                       overscroll-contain rounded-xl border border-line bg-panel
+                       p-1 shadow-xl shadow-black/10"
           >
             {children(close)}
           </div>,
@@ -209,12 +273,22 @@ export function MenuButton({
   onClick,
   icon,
   danger,
+  hint,
   children,
 }: {
   onClick: () => void;
   icon?: ReactNode;
   /** Destructive, so it reads differently before it is pressed. */
   danger?: boolean;
+  /**
+   * A second line saying what the item is.
+   *
+   * For menus whose items are *terms* rather than actions — the front-matter
+   * Add menu offers "Epigraph", which is a word a first novelist has had no
+   * reason to learn, and eight of those in a column is eight guesses. An
+   * ordinary menu of verbs needs none of this and should not carry it.
+   */
+  hint?: string;
   children: ReactNode;
 }) {
   return (
@@ -222,12 +296,26 @@ export function MenuButton({
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`${ITEM} ${danger ? "text-danger" : ""}`}
+      // Top-aligned once there are two lines, or the icon and the label centre
+      // themselves against the height of the pair and the label stops lining up
+      // with the single-line items above it.
+      className={`${ITEM} ${hint ? "items-start" : ""} ${
+        danger ? "text-danger" : ""
+      }`}
     >
       {icon && (
         <span className={danger ? "text-current" : "text-muted"}>{icon}</span>
       )}
-      {children}
+      {hint ? (
+        <span className="min-w-0 flex-1">
+          <span className="block">{children}</span>
+          <span className="mt-0.5 block text-xs leading-snug text-muted">
+            {hint}
+          </span>
+        </span>
+      ) : (
+        children
+      )}
     </button>
   );
 }

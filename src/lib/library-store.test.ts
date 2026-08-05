@@ -1,5 +1,7 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { MATTER_SECTIONS } from "@/lib/matter";
 import {
+  applyRemoteForTest,
   archiveBook,
   bookChapterCount,
   bookWordCount,
@@ -11,11 +13,14 @@ import {
   chapterLabel,
   createBookFromTemplate,
   createChapter,
-  createMatterSection,
+  createMatterPage,
+  createMatterPages,
+  rememberMatterAsked,
+  shouldAskMatter,
+  startMatter,
   deleteChapterForever,
   getBody,
   isGenericChapterTitle,
-  MATTER_SECTIONS,
   orderedChapters,
   setChapterMatter,
   spellNumber,
@@ -47,6 +52,7 @@ import {
   setTypography,
   typographyOf,
   setPref,
+  setRoadmapStep,
   setTheme,
   themeUnset,
   touchLastOpened,
@@ -1355,47 +1361,253 @@ it("moves a chapter back to the body, dropping the tag", () => {
   expect("matter" in meta).toBe(false);
 });
 
-it("creates a front-matter page seeded with the template sections", () => {
+it("makes every standard front page, each seeded with its own template", () => {
   const { bookId } = createBook();
-  const id = createMatterSection(bookId, "front");
-  expect(id).not.toBeNull();
+  const first = startMatter(bookId, "front");
+  expect(first).not.toBeNull();
 
-  const meta = findBook(getShelf(), bookId)!.chapters.find((c) => c.id === id)!;
-  expect(meta.matter).toBe("front");
-  expect(meta.matterKey).toBe("front");
-  expect(meta.title).toBe("Front matter");
+  const pages = findBook(getShelf(), bookId)!.chapters.filter(
+    (c) => c.matter === "front",
+  );
+  // One page per standard section, in the order a book is bound.
+  expect(pages.map((p) => p.title)).toEqual(
+    MATTER_SECTIONS.front.map((s) => s.title),
+  );
+  // Start lands the writer on the first of them.
+  expect(first).toBe(pages[0].id);
 
-  // The body carries every front section as a heading, in order.
-  const body = getBody(id!)!;
-  for (const section of MATTER_SECTIONS.front) {
-    expect(body).toContain(section);
+  /*
+   * Each page carries its own template lines — not every section's, which is
+   * what the single combined page used to do.
+   *
+   * And **no heading**: the page's title is printed above it by the editor and
+   * by every exporter, so a seeded `h2` of the same words arrived in the EPUB
+   * as "Dedication" twice, one under the other.
+   */
+  for (const page of pages) {
+    const section = MATTER_SECTIONS.front.find((s) => s.title === page.title)!;
+    const doc = JSON.parse(getBody(page.id)!) as {
+      content: { type: string; content?: { text: string }[] }[];
+    };
+    expect(doc.content.some((n) => n.type === "heading")).toBe(false);
+    expect(doc.content.map((n) => n.content?.[0]?.text)).toEqual([
+      ...section.lines,
+    ]);
   }
 });
 
-it("orders a front page before the body and a back page after it", () => {
-  const { bookId, chapterId } = createBook();
-  const back = createMatterSection(bookId, "back");
-  const front = createMatterSection(bookId, "front");
+it("puts a page added later in its bound position, not at the end", () => {
+  const { bookId } = createBook();
+  // Prologue is last in the front-matter order; a dedication added after it
+  // still belongs in front of it.
+  createMatterPage(bookId, "front", "Prologue");
+  createMatterPage(bookId, "front", "Dedication");
 
-  const book = findBook(getShelf(), bookId)!;
-  expect(orderedChapters(book).map((c) => c.id)).toEqual([
-    front,
-    chapterId,
-    back,
-  ]);
-  // A matter page is never numbered; the body chapter is Chapter 1.
-  expect(chapterNumberOf(book, front!)).toBeNull();
-  expect(chapterNumberOf(book, back!)).toBeNull();
-  expect(chapterNumberOf(book, chapterId)).toBe(1);
+  expect(
+    findBook(getShelf(), bookId)!
+      .chapters.filter((c) => c.matter === "front")
+      .map((c) => c.title),
+  ).toEqual(["Dedication", "Prologue"]);
 });
 
-it("returns the same matter page rather than a second copy", () => {
+it("puts a page the writer named after every standard one", () => {
   const { bookId } = createBook();
-  const first = createMatterSection(bookId, "front");
-  const again = createMatterSection(bookId, "front");
-  expect(again).toBe(first);
+  createMatterPage(bookId, "front", "A note on the maps");
+  createMatterPage(bookId, "front", "Dedication");
+
   expect(
-    findBook(getShelf(), bookId)!.chapters.filter((c) => c.matter === "front")
-      .length,
-  ).toBe(1);
+    findBook(getShelf(), bookId)!
+      .chapters.filter((c) => c.matter === "front")
+      .map((c) => c.title),
+  ).toEqual(["Dedication", "A note on the maps"]);
+});
+
+it("keeps front and back pages out of the chapter numbering", () => {
+  const { bookId, chapterId } = createBook();
+  startMatter(bookId, "front");
+  startMatter(bookId, "back");
+
+  const book = findBook(getShelf(), bookId)!;
+  // However many named pages bracket it, the one body chapter is Chapter 1.
+  expect(bookChapterCount(book)).toBe(1);
+  expect(chapterNumberOf(book, chapterId)).toBe(1);
+  for (const page of book.chapters.filter((c) => c.matter)) {
+    expect(chapterNumberOf(book, page.id)).toBeNull();
+  }
+});
+
+/**
+ * The setup question, asked once per book.
+ *
+ * `shouldAskMatter` is the whole of when the dialog appears, so both halves of
+ * it are asserted: a book that already has matter pages has answered by doing,
+ * and a book that has been asked has answered by answering — skip included.
+ */
+it("asks about matter pages for a fresh book", () => {
+  const { bookId } = createBook();
+  expect(shouldAskMatter(findBook(getShelf(), bookId)!)).toBe(true);
+});
+
+it("does not ask about a book that already has matter pages", () => {
+  const { bookId } = createBook();
+  createMatterPage(bookId, "front", "Dedication");
+  expect(shouldAskMatter(findBook(getShelf(), bookId)!)).toBe(false);
+});
+
+it("does not ask twice, even when the answer was none", () => {
+  const { bookId } = createBook();
+  rememberMatterAsked(bookId);
+  // No pages were made — the writer skipped — and it still does not ask again.
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.every((c) => !c.matter)).toBe(true);
+  expect(shouldAskMatter(book)).toBe(false);
+});
+
+it("asks about each book separately", () => {
+  const { bookId: first } = createBook();
+  const { bookId: second } = createBook();
+  rememberMatterAsked(first);
+  expect(shouldAskMatter(findBook(getShelf(), first)!)).toBe(false);
+  expect(shouldAskMatter(findBook(getShelf(), second)!)).toBe(true);
+});
+
+it("makes the chosen pages in binding order, in one commit", () => {
+  const { bookId } = createBook();
+  // Asked for out of order on purpose: the caller passes what was ticked, and
+  // the book decides where each one goes.
+  const first = createMatterPages(bookId, [
+    { part: "back", title: "Acknowledgements" },
+    { part: "front", title: "Dedication" },
+    { part: "front", title: "Half-title page" },
+  ]);
+  expect(first).not.toBeNull();
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(
+    book.chapters.filter((c) => c.matter).map((c) => `${c.matter}:${c.title}`),
+  ).toEqual([
+    "front:Half-title page",
+    "front:Dedication",
+    "back:Acknowledgements",
+  ]);
+});
+
+/**
+ * An import of the manuscript is not an import of the writer's own pages.
+ *
+ * Replace used to clear `book.chapters` entire — harmless while front and back
+ * matter were one page each that few writers made, destructive once a book
+ * carried a dedication and a copyright page. And *silent*, because the
+ * add-or-replace question is only asked when the book already has words in it,
+ * and a freshly-made set of matter pages has none.
+ */
+it("replaces the body on import and keeps front and back matter", () => {
+  const { bookId } = createBook();
+  createMatterPage(bookId, "front", "Dedication");
+  createMatterPage(bookId, "back", "Acknowledgements");
+
+  const result = importIntoBook(
+    bookId,
+    [
+      { title: "Chapter One", doc: { type: "doc" }, words: 10 },
+      { title: "Chapter Two", doc: { type: "doc" }, words: 12 },
+    ],
+    "replace",
+  );
+  expect(result).not.toBeNull();
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.map((c) => `${c.matter ?? "body"}:${c.title}`)).toEqual([
+    "front:Dedication",
+    "body:Chapter 1",
+    "body:Chapter 2",
+    "back:Acknowledgements",
+  ]);
+});
+
+it("undoes a replace without taking the matter pages with it", () => {
+  const { bookId, chapterId } = createBook();
+  renameChapter(bookId, chapterId, "The Original");
+  createMatterPage(bookId, "front", "Dedication");
+
+  const result = importIntoBook(
+    bookId,
+    [{ title: "Imported", doc: { type: "doc" }, words: 5 }],
+    "replace",
+  )!;
+  undoChapterImport(result.undo);
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "Dedication",
+    "The Original",
+  ]);
+});
+
+/**
+ * "Chapter 1 – Chapter One" was on every chapter of every imported manuscript.
+ *
+ * The renumbering stripped a leading *digit* form and kept whatever followed,
+ * so a file whose headings read "Chapter One" — the spelled form a manuscript
+ * actually uses, and this app's own default title — had its whole title kept
+ * as a description and a number pasted in front of it.
+ */
+it("does not paste a number in front of a title that is only a number", () => {
+  const { bookId } = createBook();
+  importIntoBook(
+    bookId,
+    [
+      { title: "Chapter One", doc: { type: "doc" }, words: 1 },
+      { title: "Chapter 2", doc: { type: "doc" }, words: 1 },
+      { title: "The Long Pan", doc: { type: "doc" }, words: 1 },
+    ],
+    "replace",
+  );
+  expect(
+    findBook(getShelf(), bookId)!.chapters.map((c) => c.title),
+  ).toEqual(["Chapter 1", "Chapter 2", "Chapter 3 – The Long Pan"]);
+});
+
+/**
+ * A hand-ticked roadmap step used to vanish on the next load.
+ *
+ * `roadmapDone` has no column and no mapping in `sync.ts`, and the downloaded
+ * shelf was written straight over the local one — so the field came back
+ * absent and the tick was gone. Thirteen of the nineteen steps are ticked by
+ * hand, so that was most of the roadmap, silently, on every load for anyone
+ * signed in.
+ */
+it("keeps a hand-ticked roadmap step when the server has no column for it", () => {
+  const { bookId } = createBook();
+  setRoadmapStep(bookId, "draft", true);
+  expect(findBook(getShelf(), bookId)!.roadmapDone).toEqual(["draft"]);
+
+  // What a download looks like: the same book, from a server that has never
+  // heard of roadmapDone, plus a book made on another machine.
+  const remote = getShelf();
+  applyRemoteForTest({
+    ...remote,
+    books: remote.books.map((b) => {
+      const copy = { ...b };
+      delete copy.roadmapDone;
+      return copy;
+    }),
+  });
+
+  expect(findBook(getShelf(), bookId)!.roadmapDone).toEqual(["draft"]);
+});
+
+it("still takes the server's answer for fields the server does have", () => {
+  const { bookId } = createBook();
+  setRoadmapStep(bookId, "draft", true);
+
+  const remote = getShelf();
+  applyRemoteForTest({
+    ...remote,
+    books: remote.books.map((b) => ({ ...b, title: "Renamed elsewhere" })),
+  });
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.title).toBe("Renamed elsewhere");
+  expect(book.roadmapDone).toEqual(["draft"]);
 });

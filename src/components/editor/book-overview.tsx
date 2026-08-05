@@ -6,7 +6,7 @@ import { WorkspaceRail } from "@/components/editor/workspace-rail";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import {
   BookPanel,
-  useBodyOpen,
+  useOpenPart,
   type BookPanelMode,
 } from "@/components/editor/book-panel";
 import { BookGuide } from "@/components/editor/book-guide";
@@ -34,7 +34,7 @@ export function BookOverview({ bookId }: { bookId: string }) {
   const shelf = useShelf();
   const prefs = usePrefs();
   const cover = useCover(bookId);
-  const body = useBodyOpen();
+  const body = useOpenPart();
 
   // Plays the panel's entrance, and only when the face changes — the same rule
   // the editor follows, so the two screens behave alike. Cleared once the

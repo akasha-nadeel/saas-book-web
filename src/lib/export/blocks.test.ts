@@ -1,5 +1,5 @@
-import { expect, it } from "vitest";
-import { toBlocks } from "@/lib/export/blocks";
+import { describe, expect, it } from "vitest";
+import { isUntouchedMatter, toBlocks, type Block } from "@/lib/export/blocks";
 import type { JSONContent } from "@tiptap/react";
 
 const doc = (...content: JSONContent[]): JSONContent => ({
@@ -262,4 +262,90 @@ it("reads an image node", () => {
 it("skips an image with no source", () => {
   // Otherwise every export format renders a broken picture.
   expect(toBlocks(doc({ type: "image", attrs: { alt: "Map" } }))).toEqual([]);
+});
+
+describe("isUntouchedMatter", () => {
+  const heading = (text: string): Block => ({
+    kind: "heading",
+    depth: 0,
+    level: 1,
+    runs: [{ text }],
+  });
+  const para = (text: string): Block => ({
+    kind: "paragraph",
+    depth: 0,
+    runs: [{ text }],
+  });
+
+  it("is true for a page of headings with nothing written under them", () => {
+    expect(
+      isUntouchedMatter([
+        heading("Half-title page"),
+        heading("Title page"),
+        heading("Copyright page"),
+        heading("Dedication"),
+      ]),
+    ).toBe(true);
+  });
+
+  it("counts empty paragraphs between headings as still untouched", () => {
+    expect(isUntouchedMatter([heading("Dedication"), para("   ")])).toBe(true);
+  });
+
+  it("is true for a page still carrying its seeded placeholder", () => {
+    expect(
+      isUntouchedMatter([heading("Dedication"), para("For [name].")]),
+    ).toBe(true);
+  });
+
+  /*
+   * The half that catches what the prose test cannot.
+   *
+   * A copyright page with the year typed in and `[author name]` still sitting
+   * in it has prose on it by any measure — and is exactly the page that ships
+   * by accident, because the writer believes they finished it. One placeholder
+   * anywhere on the page is enough.
+   */
+  it("is true for a page filled in only halfway", () => {
+    expect(
+      isUntouchedMatter([
+        heading("Copyright page"),
+        para("The Long Field"),
+        para("Copyright © 2026 [author name]"),
+        para("All rights reserved."),
+      ]),
+    ).toBe(true);
+  });
+
+  it("ships the page once every placeholder is gone", () => {
+    expect(
+      isUntouchedMatter([heading("Dedication"), para("For my mother.")]),
+    ).toBe(false);
+  });
+
+  it("ships a page whose boilerplate the writer left as it came", () => {
+    // Nothing to replace on this one, so it counts as done rather than as
+    // untouched — the rule is about slots left empty, not about authorship.
+    expect(
+      isUntouchedMatter([
+        heading("Copyright page"),
+        para("The Long Field"),
+        para("Copyright © 2026 Marguerite Hale"),
+        para("All rights reserved."),
+      ]),
+    ).toBe(false);
+  });
+
+  it("treats a picture as content, words or no words", () => {
+    expect(
+      isUntouchedMatter([
+        heading("Epigraph"),
+        { kind: "image", depth: 0, src: "data:,", runs: [] },
+      ]),
+    ).toBe(false);
+  });
+
+  it("is true for an empty page", () => {
+    expect(isUntouchedMatter([])).toBe(true);
+  });
 });

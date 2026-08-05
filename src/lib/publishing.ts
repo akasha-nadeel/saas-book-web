@@ -1,4 +1,5 @@
 import type { Book } from "./library-store";
+import { formShortfall } from "./book-kinds";
 import { checkCover, type CoverFacts } from "./cover-check";
 
 /**
@@ -55,6 +56,44 @@ export const DEFAULT_LANGUAGE = "en";
  * fits here fits everywhere.
  */
 export const BLURB_MAX = 4000;
+
+/**
+ * A field a shop would read as "not answered".
+ *
+ * Emptiness is not `!value` here: `seriesIndex: 0` is a real number that
+ * happens to be falsy, and an empty string is a field somebody cleared rather
+ * than one they filled with nothing.
+ */
+export function isEmptyDetail(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === null ||
+    (typeof value === "string" && value.trim() === "") ||
+    (Array.isArray(value) && value.length === 0)
+  );
+}
+
+/**
+ * The listing details as they would be *stored*, in a stable key order.
+ *
+ * `setPublishing` drops every empty field on the way in, so a screen holding a
+ * draft cannot compare it to the book with a plain `JSON.stringify` — a box
+ * the writer cleared is `""` on screen and absent in the store, and the form
+ * would read as permanently unsaved. Keys are sorted for the same reason:
+ * object order depends on which field was typed into first.
+ *
+ * Here rather than in the screen because the *rule* about what counts as
+ * answered belongs beside the type it is about, and `setPublishing` applies
+ * the same one.
+ */
+export function tidyPublishing(meta: PublishingMeta | undefined): string {
+  const out: Record<string, unknown> = {};
+  const source = (meta ?? {}) as Record<string, unknown>;
+  for (const key of Object.keys(source).sort()) {
+    if (!isEmptyDetail(source[key])) out[key] = source[key];
+  }
+  return JSON.stringify(out);
+}
 
 // ---------------------------------------------------------------------------
 // ISBN
@@ -332,6 +371,29 @@ export function storeReadiness({
 
   if (meta?.published && !/^\d{4}-\d{2}-\d{2}$/.test(meta.published)) {
     blocking("published", "The publication date must be a YYYY-MM-DD date.");
+  }
+
+  /*
+   * **The form the book is sold as, against its actual length.**
+   *
+   * A shop may refuse a listing whose description misrepresents what a reader
+   * is buying, and "A Novel" on four thousand words is exactly that — the
+   * word appears on the generated title page, and most writers put it in the
+   * subtitle too. The book's own setup already carries the answer.
+   *
+   * Advisory, and a fact rather than a verdict: it does not say the book is
+   * too short, because that is not knowable. It says what the book was set up
+   * as and what it currently runs to, and lets the writer decide which of the
+   * two is wrong. `formShortfall` only fires well below the boundary — see
+   * there for why.
+   */
+  const words = book.chapters.reduce((sum, c) => sum + (c.words ?? 0), 0);
+  const shortfall = formShortfall(book.kind ?? "novel", words);
+  if (shortfall) {
+    advisory(
+      "kind",
+      `Set up as a ${shortfall.label}, and ${words.toLocaleString()} words so far. A ${shortfall.label.toLowerCase()} is usually ${shortfall.floor.toLocaleString()} or more.`,
+    );
   }
 
   return issues;

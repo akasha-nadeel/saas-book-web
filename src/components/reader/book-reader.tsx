@@ -4,6 +4,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import {
   chapterLabel,
+  chapterMatterOf,
   chapterNumberOf,
   findBook,
   getBody,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
 import { typographyVars } from "@/lib/typography";
-import { toBlocks } from "@/lib/export/blocks";
+import { isDraftMatter, toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml } from "@/lib/export/xhtml";
 import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 import { LoadingScreen } from "@/components/loading-screen";
@@ -36,33 +37,53 @@ import { ReaderFlipbook } from "@/components/reader/reader-flipbook";
  */
 
 function loadForReading(book: Book): ReaderChapter[] {
-  return orderedChapters(book).map((chapter) => {
-    const raw = getBody(chapter.id);
-    let html = "";
-    if (raw) {
-      try {
-        html = blocksToXhtml(toBlocks(JSON.parse(raw)));
-      } catch {
-        // A corrupt body reads as an empty chapter rather than breaking the
-        // whole scroll — the same call the exporters make.
-        html = "";
-      }
-    }
-    // A spelled "Chapter Five" label sits above the title, but only when the
-    // title is a real name — a chapter still called "Chapter 5" is its own label.
-    const number = chapterNumberOf(book, chapter.id);
-    const label =
-      number !== null && !isGenericChapterTitle(chapter.title)
-        ? chapterLabel(number)
-        : null;
-    return {
-      id: chapter.id,
-      title: chapter.title,
-      label,
-      html,
-      empty: html.trim() === "",
-    };
-  });
+  return (
+    orderedChapters(book)
+      /*
+       * **The same pages the export takes, so the read-through matches the file.**
+       *
+       * Front and back matter are lists of pages now, each seeded with the shape
+       * of the thing and the writer's own details left in `[brackets]`. A book
+       * that has pressed Start and filled in two of them would otherwise read
+       * with fourteen sheets of `[Term] — [what it means]` bound into it, which
+       * is not what this view is for: it exists to show the book as it will be,
+       * and the exporters leave those pages out. See `isUntouchedMatter`.
+       *
+       * Body chapters are never dropped, however empty — an unwritten chapter is
+       * a hole in the book, and this is exactly the view for seeing one.
+       */
+      .filter(
+        (chapter) =>
+          chapterMatterOf(chapter) === "body" || !isDraftMatter(chapter.id),
+      )
+      .map((chapter) => {
+        const raw = getBody(chapter.id);
+        let html = "";
+        if (raw) {
+          try {
+            html = blocksToXhtml(toBlocks(JSON.parse(raw)));
+          } catch {
+            // A corrupt body reads as an empty chapter rather than breaking the
+            // whole scroll — the same call the exporters make.
+            html = "";
+          }
+        }
+        // A spelled "Chapter Five" label sits above the title, but only when the
+        // title is a real name — a chapter still called "Chapter 5" is its own label.
+        const number = chapterNumberOf(book, chapter.id);
+        const label =
+          number !== null && !isGenericChapterTitle(chapter.title)
+            ? chapterLabel(number)
+            : null;
+        return {
+          id: chapter.id,
+          title: chapter.title,
+          label,
+          html,
+          empty: html.trim() === "",
+        };
+      })
+  );
 }
 
 const ZOOM_MIN = 0.5;

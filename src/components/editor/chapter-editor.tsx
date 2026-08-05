@@ -37,7 +37,7 @@ import { ResizableImage } from "@/lib/editor/resizable-image";
 import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import {
   BookPanel,
-  useBodyOpen,
+  useOpenPart,
   type BookPanelMode,
 } from "@/components/editor/book-panel";
 import { BookGuide } from "@/components/editor/book-guide";
@@ -223,18 +223,18 @@ export function ChapterEditor({
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
   // The part the open page belongs to, and the part the *panel* says is
-  // selected. They are usually the same, and differ in one case: pressing
-  // Chapters while a matter page is on screen. The panel is the writer's
-  // statement of what they are working on, so the page's edge follows the
-  // selection rather than the page — press Chapters and the edge goes purple.
+  // selected. They are usually the same, and differ in one case: opening one
+  // part's list while a page from another is on screen. The panel is the
+  // writer's statement of what they are working on, so the page's edge follows
+  // the selection rather than the page.
   const chapterPart = chapter ? chapterMatterOf(chapter) : "body";
-  const body = useBodyOpen();
+  const body = useOpenPart();
 
   // Book View is not one of the three parts. It shows the book whole and picks
   // out none of them, so the page takes the accent of the button it offers — the
   // same rule as the rest, applied to a panel that has nothing selected.
   const selectedPart =
-    panelMode === "book" ? "book" : body.open ? "body" : chapterPart;
+    panelMode === "book" ? "book" : (body.open ?? chapterPart);
 
   /**
    * The editor, but only while there is one to act on.

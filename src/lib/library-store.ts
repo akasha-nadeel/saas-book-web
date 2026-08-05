@@ -28,10 +28,17 @@ import {
   trim as trimActivity,
 } from "./activity";
 import { addSnapshot, parseHistory, shouldSnapshot } from "./history";
+import { clearPrintCovers } from "./cover-store";
+import {
+  MATTER_SECTIONS,
+  matterSection,
+  matterSectionIndex,
+  type MatterPart,
+} from "./matter";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
-import type { PublishingMeta } from "./publishing";
+import { isEmptyDetail, type PublishingMeta } from "./publishing";
 import {
   fetchLibrary,
   hasClaimed,
@@ -88,9 +95,20 @@ export interface ChapterMeta {
   /** Front or back matter. Absent means a body chapter — see ChapterMatter. */
   matter?: "front" | "back";
   /**
-   * Marks the one front-matter or back-matter page. "front" on the single front
-   * page, "back" on the single back page; absent on body chapters. Lets the
-   * sidebar find the template page and open it rather than adding a second copy.
+   * **Legacy: the one combined front- or back-matter page.**
+   *
+   * Front and back matter used to be a single page each, holding every standard
+   * division as a heading, and this field is how the panel found that page
+   * again rather than making a second one. They are separate pages now — see
+   * `src/lib/matter.ts` — so nothing sets this any more.
+   *
+   * It stays read-only, and it is not tidied away: books written before the
+   * change still carry one of these pages with the writer's prose in it. It
+   * lists, opens, renames, deletes and exports like any other matter page; the
+   * field simply no longer means anything special. Deleting it here would drop
+   * the column on the way to Postgres (see `sync.ts`) and lose nothing useful,
+   * but it would also make an older tab and a newer one disagree about a
+   * chapter, which is not worth the tidiness.
    */
   matterKey?: "front" | "back";
 }
@@ -103,40 +121,6 @@ export function chapterMatterOf(chapter: ChapterMeta): ChapterMatter {
 const MATTER_RANK: Record<ChapterMatter, number> = { front: 0, body: 1, back: 2 };
 
 /**
- * The sections that make up each matter template.
- *
- * Front matter opens a book; back matter closes it. Rather than list these as
- * separate pages, OpenChapter puts each part on one page whose template already
- * carries every section as a heading — the writer fills in under the ones they
- * want and deletes the rest. These are the standard divisions of a printed book.
- */
-export const MATTER_SECTIONS: Record<"front" | "back", readonly string[]> = {
-  front: [
-    "Half-title page",
-    "Title page",
-    "Copyright page",
-    "Dedication",
-    "Epigraph",
-    "Table of contents",
-    "Preface or introduction",
-    "Prologue",
-  ],
-  back: [
-    "Epilogue",
-    "Acknowledgements",
-    "About the author",
-    "About the book",
-    "Other books by the author",
-  ],
-};
-
-/** The page title shown for each matter part. */
-export const MATTER_TITLE: Record<"front" | "back", string> = {
-  front: "Front matter",
-  back: "Back matter",
-};
-
-/**
  * The book's chapters in reading order: front matter, then the body, then back
  * matter, each keeping its own order. The stored array is a flat sequence the
  * writer reorders freely; this is the single derived order the sidebar shows
@@ -146,6 +130,14 @@ export function orderedChapters(book: Book): readonly ChapterMeta[] {
   return [...book.chapters].sort(
     (a, b) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(b)],
   );
+}
+
+/** A part's pages, in the order they are bound. */
+export function matterPages(
+  book: Book,
+  matter: MatterPart,
+): readonly ChapterMeta[] {
+  return book.chapters.filter((c) => chapterMatterOf(c) === matter);
 }
 
 /**
@@ -765,13 +757,28 @@ export function createBook(
     lastOpenedAt: Date.now(),
   };
 
-  if (setup?.cover) setCover(bookId, setup.cover);
-
+  /*
+   * **The book is committed before its cover, and the order is load-bearing.**
+   *
+   * `setCover` puts a book row in front of the cover row precisely because
+   * `book_covers.book_id` is a foreign key — but it does that by looking the
+   * book up in the shelf, and called from here the book is not in the shelf
+   * yet. So `findBook` returned null, nothing went in front, and the cover was
+   * the first row of a brand-new book to reach Postgres:
+   *
+   *   [23503] insert or update on table "book_covers" violates foreign key
+   *   constraint — Key is not present in table "books".
+   *
+   * Committing first means the shelf holds the book by the time the cover is
+   * set, and `setCover` can do its job.
+   */
   commit({
     ...shelf,
     books: [...shelf.books, book],
     lastOpenedBookId: bookId,
   });
+
+  if (setup?.cover) setCover(bookId, setup.cover);
 
   return { bookId, chapterId };
 }
@@ -921,66 +928,127 @@ type TemplateNode = {
   text?: string;
 };
 
-function matterTemplateDoc(matter: "front" | "back"): TemplateNode {
-  const content: TemplateNode[] = [];
-  for (const title of MATTER_SECTIONS[matter]) {
-    content.push({
-      type: "heading",
-      attrs: { level: 2 },
-      content: [{ type: "text", text: title }],
-    });
-    content.push({ type: "paragraph" });
-  }
+/**
+ * One matter page's body: the template lines, and nothing else.
+ *
+ * **No heading.** The first draft seeded the page's own title as an `h2`, which
+ * looked right in the panel and was a duplicate everywhere it mattered: the
+ * editor prints the page's title above the sheet, and so does every export — so
+ * a dedication arrived in the EPUB as "Dedication" twice, once from the
+ * exporter and once from the template, one under the other. The page is titled
+ * by its name in the chapter list; the body is what goes on it.
+ *
+ * A page a writer named themselves gets one empty paragraph — there is nothing
+ * to seed it with, and an empty page is a page rather than a page of guesses
+ * about what they meant.
+ */
+function matterPageDoc(part: MatterPart, title: string): TemplateNode {
+  const lines = matterSection(part, title)?.lines ?? [];
+  const content: TemplateNode[] = lines.map((line) => ({
+    type: "paragraph",
+    content: [{ type: "text", text: line }],
+  }));
+  if (content.length === 0) content.push({ type: "paragraph" });
   return { type: "doc", content };
 }
 
-/**
- * Open a book's front-matter or back-matter page, creating it the first time.
- *
- * There is one front page and one back page per book. If it does not exist yet,
- * it is created with its template body already in place — every standard section
- * as a heading — so the writer starts from the shape of a real book's matter and
- * fills it in. A second click, or another tab, returns the same page rather than
- * a duplicate. Returns null only if the body cannot be stored.
- */
-export function createMatterSection(
-  bookId: string,
-  matter: "front" | "back",
-): string | null {
-  const existing = findBook(getShelf(), bookId)?.chapters.find(
-    (c) => c.matterKey === matter,
-  );
-  if (existing) return existing.id;
+/** One page to make: which part it belongs to, and what it is called. */
+export interface MatterPick {
+  part: MatterPart;
+  title: string;
+}
 
-  const id = newId();
-  // The body is written before the shelf entry, so the page never appears in the
-  // list pointing at a template that is not there.
-  try {
-    window.localStorage.setItem(
-      bodyKey(id),
-      JSON.stringify(matterTemplateDoc(matter)),
-    );
-  } catch (err) {
-    console.error("[store] could not seed matter template", err);
-    return null;
+/**
+ * Add pages to a book's front or back matter.
+ *
+ * **Inserted where they belong, not appended.** A writer who adds a dedication
+ * after they have already made a prologue expects it in front of it, because
+ * that is where a dedication goes — so each page lands at its place in
+ * `MATTER_SECTIONS` rather than at the end of the part. A page the writer named
+ * themselves has no place in that list and goes last, which is the only answer
+ * available and the right one: it is the page nobody but them knows the
+ * position of, and they can drag it later.
+ *
+ * **Many pages, one commit.** The setup dialog can ask for a dozen at once and
+ * Start asks for eight; a loop over a single-page function would be a dozen
+ * shelf writes, a dozen fan-outs to every listening screen, and a dozen pushes
+ * to Postgres for one gesture.
+ *
+ * Bodies are written before the shelf entry, so a page never appears in the
+ * list pointing at a template that is not there. A body that will not store is
+ * skipped rather than taking the others with it: some of the pages is a state
+ * the writer can see and finish, where nothing at all after pressing Start is
+ * one they cannot. Returns the first page's id, so the caller can open it, or
+ * null if none could be written.
+ */
+export function createMatterPages(
+  bookId: string,
+  picks: readonly MatterPick[],
+): string | null {
+  const made: (MatterPick & { id: string })[] = [];
+  for (const pick of picks) {
+    const id = newId();
+    try {
+      window.localStorage.setItem(
+        bodyKey(id),
+        JSON.stringify(matterPageDoc(pick.part, pick.title)),
+      );
+      made.push({ ...pick, id });
+    } catch (err) {
+      console.error("[store] could not seed matter page", err);
+    }
   }
+  if (made.length === 0) return null;
 
   commitBook(bookId, (book) => {
-    const chapter: ChapterMeta = {
-      id,
-      title: MATTER_TITLE[matter],
-      words: 0,
-      matter,
-      matterKey: matter,
-    };
+    const chapters = [...book.chapters];
+    for (const { id, part, title } of made) {
+      const chapter: ChapterMeta = { id, title, words: 0, matter: part };
+      const rank = matterSectionIndex(part, title);
+
+      // Among this part's own pages only. Splicing into the flat array by a
+      // global index would put a front-matter page in the middle of the body.
+      const at = chapters.findIndex(
+        (c) =>
+          chapterMatterOf(c) === part && matterSectionIndex(part, c.title) > rank,
+      );
+      if (at === -1) chapters.push(chapter);
+      else chapters.splice(at, 0, chapter);
+    }
+
     // Regroup front → body → back so the stored array stays in reading order,
     // as setChapterMatter does — the sidebar and export both read it that way.
-    const grouped = [...book.chapters, chapter].sort(
+    const grouped = chapters.sort(
       (a, b) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(b)],
     );
-    return { ...book, chapters: grouped, lastOpenedId: id };
+    return { ...book, chapters: grouped, lastOpenedId: made[0].id };
   });
-  return id;
+  return made[0].id;
+}
+
+/** One page, for the Add-page menu. */
+export function createMatterPage(
+  bookId: string,
+  part: MatterPart,
+  title: string,
+): string | null {
+  return createMatterPages(bookId, [{ part, title }]);
+}
+
+/**
+ * Every standard page of a part at once, for a book that has none.
+ *
+ * What the card's Start button does, for a writer who did not answer the setup
+ * dialog — or skipped it. Meeting front matter for the first time with no idea
+ * which of eight printer's terms you need, being asked to choose is asking the
+ * question backwards; so they get the lot, each one a page they can open, and
+ * deleting the ones they do not want is the easy direction.
+ */
+export function startMatter(bookId: string, part: MatterPart): string | null {
+  return createMatterPages(
+    bookId,
+    MATTER_SECTIONS[part].map((section) => ({ part, title: section.title })),
+  );
 }
 
 /**
@@ -996,7 +1064,13 @@ export function createMatterSection(
  */
 export function createBookFromImport(
   title: string,
-  chapters: readonly { title: string; doc: unknown; words: number }[],
+  chapters: readonly {
+    title: string;
+    doc: unknown;
+    words: number;
+    /** Set only by the EPUB importer, which is the one format that says. */
+    matter?: "front" | "back";
+  }[],
   setup?: BookSetup,
 ): { bookId: string; chapterId: string } | null {
   if (!chapters.length) return null;
@@ -1010,7 +1084,15 @@ export function createBookFromImport(
       const id = newId();
       window.localStorage.setItem(bodyKey(id), JSON.stringify(chapter.doc));
       written.push(id);
-      metas.push({ id, title: chapter.title, words: chapter.words });
+      /* **A page the file declared as front or back matter stays one.**
+         Only an EPUB says — see `parseEpub` — and only for the pages it typed;
+         everything else is absent and means the body, as it always has. */
+      metas.push({
+        id,
+        title: chapter.title,
+        words: chapter.words,
+        ...(chapter.matter ? { matter: chapter.matter } : {}),
+      });
     }
   } catch (err) {
     console.error("[store] import failed, rolling back", err);
@@ -1034,8 +1116,14 @@ export function createBookFromImport(
     ...(setup?.genre ? { genre: setup.genre } : {}),
     ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
     ...(setup?.publishing ? { publishing: setup.publishing } : {}),
-    chapters: metas,
-    lastOpenedId: metas[0].id,
+    // Front → body → back, as every other write to this array is.
+    chapters: [...metas].sort(
+      (a, b) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(b)],
+    ),
+    // The first *chapter*, not the first page: landing an imported book on its
+    // own half-title would open the editor on a line of title text.
+    lastOpenedId:
+      metas.find((m) => chapterMatterOf(m) === "body")?.id ?? metas[0].id,
     lastOpenedAt: Date.now(),
   };
 
@@ -1078,7 +1166,17 @@ function renumberTitle(original: string, number: number): string {
   const description = original
     .replace(/^\s*chapter\s+\d+\s*[–—:.\-]*\s*/i, "")
     .trim();
-  return description ? `Chapter ${number} – ${description}` : `Chapter ${number}`;
+
+  /* **A heading that is only a chapter number is not a description.**
+     The strip above catches the digit form, so "Chapter 7" comes back empty and
+     is renumbered cleanly. It missed the *spelled* form, which is what a
+     manuscript actually uses and what this app's own default titles are — so
+     importing a file whose headings read "Chapter One" produced
+     "Chapter 1 – Chapter One" on every chapter of the book. */
+  if (!description || isGenericChapterTitle(description)) {
+    return `Chapter ${number}`;
+  }
+  return `Chapter ${number} – ${description}`;
 }
 
 /**
@@ -1101,35 +1199,72 @@ export interface ImportUndo {
  * Brings imported chapters into a book that already exists.
  *
  * `add` appends them after what is there and continues the numbering; `replace`
- * clears the book's chapters first and numbers the import from one. Either way
+ * clears the book's **body** first and numbers the import from one. Either way
  * bodies are written before the shelf is touched and removed if a write fails,
  * so the book never points at prose that is not there. Returns the first new
  * chapter's id and an undo record, or null on failure (bad book, empty import,
  * or storage full).
+ *
+ * **Replace does not touch front or back matter, and that is the whole point.**
+ * It used to clear `book.chapters` entire, which was harmless while those were
+ * one page each that few writers made — and destructive the moment a book
+ * carried a dedication, a copyright page and an about-the-author. Worse, it was
+ * *silent*: the add-or-replace question is asked only when the book already has
+ * words in it, and a freshly-made set of matter pages has none, so importing a
+ * manuscript into a book that had just been set up deleted ten pages without
+ * asking. A manuscript file is the story; it is not the writer's dedication,
+ * and replacing one with the other was never what anybody meant.
  */
 export function importIntoBook(
   bookId: string,
-  chapters: readonly { title: string; doc: unknown; words: number }[],
+  chapters: readonly {
+    title: string;
+    doc: unknown;
+    words: number;
+    /** Set only by the EPUB importer, which is the one format that says. */
+    matter?: "front" | "back";
+  }[],
   mode: "add" | "replace",
 ): { firstId: string; undo: ImportUndo } | null {
   if (!chapters.length) return null;
   const book = findBook(getShelf(), bookId);
   if (!book) return null;
 
-  const startNumber = mode === "replace" ? 0 : book.chapters.length;
+  /* **Numbered on from the last body chapter, not the last row in the array.**
+     `chapters.length` counts the front- and back-matter pages, so importing
+     three chapters into a two-chapter book carrying the standard sixteen matter
+     pages produced "Chapter 19, 20, 21" — numbers with nothing before them. The
+     banner and the panel both count the body, and so does this. */
+  const startNumber = mode === "replace" ? 0 : bookChapterCount(book);
+  // Counts the body chapters as they are made, so the matter pages mixed in
+  // among them do not consume numbers.
+  let bodyAt = 0;
   const metas: ChapterMeta[] = [];
   const written: string[] = [];
 
   try {
-    chapters.forEach((chapter, i) => {
+    // No index: the numbering counts body chapters (`bodyAt`), not positions,
+    // because the matter pages mixed in among them take no number.
+    chapters.forEach((chapter) => {
       const id = newId();
       window.localStorage.setItem(bodyKey(id), JSON.stringify(chapter.doc));
       written.push(id);
-      metas.push({
-        id,
-        title: renumberTitle(chapter.title, startNumber + i + 1),
-        words: chapter.words,
-      });
+      /* A matter page keeps its own name; only body chapters are renumbered,
+         because "Chapter 4 – Dedication" is what happens when they are not. */
+      metas.push(
+        chapter.matter
+          ? {
+              id,
+              title: chapter.title,
+              words: chapter.words,
+              matter: chapter.matter,
+            }
+          : {
+              id,
+              title: renumberTitle(chapter.title, startNumber + bodyAt++ + 1),
+              words: chapter.words,
+            },
+      );
     });
   } catch (err) {
     console.error("[store] import failed, rolling back", err);
@@ -1151,14 +1286,19 @@ export function importIntoBook(
   };
 
   if (mode === "replace") {
+    // The body alone. Front and back matter are the writer's own pages and
+    // survive an import of the manuscript — see the note above.
+    const clearing = book.chapters.filter((c) => chapterMatterOf(c) === "body");
+    const keeping = book.chapters.filter((c) => chapterMatterOf(c) !== "body");
+
     // Snapshot the chapters being cleared — prose and notes — so undo restores
     // them, then remove their stored text.
-    undo.removed = book.chapters.map((c) => ({
+    undo.removed = clearing.map((c) => ({
       meta: c,
       body: getBody(c.id),
       notes: getNotes(c.id),
     }));
-    for (const c of book.chapters) {
+    for (const c of clearing) {
       try {
         window.localStorage.removeItem(bodyKey(c.id));
         window.localStorage.removeItem(notesKey(c.id));
@@ -1169,7 +1309,11 @@ export function importIntoBook(
     }
     commitBook(bookId, (b) => ({
       ...b,
-      chapters: metas,
+      // Regrouped front → body → back, as every other write to this array is,
+      // so the stored order stays reading order.
+      chapters: [...keeping, ...metas].sort(
+        (a, x) => MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(x)],
+      ),
       lastOpenedId: metas[0].id,
     }));
   } else {
@@ -1212,11 +1356,18 @@ export function undoChapterImport(undo: ImportUndo) {
 
   const addedSet = new Set(undo.addedIds);
   commitBook(undo.bookId, (b) => {
-    // A replace cleared everything, so restore the snapshot; an append only
-    // added, so drop those and the originals remain.
-    const chapters = undo.removed.length
-      ? undo.removed.map((r) => r.meta)
-      : b.chapters.filter((c) => !addedSet.has(c.id));
+    /* **Drop what was added, put back what was removed** — one rule for both
+       modes. This used to *replace* the whole array with the snapshot whenever
+       anything had been removed, on the reasoning that a replace had cleared
+       everything. It no longer clears everything: front and back matter now
+       survive an import, so restoring only the snapshot would have undone the
+       import by deleting the very pages the import was fixed to protect. */
+    const chapters = [
+      ...b.chapters.filter((c) => !addedSet.has(c.id)),
+      ...undo.removed.map((r) => r.meta),
+    ].sort(
+      (x, y) => MATTER_RANK[chapterMatterOf(x)] - MATTER_RANK[chapterMatterOf(y)],
+    );
     return {
       ...b,
       chapters,
@@ -1674,6 +1825,21 @@ export interface Prefs {
    * `<html data-theme>`, so no stylesheet has to know this third value exists.
    */
   theme: Theme;
+  /**
+   * Books whose front/back-matter setup question has been answered — or
+   * skipped.
+   *
+   * **A note that a question was asked, not a fact about the book**, which is
+   * why it is here and not on the book itself. It records nothing a reader of
+   * the manuscript would want and it must not travel: a writer who skipped the
+   * dialog on their laptop has said nothing about what they want on their
+   * phone, and a field on the book would have to be a column in Postgres to
+   * survive at all.
+   *
+   * Book ids rather than a single boolean, because the question is per book —
+   * the second novel deserves it as much as the first.
+   */
+  matterAsked: string[];
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -1696,6 +1862,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   paper: "black",
   // The machine's own answer, until the writer overrules it.
   theme: "system",
+  // Nobody has been asked yet. Frozen with the rest, so it is shared — never
+  // pushed to; `rememberMatterAsked` writes a new array.
+  matterAsked: [],
 });
 
 const prefsListeners = new Set<() => void>();
@@ -1741,6 +1910,12 @@ function parsePrefs(raw: string | null): Prefs {
       theme: THEMES.includes(parsed.theme as Theme)
         ? (parsed.theme as Theme)
         : DEFAULT_PREFS.theme,
+      // Narrowed on the way in like everything else here: this key is written
+      // by us but read out of storage a version later, and a non-array would
+      // throw on the first `.includes`.
+      matterAsked: Array.isArray(parsed.matterAsked)
+        ? parsed.matterAsked.filter((id): id is string => typeof id === "string")
+        : [],
     };
   } catch {
     return DEFAULT_PREFS;
@@ -1816,6 +1991,32 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
   }
   for (const listener of prefsListeners) listener();
   pushPrefs(next);
+}
+
+/**
+ * Whether this book still has the front/back-matter question to answer.
+ *
+ * Two conditions, and both matter. The book must have **no matter pages at
+ * all** — a writer who has already made a dedication has answered by doing,
+ * and a dialog offering to set up what is on screen is a dialog that has not
+ * looked. And it must not have been **asked before**, skip included: "no
+ * thanks" is an answer, and asking again next Tuesday makes it a nag.
+ *
+ * An imported EPUB often arrives with front matter of its own, so this is
+ * quietly false for exactly the books that least need asking.
+ */
+export function shouldAskMatter(book: Book): boolean {
+  if (book.chapters.some((c) => chapterMatterOf(c) !== "body")) return false;
+  return !getPrefs().matterAsked.includes(book.id);
+}
+
+/** Records that the question has been put, whatever the answer was. */
+export function rememberMatterAsked(bookId: string) {
+  const asked = getPrefs().matterAsked;
+  if (asked.includes(bookId)) return;
+  // A new array rather than a push: DEFAULT_PREFS is frozen and shared, and the
+  // cached parse is handed out by reference to every screen that reads prefs.
+  setPref("matterAsked", [...asked, bookId]);
 }
 
 /** What "system" currently means on this machine. */
@@ -2278,12 +2479,9 @@ export function setPublishing(bookId: string, patch: Partial<PublishingMeta>) {
   commitBook(bookId, (book) => {
     const next: PublishingMeta = { ...(book.publishing ?? {}) };
     for (const [key, value] of Object.entries(patch)) {
-      const empty =
-        value === undefined ||
-        value === null ||
-        (typeof value === "string" && value.trim() === "") ||
-        (Array.isArray(value) && value.length === 0);
-      if (empty) delete next[key as keyof PublishingMeta];
+      // The same rule `tidyPublishing` applies, so a screen holding a draft
+      // can tell whether its form matches what a save would actually store.
+      if (isEmptyDetail(value)) delete next[key as keyof PublishingMeta];
       else Object.assign(next, { [key]: value });
     }
     // An object with nothing in it is not a setting; drop it so the shelf does
@@ -2465,6 +2663,15 @@ export function clearLocalLibrary() {
   }
   for (const key of doomed) window.localStorage.removeItem(key);
 
+  /* **Cover artwork lives in IndexedDB and has to go with the rest.**
+     Without this, the second writer on a shared browser inherits the first
+     one's full-size covers — invisible on every screen, because the shelf
+     reads the localStorage thumbnail that has just been deleted, and then
+     packaged into their EPUB the first time they export. Not awaited: the
+     synchronous half is what the caller is waiting on, and this module stays
+     synchronous. See `cover-store.ts`. */
+  void clearPrintCovers();
+
   cachedRaw = null;
   cachedShelf = EMPTY_SHELF;
   pushedBooks = [];
@@ -2473,10 +2680,58 @@ export function clearLocalLibrary() {
 }
 
 /** Writes a downloaded library over the local one. */
+/**
+ * Fields the server has no column for, carried across a download.
+ *
+ * **A field `sync.ts` does not map is a field the next sync deletes.** The
+ * downloaded shelf is written straight over the local one, so anything the
+ * server cannot store comes back absent and the local value is gone — and
+ * `roadmapDone` is exactly that: no column, no mapping, so a writer ticked
+ * "Finish the first draft", saw the road move to three of nineteen, reloaded,
+ * and found it back at two. Every hand-ticked step, silently, on every load.
+ * Thirteen of the nineteen steps are hand-ticked, so that is most of the
+ * roadmap.
+ *
+ * Merging rather than replacing fixes it for good and for anything added
+ * later: a book the server knows keeps the server's answer for every field the
+ * server *has* an answer for, and its local-only fields survive.
+ *
+ * The consequence is stated where a writer can read it — roadmap ticks stay on
+ * the machine they were made on, like the tool stores (`ledger`, `arc`,
+ * `bible`) that carry the same note on their own screens. Giving it a column
+ * is the better answer and is a migration; `TODO.md` carries it.
+ */
+function keepLocalOnly(local: Shelf, remote: Shelf): Shelf {
+  const mine = new Map(local.books.map((b) => [b.id, b]));
+  return {
+    ...remote,
+    books: remote.books.map((book) => {
+      const ticked = mine.get(book.id)?.roadmapDone;
+      return ticked?.length ? { ...book, roadmapDone: ticked } : book;
+    }),
+  };
+}
+
+/**
+ * The merge above, reachable from a test.
+ *
+ * `applyRemote` takes a whole downloaded library and needs Supabase to build
+ * one; the part worth testing is which fields survive it, which is this.
+ */
+export function applyRemoteForTest(remote: Shelf): void {
+  const merged = keepLocalOnly(getShelf(), remote);
+  window.localStorage.setItem(SHELF_KEY, JSON.stringify(merged));
+  cachedRaw = null;
+  emitShelf();
+}
+
 function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
   if (!remote) return;
   try {
-    window.localStorage.setItem(SHELF_KEY, JSON.stringify(remote.shelf));
+    window.localStorage.setItem(
+      SHELF_KEY,
+      JSON.stringify(keepLocalOnly(getShelf(), remote.shelf)),
+    );
     for (const [id, raw] of remote.bodies) {
       window.localStorage.setItem(bodyKey(id), raw);
     }

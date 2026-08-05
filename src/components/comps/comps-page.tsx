@@ -41,7 +41,9 @@ import {
   setTargetWords,
 } from "@/lib/library-store";
 import { suggestTarget } from "@/lib/book-kinds";
+import { ToolStepDone } from "@/components/ui/tool-save";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -85,6 +87,19 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
+
+  /*
+   * Nothing here is a draft — a search is not an edit, and "Use this target"
+   * writes the moment it is pressed.
+   *
+   * Two road steps land on this screen and they are ticked in opposite ways.
+   * "Set a length to aim at" is detected from `book.targetWords`, so pressing
+   * that button ticks it. "Find your comp titles" cannot be detected: the two
+   * or three a writer settles on are copied into a query letter and a shop's
+   * form, and nothing in the library records that they chose them. So it is
+   * this press.
+   */
+  const save = useToolSave({ book, tool: "comps" });
 
   /* Generated, not a literal: the roadmap mounts this tool in a panel, so the
      page can hold this screen and the road at once and a hard-coded id would
@@ -385,6 +400,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           tool="Comp titles"
           title="What books is yours like?"
           width="6xl"
+          action={<ToolStepDone state={save} />}
         >
           {/* **The problem before the definition.** This used to open by
               defining the term — "the published books yours sits beside" —
@@ -416,6 +432,14 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           panel at about half a screen. See the note in `blurb-page.tsx`. */}
       <div className="@container mx-auto max-w-6xl px-6 pt-6 pb-16">
         {heading}
+
+        {/* The panel draws no `ToolHeader`, and `embedded` may hide the frame
+            but never a feature. */}
+        {embedded && (
+          <div className="-mt-2 mb-4 flex justify-end">
+            <ToolStepDone state={save} />
+          </div>
+        )}
 
         {/* **A label, because the field was teaching the wrong thing.**
             The box arrived seeded and unlabelled, with a placeholder that a

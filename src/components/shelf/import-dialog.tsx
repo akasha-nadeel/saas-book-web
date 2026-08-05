@@ -11,6 +11,7 @@ import {
 } from "@/lib/import";
 import type { ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
+import { keepImportedCover } from "@/lib/cover-save";
 
 /**
  * Importing a manuscript, as a modal on the shelf.
@@ -123,6 +124,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       );
       return;
     }
+    void keepImportedCover(result.bookId, proposal.printCover);
     router.push(`/book/${result.bookId}/chapter/${result.chapterId}`);
   };
 

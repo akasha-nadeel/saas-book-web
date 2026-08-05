@@ -2319,9 +2319,29 @@ body {
   animation: oc-step-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 
+/* The save bar arriving at the foot of the window.
+   Up from below rather than fading in place: it comes from off the bottom
+   edge, which is where it lives, and the movement is what catches an eye
+   that is looking at a field halfway up the page. */
+@keyframes oc-save-bar {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oc-save-bar {
+  animation: oc-save-bar 200ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .oc-panel-in,
-  .oc-step-in {
+  .oc-step-in,
+  .oc-save-bar {
     animation: none;
   }
 }

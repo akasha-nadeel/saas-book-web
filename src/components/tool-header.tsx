@@ -94,6 +94,16 @@ export function ToolHeader({
    * here that *is* prose.
    */
   width = "5xl",
+  /**
+   * The tool's Save control, drawn at the top right.
+   *
+   * A slot rather than the button itself, because only the screen knows
+   * whether it holds a draft — and because the same control has to appear in
+   * the roadmap's panel, where this header is not rendered at all. It sits on
+   * the heading's row and not the breadcrumb's: the trail is the quietest row
+   * on the page and a filled button there would be the loudest thing in it.
+   */
+  action,
   /** One line under the heading, if the tool has something to say up front. */
   children,
 }: {
@@ -101,6 +111,7 @@ export function ToolHeader({
   tool: string;
   title?: string;
   width?: keyof typeof WIDTHS;
+  action?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   const cover = useCover(book.id);
@@ -236,6 +247,8 @@ export function ToolHeader({
               </p>
             )}
           </div>
+
+          {action}
         </div>
       </div>
     </header>

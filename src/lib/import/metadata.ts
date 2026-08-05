@@ -1,3 +1,4 @@
+import type { PrintCover } from "../cover-store";
 import { isValidIsbn13, normaliseIsbn, type PublishingMeta } from "../publishing";
 
 /**
@@ -24,6 +25,15 @@ export interface FileMetadata {
   author?: string;
   /** A data URL inside the cover budget, or absent when the file has none. */
   cover?: string;
+  /**
+   * The same artwork at full size, for the export.
+   *
+   * Kept apart from `cover` because they go to different places for different
+   * reasons — the thumbnail to localStorage where the shelf can read it during
+   * a render, this to IndexedDB where a few hundred kilobytes cost nothing.
+   * See `cover-store.ts`.
+   */
+  printCover?: PrintCover;
   /**
    * True when the file *has* a cover, whether or not one could be stored.
    *

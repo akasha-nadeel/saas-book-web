@@ -18,6 +18,8 @@ import {
 } from "./typeset";
 import { blocksToXhtml, escapeXml } from "./xhtml";
 import { frontSections } from "./front-matter";
+import { isApparatusPage, matterSectionIndex } from "@/lib/matter";
+import { isGenericChapterTitle } from "@/lib/library-store";
 
 /**
  * EPUB 3, built to be accepted by a shop rather than merely opened by a reader.
@@ -42,6 +44,8 @@ import { frontSections } from "./front-matter";
 export interface EpubChapter {
   title: string;
   xhtml: string;
+  /** Which part of the book it belongs to. Absent means the body. */
+  matter?: "front" | "body" | "back";
 }
 
 export interface EpubMeta {
@@ -129,12 +133,71 @@ function accessibility(
   ].join("\n");
 }
 
+/**
+ * Where each generated section belongs among the standard front-matter pages.
+ *
+ * Read out of `MATTER_SECTIONS` rather than written down, so the one list that
+ * says what order a book is bound in stays the only one.
+ */
+const GENERATED_RANK: Record<string, number> = {
+  title: matterSectionIndex("front", "Title page"),
+  copyright: matterSectionIndex("front", "Copyright page"),
+  contents: matterSectionIndex("front", "Table of contents"),
+};
+
+/**
+ * The reading order of the whole book, as ids.
+ *
+ * **The generated pages sit among the writer's own, not in front of them.**
+ * They used to be emitted first and the chapters after, which was right while
+ * front matter was a single page nobody made — and became wrong the moment a
+ * book could carry its own half-title: the file opened on a generated title
+ * page, then the contents, and *then* the half-title that should have led the
+ * book, with the dedication after the contents. Every one of those is a page in
+ * the wrong place in a finished book.
+ *
+ * So each generated section takes its own slot in the binding order —
+ * `GENERATED_RANK` — and is merged into the front matter by rank. A page the
+ * writer named themselves ranks `Infinity` and sorts to the end of the front
+ * matter, which is the only honest answer for a page whose position only they
+ * know. The body and the back matter follow in the order they were loaded.
+ */
+export function spineOrder(
+  chapters: readonly EpubChapter[],
+  frontIds: readonly string[],
+): string[] {
+  const front: { id: string; rank: number; seq: number }[] = [];
+  const rest: string[] = [];
+
+  chapters.forEach((chapter, i) => {
+    if (chapter.matter === "front") {
+      front.push({
+        id: chapterId(i),
+        rank: matterSectionIndex("front", chapter.title),
+        seq: i,
+      });
+    } else {
+      rest.push(chapterId(i));
+    }
+  });
+
+  frontIds.forEach((id, i) => {
+    // `seq` below every chapter's, so a generated page and a written one of the
+    // same rank put the generated one first. It cannot happen today — a written
+    // page suppresses its generated twin — but a tie has to resolve somehow.
+    front.push({ id, rank: GENERATED_RANK[id] ?? -1, seq: -frontIds.length + i });
+  });
+
+  front.sort((a, b) => a.rank - b.rank || a.seq - b.seq);
+  return [...front.map((f) => f.id), ...rest];
+}
+
 export function contentOpf(
   meta: EpubMeta,
   chapters: EpubChapter[],
   identifier: string,
-  /** Generated front-matter ids (title, copyright, contents), which come before
-   *  the chapters in the manifest and the spine. */
+  /** Generated front-matter ids (title, copyright, contents). Placed in the
+   *  spine by `spineOrder`, which binds them among the writer's own pages. */
   frontIds: readonly string[] = [],
   resources: EpubResources = {},
 ): string {
@@ -149,10 +212,6 @@ export function contentOpf(
         `    <item id="${id}" href="${id}.xhtml" media-type="application/xhtml+xml"/>`,
     )
     .join("\n");
-  const frontSpine = frontIds
-    .map((id) => `    <itemref idref="${id}" />`)
-    .join("\n");
-
   const manifest = [
     // The cover page leads the book, so it leads the manifest too.
     cover
@@ -178,8 +237,9 @@ export function contentOpf(
 
   const spine = [
     cover ? `    <itemref idref="${COVER_PAGE}" />` : "",
-    frontSpine,
-    chapters.map((_, i) => `    <itemref idref="${chapterId(i)}" />`).join("\n"),
+    spineOrder(chapters, frontIds)
+      .map((id) => `    <itemref idref="${id}" />`)
+      .join("\n"),
   ]
     .filter(Boolean)
     .join("\n");
@@ -242,16 +302,41 @@ ${spine}
  * shops still run an older ingestion path that reads this and nothing else, and
  * a book whose chapters are unreachable is rejected without much explanation.
  */
+/**
+ * The pages a contents list should carry, with the index each one keeps.
+ *
+ * **Apparatus is left out.** A reader's contents menu offering "Half-title
+ * page / Copyright page" before Chapter One is not what a published book does,
+ * and a printed contents page listing itself is a small absurdity — the shops'
+ * own ingestion guidance says the same. What stays is every division a reader
+ * would actually navigate to: a dedication, an epigraph, a prologue, the
+ * chapters, an epilogue, the acknowledgements.
+ *
+ * The index travels with each entry because the *file* names are positional
+ * (`chapter-03.xhtml` is the fourth loaded chapter, listed or not), so a
+ * filtered list must not be renumbered.
+ */
+export function listedChapters(
+  chapters: readonly EpubChapter[],
+): { chapter: EpubChapter; index: number }[] {
+  return chapters
+    .map((chapter, index) => ({ chapter, index }))
+    .filter(
+      ({ chapter }) =>
+        !isApparatusPage(chapter.matter ?? "body", chapter.title),
+    );
+}
+
 export function tocNcx(
   title: string,
   chapters: EpubChapter[],
   identifier: string,
 ): string {
-  const points = chapters
+  const points = listedChapters(chapters)
     .map(
-      (chapter, i) => `    <navPoint id="${chapterId(i)}" playOrder="${i + 1}">
+      ({ chapter, index }, n) => `    <navPoint id="${chapterId(index)}" playOrder="${n + 1}">
       <navLabel><text>${escapeXml(chapter.title)}</text></navLabel>
-      <content src="${chapterId(i)}.xhtml"/>
+      <content src="${chapterId(index)}.xhtml"/>
     </navPoint>`,
     )
     .join("\n");
@@ -278,10 +363,10 @@ export function navXhtml(
   /** Whether a cover page exists to point the landmarks at. */
   hasCover = false,
 ): string {
-  const items = chapters
+  const items = listedChapters(chapters)
     .map(
-      (chapter, i) =>
-        `        <li><a href="${chapterId(i)}.xhtml">${escapeXml(chapter.title)}</a></li>`,
+      ({ chapter, index }) =>
+        `        <li><a href="${chapterId(index)}.xhtml">${escapeXml(chapter.title)}</a></li>`,
     )
     .join("\n");
 
@@ -290,7 +375,26 @@ export function navXhtml(
   const coverLandmark = hasCover
     ? `\n        <li><a epub:type="cover" href="${COVER_PAGE}.xhtml">Cover</a></li>`
     : "";
-  const first = chapters.length > 0 ? `${chapterId(0)}.xhtml` : "nav.xhtml";
+
+  /*
+   * **"Start of content" is the first *body* chapter, not the first file.**
+   *
+   * This pointed at `chapter-01.xhtml` whatever that turned out to be. Front
+   * matter used to be a single page a writer rarely made, so it was usually
+   * right; now that a book can carry a half-title, a dedication and an epigraph
+   * as pages of their own, it was reliably wrong — and this is the landmark
+   * Apple Books uses to decide where "begin reading" lands, so a reader opening
+   * the book was put on the dedication with the novel behind them.
+   *
+   * Falls back to the first file when a book is nothing but front matter, and
+   * to the nav when there are no files at all. Both are somewhere real, which
+   * is all a landmark has to be.
+   */
+  const bodyAt = chapters.findIndex((c) => (c.matter ?? "body") === "body");
+  const first =
+    chapters.length === 0
+      ? "nav.xhtml"
+      : `${chapterId(bodyAt === -1 ? 0 : bodyAt)}.xhtml`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
@@ -377,12 +481,82 @@ export function pageXhtml(
 </html>`;
 }
 
-/** EPUB's own word for each generated front page. */
+/**
+ * EPUB's own words for each generated front page: the part, then the division.
+ *
+ * **The part was missing**, and these three pages were the only ones in the
+ * book without it — `chapterSemantics` has always written `frontmatter
+ * dedication` for a page the writer made. A bare `titlepage` is still legal,
+ * but it says what the page *is* without saying where it sits, and a reading
+ * system that only understands the part learns nothing at all. It showed on
+ * the round trip: importing a book this app had just written put its own
+ * generated title page and contents into the *body*, because the importer
+ * reads the part and there was none to read.
+ */
 const FRONT_SEMANTICS: Record<string, string> = {
-  title: "titlepage",
-  copyright: "copyright-page",
-  contents: "toc",
+  title: "frontmatter titlepage",
+  copyright: "frontmatter copyright-page",
+  contents: "frontmatter toc",
 };
+
+/**
+ * The EPUB structural semantics for a page the *writer* wrote, by its title.
+ *
+ * The generated front matter above is ours and its type is known. These are
+ * the writer's own front- and back-matter pages, and every one of them used to
+ * be labelled `bodymatter chapter` — so a dedication, an epigraph and an
+ * acknowledgements page each announced themselves to a reading system as a
+ * chapter of the novel. What that costs is real rather than pedantic: "go to
+ * the beginning of the book" lands on the dedication, and a shop's automated
+ * check reads a book that opens on one.
+ *
+ * Matched on the title because that is what the writer chose, and the standard
+ * pages are offered by name (see `src/lib/matter.ts`) so the common ones match
+ * without anyone being asked. A page named something else falls back to the
+ * part's own type alone — `frontmatter` with no second word is correct and
+ * complete; guessing at the division would be neither.
+ *
+ * Every value here is from the EPUB 3 Structural Semantics Vocabulary. A word
+ * that is not in it is worse than none: EPUBCheck reports it, and a reading
+ * system that does not recognise it treats the page as untyped anyway.
+ */
+const MATTER_SEMANTICS: Record<string, string> = {
+  "half-title page": "halftitlepage",
+  "title page": "titlepage",
+  "copyright page": "copyright-page",
+  dedication: "dedication",
+  epigraph: "epigraph",
+  "table of contents": "toc",
+  "preface or introduction": "preface",
+  preface: "preface",
+  introduction: "introduction",
+  foreword: "foreword",
+  prologue: "prologue",
+  epilogue: "epilogue",
+  afterword: "afterword",
+  acknowledgements: "acknowledgments",
+  acknowledgments: "acknowledgments",
+  glossary: "glossary",
+  appendix: "appendix",
+  bibliography: "bibliography",
+  index: "index",
+  colophon: "colophon",
+};
+
+/** What a page announces itself as: its part, then its division when known. */
+export function chapterSemantics(
+  matter: "front" | "body" | "back",
+  title: string,
+): string {
+  /* `bodymatter chapter`: the first says this is the book proper rather than
+     front or back matter, the second says what kind of division it is. Both
+     are standard EPUB structural semantics and both are what a reading system
+     looks for when it offers "go to the start of the book". */
+  if (matter === "body") return "bodymatter chapter";
+  const part = matter === "front" ? "frontmatter" : "backmatter";
+  const division = MATTER_SEMANTICS[title.trim().toLowerCase()];
+  return division ? `${part} ${division}` : part;
+}
 
 export function chapterXhtml(
   title: string,
@@ -391,20 +565,35 @@ export function chapterXhtml(
       file serves both settings and a reader that restyles keeps the number. */
   number?: number,
   language = DEFAULT_LANGUAGE,
+  /** Which part of the book this page belongs to. Body unless said otherwise,
+   *  which keeps every existing caller and every test on the old behaviour. */
+  matter: "front" | "body" | "back" = "body",
 ): string {
-  /* `bodymatter chapter`: the first says this is the book proper rather than
-     front or back matter, the second says what kind of division it is. Both
-     are standard EPUB structural semantics and both are what a reading system
-     looks for when it offers "go to the start of the book". */
+  /* **The numeral is dropped when the heading already is the number.**
+     A chapter still called "Chapter 1" was printed as a standing "1" with
+     "Chapter 1" under it — the app saying the same thing twice on the opening
+     line of every chapter of every book that kept the default titles, which is
+     most of them. `isGenericChapterTitle` is the store's own answer and knows
+     both the digit and the spelled form; the contents page asks it too, so the
+     two cannot disagree about the same chapter. */
+  const numeral = number && !isGenericChapterTitle(title) ? number : null;
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
   <head>
     <title>${escapeXml(title)}</title>
     <link rel="stylesheet" type="text/css" href="style.css"/>
   </head>
-  <body epub:type="bodymatter chapter">
-    ${number ? `<p class="chapter-number">${number}</p>` : ""}
-    <h1>${escapeXml(title)}</h1>
+  <body epub:type="${chapterSemantics(matter, title)}">
+    ${numeral ? `<p class="chapter-number">${numeral}</p>` : ""}${
+      /* **Apparatus prints no heading.** These pages are named in the app so a
+         writer can find them in a list; putting that name on the page itself
+         gives a finished book a sheet headed "Copyright page", which no
+         published book has. A dedication or a prologue is a real division and
+         keeps its heading. */
+      isApparatusPage(matter, title) ? "" : `
+    <h1>${escapeXml(title)}</h1>`
+    }
 ${body}
   </body>
 </html>`;
@@ -442,6 +631,7 @@ export async function buildEpub(
   const rendered: EpubChapter[] = chapters.map((chapter, i) => ({
     title: chapter.title,
     xhtml: blocksToXhtml(blocks[i]),
+    ...(chapter.matter ? { matter: chapter.matter } : {}),
   }));
 
   const allImagesDescribed = blocks
@@ -491,7 +681,8 @@ export async function buildEpub(
   }
 
   rendered.forEach((chapter, i) => {
-    // Body chapters carry their number; front and back matter do not.
+    // Body chapters carry their number; front and back matter do not — they
+    // carry their part instead, so a dedication is not announced as a chapter.
     zip.file(
       `OEBPS/${chapterId(i)}.xhtml`,
       chapterXhtml(
@@ -499,6 +690,7 @@ export async function buildEpub(
         chapter.xhtml,
         chapters[i].number ?? undefined,
         language,
+        chapter.matter ?? "body",
       ),
     );
   });

@@ -1,4 +1,4 @@
-import { expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
 import { DEFAULT_TYPESET } from "./typeset";
@@ -100,4 +100,84 @@ it("leaves the contents unlinked when no target is given", () => {
     copyright: false,
   });
   expect(sections[0].html).not.toContain("<a href=");
+});
+
+/**
+ * A page the writer wrote wins over the one we would generate.
+ *
+ * Three of the generated pages can also be written by hand now that front
+ * matter is a list, and a book carrying both got two title pages on
+ * consecutive sheets.
+ */
+describe("generated pages stand down for written ones", () => {
+  const chapter = (
+    title: string,
+    matter?: "front" | "back",
+  ): LoadedChapter => ({
+    title,
+    doc: { type: "doc", content: [] },
+    number: matter ? null : 1,
+    ...(matter ? { matter } : {}),
+  });
+
+  const options = {
+    ...DEFAULT_TYPESET,
+    titlePage: true,
+    copyright: true,
+    contents: true,
+  };
+  const written = { ...book, author: "Marguerite Hale" };
+
+  it("generates all three when the writer has written none", () => {
+    expect(
+      frontSections(written, [chapter("Chapter One")], options).map(
+        (s) => s.id,
+      ),
+    ).toEqual(["title", "copyright", "contents"]);
+  });
+
+  it("leaves out the one the writer has written", () => {
+    const ids = frontSections(
+      written,
+      [chapter("Title page", "front"), chapter("Chapter One")],
+      options,
+    ).map((s) => s.id);
+    expect(ids).not.toContain("title");
+    expect(ids).toEqual(["copyright", "contents"]);
+  });
+
+  it("matches the title however it is cased or spaced", () => {
+    expect(
+      frontSections(
+        written,
+        [chapter("  copyright page ", "front"), chapter("Chapter One")],
+        options,
+      ).map((s) => s.id),
+    ).not.toContain("copyright");
+  });
+
+  /*
+   * A back-matter page called "Title page" is a strange thing to have, and it
+   * is still not the book's title page — so it silences nothing. The check is
+   * about which sheet opens the book, not about the words on a tab.
+   */
+  it("only front-matter pages stand anything down", () => {
+    expect(
+      frontSections(
+        written,
+        [chapter("Chapter One"), chapter("Title page", "back")],
+        options,
+      ).map((s) => s.id),
+    ).toContain("title");
+  });
+
+  it("hands the job back when the page is renamed to something else", () => {
+    expect(
+      frontSections(
+        written,
+        [chapter("Copyright and permissions", "front"), chapter("Chapter One")],
+        options,
+      ).map((s) => s.id),
+    ).toContain("copyright");
+  });
 });

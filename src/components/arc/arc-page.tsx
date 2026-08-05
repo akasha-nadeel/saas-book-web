@@ -16,8 +16,10 @@ import {
   type ArcReader,
   type ArcStatus,
 } from "@/lib/arc";
+import { ToolSaveBar } from "@/components/ui/tool-save";
 import { findBook, saveArcRaw } from "@/lib/library-store";
 import { useArc, useHydrated, useShelf } from "@/lib/use-library";
+import { useToolSave } from "@/lib/use-tool-save";
 
 /**
  * Who has an advance copy, who read it, and who is late.
@@ -112,6 +114,30 @@ export function ArcPage({ bookId }: { bookId: string }) {
     commit(readers.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
+  /*
+   * The list itself commits as it is edited — a row is a person who has the
+   * book, and holding that behind a press would be a way to lose one.
+   *
+   * What is a draft is the row being *typed*: a name in the box and nothing
+   * pressed is the one thing on this screen a writer can walk away from and
+   * lose. So Save adds it, and the same press ticks the step this whole road
+   * was arranged around — "Line up ARC readers — now, not later", which has no
+   * detector because a row in a list is not the same claim as the readers
+   * being lined up.
+   */
+  const save = useToolSave({
+    book,
+    tool: "arc",
+    dirty: name.trim() !== "",
+    commit: add,
+    discard: () => {
+      setName("");
+      setFrom("");
+      setReads("");
+      setDue("");
+    },
+  });
+
   if (!hydrated) return <LoadingScreen />;
 
   if (!book) {
@@ -148,6 +174,9 @@ export function ArcPage({ bookId }: { bookId: string }) {
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
+      {/* Up only while a reader is half-typed into the form. The list itself
+          commits as it is edited — a row is a person who has the book. */}
+      <ToolSaveBar state={save} />
       <ToolHeader book={book} tool="Advance copies">
         Who has the book, who read it, and who is late. One list instead of six
         sites and a spreadsheet.

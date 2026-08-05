@@ -128,7 +128,7 @@ async function epubWith(options?: { reverseSpine?: boolean }) {
 }
 
 it("reads epub chapters in spine order, not zip order", async () => {
-  const blocks = await parseEpub(await epubWith({ reverseSpine: true }));
+  const blocks = (await parseEpub(await epubWith({ reverseSpine: true }))).flatMap((s) => s.blocks);
   const text = blocks.map((b) => b.inline.map((i) => i.text).join(""));
 
   // The spine says two-then-one, and the spine is the book's real order.
@@ -136,7 +136,7 @@ it("reads epub chapters in spine order, not zip order", async () => {
 });
 
 it("skips non-linear spine items like covers", async () => {
-  const blocks = await parseEpub(await epubWith());
+  const blocks = (await parseEpub(await epubWith())).flatMap((s) => s.blocks);
   const text = blocks.map((b) => b.inline.map((i) => i.text).join(""));
   expect(text).not.toContain("COVER ART");
 });
@@ -144,7 +144,7 @@ it("skips non-linear spine items like covers", async () => {
 it("resolves hrefs relative to the opf, not the zip root", async () => {
   // The chapters live in OEBPS/ but the opf refers to them as "one.xhtml".
   // Reading those paths literally finds nothing at all.
-  const blocks = await parseEpub(await epubWith());
+  const blocks = (await parseEpub(await epubWith())).flatMap((s) => s.blocks);
   expect(blocks.length).toBeGreaterThan(0);
 });
 
@@ -328,4 +328,117 @@ it("refuses an epub with no container", async () => {
   await expect(
     parseEpub(await zip.generateAsync({ type: "arraybuffer" })),
   ).rejects.toThrow(/container/i);
+});
+
+/**
+ * A book this app exported, read back in.
+ *
+ * The round trip is the sharpest test there is of the importer, because the
+ * export writes `epub:type` on every page and the import is the side that has
+ * to believe it. It used to not: every spine document was concatenated into
+ * one block stream and re-split on headings, so a half-title, a title page and
+ * a copyright page — none of which print a heading, because no published book
+ * has a sheet headed "Copyright page" — merged into the dedication that
+ * followed them and arrived as a body chapter called "Chapter 1 – Dedication".
+ */
+async function typedEpub(): Promise<ArrayBuffer> {
+  const zip = new JSZip();
+  zip.file("mimetype", "application/epub+zip");
+  zip.file(
+    "META-INF/container.xml",
+    `<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>`,
+  );
+  zip.file(
+    "OEBPS/content.opf",
+    `<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><manifest>
+      <item id="c1" href="chapter-01.xhtml"/><item id="c2" href="chapter-02.xhtml"/>
+      <item id="c3" href="chapter-03.xhtml"/><item id="c4" href="chapter-04.xhtml"/>
+    </manifest><spine>
+      <itemref idref="c1"/><itemref idref="c2"/><itemref idref="c3"/><itemref idref="c4"/>
+    </spine></package>`,
+  );
+  const page = (type: string, title: string, body: string) =>
+    `<html xmlns:epub="http://www.idpf.org/2007/ops"><head><title>${title}</title></head><body epub:type="${type}">${body}</body></html>`;
+
+  zip.file(
+    "OEBPS/chapter-01.xhtml",
+    // Apparatus: a title in the head and no heading on the page.
+    page("frontmatter halftitlepage", "Half-title page", "<p>The Salt Ledger</p>"),
+  );
+  zip.file(
+    "OEBPS/chapter-02.xhtml",
+    page("frontmatter dedication", "Dedication", "<h1>Dedication</h1><p>For Ines.</p>"),
+  );
+  zip.file(
+    "OEBPS/chapter-03.xhtml",
+    page("bodymatter chapter", "Chapter One", "<h1>Chapter One</h1><p>The pans lay white.</p>"),
+  );
+  zip.file(
+    "OEBPS/chapter-04.xhtml",
+    page("backmatter acknowledgments", "Acknowledgements", "<h1>Acknowledgements</h1><p>To Ana.</p>"),
+  );
+  return zip.generateAsync({ type: "arraybuffer" });
+}
+
+it("keeps front and back matter out of the chapters", async () => {
+  const sections = await parseEpub(await typedEpub());
+  expect(sections.map((s) => [s.matter ?? "body", s.title ?? "—"])).toEqual([
+    ["front", "Half-title page"],
+    ["front", "Dedication"],
+    ["body", "—"],
+    ["back", "Acknowledgements"],
+  ]);
+});
+
+/**
+ * An apparatus page has no heading, so its `<title>` is the only name it has —
+ * which is exactly the case that used to make it merge into the next page.
+ */
+it("names an apparatus page from its head title", async () => {
+  const sections = await parseEpub(await typedEpub());
+  expect(sections[0].title).toBe("Half-title page");
+  expect(sections[0].blocks.length).toBeGreaterThan(0);
+});
+
+it("leaves an EPUB that types nothing on the old path", async () => {
+  // No epub:type anywhere — every section is untyped, so the body keeps the
+  // whole book and `splitIntoChapters` derives the chapters as it always did.
+  const sections = await parseEpub(await epubWith());
+  expect(sections.every((s) => s.matter === undefined)).toBe(true);
+});
+
+/**
+ * A bare division with no part beside it.
+ *
+ * Plenty of EPUBs in the wild write `epub:type="toc"` and nothing else, and
+ * our own generated pages did too until the export was fixed to name the part.
+ * A division we recognise is a page whose part we know.
+ */
+it("infers the part from a division when the file gives none", async () => {
+  const zip = new JSZip();
+  zip.file("mimetype", "application/epub+zip");
+  zip.file(
+    "META-INF/container.xml",
+    `<?xml version="1.0"?><container xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf"/></rootfiles></container>`,
+  );
+  zip.file(
+    "OEBPS/content.opf",
+    `<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf"><manifest>
+      <item id="a" href="a.xhtml"/><item id="b" href="b.xhtml"/><item id="c" href="c.xhtml"/>
+    </manifest><spine><itemref idref="a"/><itemref idref="b"/><itemref idref="c"/></spine></package>`,
+  );
+  const page = (type: string, title: string, body: string) =>
+    `<html xmlns:epub="http://www.idpf.org/2007/ops"><head><title>${title}</title></head><body epub:type="${type}">${body}</body></html>`;
+  // A generated title page carries the *book's* name in its head, which is why
+  // the division's own name is preferred for apparatus.
+  zip.file("OEBPS/a.xhtml", page("titlepage", "The Salt Ledger", "<p>The Salt Ledger</p>"));
+  zip.file("OEBPS/b.xhtml", page("epilogue", "Epilogue", "<h1>Epilogue</h1><p>After.</p>"));
+  zip.file("OEBPS/c.xhtml", page("bodymatter chapter", "One", "<h1>One</h1><p>x</p>"));
+
+  const sections = await parseEpub(await zip.generateAsync({ type: "arraybuffer" }));
+  expect(sections.map((s) => [s.matter ?? "body", s.title ?? "—"])).toEqual([
+    ["front", "Title page"],
+    ["back", "Epilogue"],
+    ["body", "—"],
+  ]);
 });

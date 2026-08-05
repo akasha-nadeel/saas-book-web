@@ -8,13 +8,13 @@ import {
   chapterMatterOf,
   chapterNumberOf,
   createChapter,
-  createMatterSection,
   deleteChapter,
   findBook,
   importIntoBook,
   moveChapter,
   renameChapter,
   setPref,
+  startMatter,
   toggleBookmark,
   type ChapterMeta,
 } from "@/lib/library-store";
@@ -29,10 +29,13 @@ import { showImportBanner } from "@/components/editor/import-banner-host";
  * A book in three parts: front matter, the body, back matter.
  *
  * The body is the story — chapters the writer adds, numbered from one, reordered
- * by dragging. Front and back matter are two buttons that bracket it: each opens
- * a single page whose template already carries the standard sections of that part
- * (title page, dedication, epigraph … / epilogue, acknowledgements …) as
- * headings, for the writer to fill in. Those pages are named, never numbered.
+ * by dragging. Front and back matter bracket it, and are lists of named pages in
+ * their own right: a title page, a copyright page, a dedication, an epigraph …
+ * and an epilogue, acknowledgements, an about-the-author. Those pages are named,
+ * never numbered, and never dragged — they keep the order a book is bound in.
+ *
+ * A part with nothing in it shows one button instead, which makes its whole
+ * standard set. See `src/lib/matter.ts`.
  */
 export function ChapterSidebar({ bookId }: { bookId: string }) {
   const shelf = useShelf();
@@ -315,20 +318,23 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   );
 
   /**
-   * One matter part as a single button that brackets the body — front above the
-   * chapters, back below. It opens that part's page, seeding it with the standard
-   * template the first time. Once written it is a real page: the button becomes
-   * a highlight-when-open row with a ⋯ menu to rename or clear it.
+   * One matter part, bracketing the body — front above the chapters, back
+   * below.
+   *
+   * **This was one button opening one page**, back when front matter *was* one
+   * page holding every standard division as a heading. It is a list of pages
+   * now (see `src/lib/matter.ts`), so the rail lists them, exactly as it lists
+   * chapters: same row, same ⋯, same rename and delete. A part with nothing in
+   * it keeps the old single button, which now makes the whole set.
+   *
+   * Adding a page is deliberately *not* here. The book panel's card offers the
+   * eight standard sections with a line each saying what they are, and a
+   * second, wordless way in would be a writer choosing "Epigraph" from a rail
+   * with nothing to tell them what one is.
    */
-  const renderMatterButton = (matter: "front" | "back") => {
-    const existing = book.chapters.find((c) => c.matterKey === matter);
+  const renderMatterPart = (matter: "front" | "back") => {
+    const pages = book.chapters.filter((c) => chapterMatterOf(c) === matter);
     const label = matter === "front" ? "Front matter" : "Back matter";
-    const isActive = existing?.id === activeId;
-
-    const open = () => {
-      const id = existing?.id ?? createMatterSection(bookId, matter);
-      if (id) router.push(`/book/${bookId}/chapter/${id}`);
-    };
 
     // The book icon — front matter opens the book, back matter closes it, so the
     // two mirror. A single glyph reads as a section marker, not a chapter.
@@ -348,56 +354,89 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </svg>
     );
 
-    if (existing && renamingId === existing.id) {
-      return renameForm(existing);
-    }
-
-    return (
-      <div className="group relative">
+    if (pages.length === 0) {
+      return (
         <button
           type="button"
-          onClick={open}
-          aria-current={isActive ? "page" : undefined}
-          title={existing ? label : `Start the ${label.toLowerCase()}`}
-          className={`flex w-full items-center gap-2.5 border-l-4 py-3 pr-10 pl-3
-                      text-left font-sans text-sm font-medium outline-none
-                      transition-colors focus-visible:ring-inset
-                      focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                        isActive
-                          ? "border-accent bg-selected text-selected-fg"
-                          : existing
-                            ? "border-transparent text-fg hover:bg-raised"
-                            : "border-transparent text-muted hover:bg-raised hover:text-fg"
-                      }`}
+          onClick={() => {
+            const first = startMatter(bookId, matter);
+            if (first) router.push(`/book/${bookId}/chapter/${first}`);
+          }}
+          title={`Start the ${label.toLowerCase()}`}
+          className="flex w-full items-center gap-2.5 border-l-4
+                     border-transparent py-3 pr-10 pl-3 text-left font-sans
+                     text-sm font-medium text-muted outline-none
+                     transition-colors hover:bg-raised hover:text-fg
+                     focus-visible:ring-inset focus-visible:ring-2
+                     focus-visible:ring-accent/60"
         >
           {icon}
           <span className="flex-1 truncate">{label}</span>
         </button>
+      );
+    }
 
-        {existing && (
-          <span className="absolute top-1/2 right-2 -translate-y-1/2">
-            <RowMenu
-              label={label}
-              active={isActive}
-              items={[
-                {
-                  label: "Rename",
-                  hint: "R",
-                  icon: menuIcons.rename,
-                  onSelect: () => startRename(existing),
-                },
-                {
-                  label: "Delete",
-                  hint: "D",
-                  icon: menuIcons.trash,
-                  onSelect: () => handleDelete(existing),
-                  danger: true,
-                },
-              ]}
-            />
-          </span>
-        )}
-      </div>
+    return (
+      <>
+        {/* A heading rather than a row: these pages are named, so without one
+            "Dedication" and "Acknowledgements" sit in the same list with
+            nothing saying which end of the book they belong to. */}
+        <p className="flex items-center gap-2.5 px-3 pt-3 pb-1 font-sans text-xs
+                      font-bold tracking-wide text-muted uppercase">
+          {icon}
+          {label}
+        </p>
+        <ul>
+          {pages.map((page) => {
+            const isActive = page.id === activeId;
+            if (renamingId === page.id) return <li key={page.id}>{renameForm(page)}</li>;
+            return (
+              <li key={page.id} className="group relative">
+                <Link
+                  href={`/book/${bookId}/chapter/${page.id}`}
+                  aria-current={isActive ? "page" : undefined}
+                  draggable={false}
+                  className={`flex items-center gap-2.5 border-l-4 py-2.5 pr-10
+                              pl-3 font-sans text-sm outline-none
+                              transition-colors focus-visible:ring-inset
+                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                isActive
+                                  ? "border-accent bg-selected font-medium text-selected-fg"
+                                  : "border-transparent text-fg hover:bg-raised"
+                              }`}
+                >
+                  {/* The same indent the numbered rows use, so the two lists
+                      share a left edge instead of stepping in and out. */}
+                  <span className="w-4 shrink-0" />
+                  <span className="flex-1 truncate">{page.title}</span>
+                </Link>
+
+                <span className="absolute top-1/2 right-2 -translate-y-1/2">
+                  <RowMenu
+                    label={page.title}
+                    active={isActive}
+                    items={[
+                      {
+                        label: "Rename",
+                        hint: "R",
+                        icon: menuIcons.rename,
+                        onSelect: () => startRename(page),
+                      },
+                      {
+                        label: "Delete",
+                        hint: "D",
+                        icon: menuIcons.trash,
+                        onSelect: () => handleDelete(page),
+                        danger: true,
+                      },
+                    ]}
+                  />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      </>
     );
   };
 
@@ -512,9 +551,9 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-3">
         {/* A book, top to bottom: front matter opens it, the body is the story,
-            back matter closes it. Front and back are single buttons that open a
-            templated page; the body is the chapter list itself. */}
-        <div className="border-y border-line">{renderMatterButton("front")}</div>
+            back matter closes it. All three are lists of pages; a part with
+            nothing in it is one button that makes its standard set. */}
+        <div className="border-y border-line">{renderMatterPart("front")}</div>
 
         {bodyChapters.length > 0 ? (
           <ol>{bodyChapters.map(renderChapter)}</ol>
@@ -524,7 +563,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           </p>
         )}
 
-        <div className="border-y border-line">{renderMatterButton("back")}</div>
+        <div className="border-y border-line">{renderMatterPart("back")}</div>
       </div>
 
       {pending && (

@@ -1,7 +1,13 @@
 import type { BookSetup } from "../library-store";
 import type { Block } from "./blocks";
 import type { FileMetadata } from "./metadata";
-import { splitIntoChapters, type ImportedBook } from "./split";
+import { countWords, toDoc } from "./blocks";
+import {
+  splitIntoChapters,
+  type ImportedBook,
+  type ImportedChapter,
+} from "./split";
+import type { EpubSection } from "./epub";
 
 /**
  * Turning a file the writer already has into a book.
@@ -83,6 +89,8 @@ export async function importFile(file: File): Promise<ImportedBook> {
 
   const fallbackTitle = titleFromFileName(file.name) || "Untitled Book";
   let blocks: Block[];
+  /** Only an EPUB fills this in — see the `.epub` case. */
+  let sections: EpubSection[] = [];
   let title = fallbackTitle;
   /*
    * What the file said about itself, for the formats that say anything.
@@ -125,7 +133,11 @@ export async function importFile(file: File): Promise<ImportedBook> {
     case ".epub": {
       const data = await file.arrayBuffer();
       const { parseEpub, epubMetadata } = await import("./epub");
-      blocks = await parseEpub(data);
+      /* **The one format that says which page is which**, so it is the one
+         format whose structure is kept rather than re-derived from headings.
+         See `matterPages` below. */
+      sections = await parseEpub(data);
+      blocks = sections.flatMap((s) => s.blocks);
       metadata = await epubMetadata(data);
       title = metadata.title ?? fallbackTitle;
       break;
@@ -153,16 +165,45 @@ export async function importFile(file: File): Promise<ImportedBook> {
     );
   }
 
-  const book = splitIntoChapters(blocks, title);
+  /*
+   * **Front and back matter come out as pages, not as chapters.**
+   *
+   * Everything used to be flattened into one block stream and re-split on
+   * headings, which threw away the only thing an EPUB is reliably good at
+   * saying: `epub:type` on each document names the part and often the
+   * division. The cost was visible the moment this app could read a book it
+   * had just written — the half-title, title page and copyright merged into a
+   * body chapter called "Chapter 1 – Dedication", because apparatus pages
+   * print no heading to split on and a dedication does.
+   *
+   * The body is still split exactly as before. Only the pages the file
+   * *declared* as front or back matter are lifted out, so an EPUB that says
+   * nothing about itself — and every other format — takes the same path it
+   * always did.
+   */
+  const matter = sections.filter((s) => s.matter && s.blocks.length);
+  const bodyBlocks = matter.length
+    ? sections.filter((s) => !s.matter).flatMap((s) => s.blocks)
+    : blocks;
+
+  const book = splitIntoChapters(bodyBlocks, title);
+  const pages: ImportedChapter[] = matter.map((section, i) => ({
+    title: section.title || `Page ${i + 1}`,
+    doc: toDoc(section.blocks),
+    words: countWords(section.blocks),
+    matter: section.matter,
+  }));
 
   return {
     ...book,
+    ...(pages.length ? { chapters: [...pages, ...book.chapters] } : {}),
     // A title the file *declared* beats one guessed out of its own text. The
     // guess is good — a lone H1 above H2 chapters really is the book's title —
     // but it is still a guess, and `dc:title` is not.
     ...(metadata.title ? { title: metadata.title } : {}),
     ...(metadata.author ? { author: metadata.author } : {}),
     ...(metadata.cover ? { cover: metadata.cover } : {}),
+    ...(metadata.printCover ? { printCover: metadata.printCover } : {}),
     ...(metadata.hasCover ? { hasCover: true } : {}),
     ...(metadata.publishing ? { publishing: metadata.publishing } : {}),
   };

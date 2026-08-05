@@ -5,8 +5,10 @@ import {
   containerXml,
   contentOpf,
   coverXhtml,
+  listedChapters,
   navXhtml,
   pageXhtml,
+  spineOrder,
   tocNcx,
 } from "@/lib/export/epub";
 import type { PackagedImage } from "@/lib/export/epub-images";
@@ -408,5 +410,198 @@ describe("structural semantics", () => {
     );
     expect(opf).not.toMatch(/any order of presentation/i);
     expect(opf).toMatch(/sequential chapter navigation/i);
+  });
+});
+
+/**
+ * A dedication is not a chapter.
+ *
+ * Every page a writer wrote used to be labelled `bodymatter chapter`, front and
+ * back matter included — which told a reading system the novel began at the
+ * dedication. Both halves of that are asserted here, because both are load-
+ * bearing and neither is visible in a file that opens fine.
+ */
+describe("structural semantics", () => {
+  it("labels a body chapter as the book proper", () => {
+    expect(chapterXhtml("Chapter One", "<p>x</p>", 1, "en", "body")).toContain(
+      'epub:type="bodymatter chapter"',
+    );
+  });
+
+  it("defaults to the body, so every existing caller is unchanged", () => {
+    expect(chapterXhtml("Chapter One", "<p>x</p>")).toContain(
+      'epub:type="bodymatter chapter"',
+    );
+  });
+
+  it("names the division of a standard matter page", () => {
+    expect(chapterXhtml("Dedication", "<p>x</p>", undefined, "en", "front"))
+      .toContain('epub:type="frontmatter dedication"');
+    expect(chapterXhtml("Epigraph", "<p>x</p>", undefined, "en", "front"))
+      .toContain('epub:type="frontmatter epigraph"');
+    expect(
+      chapterXhtml("Acknowledgements", "<p>x</p>", undefined, "en", "back"),
+    ).toContain('epub:type="backmatter acknowledgments"');
+  });
+
+  it("matches the title however it is cased or spaced", () => {
+    expect(chapterXhtml("  prologue ", "<p>x</p>", undefined, "en", "front"))
+      .toContain('epub:type="frontmatter prologue"');
+  });
+
+  /*
+   * A word outside the EPUB Structural Semantics Vocabulary is worse than
+   * none: EPUBCheck reports it, and a reading system that does not know it
+   * treats the page as untyped anyway. So a page the writer named themselves
+   * gets the part alone, which is correct and complete.
+   */
+  it("falls back to the part alone for a page the writer named", () => {
+    expect(
+      chapterXhtml("A note on the maps", "<p>x</p>", undefined, "en", "front"),
+    ).toContain('epub:type="frontmatter"');
+  });
+});
+
+describe("the start-of-content landmark", () => {
+  it("points at the first body chapter, not the first file", () => {
+    const nav = navXhtml("T", [
+      { title: "Dedication", xhtml: "<p>x</p>", matter: "front" as const },
+      { title: "Epigraph", xhtml: "<p>x</p>", matter: "front" as const },
+      { title: "Chapter One", xhtml: "<p>x</p>" },
+    ]);
+    // chapter-03 is the first body chapter. Apple Books uses this landmark to
+    // decide where "begin reading" lands; pointed at chapter-01 it opened the
+    // book on the dedication with the novel behind it.
+    expect(nav).toContain(
+      '<a epub:type="bodymatter" href="chapter-03.xhtml">',
+    );
+  });
+
+  it("falls back to the first file when a book is all front matter", () => {
+    const nav = navXhtml("T", [
+      { title: "Dedication", xhtml: "<p>x</p>", matter: "front" as const },
+    ]);
+    expect(nav).toContain('<a epub:type="bodymatter" href="chapter-01.xhtml">');
+  });
+});
+
+/**
+ * The order a book is bound in, and what belongs in a contents list.
+ *
+ * Both went wrong at once when front matter became a list of the writer's own
+ * pages: the generated title page and contents were emitted before everything,
+ * so a book opened on them and met its own half-title third — and the contents
+ * listed "Half-title page" and "Copyright page" as though they were chapters.
+ */
+describe("binding order and the contents", () => {
+  const page = (title: string, matter?: "front" | "back") => ({
+    title,
+    xhtml: "<p>x</p>",
+    ...(matter ? { matter } : {}),
+  });
+
+  const book = [
+    page("Half-title page", "front"),
+    page("Dedication", "front"),
+    page("Chapter One"),
+    page("Acknowledgements", "back"),
+  ];
+
+  it("binds the generated pages among the writer's own", () => {
+    // Half-title (0), generated title (1), generated contents (5), dedication
+    // (3) — so the expected order is half-title, title, dedication, contents.
+    expect(spineOrder(book, ["title", "contents"])).toEqual([
+      "chapter-01", // Half-title page
+      "title", // generated
+      "chapter-02", // Dedication
+      "contents", // generated
+      "chapter-03", // Chapter One
+      "chapter-04", // Acknowledgements
+    ]);
+  });
+
+  it("puts a page the writer named at the end of the front matter", () => {
+    expect(
+      spineOrder([page("A note on the maps", "front"), page("Chapter One")], [
+        "title",
+      ]),
+    ).toEqual(["title", "chapter-01", "chapter-02"]);
+  });
+
+  it("is unchanged for a book with no front matter of its own", () => {
+    expect(spineOrder([page("Chapter One")], ["title", "contents"])).toEqual([
+      "title",
+      "contents",
+      "chapter-01",
+    ]);
+  });
+
+  it("leaves apparatus out of the contents but keeps the file numbering", () => {
+    const listed = listedChapters(book);
+    expect(listed.map((l) => l.chapter.title)).toEqual([
+      "Dedication",
+      "Chapter One",
+      "Acknowledgements",
+    ]);
+    // The dedication is still chapter-02: the files are positional, so a
+    // filtered list must not renumber them.
+    expect(listed.map((l) => l.index)).toEqual([1, 2, 3]);
+  });
+
+  it("keeps apparatus out of the nav and the ncx", () => {
+    const nav = navXhtml("T", book);
+    expect(nav).not.toContain("Half-title page");
+    expect(nav).toContain(">Dedication</a>");
+    const ncx = tocNcx("T", book, "urn:x");
+    expect(ncx).not.toContain("Half-title page");
+    expect(ncx).toContain("<text>Chapter One</text>");
+  });
+
+  /*
+   * No published book has a sheet headed "Copyright page". The name exists so
+   * a writer can find the page in a list; it is not part of the book.
+   */
+  it("prints no heading on an apparatus page, and keeps it elsewhere", () => {
+    expect(
+      chapterXhtml("Half-title page", "<p>x</p>", undefined, "en", "front"),
+    ).not.toContain("<h1>");
+    expect(
+      chapterXhtml("Dedication", "<p>x</p>", undefined, "en", "front"),
+    ).toContain("<h1>Dedication</h1>");
+    expect(chapterXhtml("Chapter One", "<p>x</p>", 1)).toContain(
+      "<h1>Chapter One</h1>",
+    );
+  });
+});
+
+/**
+ * "1" over "Chapter 1" was on the opening line of most exported books.
+ *
+ * The default titles this app gives chapters *are* their numbers, so the
+ * standing numeral and the heading said the same thing twice — on every
+ * chapter, of every book whose writer had not renamed them, which is most.
+ */
+describe("the chapter numeral", () => {
+  it("is dropped when the heading is already the number", () => {
+    expect(chapterXhtml("Chapter 1", "<p>x</p>", 1)).not.toContain(
+      "chapter-number",
+    );
+    // The spelled form is this app's own default, and is the one a manuscript
+    // actually uses.
+    expect(chapterXhtml("Chapter One", "<p>x</p>", 1)).not.toContain(
+      "chapter-number",
+    );
+  });
+
+  it("is kept when the chapter has a name of its own", () => {
+    const html = chapterXhtml("The Seventh Pan", "<p>x</p>", 7);
+    expect(html).toContain('<p class="chapter-number">7</p>');
+    expect(html).toContain("<h1>The Seventh Pan</h1>");
+  });
+
+  it("is absent on a matter page, which has no number at all", () => {
+    expect(
+      chapterXhtml("Dedication", "<p>x</p>", undefined, "en", "front"),
+    ).not.toContain("chapter-number");
   });
 });

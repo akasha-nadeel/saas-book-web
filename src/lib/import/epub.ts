@@ -1,3 +1,4 @@
+import type { PrintCover } from "../cover-store";
 import type { Block } from "./blocks";
 import { parseHtml } from "./html";
 import {
@@ -48,7 +49,9 @@ function byLocalName(root: Document | Element, local: string): Element[] {
   );
 }
 
-export async function parseEpub(data: ArrayBuffer): Promise<Block[]> {
+export async function parseEpub(
+  data: ArrayBuffer,
+): Promise<EpubSection[]> {
   const { default: JSZip } = await import("jszip");
   const zip = await JSZip.loadAsync(data);
 
@@ -76,7 +79,7 @@ export async function parseEpub(data: ArrayBuffer): Promise<Block[]> {
     if (id && href) hrefById.set(id, resolve(opfPath, href));
   }
 
-  const blocks: Block[] = [];
+  const sections: EpubSection[] = [];
 
   for (const ref of byLocalName(opf, "itemref")) {
     // linear="no" marks matter a reader skips — covers, adverts.
@@ -89,14 +92,116 @@ export async function parseEpub(data: ArrayBuffer): Promise<Block[]> {
     const entry = zip.file(path);
     if (!entry) continue;
 
-    blocks.push(...parseHtml(await entry.async("string")));
+    const html = await entry.async("string");
+    sections.push({ ...sectionKind(html), blocks: parseHtml(html) });
   }
 
-  if (!blocks.length) {
+  if (!sections.some((s) => s.blocks.length)) {
     throw new Error("This EPUB has no readable text in it.");
   }
 
-  return blocks;
+  return sections;
+}
+
+/**
+ * One document out of the spine, with what it says about itself.
+ *
+ * The parser used to concatenate every spine document into one flat
+ * `Block[]` and hand the pile to `splitIntoChapters`, which re-derived
+ * chapters from headings. That threw away the one thing an EPUB is *good* at
+ * telling you — `epub:type` on the body element says which page is a
+ * dedication and which is Chapter Nine — and it showed: a book this app had
+ * just exported came back with its half-title, title page and copyright
+ * merged into a body chapter called "Chapter 1 – Dedication", because the
+ * three apparatus pages print no heading to split on and the dedication does.
+ */
+export interface EpubSection {
+  blocks: Block[];
+  /** Which part of the book, when the file said. */
+  matter?: "front" | "back";
+  /** The page's own name, when the file gave one. */
+  title?: string;
+}
+
+/**
+ * The EPUB structural semantics we can act on, and the page title each implies.
+ *
+ * Only the *part* is read from the first word — `frontmatter`, `backmatter`,
+ * `bodymatter` — because that is the half every conforming file gets right.
+ * The division is looked up for a title, and an unknown one is not a failure:
+ * the page still lands in the right part and takes its name from the document
+ * instead. This is the inverse of `chapterSemantics` in `export/epub.ts`, and
+ * the names match `MATTER_SECTIONS` so a round trip through our own export
+ * comes back as the same pages it left as.
+ */
+const DIVISION_TITLES: Record<string, string> = {
+  halftitlepage: "Half-title page",
+  titlepage: "Title page",
+  "copyright-page": "Copyright page",
+  dedication: "Dedication",
+  epigraph: "Epigraph",
+  toc: "Table of contents",
+  preface: "Preface or introduction",
+  introduction: "Preface or introduction",
+  foreword: "Preface or introduction",
+  prologue: "Prologue",
+  epilogue: "Epilogue",
+  afterword: "Afterword",
+  acknowledgments: "Acknowledgements",
+  acknowledgements: "Acknowledgements",
+  glossary: "Glossary",
+  colophon: "Colophon",
+};
+
+/** Of the divisions we know, the ones that close a book rather than open it. */
+const BACK_DIVISIONS = new Set([
+  "Epilogue",
+  "Afterword",
+  "Acknowledgements",
+  "Glossary",
+  "Colophon",
+]);
+
+function sectionKind(html: string): { matter?: "front" | "back"; title?: string } {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  const body = doc.body;
+  // `getAttribute` rather than a namespaced lookup: an HTML parser lowercases
+  // the name and keeps the prefix, so the attribute is literally "epub:type".
+  const types = (body?.getAttribute("epub:type") ?? "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const division = types.map((t) => DIVISION_TITLES[t]).find(Boolean);
+
+  /* The part when the file names one, and otherwise inferred from the
+     division — plenty of files in the wild write a bare `toc` or `titlepage`
+     with no part beside it, and a page whose division we recognise is a page
+     whose part we know. `bodymatter` wins outright, because a `chapter` is
+     never front matter however it is labelled. */
+  const matter = types.includes("bodymatter")
+    ? undefined
+    : types.includes("frontmatter")
+      ? ("front" as const)
+      : types.includes("backmatter")
+        ? ("back" as const)
+        : division
+          ? (BACK_DIVISIONS.has(division) ? ("back" as const) : ("front" as const))
+          : undefined;
+  if (!matter) return {};
+
+  /* The page's own name, in the order most likely to be what a reader sees.
+     A heading if the writer wrote one; else the `<title>`, which our own
+     exporter always writes and which is the only name an apparatus page has;
+     else the division's conventional name. */
+  const heading = doc.querySelector("h1, h2")?.textContent?.trim();
+  const head = doc.querySelector("title")?.textContent?.trim();
+
+  /* The division's own name first for apparatus, because those pages carry the
+     *book's* title in their `<title>` — our own generated title page is
+     `<title>The Salt Ledger</title>` — and importing it as a front-matter page
+     called "The Salt Ledger" is a page nobody can identify in a list. */
+  return { matter, title: heading || division || head };
 }
 
 /**
@@ -209,9 +314,16 @@ export async function epubMetadata(data: ArrayBuffer): Promise<FileMetadata> {
 
   const coverPath = coverHrefFrom(opf, opfPath);
   let cover: string | undefined;
+  // The full-size copy, kept so a re-export ships the artwork the file arrived
+  // with rather than the shelf thumbnail. See `epubCover`.
+  let printCover: PrintCover | undefined;
   if (coverPath) {
     const { epubCover } = await import("./cover");
-    cover = (await epubCover(zip, coverPath)) ?? undefined;
+    const found = await epubCover(zip, coverPath);
+    if (found) {
+      cover = found.thumb;
+      printCover = found.print ?? undefined;
+    }
   }
 
   return {
@@ -220,6 +332,7 @@ export async function epubMetadata(data: ArrayBuffer): Promise<FileMetadata> {
     // it reaches a shop as a pen name if nobody notices.
     author: personName(dcValues(opf, "creator")[0]),
     ...(cover ? { cover } : {}),
+    ...(printCover ? { printCover } : {}),
     ...(coverPath ? { hasCover: true } : {}),
     publishing: publishingFrom({
       isbn: isbnFrom(dcValues(opf, "identifier")),

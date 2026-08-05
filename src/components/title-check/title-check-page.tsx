@@ -8,8 +8,10 @@ import { BookCover } from "@/components/ui/book-cover";
 import { Spinner } from "@/components/ui/spinner";
 import type { CompTitle } from "@/lib/comps/comps";
 import { findClashes, type TitleClash } from "@/lib/comps/title-check";
+import { ToolStepDone } from "@/components/ui/tool-save";
 import { findBook } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
+import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -128,6 +130,16 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
     void check(book.title);
   }, [book]);
 
+  /*
+   * Nothing to save: this screen stores no result and changes no field — a
+   * checked title is a thing the writer now *knows*.
+   *
+   * That is exactly why "Check the title" carries no detector on the road.
+   * Having read the shelf and decided, they say so here rather than going to
+   * the roadmap to say it, which was the errand this control removes.
+   */
+  const save = useToolSave({ book, tool: "title-check" });
+
   async function check(candidate: string) {
     if (candidate.trim().length < 2) return;
     setState("loading");
@@ -196,6 +208,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
           tool="Title check"
           title="Is this title taken?"
           width="7xl"
+          action={<ToolStepDone state={save} />}
         >
           Strictly, no title is taken — titles are not trademarks and cannot be
           copyrighted. The useful question is whether somebody else&rsquo;s book
@@ -211,14 +224,17 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
             panel opened on "Check the title" and a text box, with the premise
             missing. */}
         {embedded && (
-          <p className="-mt-2 mb-2 max-w-2xl text-sm text-muted">
-            {/* Explicit space: the one after `</em>` is swallowed when the
-                line wraps, which set this as "taken— titles". */}
-            No title is <em>taken</em>{" "}
-            &mdash; titles cannot be copyrighted. The useful question is whether
-            somebody else&rsquo;s book turns up first when a reader searches for
-            yours.
-          </p>
+          <div className="-mt-2 mb-2 flex items-start justify-between gap-4">
+            <p className="max-w-2xl text-sm text-muted">
+              {/* Explicit space: the one after `</em>` is swallowed when the
+                  line wraps, which set this as "taken— titles". */}
+              No title is <em>taken</em>{" "}
+              &mdash; titles cannot be copyrighted. The useful question is
+              whether somebody else&rsquo;s book turns up first when a reader
+              searches for yours.
+            </p>
+            <ToolStepDone state={save} />
+          </div>
         )}
         <form
           className="mt-6 flex flex-wrap gap-2"

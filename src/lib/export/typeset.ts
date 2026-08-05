@@ -109,10 +109,16 @@ export const DEFAULT_TYPESET: TypesetOptions = {
   trim: "a4",
   hideChapterNumbers: false,
   dropCaps: false,
-  // A real book opens on a title page and lists its contents; copyright needs a
-  // name the writer may not have set, so it is off until asked for.
+  // A real book opens on a title page, states its copyright, and lists its
+  // contents — so all three are on. Copyright was off for a while, on the
+  // reasoning that it needs a name the writer may not have set; that was the
+  // right worry and the wrong lever. Defaulting it off meant every book
+  // exported by somebody who never opened this step shipped with no copyright
+  // page at all, which is the one piece of front matter a shop's reviewers
+  // actually look for. The name is handled where it can be handled honestly:
+  // `frontSections` leaves the page out when there is no author to put on it.
   titlePage: true,
-  copyright: false,
+  copyright: true,
   contents: true,
 };
 
