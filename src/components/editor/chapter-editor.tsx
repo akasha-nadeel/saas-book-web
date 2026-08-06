@@ -45,6 +45,7 @@ import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import {
   bookWordCount,
+  canWriteBook,
   chapterLabel,
   chapterMatterOf,
   chapterNumberOf,
@@ -599,6 +600,16 @@ function EditorSurface({
 }) {
   const holdCaret = useTypewriter(prefs.typewriter);
 
+  /*
+   * May this writer change the manuscript?
+   *
+   * Read off the book rather than fetched, which is what makes it usable here:
+   * `sync.ts` puts the role on the `Book` on the way down, so the answer is known
+   * during the first render. Absence of a role means the book is this writer's
+   * own — a book made offline carries none.
+   */
+  const canWrite = canWriteBook(book);
+
   /**
    * Where the pointer went down, so a click can tell itself apart from a drag.
    *
@@ -720,13 +731,32 @@ function EditorSurface({
   }, [prefs.typewriter]);
 
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
-    save: ({ doc, words }) => saveBody(bookId, chapterId, doc, words),
+    // `saveBody` answers whether it wrote — it refuses a book this writer may
+    // only read — but autosave has nothing useful to do with the answer here: the
+    // surface is not editable for a viewer, so a refusal means a bug upstream
+    // rather than something to report at the bottom of the screen.
+    save: ({ doc, words }) => void saveBody(bookId, chapterId, doc, words),
   });
 
   const editor = useEditor({
     // Required under Next's SSR — rendering immediately causes a hydration
     // mismatch, since the server has no contenteditable to produce.
     immediatelyRender: false,
+    /*
+     * **A book somebody let this writer *read* is not typeable, and this is the
+     * one place that can say so.**
+     *
+     * The database refuses a viewer's write and `saveBody` refuses to cache it
+     * locally, so nothing is lost either way — but a surface that accepts
+     * keystrokes and quietly discards them is the worst of the three answers. It
+     * lets somebody write a page before finding out.
+     *
+     * `useBookRole` is synchronous — `sync.ts` puts the role on the `Book` on the
+     * way down — which is what makes this safe to decide here. A role that
+     * resolved a moment later would leave the surface briefly typeable, which is
+     * exactly long enough to lose a sentence in.
+     */
+    editable: canWrite,
     extensions: [
       StarterKit,
       CharacterCount,
@@ -1007,22 +1037,34 @@ function EditorSurface({
                 <ZoomControl zoom={zoom} onZoom={onZoom} />
               </div>
 
+              {/* **A save indicator on a book that cannot be saved is a lie**, and
+                  this is the corner of the screen a writer checks to find out
+                  whether their work is safe. So for a book somebody let them
+                  *read*, it reports the permission instead of a status — which is
+                  also the only place in the editor that explains why the page will
+                  not take a keystroke. */}
               <span
                 aria-live="polite"
                 className="pointer-events-none flex-1 truncate text-right"
                 style={
-                  status === "error"
+                  status === "error" && canWrite
                     ? { color: "var(--color-danger)" }
                     : undefined
                 }
               >
-                {STATUS_LABEL[status]}
-                {status === "saved" && lastSavedAt
-                  ? ` · ${lastSavedAt.toLocaleTimeString([], {
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}`
-                  : null}
+                {!canWrite ? (
+                  "Read-only · shared with you"
+                ) : (
+                  <>
+                    {STATUS_LABEL[status]}
+                    {status === "saved" && lastSavedAt
+                      ? ` · ${lastSavedAt.toLocaleTimeString([], {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}`
+                      : null}
+                  </>
+                )}
               </span>
             </div>
 
@@ -1144,6 +1186,12 @@ function EditorSurface({
                       the caret, undo and screen-reader behaviour right for free. */}
                   <input
                     value={chapterTitle}
+                    // Read-only for a viewer, like the prose below it. `readOnly`
+                    // rather than `disabled`: the text stays selectable and
+                    // copyable, which is exactly what somebody given a book to
+                    // read wants, and a disabled input is also skipped by the
+                    // keyboard.
+                    readOnly={!canWrite}
                     onChange={(e) =>
                       renameChapter(bookId, chapterId, e.target.value)
                     }

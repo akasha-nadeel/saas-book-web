@@ -61,7 +61,7 @@ export function MoneyPage({ bookId }: { bookId: string }) {
         spend; we are not, which is the only reason you are reading this.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {/* ---- The numbers -------------------------------------------- */}
         <h2 className="mt-10 text-xl font-extrabold text-fg">
           What usually happens

@@ -24,10 +24,15 @@ import {
   setCoverFacts,
 } from "@/lib/library-store";
 import { ToolStepDone } from "@/components/ui/tool-save";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 import { saveCover } from "@/lib/cover-save";
 import { useToolSave } from "@/lib/use-tool-save";
-import {
-} from "@/lib/image-import";
+import {} from "@/lib/image-import";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
@@ -681,8 +686,8 @@ function CoverChecker({ bookId }: { bookId: string }) {
     <section>
       <h2 className="text-sm font-bold text-fg">Check the file</h2>
       <p className="mt-1.5 max-w-2xl text-sm text-muted">
-        Whether a shop would refuse the artwork. Use your original file, not
-        the compressed copy stored here — that one would fail on size.
+        Whether a shop would refuse the artwork. Use your original file, not the
+        compressed copy stored here — that one would fail on size.
       </p>
 
       {/* **The drop zone goes once a file is in, and comes back on Remove.**
@@ -829,9 +834,7 @@ function CoverChecker({ bookId }: { bookId: string }) {
                   of this app's own compression, not a fact about the writer's
                   artwork, and printing it beside a shop's 50MB limit would
                   invite exactly the wrong conclusion. */}
-              {shown.bytes > 0
-                ? ` · ${(shown.bytes / 1024).toFixed(0)}KB`
-                : ""}{" "}
+              {shown.bytes > 0 ? ` · ${(shown.bytes / 1024).toFixed(0)}KB` : ""}{" "}
               · {(shown.height / shown.width).toFixed(2)}:1
             </p>
 
@@ -995,8 +998,8 @@ function CoverChecker({ bookId }: { bookId: string }) {
 
             {findings.length === 0 ? (
               <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-                Nothing a shop would refuse, and nothing worth flagging. That
-                is the <em>file</em> checked. Whether the cover works is a
+                Nothing a shop would refuse, and nothing worth flagging. That is
+                the <em>file</em> checked. Whether the cover works is a
                 different question, and the shelf above is how you answer it.
               </p>
             ) : (
@@ -1148,6 +1151,16 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
     );
   }, [book]);
 
+  /**
+   * The free plan's ten cover searches.
+   *
+   * Every search here is one the writer pressed for — this screen seeds the box
+   * but never runs it — so there is no free arrival search to carve out, as
+   * there is on comps and the title check.
+   */
+  const gate = useLimitGate("covers");
+  const shelfSearches = gate.allowance;
+
   const wall = useMemo(() => coversOf(books), [books]);
   const width = SIZES.find((s) => s.id === size)!.width;
 
@@ -1175,7 +1188,11 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   // over half the window with a logo, so an embedded tool waits silently —
   // see `Pending` in `roadmap/step-panel.tsx`.
   if (!hydrated)
-    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
+    return embedded ? (
+      <div className={toolShell(embedded)} />
+    ) : (
+      <LoadingScreen />
+    );
 
   if (!book) {
     return (
@@ -1200,16 +1217,15 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
              wall of covers, and at 5xl the wall stopped a long way short of
              the window on both sides — the one page where extra width buys
              another column of the thing you came to look at. */
-          width="6xl"
           action={<ToolStepDone state={save} />}
         >
-          Your cover, next to the shelf it has to sit on. We do not design covers
-          and we will not generate one — this is the thing you would do yourself
-          in a bookshop, if you had the afternoon.
+          Your cover, next to the shelf it has to sit on. We do not design
+          covers and we will not generate one — this is the thing you would do
+          yourself in a bookshop, if you had the afternoon.
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-6xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
 
         {/* The line the header carries when this screen owns the window.
@@ -1306,6 +1322,9 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                     className="mt-3 flex flex-wrap gap-2"
                     onSubmit={(e) => {
                       e.preventDefault();
+                      // Refused rather than disabled — the eleventh press
+                      // is what puts the banner and the dialog on screen.
+                      if (!gate.spend()) return;
                       void search(query);
                     }}
                   >
@@ -1325,6 +1344,12 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                       {state === "loading" ? "Looking…" : "Show me the shelf"}
                     </button>
                   </form>
+
+                  {/* The other half of this screen — checking a file you
+                      already have — is not counted and not affected, which is
+                      why the note sits under this form rather than the tabs. */}
+                  <LeftPill allowance={shelfSearches} className="mt-2" />
+                  <LimitBanner allowance={shelfSearches} className="mt-4" />
                   <p className="mt-3 max-w-prose text-xs text-muted">
                     {myCover
                       ? "Shown at the size a reader meets it. Whether the title still reads at thumbnail size is what the shelf below answers."
@@ -1333,8 +1358,8 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                 </>
               ) : (
                 <p className="mt-3 max-w-prose text-xs text-muted">
-                  Drop the file you are about to upload just here. It is measured in
-                  your browser and never sent anywhere.
+                  Drop the file you are about to upload just here. It is
+                  measured in your browser and never sent anywhere.
                 </p>
               )}
             </div>
@@ -1378,106 +1403,110 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
         </section>
 
         <div hidden={half !== "shelf"}>
-        {error && (
-          <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-            {error}
-          </p>
-        )}
+          {error && (
+            <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
+              {error}
+            </p>
+          )}
 
-        {wall.length > 0 && (
-          <>
-            {/* The control that matters. Thumbnail is the default because it
+          {wall.length > 0 && (
+            <>
+              {/* The control that matters. Thumbnail is the default because it
                 is where the decision is really made. */}
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <div className="flex gap-1 rounded-lg border border-line bg-panel p-1">
-                {SIZES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => setSize(s.id)}
-                    className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
-                      size === s.id ? "bg-accent text-accent-ink" : "text-muted"
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              <p className="max-w-prose text-sm text-muted">
-                {/* The count moved onto the shelf panel's own heading, where
+              <div className="mt-8 flex flex-wrap items-center gap-3">
+                <div className="flex gap-1 rounded-lg border border-line bg-panel p-1">
+                  {SIZES.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSize(s.id)}
+                      className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
+                        size === s.id
+                          ? "bg-accent text-accent-ink"
+                          : "text-muted"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="max-w-prose text-sm text-muted">
+                  {/* The count moved onto the shelf panel's own heading, where
                     it is beside the thing it counts. Said in both places it
                     read as two figures a reader had to reconcile. */}
-                {SIZES.find((s) => s.id === size)!.note}
-              </p>
-            </div>
+                  {SIZES.find((s) => s.id === size)!.note}
+                </p>
+              </div>
 
-            {/* **The shelf, boxed like Yours.** It was a bare heading over a
+              {/* **The shelf, boxed like Yours.** It was a bare heading over a
                 loose grid, so the two halves of the one comparison — your
                 cover and the wall it has to survive — were drawn as different
                 kinds of thing. Same panel, same padding: the eye reads them as
                 a pair, which is the entire point of the screen. */}
-            <section className="mt-8 rounded-xl border border-line bg-panel p-5">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h2 className="text-sm font-bold text-fg">The shelf</h2>
-                <span className="text-xs text-muted tabular-nums">
-                  {wall.length} covers
-                </span>
-              </div>
-              <ul className="mt-3 flex flex-wrap gap-4">
-                {wall.map((comp) => (
-                  <li key={comp.key} style={{ width }}>
-                    {/* A plain img: two third-party hosts whose URLs we do not
+              <section className="mt-8 rounded-xl border border-line bg-panel p-5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <h2 className="text-sm font-bold text-fg">The shelf</h2>
+                  <span className="text-xs text-muted tabular-nums">
+                    {wall.length} covers
+                  </span>
+                </div>
+                <ul className="mt-3 flex flex-wrap gap-4">
+                  {wall.map((comp) => (
+                    <li key={comp.key} style={{ width }}>
+                      {/* A plain img: two third-party hosts whose URLs we do not
                         control, and next/image would mean a config file listing
                         them that goes stale. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={comp.coverUrl}
-                      alt={`Cover of ${comp.title}`}
-                      style={{ width }}
-                      className="rounded shadow-sm"
-                    />
-                    {size !== "thumb" && (
-                      <p className="mt-1.5 line-clamp-2 text-xs text-muted">
-                        {comp.title}
-                      </p>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </>
-        )}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={comp.coverUrl}
+                        alt={`Cover of ${comp.title}`}
+                        style={{ width }}
+                        className="rounded shadow-sm"
+                      />
+                      {size !== "thumb" && (
+                        <p className="mt-1.5 line-clamp-2 text-xs text-muted">
+                          {comp.title}
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </>
+          )}
 
-        {state === "done" && wall.length === 0 && (
-          <p className="mt-8 text-muted">
-            No covers came back for that search. Try describing the story rather
-            than naming the genre.
-          </p>
-        )}
+          {state === "done" && wall.length === 0 && (
+            <p className="mt-8 text-muted">
+              No covers came back for that search. Try describing the story
+              rather than naming the genre.
+            </p>
+          )}
 
-        {/* Only once there is a wall to describe. It ran unconditionally, so
+          {/* Only once there is a wall to describe. It ran unconditionally, so
             a writer who had not searched yet read a paragraph about "the wall"
             and the fact that it is not scored, with nothing on screen it could
             be about. */}
-        {wall.length > 0 && (
-        <div className="mt-10 border-t border-line pt-6">
-          {/* The rule spans the page and the sentence does not.
+          {wall.length > 0 && (
+            <div className="mt-10 border-t border-line pt-6">
+              {/* The rule spans the page and the sentence does not.
               They were one element while a tool page was 3xl wide,
               where the two widths happened to agree; at 5xl a line of
               text run to the full container is about 160 characters,
               which is twice a readable measure. */}
-          <p className="max-w-3xl text-xs text-muted">
-            Covers are shown from Google Books and Open Library, at the size a
-            reader meets them. The wall is not scored — a number comparing your
-            cover to a genre would be invented to look like an answer. Look at the
-            wall, then look at yours.
-          </p>
+              <p className="max-w-3xl text-xs text-muted">
+                Covers are shown from Google Books and Open Library, at the size
+                a reader meets them. The wall is not scored — a number comparing
+                your cover to a genre would be invented to look like an answer.
+                Look at the wall, then look at yours.
+              </p>
+            </div>
+          )}
         </div>
-        )}
-        </div>
-
-
       </div>
+
+      {gate.dialogOpen && (
+        <LimitDialog action="covers" onClose={gate.closeDialog} />
+      )}
     </div>
   );
 }

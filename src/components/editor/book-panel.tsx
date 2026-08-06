@@ -8,6 +8,7 @@ import {
   bookWordCount,
   chapterMatterOf,
   chapterNumberOf,
+  canWriteBook,
   createChapter,
   createMatterPage,
   createMatterPages,
@@ -40,6 +41,7 @@ import {
 } from "@/components/sidebar/row-menu";
 import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
+import { LimitNote, useLimitGate } from "@/components/upgrade/free-limit";
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
@@ -334,6 +336,16 @@ export function BookPanel({
   const router = useRouter();
   const bookId = book.id;
 
+  /*
+   * May this writer change the manuscript?
+   *
+   * Read off the book rather than fetched: `sync.ts` puts the role on it on the
+   * way down, so the answer is known during the first render — which matters,
+   * because a control that appears and then vanishes is worse than one that was
+   * never there. Absence of a role means the book is their own.
+   */
+  const canWrite = canWriteBook(book);
+
   /**
    * How far it is from the edge of these cards to the edge of the paper.
    *
@@ -426,6 +438,11 @@ export function BookPanel({
   const [importError, setImportError] = useState<string | null>(null);
   const [pending, setPending] = useState<ImportedChapter[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // The free plan's ten imports. This path counts too — a file brought into a
+  // book the writer made a moment ago is the same file, and a limit with an
+  // "add a book first" way round it is a limit the pricing page cannot claim.
+  const gate = useLimitGate("imports");
+  const allowance = gate.allowance;
 
   // The Book View flip-book: page 0 is the cover, 1…N the chapter's printed
   // pages. The preview reports its page count so the pager can clamp.
@@ -564,6 +581,8 @@ export function BookPanel({
   };
 
   const handleImport = async (file: File) => {
+    // `check` and not `spend`: the store counts imports at its own funnel.
+    if (!gate.check()) return;
     setImporting(true);
     setImportError(null);
     try {
@@ -816,8 +835,12 @@ export function BookPanel({
               </button>
             )}
 
+            {canWrite && (
             <button
               type="button"
+              // Live even when the ten are gone: the refusal happens on the
+              // press, in `handleImport`, because that is the only moment the
+              // writer has asked for anything.
               disabled={importing}
               onClick={() => fileRef.current?.click()}
               aria-label={importing ? "Reading file…" : "Import a file"}
@@ -841,6 +864,7 @@ export function BookPanel({
                 <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
               </svg>
             </button>
+            )}
           </div>
 
           {/* While the microphone is live, say so in words as well as colour —
@@ -873,6 +897,8 @@ export function BookPanel({
               if (file) void handleImport(file);
             }}
           />
+
+          {gate.refused && <LimitNote allowance={allowance} className="mt-3" />}
 
           {importError && (
             <p
@@ -925,6 +951,7 @@ export function BookPanel({
               onAdd={(title) => handleAddMatterPage("front", title)}
               onOpenPage={open}
               onDelete={handleDelete}
+              canWrite={canWrite}
             />
 
             <MatterCard
@@ -955,7 +982,7 @@ export function BookPanel({
               // at. The new chapter appears in the list it was added to, so the
               // button belongs where the list is.
               secondary={
-                body.open === "body"
+                body.open === "body" && canWrite
                   ? { label: "New chapter", onClick: handleCreate }
                   : undefined
               }
@@ -969,7 +996,8 @@ export function BookPanel({
                     title={c.title}
                     active={c.id === chapterId}
                     onClick={() => open(c.id)}
-                    menu={[
+                    // Empty for a reader: every item writes the chapter row.
+                    menu={!canWrite ? [] : [
                       {
                         label: c.bookmarked ? "Unstar" : "Star",
                         icon: c.bookmarked
@@ -1024,6 +1052,7 @@ export function BookPanel({
               onAdd={(title) => handleAddMatterPage("back", title)}
               onOpenPage={open}
               onDelete={handleDelete}
+              canWrite={canWrite}
             />
           </div>
         </div>
@@ -1182,12 +1211,17 @@ function ChapterPill({
         <span className="min-w-0 flex-1 truncate">{title}</span>
       </button>
 
-      <span className="absolute top-1/2 right-1 -translate-y-1/2">
-        {/* `active` keeps the trigger shown on the open chapter: its actions
-            should be one click away rather than one hover, and it is the row a
-            touch user cannot hover to find at all. */}
-        <RowMenu label={title} items={menu} active={active} />
-      </span>
+      {/* **No items, no trigger.** Every item in this menu writes the chapter row,
+          so a book somebody let this writer *read* passes an empty list — and a ⋯
+          that opens onto nothing is worse than no ⋯ at all. */}
+      {menu.length > 0 && (
+        <span className="absolute top-1/2 right-1 -translate-y-1/2">
+          {/* `active` keeps the trigger shown on the open chapter: its actions
+              should be one click away rather than one hover, and it is the row a
+              touch user cannot hover to find at all. */}
+          <RowMenu label={title} items={menu} active={active} />
+        </span>
+      )}
     </li>
   );
 }
@@ -1244,7 +1278,10 @@ function MatterCard({
   meta?: string;
   /** The button's words. It is the only control on the card, so this is the
    *  whole of what the card offers and is worth saying exactly. */
-  action: string;
+  /** Undefined removes the button entirely — a reader's empty matter part has
+   *  nothing to press, and an empty button is the dead UI the house rules
+   *  forbid. */
+  action?: string;
   /** True when the writer is inside this part of the book. */
   active: boolean;
   onAction: () => void;
@@ -1452,6 +1489,7 @@ function MatterCard({
                 adding one are both ordinary, frequent moves, and picking a
                 winner between them would only make the loser harder to hit. */}
             <div className="mt-2.5 flex items-stretch gap-2">
+              {action && (
               <button
                 type="button"
                 onClick={onAction}
@@ -1474,6 +1512,7 @@ function MatterCard({
               >
                 {action}
               </button>
+              )}
 
               {secondaryNode}
 
@@ -1541,7 +1580,7 @@ function MatterCard({
       <button
         type="button"
         onClick={onAction}
-        aria-label={`${label} — ${action}`}
+        aria-label={action ? `${label} — ${action}` : label}
         // Mounted at both sizes and switched off with pointer-events rather
         // than added and removed. Shrinking and growing take half a second, and
         // a control that appears or vanishes partway through that is a control
@@ -1600,6 +1639,7 @@ function MatterPagesCard({
   onAdd,
   onOpenPage,
   onDelete,
+  canWrite,
 }: {
   part: MatterPart;
   label: string;
@@ -1617,6 +1657,8 @@ function MatterPagesCard({
   onOpenPage: (id: string) => void;
   /** Confirms, deletes, and moves off the page when it was the open one. */
   onDelete: (id: string, title: string) => void;
+  /** False for a book somebody let this writer read: no controls that write. */
+  canWrite: boolean;
 }) {
   const started = pages.length > 0;
 
@@ -1665,7 +1707,10 @@ function MatterPagesCard({
       }
       // "Start" only while there is nothing there. Once the pages exist the
       // card does what the body's does, and says so in the same words.
-      action={started ? (open ? "Hide pages" : "Pages") : "Start"}
+      // A reader is never offered "Start": it makes a dozen pages, which is a
+      // decision about the shape of somebody else's book. `undefined` removes the
+      // button rather than greying it — see MatterCard.
+      action={started ? (open ? "Hide pages" : "Pages") : canWrite ? "Start" : undefined}
       active={active}
       onAction={started ? onToggle : onStart}
       compact={compact}
@@ -1674,7 +1719,7 @@ function MatterPagesCard({
       // the card has one thing to offer and a second control beside it halves
       // the width of that one thing.
       secondaryNode={
-        open ? (
+        open && canWrite ? (
           <Menu
             label={`Add a page to ${label.toLowerCase()}`}
             align="end"
@@ -1766,7 +1811,7 @@ function MatterPagesCard({
             title={page.title}
             active={page.id === chapterId}
             onClick={() => onOpenPage(page.id)}
-            menu={[
+            menu={!canWrite ? [] : [
               {
                 label: "Rename",
                 icon: menuIcons.rename,

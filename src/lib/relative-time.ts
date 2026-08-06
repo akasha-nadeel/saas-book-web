@@ -39,3 +39,38 @@ export function relativeTime(then: number, now: number = Date.now()): string {
   // "2 minutes ago", which is a small lie about something the writer can check.
   return formatter.format(-Math.floor(elapsed / size), unit);
 }
+
+/**
+ * "in 13 days", "tomorrow" — the other direction, for a deadline.
+ *
+ * A separate function rather than a sign check inside `relativeTime`, because that
+ * one answers "just now" for anything under a minute *elapsed* — and a negative
+ * elapsed is under a minute. So a pending invitation with a fortnight left read
+ * "expires just now", which is the kind of wrong that looks like a bug in the
+ * thing being described rather than in the clock.
+ *
+ * Rounds *up*, unlike its sibling: an invitation with 13 days and 4 hours left has
+ * "13 days" left by flooring and "14" by rounding, and the useful direction to be
+ * wrong in on a deadline is the conservative one. Anything already past says so
+ * rather than counting backwards.
+ */
+export function timeUntil(then: number, now: number = Date.now()): string {
+  const remaining = then - now;
+  if (remaining <= 0) return "now";
+  if (remaining < MINUTE) return "in under a minute";
+
+  const [unit, size]: [Intl.RelativeTimeFormatUnit, number] =
+    remaining < HOUR
+      ? ["minute", MINUTE]
+      : remaining < DAY
+        ? ["hour", HOUR]
+        : remaining < WEEK
+          ? ["day", DAY]
+          : remaining < MONTH
+            ? ["week", WEEK]
+            : remaining < YEAR
+              ? ["month", MONTH]
+              : ["year", YEAR];
+
+  return formatter.format(Math.ceil(remaining / size), unit);
+}

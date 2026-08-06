@@ -21,6 +21,7 @@
  */
 
 import type { BookKind } from "./book-kinds";
+import type { CollabRole } from "./collab";
 import type { CoverFacts } from "./cover-check";
 import {
   parseActivity,
@@ -36,6 +37,9 @@ import {
   type MatterPart,
 } from "./matter";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
+// Type and table only. free-limits.ts is pure and imports nothing back, so the
+// policy stays out of the store and the store stays the only place that counts.
+import { COUNTED, type Counted } from "./free-limits";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
 import { isEmptyDetail, type PublishingMeta } from "./publishing";
@@ -50,6 +54,8 @@ import {
   pushCover,
   pushNotes,
   pushPrefs,
+  seedBodyRevs,
+  setConflictHandler,
   uploadLibrary,
 } from "./sync";
 import { DEFAULT_TYPOGRAPHY, type Typography } from "./typography";
@@ -282,6 +288,33 @@ export interface Book {
   lastOpenedId: string | null;
   /** Epoch ms, so the shelf can order by recency. */
   lastOpenedAt: number;
+  /**
+   * Whose book this is, when the server has said.
+   *
+   * **Absent means the writer's own** — a book made offline, or before there was
+   * an account, has no owner id and never needs one. Set by `rowsToBook` from
+   * `books.owner` on the way down, and never sent back up: `bookToRow` builds an
+   * explicit row, so this is not a column and cannot become one by accident.
+   */
+  ownerId?: string;
+  /**
+   * What this writer may do with somebody else's book. Absent on their own.
+   *
+   * Derived from `book_members` on the way down, like `ownerId`. The capability
+   * questions are asked through `can()` in `collab.ts` rather than by comparing
+   * this string, so the whole policy stays in one tested table.
+   */
+  role?: CollabRole;
+  /**
+   * A shared book that stopped arriving from the server.
+   *
+   * Set when a book carrying an `ownerId` is missing from a download: access was
+   * revoked, or the book was deleted. It stays on the shelf, read-only, rather
+   * than vanishing mid-sentence — and it must *never* be treated as unsaved work
+   * and pushed back up, which is what `syncWithServer`'s strays path would
+   * otherwise do with it, under this writer's own account.
+   */
+  access?: "lost";
 }
 
 export interface Shelf {
@@ -665,6 +698,67 @@ function chapterIdsOf(book: Book): Set<string> {
   return ids;
 }
 
+/**
+ * Is this book somebody else's?
+ *
+ * Absence of `ownerId` means it is this writer's own — a book made offline, or
+ * before there was an account, carries neither field.
+ */
+export function isSharedBook(book: Book): boolean {
+  return Boolean(book.role);
+}
+
+/** May this writer change the manuscript? Owner or editor; a viewer may not. */
+export function canWriteBook(book: Book): boolean {
+  return book.access !== "lost" && book.role !== "viewer";
+}
+
+/**
+ * Which of a book's chapter rows actually differ, position included only where
+ * the chapter really moved.
+ *
+ * **This is what keeps two writers from reverting each other.** `pushBook` used
+ * to upsert a book's *whole* chapter list on any change to the book — and a word
+ * count bumped by autosave in one chapter is a change to the book. So a
+ * co-writer typing a sentence in chapter seven would send their own stale titles
+ * for all forty chapters and silently undo a rename somebody made in chapter
+ * three. It also renumbered every `position` from the local array index, which
+ * scrambles the order when two people add a chapter at once.
+ *
+ * Comparing field by field is the fix. Nothing unchanged is sent, so a stale copy
+ * of a row cannot overwrite a fresh one.
+ */
+function changedChapterIds(
+  book: Book,
+  previous: Book | undefined,
+): Set<string> | undefined {
+  // No baseline means nothing is known to be unchanged, so everything goes.
+  if (!previous) return undefined;
+
+  const was = new Map<string, { chapter: ChapterMeta; at: number }>();
+  (previous.chapters ?? []).forEach((c, at) => was.set(c.id, { chapter: c, at }));
+  (previous.trash ?? []).forEach((c, at) => was.set(c.id, { chapter: c, at }));
+
+  const changed = new Set<string>();
+  const consider = (c: ChapterMeta, at: number) => {
+    const old = was.get(c.id);
+    if (
+      !old ||
+      old.at !== at ||
+      old.chapter.title !== c.title ||
+      old.chapter.words !== c.words ||
+      old.chapter.matter !== c.matter ||
+      old.chapter.bookmarked !== c.bookmarked
+    ) {
+      changed.add(c.id);
+    }
+  };
+
+  book.chapters.forEach(consider);
+  (book.trash ?? []).forEach(consider);
+  return changed;
+}
+
 function pushShelfDiff(next: Shelf) {
   const before = new Map(pushedBooks.map((b) => [b.id, b]));
 
@@ -674,20 +768,36 @@ function pushShelfDiff(next: Shelf) {
 
     if (previous === book) return;
 
+    /*
+     * **A book that stopped arriving is not a book to push.** Access was revoked,
+     * or the owner deleted it; either way nothing local about it belongs on the
+     * server, and the strays path in `syncWithServer` must not take it for
+     * unsaved work.
+     */
+    if (book.access === "lost") return;
+
     if (previous) {
       const survives = chapterIdsOf(book);
       for (const id of chapterIdsOf(previous)) {
         // Deleting the chapter row cascades to its body and notes, so the
         // cascade stays declared in the schema rather than repeated here.
-        if (!survives.has(id)) pushChapterDeleted(id);
+        //
+        // Owner only. An editor has no DELETE on `chapters` by design — theirs is
+        // the soft delete, an update — because this call is made from a *local*
+        // diff, so a local shelf that lost a chapter for any reason at all would
+        // otherwise become a hard delete of somebody else's prose.
+        if (!survives.has(id) && !isSharedBook(book)) pushChapterDeleted(id);
       }
     }
 
-    pushBook(book, position);
+    pushBook(book, position, changedChapterIds(book, previous));
   });
 
-  // Whatever is left never made it into the new shelf.
-  for (const id of before.keys()) pushBookDeleted(id);
+  // Whatever is left never made it into the new shelf. Only ever our own: a
+  // shared book leaving the shelf means access ended, not that the book did.
+  for (const [id, book] of before) {
+    if (!isSharedBook(book) && book.access !== "lost") pushBookDeleted(id);
+  }
 
   pushedBooks = next.books;
 }
@@ -1148,6 +1258,21 @@ export function createBookFromImport(
     lastOpenedBookId: bookId,
   });
 
+  /*
+   * Counted here, at the funnel, rather than at each screen that imports.
+   *
+   * Three of them call this — the import page, the shelf's dialog and the
+   * landing page's check — and the same argument that put `setupFromImport`
+   * in all three applies harder to a limit: a screen that forgets to count is
+   * an eleventh import nobody notices, and the one that would forget is
+   * whichever one is written next.
+   *
+   * After the commit, so a rolled-back import costs nothing, and only for a
+   * *book* — chapters appended to an existing one go through `importIntoBook`
+   * and are not what the plan counts.
+   */
+  countUse("imports");
+
   return { bookId, chapterId: metas[0].id };
 }
 
@@ -1324,6 +1449,16 @@ export function importIntoBook(
     }));
   }
 
+  /*
+   * Counted, like `createBookFromImport`.
+   *
+   * A manuscript brought into a book made thirty seconds ago is the same
+   * manuscript arriving by a different door, and a plan limit with a door left
+   * open is a number the pricing page cannot honestly print. The undo below
+   * gives it back, which is the half that makes counting it fair.
+   */
+  countUse("imports");
+
   return { firstId: metas[0].id, undo };
 }
 
@@ -1378,6 +1513,10 @@ export function undoChapterImport(undo: ImportUndo) {
           : (chapters[0]?.id ?? null),
     };
   });
+
+  // The import is being taken back in full, so the plan's tally comes back
+  // with it. `refundUse` is the only caller of that direction in the app.
+  refundUse("imports");
 }
 
 export function renameChapter(
@@ -1499,7 +1638,23 @@ export function saveBody(
   chapterId: string,
   doc: unknown,
   words: number,
-) {
+): boolean {
+  const book = findBook(getShelf(), bookId);
+
+  /*
+   * **A book this writer may not write is not written, locally either.**
+   *
+   * The database refuses a viewer's row, so the prose was never going to land —
+   * but writing it to localStorage anyway is worse than refusing: the reader's
+   * copy silently diverges from the book everybody else can see, and nothing on
+   * screen says which one is real. The UI hides the controls and the editor is not
+   * typeable, so reaching here at all means a bug; failing closed is what keeps
+   * that bug from becoming two versions of a manuscript.
+   *
+   * Returned rather than thrown, because the caller is an autosave.
+   */
+  if (book && !canWriteBook(book)) return false;
+
   const raw = JSON.stringify(doc);
   window.localStorage.setItem(bodyKey(chapterId), raw);
   pushBody(chapterId, raw);
@@ -1509,9 +1664,8 @@ export function saveBody(
   // taking the save down with it would be a backup feature that loses work.
   rememberVersion(chapterId, raw, words);
 
-  const book = findBook(getShelf(), bookId);
   const current = book?.chapters.find((c) => c.id === chapterId);
-  if (!current || current.words === words) return;
+  if (!current || current.words === words) return true;
 
   // The day's log, before the shelf is updated — `current.words` is still the
   // previous count at this point, and the difference is the day's work.
@@ -1521,6 +1675,7 @@ export function saveBody(
     ...b,
     chapters: b.chapters.map((c) => (c.id === chapterId ? { ...c, words } : c)),
   }));
+  return true;
 }
 
 export function touchLastOpened(bookId: string, chapterId: string) {
@@ -1840,6 +1995,23 @@ export interface Prefs {
    * the second novel deserves it as much as the first.
    */
   matterAsked: string[];
+  /**
+   * What the free plan counts, counted: imports, comp searches, cover searches
+   * and title checks. See `lib/free-limits.ts` for the policy — the numbers,
+   * the names and the arithmetic all live there. This is only the tally.
+   *
+   * **Here rather than on a book** for the reason `matterAsked` is: these are
+   * facts about the account rather than about any manuscript, and a field on
+   * the book would need a Postgres column to survive `sync.ts` at all. Prefs go
+   * up as one JSON blob, so the counts travel between a writer's machines,
+   * which is what stops a second browser handing out ten more of each.
+   *
+   * They only go up, with one exception: undoing an import gives that import
+   * back, because the writer reversed the thing they were charged for. Deleting
+   * an imported book does not, or "ten imports" would quietly mean "ten at a
+   * time", which is a different promise from the one the pricing page makes.
+   */
+  usage: Record<Counted, number>;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -1865,6 +2037,17 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Nobody has been asked yet. Frozen with the rest, so it is shared — never
   // pushed to; `rememberMatterAsked` writes a new array.
   matterAsked: [],
+  // Nothing spent yet, which is also what a library stored before this existed
+  // reads as. Erring low is deliberate: charging a writer for work they cannot
+  // be shown any evidence of is the wrong way round to be wrong. Frozen with
+  // the rest, so it is shared — `countUse` writes a new object rather than
+  // adding to this one.
+  usage: Object.freeze({
+    imports: 0,
+    comps: 0,
+    covers: 0,
+    titleChecks: 0,
+  }) as Record<Counted, number>,
 });
 
 const prefsListeners = new Set<() => void>();
@@ -1916,10 +2099,38 @@ function parsePrefs(raw: string | null): Prefs {
       matterAsked: Array.isArray(parsed.matterAsked)
         ? parsed.matterAsked.filter((id): id is string => typeof id === "string")
         : [],
+      // Narrowed on the way in for the same reason, and once more where it is
+      // used: `allowanceOf` refuses anything that is not a whole positive
+      // number, so a hand-edited key cannot make the arithmetic nonsense.
+      usage: parseUsage(parsed),
     };
   } catch {
     return DEFAULT_PREFS;
   }
+}
+
+/**
+ * The four tallies, narrowed one at a time.
+ *
+ * A missing action reads as nought, which is what every library stored before
+ * this existed will do. The `imports` fallback is the one migration in here:
+ * the first version of this counted imports alone, at the top level, and a
+ * writer who had already brought books in must not have that forgiven silently
+ * — a limit that resets itself is not a limit.
+ */
+function parseUsage(
+  parsed: Partial<Prefs> & { imports?: unknown },
+): Record<Counted, number> {
+  const stored = (parsed.usage ?? {}) as Record<string, unknown>;
+  const whole = (value: unknown) =>
+    typeof value === "number" && Number.isFinite(value) && value > 0
+      ? Math.floor(value)
+      : 0;
+
+  const usage = {} as Record<Counted, number>;
+  for (const action of COUNTED) usage[action] = whole(stored[action]);
+  if (!("imports" in stored)) usage.imports = whole(parsed.imports);
+  return usage;
 }
 
 /**
@@ -2008,6 +2219,31 @@ export function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]) {
 export function shouldAskMatter(book: Book): boolean {
   if (book.chapters.some((c) => chapterMatterOf(c) !== "body")) return false;
   return !getPrefs().matterAsked.includes(book.id);
+}
+
+/**
+ * Spend one of the free plan's ten.
+ *
+ * The only way anything writes to `usage`, so the four counters cannot each
+ * grow their own read-modify-write. What is counted and what it costs are not
+ * decided here — `lib/free-limits.ts` holds the policy and the screens hold the
+ * gate; this only keeps the score.
+ */
+export function countUse(action: Counted) {
+  const usage = getPrefs().usage;
+  setPref("usage", { ...usage, [action]: usage[action] + 1 });
+}
+
+/**
+ * Give one back.
+ *
+ * One caller — undoing an import, which takes back the very thing that was
+ * charged for. Floored at nought, because a stored tally that has been tampered
+ * with must not send this negative.
+ */
+export function refundUse(action: Counted) {
+  const usage = getPrefs().usage;
+  setPref("usage", { ...usage, [action]: Math.max(0, usage[action] - 1) });
 }
 
 /** Records that the question has been put, whatever the answer was. */
@@ -2706,10 +2942,60 @@ function keepLocalOnly(local: Shelf, remote: Shelf): Shelf {
   return {
     ...remote,
     books: remote.books.map((book) => {
-      const ticked = mine.get(book.id)?.roadmapDone;
-      return ticked?.length ? { ...book, roadmapDone: ticked } : book;
+      const was = mine.get(book.id);
+      let kept = book;
+
+      const ticked = was?.roadmapDone;
+      if (ticked?.length) kept = { ...kept, roadmapDone: ticked };
+
+      /*
+       * **On a shared book, four more fields are local-only — and that follows
+       * directly from the `books` row being owner-only for writes.**
+       *
+       * `archivedAt`, `trashedAt`, `lastOpenedId` and `lastOpenedAt` are
+       * per-writer state that happens to live on the shared row. A collaborator
+       * cannot push them, so without this they come back as the *owner's* values
+       * on every load: a book the co-writer set aside reappears on their shelf,
+       * and the chapter they had open is replaced by whichever one the owner was
+       * last in. `rowsToBook` already prefers the local values on the way down;
+       * this is what keeps them once the merge runs.
+       */
+      if (book.role) {
+        if (was?.archivedAt !== undefined) {
+          kept = { ...kept, archivedAt: was.archivedAt };
+        }
+        if (was?.trashedAt !== undefined) {
+          kept = { ...kept, trashedAt: was.trashedAt };
+        }
+      }
+
+      return kept;
     }),
   };
+}
+
+/**
+ * A shared book that stopped arriving, kept on the shelf rather than vanishing.
+ *
+ * **`keepLocalOnly` maps `remote.books`, so anything missing from the download is
+ * simply not in the result** — which quietly undid the `access: "lost"` mark
+ * `syncWithServer` had just written, and made a revoked book disappear
+ * mid-session with no explanation. The co-writer's reading of that is not "my
+ * access ended", it is "this app has lost my work".
+ *
+ * It is safe to keep them: a book only goes missing from a download that
+ * *succeeded*, because a failed fetch returns null and `applyRemote` does
+ * nothing at all. So absence is a real revocation or deletion, not a network
+ * blip — and the prose is still in this browser either way, which is a fact the
+ * share dialog states rather than hides.
+ */
+function keepLost(local: Shelf, merged: Shelf): Shelf {
+  const arrived = new Set(merged.books.map((b) => b.id));
+  const lost = local.books.filter(
+    (b) => b.ownerId && b.access === "lost" && !arrived.has(b.id),
+  );
+  if (lost.length === 0) return merged;
+  return { ...merged, books: [...merged.books, ...lost] };
 }
 
 /**
@@ -2719,20 +3005,54 @@ function keepLocalOnly(local: Shelf, remote: Shelf): Shelf {
  * one; the part worth testing is which fields survive it, which is this.
  */
 export function applyRemoteForTest(remote: Shelf): void {
-  const merged = keepLocalOnly(getShelf(), remote);
+  const local = getShelf();
+  const merged = keepLost(local, keepLocalOnly(local, remote));
   window.localStorage.setItem(SHELF_KEY, JSON.stringify(merged));
   cachedRaw = null;
   emitShelf();
 }
 
+/**
+ * Chapters whose local text is ahead of the server and must not be overwritten.
+ *
+ * **Without this the conflict guard is a lie.** It promises the writer's text is
+ * kept when somebody else has written the same chapter — and then the next
+ * `applyRemote` writes the server's body straight over it. So a chapter in here is
+ * skipped by the download until the writer has answered.
+ *
+ * Module-level rather than stored: it is about this session's unsent edit, and a
+ * reload has already lost the race it describes.
+ */
+const conflicted = new Set<string>();
+
+/** Chapters where the local text and the server's have diverged. */
+export function conflictedChapters(): readonly string[] {
+  return [...conflicted];
+}
+
+/** The writer has chosen; let the download win here again. */
+export function resolveConflict(chapterId: string) {
+  conflicted.delete(chapterId);
+  emitShelf();
+}
+
+setConflictHandler((chapterId) => {
+  conflicted.add(chapterId);
+  // The chapter list draws the marker, and it reads the shelf.
+  emitShelf();
+});
+
 function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
   if (!remote) return;
   try {
+    const local = getShelf();
     window.localStorage.setItem(
       SHELF_KEY,
-      JSON.stringify(keepLocalOnly(getShelf(), remote.shelf)),
+      JSON.stringify(keepLost(local, keepLocalOnly(local, remote.shelf))),
     );
     for (const [id, raw] of remote.bodies) {
+      // The one chapter the download may not touch: our copy is the unsent one.
+      if (conflicted.has(id)) continue;
       window.localStorage.setItem(bodyKey(id), raw);
     }
     for (const [id, text] of remote.notes) {
@@ -2754,6 +3074,11 @@ function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
     // coherent; TODO.md tracks giving this a proper warning.
     console.error("[store] could not cache the downloaded library", err);
   }
+
+  // What revision each body was at when it arrived. The guard compares the next
+  // save against this; without it the first save of a session cannot tell
+  // "nobody has touched this" from "somebody has".
+  seedBodyRevs(remote.revs);
 
   // Seed the diff baseline from what we just wrote, or the next edit would
   // push every book back up as though it were new.
@@ -2810,7 +3135,27 @@ export async function syncWithServer(): Promise<void> {
 
   if (!(await hasClaimed())) {
     const shelf = getShelf();
-    if (shelf.books.length > 0) {
+    /*
+     * **Own books only, and this is what stops an invited collaborator's sync
+     * breaking permanently on their second load.**
+     *
+     * A brand-new account invited to somebody's book has never claimed, and an
+     * empty shelf — so this branch is skipped, the download runs, and the shared
+     * books land locally with the claim still unrecorded. On the *next* load
+     * `books.length > 0` is true because those shared books are here, and the
+     * upload tries to take them: refused, `uploaded` false, and this function
+     * returns without applying anything, every load, forever.
+     *
+     * Counting only their own books means the branch never fires for a
+     * collaborator who has nothing of their own. Their claim simply stays
+     * unrecorded, which costs one query a load and nothing else; the moment they
+     * write a book of their own it goes up and the claim is recorded with it.
+     *
+     * `uploadLibrary` is still handed the whole shelf — it applies the same filter
+     * itself, because it is reached from the strays path below as well.
+     */
+    const own = shelf.books.filter((b) => !b.ownerId || b.ownerId === owner);
+    if (own.length > 0) {
       const { bodies, notes, covers } = collectLocal();
       const uploaded = await uploadLibrary(shelf, bodies, notes, covers, getPrefs());
       // Claimed and already correct locally — nothing to download.
@@ -2849,10 +3194,39 @@ export async function syncWithServer(): Promise<void> {
    * failure above does. Losing a manuscript to a network error is the one
    * outcome this function exists to prevent.
    */
-  const remote = await fetchLibrary();
+  const remote = await fetchLibrary(getShelf());
   if (remote) {
     const onServer = new Set(remote.shelf.books.map((b) => b.id));
-    const strays = getShelf().books.filter((b) => !onServer.has(b.id));
+    /*
+     * **A shared book missing from the download is revoked, not stray**, and this
+     * clause is the difference between the two. `ownerId` is absent on every book
+     * this browser made and set on every book that came down from the server, so
+     * `!b.ownerId` is exactly "unsaved work of ours".
+     *
+     * Without it, ending a collaboration makes the shared book local-but-not-
+     * remote, so the next load takes it for a manuscript that never reached the
+     * server and uploads it — prose and all — under the ex-collaborator's own
+     * account. The upsert then collides with the real owner's row, `books_update`
+     * refuses it, `uploadLibrary` returns false, and this function returns before
+     * applying anything: the theft fails by accident and the writer's sync is
+     * broken from then on. Both halves of that are wrong.
+     */
+    const strays = getShelf().books.filter(
+      (b) => !onServer.has(b.id) && !b.ownerId,
+    );
+
+    /*
+     * A book that *did* come from the server and has stopped arriving is marked
+     * rather than deleted. It stays on the shelf, read-only, because a fetch that
+     * failed halfway is indistinguishable from a revocation and deleting somebody
+     * out of a manuscript they were reading is not a guess worth making.
+     */
+    const lost = getShelf().books.filter(
+      (b) => !onServer.has(b.id) && b.ownerId && b.access !== "lost",
+    );
+    for (const book of lost) {
+      commitBook(book.id, (b) => ({ ...b, access: "lost" }));
+    }
 
     if (strays.length > 0) {
       const { bodies, notes, covers } = collectLocal();

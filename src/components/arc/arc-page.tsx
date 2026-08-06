@@ -182,7 +182,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
         sites and a spreadsheet.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}

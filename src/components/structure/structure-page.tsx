@@ -64,7 +64,7 @@ export function StructurePage({ bookId }: { bookId: string }) {
         A convention, not a rule — good novels break every line below.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {!placements ? (
           <section className="mt-8 rounded-xl border border-line bg-panel p-5">
             <p className="font-bold text-fg">This book has no target length</p>

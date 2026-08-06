@@ -20,6 +20,59 @@ than replacing it.
 
 ### Start here — days each, and mostly assembly
 
+- [x] **Co-writers.** Done 2026-08-07. Some books have two writers, and until
+      now the app could not express that at all: every row in the library schema
+      carries `owner uuid` and every policy on it was `auth.uid() = owner`, so a
+      book was reachable by exactly one account.
+
+      **Two roles, and the second is deliberately the last.** `editor` writes the
+      manuscript, `viewer` reads and exports it. The standard third rung across
+      this trade is a *commenter*, and it is absent because there are no comments
+      in this app — a role that cannot do the one thing its name promises is worse
+      than a role that does not exist. Reedsy is the cautionary case: three
+      advertised permission levels, one enforced.
+
+      **Seats are per book and count the owner** — 2 free, 10 on Pro, from
+      `SEATS_PER_BOOK` in `free-limits.ts`. Deliberately *not* part of `Counted`:
+      that is the monotonic `prefs.usage` tally, and a seat is current occupancy
+      that comes back when somebody is removed. The number is enforced in SQL
+      under a row lock (`invite_book_member`, `accept_book_invite`), because two
+      invitations racing each other each see the other's absence and both get in.
+      The *number* stays in TypeScript, since it needs `isPro()`.
+
+      **The line is drawn at the book, not the prose.** An editor writes chapters,
+      bodies and notes; the `books` row, the cover and the listing details stay the
+      owner's. That is not caution — `last_opened_id`, `last_opened_at` and
+      `position` live on that shared row and are per-writer, so an editor allowed
+      to write it would overwrite the owner's place in the manuscript every few
+      minutes. One sentence covers it: an editor writes the book, the owner owns
+      the book.
+
+      **A pre-existing hole was found and closed on the way.** `chapters`' insert
+      check was `auth.uid() = owner`, and `book_id` is only a foreign key — so any
+      signed-in account could already insert a chapter row into any book whose id
+      it knew. Invisible only because reads were also owner-filtered. Making reads
+      book-scoped, which sharing requires, would have turned that into injected
+      chapters appearing in a stranger's sidebar. So
+      `20260806000000_collaboration.sql` **drops and rebuilds** those policies
+      rather than adding to them: writes are keyed on `book_id` alone and `owner`
+      is derived by trigger, never accepted from the client.
+
+      Two more that would have bitten. Those `owner` columns cascade to
+      `auth.users`, so one wrong push meant **an editor closing their account
+      would silently delete the owner's chapters and prose**. And `pushBook`
+      upserted the *entire* chapter list on any change to the book — including a
+      word count bumped by autosave elsewhere — so two co-writers would have
+      silently reverted each other's renames; it now sends only the rows that
+      actually changed.
+
+      *Left:* presence ("Ann is editing Chapter 4") and the resolve-a-conflict UI.
+      The data-safety half of the conflict guard is done — `chapter_bodies.rev`,
+      a conditional update in `pushBody`, and a conflict set that stops
+      `applyRemote` overwriting the text it preserved — but nothing yet *asks* the
+      writer which version to keep. Also untested with two real accounts; see the
+      checklist below.
+
 - [x] **"Where you left off" card.** Done 2026-08-01. On the book overview,
       which is the screen a writer lands on. Backed by `src/lib/resume.ts`
       (pure, 13 tests): the last paragraph of the chapter they were in, and the
@@ -784,6 +837,96 @@ from them as *what is out there*, never as *the answer*.
 - **Thema** (EDItEUR) instead of BISAC for subject codes, if a code list is
   needed at all. BISAC is owned by BISG and licensed; Thema is open.
 
+### Collaboration — what is left, and two hazards written down
+
+- [x] **The database half, verified against the live project.** Done 2026-08-07,
+      by script rather than by reading the migration back. Six things pass:
+      `owner` is derived by trigger and a deliberately wrong value is thrown away;
+      a chapter cannot be moved between books; a signed-in stranger sees no books,
+      no chapters and no prose; and **a stranger cannot inject a chapter into a
+      book whose id they know** — the hole that existed before this migration. All
+      five manuscript tables carry the rebuilt policies and none of the old
+      `*_owner_*` ones survive on them.
+
+      Two things about testing this are worth keeping. The SQL editor connects as
+      `postgres`, which **bypasses RLS** — so a policy test run there means
+      nothing unless it first does `set local role authenticated` and sets
+      `request.jwt.claims`. Trigger tests need no such thing, because triggers
+      fire for everyone. And any check for surviving old policies must be scoped
+      to those five tables: `prefs`, `library_claims` and the billing tables keep
+      their `*_owner_*` policies on purpose, and a schema-wide scan reports them
+      as a failure that is really the design.
+
+- [x] **An editor, across two real accounts.** Done 2026-08-07. A free-plan owner
+      shared a book with a Pro account; the invitation was found in-app, accepted,
+      and the book arrived with its cover and its role. The editor added prose and
+      it saved. What the database then showed is the part worth keeping:
+
+      | | |
+      |---|---|
+      | chapter row filed under | the **book owner** |
+      | prose row filed under | the **book owner** |
+      | `updated_by` | the account that actually typed |
+      | owner's `last_opened_at` | **19:33** — unmoved |
+      | manuscript last changed | **20:38** |
+
+      Sixty-five minutes between those last two is "an editor writes the book, the
+      owner owns the book" made visible. The prose is stored under the *owner's*
+      uuid though somebody else wrote it, which is exactly what stops the writer's
+      account being deleted from taking the book with it — and `updated_by` keeps
+      the honest record of authorship, which is a different question from
+      ownership and rightly a different column.
+
+      Also confirmed incidentally: the owner's **free** plan governed the seat, not
+      the collaborator's Pro one; `book_covers` select for members works (the
+      jacket rendered); and `rev` is incrementing, so the conflict guard is live
+      rather than merely present.
+
+- [ ] **A viewer, and a revocation.** The two still untested, and the second is
+      the one that would hurt. Downgrade the collaborator to *Can view* and confirm
+      the editor stops taking keystrokes and every write control goes. Then
+      **Remove** them, reload their shelf, and check `books.owner` in Postgres is
+      still the owner's — if the strays filter in `syncWithServer` were wrong, that
+      load would re-upload somebody else's manuscript under the ex-collaborator's
+      account. Use a second browser profile, not a second tab: `openchapter:owner`
+      wipes the local library when a different account signs in, which is correct
+      and would take the first writer's shelf with it.
+- [ ] **Presence.** "Ann is editing Chapter 4", over Supabase Realtime on a
+      private per-book channel, with an RLS policy on `realtime.messages` reusing
+      `book_role()` — a public channel would let anyone holding a book id read
+      collaborator names. This is where the largest ratio of relief to work sits:
+      it turns a silent overwrite into visible turn-taking without touching the
+      merge model.
+- [ ] **The resolve-a-conflict control.** The guard already keeps the local text
+      and marks the chapter; what is missing is the two buttons — *see their
+      version* and *keep mine as a copy* (a new chapter beside it, using the
+      existing creation path, so nothing is lost). Until then a conflict is safe
+      but silent, which is half a feature.
+- [ ] **Ownership transfer, and the hazard underneath it.**
+      `books.owner references auth.users on delete cascade`, so **deleting the
+      owner's account deletes the book out from under its collaborators.** That is
+      exactly the Google Workspace failure the research turned up — an admin there
+      must transfer ownership *before* deletion or the file goes. The cascade is
+      left alone for now on purpose: changing it orphans rows with no owner to
+      reach them, which is a different bug. The honest fix is a transfer flow with
+      the shape Google's has — only to somebody the book is already shared with,
+      they must accept, the old owner drops to editor, cancellable until then.
+- [ ] **Per-chapter permissions.** Notion has publicly conceded its inheritance
+      model is too coarse; ours is one book, one role. Retrofitting per-chapter
+      overrides is a data migration, so decide it deliberately rather than by
+      drift.
+
+**Live co-editing is not on this list, and that is a decision.** Google Docs uses
+OT; Figma uses last-writer-wins per property and says outright that it would lose
+a concurrent text edit, *"because Figma is a design tool, not a text editor"*.
+Doing it properly here means Yjs + Hocuspocus, one `Y.Doc` per chapter, and a
+**stateful server** — which breaks the one property this whole store is built
+around, that the app works on a train. A `Y.Doc` is also a different storage shape
+from Tiptap JSON at a `localStorage` key, so it is not a layer on top of what
+exists. Scrivener offers no collaboration at all and Atticus offers no live
+editing; access control with presence and history is competitive in this market
+today.
+
 ### Ruled out, and why
 
 Written down so they stop being re-proposed.
@@ -1094,10 +1237,13 @@ should either ship or lose the card.
       and a validator, never against a real manuscript in a real shop. In rough
       order of what would hurt most if it were wrong:
 
-  - [ ] **Apply the migration.** `supabase/migrations/20260730000000_book_publishing.sql`
-        adds the `publishing` jsonb column and has *not* been run. Until it is,
-        listing details save locally and silently fail to sync — the push
-        rejects the unknown column. Do this one first or the rest tests nothing.
+  - [x] **Apply the migration.** Done 2026-08-07.
+        `supabase/migrations/20260730000000_book_publishing.sql` adds the
+        `publishing` jsonb column, and until it ran the push rejected the whole
+        row and listing details never left the browser. Applied alongside
+        `20260806000000_collaboration.sql`, and verified the way it should be —
+        not by the SQL editor saying "Success" but by reloading the app and
+        confirming the `[sync]` warnings were gone.
   - [ ] **Round-trip the metadata.** Fill in the Store listing card, reload, and
         confirm it survives. Then check it on a second device, which is what
         proves the column is really there.
@@ -1203,6 +1349,73 @@ should either ship or lose the card.
       which is the wrong way round. Neither limit is part of the plan now:
       books and imports are unlimited on both sides, which is what the code has
       always done. Every row on that page is true of the app again.
+
+      **Counted limits came back on 2026-08-06, this time as a decision about
+      the plan rather than a sentence to keep.** Four of them, ten each and
+      unlimited on Pro: **imports**, **comp searches**, **cover searches**,
+      **title checks**. `src/lib/free-limits.ts` holds the numbers, the names
+      and the arithmetic; `prefs.usage` holds the tallies; `countUse` in the
+      store is the only thing that writes one; and the pricing rows quote
+      `FREE_LIMITS` so the page and the gate cannot drift. The shelf limit did
+      **not** come back and is not planned — books a writer starts here stay
+      free and unbounded, which is the promise the whole product rests on.
+
+      Four things about it are worth keeping. Imports count **files rather than
+      books**, because `importIntoBook` would otherwise be one click round it
+      ("new book, then import into it") — and undoing an in-book import gives
+      the import back, since the writer reversed the thing they were charged
+      for. **A search the app ran is never counted**: the comps screen and the
+      title check both open by searching for the book already on screen, and
+      charging for that would spend the ten on ten visits, so the seed is free
+      and the press is counted. The tallies are in **prefs** rather than on a
+      book: prefs sync as a blob, so a second machine does not hand out ten
+      more, where a field on the book would have needed a Postgres column to
+      survive `sync.ts`. And the landing page's hero check **counts an import
+      but never refuses one** — the reader there has no account for a plan
+      limit to be about, and that page's entire argument is that a manuscript
+      can be checked before paying.
+
+      **The counter is silent until the last three.** The first version put
+      "0 of 10 free comp searches used" under the search box on every visit,
+      which is the freemium mistake this audience has been burned by: a meter
+      shown to somebody who has used nothing, before the screen has done
+      anything for them. What the rest of the trade does is stay quiet, warn in
+      the last quarter, and be explicit when it is gone — so `WARN_WHEN_LEFT`
+      is 3, the line says what is *left* rather than what was spent, and the
+      four numbers live on the pricing page and in Help for anyone deciding
+      what to pay for. A test walks the whole allowance and fails if it speaks
+      early.
+
+      **Nothing is said until the eleventh press.** The first version went
+      dark the instant the tenth search completed — banner up, button
+      disabled — which hands a paywall to somebody who had finished anyway,
+      and leaves no press for it to be an answer *to*. `useLimitGate` holds the
+      rule now: controls stay live, the refused press is the trigger, and it
+      costs nothing.
+
+      **The spent state is a banner and a one-time dialog.** It was a grey pill
+      first, which is the shape this app uses for footnotes — so the sentence
+      explaining why the button beside it had gone dark read as a footnote.
+      `LimitBanner` is a filled banner now — purple-into-indigo, white type,
+      one white button — after a tinted version that was legible but sat at the
+      same volume as every other panel on the screen. Still no red and no
+      exclamation: running out of ten free searches is not an error. The
+      gradient is three tokens (`--color-upgrade-*`) stated identically in both
+      themes, which is the one place in `globals.css` a pair of blocks does not
+      differ, and the reasoning is written at both ends. `LimitDialog` fires **once**,
+      on the press that spends the last one — the only moment a writer is
+      looking straight at what they ran out of — and never from an effect,
+      which would fire again on arrival for somebody who ran out yesterday.
+      Its right half is a wall of drawn book covers; spines were tried twice
+      and read as a bar chart both times, and nine of anything read as a
+      countable set on a dialog about a ceiling, so there are twelve and the
+      grid is cropped. Checked in both themes.
+
+      *Left:* these are browser gates, like the prose report and the money
+      screens, and they are honest about being that. Enforcing them server-side
+      would mean `/api/comps` checking a plan, and that route is deliberately
+      free and keyless — which is worth more than closing a hole nobody is
+      trying to defend to that standard.
 
 - [x] **A new plan.** Done 2026-08-03.
       $9 monthly, $72 a year, **$199 once**. `plans.ts`, a migration widening

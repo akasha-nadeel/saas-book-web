@@ -12,6 +12,11 @@ import {
 import type { ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
 import { keepImportedCover } from "@/lib/cover-save";
+import {
+  ImportLimitReached,
+  LeftPill,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 
 /**
  * Importing a manuscript, as a modal on the shelf.
@@ -25,9 +30,16 @@ import { keepImportedCover } from "@/lib/cover-save";
  * chapters — and nothing is written until the writer agrees to it. Chapter
  * detection is guesswork, and guesswork that silently becomes a book is how you
  * end up with a novel in eighty-three pieces.
+ *
+ * The free plan's ten imports are checked in front of all three tabs, not one:
+ * a pasted manuscript and a transcribed recording both become books through
+ * the same call, so a limit that only watched the file picker would be a limit
+ * with two ways round it.
  */
 export function ImportDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  const gate = useLimitGate("imports");
+  const allowance = gate.allowance;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -113,6 +125,11 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
 
   const create = () => {
     if (!proposal) return;
+    /* Refused here rather than at the drop zone: the writer gets to read the
+       file, see the chapters and press for it, and is answered at the moment
+       they ask — the eleventh press, not the tenth arrival. `check` and not
+       `spend`, because the store counts imports at its own funnel. */
+    if (!gate.check()) return;
     const result = createBookFromImport(
       title,
       proposal.chapters,
@@ -166,7 +183,11 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           </button>
         </header>
 
-        {proposal === null ? (
+        {gate.refused ? (
+          <div className="px-6 pb-6">
+            <ImportLimitReached used={allowance.used} />
+          </div>
+        ) : proposal === null ? (
           <>
             <div className="flex gap-6 border-b border-line px-6">
               {(
@@ -357,8 +378,8 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
 
                   <p className="mt-3 font-sans text-xs leading-relaxed text-muted">
                     MP3, M4A, WAV, WebM, OGG or FLAC, up to 25MB. Unlike the
-                    other two, this one <em>is</em> uploaded — a recording has to
-                    reach a transcriber to become words.
+                    other two, this one <em>is</em> uploaded — a recording has
+                    to reach a transcriber to become words.
                   </p>
                 </>
               ) : (
@@ -394,6 +415,10 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                   </div>
                 </>
               )}
+
+              {/* Once, below whichever tab is open: all three make a book, so
+                  all three spend the same allowance. */}
+              <LeftPill allowance={allowance} className="mt-4" />
 
               {error && (
                 <p

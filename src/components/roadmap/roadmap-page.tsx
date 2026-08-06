@@ -258,7 +258,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
             counts survive as text, which is all they ever were: "5 of 18" and
             "28%" are two numbers, and they had a card each. */}
         <header className="sticky top-0 z-10 border-b border-line bg-panel/95 px-6 py-2.5 backdrop-blur">
-          <div className={`flex items-center gap-3 ${split ? "" : "mx-auto max-w-5xl"}`}>
+          <div className={`flex items-center gap-3 ${split ? "" : "mx-auto max-w-7xl"}`}>
             <Link
               href={`/book/${book.id}`}
               aria-label={`Open ${book.title}`}
@@ -296,7 +296,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
         </header>
 
         <div
-          className={`px-6 pt-5 pb-16 ${split ? "" : "mx-auto max-w-5xl"}`}
+          className={`px-6 pt-5 pb-16 ${split ? "" : "mx-auto max-w-7xl"}`}
         >
         {/* ---- The road, as a stepper -------------------------------------
 

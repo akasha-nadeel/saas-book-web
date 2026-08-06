@@ -5,6 +5,7 @@ import Link from "next/link";
 import { startCheckout, type CheckoutState } from "@/app/upgrade/actions";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { displayPrice, perMonthOf, priceOf } from "@/lib/billing/plans";
+import { FREE_LIMITS, SEATS_PER_BOOK } from "@/lib/free-limits";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -21,11 +22,15 @@ import { displayPrice, perMonthOf, priceOf } from "@/lib/billing/plans";
  * keeps it a card standing off the page instead of a hole cut in one, and is
  * the whole of why the palette is written as jobs rather than as hues.
  *
- * **Every line below is true of the code.** The two that were not — a shelf
- * counted to fifty and an eleventh import refused — are gone rather than
- * reworded, because nothing ever counted either, and a limit promised on a
- * pricing page that no code enforces is the same failure as a feature claim the
- * app cannot back.
+ * **Every line below is true of the code.** Two were not, once — a shelf
+ * counted to fifty and an eleventh import refused — and both were deleted
+ * rather than reworded, because nothing counted either and a limit promised on
+ * a pricing page that no code enforces is the same failure as a feature claim
+ * the app cannot back. The counted rows are back because the counting is:
+ * `prefs.usage` is stamped by `countUse` at each of the six places that spend
+ * one, and `lib/free-limits.ts` holds the four numbers this file quotes. The
+ * shelf limit is *not* back and is not planned — books a writer starts here
+ * are free and unbounded, which is the promise the product rests on.
  *
  * The rows differ in *how* they are enforced, and it is worth knowing which is
  * which. The four metered ones — assistant, ranked comps, audiobook, audio
@@ -102,11 +107,44 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
 const ROWS: { label: string; starter: string; pro: string }[] = [
   { label: "Books and words", starter: "Unlimited", pro: "Unlimited" },
   { label: "Exports", starter: "All four", pro: "All four" },
-  { label: "Imports", starter: "Unlimited", pro: "Unlimited" },
+  /*
+   * The four counted rows, and every number is read out of `FREE_LIMITS` so the
+   * page and the gate cannot drift — the same rule the prices follow.
+   *
+   * Imports are counted **files, not books**: a manuscript brought into a book
+   * that already exists spends one too, or "make a book first" is one click
+   * round it. The three searches count a press rather than a screen — both the
+   * comps page and the title check open by searching for the book already in
+   * front of the writer, and that arrival search is free, or the ten would go
+   * on ten visits. Blurb and categories are not counted at all, which is why
+   * they moved off the search row and onto their own.
+   */
+  { label: "Imports", starter: `${FREE_LIMITS.imports} files`, pro: "Unlimited" },
+  { label: "Comp searches", starter: `${FREE_LIMITS.comps}`, pro: "Unlimited" },
+  { label: "Cover searches", starter: `${FREE_LIMITS.covers}`, pro: "Unlimited" },
+  {
+    label: "Title checks",
+    starter: `${FREE_LIMITS.titleChecks}`,
+    pro: "Unlimited",
+  },
   { label: "Pre-upload check & roadmap", starter: "Included", pro: "Included" },
-  { label: "Comp search, blurb, categories, covers", starter: "Included", pro: "Included" },
+  { label: "Blurb & categories", starter: "Included", pro: "Included" },
   { label: "Structure & progress", starter: "Included", pro: "Included" },
   { label: "Story bible", starter: "Per book", pro: "Across a series" },
+  /*
+   * **Both numbers, because Pro raises this rather than lifting it.**
+   *
+   * Every other metered row reads "Unlimited" on the right; a book's seats do
+   * not, and printing "Unlimited" here would be the one false cell on the page.
+   * Read from `SEATS_PER_BOOK` for the same reason the four above are read from
+   * `FREE_LIMITS` — one number, one place — and counting the owner, so the figure
+   * a reader sees is the number of faces on the book.
+   */
+  {
+    label: "People per book",
+    starter: `${SEATS_PER_BOOK.free} incl. you`,
+    pro: `${SEATS_PER_BOOK.pro} incl. you`,
+  },
   // Free on both because it costs nothing to run: dictation is the browser's
   // own SpeechRecognition, not the paid transcriber. The value says which
   // browsers rather than "Included" — it is a Chrome and Edge feature, the

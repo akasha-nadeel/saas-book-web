@@ -126,7 +126,7 @@ export function GatedTool({
           {deck}
         </ToolHeader>
       )}
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
         <div className="mt-8">
           <ProGate title={tool} what={what}>

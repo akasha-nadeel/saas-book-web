@@ -71,13 +71,30 @@ export function useToolSave({
   discard?: () => void;
 }): ToolSaveState {
   const bookId = book?.id;
+
+  /*
+   * **A book somebody let this writer read offers nothing to save, anywhere.**
+   *
+   * One check here rather than sixteen in the screens, and it is the same reason
+   * this hook exists at all: a Save bar that appears and is then refused by
+   * Postgres is the dead UI the house rules forbid, and a *roadmap tick* on
+   * somebody else's book would be worse than dead — it is local-only, so it would
+   * silently record progress against a manuscript this writer does not own.
+   *
+   * Absence of a role means the book is their own; a viewer is the only case that
+   * lands here. An editor may write the manuscript, but these screens write the
+   * `books` row — the blurb, the categories, the listing details — which is the
+   * owner's alone, so `canWriteBook` is not the test. It is ownership.
+   */
+  const readOnly = Boolean(book?.role);
+
   const steps = useMemo(
-    () => (bookId ? ticksForTool(bookId, tool) : []),
-    [bookId, tool],
+    () => (bookId && !readOnly ? ticksForTool(bookId, tool) : []),
+    [bookId, tool, readOnly],
   );
   const willTick = useMemo(
-    () => (book ? untickedFor(book, tool) : []),
-    [book, tool],
+    () => (book && !readOnly ? untickedFor(book, tool) : []),
+    [book, tool, readOnly],
   );
 
   const [ticked, setTicked] = useState<readonly Step[]>([]);
@@ -93,19 +110,21 @@ export function useToolSave({
    * on every character is how you end up with a cleanup from the previous
    * render clearing the guard the current one just installed.
    */
-  const latest = useRef({ commit, willTick, bookId });
+  const latest = useRef({ commit, willTick, bookId, locked: readOnly });
   /* Synced in an effect rather than written during render — a ref assignment
      in the render body is a side effect in a function React may call twice.
      No dependency list, so it runs after every commit; and `save` is only ever
      called from an event handler, which is strictly after the effect that
      armed it. */
   useEffect(() => {
-    latest.current = { commit, willTick, bookId };
+    latest.current = { commit, willTick, bookId, locked: readOnly };
   });
 
   const save = useCallback(() => {
-    const { commit: write, willTick: pending, bookId: id } = latest.current;
-    if (!id) return;
+    const { commit: write, willTick: pending, bookId: id, locked } = latest.current;
+    // Belt and braces: the bar is already absent, but a keyboard shortcut or a
+    // stale closure must not be the one path that writes somebody else's book.
+    if (!id || locked) return;
     write?.();
     for (const step of pending) setRoadmapStep(id, step.id, true);
     setTicked(pending);
@@ -122,5 +141,15 @@ export function useToolSave({
     return () => window.clearTimeout(timer);
   }, [flashing, ticked]);
 
-  return { dirty, willTick, steps, ticked, flashing, save, discard };
+  // `dirty` forced false is what keeps the bar down: every screen draws it from
+  // this, so there is no second place to remember.
+  return {
+    dirty: dirty && !readOnly,
+    willTick,
+    steps,
+    ticked,
+    flashing,
+    save,
+    discard,
+  };
 }

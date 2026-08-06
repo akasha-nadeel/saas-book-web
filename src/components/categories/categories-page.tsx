@@ -261,7 +261,6 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
              own note is explicit that the two must agree or the left edges
              disagree. The deck stays capped at 2xl inside it, so widening the
              page never widens a line of prose. */
-          width="6xl"
         >
           {/* **The problem before the method.** The old deck opened on "which
               shelf your book lands on", which describes the output; a writer
@@ -280,7 +279,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-6xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
         {/* ---- What is chosen --------------------------------------------
             A strip rather than the card this was. Before the first search a

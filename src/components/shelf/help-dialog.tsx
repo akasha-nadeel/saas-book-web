@@ -20,7 +20,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Import",
-        desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you.",
+        desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you. The free plan brings in ten files; the screen says how many of them you have used, and Pro has no limit.",
       },
       {
         name: "Templates",
@@ -86,7 +86,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Import into a book",
-        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after.",
+        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after. This counts against the free plan's ten imports like any other file, and undoing gives it back.",
       },
       {
         name: "Autosave",
@@ -127,7 +127,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
         name: "Cover checker",
-        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Checks the file you drop in, which is also the one your exports use. Measured in your browser and never uploaded. Whether the cover is any good is the wall's job, not a number's.",
+        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Checks the file you drop in, which is also the one your exports use. Measured in your browser and never uploaded, and never counted against anything — it is the wall above it, where you search for the covers your book has to sit beside, that spends one of the free plan's ten. Whether the cover is any good is the wall's job, not a number's.",
       },
       {
         name: "Blurb",
@@ -143,7 +143,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Comp titles",
-        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key.",
+        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key. On the free plan you get ten searches of your own; the shelf this screen opens on is not one of them, and neither is looking at what is already there. The screen tells you when three are left.",
       },
       {
         name: "Track",
@@ -273,6 +273,35 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     ],
   },
   {
+    title: "Writing with someone else",
+    items: [
+      {
+        name: "Two writers, one book",
+        desc: "Some books have two writers. Open Collaborators in the sidebar, or press Share on a book, and invite somebody by the email address their account uses. A free book holds 2 people including you; Pro holds 10. Whoever owns the book pays for its seats — the person you invite needs an account, but not a plan.",
+      },
+      {
+        name: "Can edit, or can view",
+        desc: "Two levels and no more. Can edit writes the chapters and can add, rename and reorder them. Can view reads the book and can export it, and changes nothing. Either way the book's own details — its title, cover, page setup and shop listing — stay with whoever owns it, because the panel remembers where each of you left off and a shared setting could only remember one.",
+      },
+      {
+        name: "Sending an invitation",
+        desc: "You get a link to pass on however you like — we send no email. The link only works for the address you invited, so forwarding it gives nobody access, and it lasts 14 days. It also appears under Collaborators when they next sign in, so a lost link is not the end of it. Cancelling an invitation tells them nothing.",
+      },
+      {
+        name: "Two people in one chapter",
+        desc: "This is not live co-editing: you will not see each other type. Changes travel when they are saved, and a chapter is one document — so if you both write the same one at once, the second save is refused rather than quietly replacing the first, and you are asked what to keep. Working in different chapters, which is what usually happens, needs no thought at all.",
+      },
+      {
+        name: "What does not travel",
+        desc: "The chapters, their notes and the book's settings sync. The story bible, advance readers, the ledger, your writing record and your roadmap ticks do not — none of those sync between machines for anybody, so a co-writer sees none of yours. Full-size cover artwork stays on the machine it was uploaded from, so if they export the book they get the thumbnail.",
+      },
+      {
+        name: "Taking somebody off",
+        desc: "Press Share, then Remove. They lose access from that moment. It cannot reach into a copy their browser has already downloaded, which is what local-first means — so remove somebody you have stopped trusting rather than relying on it afterwards.",
+      },
+    ],
+  },
+  {
     title: "Your data",
     items: [
       {
@@ -285,7 +314,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Plans",
-        desc: "Writing a book and getting it out are free, whole: unlimited books, every import, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly or yearly. See Pricing in the header.",
+        desc: "Writing a book and getting it out are free, whole: unlimited books, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Four things are counted on the free plan, ten each: imports (files, whether one becomes a new book or goes into a book you already have), comp searches, cover searches and title checks. Pro has no limit on any of them. A fifth is counted differently: a book holds 2 people including you on the free plan and 10 on Pro, and that is a number at a time rather than a number spent — take somebody off and the place comes back. The searches those screens run for you when you arrive — your genre’s shelf, your own title — are free and always were; what is counted is a search you asked for. Nothing you have already done is affected either way. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly or yearly. See Pricing in the header.",
       },
       {
         name: "Paying",

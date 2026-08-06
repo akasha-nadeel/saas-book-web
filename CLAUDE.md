@@ -138,8 +138,8 @@ stores (`useBible`, `useArc`, `useLedger`, `useActivity`, `useHistory`,
 `useIdeas`); a new store gets a new hook here rather than an effect in a screen.
 
 **The front door is a dashboard, not a shelf.**
-`src/components/shelf/bookshelf.tsx` is five areas — Overview, Write, Prepare,
-Track, Tools — and **Write is one of them**; the arrangement is the argument
+`src/components/shelf/bookshelf.tsx` is six areas — Overview, Write, Prepare,
+Track, Tools, Collaborators — and **Write is one of them**; the arrangement is the argument
 that the manuscript is one part of the job.
 
 **Overview is a diagnosis, and `src/lib/checkup.ts` is the whole of it.** The
@@ -246,21 +246,31 @@ Each tool is the same three pieces, and the split is the convention:
 
 Every one of them mounts **`ToolHeader`** (`src/components/tool-header.tsx`)
 when it owns the window: breadcrumb, the book as a chip *with its cover*, and
-the tool's own name as the `h1`. The cover is load-bearing — the Tools area lets
+the tool's own name as the `h1` — **in a card, like everything under it.** It
+was a full-bleed band with a hairline beneath, which is the shape a page header
+takes when it is the only thing on screen that is not a card; now that the tool
+screens work in boxes, a band above a column of them read as chrome the page
+sat in rather than as the page's first thing. The band survives as the ground
+the card sits on, which keeps the top distinct without a rule. The cover is load-bearing — the Tools area lets
 a writer pick a book before opening a tool, so landing on the wrong manuscript
 is a real way to lose ten minutes — and the heading is the tool rather than the
 book, or every screen looks like the same screen with different contents. The
 `width` prop must match the page's own container or the two left edges disagree
-— it defaults to **`5xl`**, which is a page width rather than a reading measure:
-these screens hold forms, stat rows and card grids, and the `3xl` it used to be
-left a third of an ordinary laptop window empty down each side. The header's
+— it defaults to **`7xl`**, and **every tool now takes that same width**. It
+was `5xl` with three screens opting wider, which meant walking from the blurb
+to the comps moved both edges of the page; one measure is what keeps the
+margins still. It is a page width rather than a reading measure — these screens
+hold forms, stat rows and card grids — and where a screen really is a column of
+prose the *content* caps itself inside the shared container, as the listing
+form does at `3xl`. The header's
 deck is capped separately at `2xl`, and the tool pages cap their own prose at
-`max-w-prose`, so widening the page never widens a line of text. Two screens go
-wider because they are grids of pictures rather than columns of prose: comps at
-`6xl`, and the title check at `7xl` — it puts a shelf of covers under a
-one-line answer, and every extra column is a book taken in without scrolling.
-The export screen is the one that never took this header; TODO.md records the
-decision as open.
+`max-w-prose`, so widening the page never widens a line of text. **`deckWidth`
+is the one way out of that cap** and comps is the one screen that takes it: a
+deck of two short sentences reads better across the page than stacked in a
+narrow column beside an empty half-header. Widen it and shorten the words in
+the same commit, or the cap comes straight back as a hundred-and-sixty-character
+line. The export screen is the one that never took
+this header; TODO.md records the decision as open.
 
 **A tool screen has two frames, and `src/lib/tool-page.ts` is the contract.**
 The roadmap opens six of them *beside* the road rather than instead of it, so a
@@ -353,6 +363,35 @@ name" from zero records, so it must carry which catalogues answered, or Open
 Library returning 503 for a few minutes tells a writer their title is free when
 it is on the shelf below. A failure and a clean result look identical in the
 data; only the source flags tell them apart.
+
+**The title check is one box too, and its finding arrives in the corner.**
+The shelf's own name sits at the top of that box with the search *under* it —
+while nothing has been checked the covers are the page, and the field is the
+thing you use on them. The paragraph explaining what the button would do is
+gone: it described the button to somebody looking at the button. And the
+verdict — the coloured card with the count, the reason and the provenance — is
+a **toast** (`TitleToast` + `Verdict`), top right, dismissible, *never* on a
+timer: it is the answer rather than a save confirmation, it takes longer to
+read than any timeout, and the shelves it describes stay on the page, so
+closing it loses the summary and none of the evidence. Dismissal is remembered
+against the title it was about, so the next check brings its own.
+
+**The comps screen is one box: shelves, then the search, then the covers.**
+The three were loose on the page with nothing saying where the controls ended
+and the answer began, and the covers — which *are* the answer — read as a
+separate page underneath. The shelves are *inside* the search box — `SearchBox` is a combobox, and
+opening it shows all twenty-six at once in columns rather than a scrolling
+eighth of them. They were a section of their own for a while and that was one
+section too many: a heading, a caption and twenty-six chips doing the job the
+box does. Picking one **fills the field and does not search** — browsing the
+list is not a decision to spend one of the ten — and the field shows the
+shelf's *name* rather than the `subject:"…"` query it stands for, which is our
+syntax leaking into somebody's text field. The box sits directly above the
+covers it produces, which is where every shop that sells books puts its
+search. What stays outside the box is the
+arithmetic below it — median pages, the subjects, the length reading — because
+those are readings *of* the shelf and keep their own cards, or the box is the
+whole page and stops meaning anything.
 
 **Two free catalogues sit behind `/api/comps`** — Google Books and Open Library.
 Server-side not for secrecy (neither needs a key) but for a shared cache, so one
@@ -948,10 +987,129 @@ writer on a machine inherits the first one's shelf — and now, with a server
 behind it, pushes those books up under their own account.
 
 The SQL behind all that is checked in: `supabase/migrations/` (library,
-book publishing, billing, feedback). Schema changes belong there, not only in
-the dashboard. `20260730000000_book_publishing.sql` has **not been applied** to
-the live project — see TODO.md; until it is, listing details save locally and
-the push silently rejects the unknown column.
+book publishing, billing, feedback, collaboration). Schema changes belong there,
+not only in the dashboard. **All five are applied to the live project as of
+2026-08-07** — `20260730000000_book_publishing.sql` had been outstanding for a
+week, which meant every book push silently dropped its listing details, and
+`pushBook` carries the self-healing retry that made that survivable rather than
+fatal. Keep that retry: it is the pattern any future column should follow.
+
+**Some books have two writers, and `src/lib/collab.ts` is the pure half.**
+Two roles — **editor** writes the manuscript, **viewer** reads and exports it —
+and no third. The standard third rung is a *commenter*, absent because there are
+no comments here: a role that cannot do the one thing its name promises is worse
+than one that does not exist. Reedsy is the cautionary case, advertising three
+permission levels while every invitee gets full edit rights.
+
+**The line is drawn at the book, not at the prose**, which is where Atticus draws
+it too. An editor writes chapters, bodies and notes; the `books` row, the cover,
+the page setup and the listing details stay the owner's. That is not caution —
+`last_opened_id`, `last_opened_at` and `position` live on that shared row and are
+*per-writer*, so an editor allowed to write it would overwrite the owner's place
+in the manuscript every few minutes. One sentence holds it: **an editor writes the
+book, the owner owns the book.** `keepLocalOnly` therefore carries `archivedAt`
+and `trashedAt` across a download for a shared book, and `rowsToBook` prefers the
+*local* `lastOpened*` — without both, the owner's values arrive as the reader's on
+every load.
+
+**Three rules live in SQL because the client cannot be trusted with them**, and
+`supabase/migrations/20260806000000_collaboration.sql` **drops and rebuilds** the
+library's policies rather than adding to them:
+
+- **`owner` on every child row is derived by trigger, never accepted.** Those
+  columns cascade to `auth.users`, so a row stamped with an editor's uuid means
+  that editor closing their account silently deletes the owner's chapters and
+  prose — through the one path nobody tests.
+- **Write permission is decided by the *book*, never by the row's own `owner`.**
+  `with check (auth.uid() = owner)` is satisfied by any stranger claiming the row.
+  That was already true of `chapters` before this feature and invisible only
+  because reads were owner-filtered too; making reads book-scoped would have
+  turned it into injected chapters in a stranger's sidebar.
+- **A chapter cannot change books, and prose cannot change chapters.** RLS
+  compares USING against the old row and WITH CHECK against the new, and an editor
+  moving a chapter into their own book satisfies both. Only a trigger sees a key
+  move.
+
+`chapter_bodies` and `chapter_notes` gained a **`book_id`** so a policy on them
+need not reach through `chapters` — through a definer helper that bypasses
+`chapters`' own RLS, inline it makes one table's security depend on another's.
+`book_role()`, `shared_book_ids()` and `writable_book_ids()` are `security
+definer` with `search_path = ''`, which is also what stops `books`' policies and
+`book_members`' policies recursing into each other; do not `force row level
+security` on either, and do not write either ownership test inline.
+
+**`book_members` is written by nothing but the server.** `select` is granted to
+`authenticated` **by column** — `token` and `invited_by` are withheld, so every
+read must name its columns or PostgREST refuses the whole query — and there is no
+insert, update or delete grant at all. Mutations go through Server Actions in
+`src/app/collab/actions.ts` holding `createAdminClient()`, the posture billing
+already takes with `subscriptions`, because the seat cap needs `isPro()` and
+`isBillingConfigured()`. The *counting* is done in SQL under `select … for update`
+(`invite_book_member`, `accept_book_invite`): two invitations racing each other
+each see the other's absence and both get in.
+
+**Seats are per book and count the owner** — `SEATS_PER_BOOK` in `free-limits.ts`,
+2 free and 10 on Pro. Deliberately **not** part of `Counted`, which is the
+monotonic `prefs.usage` tally: a seat is current *occupancy* and comes back when
+somebody is removed or an invitation lapses. It is the one limit Pro *raises*
+rather than lifts, so `spentLine` drops the word "free" for a paying owner and
+`LimitBanner` says what Pro actually does — printing "Unlimited" there would be
+the one false cell on the pricing page. A lapsed plan **evicts nobody**; it only
+refuses new invitations.
+
+**No email is sent, and nothing may say one was.** The owner copies a link; the
+invitation also appears in the invitee's own Collaborators area. The link is a
+*pointer, not a credential* — `/invite/[token]` sits behind the sign-in wall, and
+`acceptInvite` refuses anyone whose **confirmed** address is not the invited one,
+checked with `auth.admin.getUserById` because Supabase puts `email` in the access
+token whether or not it has been confirmed. Invitations expire after
+`INVITE_DAYS` (14), derived from the stamp rather than stored — nothing sweeps
+the table — and cancelling is silent.
+
+**Every push in `sync.ts` is owner-aware, and two filters are load-bearing.**
+`pushBook` skips the `books` upsert for a book somebody else owns and sends only
+the **changed** chapter rows (`changedChapterIds`) — it used to upsert the whole
+list on any change to the book, including a word count bumped by autosave
+elsewhere, which silently reverted a co-writer's renames. `uploadLibrary` and the
+strays filter in `syncWithServer` both exclude books with a foreign `ownerId`:
+without that, revoking access makes the book local-but-not-remote, so the
+ex-collaborator's next load takes it for unsaved work and re-uploads somebody
+else's manuscript under their own account. A book that stops arriving is marked
+`access: "lost"` rather than deleted, because a half-failed fetch and a revocation
+look identical.
+
+**A new column `fetchLibrary` selects must degrade when its migration is absent.**
+`chapter_bodies.rev` is asked for, and a 42703 falls back to the shape that worked
+before (`hasRevColumn`, `missingColumn`) — PostgREST refuses the *whole* select
+for one unknown column, so without that the entire library download fails for
+everybody, over a feature they may not use. Same lesson as `pushBook`'s
+`publishing` retry. Errors here are printed field by field via `describe()`: a
+PostgrestError is a plain object and `console.error` renders one as `{}`.
+
+**Read-only has to be true, not merely claimed.** `canWriteBook` gates the
+editor's `editable`, the title input, the chapter sidebar's and book panel's
+controls, and — through `useToolSave` returning `dirty: false` — every tool
+screen's Save bar at once. `saveBody` refuses to write localStorage for a book
+this writer may not write, so a viewer's copy cannot silently diverge from the one
+everybody else sees.
+
+**`docs/checks/collaboration-rls-check.sql` is how this was verified**, and it is
+kept because reading a migration back proves nothing. Two things about running it
+are the trap: the SQL editor connects as `postgres`, which **bypasses RLS** — so a
+policy test means nothing there unless it first does `set local role
+authenticated` and sets `request.jwt.claims`, while trigger tests need no such
+thing because triggers fire for everyone. And a check for surviving old policies
+must be **scoped to the five manuscript tables**: `prefs`, `library_claims` and
+the billing tables keep their `*_owner_*` policies on purpose, so a schema-wide
+scan reports the design as a failure. All of it passed against the live project on
+2026-08-07, injection probe included.
+
+*Not built:* presence, the resolve-a-conflict control, and ownership transfer. The
+conflict guard's *data* half is done (`rev`, a conditional update, and a conflict
+set that stops `applyRemote` overwriting the text it preserved) but nothing yet
+asks the writer which version to keep. See TODO.md, which also records the
+account-deletion hazard: `books.owner` cascades, so deleting an owner deletes the
+book out from under its collaborators.
 
 **Payments are PayHere, and optional in the same way everything else is.** Set
 `PAYHERE_MERCHANT_ID` and `PAYHERE_MERCHANT_SECRET` and the app grows plans;
@@ -983,13 +1141,108 @@ PayHere must be sent **no `recurrence` and no `duration`** or it bills the
 one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
-**What is free is what a book needs to exist and leave.** Unlimited books and
-imports, all four exports, sync, the pre-upload check and the roadmap, comps
-search, blurb, categories, covers, structure, progress, and one book's story
-bible. Pro is the metered routes plus the business layer — money, advance
-readers, the book-three curve, the writing record, the prose report, and the
-*series* read of the bible. Every competitor charges for formatting, which is
-why export is the one thing that must never move.
+**What is free is what a book needs to exist and leave.** Unlimited books, all
+four exports, sync, the pre-upload check and the roadmap, comps search, blurb,
+categories, covers, structure, progress, and one book's story bible. Pro is the
+metered routes plus the business layer — money, advance readers, the book-three
+curve, the writing record, the prose report, and the *series* read of the
+bible. Every competitor charges for formatting, which is why export is the one
+thing that must never move.
+
+**Four things are counted on the free plan, and `src/lib/free-limits.ts` is the
+whole of the policy.** Ten each — **imports**, **comp searches**, **cover
+searches**, **title checks** — and unlimited on Pro. Everything else stays
+unbounded: books, words, all four exports, sync, the check, the roadmap, the
+blurb and category screens. What is counted is the work of somebody with a
+backlist and a listing to build, which is not how a first draft gets written.
+
+Five things in there are load-bearing.
+
+- **Imports count files, not books.** `createBookFromImport` and
+  `importIntoBook` both stamp the tally, because "make an empty book, then
+  import into it" is otherwise one click round it, and a limit with a door open
+  is a number the pricing page cannot honestly print. `undoChapterImport` gives
+  one back, which is what makes counting the second path fair.
+- **A search the app ran is never counted, only one the writer asked for.** The
+  comps screen and the title check both open by searching for the book already
+  on screen; charging for that would spend the ten on ten page loads, which is
+  a limit on *visiting*. So the seed calls the plain search and the button calls
+  the counted one. The covers screen seeds only the box, so every search there
+  is a press.
+- **The tallies live in `prefs.usage`**, not on a book — they are facts about
+  the account, prefs sync as one blob so a second machine does not hand out ten
+  more of each, and a field on the book would have needed a Postgres column to
+  survive `sync.ts` at all. `countUse` / `refundUse` in the store are the only
+  writers; `parseUsage` narrows every value on the way in and carries the
+  original flat `imports` key forward, because a limit that resets itself on an
+  upgrade is not a limit.
+- **The numbers are quoted, never restated.** `FREE_LIMITS` is read by the
+  pricing rows and by every sentence on screen, the same rule the prices follow.
+- **The landing page's hero check counts an import and never refuses one.** A
+  stranger with no account is the worst place in the app to meet a plan limit,
+  and the argument of that page is that a manuscript can be checked before
+  paying.
+
+`src/components/upgrade/free-limit.tsx` is the six screens' shared voice, for
+the reason `ProGate` is one component — and it **escalates in three steps**,
+which is the shape the rest of the trade uses and the part worth keeping:
+
+- **Silence** while there is room. `WARN_WHEN_LEFT` is the rule: a limit nobody
+  has approached is not news, and "0 of 10 used" on a first visit teaches a
+  writer that this is a metered product before they have had a thing out of it.
+  Nothing is hidden by it — the four numbers are on the pricing page and in the
+  Help dialog. A test walks the whole allowance and fails if the line speaks
+  early.
+- **`LeftLine`** in the last three, stating **what is left** rather than what
+  was spent, because the remainder is the number they would otherwise have to
+  work out.
+- **`LimitBanner` and `LimitDialog` on the press that is *refused*** — the
+  eleventh, not the tenth. `useLimitGate` is the whole of that rule and all six
+  screens go through it: the tenth search runs and looks like the nine before
+  it, and only a press with nothing left to spend puts anything on screen.
+  Telling somebody at the moment they are refused is information; telling them
+  at the moment they stop needing it is an advertisement. **It follows that the
+  controls stay live** — a disabled button cannot be pressed an eleventh time,
+  so there would be no moment to answer. A refused press costs nothing. The
+  gate has two doors because the counting happens in two places: `spend()` for
+  the three searches, which count there, and `check()` for the imports, which
+  count inside the store at the funnel every import screen shares.
+- The banner is **filled**: purple-into-indigo gradient, white type, one white
+  button. It
+  was a grey pill first (muted ink at footnote size, so the sentence explaining
+  why the button beside it had gone dark *read* as a footnote), then an
+  accent-tinted card (legible, but at the same volume as the panel it sat on,
+  on a screen made of panels). `LimitNote` is the same fill stacked for the two
+  ~300px editor rails, and `ImportLimitReached` is the panel the two import
+  screens get instead, since there the missing thing is the whole screen.
+
+  **That gradient is the one exception to the palette's hue rule, and it is
+  three tokens wide.** `--color-upgrade-from` / `-to` / `-ink`, stated
+  **identically in both theme blocks** — unlike everything else in the file,
+  because a saturated mid-tone fill carries white type on either ground and a
+  value that need not change should not. It does *not* follow `--color-accent`,
+  for the reason `lp-accent` does not: the accent is #ffffff at night, and this
+  is a fill, so it would put a white slab across a black screen. The text on it
+  is literal `text-white` rather than `accent-ink` for the same reason — ink
+  that inverted on a ground that does not is the one way to get this wrong. The
+  dialog's figure panel and its CTA take the same fill, so the two surfaces
+  read as one thing; nothing else in the chrome may.
+
+**`LimitDialog` fires once, on the press that spends the last one**, and never
+from an effect — an effect watching `blocked` would also fire on arrival for
+somebody who ran out yesterday, which is a paywall shown to a writer who
+pressed nothing. The screens test `allowance.left === 1` at the moment they
+count, which is true only of that press. Inside it: what was reached without
+blaming anybody, four lines of what Pro lifts rather than a table, the price
+read from `plans.ts` so nobody has to leave to find it, a real way out ("Not
+now", Escape, the backdrop, the ×), and a closing line saying what is *not*
+affected — the fear at that moment is that work has been taken away. Its figure
+is a wall of book covers **drawn in markup**, twelve of them so the grid is
+cropped by the panel rather than being a countable nine; spines were tried
+twice and read as a bar chart.
+
+These are browser gates and are honest about it: `/api/comps` stays free and
+keyless, which is the thing that must not change to enforce this server-side.
 
 **The gates are of two kinds and the pricing page's own comment says which.**
 The four metered rows are `requirePro()` on the server, which is the only check
@@ -1205,7 +1458,7 @@ importing an array from a `"use client"` file gets `.map` of a reference object
 and the page 500s.
 
 **Routes:** `/` — landing page for a signed-out visitor, the **dashboard** for a
-writer (five areas, `?area=`), decided on the server off `getClaims()` so
+writer (six areas, `?area=`), decided on the server off `getClaims()` so
 neither sees the other's screen first; with no Supabase configured everyone gets
 the dashboard · `/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
@@ -1214,7 +1467,10 @@ the dashboard · `/signin` · `/signup` · `/forgot-password` ·
 PayHere · `/upgrade/done` PayHere's return_url, which polls ·
 `/book/new` setup · `/book/import` · `/book/[bookId]` book
 overview (lands here, not on a chapter) ·
-`/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view.
+`/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
+`/invite/[token]` the far end of a share link — gated, so by the time anybody is
+there they are signed in, which is what makes the link a pointer rather than a
+credential.
 
 The sixteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`, `title-check` ·

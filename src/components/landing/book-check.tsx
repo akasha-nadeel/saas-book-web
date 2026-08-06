@@ -159,6 +159,14 @@ export function BookCheck() {
    * browser, and the writer needs to be told that here, where the file still
    * is — sending them on would land them signed up, on an empty shelf, with no
    * idea what happened to their novel.
+   *
+   * **The free plan's import limit is counted here but never enforced here.**
+   * `createBookFromImport` stamps the tally like it does anywhere else, so the
+   * book a visitor arrives with is one of their ten. Refusing them at this
+   * card is a different matter: the whole argument of the page is that you can
+   * check a manuscript before paying, and a stranger's browser is the worst
+   * place in the app to meet a plan limit — they have no account for it to be
+   * about. Anyone standing at the limit sees it on the import screens inside.
    */
   const start = async (target: Fix | null) => {
     const book = parsed.current;

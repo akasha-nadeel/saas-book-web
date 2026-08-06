@@ -52,6 +52,34 @@ interface BookRow {
   position: number;
 }
 
+/**
+ * A book row as it comes *back*, which is not the same shape as one going out.
+ *
+ * `updated_at` is set by a trigger, so it is never sent — and it is read for one
+ * purpose. `last_opened_at` on a shared book is the *owner's* stamp: ordering a
+ * collaborator's shelf by it would sort their books by somebody else's reading,
+ * and pin "continue writing" to a book they have never opened. So for a shared
+ * book this writer has not opened here, the fallback is when the manuscript last
+ * moved — a fact about the book rather than about a stranger.
+ */
+interface BookReadRow extends BookRow {
+  updated_at: string;
+}
+
+/**
+ * A membership, as the column grant allows it to be read.
+ *
+ * `token` and `invited_by` are **not** granted to `authenticated` — see the foot
+ * of 20260806000000_collaboration.sql — and PostgREST refuses the whole query if
+ * an ungranted column is asked for. So every read of this table names its
+ * columns; there is no `select("*")` here and there cannot be.
+ */
+interface MemberRow {
+  book_id: string;
+  role: "editor" | "viewer";
+  status: "pending" | "active" | "revoked";
+}
+
 interface ChapterRow {
   id: string;
   book_id: string;
@@ -72,6 +100,13 @@ export interface RemoteLibrary {
   notes: Map<string, string>;
   covers: Map<string, string>;
   prefs: Partial<Prefs> | null;
+  /**
+   * The revision each body was at when it was downloaded, which is what the
+   * conflict guard compares against on the next save. Seeded into `bodyRevs` by
+   * `applyRemote`; without it the first save of the session cannot tell "nobody
+   * has touched this" from "somebody has".
+   */
+  revs: Map<string, number>;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,8 +224,20 @@ function rowToChapter(row: ChapterRow): ChapterMeta {
   return chapter;
 }
 
-/** Every row of a book's chapters, back into the one Book the store expects. */
-function rowsToBook(row: BookRow, chapters: ChapterRow[]): Book {
+/**
+ * Every row of a book's chapters, back into the one Book the store expects.
+ *
+ * `role` is the membership this writer holds, or undefined for their own book.
+ * `mine` is the local copy, if there is one, and it exists for one reason: four
+ * fields on a shared `books` row belong to the *owner* and not to the reader —
+ * see the note on `lastOpenedId` below.
+ */
+function rowsToBook(
+  row: BookReadRow,
+  chapters: ChapterRow[],
+  role?: "editor" | "viewer",
+  mine?: Book,
+): Book {
   const live = chapters
     .filter((c) => c.trashed_at === null)
     .sort((a, b) => a.position - b.position)
@@ -205,9 +252,27 @@ function rowsToBook(row: BookRow, chapters: ChapterRow[]): Book {
     id: row.id,
     title: row.title,
     chapters: live,
-    lastOpenedId: row.last_opened_id,
-    lastOpenedAt: Date.parse(row.last_opened_at),
+    /*
+     * **On a shared book these two are the collaborator's own, not the row's.**
+     * `last_opened_id` and `last_opened_at` are per-writer state that happens to
+     * live on the shared `books` row — which is the whole reason that row stays
+     * owner-only for writes. Reading the owner's values here would put a
+     * co-writer back on whichever chapter the *owner* last had open, and would
+     * pin their shelf's "continue writing" to a book they have never touched.
+     *
+     * So a foreign book keeps whatever this browser already knew, falling back to
+     * when the manuscript last moved rather than to the owner's reading.
+     */
+    lastOpenedId: role ? (mine?.lastOpenedId ?? null) : row.last_opened_id,
+    lastOpenedAt: role
+      ? (mine?.lastOpenedAt ?? Date.parse(row.updated_at))
+      : Date.parse(row.last_opened_at),
   };
+
+  // Always set, so `book.ownerId !== me` is the one test for "somebody else's"
+  // and no caller has to reach for the signed-in id to find out.
+  book.ownerId = row.owner;
+  if (role) book.role = role;
 
   if (row.subtitle) book.subtitle = row.subtitle;
   if (row.author) book.author = row.author;
@@ -245,6 +310,68 @@ export async function currentOwner(): Promise<string | null> {
 }
 
 // ---------------------------------------------------------------------------
+// Reading what went wrong
+//
+// Supabase rejects with a PostgrestError, which is a plain object rather than an
+// Error — and both `console.error` and the dev overlay render one of those as
+// `{}`. A sync that is failing then looks exactly like a sync that is fine, so
+// every log here pulls the fields out by name. `flush` already did this; the
+// pull path did not, and "[sync] could not read library {}" is what that costs.
+// ---------------------------------------------------------------------------
+
+/** The shape Supabase rejects with. Not an Error, which is the whole problem. */
+type Postgrestish = Partial<
+  Record<"message" | "code" | "details" | "hint", string>
+>;
+
+function describe(error: unknown): string {
+  const e = error as Postgrestish | null;
+  if (!e || typeof e !== "object") return String(error);
+  const code = e.code ? ` [${e.code}]` : "";
+  const extra = [e.details, e.hint].filter(Boolean).join(" · ");
+  return `${code} ${e.message ?? "unknown error"}${extra ? ` — ${extra}` : ""}`.trim();
+}
+
+/**
+ * Is this the database telling us a column does not exist yet?
+ *
+ * `42703` is Postgres' undefined_column; `PGRST204` is PostgREST refusing a
+ * *write* naming an unknown column. Both mean the same thing here: a migration
+ * that has not been applied. Matched on the column name too, so an unrelated
+ * schema error is not quietly swallowed as a missing feature.
+ */
+function missingColumn(error: unknown, column: string): boolean {
+  const e = error as Postgrestish | null;
+  if (!e?.code) return false;
+  if (e.code !== "42703" && e.code !== "PGRST204") return false;
+  return new RegExp(`\\b${column}\\b`).test(`${e.message ?? ""}`);
+}
+
+/** So a whole library's worth of rows does not each say the same thing. */
+const warned = new Set<string>();
+function warnOnce(key: string, message: string) {
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(message);
+}
+
+/**
+ * Does this database have the conflict guard's column?
+ *
+ * Optimistic, and corrected by the first download that finds it missing. When it
+ * is false `pushBody` reverts to the plain upsert it always did — last-write-wins
+ * on prose, which is what the app promised before sharing existed.
+ */
+let hasRevColumn = true;
+
+/** A body row, with the guard's revision when the database has one. */
+interface BodyRow {
+  chapter_id: string;
+  doc: unknown;
+  rev?: number;
+}
+
+// ---------------------------------------------------------------------------
 // Pull
 // ---------------------------------------------------------------------------
 
@@ -258,26 +385,139 @@ export async function currentOwner(): Promise<string | null> {
  * Returns null when there is nothing to talk to, which is not an error — an
  * unconfigured or signed-out app runs entirely on localStorage.
  */
-export async function fetchLibrary(): Promise<RemoteLibrary | null> {
+export async function fetchLibrary(local?: Shelf): Promise<RemoteLibrary | null> {
   const owner = await currentOwner();
   if (!owner) return null;
 
   const db = createClient();
 
+  /*
+   * **The memberships come first, and the rest is filtered by them.**
+   *
+   * These six selects used to carry no filter at all and let RLS be the filter,
+   * which was exactly right while every policy was `owner = auth.uid()`: an
+   * indexed comparison against a constant. Sharing adds a second branch, and an
+   * unfiltered select would then ask Postgres to evaluate it for every row of
+   * every writer's chapters on every page load.
+   *
+   * So the filter is stated: own rows by owner, shared rows by the handful of
+   * book ids this writer is actually in. RLS remains the guarantee — it is what
+   * makes a wrong filter safe rather than a leak — but it is no longer the plan.
+   */
+  const membership = await db
+    .from("book_members")
+    .select("book_id, role, status")
+    .eq("user_id", owner)
+    .eq("status", "active");
+
+  if (membership.error) {
+    // Not fatal, and it must not be: a database without the collaboration
+    // migration answers PGRST205 here — PostgREST cannot find the table in its
+    // schema cache — and a writer with no co-writers loses nothing by it. Their
+    // own library still downloads.
+    warnOnce(
+      "book_members",
+      `[sync] no collaboration table yet, so no shared books:${describe(
+        membership.error,
+      )}`,
+    );
+  }
+
+  const roles = new Map<string, "editor" | "viewer">(
+    ((membership.data ?? []) as MemberRow[]).map((m) => [m.book_id, m.role]),
+  );
+  const sharedIds = [...roles.keys()];
+
+  /**
+   * Own rows, plus the shared ones when there are any.
+   *
+   * PostgREST has no OR across two `.eq`/`.in` calls, so the shared half is a
+   * second request rather than a cleverer filter. Two indexed queries beat one
+   * sequential scan, and a writer with no shared books makes no second request
+   * at all.
+   */
+  const mineAndShared = async <T>(
+    table: string,
+    columns: string,
+  ): Promise<{ data: T[]; error: Postgrestish | null }> => {
+    const own = await db.from(table).select(columns).eq("owner", owner);
+    if (own.error) return { data: [], error: own.error };
+    if (sharedIds.length === 0) {
+      return { data: (own.data ?? []) as T[], error: null };
+    }
+    const shared = await db.from(table).select(columns).in("book_id", sharedIds);
+    if (shared.error) return { data: [], error: shared.error };
+    return {
+      data: [...(own.data ?? []), ...(shared.data ?? [])] as T[],
+      error: null,
+    };
+  };
+
   const [books, chapters, bodies, notes, covers, prefs] = await Promise.all([
-    db.from("books").select("*"),
-    db.from("chapters").select("*"),
-    db.from("chapter_bodies").select("chapter_id, doc"),
-    db.from("chapter_notes").select("chapter_id, text"),
-    db.from("book_covers").select("book_id, data_url"),
+    (async () => {
+      const own = await db.from("books").select("*").eq("owner", owner);
+      if (own.error || sharedIds.length === 0) return own;
+      const shared = await db.from("books").select("*").in("id", sharedIds);
+      if (shared.error) return shared;
+      return {
+        data: [...(own.data ?? []), ...(shared.data ?? [])],
+        error: null,
+      };
+    })(),
+    mineAndShared<ChapterRow>("chapters", "*"),
+    /*
+     * **`rev` is asked for, and its absence is survivable.**
+     *
+     * The conflict guard's column arrives with 20260806000000, and a database
+     * that has not had it applied answers 42703 for the *whole select* — which
+     * would take the entire library download with it, on every load, for a
+     * feature the writer may not even be using. That is the same catastrophe
+     * `pushBook` already defends against for the `publishing` column, and the
+     * same answer: ask, and fall back to the shape that worked before.
+     */
+    (async () => {
+      const withRev = await mineAndShared<BodyRow>(
+        "chapter_bodies",
+        "chapter_id, doc, rev",
+      );
+      if (!missingColumn(withRev.error, "rev")) return withRev;
+
+      warnOnce(
+        "rev",
+        "[sync] chapter_bodies has no `rev` column, so two writers in one " +
+          "chapter still resolve last-write-wins rather than being warned. " +
+          "Everything else is syncing normally. Apply " +
+          "supabase/migrations/20260806000000_collaboration.sql.",
+      );
+      hasRevColumn = false;
+      return mineAndShared<BodyRow>("chapter_bodies", "chapter_id, doc");
+    })(),
+    mineAndShared<{ chapter_id: string; text: string }>(
+      "chapter_notes",
+      "chapter_id, text",
+    ),
+    mineAndShared<{ book_id: string; data_url: string }>(
+      "book_covers",
+      "book_id, data_url",
+    ),
     db.from("prefs").select("data").maybeSingle(),
   ]);
 
-  const failure = [books, chapters, bodies, notes, covers, prefs].find(
-    (r) => r.error,
-  );
-  if (failure?.error) {
-    console.error("[sync] could not read library", failure.error);
+  const named: [string, { error: unknown }][] = [
+    ["books", books],
+    ["chapters", chapters],
+    ["bodies", bodies],
+    ["notes", notes],
+    ["covers", covers],
+    ["prefs", prefs],
+  ];
+  const failure = named.find(([, r]) => r.error);
+  if (failure) {
+    // Which table, and what it actually said. Both were missing before: the
+    // whole download failing with `{}` gives nobody anywhere to start.
+    console.error(
+      `[sync] could not read ${failure[0]}:${describe(failure[1].error)}`,
+    );
     return null;
   }
 
@@ -289,45 +529,77 @@ export async function fetchLibrary(): Promise<RemoteLibrary | null> {
     else byBook.set(row.book_id, [row]);
   }
 
-  const bookRows = ((books.data ?? []) as BookRow[]).sort(
+  const bookRows = ((books.data ?? []) as BookReadRow[]).sort(
     (a, b) => a.position - b.position,
   );
 
+  const localBooks = new Map((local?.books ?? []).map((b) => [b.id, b]));
+
   return {
     shelf: {
-      books: bookRows.map((row) => rowsToBook(row, byBook.get(row.id) ?? [])),
+      books: bookRows.map((row) =>
+        rowsToBook(
+          row,
+          byBook.get(row.id) ?? [],
+          roles.get(row.id),
+          localBooks.get(row.id),
+        ),
+      ),
       // Derived rather than stored: the most recently opened book is already
       // recorded per book, so a separate field could only disagree with it.
-      lastOpenedBookId: mostRecentlyOpened(bookRows),
+      lastOpenedBookId: mostRecentlyOpened(bookRows, owner, localBooks),
     },
     bodies: new Map(
-      (bodies.data ?? []).map((r) => [
-        r.chapter_id as string,
-        JSON.stringify(r.doc),
-      ]),
+      (bodies.data ?? []).map((r) => [r.chapter_id, JSON.stringify(r.doc)]),
     ),
-    notes: new Map(
-      (notes.data ?? []).map((r) => [r.chapter_id as string, r.text as string]),
+    // Empty when the database has no `rev` column, rather than a map of noughts:
+    // a seeded rev that does not exist on the server is worse than no rev at all,
+    // because it looks like knowledge.
+    revs: new Map(
+      hasRevColumn
+        ? (bodies.data ?? [])
+            .filter((r) => typeof r.rev === "number")
+            .map((r) => [r.chapter_id, count(r.rev)] as [string, number])
+        : [],
     ),
-    covers: new Map(
-      (covers.data ?? []).map((r) => [
-        r.book_id as string,
-        r.data_url as string,
-      ]),
-    ),
+    notes: new Map((notes.data ?? []).map((r) => [r.chapter_id, r.text])),
+    covers: new Map((covers.data ?? []).map((r) => [r.book_id, r.data_url])),
     prefs: (prefs.data?.data as Partial<Prefs> | undefined) ?? null,
   };
 }
 
-function mostRecentlyOpened(rows: BookRow[]): string | null {
-  let best: BookRow | null = null;
+/**
+ * Which book to open on arrival.
+ *
+ * **Shared books are judged by this writer's own history, never by the row's.**
+ * `last_opened_at` on somebody else's book is *their* stamp, so an active
+ * co-author would otherwise pin their collaborator's "continue writing" to the
+ * shared book permanently — and open it at whichever chapter the owner was in.
+ * A shared book the reader has never opened has no claim on this at all.
+ */
+function mostRecentlyOpened(
+  rows: BookReadRow[],
+  owner: string,
+  localBooks: Map<string, Book>,
+): string | null {
+  let bestId: string | null = null;
+  let bestAt = -Infinity;
+
   for (const row of rows) {
     if (row.trashed_at || row.archived_at) continue;
-    if (!best || Date.parse(row.last_opened_at) > Date.parse(best.last_opened_at)) {
-      best = row;
+
+    const mine = row.owner === owner;
+    const at = mine
+      ? Date.parse(row.last_opened_at)
+      : (localBooks.get(row.id)?.lastOpenedAt ?? Number.NaN);
+
+    if (!Number.isFinite(at)) continue; // never opened here
+    if (at > bestAt) {
+      bestAt = at;
+      bestId = row.id;
     }
   }
-  return best?.id ?? null;
+  return bestId;
 }
 
 // ---------------------------------------------------------------------------
@@ -385,7 +657,21 @@ export async function uploadLibrary(
   const bookRows: BookRow[] = [];
   const chapterRows: ChapterRow[] = [];
 
-  shelf.books.forEach((book, index) => {
+  /*
+   * **Only this writer's own books, and this filter is load-bearing.**
+   *
+   * A collaborator's shelf holds shared books, and uploading one would try to
+   * upsert it with `owner` set to *them* — an attempt to take somebody else's
+   * manuscript. It fails, because `books_update` is owner-only, and the failure
+   * is worse than harmless: `uploadLibrary` returns false, and every caller
+   * treats that as "do not apply the download". So an invited collaborator's sync
+   * stops working entirely, permanently, from their second load onward.
+   *
+   * Absence of `ownerId` means the book is theirs — a book made offline has none.
+   */
+  const own = shelf.books.filter((b) => !b.ownerId || b.ownerId === owner);
+
+  own.forEach((book, index) => {
     bookRows.push(bookToRow(book, owner, index));
     book.chapters.forEach((chapter, position) => {
       chapterRows.push(chapterToRow(chapter, book.id, owner, position));
@@ -406,13 +692,18 @@ export async function uploadLibrary(
    * rewrites ago. Each is a foreign key the database will refuse, and one
    * refusal takes the whole batch with it. They are dropped rather than
    * repaired: a body with no chapter has nothing to be attached to.
+   *
+   * Derived from `own` rather than from `shelf.books`, for the same reason the
+   * book rows are: a shared book's prose must not ride along, or the batch
+   * carries rows the writer has no right to insert and the whole upload is
+   * refused.
    */
   const liveChapters = new Set<string>();
-  for (const book of shelf.books) {
+  for (const book of own) {
     for (const c of book.chapters) liveChapters.add(c.id);
     for (const c of book.trash ?? []) liveChapters.add(c.id);
   }
-  const liveBooks = new Set(shelf.books.map((b) => b.id));
+  const liveBooks = new Set(own.map((b) => b.id));
 
   const bodyRows = [...bodies]
     .filter(([chapterId]) => liveChapters.has(chapterId))
@@ -536,6 +827,21 @@ function enqueue(key: string, job: Job) {
   flushTimer = setTimeout(flush, FLUSH_MS);
 }
 
+/**
+ * Marks a refusal as a refusal, and tells the store.
+ *
+ * `42501` is Postgres declining the row under RLS; `PGRST301` is PostgREST
+ * declining the request. Under collaboration either one has a specific meaning
+ * that did not exist before — **access was taken away while this tab was open** —
+ * and it is the one sync failure a writer has to be shown rather than left to
+ * find in a console. Returns the error so a caller can `throw denied(...)` and
+ * keep the existing logging.
+ */
+function denied<E extends { code?: string }>(error: E, table: string): E {
+  if (error.code === "42501" || error.code === "PGRST301") onDenied?.(table);
+  return error;
+}
+
 async function flush() {
   flushTimer = null;
   const jobs = [...pending.values()];
@@ -572,11 +878,127 @@ export function flushNow() {
 /** So a whole library's worth of books does not each say the same thing. */
 let warnedMissingPublishing = false;
 
-export function pushBook(book: Book, position: number) {
+/**
+ * The revision each chapter body was at when this browser last saw it.
+ *
+ * Module-level rather than captured in the job, because `enqueue` coalesces by
+ * key: a rev read when the job was queued is the wrong one by the time it runs,
+ * three saves later. The job reads it at execution time and writes back what the
+ * server returned — the trigger bumps `rev` on our *own* successful push, so a
+ * client that did not re-read it would report a conflict against itself on every
+ * save after the first.
+ */
+const bodyRevs = new Map<string, number>();
+
+/** Seeded by `applyRemote` from what the download carried. */
+export function seedBodyRevs(revs: Map<string, number>) {
+  for (const [chapterId, rev] of revs) bodyRevs.set(chapterId, rev);
+}
+
+/** Forgotten when the local library is cleared, or the next save is a conflict. */
+export function forgetBodyRevs() {
+  bodyRevs.clear();
+}
+
+/**
+ * Somebody else moved this chapter's text; ours was not sent.
+ *
+ * The store subscribes so it can keep the local copy and say so. Set rather than
+ * thrown because a conflict is not a failure — it is the guard doing its job, and
+ * `flush`'s error path would log it as a broken sync.
+ */
+let onConflict: ((chapterId: string) => void) | null = null;
+export function setConflictHandler(fn: (chapterId: string) => void) {
+  onConflict = fn;
+}
+
+/**
+ * A write this writer is no longer allowed to make.
+ *
+ * `42501` is Postgres refusing the row; `PGRST301` is PostgREST refusing the
+ * request. Either means access was revoked while the tab was open, which the
+ * writer has to be told — the alternative is a console line nobody reads and a
+ * manuscript that quietly stops saving.
+ */
+let onDenied: ((table: string) => void) | null = null;
+export function setDeniedHandler(fn: (table: string) => void) {
+  onDenied = fn;
+}
+
+/**
+ * Who owns this book, for a push.
+ *
+ * A book with no `ownerId` is one this browser made, so it belongs to whoever is
+ * signed in. A book *with* one keeps it — which is the whole of not stealing
+ * somebody else's manuscript, since every child row's `owner` used to come from
+ * `currentOwner()`. The database no longer trusts this value either (a trigger
+ * derives it), but sending the right one keeps the two halves saying the same
+ * thing.
+ */
+async function ownerOf(book: Book): Promise<string | null> {
+  return book.ownerId ?? (await currentOwner());
+}
+
+/**
+ * Rows for a book's chapters, live and trashed, in one list.
+ *
+ * `positions` come from the full list before any filtering, so a row that survives
+ * the `changed` filter still says where it really sits in the book.
+ */
+function chapterRowsOf(
+  book: Book,
+  owner: string,
+  changed?: Set<string>,
+): ChapterRow[] {
+  const rows = [
+    ...book.chapters.map((c, i) => chapterToRow(c, book.id, owner, i)),
+    ...(book.trash ?? []).map((c, i) =>
+      chapterToRow(c, book.id, owner, i, c.trashedAt),
+    ),
+  ];
+  return changed ? rows.filter((r) => changed.has(r.id)) : rows;
+}
+
+/**
+ * @param changed Which chapter ids actually differ from the last push, or
+ *   undefined when there is no baseline to compare against and everything must
+ *   go. **Sending only these is what keeps two writers from reverting each
+ *   other** — see `changedChapterIds` in the store for the whole reasoning.
+ *   Positions are still taken from the full list, so a filtered row carries its
+ *   real place in the book rather than its index in the subset.
+ */
+export function pushBook(
+  book: Book,
+  position: number,
+  changed?: Set<string>,
+) {
   enqueue(`book:${book.id}`, async () => {
-    const owner = await currentOwner();
+    const owner = await ownerOf(book);
     if (!owner) return;
+    const me = await currentOwner();
     const db = createClient();
+
+    /*
+     * **A book somebody else owns: the chapter list only.**
+     *
+     * The `books` row carries the book's identity, its cover flag, its page
+     * setup, its listing details — and `last_opened_*`, which is per-writer. It
+     * is owner-only in the schema, so pushing it as a collaborator is a request
+     * that will be refused; and it *should* be refused, because a co-writer's
+     * reading position is not a fact about the owner's book.
+     *
+     * A viewer pushes nothing at all. The database would refuse them anyway; not
+     * asking is what keeps a read-only session from filling the console with
+     * denials on every keystroke.
+     */
+    if (book.role === "viewer") return;
+    if (book.ownerId && me && book.ownerId !== me) {
+      const rows = chapterRowsOf(book, owner, changed);
+      if (rows.length === 0) return;
+      const { error } = await db.from("chapters").upsert(rows);
+      if (error) throw denied(error, "chapters");
+      return;
+    }
 
     const row = bookToRow(book, owner, position);
     const { error } = await db.from("books").upsert(row);
@@ -613,27 +1035,125 @@ export function pushBook(book: Book, position: number) {
     // The chapter list is part of the book as far as the store is concerned —
     // a reorder is a change to the book, not to each chapter — so it goes up
     // with it rather than as a separate call that could land out of order.
-    const rows = [
-      ...book.chapters.map((c, i) => chapterToRow(c, book.id, owner, i)),
-      ...(book.trash ?? []).map((c, i) =>
-        chapterToRow(c, book.id, owner, i, c.trashedAt),
-      ),
-    ];
+    //
+    // The *owner's* push may still send the whole list: nobody else's copy of
+    // their book can be stale in a way that matters, because they are the only
+    // one who may write this row. `pushShelfDiff` sends only the changed rows for
+    // a shared book — see the note there.
+    const rows = chapterRowsOf(book, owner, changed);
     if (rows.length === 0) return;
     const { error: chapterError } = await db.from("chapters").upsert(rows);
-    if (chapterError) throw chapterError;
+    if (chapterError) throw denied(chapterError, "chapters");
   });
 }
 
+/**
+ * Prose, and the one guard that keeps two writers from overwriting each other.
+ *
+ * **A conditional update, not an upsert.** The row carries a `rev` the trigger
+ * bumps on every write, so sending the rev we last saw makes the update match
+ * nothing when somebody else has written since. Zero rows affected is the whole
+ * signal: the local text is kept, the store is told, and the writer is asked
+ * rather than having their paragraph replaced by somebody else's.
+ *
+ * Three things that make this correct rather than nearly correct:
+ *
+ * - **`.select()` is required.** PostgREST returns no rows from an `update`
+ *   unless you ask, so without it every push looks like a conflict.
+ * - **The returned rev is written back**, because the trigger bumped it for *us*
+ *   too. A client that skipped this would conflict with itself on the second
+ *   save of every session.
+ * - **A rev we do not have means insert**, which is a chapter whose body has never
+ *   been sent. A duplicate key there is somebody else having got in first, so it
+ *   is a conflict like any other.
+ *
+ * `owner` is not sent at all any more: the trigger derives it from the book, and
+ * sending a value the database ignores is a lie about who decides.
+ */
 export function pushBody(chapterId: string, raw: string) {
   enqueue(`body:${chapterId}`, async () => {
-    const owner = await currentOwner();
-    if (!owner) return;
-    const { error } = await createClient()
+    const doc = safeParse(raw);
+    if (doc === null) return; // NOT NULL, and unreadable text is not worth sending
+    const db = createClient();
+
+    /*
+     * **No column, no guard, and the old behaviour exactly.**
+     *
+     * A database without 20260806000000 has nothing to compare against, so prose
+     * resolves last-write-wins as it always did. Saying so once is better than
+     * failing every save, and better than pretending to a guard that is not there.
+     */
+    if (!hasRevColumn) {
+      const { error } = await db
+        .from("chapter_bodies")
+        .upsert({ chapter_id: chapterId, owner: await currentOwner(), doc });
+      if (error) throw denied(error, "chapter_bodies");
+      return;
+    }
+
+    /*
+     * A chapter whose revision we have never seen. Read it rather than guessing:
+     * inserting and treating the duplicate-key as a conflict was wrong, because
+     * "this body exists on the server and was not in our download" is not the same
+     * thing as "somebody edited it while we were typing" — and reporting the
+     * second when it was the first puts a conflict banner on a chapter nobody
+     * else has touched.
+     */
+    let seen = bodyRevs.get(chapterId);
+    if (seen === undefined) {
+      const { data, error } = await db
+        .from("chapter_bodies")
+        .select("rev")
+        .eq("chapter_id", chapterId)
+        .maybeSingle();
+
+      if (error) {
+        if (missingColumn(error, "rev")) {
+          hasRevColumn = false;
+          return pushBody(chapterId, raw); // once more, down the plain path
+        }
+        throw denied(error, "chapter_bodies");
+      }
+      if (data) {
+        seen = count(data.rev);
+        bodyRevs.set(chapterId, seen);
+      }
+    }
+
+    // Still nothing: the server has no body for this chapter, so this is the
+    // first save of a new one.
+    if (seen === undefined) {
+      const { data, error } = await db
+        .from("chapter_bodies")
+        .insert({ chapter_id: chapterId, doc })
+        .select("rev")
+        .maybeSingle();
+      // 23505 means somebody inserted between our read and our write, which is
+      // the race the guard is for.
+      if (error?.code === "23505") return conflict(chapterId);
+      if (error) throw denied(error, "chapter_bodies");
+      if (data) bodyRevs.set(chapterId, count(data.rev));
+      return;
+    }
+
+    const { data, error } = await db
       .from("chapter_bodies")
-      .upsert({ chapter_id: chapterId, owner, doc: safeParse(raw) });
-    if (error) throw error;
+      .update({ doc })
+      .eq("chapter_id", chapterId)
+      .eq("rev", seen)
+      .select("rev")
+      .maybeSingle();
+
+    if (error) throw denied(error, "chapter_bodies");
+    // Zero rows and no error: the rev moved, so somebody else wrote this chapter.
+    if (data === null) return conflict(chapterId);
+    bodyRevs.set(chapterId, count(data.rev));
   });
+}
+
+/** Kept out of `flush`'s error path: a conflict is the guard working, not a fault. */
+function conflict(chapterId: string) {
+  onConflict?.(chapterId);
 }
 
 export function pushNotes(chapterId: string, text: string) {
@@ -642,8 +1162,19 @@ export function pushNotes(chapterId: string, text: string) {
     if (!owner) return;
     const { error } = await createClient()
       .from("chapter_notes")
+      /*
+       * `owner` is still sent, even though a trigger now derives it.
+       *
+       * The column is NOT NULL, and the trigger arrives with
+       * 20260806000000 — so a database without that migration would refuse a row
+       * that omitted it. Where the trigger *does* exist it overwrites this with
+       * the book's owner, which is what stops a note on a shared chapter being
+       * filed under whoever typed it. Sending the signed-in writer is right in
+       * the only case that can reach here without a trigger: an unshared chapter,
+       * because sharing cannot exist before the migration that creates it.
+       */
       .upsert({ chapter_id: chapterId, owner, text });
-    if (error) throw error;
+    if (error) throw denied(error, "chapter_notes");
   });
 }
 
@@ -655,10 +1186,13 @@ export function pushCover(bookId: string, dataUrl: string | null) {
     const { error } =
       dataUrl === null
         ? await db.from("book_covers").delete().eq("book_id", bookId)
+        // `owner` sent for the reason given in `pushNotes`: NOT NULL, and the
+        // trigger that would derive it does not exist before 20260806000000. A
+        // cover is owner-only either way.
         : await db
             .from("book_covers")
             .upsert({ book_id: bookId, owner, data_url: dataUrl });
-    if (error) throw error;
+    if (error) throw denied(error, "book_covers");
   });
 }
 
@@ -688,12 +1222,23 @@ export function pushBookDeleted(bookId: string) {
   });
 }
 
+/**
+ * A chapter gone for good — emptied from the trash, or never trashed at all.
+ *
+ * **Only for a book this writer owns**, and the caller is what enforces it (see
+ * `pushShelfDiff`). An editor has no DELETE on `chapters` by design: their delete
+ * is `trashed_at`, an update, so a restore stays lossless. A hard delete cascades
+ * to the prose and the notes, and this call is made from a *local* diff — so any
+ * local shelf that lost a chapter for any reason, a quota-truncated download
+ * included, would become a delete statement against somebody else's manuscript.
+ */
 export function pushChapterDeleted(chapterId: string) {
   enqueue(`chapter:${chapterId}`, async () => {
     const { error } = await createClient()
       .from("chapters")
       .delete()
       .eq("id", chapterId);
-    if (error) throw error;
+    if (error) throw denied(error, "chapters");
+    bodyRevs.delete(chapterId);
   });
 }

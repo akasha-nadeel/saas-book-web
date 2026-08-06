@@ -126,7 +126,6 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
           book={book}
           tool="Blurb"
           title="What goes on the back cover?"
-          width="5xl"
         >
           {/* **The problem before the definition**, and the refusal before the
               feature. Every shop makes a writer supply this before it will
@@ -155,7 +154,7 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
           shrinking editor inside the panel and squeezed both into columns too
           narrow to use. A container query asks the only question that matters
           here: how much room does this actually have? */}
-      <div className="@container mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="@container mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
 
         {/* `ToolHeader` is suppressed in the roadmap's panel and it was the

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { relativeTime } from "@/lib/relative-time";
+import { relativeTime, timeUntil } from "@/lib/relative-time";
 
 const NOW = Date.UTC(2026, 6, 21, 12, 0, 0);
 const ago = (ms: number) => relativeTime(NOW - ms, NOW);
@@ -51,4 +51,45 @@ it("rounds down rather than up", () => {
 it("does not fall off the end at unit boundaries", () => {
   expect(ago(59 * MINUTE)).toBe("59 minutes ago");
   expect(ago(23 * HOUR)).toBe("23 hours ago");
+});
+
+// ---------------------------------------------------------------------------
+// The other direction
+// ---------------------------------------------------------------------------
+
+const until = (ms: number) => timeUntil(NOW + ms, NOW);
+
+/*
+ * The one not to "fix". `relativeTime` answers "just now" for anything under a
+ * minute *elapsed*, and a future stamp has a negative elapsed — so a pending
+ * invitation with a fortnight left read "expires just now". That is the kind of
+ * wrong that looks like a bug in the invitation rather than in the clock.
+ */
+it("counts forwards rather than saying just now", () => {
+  expect(until(14 * DAY)).not.toBe("just now");
+  expect(until(3 * DAY)).toBe("in 3 days");
+});
+
+it("says a deadline already past is now, not a countdown backwards", () => {
+  expect(until(0)).toBe("now");
+  expect(until(-5 * DAY)).toBe("now");
+});
+
+it("rounds up, because the conservative answer is the useful one on a deadline", () => {
+  // 13 days and 4 hours: flooring says 13, which promises time that is not there.
+  expect(until(13 * DAY + 4 * HOUR)).toBe("in 2 weeks");
+  expect(until(90 * MINUTE)).toBe("in 2 hours");
+});
+
+it("uses the words English has for a single unit", () => {
+  expect(until(DAY)).toBe("tomorrow");
+  // And note how that interacts with rounding up: 25 hours is *not* tomorrow,
+  // because ceiling it lands on two days. Deliberate — the alternative promises
+  // a deadline more time than it has.
+  expect(until(25 * HOUR)).toBe("in 2 days");
+});
+
+it("does not fall off the end at unit boundaries", () => {
+  expect(until(59 * MINUTE)).toBe("in 59 minutes");
+  expect(until(23 * HOUR)).toBe("in 23 hours");
 });

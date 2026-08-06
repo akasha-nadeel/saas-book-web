@@ -9,7 +9,13 @@ import { Spinner } from "@/components/ui/spinner";
 import type { CompTitle } from "@/lib/comps/comps";
 import { findClashes, type TitleClash } from "@/lib/comps/title-check";
 import { ToolStepDone } from "@/components/ui/tool-save";
-import { findBook } from "@/lib/library-store";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
+import { findBook, setBookDetails } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
@@ -37,7 +43,6 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   const [title, setTitle] = useState("");
   const [clashes, setClashes] = useState<TitleClash[] | null>(null);
   /** How many records the two catalogues actually handed over. */
-  const [fetched, setFetched] = useState(0);
   /**
    * Which catalogues answered.
    *
@@ -73,11 +78,6 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
    * reader it is stale.
    */
   const [checked, setChecked] = useState<string | null>(null);
-  /**
-   * How many the catalogue says exist under that name, against the handful it
-   * handed over. Without it the count below reads as a count of the world.
-   */
-  const [reported, setReported] = useState<number | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );
@@ -106,21 +106,42 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   useEffect(() => {
     if (askedShelf.current || title.trim() !== "" || !book?.genre) return;
     askedShelf.current = true;
-    void fetch(
-      `/api/comps?q=${encodeURIComponent(`subject:"${book.genre}"`)}`,
-    )
+    void fetch(`/api/comps?q=${encodeURIComponent(`subject:"${book.genre}"`)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         // The search returns fifty-odd; this takes most of them. It is a
         // shelf to browse rather than a figure to read, so the useful amount
         // is however many fit without the page becoming a scroll.
-        if (data) setGenreShelf(((data.books ?? []) as CompTitle[]).slice(0, 32));
+        if (data)
+          setGenreShelf(((data.books ?? []) as CompTitle[]).slice(0, 32));
       })
       .catch(() => {
         // A shelf that will not load leaves the space as it was. Nothing on
         // this screen depends on it.
       });
   }, [title, book?.genre]);
+
+  /**
+   * The free plan's ten title checks.
+   *
+   * **The book's own title is checked free, every time.** The seed below is the
+   * answer this screen exists to give about *this* book, and charging for it
+   * would spend the ten on ten visits — a limit on arriving rather than on
+   * checking. What is counted is a title the writer typed and pressed for,
+   * which is the part that turns this into a naming tool.
+   */
+  const gate = useLimitGate("titleChecks");
+  const checks = gate.allowance;
+  /**
+   * The title whose finding has been closed.
+   *
+   * The title rather than a boolean, so closing one does not silence the next:
+   * a new check writes a new `checked`, which no longer matches this, and the
+   * banner comes back on its own.
+   */
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  /** So "Try another" can leave the caret where the next title goes. */
+  const fieldRef = useRef<HTMLInputElement>(null);
 
   const seeded = useRef(false);
   useEffect(() => {
@@ -159,11 +180,9 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
         return;
       }
       setClashes(findClashes(candidate, (data.books ?? []) as CompTitle[]));
-      setFetched((data.books ?? []).length);
       setSources(
         data.sources && typeof data.sources === "object" ? data.sources : null,
       );
-      setReported(typeof data.reported === "number" ? data.reported : null);
       setChecked(candidate.trim());
       setState("done");
     } catch {
@@ -176,7 +195,11 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   // over half the window with a logo, so an embedded tool waits silently —
   // see `Pending` in `roadmap/step-panel.tsx`.
   if (!hydrated)
-    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
+    return embedded ? (
+      <div className={toolShell(embedded)} />
+    ) : (
+      <LoadingScreen />
+    );
 
   if (!book) {
     return (
@@ -198,7 +221,22 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
    * title brings the answer back instead of demanding another search — and so
    * a stray keypress does not throw away a result the writer is reading.
    */
-  const answered = state === "done" && checked !== null && title.trim() === checked;
+  const answered =
+    state === "done" && checked !== null && title.trim() === checked;
+
+  /**
+   * Whether the box is standing in for an answer with the genre's shelf.
+   *
+   * One flag because the heading, the note and the covers have to appear and
+   * disappear together — they were two `&&` chains in two places before the
+   * heading moved to the top of the box, which is one edit away from a box
+   * titled after a shelf it is not showing.
+   */
+  /** Whether the checked title is the one the book already carries. */
+  const isOwnTitle = (checked ?? "").trim() === book?.title.trim();
+
+  const showShelf =
+    !answered && !error && state !== "loading" && genreShelf.length > 0;
 
   return (
     <div className={toolShell(embedded)}>
@@ -208,11 +246,16 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
           tool="Title check"
           title="Is this title taken?"
           width="7xl"
+          /* Across the page, and shortened to earn it — the same trade the
+             comps deck makes. "Strictly" and the aside about trademarks were
+             three lines in a narrow column beside an empty half-header; the
+             point survives in one. */
+          deckWidth="full"
           action={<ToolStepDone state={save} />}
         >
-          Strictly, no title is taken — titles are not trademarks and cannot be
-          copyrighted. The useful question is whether somebody else&rsquo;s book
-          turns up first when a reader searches for yours.
+          No title is taken — titles cannot be copyrighted. The useful question
+          is whether somebody else&rsquo;s book turns up first when a reader
+          searches for yours.
         </ToolHeader>
       )}
 
@@ -228,149 +271,208 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
             <p className="max-w-2xl text-sm text-muted">
               {/* Explicit space: the one after `</em>` is swallowed when the
                   line wraps, which set this as "taken— titles". */}
-              No title is <em>taken</em>{" "}
-              &mdash; titles cannot be copyrighted. The useful question is
-              whether somebody else&rsquo;s book turns up first when a reader
-              searches for yours.
+              No title is <em>taken</em> &mdash; titles cannot be copyrighted.
+              The useful question is whether somebody else&rsquo;s book turns up
+              first when a reader searches for yours.
             </p>
             <ToolStepDone state={save} />
           </div>
         )}
-        <form
-          className="mt-6 flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void check(title);
-          }}
-        >
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="A title you are considering"
-            aria-label="Title to check"
-            className="min-w-[14rem] flex-1 rounded-lg border border-line bg-panel px-4 py-2.5
-                       text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-          />
-          <button
-            type="submit"
-            disabled={state === "loading" || title.trim().length < 2}
-            className="flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5
-                       font-semibold text-accent-ink disabled:opacity-50"
+        {/* ---- One box: the shelf's name, the search, and what it finds ---
+
+            The three were loose on the band — a field, a caption, a paragraph
+            explaining what the field would do, then a heading and a shelf —
+            so nothing said where the control ended and the answer began. In a
+            box they read as one instrument, which is what the comps screen
+            does with its own search.
+
+            **The shelf's heading sits above the search rather than under it.**
+            While nothing has been checked, the covers below *are* the page,
+            and the field is the thing you use on them; naming them first and
+            putting the control under that name is the order the eye wants.
+            Once there is an answer the heading is gone and the box opens on
+            the field, which is then the only thing above the finding. */}
+        <section className="mt-6 rounded-2xl border border-line bg-panel p-5 @2xl:p-6">
+          {showShelf && (
+            <>
+              {/* The same two lines the shelf used to carry under it, now at
+                  the top of the box it lives in. */}
+              <h2 className="text-2xl font-bold tracking-tight text-fg">
+                Titles on the {book.genre?.toLowerCase()} shelf
+                <span className="ml-3 text-lg font-normal text-muted">
+                  {genreShelf.length}
+                </span>
+              </h2>
+              <p className="mt-1 mb-4 max-w-prose text-sm text-muted">
+                Not a check — just what the books beside yours are called, while
+                you decide.
+              </p>
+            </>
+          )}
+
+          <form
+            className="flex flex-wrap gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              // Refused rather than disabled — the eleventh press is what
+              // puts the banner and the dialog on screen.
+              if (!gate.spend()) return;
+              void check(title);
+            }}
           >
-            {state === "loading" && <Spinner className="h-4 w-4" />}
-            {state === "loading" ? "Looking…" : "Check it"}
-          </button>
-        </form>
-        <p className="mt-2 text-xs text-muted">
-          Try any title, not just this book&rsquo;s — nothing here is saved.
-        </p>
-
-        {error && (
-          <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-            {error}
-          </p>
-        )}
-
-        {/* What pressing the button will show, before it has been pressed.
-        
-            The screen was a box, a caveat and half a page of nothing — and the
-            caveat was written to be read *beside results*, so arriving at it
-            cold explained a judgement the writer had not been given yet. */}
-        {!answered && !error && state !== "loading" && (
-          <>
-            <p className="mt-6 max-w-prose text-sm text-muted">
-              Type a title and press Check it. What comes back is every book
-              already published under that name, from Google Books and Open
-              Library, with the year and author so you can see who you would be
-              standing next to.
-            </p>
-
-            {genreShelf.length > 0 && (
-              <Shelf
-                heading={`Titles on the ${book.genre?.toLowerCase()} shelf`}
-                books={genreShelf}
-                note="Not a check — just what the books beside yours are called, while you decide."
-              />
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="A title you are considering"
+              aria-label="Title to check"
+              className="min-w-[14rem] flex-1 rounded-lg border border-line bg-panel px-4 py-2.5
+                         text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+            />
+            <button
+              type="submit"
+              // Never disabled by the limit: an eleventh press is the only
+              // moment there is anything to say about it.
+              disabled={state === "loading" || title.trim().length < 2}
+              className="flex items-center justify-center gap-2 rounded-lg bg-accent px-5 py-2.5
+                         font-semibold text-accent-ink disabled:opacity-50"
+            >
+              {state === "loading" && <Spinner className="h-4 w-4" />}
+              {state === "loading" ? "Looking…" : "Check it"}
+            </button>
+          </form>
+          {answered &&
+            clashes &&
+            sources &&
+            (sources.google || sources.openLibrary) &&
+            dismissed !== checked &&
+            /* Not while the plan is spent: the upgrade banner is standing in
+               that space and two filled bars stacked read as one thing said
+               twice. The covers underneath still carry the finding. */
+            !checks.blocked && (
+              <VerdictBanner
+                tone={verdictLine(clashes).tone}
+                /* **Only on the amber one.** A finding of "nothing uses this
+                   name" leaves nothing to decide — a pair of buttons under it
+                   would be asking a question that has already been answered.
+                   The decision belongs to the banner that raises a problem. */
+                actions={
+                  verdictLine(clashes).tone !== "note" ? null : (
+                    <VerdictActions
+                      tone={verdictLine(clashes).tone}
+                      primary={isOwnTitle ? "Try another" : "Use this title"}
+                      onPrimary={() => {
+                        if (isOwnTitle) {
+                          setTitle("");
+                          fieldRef.current?.focus();
+                          return;
+                        }
+                        setBookDetails(book.id, {
+                          title: checked ?? "",
+                          // Handed back unchanged: this setter clears any field
+                          // it is not given, so renaming here would quietly drop
+                          // the subtitle, the byline and the genre.
+                          subtitle: book.subtitle ?? "",
+                          author: book.author ?? "",
+                          genre: book.genre,
+                        });
+                      }}
+                      secondary={
+                        isOwnTitle ? "Keep it" : `Keep “${book.title}”`
+                      }
+                      onSecondary={() => {
+                        if (!isOwnTitle) setTitle(book.title);
+                        setDismissed(checked);
+                      }}
+                    />
+                  )
+                }
+              >
+                {verdictLine(clashes).headline}
+              </VerdictBanner>
             )}
-          </>
-        )}
 
-        {/* **The blank page was the bug, not the missing spinner.**
+          <LeftPill allowance={checks} className="mt-3" />
+          <LimitBanner allowance={checks} className="mt-4" />
 
-            A control that says it is busy tells the reader their press landed.
-            It does not tell them anything about the wait, and everything below
-            the box vanished while the request was out — which on a screen that
-            had just been full of covers reads as the results being *cleared*
-            rather than replaced.
-
-            So the space keeps the shape it is about to hold: a heading and a
-            grid of cover-shaped blocks, at the same size and gap as the real
-            ones, so nothing moves when they arrive. */}
-        {state === "loading" && (
-          <section className="mt-8" aria-hidden>
-            <div className="animate-pulse rounded-xl border border-line bg-panel px-5 py-4">
-              <div className="h-5 w-2/5 rounded bg-raised" />
-              <div className="mt-3 h-3 w-4/5 rounded bg-raised" />
-              <div className="mt-2 h-3 w-3/5 rounded bg-raised" />
-            </div>
-
-            <div className="mt-8 h-4 w-40 animate-pulse rounded bg-raised" />
-
-            {/* The same track rule as the real shelf, or the page jumps
-                when the covers land. */}
-            <ul className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(8.5rem,13rem))] justify-start gap-x-4 gap-y-6">
-              {Array.from({ length: 16 }, (_, i) => (
-                <li key={i} className="animate-pulse">
-                  <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
-                  <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
-                  <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {/* A search where neither catalogue answered is not a finding, so it
-            never reaches `Result`. Saying nothing here is the only honest
-            option: we did not look. */}
-        {answered && sources && !sources.google && !sources.openLibrary && (
-          <p className="mt-8 rounded-xl border border-line bg-panel p-4 text-fg">
-            Neither catalogue answered just now, so this is not a result — the
-            search did not run. Press Check it again in a moment.
-          </p>
-        )}
-
-        {answered && clashes && sources && (sources.google || sources.openLibrary) && (
-          <Result
-            title={checked ?? ""}
-            clashes={clashes}
-            fetched={fetched}
-            reported={reported}
-            sources={sources}
-          />
-        )}
-
-        {/* Only alongside results. It is advice about *reading* a list, and
-            it ran on an empty screen where there was no list to read — and
-            then went on running beside a box the writer had emptied, which is
-            the same fault one step further on. `answered` is the whole test:
-            is what is on screen still about what is in the field. */}
-        {answered && !error && (
-          <div className="mt-10 border-t border-line pt-6">
-            {/* The rule spans the page and the sentence does not.
-                They were one element while a tool page was 3xl wide,
-                where the two widths happened to agree; at 5xl a line of
-                text run to the full container is about 160 characters,
-                which is twice a readable measure. */}
-            <p className="max-w-3xl text-xs text-muted">
-              We do not tell you whether to change it. Sharing a title with an
-              obscure book from 1974 is nothing; sharing one with a bestseller in
-              your genre is a real problem — and you can tell which you are
-              looking at faster than any rule we could write.
+          {error && (
+            <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
+              {error}
             </p>
-          </div>
-        )}
+          )}
+
+          {/* **The paragraph explaining the button is gone.** It described what
+              pressing Check it would produce, to a reader looking straight at
+              the button — and now at a shelf of the very covers it was
+              describing. A control that needs a paragraph about what it does is
+              usually a control in the wrong place; this one is in the right
+              place, so the paragraph was just words. */}
+          {showShelf && <Shelf books={genreShelf} />}
+
+          {/* **The blank page was the bug, not the missing spinner.**
+
+              A control that says it is busy tells the reader their press landed.
+              It does not tell them anything about the wait, and everything below
+              the box vanished while the request was out — which on a screen that
+              had just been full of covers reads as the results being *cleared*
+              rather than replaced.
+
+              So the space keeps the shape it is about to hold: a heading and a
+              grid of cover-shaped blocks, at the same size and gap as the real
+              ones, so nothing moves when they arrive. */}
+          {state === "loading" && (
+            <section className="mt-8" aria-hidden>
+              <div className="animate-pulse rounded-xl border border-line bg-panel px-5 py-4">
+                <div className="h-5 w-2/5 rounded bg-raised" />
+                <div className="mt-3 h-3 w-4/5 rounded bg-raised" />
+                <div className="mt-2 h-3 w-3/5 rounded bg-raised" />
+              </div>
+
+              <div className="mt-8 h-4 w-40 animate-pulse rounded bg-raised" />
+
+              {/* The same track rule as the real shelf, or the page jumps
+                  when the covers land. */}
+              {/* The same track rule as the real shelf, or the page jumps
+                  when the covers land. */}
+              <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-4 gap-y-6">
+                {Array.from({ length: 16 }, (_, i) => (
+                  <li key={i} className="animate-pulse">
+                    <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
+                    <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
+                    <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* A search where neither catalogue answered is not a finding, so it
+              never reaches `Result`. Saying nothing here is the only honest
+              option: we did not look. */}
+          {answered && sources && !sources.google && !sources.openLibrary && (
+            <p className="mt-8 rounded-xl border border-line bg-panel p-4 text-fg">
+              Neither catalogue answered just now, so this is not a result — the
+              search did not run. Press Check it again in a moment.
+            </p>
+          )}
+
+          {answered &&
+            clashes &&
+            sources &&
+            (sources.google || sources.openLibrary) && (
+              <Result title={checked ?? ""} clashes={clashes} />
+            )}
+
+          {/* Only alongside results. It is advice about *reading* a list, and
+              it ran on an empty screen where there was no list to read — and
+              then went on running beside a box the writer had emptied, which is
+              the same fault one step further on. `answered` is the whole test:
+              is what is on screen still about what is in the field. */}
+        </section>
       </div>
+
+      {gate.dialogOpen && (
+        <LimitDialog action="titleChecks" onClose={gate.closeDialog} />
+      )}
     </div>
   );
 }
@@ -398,162 +500,200 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
  * red means blocked here, and the whole position is that no title is taken and
  * the writer decides.
  */
-function Result({
-  title,
-  clashes,
-  fetched,
-  reported,
-  sources,
+/**
+ * The finding, as a filled bar inside the box.
+ *
+ * **One line, in the colour of the answer, where the question was asked.** It
+ * was a card with a deck and a provenance footnote, then a toast in the
+ * corner; it is a banner again because the box is where the writer is looking
+ * and a result that has to be chased across the screen is a result they read
+ * twice. Green means nobody has the name, amber means somebody does — the
+ * two-colour ladder the rest of the app already teaches, spent on the one
+ * thing this screen exists to say.
+ *
+ * **Minimal, and that is a rule rather than a mood.** The headline is the
+ * whole message: no explanation of why it matters, no count of the records it
+ * came from. What those said is now said by the covers underneath, which are
+ * the evidence rather than a description of it.
+ *
+ * `*-solid` rather than `*-fg`, and that distinction is why those tokens
+ * exist: `ok-fg` is a bright mint at night because its job is *ink on a
+ * near-black ground*, and white on it is unreadable. The solids are stated
+ * once for both themes and are deep enough to carry white. White is written
+ * literally here, not through `accent-ink`, because these two do not invert —
+ * the note beside the tokens says so.
+ */
+function VerdictBanner({
+  tone,
+  actions,
+  children,
 }: {
-  title: string;
-  clashes: TitleClash[];
-  fetched: number;
-  reported: number | null;
-  sources: { google: boolean; openLibrary: boolean };
+  /** `note` when something already uses the name, `ok` when nothing does. */
+  tone: "ok" | "note";
+  /** The two decisions the finding leaves open. See `VerdictActions`. */
+  actions?: React.ReactNode;
+  children: React.ReactNode;
 }) {
+  return (
+    <div
+      role="status"
+      className={`mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl
+                  px-4 py-3 text-white ${
+                    tone === "note" ? "bg-note-solid" : "bg-ok-solid"
+                  }`}
+    >
+      {/* A ring with a mark in it, as every filled status bar draws: the shape
+          says which of the two this is before the colour has been read, which
+          is the half of the signal that survives colour blindness. */}
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full
+                   border border-white/60"
+      >
+        <svg
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-3.5 w-3.5"
+        >
+          {tone === "note" ? (
+            <path d="M10 5.5v5.5M10 14.2v.3" />
+          ) : (
+            <path d="m5.5 10.5 3 3 6-6.5" />
+          )}
+        </svg>
+      </span>
+
+      <p className="min-w-0 flex-1 font-sans text-sm leading-snug font-semibold">
+        {children}
+      </p>
+
+      {actions}
+    </div>
+  );
+}
+
+/**
+ * The two ways out of a finding, in the banner that made it.
+ *
+ * **A check ends in a decision, and the screen used to leave the writer to
+ * make it somewhere else.** They read "at least eighteen books use this exact
+ * title", agreed with it, and then had to go to the listing screen to change
+ * the name — a trip that loses the shelf they were looking at. So the decision
+ * is offered where it is made, and both answers do something real:
+ *
+ * - **The title in the box is not the book's.** Then the choice is whether to
+ *   adopt it: *Use this title* renames the book, *Keep "…"* puts the field
+ *   back to the book's own name and closes the finding.
+ * - **The title in the box *is* the book's.** Adopting it is a no-op, so the
+ *   pair becomes *Try another* — which empties the field and puts the caret in
+ *   it — and *Keep it*, which closes the finding.
+ *
+ * Neither is styled as the recommended one. This screen reports and does not
+ * advise: sharing a title with an obscure book from 1974 is nothing and
+ * sharing one with a bestseller in the same genre is a real problem, and only
+ * the writer can see which they are looking at.
+ */
+function VerdictActions({
+  tone,
+  primary,
+  onPrimary,
+  secondary,
+  onSecondary,
+}: {
+  tone: "ok" | "note";
+  primary: string;
+  onPrimary: () => void;
+  secondary: string;
+  onSecondary: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={onPrimary}
+        /* White fill, the banner's own colour as its ink — the same pairing
+           the upgrade banner uses, and the reason `*-solid` is a token: it is
+           dark enough to read on white as well as to carry white. */
+        className={`rounded-lg bg-white px-3.5 py-1.5 font-sans text-xs
+                    font-semibold outline-none transition-opacity
+                    hover:opacity-90 focus-visible:ring-2
+                    focus-visible:ring-white/70 ${
+                      tone === "note" ? "text-note-solid" : "text-ok-solid"
+                    }`}
+      >
+        {primary}
+      </button>
+      <button
+        type="button"
+        onClick={onSecondary}
+        className="rounded-lg border border-white/40 px-3.5 py-1.5 font-sans
+                   text-xs font-semibold text-white outline-none
+                   transition-colors hover:bg-white/15 focus-visible:ring-2
+                   focus-visible:ring-white/70"
+      >
+        {secondary}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The one line the toast carries.
+ *
+ * **Three states, not two**, and the headline used to branch on `exact` alone
+ * — so a search with no exact match but nineteen near ones read "Nothing
+ * published under this exact name", a flat all-clear sitting directly above a
+ * shelf of nineteen books a reader could plainly mistake for yours. On a
+ * screen answering a yes-or-no question the headline is what gets read, so the
+ * near shelf is named in the answer rather than only underneath it.
+ *
+ * **A floor we counted, not an estimate we were handed.** The question is "how
+ * many books actually have this name", and the honest answer is a *minimum*.
+ * Two earlier attempts got there: "15 of these use this exact title" was true
+ * of the records fetched and a false impression of the world, and Google's own
+ * `totalItems` is not a fact about books either — for one query it reports 300
+ * when asked for one result and 10 when asked for forty. It moves with our own
+ * request. What survives is what we counted ourselves, stated as the floor it
+ * is: smaller than the truth and never larger, which is the right direction to
+ * be wrong in on a screen somebody is using to decide whether a name is
+ * crowded.
+ */
+function verdictLine(clashes: TitleClash[]): {
+  tone: "ok" | "note";
+  headline: string;
+} {
+  const exact = clashes.filter((c) => c.match === "exact").length;
+  const near = clashes.length - exact;
+
+  if (exact > 0) {
+    return {
+      tone: "note",
+      headline: `At least ${exact} published book${exact === 1 ? "" : "s"} use${
+        exact === 1 ? "s" : ""
+      } this exact title`,
+    };
+  }
+  if (near > 0) {
+    return {
+      tone: "ok",
+      headline: `Nothing under this exact name — but check the ${
+        near === 1 ? "one" : near
+      } close to it`,
+    };
+  }
+  return { tone: "ok", headline: "Nothing published under this exact name" };
+}
+
+function Result({ title, clashes }: { title: string; clashes: TitleClash[] }) {
   const exact = clashes.filter((c) => c.match === "exact");
   const near = clashes.filter((c) => c.match !== "exact");
 
-  /**
-   * One catalogue answered and the other did not.
-   *
-   * Not a footnote. "Nothing published under this name" from half a search is
-   * a materially weaker claim than the same words from a whole one, and the
-   * reader cannot tell them apart unless the card says which they are holding.
-   */
-  const missing = !sources.google
-    ? "Google Books"
-    : !sources.openLibrary
-      ? "Open Library"
-      : null;
-
   return (
     <section className="mt-8">
-      <div
-        className={`rounded-xl border px-5 py-4 ${
-          exact.length > 0
-            ? "border-note-line bg-note-bg"
-            : "border-ok-line bg-ok-bg"
-        }`}
-      >
-        {/* **A floor we counted, not an estimate we were handed.**
-
-            The question is "how many books actually have this name", and the
-            honest answer is a **minimum**. Two attempts got there:
-
-            First it read "15 of these use this exact title" — true of the
-            records fetched, and a false impression of the world. Then Google's
-            own `totalItems` led instead, and that is not a fact about books
-            either: for `intitle:"The Rule of Four"` it reports **300** when
-            asked for one result and **10** when asked for forty. It moves with
-            our own request parameters. Stable for a *fixed* request — we always
-            ask for forty — so it survives below as rough context, but it
-            cannot carry a headline.
-
-            What survives is what we counted ourselves, stated as the floor it
-            is. "At least 4" is smaller than the truth and never larger, which
-            is the right direction to be wrong in on a screen somebody is using
-            to decide whether a name is crowded.
-
-            **Three states here too, for the reason the deck below has them.**
-            The headline used to branch on `exact` alone, so a search with no
-            exact match but nineteen near ones read "Nothing published under
-            this exact name" — a flat all-clear sitting directly above a shelf
-            of nineteen books a reader could plainly mistake for yours. The
-            deck said so and the headline did not, and on a screen answering a
-            yes-or-no question the headline is what gets read. So the near
-            shelf is named in the answer rather than only underneath it. */}
-        <p
-          className={`text-lg font-bold ${
-            exact.length > 0 ? "text-note-fg" : "text-ok-fg"
-          }`}
-        >
-          {exact.length > 0
-            ? `At least ${exact.length} published book${
-                exact.length === 1 ? "" : "s"
-              } use${exact.length === 1 ? "s" : ""} this exact title`
-            : near.length > 0
-              ? `Nothing under this exact name — but check the ${
-                  near.length === 1 ? "one" : near.length
-                } close to it`
-              : "Nothing published under this exact name"}
-        </p>
-
-        <p className="max-w-prose mt-1.5 text-sm text-fg/75">
-          {/* Three states, not two.
-
-              The middle one was missing and it contradicted the page: with no
-              exact match but fourteen near ones, this read "nothing came back
-              that a reader could mistake for yours" directly above a grid of
-              fourteen books a reader could plainly mistake for yours. The
-              branch was on `exact` while the sentence spoke for `clashes`.
-
-              It is still a good sign — nobody has the name — but the near
-              shelf is the whole reason this screen exists, so it gets said
-              rather than contradicted.
-
-              The *count* moved up into the headline once that learned the same
-              three states; this carries why it matters, not how many. Putting
-              the number back here says it twice in two sentences. */}
-          {exact.length > 0 ? (
-            <>
-              Sharing a name is allowed and common — titles cannot be
-              copyrighted. What matters is who you would be standing next to,
-              which is what the years and authors below are for.
-            </>
-          ) : near.length > 0 ? (
-            <>
-              Nobody has the name itself, which is the good half. The close
-              ones still matter: a reader searching for your title could land
-              on one of those first, and that is what the years and authors
-              below are for.
-            </>
-          ) : (
-            <>
-              A good sign: nothing came back that a reader could mistake for
-              yours.
-            </>
-          )}
-        </p>
-
-        {/* Our own arithmetic, saying exactly what it is arithmetic over. */}
-        <p className="mt-2.5 text-xs text-fg/60">
-          {exact.length > 0 ? (
-            <>
-              Counted from the {fetched} closest records we could read
-              {missing ? `, after ${missing} did not answer` : ""}
-              {near.length > 0
-                ? `, ${near.length} of them near rather than exact`
-                : ""}
-              .
-              {reported !== null && reported > fetched
-                ? ` Google suggests around ${reported.toLocaleString()} carry the phrase somewhere in the title.`
-                : ""}{" "}
-              Neither catalogue is complete, so this is a floor rather than a
-              total.
-            </>
-          ) : (
-            <>
-              {/* The limit, where a limit belongs — under the answer rather
-                  than in front of it. It also has to reconcile "nothing" with
-                  a record count, or the two lines read as contradicting each
-                  other: books did come back, none of them close enough to
-                  matter. */}
-              Checked against {fetched} record{fetched === 1 ? "" : "s"} from
-              {missing ? " one catalogue" : " Google Books and Open Library"}
-              {near.length > 0
-                ? `, ${near.length} of them near the name but none matching it`
-                : ", none close enough to clash"}
-              .
-              {missing
-                ? ` ${missing} did not answer, so only one of the two was searched. `
-                : " "}
-              Neither catalogue is complete, so this is not proof.
-            </>
-          )}
-        </p>
-      </div>
-
       {exact.length > 0 && (
         <Shelf
           heading="Under this exact name"
@@ -565,9 +705,7 @@ function Result({
       )}
 
       {clashes.length === 0 && (
-        <p className="mt-4 text-sm text-muted">
-          Searched “{title}”.
-        </p>
+        <p className="mt-4 text-sm text-muted">Searched “{title}”.</p>
       )}
     </section>
   );
@@ -592,7 +730,12 @@ function Shelf({
   books,
   note,
 }: {
-  heading: string;
+  /**
+   * Absent when the section around it is already named — the genre shelf's
+   * heading sits at the top of the box now, above the search rather than
+   * under it, so printing it again here would be the same words twice.
+   */
+  heading?: string;
   books: CompTitle[];
   /** One line under the heading, where the shelf needs explaining. */
   note?: string;
@@ -609,12 +752,14 @@ function Shelf({
           that matched it would leave the screen with two things claiming to
           be its name. The count stays a step down and in the muted grey — it
           is a figure about the heading, not part of it. */}
-      <h2 className="mt-10 text-2xl font-bold tracking-tight text-fg">
-        {heading}
-        <span className="ml-3 text-lg font-normal text-muted">
-          {books.length}
-        </span>
-      </h2>
+      {heading && (
+        <h2 className="mt-10 text-2xl font-bold tracking-tight text-fg">
+          {heading}
+          <span className="ml-3 text-lg font-normal text-muted">
+            {books.length}
+          </span>
+        </h2>
+      )}
       {note && <p className="max-w-prose mt-1 text-sm text-muted">{note}</p>}
 
       {/* **The columns follow the content, rather than the content filling
@@ -635,7 +780,14 @@ function Shelf({
 
           No breakpoints and no container queries — the track size decides, so
           this needs no separate answer for the roadmap's half-width panel. */}
-      <ul className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(8.5rem,13rem))] justify-start gap-x-4 gap-y-6">
+      {/* **`auto-fill` with a `1fr` ceiling, not `auto-fit` with a fixed one.**
+          The tracks used to stop at 13rem, so on a wide page five covers ended
+          a long way short of the right edge and the shelf sat in a box it did
+          not fill — the imbalance was the cap, not the alignment. `1fr` lets
+          the tracks share what is there, and `auto-fill` keeps the empty ones,
+          which is what stops a four-book answer stretching each cover into a
+          poster. That was the fixed cap's job and it is still done. */}
+      <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-4 gap-y-6">
         {books.map((other) => {
           const inner = (
             <>
@@ -644,7 +796,9 @@ function Shelf({
                 {other.title}
               </span>
               <span className="block truncate text-xs text-muted">
-                {other.year ? <span className="text-fg">{other.year}</span> : null}
+                {other.year ? (
+                  <span className="text-fg">{other.year}</span>
+                ) : null}
                 {other.year && other.authors.length > 0 ? " · " : ""}
                 {other.authors[0] ?? ""}
               </span>

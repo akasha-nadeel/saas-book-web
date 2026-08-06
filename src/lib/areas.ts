@@ -14,7 +14,13 @@
  * component, and importing it into every tool header to read five labels would
  * pull the whole shelf into every tool page.
  */
-export type AreaId = "overview" | "write" | "prepare" | "track" | "tools";
+export type AreaId =
+  | "overview"
+  | "write"
+  | "prepare"
+  | "track"
+  | "tools"
+  | "collab";
 
 export const AREA_LABELS: Record<AreaId, string> = {
   overview: "Overview",
@@ -22,6 +28,7 @@ export const AREA_LABELS: Record<AreaId, string> = {
   prepare: "Prepare",
   track: "Track",
   tools: "Tools",
+  collab: "Collaborators",
 };
 
 /**

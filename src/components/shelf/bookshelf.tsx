@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
+import { CollabArea } from "@/components/collab/collab-area";
+import { InviteWatch } from "@/components/collab/invite-watch";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { BookToolsDialog } from "@/components/shelf/book-tools-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
@@ -128,7 +130,7 @@ import {
  * rather than glimpsed as a grey card.
  */
 
-type Area = "overview" | "write" | "prepare" | "track" | "tools";
+type Area = "overview" | "write" | "prepare" | "track" | "tools" | "collab";
 
 const AREAS: {
   id: Area;
@@ -184,6 +186,15 @@ const AREAS: {
     live: true,
     blurb: "The small jobs that cost a fortune elsewhere.",
     icon: shelfIcons.tools,
+    stage: false,
+  },
+  {
+    id: "collab",
+    label: "Collaborators",
+    live: true,
+    blurb: "Some books have two writers. Say who, and what they may do.",
+    icon: shelfIcons.community,
+    // Not a stage in a book's life — it is something you consult, like Tools.
     stage: false,
   },
 ];
@@ -668,6 +679,18 @@ export function Bookshelf({
           {area === "tools" && <Tools books={active} current={current} />}
 
           {area === "track" && <Track books={active} />}
+
+          {/* Mounted only when the area is open, so the member-list request is
+              never made by a writer who does not share books. */}
+          {area === "collab" && <CollabArea />}
+
+          {/* **The one collaboration request the dashboard always makes**, and it
+              earns its place: this app sends no email, so an invitation whose link
+              went astray would otherwise be found only by somebody who thought to
+              open Collaborators — which is the one screen a writer who has never
+              collaborated has no reason to visit. It interrupts once per browser
+              session and never again; see the dialog's own note. */}
+          <InviteWatch onSee={() => setArea("collab")} />
         </main>
       </div>
 

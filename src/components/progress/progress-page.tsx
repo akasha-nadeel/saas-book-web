@@ -64,7 +64,7 @@ export function ProgressPage({ bookId }: { bookId: string }) {
         question is about you rather than about one manuscript.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         <section className="mt-8 grid gap-3 sm:grid-cols-3">
           <Stat
             value={stats.streak === 0 ? "—" : String(stats.streak)}

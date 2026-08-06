@@ -82,7 +82,7 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
         all depend on the page count, which is why this takes people an evening.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {/* ---- The two things it needs ---------------------------------- */}
         <section className="grid gap-4 rounded-xl border border-line bg-panel p-5 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">

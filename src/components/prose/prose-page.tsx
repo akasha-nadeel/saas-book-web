@@ -93,7 +93,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
         here changes a word — the decisions are all yours.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {chapters.length === 0 ? (
           <p className="mt-8 text-muted">
             Nothing written yet. There is nothing to count.

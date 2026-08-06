@@ -42,6 +42,12 @@ import {
 } from "@/lib/library-store";
 import { suggestTarget } from "@/lib/book-kinds";
 import { ToolStepDone } from "@/components/ui/tool-save";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
@@ -120,8 +126,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     google: string | null;
     openLibrary: string | null;
   } | null>(null);
-  /** Whether the worked example is showing in the empty box. */
-  const [hint, setHint] = useState(true);
   const [state, setState] = useState<"idle" | "loading" | "done" | "error">(
     "idle",
   );
@@ -165,7 +169,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
    * on screen — the same fault the title check had with its own answer.
    */
   const [searched, setSearched] = useState("");
-
 
   /**
    * Search, translating the writer's words into a catalogue query first.
@@ -297,6 +300,26 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     [query],
   );
 
+  /**
+   * The free plan's ten comp searches.
+   *
+   * **Only a search the writer asked for is counted.** The seed below runs on
+   * arrival, and charging for that would spend the ten on ten visits — a limit
+   * on opening the screen rather than on searching it. So `ask` is what the
+   * button and the shelf chips call, and the seed keeps calling `search`.
+   */
+  const gate = useLimitGate("comps");
+  const comps = gate.allowance;
+  const ask = useCallback(
+    (q: string, genre?: string) => {
+      // Refused rather than disabled: the eleventh press is what puts the
+      // banner and the dialog on screen. See `useLimitGate`.
+      if (!gate.spend()) return;
+      void search(q, genre);
+    },
+    [gate, search],
+  );
+
   const seeded = useRef(false);
   /**
    * Whether the writer has touched the box.
@@ -352,9 +375,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
       const chosen: RankedComp[] = (data.picks ?? []).flatMap(
         (p: { key?: string; reason?: string }) => {
           const found = p.key ? byKey.get(p.key) : undefined;
-          return found && p.reason
-            ? [{ book: found, reason: p.reason }]
-            : [];
+          return found && p.reason ? [{ book: found, reason: p.reason }] : [];
         },
       );
       setPicks(chosen);
@@ -370,7 +391,11 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   // over half the window with a logo, so an embedded tool waits silently —
   // see `Pending` in `roadmap/step-panel.tsx`.
   if (!hydrated)
-    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
+    return embedded ? (
+      <div className={toolShell(embedded)} />
+    ) : (
+      <LoadingScreen />
+    );
 
   if (!book) {
     return (
@@ -399,38 +424,30 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           book={book}
           tool="Comp titles"
           title="What books is yours like?"
-          width="6xl"
+          width="7xl"
+          /* Two sentences, run across the page. It was five lines in a narrow
+             column beside an empty half-header — the shape a deck takes when
+             it is written long and then capped. Shortened first: the aside
+             about reaching for a bestseller was the best-written part of it
+             and the least useful, since the two shelves below make the same
+             point by showing it. */
+          deckWidth="full"
           action={<ToolStepDone state={save} />}
         >
-          {/* **The problem before the definition.** This used to open by
-              defining the term — "the published books yours sits beside" —
-              which only lands for somebody who already knew what a comp was
-              and had therefore not come here to find out. A writer arrives at
-              this screen because a form asked them a question they cannot
-              answer, so the deck now opens on that form.
-
-              Three sentences, in the order the writer meets the problem: what
-              is being asked of them, how it goes wrong, what this screen hands
-              back. The Tolkien line survived the rewrite because it is the one
-              sentence writers repeat to each other — it names the specific
-              mistake rather than warning about mistakes in general.
-
-              Every claim in the last sentence is a thing on the page below:
-              the shelf of real records, the median length, the Filed under
-              row. Nothing here promises the ranking, which is gated. */}
-          Every listing form and every letter to an agent asks the same thing:
-          name two or three published books like yours. Most writers either do
-          not know what is out there or reach for a bestseller — and a shop
-          reads &ldquo;like Tolkien&rdquo; as somebody who has not looked. This
-          searches two catalogues for real ones you can name, how long they
-          run, and what shelf they sit on.
+          {/* **The problem before the definition.** This used to open on what
+              a comp title *is*, which is a definition read by somebody who
+              does not yet know why they should care. The listing form asking
+              for it is the reason they are here. */}
+          Every listing form and every letter to an agent asks for two or three
+          published books like yours. This finds real ones you can name — how
+          long they run, and what shelf they sit on.
         </ToolHeader>
       )}
 
       {/* A query container, so the figures below break on the width this page
           actually has rather than on the window's — it opens in the roadmap's
           panel at about half a screen. See the note in `blurb-page.tsx`. */}
-      <div className="@container mx-auto max-w-6xl px-6 pt-6 pb-16">
+      <div className="@container mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
 
         {/* The panel draws no `ToolHeader`, and `embedded` may hide the frame
@@ -441,273 +458,202 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           </div>
         )}
 
-        {/* **A label, because the field was teaching the wrong thing.**
-            The box arrived seeded and unlabelled, with a placeholder that a
-            seeded field never shows — so the only instruction on screen was
-            the button, and "Find comps" tells somebody who does not know the
-            word nothing at all. What a writer does next is type the one thing
-            they are certain of: the name of their book. That search cannot
-            work, and the screen was letting them make it before saying so.
+        {/* ---- The bench, and everything it produces --------------------
 
-            So the instruction goes *above* the input, where it is read before
-            the first keystroke rather than after the empty result. The example
-            is the load-bearing half — "describe the story" is abstract until
-            somebody sees the shape of an answer, and one concrete phrase
-            teaches the register faster than a sentence of guidance.
+            **One box: the shelves, the box you type in, and the books.** They
+            were three things loose on the band with nothing saying where the
+            controls ended and the results began — and the covers, which are
+            the answer, read as a separate page that happened to be underneath.
+            Boxed together they read as one instrument: choose a shelf or
+            describe the book, and what comes back is *inside* the same frame.
 
-            A real `<label>` rather than the `aria-label` it replaces: that
-            attribute was doing this job for screen readers only, which is the
-            wrong half of the audience to help when the fault is that nobody
-            can see what to type. */}
-        <label
-          htmlFor={queryId}
-          /* **An instruction, not a question.** "What is your book about?" was
-             the wrong shape for a label sitting on top of an empty field: a
-             question invites an answer in the writer's head, where what is
-             needed is the one thing they should do next. It also duplicated
-             the page's `h1`, which is already a question — two on one screen
-             and neither is clearly the one being asked.
+            **The shelves come first, and that is the argument.** A writer who
+            knew what to type would not be on this screen; the useful move for
+            everybody else is to walk a shelf and see what is on it. The box is
+            second because it is the refinement, and it sits directly above the
+            covers it produces, which is where every shop that sells books puts
+            its search.
 
-             A step under that `h1` and no further. At `text-sm` this was set
-             smaller than the book titles in the results below and read as a
-             field label rather than as the thing to do. */
-          className="block text-lg font-semibold tracking-tight text-fg"
-        >
-          Type a few words about your book
-        </label>
-        {/* **Says what to type, not what the machine does with it.** The
-            translation step is deliberately unadvertised: it needs a plan and
-            a model key, so a line promising that your words become a proper
-            search would be false for anyone without either — and this screen's
-            free half is the part that may never come with an asterisk. The
-            query it lands on is visible in the box afterwards, which is a
-            demonstration rather than a claim.
+            What is *not* in here is the arithmetic below — median pages, the
+            subjects, the length reading. Those are readings *of* the shelf and
+            they keep their own cards, or this box would be the whole page and
+            stop meaning anything. */}
+        <section className="rounded-2xl border border-line bg-panel p-5 @2xl:p-6">
+          {/* **The shelves live in the box now.** They were a section of their
+              own under it — a heading, a caption and twenty-six chips — which
+              asked the same question the box asks and pushed the covers a
+              third of a page down. Why they exist has not changed: a writer
+              who does not know what their book sits beside is exactly the
+              writer this screen is for, and the useful move for them is to
+              walk a shelf rather than phrase a better query. See `SearchBox`
+              for how the two fit in one control. */}
+          <label
+            htmlFor={queryId}
+            /* **An instruction, not a question.** "What is your book about?"
+               was the wrong shape for a label over an empty field: a question
+               invites an answer in the writer's head, where what is needed is
+               the one thing to do next. It also duplicated the page's `h1`,
+               which is already a question. */
+            className="block text-lg font-semibold tracking-tight text-fg"
+          >
+            Type a few words about your book, or pick a shelf
+          </label>
 
-            "Plain words are fine" is the sentence that earns its place now,
-            because before the translation they were not fine: a sentence went
-            to the catalogue verbatim and came back with a comedian's memoir.
-            *Not the title* stays, since that is still the commonest mistake
-            and no amount of translating fixes it. */}
-        <p className="mt-1.5 mb-3 max-w-prose text-sm leading-relaxed text-muted">
-          Plain words are fine — the kind of story, who it is for, where it is
-          set. Not the title, though: comps are books <em>like</em> yours.
-        </p>
+          {/* **Says what to type, not what the machine does with it.** The
+              translation step is deliberately unadvertised: it needs a plan
+              and a model key, so a line promising that your words become a
+              proper search would be false for anyone without either — and this
+              screen's free half is the part that may never come with an
+              asterisk. The query it lands on is visible in the box afterwards,
+              which is a demonstration rather than a claim. */}
+          <p className="mt-1.5 mb-3 max-w-prose text-sm leading-relaxed text-muted">
+            Plain words are fine — the kind of story, who it is for, where it is
+            set. Not the title, though: comps are books <em>like</em> yours.
+          </p>
 
-        <form
-          className="flex flex-wrap gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void search(query, book.genre);
-          }}
-        >
-          <input
+          <SearchBox
             id={queryId}
             value={query}
-            onChange={(e) => {
+            onChange={(next) => {
               touched.current = true;
-              setQuery(e.target.value);
+              setQuery(next);
             }}
-            /* **The example, where it is needed and only then.** The box is
-               seeded on load, so this shows the moment a writer clears it to
-               type their own — which is the one instant they are looking at an
-               empty field wondering what shape of thing goes in it. "Words
-               that describe your book" was the old text and it restates the
-               label; a worked example teaches the register instead.
-
-               **Cleared on focus rather than left to the browser.** A native
-               placeholder survives the click and only goes on the first
-               keystroke, so it sits under the caret while somebody is deciding
-               what to write. It comes back on blur if nothing was typed, so
-               the hint is not spent by a stray click. */
-            /* **Chosen by running the candidates, not by taste.** An example
-               in a field is an instruction, so it has to be a search that
-               actually works — measured against the live catalogues, three
-               words beat a sentence and a *shape* beat a plot:
-
-                 second chance romance  → romance novels, every one
-                 witch academy          → YA fantasy novels
-                 haunted house horror   → a film study and a how-to build one
-                 small town murder      → The Dark Half, a comic, a computing book
-                 young adult fantasy    → books *about* the genre: criticism,
-                                          "Language Arts & Disciplines"
-
-               That last row is the trap worth knowing: a bare genre name
-               matches the titles of academic books written about the genre,
-               because that is where those words appear as a title. What
-               survives is [hook] + [genre] — narrow enough to miss the
-               criticism, plain enough that a writer recognises the form and
-               can copy it with their own hook. */
-            placeholder={hint ? "Eg : second chance romance" : ""}
-            onFocus={() => setHint(false)}
-            onBlur={() => setHint(true)}
-            className="min-w-[14rem] flex-1 rounded-lg border border-line bg-panel px-4 py-2.5
-                       text-fg outline-none placeholder:text-muted/70
-                       focus-visible:ring-2 focus-visible:ring-accent/50"
+            onSearch={(q) => ask(q, book.genre)}
+            busy={state === "loading"}
           />
-          <button
-            type="submit"
-            disabled={state === "loading" || query.trim().length < 2}
-            className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
-          >
-            {state === "loading" ? "Looking…" : "Find comps"}
-          </button>
-        </form>
 
-        {/* Shelves to walk along, always — not only when the book has no genre.
-            A writer who does not know what their book sits beside is exactly
-            the writer this screen is for, and the useful move for them is to
-            look at a few shelves rather than to phrase a better query. Pressing
-            one is only a search: nothing is written to the book, which is why
-            these read as places to go rather than as a form to fill in. */}
-        <div className="mt-3">
-          {/* What is *on screen*, not what the book says it is.
-              This read "Showing Mystery, from this book’s genre" while the
-              Fantasy shelf was open and its chip lit, because it was written
-              from `book.genre` and the genre never changes. A caption that
-              contradicts the covers under it is worse than no caption: the
-              reader has to work out which of the two is lying. */}
-          <p className="text-xs text-muted">
+          {/* What is *on screen*, not what the book says it is. This read
+              "Showing Mystery, from this book's genre" while the Fantasy shelf
+              was open, because it was written from `book.genre` and the genre
+              never changes. A caption that contradicts the covers under it is
+              worse than no caption: the reader has to work out which of the two
+              is lying. */}
+          <p className="mt-2 text-sm text-muted">
             {shownShelf
               ? `Showing ${shownShelf}${
                   shownShelf === book.genre
                     ? `, from this book’s genre${book.publishing?.description ? " and blurb" : ""}`
                     : ""
-                }. Look at another shelf:`
+                }.`
               : book.genre
-                ? `Searching your own words. Or look at a shelf:`
-                : "This book has no genre set. Pick a shelf to look at, or describe the story in your own words above."}
+                ? "Searching your own words."
+                : "This book has no genre set, so nothing is chosen for you."}
           </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {BROWSE_SHELVES.map((genre) => {
-              const seed = `subject:"${genre}"`;
-              const on = query === seed;
-              return (
-                <button
-                  key={genre}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => {
-                    setQuery(seed);
-                    void search(seed, book.genre);
-                  }}
-                  className={`rounded-full border px-3 py-1 text-xs font-medium ${
-                    on
-                      ? "border-accent/60 bg-accent/10 text-accent"
-                      : "border-line bg-panel text-fg hover:border-accent/40"
-                  }`}
-                >
-                  {genre}
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
-        {error && (
-          <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-            {error}
-          </p>
-        )}
+          {/* The count, and nothing while there is plenty left. */}
+          <LeftPill allowance={comps} className="mt-2" />
 
-        {/* The shelf loads on arrival, so the wait is the first thing anybody
-            sees — and an empty page for two seconds reads as broken on a screen
-            most writers have never opened before. Shaped like the rows that
-            replace them, so nothing jumps when they do. */}
-        {state === "loading" && (
-          <ul
-            className="mt-12 grid grid-cols-2 gap-x-4 gap-y-6 @sm:grid-cols-3 @lg:grid-cols-4 @2xl:grid-cols-5"
-            aria-hidden
-          >
-            {Array.from({ length: 10 }, (_, i) => (
-              <li key={i} className="animate-pulse">
-                <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
-                <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
-                <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
-              </li>
-            ))}
-          </ul>
-        )}
+          {/* True of the shelves too: they are searches, and they go with it. */}
+          <LimitBanner allowance={comps} className="mt-5" />
 
-        {/* Only reachable when the book had nothing to seed a search with, now
-            that arriving runs one. The shelves above are the way out of it, so
-            this is a line rather than the essay that used to sit here. */}
-        {state === "idle" && (
-          <p className="mt-8 text-muted">
-            Pick a shelf above to see what is on it, or describe your story in
-            the box.
-          </p>
-        )}
-
-        {/* ---- The books ------------------------------------------------
-
-            First, and that is the whole of this section's design. These panels
-            used to run figures, then a length reading, then the ranking card
-            before a single cover appeared — about a screen and a half of
-            analysis above the thing being analysed, so the answer to "what
-            does my book sit beside" was below the fold on every screen size.
-            Every shop that sells books puts the shelf directly under the
-            search box and its facets and summaries around or after it; there
-            is no version of this where the arithmetic outranks the covers.
-        ---------------------------------------------------------------- */}
-
-        {/* Why nothing came back — see `emptyReason`. */}
-        {state === "done" && books.length === 0 && (
-          <p className="mt-8 max-w-prose text-muted">
-            {emptyReason(searched, book.title, sources, googleKeyed, why)}
-          </p>
-        )}
-
-        {books.length > 0 && (
-          <ResultsBar
-            picks={picks}
-            pattern={pattern}
-            ranking={ranking}
-            error={rankError}
-            count={books.length}
-            hasBlurb={Boolean(book.publishing?.description?.trim())}
-            hasOpening={Boolean(opening)}
-            onRank={rank}
-          />
-        )}
-
-        {/* Said plainly rather than left as a short list. A writer who sees ten
-            results instead of twenty should know a service was down, not
-            conclude that their genre is nearly empty. */}
-        {/* Gated on there being records for "these" to refer to. With none, it
-            sat under "Nothing came back" and announced that the nothing was
-            Open Library's records only, carrying no blurbs — describing the
-            shape of an empty list. The zero case is now said once, above, and
-            said as what it is: half a search. */}
-        {state === "done" &&
-          books.length > 0 &&
-          sources &&
-          (!sources.google || !sources.openLibrary) && (
-            <p className="mt-3 text-xs text-muted">
-              {!sources.google
-                ? `Google Books did not answer, so these are Open Library’s
-                   records only and carry no blurbs. It rate-limits without an
-                   API key.`
-                : `Open Library did not answer, so these are Google Books’
-                   records only — thinner on covers, and the shelves below are
-                   Google’s broad categories rather than librarians’ subjects.`}
-            </p>
-          )}
-
-        {picks && picks.length > 0 && (
-          <CompGrid comps={picks.map((p) => p.book)} reasons={picks} />
-        )}
-
-        {books.length > 0 && (
-          <>
-            {picks && picks.length > 0 && (
-              <h2 className="mt-10 text-sm font-bold text-fg">
-                The rest of what came back
-              </h2>
+          {/* ---- What came back ---------------------------------------- */}
+          <div className="mt-7 border-t border-line pt-7">
+            {error && (
+              <p className="rounded-lg border border-line bg-panel p-4 text-sm text-fg">
+                {error}
+              </p>
             )}
-            <CompGrid comps={picks ? restOf(books, picks) : books} />
-          </>
-        )}
 
+            {/* The shelf loads on arrival, so the wait is the first thing anybody
+                sees — and an empty page for two seconds reads as broken on a screen
+                most writers have never opened before. Shaped like the rows that
+                replace them, so nothing jumps when they do. */}
+            {state === "loading" && (
+              <ul
+                className="grid grid-cols-2 gap-x-4 gap-y-6 @sm:grid-cols-3 @lg:grid-cols-4 @2xl:grid-cols-5"
+                aria-hidden
+              >
+                {Array.from({ length: 10 }, (_, i) => (
+                  <li key={i} className="animate-pulse">
+                    <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
+                    <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
+                    <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Only reachable when the book had nothing to seed a search with, now
+                that arriving runs one. The shelves above are the way out of it, so
+                this is a line rather than the essay that used to sit here. */}
+            {state === "idle" && (
+              <p className="text-muted">
+                Pick a shelf above to see what is on it, or describe your story
+                in the box.
+              </p>
+            )}
+
+            {/* ---- The books ------------------------------------------------
+
+                First, and that is the whole of this section's design. These panels
+                used to run figures, then a length reading, then the ranking card
+                before a single cover appeared — about a screen and a half of
+                analysis above the thing being analysed, so the answer to "what
+                does my book sit beside" was below the fold on every screen size.
+                Every shop that sells books puts the shelf directly under the
+                search box and its facets and summaries around or after it; there
+                is no version of this where the arithmetic outranks the covers.
+            ---------------------------------------------------------------- */}
+
+            {/* Why nothing came back — see `emptyReason`. */}
+            {state === "done" && books.length === 0 && (
+              <p className="max-w-prose text-muted">
+                {emptyReason(searched, book.title, sources, googleKeyed, why)}
+              </p>
+            )}
+
+            {books.length > 0 && (
+              <ResultsBar
+                picks={picks}
+                pattern={pattern}
+                ranking={ranking}
+                error={rankError}
+                count={books.length}
+                hasBlurb={Boolean(book.publishing?.description?.trim())}
+                hasOpening={Boolean(opening)}
+                onRank={rank}
+              />
+            )}
+
+            {/* Said plainly rather than left as a short list. A writer who sees ten
+                results instead of twenty should know a service was down, not
+                conclude that their genre is nearly empty. */}
+            {/* Gated on there being records for "these" to refer to. With none, it
+                sat under "Nothing came back" and announced that the nothing was
+                Open Library's records only, carrying no blurbs — describing the
+                shape of an empty list. The zero case is now said once, above, and
+                said as what it is: half a search. */}
+            {state === "done" &&
+              books.length > 0 &&
+              sources &&
+              (!sources.google || !sources.openLibrary) && (
+                <p className="mt-3 text-xs text-muted">
+                  {!sources.google
+                    ? `Google Books did not answer, so these are Open Library’s
+                       records only and carry no blurbs. It rate-limits without an
+                       API key.`
+                    : `Open Library did not answer, so these are Google Books’
+                       records only — thinner on covers, and the shelves below are
+                       Google’s broad categories rather than librarians’ subjects.`}
+                </p>
+              )}
+
+            {picks && picks.length > 0 && (
+              <CompGrid comps={picks.map((p) => p.book)} reasons={picks} />
+            )}
+
+            {books.length > 0 && (
+              <>
+                {picks && picks.length > 0 && (
+                  <h2 className="mt-10 text-sm font-bold text-fg">
+                    The rest of what came back
+                  </h2>
+                )}
+                <CompGrid comps={picks ? restOf(books, picks) : books} />
+              </>
+            )}
+          </div>
+        </section>
         {/* ---- What the shelf adds up to ---------------------------------
 
             After the covers, because it is a reading *of* them. A writer who
@@ -775,6 +721,263 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           </p>
         </div>
       </div>
+
+      {gate.dialogOpen && (
+        <LimitDialog action="comps" onClose={gate.closeDialog} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * The search box, with the shelves inside it.
+ *
+ * **They used to be a second section and that was one section too many.** A
+ * heading, a caption and twenty-six chips sat under the box doing the same job
+ * it does — starting a search — so the screen asked the same question twice,
+ * and the covers, which are the answer, were pushed a third of a page further
+ * down. One control, two ways to fill it: type your own words, or open it and
+ * take a shelf.
+ *
+ * This is the shape every large site gives a search that has a known set
+ * behind it. Four behaviours are what make it feel like one rather than a
+ * novelty, and all four are here:
+ *
+ * - **Opening it shows the whole list**, not a filtered one, and shows it
+ *   *all at once*. A writer who has already picked Fantasy and comes back to
+ *   change it must see the other twenty-five; a box that filtered itself down
+ *   to the current answer would be a dead end, so a value that *is* a shelf
+ *   query filters nothing and marks itself instead. Twenty-six rows in one
+ *   column is nine hundred pixels of scrolling, which is a list you read
+ *   rather than a set you choose from — so they go in columns, the way a
+ *   category menu on a large site does, and the whole set is on screen.
+ * - **Typing filters, and never blocks.** Words that match no shelf leave the
+ *   writer's own row as the only one, and Enter searches them. The suggestions
+ *   help; they do not gate — the same rule the category box follows, and for
+ *   the same reason: this box's whole job is the search nobody has a shelf for.
+ * - **The keyboard works.** Down and up move, Enter takes the highlighted row
+ *   or the writer's own words when none is highlighted, Escape closes.
+ * - **A pick fills the box; it does not search.** Picking and searching are
+ *   two decisions, and running one on a click means a writer who opened the
+ *   list to *look* at the shelves has spent a search by browsing. It also
+ *   makes the row and the button disagree about who is in charge. So a pick
+ *   writes the query into the field, closes the list and leaves the caret
+ *   there; Find comps is what runs it, in both directions.
+ *
+ * `onMouseDown` rather than `onClick` on the rows, because the input's blur
+ * fires first and would close the list out from under the click.
+ */
+function SearchBox({
+  id,
+  value,
+  onChange,
+  onSearch,
+  busy,
+}: {
+  id: string;
+  value: string;
+  onChange: (next: string) => void;
+  /** Runs a search. A shelf arrives here as its whole `subject:"…"` query. */
+  onSearch: (query: string) => void;
+  busy: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const [hint, setHint] = useState(true);
+
+  /** The shelf this query *is*, when it is one. */
+  const chosen = BROWSE_SHELVES.find((g) => value === `subject:"${g}"`) ?? null;
+
+  // A value that is already a shelf filters nothing — see the note above.
+  const typed = chosen ? "" : value.trim();
+  const shelves = typed
+    ? BROWSE_SHELVES.filter((g) =>
+        g.toLowerCase().includes(typed.toLowerCase()),
+      )
+    : BROWSE_SHELVES;
+
+  /* The writer's own words first, whenever they are not already the name of a
+     shelf — the row that keeps this a search box rather than a menu. */
+  const own =
+    typed &&
+    !BROWSE_SHELVES.some((g) => g.toLowerCase() === typed.toLowerCase())
+      ? typed
+      : null;
+
+  const rows: { query: string; label: string; shelf: boolean }[] = [
+    ...(own ? [{ query: own, label: own, shelf: false }] : []),
+    ...shelves.map((g) => ({ query: `subject:"${g}"`, label: g, shelf: true })),
+  ];
+
+  const showing = open && rows.length > 0;
+
+  /** Fill the box with a row's query and close. Never searches — see above. */
+  function take(query: string) {
+    onChange(query);
+    setOpen(false);
+    setActive(-1);
+  }
+
+  return (
+    <div className="relative">
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (showing && active >= 0) take(rows[active].query);
+          else onSearch(value);
+        }}
+      >
+        <input
+          id={id}
+          /* **The shelf's name, not the query it stands for.** A writer who
+             picks Self-help should see `Self-help`, not `subject:"Self-help"`
+             — the second is our syntax leaking into their field, and it makes
+             a plain box look like one that wants a language. The query is
+             still what gets searched and still what the caption reports; only
+             a value that *is* a known shelf is shown by its name, and the
+             first keystroke replaces it with the writer's own words, exactly
+             as before. */
+          value={chosen ?? value}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+            setActive(-1);
+          }}
+          onFocus={() => {
+            setHint(false);
+            setOpen(true);
+          }}
+          // Deferred past the click on a row that would otherwise never land.
+          onBlur={() => {
+            setHint(true);
+            setTimeout(() => setOpen(false), 120);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setOpen(false);
+              return;
+            }
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              if (!showing) {
+                setOpen(true);
+                return;
+              }
+              setActive((i) =>
+                e.key === "ArrowDown"
+                  ? (i + 1) % rows.length
+                  : i <= 0
+                    ? rows.length - 1
+                    : i - 1,
+              );
+            }
+          }}
+          role="combobox"
+          aria-expanded={showing}
+          aria-controls="comp-shelves"
+          aria-autocomplete="list"
+          /* **Chosen by running the candidates, not by taste.** An example in a
+             field is an instruction, so it has to be a search that actually
+             works — measured against the live catalogues, three words beat a
+             sentence and a *shape* beat a plot:
+
+               second chance romance  → romance novels, every one
+               witch academy          → YA fantasy novels
+               haunted house horror   → a film study and a how-to build one
+               small town murder      → The Dark Half, a comic, a computing book
+               young adult fantasy    → books *about* the genre: criticism,
+                                        "Language Arts & Disciplines"
+
+             That last row is the trap worth knowing: a bare genre name matches
+             the titles of academic books written *about* the genre. What
+             survives is [hook] + [genre] — narrow enough to miss the criticism,
+             plain enough that a writer recognises the form and can copy it.
+
+             Cleared on focus rather than left to the browser: a native
+             placeholder survives the click and only goes on the first
+             keystroke, so it would sit under the caret while somebody is
+             deciding what to write. */
+          placeholder={
+            hint ? "Eg : second chance romance — or pick a shelf" : ""
+          }
+          className="min-w-[16rem] flex-1 rounded-lg border border-line bg-raised px-4 py-2.5
+                     text-fg outline-none placeholder:text-muted/70
+                     focus-visible:ring-2 focus-visible:ring-accent/50"
+        />
+        <button
+          type="submit"
+          // Never disabled by the limit: an eleventh press is the only
+          // moment there is anything to say about it.
+          disabled={busy || value.trim().length < 2}
+          className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
+        >
+          {busy ? "Looking…" : "Find comps"}
+        </button>
+      </form>
+
+      {showing && (
+        <div
+          id="comp-shelves"
+          role="listbox"
+          className="absolute z-20 mt-1 w-full rounded-lg border border-line
+                     bg-panel p-1.5 shadow-lg"
+        >
+          {/* The writer's own words, full width above the columns: it is a
+              different kind of row and reads as one. */}
+          {own && (
+            <div role="option" aria-selected={active === 0}>
+              <button
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  take(rows[0].query);
+                }}
+                onMouseEnter={() => setActive(0)}
+                className={`mb-1 flex w-full items-center gap-2 rounded-md px-2.5 py-2
+                            text-left text-sm ${
+                              active === 0 ? "bg-raised text-fg" : "text-fg"
+                            }`}
+              >
+                <span className="min-w-0 truncate">
+                  Search <span className="font-medium">{own}</span>
+                </span>
+              </button>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-x-1 @xl:grid-cols-3">
+            {rows.map((row, i) =>
+              row.shelf ? (
+                <div key={row.query} role="option" aria-selected={i === active}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      take(row.query);
+                    }}
+                    onMouseEnter={() => setActive(i)}
+                    /* Tighter rows than a one-column list would take: nine rows
+                     of three have to fit under the field without the page
+                     scrolling, or "all of them at once" is not true. */
+                    className={`flex w-full items-center justify-between gap-2 rounded-md
+                            px-2.5 py-1.5 text-left text-sm ${
+                              i === active ? "bg-raised text-fg" : "text-fg"
+                            }`}
+                  >
+                    <span className="min-w-0 truncate">{row.label}</span>
+                    {row.label === chosen && (
+                      <span className="shrink-0 text-xs text-accent">
+                        Showing
+                      </span>
+                    )}
+                  </button>
+                </div>
+              ) : null,
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -896,7 +1099,8 @@ function ResultsBar({
   const nothingToJudge = !hasBlurb && !hasOpening;
 
   return (
-    <div className="mt-8">
+    // No top margin: the section this sits in provides its own.
+    <div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <p className="text-sm text-muted">
           {picks === null ? (
@@ -1077,7 +1281,6 @@ function CompCard({ comp, reason }: { comp: CompTitle; reason?: string }) {
     </li>
   );
 }
-
 
 /**
  * A word range from the page counts of real books, against the writer's own

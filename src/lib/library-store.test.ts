@@ -11,6 +11,8 @@ import {
   chapterNumberOf,
   createBookFromImport,
   chapterLabel,
+  countUse,
+  refundUse,
   createBookFromTemplate,
   createChapter,
   createMatterPage,
@@ -538,6 +540,108 @@ it("leaves nothing behind when an import cannot be stored", () => {
 
 it("refuses an import with no chapters", () => {
   expect(createBookFromImport("Empty", [])).toBeNull();
+});
+
+/*
+ * The tally behind the free plan's ten imports. It is only a count here — the
+ * limit itself is `lib/free-limits.ts` — but the count has to be taken at the
+ * funnels or the number on the pricing page means nothing.
+ */
+it("counts a manuscript brought in as a book", () => {
+  expect(getPrefs().usage.imports).toBe(0);
+
+  createBookFromImport("One", [
+    { title: "Chapter One", doc: { type: "doc" }, words: 10 },
+  ]);
+  createBookFromImport("Two", [
+    { title: "Chapter One", doc: { type: "doc" }, words: 10 },
+  ]);
+
+  expect(getPrefs().usage.imports).toBe(2);
+});
+
+it("does not spend an import on a file it could not store", () => {
+  const setItem = localStorage.setItem.bind(localStorage);
+  let calls = 0;
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation((k, v) => {
+    calls += 1;
+    if (calls === 2) throw new DOMException("quota", "QuotaExceededError");
+    setItem(k, v);
+  });
+
+  createBookFromImport("Too Big", [
+    { title: "One", doc: { type: "doc" }, words: 1 },
+    { title: "Two", doc: { type: "doc" }, words: 1 },
+  ]);
+  vi.restoreAllMocks();
+
+  expect(getShelf().books).toHaveLength(0);
+  expect(getPrefs().usage.imports).toBe(0);
+});
+
+it("counts a manuscript brought into a book that already exists", () => {
+  // The way round the limit if this one did not count: make an empty book,
+  // then import into it.
+  const { bookId } = createBook("Started here");
+  importIntoBook(
+    bookId,
+    [{ title: "Chapter One", doc: { type: "doc" }, words: 900 }],
+    "add",
+  );
+
+  expect(getPrefs().usage.imports).toBe(1);
+});
+
+it("gives the import back when the writer undoes it", () => {
+  const { bookId } = createBook("Started here");
+  const result = importIntoBook(
+    bookId,
+    [{ title: "Chapter One", doc: { type: "doc" }, words: 900 }],
+    "add",
+  )!;
+  expect(getPrefs().usage.imports).toBe(1);
+
+  undoChapterImport(result.undo);
+  expect(getPrefs().usage.imports).toBe(0);
+});
+
+it("counts each free-plan action on its own tally", () => {
+  countUse("comps");
+  countUse("comps");
+  countUse("titleChecks");
+
+  expect(getPrefs().usage).toEqual({
+    imports: 0,
+    comps: 2,
+    covers: 0,
+    titleChecks: 1,
+  });
+});
+
+it("never counts below nought", () => {
+  refundUse("covers");
+  expect(getPrefs().usage.covers).toBe(0);
+});
+
+it("carries a tally written before the counts were a record", () => {
+  // The first version counted imports alone, at the top level of prefs. A
+  // writer who had already brought books in must not have those forgiven by an
+  // upgrade — a limit that resets itself is not a limit.
+  localStorage.setItem("openchapter:prefs", JSON.stringify({ imports: 4 }));
+  expect(getPrefs().usage.imports).toBe(4);
+});
+
+it("keeps a tally that storage has had tampered with sane", () => {
+  localStorage.setItem(
+    "openchapter:prefs",
+    JSON.stringify({ usage: { imports: -3, comps: "lots" } }),
+  );
+  expect(getPrefs().usage).toEqual({
+    imports: 0,
+    comps: 0,
+    covers: 0,
+    titleChecks: 0,
+  });
 });
 
 it("keeps chapter ids unique across books", () => {
@@ -1595,6 +1699,54 @@ it("keeps a hand-ticked roadmap step when the server has no column for it", () =
   });
 
   expect(findBook(getShelf(), bookId)!.roadmapDone).toEqual(["draft"]);
+});
+
+/**
+ * A shared book that stopped arriving used to vanish mid-session.
+ *
+ * `syncWithServer` marks it `access: "lost"`, but `keepLocalOnly` maps
+ * `remote.books` — so anything missing from the download was simply not in the
+ * result, and the mark it had just written was thrown away. The co-writer's
+ * reading of a book disappearing with no explanation is not "my access ended",
+ * it is "this app has lost my work".
+ *
+ * Verified by hand on 2026-08-07 before it was fixed: removing a collaborator
+ * made the book vanish from their shelf outright.
+ */
+it("keeps a revoked shared book on the shelf instead of vanishing it", () => {
+  const { bookId } = createBook();
+  // What sync.ts writes for a book that came from the server and stopped
+  // arriving: somebody else owns it, and it is no longer reachable.
+  const shelf = getShelf();
+  window.localStorage.setItem(
+    "openchapter:shelf",
+    JSON.stringify({
+      ...shelf,
+      books: shelf.books.map((b) =>
+        b.id === bookId
+          ? { ...b, ownerId: "someone-else", role: "editor", access: "lost" }
+          : b,
+      ),
+    }),
+  );
+
+  // The download no longer carries it — which is what revocation looks like.
+  applyRemoteForTest({ books: [], lastOpenedBookId: null });
+
+  const book = findBook(getShelf(), bookId);
+  expect(book).toBeTruthy();
+  expect(book!.access).toBe("lost");
+});
+
+/*
+ * The other half, and the one that keeps the first from becoming a leak: a book
+ * of the writer's *own* that the server does not have is not "lost", it is
+ * deleted elsewhere, and it must still go.
+ */
+it("does not resurrect a book of your own that the server has dropped", () => {
+  const { bookId } = createBook();
+  applyRemoteForTest({ books: [], lastOpenedBookId: null });
+  expect(findBook(getShelf(), bookId)).toBeNull();
 });
 
 it("still takes the server's answer for fields the server does have", () => {

@@ -9,6 +9,7 @@ import {
   chapterNumberOf,
   createChapter,
   deleteChapter,
+  canWriteBook,
   findBook,
   importIntoBook,
   moveChapter,
@@ -23,6 +24,7 @@ import { useShelf } from "@/lib/use-library";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
 import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
+import { LimitNote, useLimitGate } from "@/components/upgrade/free-limit";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
 /**
@@ -40,6 +42,8 @@ import { showImportBanner } from "@/components/editor/import-banner-host";
 export function ChapterSidebar({ bookId }: { bookId: string }) {
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
+  // A book somebody let this writer read shows no controls that would be refused.
+  const canWrite = !book || canWriteBook(book);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -55,6 +59,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   const [importError, setImportError] = useState<string | null>(null);
   const [pending, setPending] = useState<ImportedChapter[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Counted against the free plan's ten, exactly as the book panel's copy of
+  // this control is: the same file into the same book by a different door.
+  const gate = useLimitGate("imports");
+  const allowance = gate.allowance;
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -78,6 +86,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
    * comes in split into chapters — but lands inside the book already open.
    */
   const handleImport = async (file: File) => {
+    // `check` and not `spend`: the store counts imports at its own funnel.
+    if (!gate.check()) return;
     setImporting(true);
     setImportError(null);
     try {
@@ -205,19 +215,24 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     return (
       <li
         key={chapter.id}
-        draggable
-        onDragStart={() => setDragId(chapter.id)}
+        // Reordering is a write, so a shared reader's row does not lift. The
+        // handlers go with it rather than staying and failing quietly — a row that
+        // follows the pointer and then springs back says the app is broken.
+        draggable={canWrite}
+        onDragStart={canWrite ? () => setDragId(chapter.id) : undefined}
         onDragEnd={() => {
           setDragId(null);
           setOverId(null);
         }}
         onDragOver={(e) => {
+          if (!canWrite) return;
           // Without preventDefault the browser refuses the drop.
           e.preventDefault();
           if (dragId && dragId !== chapter.id) setOverId(chapter.id);
         }}
         onDragLeave={() => setOverId(null)}
         onDrop={(e) => {
+          if (!canWrite) return;
           e.preventDefault();
           handleDropOn(chapter.id);
         }}
@@ -278,7 +293,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           </Link>
         )}
 
-        {renamingId !== chapter.id && (
+        {/* Every item in this menu writes the `chapters` row — a star as much as
+            a rename — so the whole menu goes for a reader rather than opening
+            onto three things that cannot be done. */}
+        {renamingId !== chapter.id && canWrite && (
           <span className="absolute top-1/2 right-2 -translate-y-1/2">
             <RowMenu
               label={chapter.title}
@@ -355,6 +373,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     );
 
     if (pages.length === 0) {
+      // "Start the front matter" creates a dozen pages, which is the owner's
+      // decision about the shape of their book. Nothing at all for a reader: an
+      // empty part they cannot fill has nothing to say to them.
+      if (!canWrite) return null;
       return (
         <button
           type="button"
@@ -381,15 +403,18 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         {/* A heading rather than a row: these pages are named, so without one
             "Dedication" and "Acknowledgements" sit in the same list with
             nothing saying which end of the book they belong to. */}
-        <p className="flex items-center gap-2.5 px-3 pt-3 pb-1 font-sans text-xs
-                      font-bold tracking-wide text-muted uppercase">
+        <p
+          className="flex items-center gap-2.5 px-3 pt-3 pb-1 font-sans text-xs
+                      font-bold tracking-wide text-muted uppercase"
+        >
           {icon}
           {label}
         </p>
         <ul>
           {pages.map((page) => {
             const isActive = page.id === activeId;
-            if (renamingId === page.id) return <li key={page.id}>{renameForm(page)}</li>;
+            if (renamingId === page.id)
+              return <li key={page.id}>{renameForm(page)}</li>;
             return (
               <li key={page.id} className="group relative">
                 <Link
@@ -411,27 +436,29 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   <span className="flex-1 truncate">{page.title}</span>
                 </Link>
 
-                <span className="absolute top-1/2 right-2 -translate-y-1/2">
-                  <RowMenu
-                    label={page.title}
-                    active={isActive}
-                    items={[
-                      {
-                        label: "Rename",
-                        hint: "R",
-                        icon: menuIcons.rename,
-                        onSelect: () => startRename(page),
-                      },
-                      {
-                        label: "Delete",
-                        hint: "D",
-                        icon: menuIcons.trash,
-                        onSelect: () => handleDelete(page),
-                        danger: true,
-                      },
-                    ]}
-                  />
-                </span>
+                {canWrite && (
+                  <span className="absolute top-1/2 right-2 -translate-y-1/2">
+                    <RowMenu
+                      label={page.title}
+                      active={isActive}
+                      items={[
+                        {
+                          label: "Rename",
+                          hint: "R",
+                          icon: menuIcons.rename,
+                          onSelect: () => startRename(page),
+                        },
+                        {
+                          label: "Delete",
+                          hint: "D",
+                          icon: menuIcons.trash,
+                          onSelect: () => handleDelete(page),
+                          danger: true,
+                        },
+                      ]}
+                    />
+                  </span>
+                )}
               </li>
             );
           })}
@@ -478,9 +505,17 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="shrink-0 px-4 pt-3 pb-3">
-        {/* New chapter leads, Import sits beside it as a compact button — one
-            row rather than two stacked. */}
-        <div className="flex items-stretch gap-2">
+        {/* **Hidden rather than disabled for a book somebody let you read.**
+            The house rule is that a control either works or plainly says it is
+            not built — and neither applies here: these work perfectly well, for
+            somebody else. A greyed-out New chapter on a book that is not yours
+            invites a writer to keep pressing it looking for the unlock. The line
+            below says what the panel is for instead, once. */}
+        {canWrite ? (
+          <>
+            {/* New chapter leads, Import sits beside it as a compact button — one
+                row rather than two stacked. */}
+            <div className="flex items-stretch gap-2">
           <button
             type="button"
             onClick={handleCreate}
@@ -496,6 +531,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
               appends its chapters here. Icon only, so the row stays compact. */}
           <button
             type="button"
+            // Live even when the ten are gone — the refusal happens on the
+            // press, in `handleImport`.
             disabled={importing}
             onClick={() => fileRef.current?.click()}
             aria-label={importing ? "Reading file…" : "Import a file"}
@@ -523,28 +560,39 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           </button>
         </div>
 
-        <input
-          ref={fileRef}
-          type="file"
-          accept={IMPORT_ACCEPT}
-          aria-label="Import a chapter file"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            // Reset, or choosing the same file twice fires nothing.
-            e.target.value = "";
-            if (file) void handleImport(file);
-          }}
-        />
+            <input
+              ref={fileRef}
+              type="file"
+              accept={IMPORT_ACCEPT}
+              aria-label="Import a chapter file"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                // Reset, or choosing the same file twice fires nothing.
+                e.target.value = "";
+                if (file) void handleImport(file);
+              }}
+            />
 
-        {importError && (
-          <p
-            role="alert"
-            className="mt-2 rounded-md border border-line bg-raised px-2.5 py-2
-                       font-sans text-xs leading-relaxed"
-            style={{ color: "var(--color-danger)" }}
-          >
-            {importError}
+            {gate.refused && <LimitNote allowance={allowance} className="mt-2" />}
+
+            {importError && (
+              <p
+                role="alert"
+                className="mt-2 rounded-md border border-line bg-raised px-2.5 py-2
+                           font-sans text-xs leading-relaxed"
+                style={{ color: "var(--color-danger)" }}
+              >
+                {importError}
+              </p>
+            )}
+          </>
+        ) : (
+          <p className="rounded-md border border-line bg-raised px-2.5 py-2
+                        font-sans text-xs leading-relaxed text-muted">
+            <strong className="font-semibold text-fg">Read-only.</strong> This
+            book was shared with you to read. You can open every chapter and
+            export the book; adding and renaming stay with whoever owns it.
           </p>
         )}
       </div>

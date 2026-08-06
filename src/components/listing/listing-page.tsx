@@ -70,7 +70,11 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
 
   // The app's splash is for the app; an embedded tool waits silently.
   if (!hydrated)
-    return embedded ? <div className={toolShell(embedded)} /> : <LoadingScreen />;
+    return embedded ? (
+      <div className={toolShell(embedded)} />
+    ) : (
+      <LoadingScreen />
+    );
 
   if (!book) {
     return (
@@ -100,19 +104,25 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-3xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
-        {/* `max-w-3xl`: this is a form rather than a grid of cards, and the
-            5xl the tool pages default to would run a two-column layout of
-            short fields across most of a laptop with nothing holding them
-            together. */}
-        <ListingDetails
-          book={book}
-          meta={fields}
-          onChange={(patch) =>
-            setDraft((current) => ({ ...(current ?? stored ?? {}), ...patch }))
-          }
-        />
+        {/* **The page is as wide as every other tool; the form is not.** The
+            margins have to match the screen next door, but a two-column layout
+            of short fields run across most of a laptop has nothing holding it
+            together — so the container is shared and the form keeps its own
+            measure inside it. */}
+        <div className="max-w-3xl">
+          <ListingDetails
+            book={book}
+            meta={fields}
+            onChange={(patch) =>
+              setDraft((current) => ({
+                ...(current ?? stored ?? {}),
+                ...patch,
+              }))
+            }
+          />
+        </div>
 
         {/* **Says where the answers go, since the Save button now says when.**
 

@@ -160,7 +160,7 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
         it was being done. This is yours, in a document you can send.
       </ToolHeader>
 
-      <div className="mx-auto max-w-5xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
         {error && (
           <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
             {error}

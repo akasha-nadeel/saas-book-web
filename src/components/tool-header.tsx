@@ -85,6 +85,13 @@ export function ToolHeader({
   /**
    * Must match the page's own container, or the two edges disagree.
    *
+   * **One measure for every tool, so the margins do not jump between them.**
+   * It was `5xl` with three screens opting wider, which meant walking from the
+   * blurb to the comps moved both edges of the page. The widest of them is now
+   * the default and the opt-outs are gone: the deck is capped separately and
+   * every page caps its own prose, so a wider container never widens a line of
+   * text — it only stops wasting the sides of an ordinary laptop.
+   *
    * **The default is a page width, not a reading measure.** It was `3xl` — 768
    * pixels — which is right for a column of prose and wrong for what these
    * screens actually hold: forms, stat rows, card grids and drawn figures. On
@@ -93,7 +100,8 @@ export function ToolHeader({
    * separately at `2xl`, so widening the page does not stretch the one thing
    * here that *is* prose.
    */
-  width = "5xl",
+  width = "7xl",
+  deckWidth = "measure",
   /**
    * The tool's Save control, drawn at the top right.
    *
@@ -111,6 +119,12 @@ export function ToolHeader({
   tool: string;
   title?: string;
   width?: keyof typeof WIDTHS;
+  /**
+   * How wide the deck runs. `measure` (the default) caps it at a readable
+   * eighty characters; `full` lets it run the page's own width, which is only
+   * right for a deck of a line or two — see the note beside it below.
+   */
+  deckWidth?: "measure" | "full";
   action?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -130,25 +144,38 @@ export function ToolHeader({
   const from = areaLabel(fromId);
 
   return (
-    <header className="border-b border-line bg-panel">
-      <div className={`mx-auto ${WIDTHS[width]} px-6 py-5`}>
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-          <nav
-            aria-label="Breadcrumb"
-            className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted"
-          >
-            <Link href="/" className="hover:text-fg">
-              Books
-            </Link>
-            <span aria-hidden="true">›</span>
-            <Link href={`/book/${book.id}`} className="truncate hover:text-fg">
-              {book.title}
-            </Link>
-            <span aria-hidden="true">›</span>
-            <span className="font-semibold text-fg">{tool}</span>
-          </nav>
+    /* **A card, like everything under it.** The header used to be a full-bleed
+       band with a hairline under it — the shape a page header takes when it is
+       the only thing on the screen that is not a card. Every tool now works in
+       boxes, and a band above a column of them reads as chrome the page is
+       sitting in rather than as the first thing on the page. Boxed, the screen
+       is one stack: what this is, then what it does.
 
-          {/* Beside the trail rather than in it. The breadcrumb describes where
+       The band survives as the ground the card sits on, which is what keeps
+       the top of the page distinct from the working area without a rule. */
+    <header className="bg-surface">
+      <div className={`mx-auto ${WIDTHS[width]} px-6 pt-6`}>
+        <div className="rounded-2xl border border-line bg-panel p-5 @2xl:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <nav
+              aria-label="Breadcrumb"
+              className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted"
+            >
+              <Link href="/" className="hover:text-fg">
+                Books
+              </Link>
+              <span aria-hidden="true">›</span>
+              <Link
+                href={`/book/${book.id}`}
+                className="truncate hover:text-fg"
+              >
+                {book.title}
+              </Link>
+              <span aria-hidden="true">›</span>
+              <span className="font-semibold text-fg">{tool}</span>
+            </nav>
+
+            {/* Beside the trail rather than in it. The breadcrumb describes where
               this page sits — a tool belongs to a book — and the launcher is
               not its parent: the same screen is reached from the book cards,
               from Prepare and from the roadmap. This is a shortcut back to the
@@ -159,75 +186,75 @@ export function ToolHeader({
               thing in this header and a box gave it the weight of an action —
               which put a second heavy element on the one row that should be
               quiet. */}
-          {/* The way back names where it goes. When a caller said where the
+            {/* The way back names where it goes. When a caller said where the
               writer came from, that wins — returning them to the launcher when
               they arrived from a list they were working through is the thing
               this exists to stop. "All tools" stays for everyone else. */}
-          <Link
-            href={from ? `/?area=${fromId}` : "/?area=tools"}
-            className="shrink-0 text-xs font-semibold text-muted hover:text-fg"
-          >
-            ← {from ? `Back to ${from}` : "All tools"}
-          </Link>
-        </div>
+            <Link
+              href={from ? `/?area=${fromId}` : "/?area=tools"}
+              className="shrink-0 text-xs font-semibold text-muted hover:text-fg"
+            >
+              ← {from ? `Back to ${from}` : "All tools"}
+            </Link>
+          </div>
 
-        {/* Cover, then the whole of the text hanging off it.
+          {/* Cover, then the whole of the text hanging off it.
 
             `items-start` and not `items-center`: the block is three lines of
             different weights, and centring it against the cover would leave
             the heading floating at whatever height the description happened to
             make. The top edges agree instead. */}
-        <div className="mt-4 flex items-start gap-4">
-          {/* Linked, because the cover is what a writer reaches for the moment
+          <div className="mt-4 flex items-start gap-4">
+            {/* Linked, because the cover is what a writer reaches for the moment
               they see it is the wrong book. Shadowed rather than bordered so it
               reads as an object on the page instead of a framed thumbnail. */}
-          <Link
-            href={`/book/${book.id}`}
-            aria-label={`Open ${book.title}`}
-            className="w-11 shrink-0 overflow-hidden rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.18),0_6px_12px_-6px_rgba(0,0,0,0.35)]
+            <Link
+              href={`/book/${book.id}`}
+              aria-label={`Open ${book.title}`}
+              className="w-11 shrink-0 overflow-hidden rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.18),0_6px_12px_-6px_rgba(0,0,0,0.35)]
                        transition-transform hover:-translate-y-0.5 sm:w-12"
-          >
-            <BookCover
-              title={book.title}
-              words={bookWordCount(book)}
-              seed={book.id}
-              image={cover}
-              {...(book.subtitle ? { subtitle: book.subtitle } : {})}
-              {...(book.author ? { author: book.author } : {})}
-              {...(book.bareCover ? { bare: true } : {})}
-            />
-          </Link>
+            >
+              <BookCover
+                title={book.title}
+                words={bookWordCount(book)}
+                seed={book.id}
+                image={cover}
+                {...(book.subtitle ? { subtitle: book.subtitle } : {})}
+                {...(book.author ? { author: book.author } : {})}
+                {...(book.bareCover ? { bare: true } : {})}
+              />
+            </Link>
 
-          <div className="min-w-0 flex-1">
-            {/* Whose book, small and above — the eyebrow the heading needed.
+            <div className="min-w-0 flex-1">
+              {/* Whose book, small and above — the eyebrow the heading needed.
                 It was a pill on its own row and is now a line of type, which
                 is all it ever had to be. */}
-            <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs">
-              <Link
-                href={`/book/${book.id}`}
-                className="truncate font-semibold text-fg hover:text-accent"
-              >
-                {book.title}
-              </Link>
-              <span className="whitespace-nowrap text-muted">
-                {bookChapterCount(book).toLocaleString()}{" "}
-                {bookChapterCount(book) === 1 ? "chapter" : "chapters"} ·{" "}
-                {bookWordCount(book).toLocaleString()}{" "}
-                {bookWordCount(book) === 1 ? "word" : "words"}
-              </span>
-            </p>
+              <p className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-xs">
+                <Link
+                  href={`/book/${book.id}`}
+                  className="truncate font-semibold text-fg hover:text-accent"
+                >
+                  {book.title}
+                </Link>
+                <span className="whitespace-nowrap text-muted">
+                  {bookChapterCount(book).toLocaleString()}{" "}
+                  {bookChapterCount(book) === 1 ? "chapter" : "chapters"} ·{" "}
+                  {bookWordCount(book).toLocaleString()}{" "}
+                  {bookWordCount(book) === 1 ? "word" : "words"}
+                </span>
+              </p>
 
-            {/* A step up from 2xl. This is the name of the screen a writer
+              {/* A step up from 2xl. This is the name of the screen a writer
                 deliberately navigated to, and it was sitting at the same size
                 as a section heading inside the page under it — the thing that
                 says where you are should not be the same weight as the things
                 that say what is on the shelf. Held back on a phone, where 3xl
                 wraps a two-word tool name onto two lines. */}
-            <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">
-              {title ?? tool}
-            </h1>
+              <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-fg sm:text-3xl">
+                {title ?? tool}
+              </h1>
 
-            {/* Capped at a readable measure. Running the full width of a 5xl
+              {/* Capped at a readable measure. Running the full width of a 5xl
                 page gave a line nobody wants to read twice, and it was most of
                 why this header looked loose. At `text-base` that cap is about
                 eighty characters, which is shorter than it was at `text-sm` —
@@ -240,15 +267,28 @@ export function ToolHeader({
                 of these screens it is the only explanation of what the tool is
                 for. So it takes the page's own ink held slightly back, the
                 same treatment the pricing page's deck already uses, with the
-                weight lifted to match. */}
-            {children && (
-              <p className="mt-2 max-w-2xl text-base leading-relaxed font-medium text-fg/75">
-                {children}
-              </p>
-            )}
-          </div>
+                weight lifted to match.
 
-          {action}
+                **`deckWidth` is the escape hatch, and the cap is still the
+                default.** A deck of two short sentences reads better across
+                the page than stacked into a narrow column beside an acre of
+                empty header — but that is only true once it is short. Widen
+                this on a screen and shorten the words in the same commit, or
+                the cap comes back as a line of a hundred and sixty
+                characters. */}
+              {children && (
+                <p
+                  className={`mt-2 text-base leading-relaxed font-medium text-fg/75 ${
+                    deckWidth === "full" ? "" : "max-w-2xl"
+                  }`}
+                >
+                  {children}
+                </p>
+              )}
+            </div>
+
+            {action}
+          </div>
         </div>
       </div>
     </header>
