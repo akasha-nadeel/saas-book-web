@@ -77,6 +77,21 @@ export function ShareDialog({
   const [copied, setCopied] = useState<string | null>(null);
   const [showLimit, setShowLimit] = useState(false);
   /*
+   * **Whether a *press* has been refused — not whether the book is full.**
+   *
+   * `LimitBanner`'s own rule is that it stands for as long as the limit lasts,
+   * and for the four counted actions that is right: ten searches spent means the
+   * screen cannot do the thing it exists for, and a writer returning tomorrow
+   * should be told where they are without pressing a dead button to find out.
+   *
+   * Seats are not that. A book at 2 of 2 is not a failure state — it is the
+   * feature working exactly as set up, and a purple upgrade block across it tells
+   * somebody they have a problem when what they have is a co-writer. So the
+   * banner waits for the same moment the dialog does: a press that was actually
+   * refused.
+   */
+  const [refused, setRefused] = useState(false);
+  /*
    * The invitation that has just been made, held so its link can be handed over.
    *
    * It used to be copied to the clipboard silently and confirmed with a green
@@ -125,6 +140,7 @@ export function ShareDialog({
      */
     if (allowance.blocked) {
       setProblem(null);
+      setRefused(true);
       if (!pro) setShowLimit(true);
       else setProblem(spentLine(allowance));
       return;
@@ -305,7 +321,11 @@ export function ShareDialog({
               a margin on top of it would double the gap only when the banner is
               showing — which is the hardest kind of spacing bug to spot, because
               the screen looks right until somebody fills a book. */}
-          {allowance.blocked &&
+          {/* `refused && blocked`, not `blocked`: removing somebody makes room, and
+              the banner should go the moment it does rather than outlive the
+              limit it describes. */}
+          {refused &&
+            allowance.blocked &&
             (pro ? (
               <p className="rounded-xl border border-line bg-panel px-4 py-3 text-sm text-muted">
                 {spentLine(allowance)} Remove somebody to make room.
