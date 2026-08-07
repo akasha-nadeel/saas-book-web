@@ -98,15 +98,55 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
  *   money per use and are the only things here that do.
  * - **The business layer is Pro.** Earnings, advance readers, the curve, the
  *   evidence document: a drafting writer has no money and a selling one does.
+ * - **A cap Pro *raises* is a fourth kind, and the three above do not cover
+ *   it.** People per book and the story bible are not metered per use and are
+ *   not the business layer — they are one feature, sized. So they read "2 / 10"
+ *   and "Per book / Across a series" rather than "Unlimited" or a cross, either
+ *   of which would be false in a different direction: the free plan really does
+ *   share a book with somebody, and Pro really does not make that unbounded.
+ *   Both numbers come from `SEATS_PER_BOOK`, so this page cannot drift from what
+ *   the database enforces.
  *
  * Two rows were removed rather than reworded. "Books 50" and "Imports 10 files"
  * were limits the code has never enforced — a promise on a pricing page that
  * nothing implements is the same failure as a claim the code cannot back, and
  * this is the page a sceptical reader checks hardest.
  */
-const ROWS: { label: string; starter: string; pro: string }[] = [
+const ROWS: {
+  label: string;
+  /**
+   * A quieter aside after the label, set in parentheses and a size down.
+   *
+   * Its own field rather than part of `label`, because a detail baked into the
+   * string cannot be styled apart from the thing it qualifies — and it should
+   * be: "which four" is a footnote to "Exports", not a second half of the name.
+   * Keeping them separate also means `STARTER_HIGHLIGHT` still matches on a
+   * short, stable label.
+   */
+  detail?: string;
+  starter: string;
+  pro: string;
+}[] = [
   { label: "Books and words", starter: "Unlimited", pro: "Unlimited" },
-  { label: "Exports", starter: "All four", pro: "All four" },
+  /*
+   * **Named in the label, counted in the badge.**
+   *
+   * "All four" alone asked the reader to take our word for how many and which —
+   * on the row that is this page's whole argument, since every competitor
+   * charges for formatting. Naming them costs one line and answers it.
+   *
+   * They sit in the *label* rather than the badge because the badge column is a
+   * column of short answers, and "All four (EPUB, DOCX, PDF, Markdown)" in a
+   * pill would be twice the width of every other one and break the alignment
+   * that makes the column scannable.
+   *
+   * Written out rather than imported from `export/index.ts`: that module pulls
+   * in `cover-store` and the export pipeline at the top level, which is a great
+   * deal of code to drag into a pricing page for four words. `Format` there is a
+   * type and cannot be counted at runtime anyway. If a fifth format ever ships,
+   * this line is part of shipping it.
+   */
+  { label: "Exports", detail: "EPUB, DOCX, PDF, Markdown", starter: "All four", pro: "All four" },
   /*
    * The four counted rows, and every number is read out of `FREE_LIMITS` so the
    * page and the gate cannot drift — the same rule the prices follow.
@@ -259,9 +299,9 @@ export function Plans({
           <PlanCard
             mark={<PenIcon className="h-6 w-6" />}
             name="Starter"
-            blurb="For everything it takes to write a book and get it out."
+            blurb="For everything it takes to write a book — on your own or with one other — and get it out."
             price="$0"
-            rows={ROWS.map((r) => ({ label: r.label, value: r.starter }))}
+            rows={ROWS.map((r) => ({ label: r.label, detail: r.detail, value: r.starter }))}
             action={
               // Not a disabled "current plan" chip: a writer who is already in
               // has somewhere to be, and one who is not has an account to make.
@@ -286,7 +326,7 @@ export function Plans({
             blurb="For the assistant, the money, the readers and the book read aloud."
             price={headline}
             note={note}
-            rows={ROWS.map((r) => ({ label: r.label, value: r.pro }))}
+            rows={ROWS.map((r) => ({ label: r.label, detail: r.detail, value: r.pro }))}
             action={
               alreadyPro ? (
                 // Nothing to sell someone who has already bought it. A disabled
@@ -424,6 +464,109 @@ function PeriodToggle({
  * it, the blurb, the figure, the action, a rule, then the lines. Everything is
  * a token, so it holds in both themes.
  */
+type Tone = "gold" | "purple" | "blue";
+
+/**
+ * The two rows the Starter card puts in purple.
+ *
+ * **These are the wedge, and the pricing page should look like it.** Every
+ * competitor charges for formatting — Scrivener $60, Atticus $147, Vellum $200
+ * and up — and most charge again for syncing between machines. Giving both away
+ * is the argument this page is making, so on the free card they get the colour
+ * that says "look here" rather than sitting in the same blue as the row counting
+ * cover searches.
+ *
+ * Matched on the label, which is a string, so a rename in `ROWS` silently drops
+ * the highlight. It lives directly under `ROWS` for that reason — the two are
+ * meant to be read together.
+ */
+const STARTER_HIGHLIGHT = new Set(["Exports", "Sync"]);
+
+/**
+ * Which fill a value wears.
+ *
+ * Gold outranks everything: it means *no ceiling*, and it may never be spent on
+ * anything else. After that the card decides — Pro is purple throughout, and
+ * Starter is blue except for the two rows above.
+ */
+function badgeTone(label: string, value: string, pro: boolean): Tone {
+  if (value === "Unlimited") return "gold";
+  if (pro) return "purple";
+  return STARTER_HIGHLIGHT.has(label) ? "purple" : "blue";
+}
+
+/**
+ * A row's value, as a badge rather than a line of grey text.
+ *
+ * **Gold is spent on one word.** "Unlimited" is the only value in this table
+ * that describes something genuinely without a ceiling, and it is the answer a
+ * reader is scanning the Pro column *for* — so it gets the fill, the halo and
+ * the shine, and nothing else does. That restraint is the whole mechanism: a
+ * table where every badge glitters has no emphasis in it, only noise, and the
+ * eye stops being able to find the row that matters. If a second value ever
+ * wears gold, this stops working and the tokens' own note in globals.css says
+ * so.
+ *
+ * Everything else is blue, white-inked, with its own soft halo. Two fills
+ * rather than a loud one and a quiet one, because **the hue now carries the
+ * hierarchy that weight used to** — gold reads as the exception at a glance,
+ * against a column of blue, without either having to shout.
+ *
+ * The shine stays gold-only. With the two colours doing the separating it would
+ * have been safe to animate both, and it is still the wrong call: two dozen
+ * badges glinting on one screen is a page that will not sit still to be read,
+ * and the movement is worth more spent on the one row it was bought for.
+ *
+ * The gold keeps its dark ink. White on it measures between 1.25:1 and 2.27:1 —
+ * not merely low but genuinely unreadable — where the dark ink runs 5.6:1 to
+ * 10.2:1. The blue is the other way round by design: its lightest stop was
+ * chosen so that *white* clears AA on it.
+ *
+ * "Not included" never becomes a badge. A badge is a thing you are being given;
+ * putting a negative in one dresses an absence up as a feature, and the crossed
+ * mark to its left has already said it more honestly.
+ */
+function ValueBadge({ value, tone }: { value: string; tone: Tone }) {
+  if (tone === "gold") {
+    return (
+      <span
+        className="oc-shine relative inline-flex items-center overflow-hidden
+                   rounded-full bg-linear-to-b from-gold-a via-gold-b to-gold-c
+                   px-3 py-1 font-sans text-[0.9375rem] leading-tight
+                   font-bold tracking-tight text-gold-ink
+                   shadow-[0_0_0_1px_var(--color-gold-c),0_2px_10px_-2px_var(--color-gold-glow)]"
+      >
+        {/* The word sits above the sweep, or the shine washes over the letters
+            instead of across the metal behind them. */}
+        <span className="relative z-10">{value}</span>
+      </span>
+    );
+  }
+
+  /* Purple on Pro, blue on Starter — the *card* is the context, so a reader
+     comparing the two columns knows which side they are on without reading a
+     heading. Written as two whole class strings rather than one with a hole in
+     it: Tailwind scans source text, so a class assembled from a variable is a
+     class it never sees and never emits. */
+  return (
+    <span
+      className={
+        tone === "purple"
+          ? `inline-flex items-center rounded-full bg-linear-to-b
+             from-pill-pro-a to-pill-pro-b px-3 py-1 font-sans text-[0.9375rem]
+             leading-tight font-semibold tracking-tight text-pill-ink
+             shadow-[0_0_0_1px_var(--color-pill-pro-b),0_2px_10px_-3px_var(--color-pill-pro-glow)]`
+          : `inline-flex items-center rounded-full bg-linear-to-b
+             from-pill-a to-pill-b px-3 py-1 font-sans text-[0.9375rem]
+             leading-tight font-semibold tracking-tight text-pill-ink
+             shadow-[0_0_0_1px_var(--color-pill-b),0_2px_10px_-3px_var(--color-pill-glow)]`
+      }
+    >
+      {value}
+    </span>
+  );
+}
+
 function PlanCard({
   featured = false,
   badge,
@@ -448,7 +591,7 @@ function PlanCard({
   price: string;
   /** Shown under the price when the cycle needs explaining. */
   note?: string;
-  rows: { label: string; value: string }[];
+  rows: { label: string; detail?: string; value: string }[];
   action: React.ReactNode;
 }) {
   const card = (
@@ -505,7 +648,7 @@ function PlanCard({
       {/* No "Features" heading. The rule already says a new part of the card
           has started, and the reference reads better without a word between
           the button and the list. */}
-      <dl className="mt-6 space-y-3.5">
+      <dl className="mt-6 space-y-4">
         {rows.map((row) => {
           // What the plan gives you is set in the card's own ink — mark, label
           // and value alike — and what it withholds is the only thing faded.
@@ -527,17 +670,45 @@ function PlanCard({
                   legible in both themes: saturated ink at night, darker ink by
                   day. A hex green tuned against black is a smudge on white.
 
-                  Drawn at 20px and a heavier stroke than the card marks above
+                  Drawn at 24px and a heavier stroke than the card marks above
                   them, because these are read as a column at a glance rather
                   than looked at one at a time, and at 16px and hairline weight
                   the tick and the cross are the same grey smudge until you
-                  lean in. */}
+                  lean in.
+
+                  **Sized with the row rather than fixed.** They were 20px
+                  against a 14px label; the values became 15px badges, and a mark
+                  that stays put while everything beside it grows stops reading
+                  as the anchor of its line and starts reading as a bullet
+                  somebody forgot to scale. Now 24px against a 16px label. */}
               {has ? (
-                <CheckIcon className="h-5 w-5 shrink-0 text-ok-fg" />
+                <CheckIcon className="h-6 w-6 shrink-0 text-ok-fg" />
               ) : (
-                <CrossIcon className="h-5 w-5 shrink-0 text-stop-fg" />
+                <CrossIcon className="h-6 w-6 shrink-0 text-stop-fg" />
               )}
-              <dt className="font-sans text-sm">{row.label}</dt>
+              {/* 16px and medium.
+
+                  The label used to stay regular so the semibold badge had
+                  something to win against — but the badges carry a *hue* now,
+                  gold or blue, and hue outranks weight by a distance. So the
+                  hierarchy survives the label getting heavier, and the row stops
+                  reading as a caption with a button stuck on the end.
+
+                  Medium rather than semibold, though: one step below the badge
+                  keeps the order of the two, which is the part that matters. */}
+              <dt className="font-sans text-base leading-snug font-medium">
+                {row.label}
+                {/* A size down, regular weight, muted — three steps back, so it
+                    reads as an aside to the label rather than competing with it.
+                    Inline rather than on its own line: a parenthesis opening at
+                    the end of one line and closing on the next is a bracket the
+                    eye has to hold open. */}
+                {row.detail && (
+                  <span className="ml-1.5 text-xs font-normal text-muted">
+                    ({row.detail})
+                  </span>
+                )}
+              </dt>
               {/* ml-auto rather than a two-column grid: the value is set
                   against the right edge the way a price list is, and a long one
                   wraps under itself instead of squeezing the label.
@@ -547,8 +718,11 @@ function PlanCard({
                   a glyph is the kind of line a reader learns to skip — which
                   costs the rows that do carry a value. */}
               {row.value !== "Included" && !has === false && (
-                <dd className="ml-auto text-right font-sans text-sm text-muted">
-                  {row.value}
+                <dd className="ml-auto shrink-0 pl-2 text-right">
+                  <ValueBadge
+                    value={row.value}
+                    tone={badgeTone(row.label, row.value, Boolean(featured))}
+                  />
                 </dd>
               )}
             </div>
@@ -654,7 +828,10 @@ function Stroke({
 
 function CheckIcon({ className }: { className?: string }) {
   return (
-    <Stroke className={className} weight={2}>
+    // 2.4 rather than 2: at 24px in a column read at a glance, a 2-weight ring
+    // and its tick thin out into the same grey mark, and the difference between
+    // a yes and a no is the one thing this column exists to carry.
+    <Stroke className={className} weight={2.4}>
       <circle cx="10" cy="10" r="7.5" />
       <path d="m6.75 10.25 2.25 2.25 4.25-4.75" />
     </Stroke>
@@ -664,7 +841,7 @@ function CheckIcon({ className }: { className?: string }) {
 /** The same circle, crossed. */
 function CrossIcon({ className }: { className?: string }) {
   return (
-    <Stroke className={className} weight={2}>
+    <Stroke className={className} weight={2.4}>
       <circle cx="10" cy="10" r="7.5" />
       <path d="m7.5 7.5 5 5M12.5 7.5l-5 5" />
     </Stroke>

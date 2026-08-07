@@ -43,13 +43,22 @@ export const CURRENCY: Currency =
 /**
  * The prices. `total` is what PayHere charges on each cycle; `perMonth` is what
  * the card shows, because a reader compares plans by the month whatever the
- * cycle. The annual rate is the monthly one less a third, and `total` is
- * exactly twelve times it, so the two figures cannot disagree.
+ * cycle.
+ *
+ * **`total` is exactly twelve times `perMonth`, and that is a rule rather than a
+ * coincidence** — the annual card says "$7.25 a month, billed yearly", and the
+ * two figures disagreeing by a cent would make one of them a lie. A test asserts
+ * it, so a future price change cannot quietly break the pair.
+ *
+ * The annual rate is a third off, near enough: $7.25 against $10.99 is 34%. Both
+ * numbers were chosen to divide cleanly rather than to hit exactly 33.3% — the
+ * arithmetically pure pair is $7.33 and $87.96, and a pricing page reads better
+ * with $87 a year on it than with ninety-six cents nobody will remember.
  */
 const PRICES: Record<Currency, Record<Period, { total: number; perMonth: number }>> = {
   USD: {
-    monthly: { total: 9.0, perMonth: 9.0 },
-    annual: { total: 72.0, perMonth: 6.0 },
+    monthly: { total: 10.99, perMonth: 10.99 },
+    annual: { total: 87.0, perMonth: 7.25 },
   },
   LKR: {
     monthly: { total: 2900, perMonth: 2900 },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { LoadingScreen } from "@/components/loading-screen";
@@ -153,14 +153,20 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
    * `popstate`, no unload. `confirmLeave` falls through when there is nothing
    * pending, so every ordinary press behaves exactly as it did.
    */
-  const setPanel = (stepId: string | null) => {
-    confirmLeave(() => {
-      const next = new URLSearchParams();
-      next.set("phase", open);
-      if (stepId) next.set("open", stepId);
-      router.replace(`${pathname}?${next}`, { scroll: false });
-    });
-  };
+  // Stable, because the Escape handler below lists it as a dependency: a plain
+  // function rebuilt each render would tear down and re-register that listener
+  // on every keystroke inside the open tool.
+  const setPanel = useCallback(
+    (stepId: string | null) => {
+      confirmLeave(() => {
+        const next = new URLSearchParams();
+        next.set("phase", open);
+        if (stepId) next.set("open", stepId);
+        router.replace(`${pathname}?${next}`, { scroll: false });
+      });
+    },
+    [open, pathname, router],
+  );
 
   const openStep = steps.find((s) => s.id === params.get("open")) ?? null;
   const openHref = openStep?.href?.(bookId);
@@ -184,6 +190,29 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
       ? (phases.find((p) => p.id === here) ?? null)
       : null;
 
+  /*
+   * **Escape closes the sheet**, which a two-column split had no reason to offer
+   * and a layer must. It is the first thing anybody tries on something sitting
+   * over a page, and its absence is what makes an overlay feel like a trap.
+   *
+   * Through `setPanel(null)` like every other exit, so `confirmLeave` still gets
+   * its say — a tool holding an unsaved draft asks before this runs, and falls
+   * straight through when there is nothing pending.
+   *
+   * **Above the early returns**, because a hook after one is called on some
+   * renders and not others. Bound only while a tool is open, so the road itself
+   * carries no key handler; and not captured, so a tool's own dialog — which
+   * stops the event — closes itself first rather than taking the sheet with it.
+   */
+  useEffect(() => {
+    if (!openTool) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setPanel(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [openTool, setPanel]);
+
   if (!hydrated) return <LoadingScreen />;
 
   if (!book) {
@@ -201,47 +230,39 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
 
   const share = Math.round((progress.done / progress.total) * 100);
 
-  const split = Boolean(openTool);
-
   return (
     /*
-     * Two columns once a step is open, one otherwise.
+     * **The tool opens *over* the road, not beside it.**
      *
-     * The road keeps its place on the left rather than being replaced: the
-     * whole complaint this page answers is that nobody tells you the order, and
-     * sending a writer to a full-window tool the moment they act on a step
-     * takes the order away again at exactly the moment it is being used. Coming
-     * back then meant the browser's back button and a scroll hunt for where
-     * they were.
+     * The intent has never changed: a writer acting on a step must not lose the
+     * order, because "nobody tells you the order" is the whole complaint this
+     * page answers. What changed is which layout actually keeps that promise.
      *
-     * `lg` is where the split starts. Below it there is no honest way to put a
-     * list and a working tool side by side, so the panel takes the screen —
-     * still a panel with a Close, so the road is one press away, which is the
-     * part that matters.
+     * A two-column split kept the road *visible* and reflowed it to do so — 55%
+     * of the window, so every card re-wrapped, the phase controls stacked, and
+     * the row a writer was reading moved under them. Closing reflowed it all
+     * back. "Where you were" survived in the sense that the page had not
+     * navigated, and not in the sense that anybody could find it again. It also
+     * gave the tool 45% of the window when these are `7xl` screens designed for
+     * the whole of one, and left two scroll contexts competing for the wheel.
+     *
+     * An overlay is the same promise kept literally. The road underneath is not
+     * touched — not narrowed, not re-wrapped, not re-scrolled — so closing is a
+     * true return rather than a rebuild that lands somewhere similar. The sheet
+     * is inset from the left, so the road stays *visible* behind it exactly as
+     * the split intended, and the tool gets more room than the split ever gave
+     * it. One scroll context at a time.
+     *
+     * This is the shape the peek panel takes everywhere it works well — Linear's
+     * issue peek, Notion's page preview — and for this reason rather than for
+     * fashion: a layer costs the thing underneath nothing.
      */
-    <div className="flex h-dvh overflow-hidden bg-surface">
-      {/* A proportion rather than a fixed column, and the larger of the two.
-
-          The road is the subject of this screen — the tool is what a single
-          step opens — so the split reads the wrong way round when the panel
-          dominates. Percentages rather than rem so the ratio holds at every
-          window size instead of the roadmap staying put while the tool takes
-          everything a wider monitor gives.
-
-          A *width* in both states, never `flex-1` in one and a width in the
-          other: two different properties cannot transition into each other, so
-          that pairing snapped the column to its new size while the panel eased
-          in beside it — which looks more broken than no animation at all. With
-          both ends expressed as widths the road narrows as the panel arrives,
-          and the two read as one movement. */}
-      <div
-        className={`shrink-0 overflow-y-auto transition-[width] duration-300 ease-out
-                    motion-reduce:transition-none ${
-                      split
-                        ? "hidden border-r border-line lg:block lg:w-[55%]"
-                        : "w-full"
-                    }`}
-      >
+    <div className="h-dvh overflow-hidden bg-surface">
+      {/* **One width, always.** The road no longer knows whether a tool is open,
+          which is the point: nothing it draws can move when one arrives. The
+          transition that used to ease this column between two widths is gone
+          with the widths — there is no longer anything for it to animate. */}
+      <div className="h-full w-full overflow-y-auto">
         {/* ---- One strip, instead of three blocks -------------------------
 
             This screen opened with a full `ToolHeader` (cover, title, a line of
@@ -258,7 +279,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
             counts survive as text, which is all they ever were: "5 of 18" and
             "28%" are two numbers, and they had a card each. */}
         <header className="sticky top-0 z-10 border-b border-line bg-panel/95 px-6 py-2.5 backdrop-blur">
-          <div className={`flex items-center gap-3 ${split ? "" : "mx-auto max-w-7xl"}`}>
+          <div className="mx-auto flex max-w-7xl items-center gap-3">
             <Link
               href={`/book/${book.id}`}
               aria-label={`Open ${book.title}`}
@@ -296,7 +317,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
         </header>
 
         <div
-          className={`px-6 pt-5 pb-16 ${split ? "" : "mx-auto max-w-7xl"}`}
+          className="mx-auto max-w-7xl px-6 pt-5 pb-16"
         >
         {/* ---- The road, as a stepper -------------------------------------
 
@@ -430,21 +451,14 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
             understood. Skip only appears once the writer has browsed away from
             where they are, since otherwise it would land them where they
             already stand. */}
-        {/* Stacked in the narrow column, one row when the page is whole.
+        {/* One row, now that the column is never narrowed.
 
-            Three controls carrying phase *names* — "← Revise", "Skip to
-            Write", "Before you publish →" — cannot share a 24rem line, and
-            wrapping left them ragged with the primary stranded on its own row
-            anyway. Driven off `split` rather than a breakpoint because the
-            column is narrow while the *viewport* is wide, which is exactly the
-            case a media query cannot see. */}
-        <div
-          className={`mt-8 gap-3 border-t border-line pt-5 ${
-            split
-              ? "flex flex-col items-stretch"
-              : "flex flex-wrap items-center"
-          }`}
-        >
+            This used to stack when the split was open, because three controls
+            carrying phase *names* — "← Revise", "Skip to Write", "Before you
+            publish →" — cannot share a 24rem line. The overlay removes the
+            narrow case entirely, so the wrap-and-push-right version is the only
+            one left. */}
+        <div className="mt-8 flex flex-wrap items-center gap-3 border-t border-line pt-5">
           {previous ? (
             <button
               type="button"
@@ -471,14 +485,12 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
               type="button"
               onClick={() => setPicked(following.id)}
               className={`truncate rounded-lg bg-accent px-4 py-2 text-sm font-semibold
-                         text-accent-ink hover:bg-accent-strong ${
-                           split ? "" : "ml-auto"
-                         }`}
+                         text-accent-ink hover:bg-accent-strong ml-auto`}
             >
               {following.label} →
             </button>
           ) : (
-            <p className={`text-sm text-muted ${split ? "" : "ml-auto"}`}>
+            <p className="ml-auto text-sm text-muted">
               That is the whole road.
             </p>
           )}
@@ -499,9 +511,47 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
           would keep the previous one's scroll position and half-typed state
           under a heading that had changed. */}
       {openTool && openStep && (
+        /*
+          The layer. `fixed` rather than absolute, because the road scrolls and a
+          sheet that scrolled with it would leave the window on the way down.
+          `z-40` sits under the app's dialogs (50) — a tool that opens one of its
+          own, and several do, must appear over this rather than under it.
+        */
+        <div className="fixed inset-0 z-40">
+          {/* **The backdrop is a button, not a div with an onClick.**
+
+              It is the largest dismiss target on the screen and the one most
+              people reach for first, so it has to be a real control: focusable,
+              named, and answering Enter. `aria-hidden` on a clickable div is the
+              commonest way an overlay becomes unusable without a mouse.
+
+              Dark enough to say the road is not the live surface, light enough
+              that it is plainly still there — which is the whole reason this is
+              a layer rather than a navigation. */}
+          <button
+            type="button"
+            aria-label="Close this step and go back to the road"
+            onClick={() => setPanel(null)}
+            className="oc-scrim-in absolute inset-0 cursor-default bg-black/40
+                       backdrop-blur-[1px]"
+          />
+
+          {/* Right-anchored and inset, so the left edge of the road stays in
+              view behind it. That inset is doing the job the 55% column was for
+              — keeping the order visible — at none of the cost, because nothing
+              behind it moves.
+
+              `max-w-6xl` gives the tool more width than the split ever did,
+              while stopping short of the full window: a sheet that reaches both
+              edges is a navigation wearing a Close button, and the thing that
+              makes this readable as a layer is seeing what it sits on. */}
         <section
           aria-label={openStep.title}
-          className="oc-panel-in flex min-w-0 flex-1 flex-col bg-surface"
+          aria-modal="true"
+          role="dialog"
+          className="oc-panel-in absolute inset-y-0 right-0 flex w-full max-w-6xl
+                     flex-col overflow-hidden border-l border-line bg-surface
+                     shadow-2xl lg:inset-y-3 lg:right-3 lg:rounded-2xl lg:border"
         >
           {/* Close and nothing else.
 
@@ -568,6 +618,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
             />
           </div>
         </section>
+        </div>
       )}
     </div>
   );

@@ -137,6 +137,64 @@
   --color-upgrade-to: #4f46e5; /* indigo */
   --color-upgrade-ink: #7c3aed; /* the button's text, on white */
 
+  /* Gold, for the word "Unlimited" on the pricing table and nothing else.
+     ------------------------------------------------------------------------
+     **The second exception to the palette's hue rule, and it is narrow on
+     purpose** — the first is `--color-upgrade-*` above, and both earn it the
+     same way: a saturated fill carries its own ink whatever it sits on, so the
+     value need not change between themes and a value that need not change
+     should not. All five are stated identically in both blocks.
+
+     It does *not* follow `--color-accent`, for the reason the upgrade fill does
+     not: the accent is #ffffff at night, and a badge is a fill, so following it
+     would put a white pill where a gold one was meant.
+
+     Reserved for the one row value that is genuinely unbounded. The moment a
+     second kind of thing wears it, it stops meaning "this has no ceiling" and
+     becomes decoration — which is the whole cost of spending a hue. */
+  --color-gold-a: #fde68a; /* the lit edge the shimmer runs along */
+  --color-gold-b: #f5c33b; /* the body of the badge */
+  --color-gold-c: #dfa11c; /* the shaded edge, so it reads as metal not paint */
+  --color-gold-ink: #4a2c06; /* dark enough to clear 4.5:1 on all three above */
+  --color-gold-glow: #eab308; /* the halo, used only at low alpha */
+
+  /* Blue, for every other value on the pricing table.
+     ------------------------------------------------------------------------
+     Same posture as the gold above and stated identically in both blocks, for
+     the same reason: a saturated fill carries its own ink whatever it sits on.
+
+     **The lightest stop is the one that has to pass.** Text sits across the
+     whole gradient, so the top of it — not the average — decides whether the
+     badge is readable. #2563eb carries white at 5.17:1 and #1d4ed8 at 6.70:1,
+     so both ends clear AA; the obvious brighter choice, #3b82f6, is 3.68:1 and
+     would have been a badge nobody could read at 15px.
+
+     Deliberately *not* `--color-accent`. The accent is white at night, so a
+     badge following it would be a white pill with white text — and by day it is
+     #312e81, a much deeper, more violet indigo. Keeping this its own value is
+     also what keeps the accent meaning "the way forward" rather than becoming
+     the colour every chip happens to wear. */
+  --color-pill-a: #2563eb; /* the lit top of the fill — 5.17:1 against white */
+  --color-pill-b: #1d4ed8; /* the shaded foot — 6.70:1 */
+  --color-pill-ink: #ffffff;
+  --color-pill-glow: #3b82f6; /* the halo, used only at low alpha */
+
+  /* And the same pill on the Pro card, in purple.
+     ------------------------------------------------------------------------
+     Two fills for one component, because the *card* is the context: Starter's
+     values are blue and Pro's are purple, so a reader comparing the columns can
+     tell which side they are looking at without reading a heading. It is also
+     the purple the Pro card already wears — `--color-upgrade-from` is this
+     exact value — so the badges join the card rather than adding a third idea
+     to it.
+
+     White clears AA on both stops (5.38:1 and 6.98:1), and that constraint is
+     what picked them: purple-500 is prettier and 3.96:1, which would have been
+     a badge nobody could read. */
+  --color-pill-pro-a: #9333ea;
+  --color-pill-pro-b: #7e22ce;
+  --color-pill-pro-glow: #a855f7;
+
   /* The second half of the wordmark — the "Chapter" in OpenChapter, and
      nothing else. It is a *brand* colour rather than chrome, which is why it
      is allowed a hue at all: same reasoning as the fifteen tool marks, and the
@@ -435,6 +493,22 @@
   --color-upgrade-from: #9333ea;
   --color-upgrade-to: #4f46e5;
   --color-upgrade-ink: #7c3aed;
+
+  /* Identical to the dark block on purpose — see the note there. */
+  --color-gold-a: #fde68a;
+  --color-gold-b: #f5c33b;
+  --color-gold-c: #dfa11c;
+  --color-gold-ink: #4a2c06;
+  --color-gold-glow: #eab308;
+
+  /* Identical to the dark block — see the note there. */
+  --color-pill-a: #2563eb;
+  --color-pill-b: #1d4ed8;
+  --color-pill-ink: #ffffff;
+  --color-pill-glow: #3b82f6;
+  --color-pill-pro-a: #9333ea;
+  --color-pill-pro-b: #7e22ce;
+  --color-pill-pro-glow: #a855f7;
 
   /* The wordmark's second half, in daylight: the indigo of the landing page's
      closing banner, lifted a step. That family is the whole reason for the
@@ -2376,7 +2450,11 @@ body {
 @keyframes oc-panel-in {
   from {
     opacity: 0;
-    transform: translateX(1.25rem);
+    /* A sheet's worth of travel, not a column's. This was 1.25rem when the panel
+       eased open *beside* the road and only had to suggest arrival; a layer that
+       covers most of the window has to be seen coming from somewhere, or it
+       reads as the page having been replaced. */
+    transform: translateX(2.5rem);
   }
   to {
     opacity: 1;
@@ -2400,6 +2478,76 @@ body {
    of contents in a frame that is already there. */
 .oc-panel-in {
   animation: oc-panel-in 300ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* The scrim behind it, fading rather than sliding.
+
+   A backdrop that travelled with the sheet would read as part of the sheet; what
+   it has to say is that the page behind has gone quiet, and quiet is a fade. It
+   is deliberately quicker than the panel, so the road dims *before* the sheet
+   lands rather than arriving with it and looking like one heavy object. */
+@keyframes oc-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* The shine crossing a gold badge.
+   --------------------------------------------------------------------------
+   A pseudo-element sweeping a soft white band across the fill, clipped by the
+   badge's own `overflow-hidden`. Not a background-position animation: that
+   animates paint on the main thread, and this runs on `transform`, which the
+   compositor handles — twenty of these on one screen and the difference is the
+   page scrolling smoothly or not.
+
+   **It rests for most of the cycle.** The sweep takes about a fifth of the
+   loop and the rest is still, so it reads as an occasional glint rather than a
+   thing permanently in motion. A badge that shimmers without pause is a badge
+   nobody can read the word on.
+
+   Stopped outright under `prefers-reduced-motion`. The gradient, the glow and
+   the contrast all survive it, so nothing is lost but the movement — which is
+   the test for whether an animation was decoration or information. */
+@keyframes oc-shine {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+  22%,
+  100% {
+    transform: translateX(240%) skewX(-18deg);
+  }
+}
+
+.oc-shine::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgb(255 255 255 / 0.7),
+    transparent
+  );
+  animation: oc-shine 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-shine::after {
+    animation: none;
+    /* Parked off-screen rather than left mid-sweep across the word. */
+    transform: translateX(-140%);
+  }
+}
+
+.oc-scrim-in {
+  animation: oc-scrim-in 180ms ease-out both;
 }
 
 .oc-step-in {

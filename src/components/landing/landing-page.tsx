@@ -9,6 +9,7 @@ import { StoreListingDemo } from "@/components/landing/store-listing-demo";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
+import { SEATS_PER_BOOK } from "@/lib/free-limits";
 
 /**
  * The landing page.
@@ -428,6 +429,21 @@ const FAQ = [
   [
     "I have a finished manuscript. Where does it go?",
     "Straight in. Import a .docx, .epub, .md, .txt or .html file and it is split into chapters for you. Then the first screen tells you what stands between it and a shop — usually four or five things, most of them ten minutes each.",
+  ],
+  /*
+   * **The question the new section invites, answered before it is asked.**
+   *
+   * "Two writers" reads as Google Docs to anybody who has used Google Docs, and
+   * this is not that — changes travel on save, not per keystroke. Leaving that
+   * to be discovered is the exact failure this page exists to avoid, and it is
+   * cheaper to say plainly here than to have somebody find out with a co-writer
+   * waiting. The comparison is checkable rather than a boast: Dabble's own
+   * documentation states that an invitee's access depends on their own
+   * subscription, so on the closest tool to this one both people pay.
+   */
+  [
+    "Can two of us write the same book?",
+    "Yes. Put somebody on a book and choose whether they can edit it or only read it — free covers you and one other, and Pro raises that. Whoever owns the book pays for the seats, so the person you invite needs an account and nothing else. What it is not is Google Docs: you will not see each other type. Changes travel when they are saved, and if you both write the same chapter at once the second save is refused rather than quietly replacing the first. Working in different chapters, which is what usually happens, needs no thought at all.",
   ],
   [
     "What doesn’t it do?",
@@ -1177,6 +1193,125 @@ export function LandingPage() {
         </section>
 
         {/* ---- Still to come -------------------------------------------- */}
+        {/* ---- Two writers ---------------------------------------------- */}
+        {/*
+          **Placed after the tools and before the refusals, not in the hero.**
+
+          The page's argument is "nobody tells you the order", and that is the one
+          claim a competitor cannot answer by shipping a feature. Co-writing is a
+          different axis — genuinely attractive, and not what this page is about —
+          so it earns a section rather than the headline. Putting it higher would
+          trade the sharpest thing on the page for a feature several other tools
+          also have.
+
+          Everything countable here is imported: the seat numbers come from
+          `SEATS_PER_BOOK`, which is also what the database enforces and what the
+          pricing page prints. Nothing on this page may restate a figure.
+
+          The competitive line is checkable and that is why it is here at all.
+          Dabble's own documentation says "the invitee's access depends on their
+          own subscription level, not the project owner's" — so on the tool
+          closest to this one, both people pay. Ours is the owner's plan, and a
+          reader can verify that by being invited.
+        */}
+        <section className="border-b border-lp-line px-6 py-14 sm:py-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="Two writers"
+              title="Some books have more than one author"
+              lead="Put somebody on a book and choose what they may do with it. They write with you, or they only read. Free covers you and one other; nobody has to buy anything to be invited."
+            />
+
+            <div className="mt-12 grid gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-center">
+              <ul className="space-y-7">
+                {[
+                  [
+                    "Two levels, both enforced",
+                    "Can edit writes the chapters. Can view reads the book and exports it, and changes nothing — refused by the database, not just hidden on screen.",
+                  ],
+                  [
+                    "The owner pays, not the guest",
+                    "Whoever owns the book covers its seats. The person you invite needs an account and nothing else.",
+                  ],
+                  [
+                    "Their half stays theirs",
+                    "Chapters and notes travel. Your story bible, ledger and writing record do not — and the app says so before you share, not after.",
+                  ],
+                ].map(([name, note]) => (
+                  <li key={name} className="flex gap-4">
+                    <Icon
+                      name="check"
+                      className="mt-1 h-[19px] w-[19px] shrink-0"
+                      weight={2.3}
+                    />
+                    <div>
+                      <p className="oc-heading font-serif text-lg text-lp-ink">
+                        {name}
+                      </p>
+                      <p className="mt-1.5 leading-relaxed">{note}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+
+              {/* Drawn in markup, never screenshotted — a picture of this app
+                  goes stale silently while the app moves, on the one page whose
+                  whole pitch is being checkable. It quotes the product's own
+                  role labels, so it can only be wrong if the product is. */}
+              <div
+                role="img"
+                aria-label={`A book shared with one other writer: the owner, and somebody who can edit. A free book holds ${SEATS_PER_BOOK.free} people including you; Pro holds ${SEATS_PER_BOOK.pro}.`}
+                className="rounded-2xl border border-lp-edge bg-lp-well p-5 sm:p-7"
+              >
+                <div className="rounded-xl border border-lp-edge bg-lp-ground p-5">
+                  <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
+                    On this book
+                  </p>
+
+                  <div aria-hidden="true" className="mt-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-lp-accent text-[11px] font-semibold text-lp-accent-ink">
+                        You
+                      </span>
+                      <span className="oc-heading flex-1 font-serif text-lp-ink">
+                        You
+                      </span>
+                      <span className="font-code text-[0.625rem] tracking-[0.12em] text-lp-faint uppercase">
+                        Owner
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-lp-edge-strong text-[11px] font-semibold text-lp-ink">
+                        A
+                      </span>
+                      <span className="oc-heading flex-1 truncate font-serif text-lp-ink">
+                        your co-writer
+                      </span>
+                      <span className="rounded-md border border-lp-edge px-2 py-1 font-code text-[0.625rem] tracking-[0.12em] text-lp-ink uppercase">
+                        Can edit
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 border-t border-lp-edge pt-4">
+                    <p className="text-sm leading-relaxed">
+                      <strong className="text-lp-ink">
+                        {SEATS_PER_BOOK.free} people
+                      </strong>{" "}
+                      on a book, free — including you.{" "}
+                      <strong className="text-lp-ink">
+                        {SEATS_PER_BOOK.pro}
+                      </strong>{" "}
+                      on Pro.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section className="border-b border-lp-line px-6 py-14 sm:py-20">
           <div className="mx-auto max-w-5xl">
             <Head
