@@ -4,7 +4,13 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { startCheckout, type CheckoutState } from "@/app/upgrade/actions";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
-import { displayPrice, perMonthOf, priceOf } from "@/lib/billing/plans";
+import {
+  annualSavingPercent,
+  displayPrice,
+  perMonthOf,
+  priceOf,
+} from "@/lib/billing/plans";
+import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
 import { FREE_LIMITS, SEATS_PER_BOOK } from "@/lib/free-limits";
 
 /**
@@ -204,15 +210,25 @@ const ROWS: {
 export function Plans({
   /** Decides where the starter card's button goes — the shelf, or the way in. */
   signedIn,
-  /** Is there a PayHere merchant behind the Upgrade button? */
-  billing,
+  /**
+   * Which gateway is behind the Upgrade button, or null if none is.
+   *
+   * It was a boolean while PayHere was the only one. The two buy in genuinely
+   * different shapes — PayHere POSTs the browser to a payment page, Paddle
+   * opens an overlay over this one — so the card needs to know which, and a
+   * boolean would have meant guessing.
+   */
+  provider,
+  /** Paddle's client-side token and environment, when Paddle is the gateway. */
+  paddle,
   /** Already paying. The card stops selling and starts confirming. */
   pro: alreadyPro,
-  /** Set when PayHere sent the writer back without taking anything. */
+  /** Set when the gateway sent the writer back without taking anything. */
   cancelled = false,
 }: {
   signedIn: boolean;
-  billing: boolean;
+  provider: "paddle" | "payhere" | null;
+  paddle?: { token: string; environment: "sandbox" | "production" };
   pro: boolean;
   cancelled?: boolean;
 }) {
@@ -335,7 +351,14 @@ export function Plans({
                 <Link href="/" className={PRO_BUTTON}>
                   You&rsquo;re on Pro — keep writing
                 </Link>
-              ) : billing ? (
+              ) : provider === "paddle" && paddle ? (
+                <PaddleUpgradeButton
+                  period={period}
+                  token={paddle.token}
+                  environment={paddle.environment}
+                  className={PRO_BUTTON}
+                />
+              ) : provider === "payhere" ? (
                 <form action={checkout}>
                   {/* The cycle is read from the toggle at submit time rather
                       than from a second piece of state on the server. */}
@@ -410,6 +433,8 @@ function PeriodToggle({
   period: Period;
   onChange: (next: Period) => void;
 }) {
+  const saving = annualSavingPercent();
+
   const options: { value: Period; label: string }[] = [
     { value: "monthly", label: "Monthly" },
     { value: "annual", label: "Annually" },
@@ -424,6 +449,18 @@ function PeriodToggle({
     >
       {options.map((option) => {
         const on = period === option.value;
+        /* The saving rides *on the control that switches to it*, which is
+           where every subscription page puts it and the only place it is an
+           answer rather than a fact: the reader is deciding between two
+           buttons and this is the difference between them. On the price
+           beneath it, it would be arriving after the decision.
+
+           The percentage is computed from the two prices (see
+           `annualSavingPercent`) rather than written here — a badge is a claim
+           about figures that live somewhere else, and the last hand-typed one
+           in this codebase went stale the day a price moved. */
+        const badge = option.value === "annual" && saving > 0;
+
         return (
           <button
             key={option.value}
@@ -431,15 +468,29 @@ function PeriodToggle({
             role="radio"
             aria-checked={on}
             onClick={() => onChange(option.value)}
-            className={`cursor-pointer rounded-full px-5 py-2 font-sans text-sm
-                        font-medium outline-none transition-colors
-                        focus-visible:ring-2 focus-visible:ring-accent/60 ${
+            className={`flex cursor-pointer items-center gap-2 rounded-full py-2
+                        font-sans text-sm font-medium outline-none
+                        transition-colors focus-visible:ring-2
+                        focus-visible:ring-accent/60 ${badge ? "pr-2 pl-5" : "px-5"} ${
                           on
                             ? "bg-fg text-surface"
                             : "text-muted hover:text-fg"
                         }`}
           >
             {option.label}
+            {badge && (
+              /* `ok`, the status family's green, because a saving is money
+                 kept rather than a feature — the same ink the readiness
+                 badges use for "nothing owed here". It keeps its own ground
+                 on both sides of the toggle, so the figure stays legible when
+                 the pill behind it inverts. */
+              <span
+                className="rounded-md border border-ok-line bg-ok-bg px-2 py-0.5
+                           font-sans text-[0.6875rem] font-semibold text-ok-fg"
+              >
+                Save {saving}%
+              </span>
+            )}
           </button>
         );
       })}
@@ -498,69 +549,48 @@ function badgeTone(label: string, value: string, pro: boolean): Tone {
 /**
  * A row's value, as a badge rather than a line of grey text.
  *
- * **Gold is spent on one word.** "Unlimited" is the only value in this table
- * that describes something genuinely without a ceiling, and it is the answer a
- * reader is scanning the Pro column *for* — so it gets the fill, the halo and
- * the shine, and nothing else does. That restraint is the whole mechanism: a
- * table where every badge glitters has no emphasis in it, only noise, and the
- * eye stops being able to find the row that matters. If a second value ever
- * wears gold, this stops working and the tokens' own note in globals.css says
- * so.
+ * **A tint, a hairline of the same hue, and ink of that hue** — the shape a
+ * label takes when it is a value in a table rather than a thing being sold.
+ * These were saturated gradient pills with halos and a shine on the gold, and
+ * the fix is documented at the tokens in `globals.css`: twenty-odd filled
+ * lozenges down two columns all shout at one volume, so the hue meant to
+ * separate them had nothing quiet to separate them from, and the gold that
+ * meant "no ceiling" was one glint among two dozen.
  *
- * Everything else is blue, white-inked, with its own soft halo. Two fills
- * rather than a loud one and a quiet one, because **the hue now carries the
- * hierarchy that weight used to** — gold reads as the exception at a glance,
- * against a column of blue, without either having to shout.
+ * **Gold is still spent on one word.** "Unlimited" is the only value in this
+ * table that describes something genuinely without a ceiling, and it is the
+ * answer a reader is scanning the Pro column *for*. If a second value ever
+ * wears it, this stops working.
  *
- * The shine stays gold-only. With the two colours doing the separating it would
- * have been safe to animate both, and it is still the wrong call: two dozen
- * badges glinting on one screen is a page that will not sit still to be read,
- * and the movement is worth more spent on the one row it was bought for.
+ * **The hue carries the hierarchy that weight used to.** Blue is Starter's,
+ * purple is Pro's — the card is the context — and amber is the exception, which
+ * reads at a glance against a column of the other two without any of them
+ * having to be loud.
  *
- * The gold keeps its dark ink. White on it measures between 1.25:1 and 2.27:1 —
- * not merely low but genuinely unreadable — where the dark ink runs 5.6:1 to
- * 10.2:1. The blue is the other way round by design: its lightest stop was
- * chosen so that *white* clears AA on it.
+ * The radius is `rounded-lg` rather than a capsule. A full pill is a *control*
+ * in this app (the period toggle two hundred lines up is one), and a value you
+ * cannot press should not borrow the shape of one.
  *
  * "Not included" never becomes a badge. A badge is a thing you are being given;
  * putting a negative in one dresses an absence up as a feature, and the crossed
  * mark to its left has already said it more honestly.
  */
 function ValueBadge({ value, tone }: { value: string; tone: Tone }) {
-  if (tone === "gold") {
-    return (
-      <span
-        className="oc-shine relative inline-flex items-center overflow-hidden
-                   rounded-full bg-linear-to-b from-gold-a via-gold-b to-gold-c
-                   px-3 py-1 font-sans text-[0.9375rem] leading-tight
-                   font-bold tracking-tight text-gold-ink
-                   shadow-[0_0_0_1px_var(--color-gold-c),0_2px_10px_-2px_var(--color-gold-glow)]"
-      >
-        {/* The word sits above the sweep, or the shine washes over the letters
-            instead of across the metal behind them. */}
-        <span className="relative z-10">{value}</span>
-      </span>
-    );
-  }
+  /* Three whole class strings rather than one with a hole in it: Tailwind scans
+     source text, so a class assembled from a variable is a class it never sees
+     and never emits. */
+  const skin =
+    tone === "gold"
+      ? "border-badge-gold-line bg-badge-gold-bg text-badge-gold-ink"
+      : tone === "purple"
+        ? "border-badge-pro-line bg-badge-pro-bg text-badge-pro-ink"
+        : "border-badge-blue-line bg-badge-blue-bg text-badge-blue-ink";
 
-  /* Purple on Pro, blue on Starter — the *card* is the context, so a reader
-     comparing the two columns knows which side they are on without reading a
-     heading. Written as two whole class strings rather than one with a hole in
-     it: Tailwind scans source text, so a class assembled from a variable is a
-     class it never sees and never emits. */
   return (
     <span
-      className={
-        tone === "purple"
-          ? `inline-flex items-center rounded-full bg-linear-to-b
-             from-pill-pro-a to-pill-pro-b px-3 py-1 font-sans text-[0.9375rem]
-             leading-tight font-semibold tracking-tight text-pill-ink
-             shadow-[0_0_0_1px_var(--color-pill-pro-b),0_2px_10px_-3px_var(--color-pill-pro-glow)]`
-          : `inline-flex items-center rounded-full bg-linear-to-b
-             from-pill-a to-pill-b px-3 py-1 font-sans text-[0.9375rem]
-             leading-tight font-semibold tracking-tight text-pill-ink
-             shadow-[0_0_0_1px_var(--color-pill-b),0_2px_10px_-3px_var(--color-pill-glow)]`
-      }
+      className={`inline-flex items-center rounded-lg border px-2.5 py-1
+                  font-sans text-[0.9375rem] leading-tight font-semibold
+                  tracking-tight ${skin}`}
     >
       {value}
     </span>

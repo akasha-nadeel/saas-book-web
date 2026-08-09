@@ -6,6 +6,7 @@ import {
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 import { safeNext } from "@/lib/auth-redirect";
+import { LEGAL_PAGES } from "@/lib/legal";
 
 /**
  * Session refresh, and the sign-in wall.
@@ -39,8 +40,15 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
  *
  * "/upgrade" is public because a price is read before an account is made. It
  * holds no manuscript and no account detail — only what each plan costs.
+ *
+ * The four policy pages are public for a harder reason than convenience: a
+ * payment provider reviews this site before it will let anybody take a card,
+ * and it reviews it signed out. A privacy policy behind a sign-in wall is a
+ * privacy policy that does not exist as far as that review is concerned — and
+ * as far as a customer looking for the refund terms is concerned too. They are
+ * read from `LEGAL_PAGES` so adding a fifth page cannot forget this list.
  */
-const PUBLIC_EXACT = ["/", "/upgrade"];
+const PUBLIC_EXACT = ["/", "/upgrade", ...LEGAL_PAGES.map((page) => page.href)];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.includes(pathname)) return true;

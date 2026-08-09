@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
-import { isBillingConfigured } from "./payhere";
+import { asProvider, billingConfigured } from "./provider";
 import { asPeriod } from "./plans";
 import {
   asSubscriptionStatus,
@@ -36,12 +36,19 @@ function toSubscription(row: Record<string, unknown> | null): Subscription | nul
   const cancelled = row.cancelled_at;
 
   return {
+    // Rows written before the Paddle migration carry no provider column value
+    // of their own; `asProvider` reads them as PayHere, which is what they are.
+    provider: asProvider(row.provider),
     status,
     period,
     currentPeriodEnd: typeof end === "string" ? new Date(end) : null,
     payhereSubscriptionId:
       typeof row.payhere_subscription_id === "string"
         ? row.payhere_subscription_id
+        : null,
+    paddleSubscriptionId:
+      typeof row.paddle_subscription_id === "string"
+        ? row.paddle_subscription_id
         : null,
     cancelledAt: typeof cancelled === "string" ? new Date(cancelled) : null,
   };
@@ -94,8 +101,8 @@ export async function currentSubscription(): Promise<{
  * past, which is the sort of loop that gets support mail.
  *
  * Two conditions skip the gate entirely, and both are deliberate. With no
- * Supabase project there are no accounts to bill, and with no PayHere merchant
- * there is no way to pay — so a self-hosted OpenChapter running on its owner's
+ * Supabase project there are no accounts to bill, and with no gateway
+ * configured there is no way to pay — so a self-hosted OpenChapter on its owner's
  * own API keys works exactly as it did before any of this existed. Billing is
  * optional in the same way accounts and the assistant's key are optional.
  */
@@ -115,7 +122,7 @@ export async function requirePro(messages: {
     return Response.json({ error: messages.signIn }, { status: 401 });
   }
 
-  if (!isBillingConfigured()) return null;
+  if (!billingConfigured()) return null;
 
   const subscription = await subscriptionFor(supabase, userId);
   if (isPro(subscription)) return null;

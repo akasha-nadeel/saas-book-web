@@ -1,4 +1,6 @@
-import { canManageSubscriptions, isBillingConfigured } from "@/lib/billing/payhere";
+import { isPaddleConfigured } from "@/lib/billing/paddle";
+import { canManageSubscriptions } from "@/lib/billing/payhere";
+import { billingConfigured } from "@/lib/billing/provider";
 import { currentSubscription } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +21,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const billing = isBillingConfigured();
+  const billing = billingConfigured();
 
   // No gateway means nothing is for sale and therefore nothing is held back.
   // The same shape as a missing API key or a missing Supabase project: the app
@@ -65,15 +67,22 @@ export async function GET(request: Request) {
     status: subscription?.status ?? null,
     period: subscription?.period ?? null,
     currentPeriodEnd: subscription?.currentPeriodEnd?.toISOString() ?? null,
-    // Whether the Cancel button should exist at all. The Subscription Manager
-    // credentials are a separate pair from the checkout ones and may well not
-    // be set, in which case a button here could not do anything — so the dialog
-    // shows how to cancel by hand instead of a control that fails when pressed.
-
+    // Whether the Cancel button should exist at all, asked of *this row's*
+    // gateway rather than of the deployment's current one — a writer who
+    // subscribed through PayHere is still cancelled at PayHere after new
+    // checkouts have moved to Paddle.
+    //
+    // Each gateway can fail to answer for its own reason. PayHere needs the
+    // Subscription Manager credentials, which are a separate pair from the
+    // checkout ones and may well not be set; Paddle needs an API key. Where the
+    // answer is no, the dialog shows how to cancel by hand rather than a
+    // control that fails when pressed.
     canCancel: Boolean(
-      subscription?.payhereSubscriptionId &&
+      subscription &&
         subscription.status !== "cancelled" &&
-        canManageSubscriptions(),
+        (subscription.provider === "paddle"
+          ? subscription.paddleSubscriptionId && isPaddleConfigured()
+          : subscription.payhereSubscriptionId && canManageSubscriptions()),
     ),
   });
 }

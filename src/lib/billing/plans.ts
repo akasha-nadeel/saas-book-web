@@ -46,19 +46,34 @@ export const CURRENCY: Currency =
  * cycle.
  *
  * **`total` is exactly twelve times `perMonth`, and that is a rule rather than a
- * coincidence** — the annual card says "$7.25 a month, billed yearly", and the
+ * coincidence** — the annual card says "$8.25 a month, billed yearly", and the
  * two figures disagreeing by a cent would make one of them a lie. A test asserts
  * it, so a future price change cannot quietly break the pair.
  *
- * The annual rate is a third off, near enough: $7.25 against $10.99 is 34%. Both
- * numbers were chosen to divide cleanly rather than to hit exactly 33.3% — the
- * arithmetically pure pair is $7.33 and $87.96, and a pricing page reads better
- * with $87 a year on it than with ninety-six cents nobody will remember.
+ * **The annual was $87 and is now $99, and the reason is the discount rather
+ * than the price.** $87 against $10.99 a month is 34% off — roughly double what
+ * this trade does. The convention is "two months free", twelve for the price of
+ * ten, which is 16.7%; 15–20% is the usual band and 20–25% is already the
+ * aggressive end. Dabble, the nearest subscription competitor, uses 20%. So the
+ * old figure was not cheap for the market, it was *discounted* far past it, and
+ * the money was being left on the table by the arithmetic rather than by a
+ * decision.
+ *
+ * $99 is 25% off, still visibly generous, lands exactly on Plottr Pro's annual,
+ * and divides by twelve into $8.25 with nothing left over — which the rule above
+ * requires. Changed while there were no subscribers, since a price rise
+ * afterwards is an announcement rather than an edit.
+ *
+ * The comparison worth keeping in view is not the other subscriptions, though.
+ * Atticus is $147 **once**, Vellum $199–$250 once, Scrivener $60 once: this
+ * market is used to buying a tool rather than renting one. See TODO.md on the
+ * lifetime tier that was built and removed on 2026-08-03 — that is the real
+ * pricing question, and it is a business decision rather than a number here.
  */
 const PRICES: Record<Currency, Record<Period, { total: number; perMonth: number }>> = {
   USD: {
     monthly: { total: 10.99, perMonth: 10.99 },
-    annual: { total: 87.0, perMonth: 7.25 },
+    annual: { total: 99.0, perMonth: 8.25 },
   },
   LKR: {
     monthly: { total: 2900, perMonth: 2900 },
@@ -78,6 +93,25 @@ export function priceOf(period: Period, currency: Currency = CURRENCY): number {
 
 export function perMonthOf(period: Period, currency: Currency = CURRENCY): number {
   return PRICES[currency][period].perMonth;
+}
+
+/**
+ * What the annual cycle saves, as a whole percent.
+ *
+ * **Derived, never typed.** It is the one figure on the pricing page that is a
+ * claim about the other two, so a hand-written "Save 25%" is a sentence that
+ * silently becomes false the next time either price moves — which is exactly
+ * what happened to the 34% in this file's own comment. Rounded rather than
+ * printed to a decimal: a badge saying "Save 24.9%" reads as arithmetic rather
+ * than as an offer.
+ *
+ * Currency-aware, because the LKR table is priced for its own market and its
+ * saving need not match the USD one. Today both come to 25%.
+ */
+export function annualSavingPercent(currency: Currency = CURRENCY): number {
+  const monthly = PRICES[currency].monthly.perMonth;
+  const annual = PRICES[currency].annual.perMonth;
+  return Math.round(((monthly - annual) / monthly) * 100);
 }
 
 /** For a card, not for PayHere. `$5.00`, `Rs 1,990`. */

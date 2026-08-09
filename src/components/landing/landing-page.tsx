@@ -10,6 +10,7 @@ import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
 import { SEATS_PER_BOOK } from "@/lib/free-limits";
+import { LEGAL_PAGES } from "@/lib/legal";
 
 /**
  * The landing page.
@@ -1391,10 +1392,29 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="px-6 py-10">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4 font-code text-xs tracking-wider text-lp-faint uppercase">
-          <span>© {new Date().getFullYear()} OpenChapter</span>
-          <span>Your manuscript stays in your browser</span>
+      {/* The footer carries the policy pages, and that is not housekeeping: a
+          payment provider reviews this site before it will let anybody take a
+          card, and what it looks for first is a privacy policy, a refund policy
+          and a way to reach a human. A policy that exists at a URL nobody links
+          to is reported as missing. They read from `LEGAL_PAGES` so the four
+          cannot drift out of step with the pages themselves. */}
+      <footer className="border-t border-lp-line px-6 py-10">
+        <div className="mx-auto flex max-w-5xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+          <nav>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2 font-sans text-sm text-lp-body">
+              {LEGAL_PAGES.map((page) => (
+                <li key={page.href}>
+                  <Link href={page.href} className="hover:text-lp-ink">
+                    {page.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 font-code text-xs tracking-wider text-lp-faint uppercase">
+            <span>© {new Date().getFullYear()} OpenChapter</span>
+            <span>Your manuscript stays in your browser</span>
+          </div>
         </div>
       </footer>
     </div>

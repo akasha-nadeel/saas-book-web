@@ -1,4 +1,5 @@
 import type { Period } from "./plans";
+import type { Provider } from "./provider";
 
 /**
  * What a subscription is, and when it entitles someone to anything.
@@ -54,12 +55,22 @@ export function paymentStatusFromCode(code: number): PaymentStatus {
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
 
 export interface Subscription {
+  /**
+   * Which gateway this one was bought through, and it is a fact about the row
+   * rather than about the deployment. A writer who subscribed through PayHere
+   * keeps being cancelled at PayHere after the app has moved to Paddle for new
+   * checkouts — the alternative is telling somebody they are cancelled while
+   * their card goes on being charged.
+   */
+  provider: Provider;
   status: SubscriptionStatus;
   period: Period;
   /** The end of the cycle that has been paid for. */
   currentPeriodEnd: Date | null;
   /** PayHere's id for the recurring authorisation, if it has told us one yet. */
   payhereSubscriptionId: string | null;
+  /** Paddle's id for the subscription, likewise. `sub_…`. */
+  paddleSubscriptionId: string | null;
   cancelledAt: Date | null;
 }
 

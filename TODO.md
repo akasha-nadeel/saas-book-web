@@ -1328,19 +1328,127 @@ should either ship or lose the card.
       nothing, concluded the order did not exist, and answered 200. A payment
       taken and not granted, with nothing in the response to say so.
 
-      Still unverified: **cancelling.** It needs `PAYHERE_APP_ID` /
-      `PAYHERE_APP_SECRET` for the Subscription Manager API, which are not set,
-      so the account dialog correctly shows no Cancel button. Set them, cancel,
-      then confirm PayHere's Subscriptions page shows it cancelled *and* Pro
-      still runs to the paid-up date.
+      **Cancelling verified too, 2026-08-08.** The live sandbox subscription
+      from the July test was cancelled from the account menu: PayHere's
+      Subscriptions page flipped Active → Cancelled, the row kept its
+      `current_period_end`, and the menu read "Cancelled — runs until Oct 1,
+      2026" with the Pro chip intact — which is `isPro()` running a cancelled
+      plan to its paid-up date, read straight off the row the route returns.
 
-- [ ] **A root domain, before any of this can take real money.** PayHere's
-      Domains & Credentials refuses subdomains outright — "Sub Domains not
-      allowed or Invalid Domain name". That rules out every ngrok URL and, more
-      importantly, `openchapter.vercel.app` too. Sandbox testing works because
-      PayHere accepts the literal `localhost`, which production obviously
-      cannot. So a root domain is not a launch nicety here, it is a hard
-      dependency of taking a single payment.
+      Where those credentials come from is the part that cost the time, because
+      it is not where the code comment said. **Settings → API Keys → Create API
+      Key**, with an app name, a comma-separated domain whitelist and the
+      **Subscription Management API** permission toggled on; the App ID and
+      Secret then sit behind *View Credentials* on that row. **Integrations**
+      (the old Domains & Credentials) is a different thing entirely — its
+      "App" type is for the mobile SDK and hands back a merchant secret, not an
+      App ID/Secret pair.
+
+      One thing that lands with the live switch: PayHere IP-whitelists merchant
+      API keys in the live environment, by emailing them the calling server's
+      address. Vercel has no static egress IP on the ordinary plans, so
+      cancelling may not work from there even though sandbox does. It fails in
+      the safe direction — no working credentials means no Cancel button and
+      the writer cancels from PayHere's receipt email — but ask them about it
+      rather than finding out after the first paying writer tries to leave.
+
+- [x] **A root domain, before any of this can take real money.** Done —
+      `openchapterapp.com` is live. PayHere's Domains & Credentials refuses
+      subdomains outright ("Sub Domains not allowed or Invalid Domain name"),
+      which ruled out every ngrok URL and `openchapter.vercel.app` with it;
+      sandbox only ever worked because PayHere accepts the literal `localhost`.
+
+- [x] **Paddle, and it is verified end to end.** Done 2026-08-09. New
+      checkouts go through Paddle; PayHere is kept intact beside it and
+      `provider.ts` picks whichever is configured, Paddle winning when both
+      are. A `subscriptions` row records which gateway sold it, so a writer who
+      subscribed through PayHere keeps being cancelled at PayHere — the
+      alternative is telling somebody they are cancelled while their card goes
+      on being charged.
+
+      **Tested against Paddle's sandbox, 2026-08-09**, with a real overlay
+      checkout on the 4242 test card. What was verified: the transaction is
+      created **server-side** (`/api/billing/paddle/checkout`) so neither the
+      price nor the buyer's id can be edited by the person paying; the webhook
+      wrote `provider = paddle`, `status = active`, both Paddle ids and a
+      period end one month out; `transaction.completed` landed in
+      `payment_events` at **10.99 USD**, which is the cents-to-dollars
+      conversion working (Paddle sends `"1099"`); the `payment_orders` row our
+      checkout wrote was closed to `paid`; the account menu showed Pro with the
+      renewal date; and cancelling produced a **scheduled cancellation at
+      Paddle** for the exact period end, with Pro intact until then.
+
+      **One bug found by that test, and it is the reason to run one.** Paddle
+      keeps a cancelled subscription at `status: "active"` until the period
+      actually ends and announces the cancellation in `scheduled_change`
+      instead — which is correct of Paddle, since the writer has paid to the
+      9th. Our cancel route wrote `cancelled`, Paddle's `subscription.updated`
+      arrived a second later saying `active`, and the webhook faithfully undid
+      it: `cancelled_at` back to null, the Cancel button offered again for a
+      subscription already cancelled, and a renewal promised that was never
+      coming. `paddleStatus()` now reads the scheduled change **before** the
+      status, and is pure and tested for exactly that. Confirmed by replaying
+      the offending notification from Paddle's own log against the fixed
+      handler — a real payload, not a mock.
+
+      Worth knowing for later: the sandbox **API key expires 7 Nov 2026**
+      (Paddle defaults to 90 days), and `cancelled_at` for a scheduled cancel
+      is stored as the change's *effective* date, because Paddle leaves its own
+      `canceled_at` null until the period runs out.
+
+- [ ] **When to move back to PayHere, and it is arithmetic.** The switch is a
+      config change now, not a migration:
+
+      - **Nature of Business "Sole proprietorship" demands a Business
+        Registration number.** Unregistered is allowed — PayHere's own rules
+        exempt home-based businesses, freelancers, clubs and government bodies,
+        who give "proof of business" (an active website) instead.
+      - **But an unregistered business gets PayHere Lite, and Lite cannot sell
+        a subscription.** One-time payments only, no recurring billing, and
+        **no USD payouts** — against a price table that is in USD.
+      - Recurring starts at **Plus, LKR 3,990/month** (2.99%, Rs 250,000 per
+        payment), which needs the BR. Premium is LKR 9,990.
+
+      Paddle answered that, and the entry above records it. What remains is
+      **when to come back**: the crossover is around **18 subscribers** —
+      Paddle takes 5% + $0.50 = $1.05 a month on $10.99 with no fixed cost,
+      PayHere Plus takes 2.99% = $0.33 plus ~$13 fixed, and 13 ÷ 0.72 ≈ 18.
+      Below that Paddle is cheaper *and* needs no BR; above it Plus wins and
+      the gap widens with every subscriber. Recompute rather than quoting 18 if
+      the price or the rupee has moved. Two things the saving does not cover:
+      Plus needs the business registration, and leaving a merchant of record
+      puts **worldwide sales tax** back on us.
+
+      The code half is already done, which is the point of building it the way
+      it was built: `provider.ts` picks the gateway from whichever env block is
+      filled in, and both webhooks, both cancel paths and both id columns
+      exist. Moving is emptying the Paddle block in the environment — not a
+      migration, and not a line of code.
+
+- [x] **The four policy pages, because every gateway reviews the site.** Done
+      2026-08-08: `/privacy`, `/terms`, `/refunds`, `/contact` over
+      `components/legal/legal-shell.tsx`, linked from the landing footer, from
+      each other, and from the checkout screen. A missing privacy or refund
+      policy is a standard rejection at PayHere, Paddle and every MoR alike,
+      so this is the one piece of launch work that is not specific to whichever
+      gateway wins.
+
+      Three things in there are load-bearing. **They are in `PUBLIC_EXACT` in
+      `proxy.ts`** — a reviewer reads the site signed out, so a policy behind
+      the sign-in wall does not exist as far as the review is concerned; they
+      are read from `LEGAL_PAGES` so a fifth page cannot forget the list. **The
+      privacy page names every route that sends anything**, feature by feature,
+      rather than saying "third-party service providers" — which means adding a
+      route that leaves the browser means adding it there, the same obligation
+      the feedback dialog carries for its own fields. And **the prices, the free
+      limits and the refund window are imported**, never retyped: the one page a
+      customer quotes back at you in a dispute is the worst place for a figure
+      nobody updated.
+
+      The seven-day refund window is honoured by hand from the mailbox —
+      nothing enforces it in code. A stated window is what a reviewer looks for,
+      and "no refunds ever" on a subscription invites the chargebacks it was
+      written to prevent.
 
 - [x] **The two rows the pricing page promised.** Done 2026-08-03, by
       deleting them. "Books 50" and "Imports 10 files" were never enforced

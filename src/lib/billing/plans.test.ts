@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  annualSavingPercent,
   asPeriod,
   cycleLabel,
   displayPrice,
@@ -112,6 +113,36 @@ describe("periodEnd", () => {
     const from = at("2026-01-15T10:00:00.000Z");
     periodEnd(from, "annual");
     expect(from.toISOString()).toBe("2026-01-15T10:00:00.000Z");
+  });
+});
+
+describe("annualSavingPercent", () => {
+  it("is the saving the pricing page prints, in both currencies", () => {
+    // The badge on the cycle toggle says this number. It is derived rather
+    // than typed precisely so that moving a price moves the badge — the
+    // previous hand-written figure survived a price change and became a false
+    // claim on the one page a customer reads before paying.
+    expect(annualSavingPercent("USD")).toBe(25);
+    expect(annualSavingPercent("LKR")).toBe(33);
+  });
+
+  it("agrees with the two prices it describes", () => {
+    for (const currency of ["USD", "LKR"] as const) {
+      const monthly = perMonthOf("monthly", currency);
+      const annual = perMonthOf("annual", currency);
+      expect(annualSavingPercent(currency)).toBe(
+        Math.round(((monthly - annual) / monthly) * 100),
+      );
+    }
+  });
+
+  it("stays inside what this trade actually does", () => {
+    // Not a style rule: the convention is "two months free" (about 17%), the
+    // usual band is 15-20%, and past 30% the annual plan is quietly cheaper
+    // than the business intends rather than deliberately generous. The USD
+    // annual sat at 34% for a week on exactly that mistake.
+    expect(annualSavingPercent("USD")).toBeGreaterThanOrEqual(10);
+    expect(annualSavingPercent("USD")).toBeLessThanOrEqual(30);
   });
 });
 

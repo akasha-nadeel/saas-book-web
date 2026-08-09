@@ -151,8 +151,22 @@ export function CheckoutForm({
             {leaving ? "Taking you to PayHere…" : "Continue to PayHere"}
           </button>
 
+          {/* The terms and the refund policy belong at the moment of payment,
+              not only in a footer three pages away. That is what the card
+              networks ask for and what a payment provider's review checks —
+              and it is also simply where somebody about to be charged wants to
+              read "cancel any time". */}
           <p className="mt-4 text-center font-sans text-xs leading-relaxed text-muted">
-            Card details are entered on PayHere and never reach OpenChapter.
+            Card details are entered on PayHere and never reach OpenChapter. By
+            continuing you agree to the{" "}
+            <Link href="/terms" className="underline hover:text-fg">
+              terms
+            </Link>{" "}
+            and the{" "}
+            <Link href="/refunds" className="underline hover:text-fg">
+              refund policy
+            </Link>
+            .
           </p>
         </form>
       </div>

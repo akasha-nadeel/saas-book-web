@@ -1128,11 +1128,21 @@ server-only by naming: none of it carries a `NEXT_PUBLIC_` prefix, so an
 accidental client import reads empty strings and `isBillingConfigured()`
 answers false rather than leaking a secret. `server.ts` is `requirePro()`, the
 gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe`,
-`/api/comps/rank` and `/api/comps/categories` — 401 when signed out, **402** when signed in and unpaid,
+`/api/comps/query`, `/api/comps/rank` and `/api/comps/categories` — 401 when
+signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
 
-**Two cycles, and both renew.** $9 monthly, $72 a year. A lifetime tier was
+**Two cycles, and both renew.** $10.99 monthly, $99 a year — 25% off, and the
+annual total is exactly twelve times the per-month figure the card prints,
+which is a rule with a test on it rather than a coincidence. **The annual was
+$87 until 2026-08-09**, which was 34% off: roughly double what this trade does.
+The convention is "two months free" (16.7%), the usual band is 15–20%, and 20–25%
+is the aggressive end — so the old figure was not cheap for the market, it was
+discounted past it by arithmetic rather than by a decision. $99 keeps a visible
+saving, lands on Plottr Pro's annual, and divides by twelve into $8.25 exactly,
+which the rule above requires. It was changed while there were no subscribers.
+The LKR table is priced for its own market and is not the USD one converted. A lifetime tier was
 built on 2026-08-03 and removed the same day — worth knowing only because the
 removal is a decision rather than an omission: selling outright is what this
 market mostly does, and it trades recurring revenue for a support obligation

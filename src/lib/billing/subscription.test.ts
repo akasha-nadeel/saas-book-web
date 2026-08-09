@@ -10,10 +10,15 @@ const NOW = new Date("2026-07-30T12:00:00.000Z");
 
 function sub(overrides: Partial<Subscription> = {}): Subscription {
   return {
+    // PayHere by default because these tests predate the second gateway and
+    // are about entitlement rather than about who took the money — isPro()
+    // reads the status and the date and has never cared which.
+    provider: "payhere",
     status: "active",
     period: "monthly",
     currentPeriodEnd: new Date("2026-08-15T12:00:00.000Z"),
     payhereSubscriptionId: "PH-1",
+    paddleSubscriptionId: null,
     cancelledAt: null,
     ...overrides,
   };

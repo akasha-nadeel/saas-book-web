@@ -1,3 +1,9 @@
+import { Environment, Paddle } from "@paddle/paddle-node-sdk";
+import {
+  PADDLE_API_KEY,
+  PADDLE_SANDBOX,
+  isPaddleConfigured,
+} from "@/lib/billing/paddle";
 import {
   APP_ID,
   APP_SECRET,
@@ -28,6 +34,79 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The same job at Paddle, and it is shorter for one structural reason: Paddle
+ * *is* the merchant of record, so cancelling is one authenticated call rather
+ * than an OAuth exchange followed by a request.
+ *
+ * `effectiveFrom: "next_billing_period"` is the whole of the policy this app
+ * states on its refunds page — the renewal stops and the writer keeps what they
+ * have paid for. `"immediately"` would end the period they bought, which is the
+ * one thing cancelling here has never done.
+ *
+ * Our table is written second, exactly as with PayHere, and for the same
+ * reason: a writer told they are cancelled while the card is still live is the
+ * only outcome here that costs somebody real money. Paddle's own webhook will
+ * also arrive and write the same row, which is harmless — it carries the
+ * absolute period end, so writing it twice writes the same dates twice.
+ */
+async function cancelAtPaddle(
+  userId: string,
+  subscriptionId: string | null,
+): Promise<Response> {
+  if (!isPaddleConfigured()) {
+    return Response.json(
+      {
+        error:
+          "Cancelling from here isn't switched on. Cancel from the receipt " +
+          "Paddle emailed you, or write to us.",
+      },
+      { status: 501 },
+    );
+  }
+
+  if (!subscriptionId) {
+    return Response.json(
+      { error: "There is no subscription to cancel." },
+      { status: 400 },
+    );
+  }
+
+  const paddle = new Paddle(PADDLE_API_KEY, {
+    environment: PADDLE_SANDBOX ? Environment.sandbox : Environment.production,
+  });
+
+  try {
+    await paddle.subscriptions.cancel(subscriptionId, {
+      effectiveFrom: "next_billing_period",
+    });
+  } catch (error) {
+    console.error("[billing] Paddle refused the cancellation", error);
+    return Response.json(
+      { error: "Paddle could not cancel that subscription." },
+      { status: 502 },
+    );
+  }
+
+  const supabase = createAdminClient();
+  if (!supabase) {
+    // Cancelled at Paddle, unrecorded here — the half that matters is done, and
+    // Paddle's webhook will write the row when it arrives.
+    console.error(
+      "[billing] cancelled at Paddle but SUPABASE_SECRET_KEY is not set",
+      { userId },
+    );
+    return Response.json({ ok: true, recorded: false });
+  }
+
+  await supabase
+    .from("subscriptions")
+    .update({ status: "cancelled", cancelled_at: new Date().toISOString() })
+    .eq("owner", userId);
+
+  return Response.json({ ok: true, recorded: true });
+}
+
 /** An access token, from the app id and secret. Good for this request only. */
 async function accessToken(): Promise<string | null> {
   const basic = Buffer.from(`${APP_ID}:${APP_SECRET}`).toString("base64");
@@ -49,6 +128,27 @@ async function accessToken(): Promise<string | null> {
 }
 
 export async function POST() {
+  const { userId, subscription } = await currentSubscription();
+
+  if (!userId) {
+    return Response.json({ error: "Sign in to manage your plan." }, { status: 401 });
+  }
+
+  if (!subscription) {
+    return Response.json(
+      { error: "There is no subscription to cancel." },
+      { status: 400 },
+    );
+  }
+
+  // Which gateway is asked is decided by the row, never by which one this
+  // deployment sells through today. Cancelling a PayHere subscription at Paddle
+  // would answer "not found", we would mark the row cancelled, and the card
+  // would go on being charged every month with the app saying it had stopped.
+  if (subscription.provider === "paddle") {
+    return cancelAtPaddle(userId, subscription.paddleSubscriptionId);
+  }
+
   if (!canManageSubscriptions()) {
     return Response.json(
       {
@@ -60,13 +160,7 @@ export async function POST() {
     );
   }
 
-  const { userId, subscription } = await currentSubscription();
-
-  if (!userId) {
-    return Response.json({ error: "Sign in to manage your plan." }, { status: 401 });
-  }
-
-  if (!subscription?.payhereSubscriptionId) {
+  if (!subscription.payhereSubscriptionId) {
     return Response.json(
       { error: "There is no subscription to cancel." },
       { status: 400 },
