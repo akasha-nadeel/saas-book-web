@@ -1,6 +1,6 @@
 "use server";
 
-import { isBillingConfigured } from "@/lib/billing/payhere";
+import { billingConfigured } from "@/lib/billing/provider";
 import { subscriptionFor } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
 import { INVITE_DAYS, inviteProblem, normalizeEmail, type CollabRole } from "@/lib/collab";
@@ -16,7 +16,7 @@ import { createClient } from "@/lib/supabase/server";
  * `book_members` grants `authenticated` a column-limited `select` and nothing
  * else — no insert, no update, no delete — for the reason
  * 20260730120000_billing.sql takes the same posture with `subscriptions`: the seat
- * cap depends on `isPro()` and `isBillingConfigured()`, which are facts Postgres
+ * cap depends on `isPro()` and `billingConfigured()`, which are facts Postgres
  * does not have. A grant that does not exist is the part a reader with devtools
  * cannot argue with.
  *
@@ -37,7 +37,11 @@ export type CollabResult = { error: string } | { ok: true; link?: string };
 async function seatsFor(ownerId: string): Promise<number> {
   // No gateway means nothing is for sale, so nothing is held back — the same
   // shape as `requirePro()` passing everyone when billing is unconfigured.
-  if (!isBillingConfigured()) return SEATS_PER_BOOK.pro;
+  // Asked of `provider.ts` rather than of PayHere: the question is whether
+  // *anything* can take money, and a Paddle-only deployment (which is what
+  // going live means) answers false to PayHere's own check while selling
+  // perfectly well. Asking the wrong half handed every free owner Pro's seats.
+  if (!billingConfigured()) return SEATS_PER_BOOK.pro;
 
   const db = createAdminClient();
   if (!db) return SEATS_PER_BOOK.free;

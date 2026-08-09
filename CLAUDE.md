@@ -42,7 +42,8 @@ logic: the import/export pipelines (including the XHTML and front-matter
 renderers), the store, page setup, typography, search, book kinds, the custom
 Tiptap marks, pagination and click-to-type arithmetic, caret scrolling,
 narration chunking, transcript paragraphing, publishing details and the ISBN
-check digit, the billing price/cycle arithmetic and PayHere's two MD5s, the
+check digit, the billing price/cycle arithmetic, PayHere's two MD5s and
+Paddle's status mapping, the
 account fallbacks and the `?next=` redirect guard, ambience, relative time —
 and one module per tool screen (see the tools section below). Components are
 not tested — jsdom is there for `localStorage`, not for a DOM.
@@ -987,9 +988,12 @@ writer on a machine inherits the first one's shelf — and now, with a server
 behind it, pushes those books up under their own account.
 
 The SQL behind all that is checked in: `supabase/migrations/` (library,
-book publishing, billing, feedback, collaboration). Schema changes belong there,
-not only in the dashboard. **All five are applied to the live project as of
-2026-08-07** — `20260730000000_book_publishing.sql` had been outstanding for a
+book publishing, billing, feedback, collaboration, Paddle). Schema changes
+belong there, not only in the dashboard. **All six are applied to the live
+project** — the first five as of 2026-08-07 and `20260808000000_paddle.sql` on
+2026-08-09, proved by the sandbox checkout writing `provider`,
+`paddle_subscription_id` and a period end into real rows rather than by the SQL
+editor saying "Success". `20260730000000_book_publishing.sql` had been outstanding for a
 week, which meant every book push silently dropped its listing details, and
 `pushBook` carries the self-healing retry that made that survivable rather than
 fatal. Keep that retry: it is the pattern any future column should follow.
@@ -1111,22 +1115,50 @@ asks the writer which version to keep. See TODO.md, which also records the
 account-deletion hazard: `books.owner` cascades, so deleting an owner deletes the
 book out from under its collaborators.
 
-**Payments are PayHere, and optional in the same way everything else is.** Set
-`PAYHERE_MERCHANT_ID` and `PAYHERE_MERCHANT_SECRET` and the app grows plans;
-leave them unset and there are no plans *and nothing is held back* — every
-paid screen works, and the Upgrade button says why there is nothing to buy.
-That falls out of the subscription route answering `pro: true` when there is no
-gateway, which `ProGate` and `requirePro()` both read. `isBillingConfigured()` is checked
-first everywhere, and `requirePro()` passes everyone when it is false, so a
-self-hosted copy running on its owner's API keys behaves exactly as it did
+**Payments are Paddle *or* PayHere, one at a time, and optional in the same way
+everything else is.** Configure either gateway and the app grows plans; leave
+both unset and there are no plans *and nothing is held back* — every paid
+screen works, and the Upgrade button says why there is nothing to buy. That
+falls out of the subscription route answering `pro: true` when there is no
+gateway, which `ProGate` and `requirePro()` both read. `billingConfigured()` is
+checked first everywhere, and `requirePro()` passes everyone when it is false,
+so a self-hosted copy running on its owner's API keys behaves exactly as it did
 before billing existed.
 
+**`provider.ts` is the whole of which gateway sells, and there will not be a
+third.** PayHere came first and is verified against its sandbox end to end;
+Paddle arrived on 2026-08-09 because **PayHere cannot sell a subscription to an
+unregistered business** — its free Lite tier is one-time payments only and pays
+out no USD, and recurring starts at Plus, which wants LKR 3,990 a month and a
+business registration. Paddle costs nothing until it is paid and is the
+**merchant of record**, so worldwide sales tax is its problem rather than ours.
+Three things follow, and they are the reason PayHere is kept whole beside it
+rather than deleted:
+
+- **Paddle wins when both are configured.** Two live gateways would mean two
+  ways to be on Pro, two webhooks writing one `subscriptions` row and two
+  answers to "cancel this".
+- **The row records which provider sold it** (`asProvider`, and a row written
+  before the Paddle migration reads as PayHere, which is what it is). So a
+  switch leaves the writers already paying exactly where they are: their cancel
+  button keeps calling PayHere, and only new checkouts go the new way. A writer
+  told they are cancelled while their card goes on being charged is the one
+  outcome here that costs somebody real money.
+- **Merchant-of-record fees stop winning at scale.** PayHere's 2.99% beats
+  Paddle's 5% plus the fixed fee at around **eighteen subscribers**, which is
+  why `payhere.ts` is not to be tidied away — deleting it means building it
+  again.
+
 `src/lib/billing/` is the pure half — `plans.ts` (the price table, the cycle
-arithmetic), `signature.ts` (PayHere's two MD5s), `subscription.ts` (`isPro()`,
-the status codes) — all tested. `payhere.ts` holds the credentials and is
-server-only by naming: none of it carries a `NEXT_PUBLIC_` prefix, so an
-accidental client import reads empty strings and `isBillingConfigured()`
-answers false rather than leaking a secret. `server.ts` is `requirePro()`, the
+arithmetic), `signature.ts` (PayHere's two MD5s), `paddle.ts` (`paddleStatus()`,
+below), `provider.ts` (`activeProvider()`, `billingConfigured()`),
+`subscription.ts` (`isPro()`, the status codes) — all tested. `payhere.ts` and
+`paddle.ts` hold the credentials and are server-only by naming: none of it
+carries a `NEXT_PUBLIC_` prefix **except Paddle's client token**, which is
+designed to be public — Paddle.js authenticates with it in the browser and it
+can do nothing but open a checkout. An accidental client import of the rest
+reads empty strings, so `isPaddleConfigured()` answers false rather than leaking
+a secret. `server.ts` is `requirePro()`, the
 gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe`,
 `/api/comps/query`, `/api/comps/rank` and `/api/comps/categories` — 401 when
 signed out, **402** when signed in and unpaid,
@@ -1266,42 +1298,104 @@ the honest lever for those is syncing their data, which is server-side.
 
 Four more things in there are load-bearing.
 
-**Only the webhook grants Pro.** `/api/billing/notify` is a POST from PayHere's
-*servers*, with no session and no cookies, and it is the one caller that writes
+**Only the webhook grants Pro.** `/api/billing/notify` (PayHere) and
+`/api/billing/paddle/notify` are POSTs from the gateway's *servers*, with no
+session and no cookies, and they are the only callers that write
 `subscriptions` — which is why `authenticated` has no insert or update grant on
-that table at all and the route uses the secret key
-(`src/lib/supabase/admin.ts`). The return_url is not proof of anything: a writer
-can type it. `/upgrade/done` therefore polls rather than assumes, because the
-browser's redirect and PayHere's notification race and are not ordered.
+that table at all and both routes use the secret key
+(`src/lib/supabase/admin.ts`). A return_url is not proof of anything: a writer
+can type it, and an overlay closing proves only that it closed. `/upgrade/done`
+therefore polls rather than assumes, and Paddle's button has **no success
+handler**, because the browser's redirect and the gateway's notification race
+and are not ordered.
 
 **The notification is verified before it is believed.** The URL is public and
-the body is entirely attacker-shaped; `verifyNotification()` against the
-merchant secret is the only thing standing between that and a stranger writing
-"paid" into the table. A bad signature is refused with 403 and never retried.
+the body is entirely attacker-shaped; PayHere's `verifyNotification()` against
+the merchant secret, and Paddle's `unmarshal` against the endpoint secret
+(`pdl_ntfset_…`, which also refuses a replayed timestamp), are the only things
+standing between that and a stranger writing "paid" into the table. A bad
+signature is refused with 403 and never retried. Paddle's check reads the **raw
+text, not the parsed body** — the signature covers the bytes Paddle sent, and
+re-serialising a parsed object changes them.
 
-**It is idempotent on `payment_id`,** which is the primary key of
-`payment_events`. PayHere retries anything it did not get a 200 for, and a
-subscription charges again on the *same* order id every cycle — so an order
-cannot be the key, and a retry that re-ran would extend the period twice.
-Anything the route cannot act on answers 200 and logs; only a storage failure
-answers 500, because that one *should* come back.
+**Idempotency is PayHere's problem and comes free at Paddle.** PayHere sends
+"extend by one cycle", so a retry had to be refused by primary key — that key is
+`payment_id` on `payment_events`, never the order, because a subscription
+charges again on the *same* order id every cycle and a retry that re-ran would
+extend the period twice. Paddle sends the **absolute period end**, so writing
+the same event twice writes the same dates twice. Its transaction row still
+keys on the transaction id, since a duplicate charge in the ledger would be a
+lie about how much somebody paid. Anything a route cannot act on answers 200 and
+logs; only a storage failure answers 500, because that one *should* come back.
 
-**A cancel goes to PayHere first and our table second.** The other order leaves
-a writer who has been told they are cancelled with a card still being charged.
-Cancelling takes a second credential pair (`PAYHERE_APP_ID` / `_APP_SECRET`) for
-the Subscription Manager API; without it the account dialog shows no Cancel
-button rather than one that cannot work. Cancelled is not gone — `isPro()` runs
-a cancelled plan to its paid-up date with no grace, and an active or past_due
-one three days past it, because a renewal that needs one retry is a normal
-Tuesday and PayHere's queue is not instant.
+**A cancel goes to the gateway first and our table second.** The other order
+leaves a writer who has been told they are cancelled with a card still being
+charged. `/api/billing/cancel` branches on the row's own provider: PayHere takes
+a second credential pair (`PAYHERE_APP_ID` / `_APP_SECRET`) for the Subscription
+Manager API, and without it the account dialog shows no Cancel button rather
+than one that cannot work; Paddle is one authenticated call, because it *is* the
+merchant of record, and it is sent `effectiveFrom: "next_billing_period"` —
+`"immediately"` would end the period the writer bought, which is the one thing
+cancelling here has never done. Cancelled is not gone: `isPro()` runs a
+cancelled plan to its paid-up date with no grace, and an active or past_due one
+three days past it, because a renewal that needs one retry is a normal Tuesday
+and a gateway's queue is not instant.
+
+**A cancelled Paddle subscription says `active` until the period ends**, and
+announces the cancellation in `scheduled_change` instead. That is correct of
+Paddle — the writer has paid to the 9th and is entitled to it — and it cost a
+bug the first time round, which is the reason to *test* a gateway rather than
+reason about one: our cancel wrote `cancelled`, Paddle's `subscription.updated`
+landed a second later saying `active`, and the webhook faithfully undid it. The
+account menu then offered Cancel for a subscription already cancelled and
+promised a renewal that was never coming. So `paddleStatus()` reads the
+scheduled change **first** and everything else is the plain status; it is pure
+and tested for exactly that. `paused` maps to cancelled — the table has no
+fourth word, and that is the safe direction, since `isPro()` then runs it to the
+paid-up date and stops rather than serving Pro indefinitely for nothing.
+
+**Two checkout shapes, and neither lets the browser say what it is buying.**
+PayHere is a form POST out to a payment page after `/upgrade/checkout/[orderId]`
+collects billing details. Paddle is an **overlay** opened over the pricing page
+— but the transaction is created by `/api/billing/paddle/checkout` first, so the
+price comes from `plans.ts` and the buyer's id from their own session. Handed a
+bare price id and a `customData` object, Paddle's overlay would let the person
+paying choose both the price and the name on the receipt; the route is what
+stops that, the same reasoning `payment_orders` was built on. `periodFrom()`
+in the webhook decides the cycle from **the price id we sent**, not the billing
+interval Paddle reports, because `period` is a CHECK constraint of two values
+and a quarterly price would otherwise abort the write for a payment already
+taken. Paddle.js loads on the **first press, not on mount** — a pricing page is
+read far more often than it is bought from, and a payment network's script on
+every visit is a third party watching people who are only looking.
 
 `use-plan.ts` is the client's view of all that, and it **fetches rather than
-derives**: the plan lives in Postgres and changes when PayHere says so — a
+derives**: the plan lives in Postgres and changes when the gateway says so — a
 webhook away, months later, with no page open — so there is nothing local to
 read it from, and it is deliberately not part of `library-store.ts`. Nothing it
 returns gates anything that costs money; the billed routes check server-side,
 which is the only check a reader with devtools cannot edit. It exists to tell a
 writer the truth about their own account.
+
+**Four legal pages exist because a gateway reviews the site before it lets
+anybody take a card**, and a missing privacy or refund policy is a standard
+rejection. `/privacy`, `/terms`, `/refunds` and `/contact`, sharing
+`components/legal/legal-shell.tsx`, linked from the landing footer, from each
+other and from the checkout. Three things about them are load-bearing:
+
+- **They are in `PUBLIC_EXACT` in `src/proxy.ts`.** A reviewer reads the site
+  *signed out*, so a policy behind the sign-in wall does not exist as far as the
+  review is concerned — nor as far as a customer hunting for the refund terms
+  does.
+- **`src/lib/legal.ts` states each fact once** — the operator's legal name, the
+  trading name, the country whose law governs, the one contact address,
+  `REFUND_DAYS`, `REPLY_DAYS`, `UPDATED` and the `LEGAL_PAGES` array the footer
+  and every page's see-also strip read from. Same rule the prices and the free
+  limits follow: an address right on three pages and stale on the fourth is the
+  exact failure a reviewer looks for. `UPDATED` is written out by hand — a date
+  from `new Date()` would say the policy changed today, every day.
+- **The privacy page names every route that sends anything, feature by
+  feature.** That makes adding such a route an obligation to add it there too.
 
 **Feedback is a private channel, and what it may carry is the whole design.**
 `src/lib/feedback.ts` (the topics and the four faces) plus `feedback-dialog.tsx`,
@@ -1472,9 +1566,12 @@ writer (six areas, `?area=`), decided on the server off `getClaims()` so
 neither sees the other's screen first; with no Supabase configured everyone gets
 the dashboard · `/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
-`/upgrade` plans (public — a price is read before an account exists) ·
+`/upgrade` plans (public — a price is read before an account exists; Paddle's
+overlay opens from here) ·
 `/upgrade/checkout/[orderId]` billing details, then a form POST straight to
 PayHere · `/upgrade/done` PayHere's return_url, which polls ·
+`/privacy` · `/terms` · `/refunds` · `/contact` — public, and public is the
+point ·
 `/book/new` setup · `/book/import` · `/book/[bookId]` book
 overview (lands here, not on a chapter) ·
 `/book/[bookId]/chapter/[chapterId]` editor · `/book/[bookId]/read` reading view ·
