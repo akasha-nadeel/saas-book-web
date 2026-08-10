@@ -1,4 +1,4 @@
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MATTER_SECTIONS } from "@/lib/matter";
 import {
   applyRemoteForTest,
@@ -12,6 +12,7 @@ import {
   createBookFromImport,
   chapterLabel,
   markToolBook,
+  mergeUsage,
   spendDailyUse,
   isToolBook,
   createBookFromTemplate,
@@ -662,6 +663,77 @@ it("starts an older library clean rather than guessing", () => {
 
   expect(getPrefs().usedOn).toEqual({});
   expect(getPrefs().usedToday.day).toBe("");
+});
+
+/*
+ * Merging the two usage counters on the way down.
+ *
+ * **Every other pref is last-writer-wins and should be; these two must not be.**
+ * A download that replaced them would let a laptop and a phone each hand out a
+ * full daily allowance — two searches here, two there, four in a day the plan
+ * says holds two — and would lose counts just as easily in the other direction.
+ */
+describe("mergeUsage", () => {
+  const empty = { usedToday: { day: "", counts: {} }, usedOn: {} };
+
+  it("takes the larger count for each tool on the same day", () => {
+    const merged = mergeUsage(
+      { usedToday: { day: "2026-08-10", counts: { comps: 2, covers: 1 } }, usedOn: {} },
+      { usedToday: { day: "2026-08-10", counts: { comps: 1, titleCheck: 2 } } },
+    );
+
+    // comps: ours is higher. covers: only ours has it. titleCheck: only theirs.
+    expect(merged.usedToday).toEqual({
+      day: "2026-08-10",
+      counts: { comps: 2, covers: 1, titleCheck: 2 },
+    });
+  });
+
+  it("takes the later day outright when the two machines disagree", () => {
+    const yesterday = { usedToday: { day: "2026-08-09", counts: { comps: 2 } }, usedOn: {} };
+    const today = { usedToday: { day: "2026-08-10", counts: { comps: 1 } } };
+
+    // A new day supersedes: the older machine's spent allowance is not carried
+    // into it, which is the whole point of a limit that comes back.
+    expect(mergeUsage(yesterday, today).usedToday).toEqual({
+      day: "2026-08-10",
+      counts: { comps: 1 },
+    });
+    // And the reverse: a stale download must not drag a writer back to
+    // yesterday's tally.
+    expect(
+      mergeUsage(
+        { usedToday: today.usedToday, usedOn: {} },
+        { usedToday: yesterday.usedToday },
+      ).usedToday,
+    ).toEqual({ day: "2026-08-10", counts: { comps: 1 } });
+  });
+
+  it("never lets a machine that has counted nothing overwrite one that has", () => {
+    const used = { usedToday: { day: "2026-08-10", counts: { comps: 2 } }, usedOn: {} };
+    // The empty day a fresh library carries sorts below every real one.
+    expect(mergeUsage(used, empty).usedToday).toEqual(used.usedToday);
+  });
+
+  /*
+   * **The set union is lossless, and that is the advantage of a set of books
+   * over a tally of attempts.** Two machines can each mark a different book and
+   * neither mark is lost; two tallies could only be guessed between.
+   */
+  it("unions the books each tool has been used on", () => {
+    const merged = mergeUsage(
+      { usedToday: { day: "", counts: {} }, usedOn: { blurb: ["a", "b"], prose: ["x"] } },
+      { usedOn: { blurb: ["b", "c"], track: ["z"] } },
+    );
+
+    expect(merged.usedOn.blurb).toEqual(["a", "b", "c"]);
+    expect(merged.usedOn.prose).toEqual(["x"]);
+    expect(merged.usedOn.track).toEqual(["z"]);
+  });
+
+  it("survives a remote with nothing in it", () => {
+    expect(mergeUsage(empty, {})).toEqual(empty);
+  });
 });
 
 it("keeps chapter ids unique across books", () => {

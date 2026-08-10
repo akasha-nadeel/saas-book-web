@@ -2177,6 +2177,76 @@ function parseUsedOn(parsed: Partial<Prefs>): Partial<Record<BookLimit, string[]
 }
 
 /**
+ * The two usage counters, merged rather than replaced, on the way down.
+ *
+ * **Every other pref is last-writer-wins and should be** — a writer who picks a
+ * light theme on their phone means it, and the newest answer is the right one.
+ * These two are not preferences, they are a record of what has been spent, and
+ * taking the newest answer means a laptop and a phone can each hand out a full
+ * allowance: two comp searches here, two there, four in a day the plan says
+ * holds two. It loses counts in the other direction just as easily, which is the
+ * same bug wearing a friendlier face.
+ *
+ * So each is merged in the way its own shape allows:
+ *
+ * - **`usedOn` is a set union**, which is lossless. That is the whole advantage
+ *   of a set of books over a tally of attempts: two machines can each mark a
+ *   different book and neither mark is lost, where two tallies can only be
+ *   guessed between.
+ * - **`usedToday` takes the larger count per tool** when both machines are on
+ *   the same local day, and otherwise the *later* day outright. A day string
+ *   sorts correctly as text, and the empty day a fresh library carries sorts
+ *   below every real one, so a machine that has never counted anything never
+ *   overwrites one that has.
+ *
+ * The bias is deliberate and it is towards the plan: where two machines
+ * disagree about how much has been spent, this believes the one that spent more.
+ * Erring the other way would make the daily limits advisory for anybody with two
+ * browsers, and these are browser gates already — they do not need a second way
+ * round them.
+ *
+ * Pure and exported for its test: it is handed both sides rather than reading
+ * storage, so a merge can be asserted without staging two browsers.
+ */
+export function mergeUsage(
+  local: Pick<Prefs, "usedToday" | "usedOn">,
+  remote: Partial<Prefs>,
+): Pick<Prefs, "usedToday" | "usedOn"> {
+  const theirs = {
+    usedToday: parseUsedToday(remote),
+    usedOn: parseUsedOn(remote),
+  };
+
+  const usedOn: Partial<Record<BookLimit, string[]>> = {};
+  for (const action of new Set([
+    ...Object.keys(local.usedOn),
+    ...Object.keys(theirs.usedOn),
+  ]) as Set<BookLimit>) {
+    usedOn[action] = [
+      ...new Set([...(local.usedOn[action] ?? []), ...(theirs.usedOn[action] ?? [])]),
+    ];
+  }
+
+  if (theirs.usedToday.day !== local.usedToday.day) {
+    return {
+      usedToday:
+        theirs.usedToday.day > local.usedToday.day
+          ? theirs.usedToday
+          : local.usedToday,
+      usedOn,
+    };
+  }
+
+  const counts: Partial<Record<DailyLimit, number>> = { ...local.usedToday.counts };
+  for (const [key, value] of Object.entries(theirs.usedToday.counts)) {
+    const action = key as DailyLimit;
+    counts[action] = Math.max(counts[action] ?? 0, value ?? 0);
+  }
+
+  return { usedToday: { day: local.usedToday.day, counts }, usedOn };
+}
+
+/**
  * The stored sheet, or the default for anyone who has never picked one.
  *
  * Reading is deliberately dumb — whatever is in the key, or the default. The
@@ -3140,9 +3210,16 @@ function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
       window.localStorage.setItem(coverKey(id), dataUrl);
     }
     if (remote.prefs) {
+      // The spread is last-writer-wins, which is right for a preference and
+      // wrong for a spend — `mergeUsage` puts the two usage counters back after
+      // it, merged rather than replaced. See its note.
       window.localStorage.setItem(
         PREFS_KEY,
-        JSON.stringify({ ...DEFAULT_PREFS, ...remote.prefs }),
+        JSON.stringify({
+          ...DEFAULT_PREFS,
+          ...remote.prefs,
+          ...mergeUsage(getPrefs(), remote.prefs),
+        }),
       );
     }
   } catch (err) {
