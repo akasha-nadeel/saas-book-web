@@ -168,6 +168,13 @@ export default function PrivacyPage() {
               before you press it.
             </>,
             <>
+              <Term>Reading your blurb</Term> — the description you typed, your
+              title and your genre, sent to a language model when you press
+              &ldquo;Ask a reader&rdquo;. It answers with what a reader would
+              still be asking; it does not write a description for you, and it
+              is not sent any part of the manuscript.
+            </>,
+            <>
               <Term>Sync</Term> — if you are signed in, your library as
               described above, to our database.
             </>,

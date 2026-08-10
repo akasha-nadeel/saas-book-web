@@ -1414,6 +1414,23 @@ spend", the planning tool) while the tool called `track` is limited to two books
 competitor charges for formatting, which is why export is the one thing that must
 never move.
 
+**Writing a blurb is free; having one *read* is not.** `/api/blurb/critique` is
+the newest metered route and the one that most needed the refusal spelled out,
+because this is where a paid generator would obviously sell — see
+`src/lib/blurb-critique.ts` for the whole argument. Three things about it. **It
+reports and never writes**, like everything else here: the parsed shape has no
+field for a rewritten sentence, a "note" long enough to be replacement copy is
+dropped server-side, and a test asserts both. **The stores are not the reason**
+— Amazon's AI disclosure covers the manuscript, a description is *metadata* and
+needs no declaration at all, so a generator would be permitted and is refused on
+product grounds: generated blurbs are generic exactly where a blurb cannot
+afford to be, and generating one honestly would mean sending the whole book,
+which yields a synopsis with the ending in it. And **no prose leaves** — what
+goes is the description, the title and the genre, all typed into form fields, so
+this route is not on the short list of places the manuscript can travel. Send a
+chapter from here and it needs a line on the privacy page and a sentence above
+the button, as the prose report has.
+
 **Everything else is metered in the unit its own work comes in, and
 `src/lib/free-limits.ts` is the whole of the policy.** There is no single global
 number, and there was: a version of this gave the free plan "every tool,
@@ -1859,7 +1876,7 @@ grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
 `/api/comps` · `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
-`/api/comps/categories` · `/api/billing/*`. All of those except
+`/api/comps/categories` · `/api/blurb/critique` · `/api/billing/*`. All of those except
 `/api/comps` and `/api/comps/subjects` are metered and gated by `requirePro()`;
 those two are free, keyless and stay that way — which is the whole reason the
 three model steps around the comps search (query, rank, categories) are routes

@@ -265,6 +265,17 @@ const ROWS: {
     starter: `${FREE_LIMITS.blurb.free} books`,
     pro: "Unlimited",
   },
+  // Its own row rather than folded into the one above, because the two are
+  // gated differently and a reader comparing columns would otherwise see
+  // "5 books" and assume it covered both. Writing the blurb, the counts and
+  // the findings are free on any book; only the reading is metered, and it is
+  // metered on the server by `requirePro()` rather than in the browser.
+  {
+    group: "Getting it ready",
+    label: "A reader on your blurb",
+    starter: NOT_INCLUDED,
+    pro: "Included",
+  },
   {
     group: "Getting it ready",
     label: "Categories & keywords",
