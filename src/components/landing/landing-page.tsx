@@ -1645,6 +1645,18 @@ export function LandingPage() {
         <div className="mx-auto flex max-w-5xl flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <nav>
             <ul className="flex flex-wrap gap-x-6 gap-y-2 font-sans text-sm text-lp-body">
+              {/* Pricing leads, and it is here for the same reader as the four
+                  below. The reviewer's list asks for the policies *and* for
+                  pricing to be reachable; this page prints no figure of its own
+                  by design, so the header link and this one are the only routes
+                  from the front door to what Pro costs. It is not part of
+                  `LEGAL_PAGES` because it is not a policy — that array is what
+                  the four pages themselves read for their see-also strip. */}
+              <li>
+                <Link href="/upgrade" className="hover:text-lp-ink">
+                  Pricing
+                </Link>
+              </li>
               {LEGAL_PAGES.map((page) => (
                 <li key={page.href}>
                   <Link href={page.href} className="hover:text-lp-ink">

@@ -199,6 +199,20 @@ export function LandingHeader({ ink }: { ink: string }) {
             <a href="#tools" className="hover:text-lp-ink">
               Tools
             </a>
+            {/* **The one item here that leaves the page, and it belongs with
+                the anchors anyway.** The objection above was to an *account*
+                action standing in a row of navigation; a price is information,
+                the same kind of thing as Tools.
+
+                It is not optional furniture: Paddle reviews this domain before
+                it will let anybody take a card, and "pricing details or a
+                pricing page" is on the list it checks. This page states no
+                figure of its own by design — every number is read from the
+                modules that enforce it — so without this link the prices live
+                at a URL a visitor is never told about. */}
+            <Link href="/upgrade" className="hover:text-lp-ink">
+              Pricing
+            </Link>
           </span>
 
           {/* **A label, not a button or a link.** It is bound to the hero
