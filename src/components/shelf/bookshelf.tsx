@@ -48,6 +48,7 @@ import {
   useCover,
   useHydrated,
   useLedger,
+  useLibrarySettled,
   useCoverEpoch,
   usePrefs,
   useShelf,
@@ -793,6 +794,9 @@ function Overview({
   onPrepare: (bookId: string) => void;
 }) {
   const activity = useActivity();
+  // Only the *empty* half of this screen waits on it — see `useLibrarySettled`.
+  // A book that is already readable is drawn at once.
+  const settled = useLibrarySettled();
 
   /**
    * Advance readers whose date has gone, across every book.
@@ -1520,12 +1524,30 @@ function Overview({
             </div>
           )}
         </section>
-      ) : (
+      ) : settled ? (
         <EmptyState title="Nothing on the shelf yet" primary={START} secondary={IMPORT}>
           Start one and name it later, or bring in a manuscript you already have
           — .docx, .epub, .md, .txt or .html. Then this screen tells you what
           stands between it and a shop.
         </EmptyState>
+      ) : (
+        /* **Waiting, not empty — and the difference is the first thing a
+            writer saw on signing in.** On a machine that has just signed in,
+            storage is genuinely empty for the second or two the library takes
+            to come down, and `useHydrated` cannot tell that apart from a shelf
+            with nothing on it. So the dashboard greeted somebody with thirteen
+            chapters on the server with "Nothing on the shelf yet", then
+            swapped it for their book once the download landed.
+
+            A placeholder rather than a spinner, and at the height of the card
+            it is standing in for, so the page does not jump when the real one
+            arrives. No words: there is nothing true to say yet, and "Loading
+            your books" would be a claim about somebody who may simply have
+            none. */
+        <div
+          aria-hidden="true"
+          className="h-64 animate-pulse rounded-2xl border border-line bg-panel"
+        />
       )}
 
       {/* Nothing when nothing is late, which is most days. A panel that has
@@ -1974,6 +1996,8 @@ function Write({
   /** Opens the sheet holding every per-book tool. */
   onTools: (b: Book) => void;
 }) {
+  const settled = useLibrarySettled();
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -2007,7 +2031,21 @@ function Write({
         </label>
       </div>
 
-      {visible.length === 0 ? (
+      {visible.length === 0 && !settled && !searching ? (
+        /* The same wait the Overview makes, for the same reason: on a machine
+           that has just signed in, an empty list means "still arriving" rather
+           than "you have no books", and this screen used to announce the
+           second. A search that found nothing is exempt — that answer is about
+           the query and is already true of whatever is loaded. */
+        <ul aria-hidden="true" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((card) => (
+            <li
+              key={card}
+              className="h-36 animate-pulse rounded-xl border border-line bg-panel"
+            />
+          ))}
+        </ul>
+      ) : visible.length === 0 ? (
         <div className="mt-6">
           {searching ? (
             <EmptyState

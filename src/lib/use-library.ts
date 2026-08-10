@@ -52,7 +52,9 @@ import {
   subscribeToNotes,
   subscribeToPrefs,
   getCoverEpoch,
+  getSyncPhase,
   subscribeToShelf,
+  subscribeToSync,
   type Prefs,
   type Shelf,
 } from "./library-store";
@@ -82,6 +84,27 @@ const onServer = () => false;
  */
 export function useHydrated(): boolean {
   return useSyncExternalStore(NEVER_CHANGES, onClient, onServer);
+}
+
+/**
+ * False until the first reconcile with the server has finished.
+ *
+ * The companion to `useHydrated`, and needed for the state that one cannot
+ * see: storage read, genuinely empty, books still arriving. See the note on
+ * `getSyncPhase` in the store — a screen that treats that as "no books" tells a
+ * writer their library is gone and then takes it back.
+ *
+ * Guard the *empty* states on this, never the loaded ones. A shelf with books
+ * on it is worth showing the instant it is readable, whether or not the
+ * download has caught up.
+ */
+const pendingOnServer = () => "pending" as const;
+
+export function useLibrarySettled(): boolean {
+  return (
+    useSyncExternalStore(subscribeToSync, getSyncPhase, pendingOnServer) ===
+    "settled"
+  );
 }
 
 /** The raw stored document for one chapter, or null if never saved. */

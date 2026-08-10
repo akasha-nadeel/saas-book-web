@@ -44,6 +44,7 @@ import { localDay, type BookLimit, type DailyLimit, type DailyUse } from "./free
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
 import { isEmptyDetail, type PublishingMeta } from "./publishing";
+import { isSupabaseConfigured } from "./supabase/config";
 import {
   fetchLibrary,
   hasClaimed,
@@ -3265,6 +3266,59 @@ function collectLocal() {
 }
 
 /**
+ * Whether the first reconcile with the server has finished.
+ *
+ * **This exists because an empty shelf means a third thing.** `useHydrated`
+ * already separates "no books yet" from "storage has not been read yet"; on a
+ * machine that has just signed in there is a third state it cannot see —
+ * storage *has* been read, it is genuinely empty, and the writer's books are
+ * still coming down the wire. The dashboard took that for "no books" and
+ * printed "Nothing on the shelf yet" at somebody with thirteen chapters on the
+ * server, then replaced it a second later when `applyRemote` landed. The first
+ * screen of the session said the work was gone.
+ *
+ * It is a phase rather than a boolean promise because nothing may await it: the
+ * store is read synchronously during render, which is the whole reason
+ * `useSyncExternalStore` works here.
+ *
+ * **The initial value is decided synchronously by whether a server exists at
+ * all.** With no Supabase configured nothing is ever downloaded, so it starts
+ * settled and a local-only copy behaves exactly as it did before this existed.
+ * With one configured it starts pending, because the alternative — starting
+ * settled and flipping to pending inside an effect — is a first paint with the
+ * empty state on it, which is the bug.
+ */
+type SyncPhase = "pending" | "settled";
+
+let syncPhase: SyncPhase = isSupabaseConfigured() ? "pending" : "settled";
+const syncListeners = new Set<() => void>();
+
+export function getSyncPhase(): SyncPhase {
+  return syncPhase;
+}
+
+export function subscribeToSync(listener: () => void): () => void {
+  syncListeners.add(listener);
+  return () => {
+    syncListeners.delete(listener);
+  };
+}
+
+/**
+ * Settled, whatever the outcome.
+ *
+ * A failed sync settles too, and deliberately: the screen's job is to stop
+ * *waiting*, not to claim the download worked. A writer whose connection is
+ * down should meet the shelf as this browser knows it rather than a spinner
+ * with no end.
+ */
+function settleSync(): void {
+  if (syncPhase === "settled") return;
+  syncPhase = "settled";
+  for (const listener of syncListeners) listener();
+}
+
+/**
  * Reconcile this browser with the server. Safe to call more than once.
  *
  * Three cases, and the order they are tested in is what keeps manuscripts safe:
@@ -3280,6 +3334,18 @@ function collectLocal() {
  * downloads an empty library over a real one.
  */
 export async function syncWithServer(): Promise<void> {
+  try {
+    await reconcile();
+  } finally {
+    // In a `finally` because every path out of `reconcile` has to settle the
+    // phase — the early returns for a signed-out reader and a failed upload
+    // just as much as a completed download. One that did not would leave the
+    // dashboard waiting on a sync that had already given up.
+    settleSync();
+  }
+}
+
+async function reconcile(): Promise<void> {
   const owner = await currentOwner();
   if (!owner) return;
 
