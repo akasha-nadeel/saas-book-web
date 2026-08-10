@@ -1,6 +1,6 @@
 # OpenChapter — what's next
 
-Last updated 2026-08-02. Ordered roughly by value, not by effort.
+Last updated 2026-08-10. Ordered roughly by value, not by effort.
 
 ## The direction changed
 
@@ -33,12 +33,23 @@ than replacing it.
       advertised permission levels, one enforced.
 
       **Seats are per book and count the owner** — 2 free, 10 on Pro, from
-      `SEATS_PER_BOOK` in `free-limits.ts`. Deliberately *not* part of `Counted`:
-      that is the monotonic `prefs.usage` tally, and a seat is current occupancy
-      that comes back when somebody is removed. The number is enforced in SQL
-      under a row lock (`invite_book_member`, `accept_book_invite`), because two
-      invitations racing each other each see the other's absence and both get in.
-      The *number* stays in TypeScript, since it needs `isPro()`.
+      `SEATS_PER_BOOK` in `free-limits.ts`. Deliberately not a spend: a seat is
+      current occupancy and comes back when somebody is removed. The number is
+      enforced in SQL under a row lock (`invite_book_member`,
+      `accept_book_invite`), because two invitations racing each other each see
+      the other's absence and both get in. The *number* stays in TypeScript,
+      since it needs `isPro()`.
+
+      **One bug here would have shipped on the go-live configuration.** Fixed
+      2026-08-10. `seatsFor()` asked **PayHere's** `isBillingConfigured()` to
+      answer "is anything for sale at all" — the branch that hands out Pro's
+      seats when nothing can be bought, so a self-hosted copy is unlimited. With
+      Paddle set and PayHere unset, which is exactly what going live means, that
+      reads false and **every free owner got 10 seats instead of 2**. It now asks
+      `billingConfigured()` from `provider.ts`, which is the gateway-neutral
+      question the comment above the line already claimed it was asking. The
+      other three callers of PayHere's version are its own webhook, its own order
+      creation and its own checkout page, and are right to ask it.
 
       **The line is drawn at the book, not the prose.** An editor writes chapters,
       bodies and notes; the `books` row, the cover and the listing details stay the
@@ -70,8 +81,97 @@ than replacing it.
       The data-safety half of the conflict guard is done — `chapter_bodies.rev`,
       a conditional update in `pushBody`, and a conflict set that stops
       `applyRemote` overwriting the text it preserved — but nothing yet *asks* the
-      writer which version to keep. Also untested with two real accounts; see the
-      checklist below.
+      writer which version to keep. **Ownership transfer is also not built**, and
+      the account-deletion hazard below still stands: `books.owner` cascades, so
+      deleting an owner deletes the book out from under its collaborators.
+
+      The invitation flow *was* exercised with two real accounts on 2026-08-10 —
+      see the two entries below — so the "untested" caveat that stood here is
+      gone. What that testing did not cover is two writers **editing the same
+      chapter at once**, which is the case the conflict guard exists for.
+
+- [x] **The invitation carries somebody all the way in.** Done 2026-08-10, and
+      tested with two real accounts, which is what the line above was waiting
+      for. A share link used to end in a paragraph: signed in as the wrong
+      account it named the right address and told you to go and sign in as it,
+      with nothing to press; expired, answered, or waiting on an unconfirmed
+      email it said so and offered nothing at all. **Three of the seven states a
+      link can resolve to were a sentence and a closed tab.** Every one of them
+      ends in exactly one control now, which is the rule the screen is built on
+      and the thing every large product converged on.
+
+      So: a **Switch account** button carrying `next` *and* the invited address
+      back to the invitation, because the account being signed out of is the one
+      the browser will helpfully autofill. An already-accepted link **opens the
+      book** rather than reporting that the token has been used. An unconfirmed
+      address gets **Send it again** — the one blocked state a reader can clear
+      without anybody else acting. And accepting opens the book rather than a
+      card with a button to the shelf, awaiting `syncWithServer()` first so the
+      page that renders the book is asked for *after* this browser has it.
+
+      **Following the link and signing in is the yes.** `via=link`, set by the
+      proxy when it turns an invitation away and by the switch button, suppresses
+      the Accept card on that path only — never a check, since `acceptInvite`
+      still refuses anyone whose *confirmed* address is not the invited one.
+
+      The bug underneath it is the one worth remembering: three actions read
+      `getUserById`'s `data` and dropped its `error`, so a lookup that *failed*
+      became a confident false statement. `acceptInvite` answered "confirm your
+      email address first" about a state nobody had established — which is how it
+      and `offerFor` disagreed about one account, the page offering Accept and
+      the press being refused. `declineInvite` was worse: it fell through to
+      matching `invited_email = ""`, hit no rows, raised no error, and reported an
+      invitation declined **when nothing had happened**. One `accountFor()` helper
+      checks the error and returns null; each caller says so in its own words.
+
+      A second one found the same day and fixed with a typed constant
+      (`ON_THE_BOOK`): `memberFaces` and `offerFor` filtered on
+      `status = 'accepted'`, and the CHECK constraint allows only 'pending',
+      'active' and 'revoked'. The query was well formed, raised no error, and
+      returned nothing — so the face pile drew initials for collaborators who all
+      had photographs, and "you are already on this book" was unreachable. **A
+      mismatched enum value in a filter is indistinguishable from an empty
+      table**, which is why it passed tests, lint, typecheck and a build.
+
+- [x] **A collaborator can take themselves off a book.** Done 2026-08-10. Only
+      the owner could remove anybody, so a writer on somebody else's book was on
+      it for good. Survivable while joining took a deliberate Accept; not
+      survivable the moment an invite link started auto-accepting, because a
+      stray link then puts a book on your shelf permanently.
+
+      `leaveBook` is the invitee's side of `removeMember`, kept apart rather than
+      sharing one function because they authorise differently: **it takes a book
+      id and never a member id**, finding the row by the caller's own user id, so
+      no argument anybody can pass reaches somebody else's membership. The row is
+      revoked rather than deleted, like a removal — the seat comes back either
+      way, and a deleted row would lose the record that this address was ever on
+      the book, which the invitation's unique index needs to re-invite cleanly.
+
+      The client follows with `deleteBook`, which is safe on a shared book
+      because it refuses to push a deletion for a book somebody else owns.
+      Without it the shelf holds the book until the next sync marks it "No longer
+      shared" — the wording for *being removed*, which reads as a fault rather
+      than as the thing just done.
+
+- [x] **A shared book says so, and the faces are real.** Done 2026-08-10. Nothing
+      on any screen said a book belonged to somebody else: `isSharedBook` existed
+      in the store and had no caller. The badge is on the dashboard card, the
+      book's overview and the book panel — always **above the title**, where
+      GitHub puts the owner in `owner/repo`, because whose book this is has to be
+      read before the name. Blue for a book you may write, `note` amber for one
+      you may only read, since a viewer's editing controls are gone and the badge
+      is the only thing explaining a manuscript that will not take a keystroke.
+
+      The face pile draws real photographs where a provider gave one.
+      `memberFaces()` **takes no arguments** and derives its own id list from the
+      books the caller is on — a function accepting uuids would be an oracle
+      returning a name and a face for any account. The caller's own face was
+      already on the page, resolved server-side, so the disc that leads every
+      pile paints in the first frame instead of waiting on a request for
+      something we were holding.
+
+      *Left:* only Google accounts have a photo at all, so the initial is the
+      permanent fallback rather than a loading state.
 
 - [x] **"Where you left off" card.** Done 2026-08-01. On the book overview,
       which is the screen a writer lands on. Backed by `src/lib/resume.ts`
@@ -1549,11 +1649,99 @@ should either ship or lose the card.
       countable set on a dialog about a ceiling, so there are twelve and the
       grid is cropped. Checked in both themes.
 
+      **Replaced twice since, and the second replacement is the one that
+      stands.** Everything above describes four meters of ten, which shipped on
+      2026-08-06 and is gone. What follows is why, because the reasoning is the
+      part worth keeping.
+
+      **2026-08-09 — five books, everything unlimited inside them.** The meters
+      each counted an *attempt*, and every one of those screens is a screen you
+      use badly on purpose: naming is iterative, so ten searches is perhaps three
+      real candidates, and the meter ran out in the middle of the one activity
+      the tool exists for. The writer who felt it first was the writer using it
+      properly. Counting books charged for *scale* instead — Figma's free tier is
+      the same shape and nearly the same sentence.
+
+      **2026-08-10 — per-tool limits, because the container leaked.** The comps
+      box and the title-check box take **arbitrary text**, so one book slot was a
+      general-purpose research desk for any number of manuscripts. A container
+      limit cannot hold a container whose contents are arbitrary; it only ever
+      bound the tools that read the manuscript. So each tool is metered in the
+      unit its own work comes in:
+
+      | Shape | Tools | Free |
+      |---|---|---|
+      | **Per day** | comps, covers, title check | 2 / 3 / 2 |
+      | **Per book** | blurb, prose report, track | 5 / 6 / 2 |
+      | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
+
+      The three that query a catalogue are counted **per day** — what every
+      serious research tool does (Semrush's free plan is ten queries a day) and
+      for the same reason: a search box takes arbitrary input, so the honest unit
+      is the query. **They come back tomorrow**, which is the half that matters:
+      nobody is permanently walled out of a book they own, and every sentence
+      about them says so. Occupancy counts what is *currently* there, so removing
+      an advance reader gives the place back.
+
+      Imports became **unlimited** in the same change, and so did the writing
+      record, the series read of the story bible and the keyword boxes — all
+      three of which left the Pro column. What remains Pro: the six server-gated
+      routes that cost real money, the sales-report import inside Track, and the
+      book-three curve.
+
+      Four things hold it up. **`onThisBook`** keeps "unlimited within a book" —
+      a book already counted is never blocked, so the wall lands on the *next*
+      one and never mid-sentence. The **daily reset lives in `dailyAllowance`**
+      rather than the parser, because `getPrefs` caches on the raw string and
+      anything derived from the clock there goes stale at midnight with nothing
+      to invalidate it. **Every limit is spent on a press**, which is why the
+      prose report gained a Run button rather than an exception to the rule that
+      `LimitDialog` never fires from an effect. And **`warnAt` caps the warning at
+      `limit - 1`**, or three of these limits would greet a writer who had used
+      nothing with a meter.
+
+      **The counters are merged on the way down, not replaced.** `applyRemote`
+      spreads remote prefs over local, which is right for a preference and wrong
+      for a spend: a laptop and a phone could each hand out a full daily
+      allowance. `usedOn` is a **set union** — lossless, which is the advantage of
+      a set of books over a tally of attempts — and `usedToday` takes the **larger
+      count per tool** on the same day, the later day outright otherwise. The bias
+      is towards the plan: where two machines disagree, it believes the one that
+      spent more.
+
+      **Verified in a browser on a real free account, 2026-08-10**, which is what
+      unit tests could not do. All three daily limits count, warn, refuse and open
+      the right dialog, with the counters independent per tool. **Arrival searches
+      cost nothing** — the property that stops 2/day being a limit on opening a
+      screen. Prose refuses the seventh book without recording it; blurb refuses
+      on *save* with nothing written; ARC refuses the eleventh reader while all
+      ten still render **and the typed name survives**. The merge proved itself
+      against the real server: a locally lowered counter came back at the higher
+      value. An old library came up `{day: "", counts: {}}` — the migration
+      working.
+
+      That session found exactly one bug, now fixed: the title check **hid its
+      verdict whenever the allowance was blocked**. Defensible at ten per
+      lifetime, where blocked was a rare terminal state; at two a day it is the
+      *second* search that spends the last one, so the writer pressed a button
+      they were entitled to press, the catalogues answered, and the screen showed
+      them nothing — every day, under a banner claiming "everything you have
+      already found stays where it is".
+
       *Left:* these are browser gates, like the prose report and the money
       screens, and they are honest about being that. Enforcing them server-side
       would mean `/api/comps` checking a plan, and that route is deliberately
       free and keyless — which is worth more than closing a hole nobody is
-      trying to defend to that standard.
+      trying to defend to that standard. The daily ones are also resettable by
+      anybody willing to move their machine's clock, which the file header says
+      outright rather than leaving to be discovered.
+
+      *Also left:* **the daily rollover has never been watched happen.** The
+      reset is unit-tested with an injected day and the arithmetic is right, but
+      nobody has yet left a browser open past local midnight and pressed the
+      button. And `service_role` has **no GRANT on the `prefs` table** — nothing
+      needs it today, and an admin path that ever does will fail with "permission
+      denied" rather than anything more helpful.
 
 - [x] **A new plan.** Done 2026-08-03.
       $9 monthly, $72 a year, **$199 once**. `plans.ts`, a migration widening
