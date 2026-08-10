@@ -10,6 +10,13 @@ import { findBook, setPublishing } from "@/lib/library-store";
 import { BLURB_MAX } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { useToolSave } from "@/lib/use-tool-save";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  LimitNote,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -81,11 +88,23 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
      times, and a save they cannot see is a save they assume did not happen.
      The step it ticks is "Write the blurb", which is detected rather than
      stored: it ticks because the description is now on the book. */
+  /*
+   * **Spent on the save, not on the typing and not on arrival.** Drafting is
+   * the whole of this screen — a writer redrafts the same two hundred words a
+   * dozen times — so charging for a keystroke would be the meter this policy
+   * exists to remove. Keeping the blurb is the thing worth counting, and a book
+   * already counted is never asked again however often it is redrafted.
+   */
+  const gate = useLimitGate({ action: "blurb", bookId });
+
   const save = useToolSave({
     book,
     tool: "blurb",
     dirty: draft !== null && draft !== stored,
-    commit: () => book && setPublishing(book.id, { description: text }),
+    commit: () => {
+      if (!book || !gate.spend()) return;
+      setPublishing(book.id, { description: text });
+    },
     discard: () => setDraft(null),
   });
 
@@ -116,6 +135,9 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
           Outside the scrolling column on purpose: this screen scrolls, and a
           control that scrolls away is not there at the moment it matters. */}
       <ToolSaveBar state={save} />
+      {gate.dialogOpen && (
+        <LimitDialog action="blurb" onClose={gate.closeDialog} />
+      )}
       {/* The trail keeps the trade word, the heading asks the writer's own
           question — the split comps and the title check already make. "Blurb"
           is what this is called in the launcher and on a shop's own form, so it
@@ -184,6 +206,17 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
             it. Centring it was the other option and it breaks that alignment
             the moment the window is wide. */}
         <div className="max-w-3xl">
+          {/* Standing above the composer, because what is refused here is the
+              *save* — a writer may draft freely either way, and the thing they
+              need to know before spending an evening on it is that keeping it
+              is what costs. `LimitNote` in the roadmap's panel, which is a
+              ~300px column the wide banner does not fit. */}
+          {embedded ? (
+            <LimitNote allowance={gate.allowance} className="mb-4" />
+          ) : (
+            <LimitBanner allowance={gate.allowance} className="mb-4" />
+          )}
+          <LeftPill allowance={gate.allowance} className="mb-4" />
           <div>
             {/* The counters live inside the box's frame rather than under it.
                 They were fourteen rows down, which on this screen meant below

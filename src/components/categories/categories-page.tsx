@@ -12,7 +12,6 @@ import {
 } from "@/lib/comps/subjects";
 import { COMMON_SUBJECTS } from "@/lib/comps/common-subjects";
 import { keywordReport, SLOTS, SLOT_MAX, type Issue } from "@/lib/keywords";
-import { ProGate } from "@/components/upgrade/pro-gate";
 import { ToolSaveBar } from "@/components/ui/tool-save";
 import { findBook, setPublishing } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
@@ -396,19 +395,14 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
             </p>
 
             <div className="mt-3.5 border-t border-line pt-3.5">
-              <ProGate
-                title="The seven keyword boxes"
-                what="The seven backend keyword fields a shop's listing form asks for, counted: which are over the limit, which repeat words your title already owns, which spend the same word twice, and which use phrases shops reject."
-              >
-                <KeywordBoxes
-                  keywords={keywords}
-                  title={book.title}
-                  subtitle={book.subtitle}
-                  author={book.author}
-                  series={book.publishing?.series}
-                  onChange={setKeyword}
-                />
-              </ProGate>
+              <KeywordBoxes
+                keywords={keywords}
+                title={book.title}
+                subtitle={book.subtitle}
+                author={book.author}
+                series={book.publishing?.series}
+                onChange={setKeyword}
+              />
             </div>
           </div>
         </section>

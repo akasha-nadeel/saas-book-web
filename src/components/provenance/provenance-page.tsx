@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
 import { parseHistory } from "@/lib/history";
 import {
   findBook,
@@ -46,7 +45,6 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
   // Read here with the other hooks rather than beside the early return
   // below: hooks cannot sit after a conditional, and this screen has
   // several of its own already.
-  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const activity = useActivity();
@@ -128,27 +126,6 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
     );
   }
 
-  // The gate stands *after* the not-found guard above: a writer who
-  // followed a stale link to a deleted book should be told the book is
-  // gone, not asked to pay for one that does not exist.
-  if (!entitled) {
-    return (
-      <GatedTool
-        book={book}
-        tool="Writing record"
-        what="The trail your work left while it was being done — which days you wrote on, how the count moved, every draft saved along the way — gathered into a plain-text document you can send if you are ever accused of not having written your own book, with a SHA-256 fingerprint of the manuscript."
-        deck={
-          <>
-            If someone accuses you of not having written your own book, there is no
-        test that settles it — and the detectors sold for the job are known to
-        misfire on plain prose and on writers whose first language is not
-        English. What people actually reach for is the trail the work left while
-        it was being done. This is yours, in a document you can send.
-          </>
-        }
-      />
-    );
-  }
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">

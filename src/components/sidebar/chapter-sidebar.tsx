@@ -24,7 +24,6 @@ import { useShelf } from "@/lib/use-library";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
 import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
-import { LimitNote, useLimitGate } from "@/components/upgrade/free-limit";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
 /**
@@ -61,8 +60,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   // Counted against the free plan's ten, exactly as the book panel's copy of
   // this control is: the same file into the same book by a different door.
-  const gate = useLimitGate("imports");
-  const allowance = gate.allowance;
 
   // The route is the source of truth for which chapter is open, so the sidebar
   // needs no state of its own to stay in sync with the editor.
@@ -87,7 +84,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
    */
   const handleImport = async (file: File) => {
     // `check` and not `spend`: the store counts imports at its own funnel.
-    if (!gate.check()) return;
     setImporting(true);
     setImportError(null);
     try {
@@ -573,8 +569,6 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                 if (file) void handleImport(file);
               }}
             />
-
-            {gate.refused && <LimitNote allowance={allowance} className="mt-2" />}
 
             {importError && (
               <p

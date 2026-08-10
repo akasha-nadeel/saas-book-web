@@ -37,9 +37,10 @@ import {
   type MatterPart,
 } from "./matter";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
-// Nothing is imported from free-limits.ts any more: the policy is a number and
-// two functions there, and the store's only job is to keep the list of books.
-// It stays pure and imports nothing back, so the policy stays out of the store.
+// Types and one date helper. free-limits.ts is pure and imports nothing back, so
+// the policy stays out of the store and the store stays the only place that keeps
+// the score.
+import { localDay, type BookLimit, type DailyLimit, type DailyUse } from "./free-limits";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
 import { isEmptyDetail, type PublishingMeta } from "./publishing";
@@ -1258,19 +1259,6 @@ export function createBookFromImport(
     lastOpenedBookId: bookId,
   });
 
-  /*
-   * Marked here, at the funnel, rather than at each screen that imports.
-   *
-   * Three of them arrive this way — the import page, the shelf's dialog and the
-   * landing page's check — and the same argument that put `setupFromImport` in
-   * all three applies harder to a plan limit: a screen that forgets to mark is
-   * a book the plan never sees, and the one that would forget is whichever is
-   * written next.
-   *
-   * Importing *is* using a tool on a book, so the new book joins the five. It
-   * is marked after the commit, so a rolled-back import leaves nothing behind.
-   */
-  markToolUse(book.id);
 
   return { bookId, chapterId: metas[0].id };
 }
@@ -1448,16 +1436,6 @@ export function importIntoBook(
     }));
   }
 
-  /*
-   * Marked, like `createBookFromImport`.
-   *
-   * A manuscript brought into a book made thirty seconds ago is the same
-   * manuscript arriving by a different door, and a plan limit with a door left
-   * open is a number the pricing page cannot honestly print. Marking the book
-   * rather than counting the file is what closes it: "new book, then import
-   * into it" now lands on the same book either way.
-   */
-  markToolUse(bookId);
 
   return { firstId: metas[0].id, undo };
 }
@@ -1514,9 +1492,7 @@ export function undoChapterImport(undo: ImportUndo) {
     };
   });
 
-  // Nothing to give back. The book itself is still here and still tooled, so
-  // undoing an import into it does not release a slot — under the old
-  // per-import meter this refunded a spend, and there is no longer a spend.
+  // Nothing to give back: importing is unbounded on either plan.
 }
 
 export function renameChapter(
@@ -2020,23 +1996,26 @@ export interface Prefs {
    */
   dismissed: string[];
   /**
-   * What the free plan counts, counted: imports, comp searches, cover searches
-   * and title checks. See `lib/free-limits.ts` for the policy — the numbers,
-   * the names and the arithmetic all live there. This is only the tally.
+   * Today's count for each per-day tool, with the local day it belongs to.
    *
-   * **Here rather than on a book** for the reason `matterAsked` is: these are
-   * facts about the account rather than about any manuscript, and a field on
-   * the book would need a Postgres column to survive `sync.ts` at all. Prefs go
-   * up as one JSON blob, so the list travels between a writer's machines, which
-   * is what stops a second browser handing out five more.
-   *
-   * **A set, not a tally.** A book on this list costs nothing more however much
-   * work is done on it — that is the whole of "unlimited within a book". An id
-   * is added the first time a tool does real work there and is never removed:
-   * dropping it when a book is deleted would make "five books" mean "five at a
-   * time", which is a different promise from the one the pricing page makes.
+   * The day travels with the counts so a stale record reads as nought without
+   * anybody having to sweep it — see `dailyAllowance`, which does that
+   * comparison. It is deliberately *not* reset in the parser: `getPrefs` caches
+   * on the raw string, so anything derived from the clock there goes stale the
+   * moment midnight passes with nothing to invalidate it.
    */
-  toolBooks: string[];
+  usedToday: DailyUse;
+  /**
+   * Which books each book-counted tool has been used on. Cumulative.
+   *
+   * **A set per tool, not a tally.** A book already listed costs nothing more
+   * however much work is done on it, which is the whole of "unlimited within a
+   * book". An id is added the first time a tool does real work there and is
+   * never removed: dropping it when a book is deleted would make "five books"
+   * mean "five at a time", a different promise from the one the pricing page
+   * makes.
+   */
+  usedOn: Partial<Record<BookLimit, string[]>>;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -2066,13 +2045,15 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Nothing spent yet, which is also what a library stored before this existed
   // reads as. Erring low is deliberate: charging a writer for work they cannot
   // be shown any evidence of is the wrong way round to be wrong. Frozen with
-  // the rest, so it is shared — `markToolUse` writes a new array rather than
+  // the rest, so it is shared — the writers build new objects rather than
   // adding to this one.
-  // Nothing tooled yet, which is also what a library stored before this existed
-  // reads as. Erring low is deliberate: charging a writer for work they cannot
-  // be shown any evidence of is the wrong way round to be wrong. Frozen with
-  // the rest, so it is shared — `markToolUse` writes a new array.
-  toolBooks: [],
+  // Nothing used yet, which is also what a library stored before this existed
+  // reads as. `day: ""` never equals a real local day, so a fresh library and a
+  // legacy one both read as "nothing used today" with no special case anywhere.
+  // Frozen with the rest, so they are shared — the writers below build new
+  // objects rather than adding to these.
+  usedToday: Object.freeze({ day: "", counts: Object.freeze({}) }) as DailyUse,
+  usedOn: Object.freeze({}) as Partial<Record<BookLimit, string[]>>,
 });
 
 const prefsListeners = new Set<() => void>();
@@ -2127,10 +2108,12 @@ function parsePrefs(raw: string | null): Prefs {
       matterAsked: Array.isArray(parsed.matterAsked)
         ? parsed.matterAsked.filter((id): id is string => typeof id === "string")
         : [],
-      // Narrowed on the way in for the same reason, and once more where it is
-      // used: `bookToolAllowance` refuses anything that is not a whole positive
-      // number, so a hand-edited key cannot make the arithmetic nonsense.
-      toolBooks: parseToolBooks(parsed),
+      // Narrowed on the way in for the same reason, and once more where they are
+      // used: the allowance functions refuse anything that is not a whole
+      // positive number, so a hand-edited key cannot make the arithmetic
+      // nonsense.
+      usedToday: parseUsedToday(parsed),
+      usedOn: parseUsedOn(parsed),
     };
   } catch {
     return DEFAULT_PREFS;
@@ -2147,20 +2130,50 @@ function parsePrefs(raw: string | null): Prefs {
  * — a limit that resets itself is not a limit.
  */
 /**
- * The books the tools have been used on, narrowed on the way in.
+ * Today's counters, narrowed on the way in.
  *
- * **It also carries an older library forward without punishing anyone.** Before
- * this, the free plan metered four actions ten times each and kept the counts in
- * `prefs.usage`. Those numbers say nothing about *which* books the work happened
- * on, so there is nothing to migrate and nothing is guessed: a writer who
- * arrives from that version starts with an empty list and five books in hand.
- * Erring generous is the only defensible direction — the alternative is charging
- * somebody for work they cannot be shown any evidence of.
+ * The day is kept verbatim rather than compared against the clock here — see the
+ * field's own note. Anything that is not a positive finite number is dropped
+ * rather than coerced, so a hand-edited key cannot hand somebody an allowance.
  */
-function parseToolBooks(parsed: Partial<Prefs>): string[] {
-  return Array.isArray(parsed.toolBooks)
-    ? [...new Set(parsed.toolBooks.filter((id): id is string => typeof id === "string"))]
-    : [];
+function parseUsedToday(parsed: Partial<Prefs>): DailyUse {
+  const stored = parsed.usedToday;
+  if (!stored || typeof stored !== "object" || typeof stored.day !== "string") {
+    return { day: "", counts: {} };
+  }
+
+  const raw = (stored.counts ?? {}) as Record<string, unknown>;
+  const counts: Partial<Record<DailyLimit, number>> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+      counts[key as DailyLimit] = Math.floor(value);
+    }
+  }
+
+  return { day: stored.day, counts };
+}
+
+/**
+ * The per-tool book lists, narrowed and de-duplicated on the way in.
+ *
+ * **Nothing is migrated from the version before this.** That one kept a single
+ * `toolBooks` list meaning "some tool ran here", which cannot be split into
+ * blurb-versus-prose after the fact, and kept no daily history at all. So every
+ * writer starts clean. Erring generous is the only defensible direction when the
+ * alternative is charging somebody for work there is no evidence of.
+ */
+function parseUsedOn(parsed: Partial<Prefs>): Partial<Record<BookLimit, string[]>> {
+  const stored = parsed.usedOn;
+  if (!stored || typeof stored !== "object") return {};
+
+  const usedOn: Partial<Record<BookLimit, string[]>> = {};
+  for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+    if (!Array.isArray(value)) continue;
+    usedOn[key as BookLimit] = [
+      ...new Set(value.filter((id): id is string => typeof id === "string")),
+    ];
+  }
+  return usedOn;
 }
 
 /**
@@ -2252,32 +2265,46 @@ export function shouldAskMatter(book: Book): boolean {
 }
 
 /**
- * Record that the tools have been used on this book.
+ * Spend one of today's uses of a per-day tool.
  *
- * The only way anything writes `toolBooks`, so no screen grows its own
- * read-modify-write. What the limit *is* is not decided here —
- * `lib/free-limits.ts` holds the policy and the screens hold the gate; this
- * only keeps the list.
+ * The only way anything writes `usedToday`, so no screen grows its own
+ * read-modify-write. **The reset is folded in**: a stored record from yesterday
+ * is replaced rather than added to, so the first press of a new day starts at
+ * one however long the app was left open.
  *
- * **Idempotent, and that is the feature.** Calling it on a book already in the
- * list writes nothing at all: no storage write, no fan-out, no push. Every tool
- * can therefore call it on every action without anybody having to work out
- * whether this particular search is the first one.
+ * What the limit *is* is not decided here — `lib/free-limits.ts` holds the policy
+ * and the screens hold the gate; this only keeps the count.
  */
-export function markToolUse(bookId: string) {
-  const books = getPrefs().toolBooks;
-  if (books.includes(bookId)) return;
-  setPref("toolBooks", [...books, bookId]);
+export function spendDailyUse(action: DailyLimit) {
+  const stored = getPrefs().usedToday;
+  const day = localDay();
+  const counts = stored.day === day ? stored.counts : {};
+
+  setPref("usedToday", {
+    day,
+    counts: { ...counts, [action]: (counts[action] ?? 0) + 1 },
+  });
 }
 
 /**
- * Whether this book is one of the ones already being tooled.
+ * Record that a book-counted tool has done real work on this book.
  *
- * Read by the gate before it refuses anything, because a book on the list is
- * never refused however much work happens there.
+ * The only way anything writes `usedOn`. **Idempotent, and that is the
+ * feature**: calling it on a book already listed writes nothing at all — no
+ * storage write, no fan-out, no push — so every screen can call it on every
+ * action without having to work out whether this particular press is the first.
  */
-export function isToolBook(bookId: string): boolean {
-  return getPrefs().toolBooks.includes(bookId);
+export function markToolBook(action: BookLimit, bookId: string) {
+  const usedOn = getPrefs().usedOn;
+  const books = usedOn[action] ?? [];
+  if (books.includes(bookId)) return;
+
+  setPref("usedOn", { ...usedOn, [action]: [...books, bookId] });
+}
+
+/** Whether this book is already one of the ones that tool is counted on. */
+export function isToolBook(action: BookLimit, bookId: string): boolean {
+  return (getPrefs().usedOn[action] ?? []).includes(bookId);
 }
 
 /**

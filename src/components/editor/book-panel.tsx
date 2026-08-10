@@ -44,7 +44,6 @@ import {
 } from "@/components/sidebar/row-menu";
 import type { ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
-import { LimitNote, useLimitGate } from "@/components/upgrade/free-limit";
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
@@ -445,8 +444,6 @@ export function BookPanel({
   // The free plan's ten imports. This path counts too — a file brought into a
   // book the writer made a moment ago is the same file, and a limit with an
   // "add a book first" way round it is a limit the pricing page cannot claim.
-  const gate = useLimitGate("imports");
-  const allowance = gate.allowance;
 
   // The Book View flip-book: page 0 is the cover, 1…N the chapter's printed
   // pages. The preview reports its page count so the pager can clamp.
@@ -608,7 +605,6 @@ export function BookPanel({
 
   const handleImport = async (file: File) => {
     // `check` and not `spend`: the store counts imports at its own funnel.
-    if (!gate.check()) return;
     setImporting(true);
     setImportError(null);
     try {
@@ -961,8 +957,6 @@ export function BookPanel({
               if (file) void handleImport(file);
             }}
           />
-
-          {gate.refused && <LimitNote allowance={allowance} className="mt-3" />}
 
           {importError && (
             <p

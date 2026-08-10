@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
-import { FREE_TOOL_BOOKS } from "@/lib/free-limits";
+import { FREE_LIMITS } from "@/lib/free-limits";
 import {
   CONTACT_EMAIL,
   COUNTRY,
@@ -81,11 +81,15 @@ export default function TermsPage() {
       <Section title="5. Free and paid">
         <p>
           Writing, importing, all four export formats, sync, the pre-upload
-          check and the publishing roadmap are free and stay free. The free plan
-          runs the per-book tools — comparable titles, cover research, the title
-          check and the rest — on {FREE_TOOL_BOOKS} books, as often as you like
-          on each. The paid plan lifts the number of books and adds the tools
-          listed on the pricing page.
+          check and the publishing roadmap are free and stay free. Each research
+          tool has its own free allowance — {FREE_LIMITS.comps.free} comparable-title
+          searches and {FREE_LIMITS.titleCheck.free} title checks a day,{" "}
+          {FREE_LIMITS.covers.free} cover searches a day, the blurb on{" "}
+          {FREE_LIMITS.blurb.free} books, the prose report on{" "}
+          {FREE_LIMITS.prose.free}, money tracking on {FREE_LIMITS.track.free}, and{" "}
+          {FREE_LIMITS.arcReaders.free} advance readers on each book. The daily
+          ones start again the next day. The paid plan lifts all of them and adds
+          the tools listed on the pricing page.
         </p>
         <p>
           {TRADING_NAME} Pro is {displayPrice(priceOf("monthly"))} a month or{" "}

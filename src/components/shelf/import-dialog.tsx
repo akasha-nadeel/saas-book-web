@@ -12,11 +12,6 @@ import {
 import type { ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
 import { keepImportedCover } from "@/lib/cover-save";
-import {
-  ImportLimitReached,
-  LeftPill,
-  useLimitGate,
-} from "@/components/upgrade/free-limit";
 
 /**
  * Importing a manuscript, as a modal on the shelf.
@@ -38,8 +33,6 @@ import {
  */
 export function ImportDialog({ onClose }: { onClose: () => void }) {
   const router = useRouter();
-  const gate = useLimitGate("imports");
-  const allowance = gate.allowance;
   const dialogRef = useRef<HTMLDialogElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -129,7 +122,6 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
        file, see the chapters and press for it, and is answered at the moment
        they ask — the eleventh press, not the tenth arrival. `check` and not
        `spend`, because the store counts imports at its own funnel. */
-    if (!gate.check()) return;
     const result = createBookFromImport(
       title,
       proposal.chapters,
@@ -183,11 +175,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           </button>
         </header>
 
-        {gate.refused ? (
-          <div className="px-6 pb-6">
-            <ImportLimitReached used={allowance.used} />
-          </div>
-        ) : proposal === null ? (
+        {proposal === null ? (
           <>
             <div className="flex gap-6 border-b border-line px-6">
               {(
@@ -418,7 +406,6 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
 
               {/* Once, below whichever tab is open: all three make a book, so
                   all three spend the same allowance. */}
-              <LeftPill allowance={allowance} className="mt-4" />
 
               {error && (
                 <p

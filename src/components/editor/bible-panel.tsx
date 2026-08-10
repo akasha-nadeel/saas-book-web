@@ -18,7 +18,6 @@ import {
   seriesOf,
   type SeriesBook,
 } from "@/lib/series";
-import { ProGate, useEntitled } from "@/components/upgrade/pro-gate";
 import {
   useBible,
   useChapterBody,
@@ -80,19 +79,17 @@ export function BiblePanel({
   const seriesName = self ? seriesNameOf(self) : null;
 
   const [scope, setScope] = useState<"book" | "series">("series");
-  const entitled = useEntitled();
 
   /*
    * Reading across a series is the paid half; one book's bible is not.
    *
-   * The toggle is drawn either way and pressing it does something either way —
-   * a control that greys out tells a writer nothing about what they are
-   * missing, and the whole argument for this feature is one paragraph long.
-   * `wide` stays false while it is gated so the merge is never computed for a
-   * list nobody is going to see.
+   * The toggle is drawn whenever the book is in a series, and the series read
+   * is free on both plans — it was behind a Pro gate until the per-tool limits
+   * arrived, and one book's bible had always been free, so the gate was the
+   * last thing standing between a writer and the half of the feature that
+   * answers "who did I write down two books ago".
    */
-  const wide = hasSeries && scope === "series" && entitled;
-  const gated = hasSeries && scope === "series" && !entitled;
+  const wide = hasSeries && scope === "series";
 
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
@@ -288,14 +285,7 @@ export function BiblePanel({
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {gated ? (
-          <ProGate
-            title="The series bible"
-            what="Every book in the series read as one cast, so the lookup finds the people you wrote down two books ago — each entry saying which book introduced them, with every book's own description under it rather than merged into one."
-          >
-            {null}
-          </ProGate>
-        ) : rows.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="font-sans text-sm text-muted">
             {wide
               ? "Nothing written down in any of these books yet. Add the people, places and things that will have to be the same three books from now."

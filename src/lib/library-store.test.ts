@@ -11,7 +11,8 @@ import {
   chapterNumberOf,
   createBookFromImport,
   chapterLabel,
-  markToolUse,
+  markToolBook,
+  spendDailyUse,
   isToolBook,
   createBookFromTemplate,
   createChapter,
@@ -63,6 +64,7 @@ import {
   touchLastOpenedBook,
   type Book,
 } from "@/lib/library-store";
+import { localDay } from "@/lib/free-limits";
 import { DEFAULT_TYPOGRAPHY } from "@/lib/typography";
 
 beforeEach(() => {
@@ -543,24 +545,11 @@ it("refuses an import with no chapters", () => {
 });
 
 /*
- * The list behind the free plan's five tooled books. It is only a list here —
- * the limit itself is `lib/free-limits.ts` — but the mark has to be made at the
- * funnels or the number on the pricing page means nothing.
+ * The counters behind the per-tool free limits. They are only counters here —
+ * the policy is `lib/free-limits.ts` — but a screen that forgets to record a use
+ * is a limit the pricing page cannot honestly print.
  */
-it("marks a manuscript brought in as a book", () => {
-  expect(getPrefs().toolBooks).toEqual([]);
-
-  const one = createBookFromImport("One", [
-    { title: "Chapter One", doc: { type: "doc" }, words: 10 },
-  ])!;
-  const two = createBookFromImport("Two", [
-    { title: "Chapter One", doc: { type: "doc" }, words: 10 },
-  ])!;
-
-  expect(getPrefs().toolBooks).toEqual([one.bookId, two.bookId]);
-});
-
-it("does not mark a book it could not store", () => {
+it("does not roll back a book it could not store", () => {
   const setItem = localStorage.setItem.bind(localStorage);
   let calls = 0;
   vi.spyOn(Storage.prototype, "setItem").mockImplementation((k, v) => {
@@ -576,12 +565,18 @@ it("does not mark a book it could not store", () => {
   vi.restoreAllMocks();
 
   expect(getShelf().books).toHaveLength(0);
-  expect(getPrefs().toolBooks).toEqual([]);
 });
 
-it("marks a manuscript brought into a book that already exists", () => {
-  // The way round the limit if this one did not mark: make an empty book, then
-  // import into it.
+/*
+ * **Importing is unbounded on either plan, and this is the test that proves the
+ * removal.** It used to spend one of ten, then to mark a book against a global
+ * five. Neither survives: nothing about bringing a manuscript in is metered.
+ */
+it("does not touch the plan's counters when a manuscript is imported", () => {
+  createBookFromImport("One", [
+    { title: "Chapter One", doc: { type: "doc" }, words: 10 },
+  ]);
+
   const { bookId } = createBook("Started here");
   importIntoBook(
     bookId,
@@ -589,58 +584,84 @@ it("marks a manuscript brought into a book that already exists", () => {
     "add",
   );
 
-  expect(getPrefs().toolBooks).toEqual([bookId]);
+  expect(getPrefs().usedOn).toEqual({});
+  expect(getPrefs().usedToday.counts).toEqual({});
+});
+
+it("marks a book once however many times a tool is used on it", () => {
+  markToolBook("blurb", "book-a");
+  markToolBook("blurb", "book-a");
+  markToolBook("blurb", "book-b");
+  markToolBook("blurb", "book-a");
+
+  expect(getPrefs().usedOn.blurb).toEqual(["book-a", "book-b"]);
+  expect(isToolBook("blurb", "book-a")).toBe(true);
+  expect(isToolBook("blurb", "book-c")).toBe(false);
+});
+
+it("keeps each tool's books apart", () => {
+  markToolBook("blurb", "book-a");
+  markToolBook("prose", "book-b");
+
+  expect(getPrefs().usedOn.blurb).toEqual(["book-a"]);
+  expect(getPrefs().usedOn.prose).toEqual(["book-b"]);
+  expect(isToolBook("prose", "book-a")).toBe(false);
+});
+
+it("counts each day's uses, one tool at a time", () => {
+  spendDailyUse("comps");
+  spendDailyUse("comps");
+  spendDailyUse("covers");
+
+  expect(getPrefs().usedToday.day).toBe(localDay());
+  expect(getPrefs().usedToday.counts).toEqual({ comps: 2, covers: 1 });
 });
 
 /*
- * **The one not to "fix".** Undoing an import used to hand back a spend,
- * because the old limit counted files. It counts *books* now, and the book is
- * still here and still being worked on — so the slot stays taken. Releasing it
- * would make "five books" mean "five at a time".
+ * **The one not to "fix": yesterday's count is replaced, not added to.** These
+ * are the only limits in the app that come back, and the reset happens on the
+ * first press of a new day rather than being swept by anything — so a browser
+ * left open overnight starts the writer at one, not at three.
  */
-it("keeps the book marked when an import into it is undone", () => {
-  const { bookId } = createBook("Started here");
-  const result = importIntoBook(
-    bookId,
-    [{ title: "Chapter One", doc: { type: "doc" }, words: 900 }],
-    "add",
-  )!;
-  expect(getPrefs().toolBooks).toEqual([bookId]);
-
-  undoChapterImport(result.undo);
-  expect(getPrefs().toolBooks).toEqual([bookId]);
-});
-
-it("marks a book once however many tools are used on it", () => {
-  markToolUse("book-a");
-  markToolUse("book-a");
-  markToolUse("book-b");
-  markToolUse("book-a");
-
-  expect(getPrefs().toolBooks).toEqual(["book-a", "book-b"]);
-  expect(isToolBook("book-a")).toBe(true);
-  expect(isToolBook("book-c")).toBe(false);
-});
-
-it("keeps a list that storage has had tampered with sane", () => {
+it("starts again when the stored day is not today", () => {
   localStorage.setItem(
     "openchapter:prefs",
-    JSON.stringify({ toolBooks: ["a", 7, null, "a", "b"] }),
+    JSON.stringify({ usedToday: { day: "2000-01-01", counts: { comps: 2 } } }),
   );
-  expect(getPrefs().toolBooks).toEqual(["a", "b"]);
+
+  spendDailyUse("comps");
+
+  expect(getPrefs().usedToday.day).toBe(localDay());
+  expect(getPrefs().usedToday.counts).toEqual({ comps: 1 });
 });
 
-it("starts an older library on an empty list rather than guessing", () => {
-  // Before this, the plan metered four actions ten times each and kept the
-  // counts in `prefs.usage`. Those numbers say nothing about *which* books the
-  // work happened on, so nothing is migrated: erring generous is the only
+it("keeps counters that storage has had tampered with sane", () => {
+  localStorage.setItem(
+    "openchapter:prefs",
+    JSON.stringify({
+      usedToday: { day: 7, counts: { comps: "lots" } },
+      usedOn: { blurb: ["a", 7, null, "a", "b"], prose: "nope" },
+    }),
+  );
+
+  expect(getPrefs().usedToday).toEqual({ day: "", counts: {} });
+  expect(getPrefs().usedOn.blurb).toEqual(["a", "b"]);
+  expect(getPrefs().usedOn.prose).toBeUndefined();
+});
+
+it("starts an older library clean rather than guessing", () => {
+  // The version before this kept one `toolBooks` list meaning "some tool ran
+  // here", which cannot be split into blurb-versus-prose after the fact, and no
+  // daily history at all. So nothing is migrated: erring generous is the only
   // defensible direction when the alternative is charging somebody for work
   // there is no evidence of.
   localStorage.setItem(
     "openchapter:prefs",
-    JSON.stringify({ usage: { imports: 9, comps: 10 } }),
+    JSON.stringify({ toolBooks: ["a", "b"], usage: { imports: 9 } }),
   );
-  expect(getPrefs().toolBooks).toEqual([]);
+
+  expect(getPrefs().usedOn).toEqual({});
+  expect(getPrefs().usedToday.day).toBe("");
 });
 
 it("keeps chapter ids unique across books", () => {

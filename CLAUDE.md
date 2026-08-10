@@ -1367,112 +1367,127 @@ PayHere must be sent **no `recurrence` and no `duration`** or it bills the
 one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
-**What is free is what a book needs to exist and leave.** Unlimited books, all
-four exports, sync, the pre-upload check and the roadmap, comps search, blurb,
-categories, covers, structure, progress, **`money`** ("Before you spend", which
-is the planning tool and not the tracking one) and one book's story bible — with
-the per-book tools among them running on **five books**, unmetered inside each
-(see `FREE_TOOL_BOOKS` below). Pro
-is the metered routes plus the business layer — **`track`** (costs against
-earnings) and the book-three curve, advance readers, **`provenance`** (the
-writing record), the prose report, and the *series* read of the bible. Note the
-two names that read backwards: the tool called `money` is free and the tool
-called `track` is not, and the pricing row that covers the paid one is "Money
-tracking & the curve". Four screens mount `GatedTool` — arc, prose,
-provenance, track — and that list is the check. Every competitor charges for
-formatting, which is why export is the one thing that must never move.
+**What is free is what a book needs to exist and leave.** Unlimited books,
+words, chapters and **imports**, all four exports, sync, the pre-upload check and
+the roadmap, structure, progress, categories and its keyword boxes, the writing
+record, and the story bible **across a whole series**. Pro is the metered routes
+plus two things a writer only wants once there are real sales: reading a shop's
+sales export into the ledger, and the book-three curve. Note the two names that
+read backwards: the tool called `money` is free and unmetered ("Before you
+spend", the planning tool) while the tool called `track` is limited to two books.
+**One screen still mounts `GatedTool` — `track` — and one section mounts
+`ProGate`: the sales-report import inside it.** That list is the check. Every
+competitor charges for formatting, which is why export is the one thing that must
+never move.
 
-**One thing is limited on the free plan, and `src/lib/free-limits.ts` is the
-whole of the policy.** The free plan runs the per-book tools on
-**`FREE_TOOL_BOOKS` (5) books**, and inside those five nothing is metered at
-all — searches, imports, cover research, title checks, as often as the work
-takes. Pro lifts the number of books. Everything else stays unbounded as it
-always was: books, words, all four exports, sync, the check, the roadmap, the
-blurb and category screens. **A book you never open a tool on costs nothing** —
-the shelf is not the limit, the tooling is.
+**Everything else is metered in the unit its own work comes in, and
+`src/lib/free-limits.ts` is the whole of the policy.** There is no single global
+number, and there was: a version of this gave the free plan "every tool,
+unlimited, on five books". A *container* limit cannot hold a container whose
+contents are arbitrary — the comps box and the title-check box take any words a
+writer types, so one book slot was a general-purpose research desk for any number
+of manuscripts. Three shapes replaced it:
 
-**It replaced four meters of ten** (imports, comp searches, cover searches,
-title checks), and the reason is what those charged for. Each counted an
-*attempt*, and every one of those screens is a screen you use badly on purpose:
-naming is iterative, so ten searches is perhaps three real candidates, and the
-meter ran out in the middle of the one activity the tool exists for. The writer
-who felt it first was the writer using it properly. Counting books charges for
-*scale* instead, which is also the honest description of who should be paying —
-and it is a limit a reader can hold in their head, which "ten of each of four
-different things" never was. Figma's free tier is the same shape and nearly the
-same sentence: three files, unlimited work inside them.
+| Shape | Tools | Free |
+|---|---|---|
+| **Per day** | comps, covers, title check | 2 / 3 / 2 a day |
+| **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
+| **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
 
-Five things in there are load-bearing.
+Which shape a tool takes follows from what it does. The three that send a query
+to a catalogue are counted **per day**, which is what every serious research tool
+does (Semrush's free plan is ten queries a day) and for the same reason: a search
+box takes arbitrary input, so the honest unit is the query. **They come back
+tomorrow**, and that half is what makes them humane — a writer stopped
+mid-session returns rather than churning, and nobody is permanently walled out of
+a book they own. The ones that read one manuscript are counted in **books**,
+which charges for scale rather than effort. Occupancy counts what is *currently*
+there, so removing an advance reader gives the place back.
 
-- **`onThisBook` is the whole of "unlimited within a book".** `bookToolAllowance`
-  takes it as a second argument and a book already on the list is never blocked,
-  whatever is left — so the gate refuses the *sixth book* and never the sixth
-  search. A test asserts it, and it is the one not to "fix": without it the
-  limit is back to charging for effort.
-- **Importing marks the book rather than counting the file.** Both funnels —
-  `createBookFromImport` and `importIntoBook` — call `markToolUse`, because
-  "make an empty book, then import into it" would otherwise be one click round
-  it. `undoChapterImport` gives **nothing** back now: the book is still there
-  and still being worked on, and releasing the slot would make five books mean
-  five *at a time*.
-- **The list lives in `prefs.toolBooks`**, not on a book — it is a fact about
-  the account, prefs sync as one blob so a second machine does not hand out five
-  more, and a field on the book would have needed a Postgres column to survive
-  `sync.ts` at all. `markToolUse` is the only writer and is **idempotent**, so
-  every tool can call it on every action without working out whether this press
-  is the first. `parseToolBooks` narrows and de-duplicates on the way in, and
-  **migrates nothing**: the old `prefs.usage` counts say nothing about *which*
-  books the work happened on, so a library from that version starts with an
-  empty list and five books in hand. Erring generous is the only defensible
-  direction when the alternative is charging for work there is no evidence of.
-- **The number is quoted, never restated.** `FREE_TOOL_BOOKS` is read by the
-  pricing row, the terms, the Help dialog and every sentence on screen, the same
-  rule the prices follow.
-- **The landing page's hero check never refuses one.** A stranger with no
-  account is the worst place in the app to meet a plan limit, and the argument
-  of that page is that a manuscript can be checked before paying.
+Six things in there are load-bearing.
 
-**The words are about books, and a test enforces it.** `leftLine` and
-`spentLine` may not contain "search", "check" or "import": a reader told "2
-checks left" would ration the one thing this plan does not ration. What runs out
-is manuscripts, and every sentence says so.
+- **`onThisBook` is the whole of "unlimited within a book".** `bookAllowance`
+  takes it as a second argument, and a book already counted is never blocked
+  whatever is left — so the wall lands on the *next* book and never in the middle
+  of the one being written. A test asserts it, and it is the one not to "fix".
+- **The daily reset lives in `dailyAllowance`, not in the parser.** A stored
+  record carrying yesterday's date reads as nought without anybody having to
+  clear it. In `parsePrefs` it would have been wrong twice: `getPrefs` caches on
+  the raw string, so a value derived from the clock there goes stale the moment
+  midnight passes with nothing to invalidate it, and a reset that only happened
+  on a read would depend on somebody having opened the app.
+- **Every limit is spent on a press, never on arrival** — the standing rule that
+  a search the app ran is never counted. Two screens had no press and were given
+  one rather than an exception: the prose report gained a **Run the report**
+  button, and `track` marks its book on the first figure recorded. Marking on
+  arrival would have made these limits on *visiting*, and would have had to open
+  `LimitDialog` from an effect, which that component forbids for the reason an
+  effect fires again on every remount.
+- **The counters live in `prefs`** — `usedToday` (a day plus per-tool counts) and
+  `usedOn` (a set of books per tool) — not on a book, because they are facts
+  about the account and prefs sync as one blob so a second machine does not hand
+  out a second allowance. `spendDailyUse` and `markToolBook` are the only
+  writers; the latter is **idempotent**, so any screen may call it on any action
+  without working out whether this press is the first.
+- **Nothing migrates, and that is deliberate.** The old `toolBooks` said only
+  "some tool ran here" — it cannot be split into blurb-versus-prose after the
+  fact, and there was no daily history at all. Every writer starts clean. Erring
+  generous is the only defensible direction when the alternative is charging for
+  work there is no evidence of.
+- **`warnAt(limit)` caps `WARN_WHEN_LEFT` at `limit - 1`.** Three of these limits
+  are 2 or 3, and at a flat two a writer who had used *nothing* would be told
+  they had two left — a meter in front of somebody who has not started, which is
+  the exact failure the constant exists to prevent. A test walks every limit.
 
-`src/components/upgrade/free-limit.tsx` is the six screens' shared voice, for
-the reason `ProGate` is one component — and it **escalates in three steps**,
+**The words match the shape, and tests enforce it.** A daily sentence must say
+"today" and its spent line must promise **tomorrow** — these are the only limits
+here that come back, and a line stopping at "today's are used" reads as the end
+of the road on a screen the writer could simply revisit. A book sentence must
+**name its tool**, or blurb (5) and the prose report (6) both say "1 more book"
+and mean different things. And the lines that do *not* come back may not say
+"today" or "tomorrow" at all.
+
+**These are browser gates and cannot be otherwise**, which the file header says
+outright: the daily ones are resettable by anybody willing to move their
+machine's clock. That is accepted rather than papered over, because the routes
+that actually cost money are gated by `requirePro()` on the server and none of
+this touches them.
+
+`src/components/upgrade/free-limit.tsx` is every limited screen's shared voice,
+for the reason `ProGate` is one component — and it **escalates in three steps**,
 which is the shape the rest of the trade uses and the part worth keeping:
 
 - **Silence** while there is room. `WARN_WHEN_LEFT` is the rule: a limit nobody
-  has approached is not news, and "0 of 10 used" on a first visit teaches a
+  has approached is not news, and "0 of 5 used" on a first visit teaches a
   writer that this is a metered product before they have had a thing out of it.
-  Nothing is hidden by it — the number is on the pricing page and in the Help
-  dialog. A test walks the whole allowance and fails if the line speaks early.
-  `WARN_WHEN_LEFT` is **2** rather than 3 now that the allowance is five: three
-  of five would speak on a writer's third book, which is well inside ordinary
-  use.
-- **`LeftLine`** in the last three, stating **what is left** rather than what
-  was spent, because the remainder is the number they would otherwise have to
-  work out.
-- **`LimitBanner` and `LimitDialog` on the press that is *refused*** — the
-  first press on a **sixth book**, never a press on one of the five.
-  `useLimitGate(bookId)` is the whole of that rule and every screen goes through
-  it: work on a book already counted looks exactly as it always did, and only a
-  press on a book the plan has no room for puts anything on screen. Telling
-  somebody at the moment they are refused is information; telling them at the
-  moment they stop needing it is an advertisement — and the research on this is
-  unambiguous, prompts shown at the blocked action converting far better than
-  ambient ones. **It follows that the controls stay live**: a disabled button
-  cannot be pressed, so there would be no moment to answer. A refused press
-  costs nothing. The gate has two doors because the marking happens in two
-  places: `spend()` for the searches, which marks there, and `check()` for the
-  imports, which the store marks at the funnel every import screen shares.
+  Nothing is hidden by it — the numbers are on the pricing page and in the Help
+  dialog. `WARN_WHEN_LEFT` is **2**, capped by `warnAt` at `limit - 1` so the
+  three small limits cannot announce themselves to somebody who has used
+  nothing; a test walks every limit and fails if a line speaks early.
+- **`LeftPill`** in the last two, stating **what is left** rather than what was
+  spent, because the remainder is the number they would otherwise have to work
+  out.
+- **`LimitBanner` and `LimitDialog` on the press that is *refused*** — never on
+  the last one that worked. `useLimitGate(ask)` is the whole of that rule and
+  every screen goes through it, `ask` being a **discriminated union** so the
+  compiler refuses a book limit with no book: the version before this took a
+  bare `bookId` and four screens were quietly passing the literal `"imports"`.
+  Work inside a limit looks exactly as it always did, and only a press the plan
+  has no room for puts anything on screen. Telling somebody at the moment they
+  are refused is information; telling them at the moment they stop needing it is
+  an advertisement — and the research is unambiguous, prompts shown at the
+  blocked action converting far better than ambient ones. **It follows that the
+  controls stay live**: a disabled button cannot be pressed, so there would be no
+  moment to answer. A refused press costs nothing, and on ARC it does not even
+  clear the typed fields.
 - The banner is **filled**: purple-into-indigo gradient, white type, one white
   button. It
   was a grey pill first (muted ink at footnote size, so the sentence explaining
   why the button beside it had gone dark *read* as a footnote), then an
   accent-tinted card (legible, but at the same volume as the panel it sat on,
   on a screen made of panels). `LimitNote` is the same fill stacked for the two
-  ~300px editor rails, and `ImportLimitReached` is the panel the two import
-  screens get instead, since there the missing thing is the whole screen.
+  ~300px editor rails — which is what the blurb uses when the roadmap's panel
+  mounts it, since the wide banner does not fit a narrow column.
 
   **That gradient is a documented exception to the palette's hue rule, and it
   is three tokens wide.** (The pricing table's badges are the palette's other
@@ -1504,10 +1519,11 @@ These are browser gates and are honest about it: `/api/comps` stays free and
 keyless, which is the thing that must not change to enforce this server-side.
 
 **The gates are of two kinds and the pricing page's own comment says which.**
-The four metered rows are `requirePro()` on the server, which is the only check
-a reader with devtools cannot edit. The rest are computed in the browser and
-gated there by `ProGate` / `useEntitled` (`src/components/upgrade/pro-gate.tsx`)
-— one component so six screens cannot drift into six tones of upsell, and it
+The metered routes are `requirePro()` on the server, which is the only check a
+reader with devtools cannot edit. Everything else is computed in the browser: the
+per-tool allowances through `useLimitGate`, and the two remaining all-or-nothing
+Pro pieces through `ProGate` / `useEntitled` (`src/components/upgrade/pro-gate.tsx`)
+— one component so the gated screens cannot drift into six tones of upsell, and it
 renders children untouched while the plan is still loading, because half a
 second of a paywall shown to a paying writer is the screenshot nobody wants.
 Do not add a Pro row whose value depends on a browser gate being unbreakable;

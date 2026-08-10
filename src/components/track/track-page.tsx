@@ -4,7 +4,13 @@ import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
+import { ProGate } from "@/components/upgrade/pro-gate";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 import {
   copiesToLevel,
   guessColumns,
@@ -41,10 +47,10 @@ export function TrackPage({ bookId }: { bookId: string }) {
   // Read here with the other hooks rather than beside the early return
   // below: hooks cannot sit after a conditional, and this screen has
   // several of its own already.
-  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const ledger = useLedger();
+  const gate = useLimitGate({ action: "track", bookId });
   const book = findBook(shelf, bookId);
 
   const [what, setWhat] = useState("");
@@ -83,6 +89,12 @@ export function TrackPage({ bookId }: { bookId: string }) {
   function add() {
     const value = Number(amount);
     if (!Number.isFinite(value) || value <= 0 || !what.trim()) return;
+    /*
+     * Recording the first figure is what counts this book, not arriving: a
+     * writer who opens Track to see what it does, and writes nothing down, has
+     * not started tracking anything. The typed fields survive a refusal.
+     */
+    if (!gate.spend()) return;
     commit([
       {
         id: crypto.randomUUID(),
@@ -148,24 +160,6 @@ export function TrackPage({ bookId }: { bookId: string }) {
     );
   }
 
-  // The gate stands *after* the not-found guard above: a writer who
-  // followed a stale link to a deleted book should be told the book is
-  // gone, not asked to pay for one that does not exist.
-  if (!entitled) {
-    return (
-      <GatedTool
-        book={book}
-        tool="Track"
-        what="What this book cost against what it earned. Record what you spent, import a sales report as CSV — you say which column is which — and it works out how many more copies get you level, from the per-copy figure your own rows show rather than a royalty rate we invented."
-        deck={
-          <>
-            What this book cost against what it earned. Nobody keeps this, which is
-        why the total is always a shock.
-          </>
-        }
-      />
-    );
-  }
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
@@ -212,6 +206,8 @@ export function TrackPage({ bookId }: { bookId: string }) {
 
         {/* ---- Add by hand -------------------------------------------- */}
         <h2 className="mt-10 text-xl font-extrabold text-fg">Add a line</h2>
+        <LimitBanner allowance={gate.allowance} className="mt-8" />
+        <LeftPill allowance={gate.allowance} className="mt-4" />
         <form
           className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-panel p-5"
           onSubmit={(e) => {
@@ -274,9 +270,19 @@ export function TrackPage({ bookId }: { bookId: string }) {
         </form>
 
         {/* ---- Import a report ---------------------------------------- */}
+        {/* **The one part of this screen that stays Pro.** Recording figures by
+            hand is free on the books the plan covers; reading a shop's export
+            is the part somebody with real sales needs, and it is the piece a
+            writer with a backlist is actually buying. `ProGate` wraps real
+            children here rather than replacing the page, the way the Categories
+            keyword boxes used to — the rest of Track keeps working around it. */}
         <h2 className="mt-10 text-xl font-extrabold text-fg">
           Or import a sales report
         </h2>
+        <ProGate
+          title="Sales report import"
+          what="Read a shop's own CSV export straight into the ledger — you say which column is which, so it works whatever the shop calls things and whatever they rename next year. Recording figures by hand stays free."
+        >
         <section className="mt-4 rounded-xl border border-line bg-panel p-5">
           <p className="max-w-prose text-sm text-muted">
             KDP has no public API, so nothing can be fetched — but it will let
@@ -354,6 +360,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
             </div>
           )}
         </section>
+        </ProGate>
 
         {/* ---- The lines ---------------------------------------------- */}
         {mine.length > 0 && (
@@ -409,6 +416,9 @@ export function TrackPage({ bookId }: { bookId: string }) {
           </p>
         </div>
       </div>
+      {gate.dialogOpen && (
+        <LimitDialog action="track" onClose={gate.closeDialog} />
+      )}
     </div>
   );
 }

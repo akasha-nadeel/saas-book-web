@@ -4,11 +4,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 import { findBook, getBody, orderedChapters } from "@/lib/library-store";
 import { proseReport } from "@/lib/prose";
 import { chapterText } from "@/lib/search";
-import { useHydrated, useShelf } from "@/lib/use-library";
+import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 
 /**
  * A report on a chapter's prose, and never an edit of it.
@@ -32,11 +37,25 @@ export function ProsePage({ bookId }: { bookId: string }) {
   // Read here with the other hooks rather than beside the early return
   // below: hooks cannot sit after a conditional, and this screen has
   // several of its own already.
-  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
   const [chapterId, setChapterId] = useState<string | null>(null);
+  /*
+   * **The report is run on a press, and that is why the button exists.**
+   * Counting books needs a moment to count at, and this screen had none: it
+   * drew the report the instant it mounted. Marking on arrival would have made
+   * the limit a limit on *visiting* — walk through six prose screens and the
+   * allowance is gone without a report being read — and it would have had to
+   * open `LimitDialog` from an effect, which that component's own note forbids
+   * for the reason an effect fires again on every remount.
+   *
+   * So the press is the use. A book already counted is never asked again, so
+   * this reads as a one-time button on the six books that matter and never
+   * appears at all on Pro.
+   */
+  const [ran, setRan] = useState(false);
+  const gate = useLimitGate({ action: "prose", bookId });
 
   const chapters = useMemo(
     () => (book ? orderedChapters(book).filter((c) => c.words > 0) : []),
@@ -44,6 +63,17 @@ export function ProsePage({ bookId }: { bookId: string }) {
   );
 
   const chosen = chapterId ?? chapters[0]?.id ?? null;
+
+  /**
+   * Whether the report may be drawn.
+   *
+   * Three ways in, and the second is the one that matters: a book **already**
+   * among the six draws straight away, so a writer returning to a chapter is
+   * never asked to press again for something they have already spent. On Pro
+   * there is no limit and so no button at all.
+   */
+  const counted = (usePrefs().usedOn.prose ?? []).includes(bookId);
+  const showing = ran || counted || gate.allowance.limit === null;
 
   const report = useMemo(() => {
     if (!chosen) return null;
@@ -67,24 +97,6 @@ export function ProsePage({ bookId }: { bookId: string }) {
     );
   }
 
-  // The gate stands *after* the not-found guard above: a writer who
-  // followed a stale link to a deleted book should be told the book is
-  // gone, not asked to pay for one that does not exist.
-  if (!entitled) {
-    return (
-      <GatedTool
-        book={book}
-        tool="Prose report"
-        what="What is in a chapter, counted: dialogue tags that are not “said”, words ending in -ly, filter words, runs of sentences that open the same way, and very long sentences. There is no score and it never changes a word — none of these is a fault, and the service is showing you where yours are."
-        deck={
-          <>
-            What is in the chapter, counted. Nothing here is a fault and nothing
-        here changes a word — the decisions are all yours.
-          </>
-        }
-      />
-    );
-  }
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
@@ -115,7 +127,27 @@ export function ProsePage({ bookId }: { bookId: string }) {
               </select>
             </label>
 
-            {report && (
+            {!showing && (
+              <div className="mt-6">
+                <LimitBanner allowance={gate.allowance} className="mb-4" />
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!gate.spend()) return;
+                      setRan(true);
+                    }}
+                    className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold
+                               text-accent-ink"
+                  >
+                    Run the report
+                  </button>
+                  <LeftPill allowance={gate.allowance} />
+                </div>
+              </div>
+            )}
+
+            {showing && report && (
               <>
                 <section className="mt-6 grid gap-3 sm:grid-cols-4">
                   <Stat value={report.words.toLocaleString()} label="words" />
@@ -185,6 +217,9 @@ export function ProsePage({ bookId }: { bookId: string }) {
           </p>
         </div>
       </div>
+      {gate.dialogOpen && (
+        <LimitDialog action="prose" onClose={gate.closeDialog} />
+      )}
     </div>
   );
 }

@@ -119,7 +119,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
    * being worked on, so a writer is only ever stopped when they open the tools
    * on a *sixth* manuscript.
    */
-  const gate = useLimitGate(bookId);
+  const gate = useLimitGate({ action: "titleCheck" });
   const checks = gate.allowance;
   /**
    * The title whose finding has been closed.
@@ -475,7 +475,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
       </div>
 
       {gate.dialogOpen && (
-        <LimitDialog action="bookTools" onClose={gate.closeDialog} />
+        <LimitDialog action="titleCheck" onClose={gate.closeDialog} />
       )}
     </div>
   );

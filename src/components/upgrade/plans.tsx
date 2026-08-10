@@ -11,7 +11,7 @@ import {
   priceOf,
 } from "@/lib/billing/plans";
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
-import { FREE_TOOL_BOOKS, SEATS_PER_BOOK } from "@/lib/free-limits";
+import { FREE_LIMITS, SEATS_PER_BOOK } from "@/lib/free-limits";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -154,30 +154,27 @@ const ROWS: {
    */
   { label: "Exports", detail: "EPUB, DOCX, PDF, Markdown", starter: "All four", pro: "All four" },
   /*
-   * **One row where there were four**, and the number is read out of
-   * `FREE_TOOL_BOOKS` so the page and the gate cannot drift — the same rule the
+   * **Each tool metered in its own unit, and every number read out of
+   * `FREE_LIMITS`** so the page and the gate cannot drift — the same rule the
    * prices follow.
    *
-   * The four rows it replaced each metered an *attempt*: ten imports, ten comp
-   * searches, ten cover searches, ten title checks. Four numbers is four things
-   * for a reader to hold while comparing two columns, and every one of them
-   * charged for iteration on screens whose whole use is iterative. One row that
-   * says "5 books, everything unlimited inside them" is the same plan stated in
-   * a sentence somebody can act on — Figma's free tier reads the same way, and
-   * for the same reason.
+   * A table rather than a paragraph, deliberately: six numbers in three shapes
+   * is more than a sentence can carry, and the version of this page that tried
+   * ("ten of each of four things") was the reason the whole policy was rewritten
+   * once already. Read down a column and each row answers one question.
    *
-   * The rows underneath say "Unlimited" on *both* columns now, because they are:
-   * what Pro lifts is the number of books, not the work done in them.
+   * The three searches say "a day" because they come back — the only limits
+   * here that do, and a row reading "2" would look like a lifetime allowance.
    */
-  { label: "Books with tools", starter: `${FREE_TOOL_BOOKS}`, pro: "Unlimited" },
   { label: "Imports", starter: "Unlimited", pro: "Unlimited" },
-  { label: "Comp searches", starter: "Unlimited", pro: "Unlimited" },
-  { label: "Cover searches", starter: "Unlimited", pro: "Unlimited" },
-  { label: "Title checks", starter: "Unlimited", pro: "Unlimited" },
+  { label: "Comp searches", starter: `${FREE_LIMITS.comps.free} a day`, pro: "Unlimited" },
+  { label: "Cover searches", starter: `${FREE_LIMITS.covers.free} a day`, pro: "Unlimited" },
+  { label: "Title checks", starter: `${FREE_LIMITS.titleCheck.free} a day`, pro: "Unlimited" },
   { label: "Pre-upload check & roadmap", starter: "Included", pro: "Included" },
-  { label: "Blurb & categories", starter: "Included", pro: "Included" },
+  { label: "Blurb", starter: `${FREE_LIMITS.blurb.free} books`, pro: "Unlimited" },
+  { label: "Categories & keywords", starter: "Included", pro: "Included" },
   { label: "Structure & progress", starter: "Included", pro: "Included" },
-  { label: "Story bible", starter: "Per book", pro: "Across a series" },
+  { label: "Story bible", starter: "Across a series", pro: "Across a series" },
   /*
    * **Both numbers, because Pro raises this rather than lifting it.**
    *
@@ -202,10 +199,11 @@ const ROWS: {
   { label: "Assistant", starter: NOT_INCLUDED, pro: "Included" },
   { label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
   { label: "Audiobook & audio import", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Prose report", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Money tracking & the curve", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Advance copies", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Writing record", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Prose report", starter: `${FREE_LIMITS.prose.free} books`, pro: "Unlimited" },
+  { label: "Money tracking", starter: `${FREE_LIMITS.track.free} books`, pro: "Unlimited" },
+  { label: "Sales report import & the curve", starter: NOT_INCLUDED, pro: "Included" },
+  { label: "Advance copies", starter: `${FREE_LIMITS.arcReaders.free} a book`, pro: "Unlimited" },
+  { label: "Writing record", starter: "Included", pro: "Included" },
 ];
 
 export function Plans({

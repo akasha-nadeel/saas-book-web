@@ -13,11 +13,6 @@ import {
 import type { ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
 import { keepImportedCover } from "@/lib/cover-save";
-import {
-  ImportLimitReached,
-  LeftPill,
-  useLimitGate,
-} from "@/components/upgrade/free-limit";
 
 /**
  * Bringing an existing manuscript in.
@@ -35,8 +30,6 @@ import {
 export function ImportBook() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const gate = useLimitGate("imports");
-  const allowance = gate.allowance;
 
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -71,7 +64,6 @@ export function ImportBook() {
        file, see the chapters and press for it, and is answered at the moment
        they ask — the eleventh press, not the tenth arrival. `check` and not
        `spend`, because the store counts imports at its own funnel. */
-    if (!gate.check()) return;
 
     const result = createBookFromImport(
       title,
@@ -107,9 +99,7 @@ export function ImportBook() {
           library until you have seen what came through.
         </p>
 
-        {gate.refused ? (
-          <ImportLimitReached used={allowance.used} className="mt-9" />
-        ) : proposal === null ? (
+        {proposal === null ? (
           <>
             <div
               onDragOver={(e) => {
@@ -174,7 +164,6 @@ export function ImportBook() {
                 PDF and old .doc files cannot be read here — export or save your
                 manuscript as .docx first.
               </p>
-              <LeftPill allowance={allowance} className="mt-2" />
             </div>
 
             {/* Announced, not pretended. Transcription is not a parser — it

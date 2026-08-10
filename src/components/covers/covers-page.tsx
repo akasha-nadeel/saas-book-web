@@ -1158,7 +1158,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
    * but never runs it — so there is no free arrival search to carve out, as
    * there is on comps and the title check.
    */
-  const gate = useLimitGate(bookId);
+  const gate = useLimitGate({ action: "covers" });
   const shelfSearches = gate.allowance;
 
   const wall = useMemo(() => coversOf(books), [books]);
@@ -1505,7 +1505,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
       </div>
 
       {gate.dialogOpen && (
-        <LimitDialog action="bookTools" onClose={gate.closeDialog} />
+        <LimitDialog action="covers" onClose={gate.closeDialog} />
       )}
     </div>
   );

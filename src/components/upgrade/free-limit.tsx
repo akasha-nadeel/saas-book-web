@@ -5,16 +5,21 @@ import Image from "next/image";
 import Link from "next/link";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
 import {
-  bookToolAllowance,
-  FREE_TOOL_BOOKS,
+  bookAllowance,
+  dailyAllowance,
+  itemAllowance,
   leftBadge,
   leftLine,
+  reachedHeadline,
   SEATS_PER_BOOK,
   spentLine,
   type Allowance,
+  type BookLimit,
+  type DailyLimit,
+  type ItemLimit,
   type Limited,
 } from "@/lib/free-limits";
-import { markToolUse } from "@/lib/library-store";
+import { markToolBook, spendDailyUse } from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
 import { usePlan } from "@/lib/use-plan";
 
@@ -41,25 +46,45 @@ import { usePlan } from "@/lib/use-plan";
  */
 
 /**
- * The plan and the list of tooled books, in a single answer.
+ * What is being asked about.
+ *
+ * A discriminated union rather than a bare action, so the compiler refuses a
+ * book limit with no book and an item limit with nothing counted. Six limits of
+ * three shapes is exactly the situation where a loose string argument goes wrong
+ * quietly — the version before this took a `bookId` and four screens were
+ * passing the literal `"imports"`.
+ */
+export type LimitAsk =
+  | { action: DailyLimit }
+  | { action: BookLimit; bookId: string }
+  | { action: ItemLimit; items: number };
+
+/**
+ * The plan and whichever counter this limit keeps, in a single answer.
  *
  * **A loading plan counts as entitled**, exactly as `ProGate` does: half a
  * second of a paywall shown to somebody who is paying is worse than half a
  * second of nothing, and here it would be a search button refusing to work on
  * arrival. The plan resolves in a moment and the notice arrives with it.
- *
- * `bookId` is what makes the answer specific: a book already on the list is
- * never blocked, so the same writer on the same day gets a live screen on their
- * fourth book and a refusal on their sixth.
  */
-export function useAllowance(bookId: string): Allowance {
+export function useAllowance(ask: LimitAsk): Allowance {
   const plan = usePlan();
-  const books = usePrefs().toolBooks;
-  return bookToolAllowance(
-    books.length,
-    books.includes(bookId),
-    plan.loading || plan.pro,
-  );
+  const prefs = usePrefs();
+  const pro = plan.loading || plan.pro;
+
+  if ("bookId" in ask) {
+    const books = prefs.usedOn[ask.action] ?? [];
+    return bookAllowance(
+      ask.action,
+      books.length,
+      books.includes(ask.bookId),
+      pro,
+    );
+  }
+
+  if ("items" in ask) return itemAllowance(ask.action, ask.items, pro);
+
+  return dailyAllowance(ask.action, prefs.usedToday, pro);
 }
 
 /**
@@ -94,7 +119,7 @@ export function useAllowance(bookId: string): Allowance {
  * Both answer `true` when the caller may go ahead, and `false` having already
  * put the refusal on screen.
  */
-export function useLimitGate(bookId: string): {
+export function useLimitGate(ask: LimitAsk): {
   allowance: Allowance;
   /** True once a press has been refused. Drives the banner, which stays. */
   refused: boolean;
@@ -110,38 +135,42 @@ export function useLimitGate(bookId: string): {
    * the interruption and goes when it is dismissed.
    */
   dialogOpen: boolean;
-  /** Ask, and put this book on the list if it is not there already. */
+  /** Ask, and record the use if there is one to record. */
   spend: () => boolean;
-  /** Ask without marking — for the paths the store marks for itself. */
-  check: () => boolean;
   /** Close the dialog. The banner stays: the limit has not moved. */
   closeDialog: () => void;
 } {
-  const allowance = useAllowance(bookId);
+  const allowance = useAllowance(ask);
   const [refused, setRefused] = useState(false);
   const [dialog, setDialog] = useState(false);
 
-  const check = useCallback(() => {
-    if (!allowance.blocked) return true;
-    setRefused(true);
-    setDialog(true);
-    return false;
-  }, [allowance.blocked]);
+  // The ask is an object literal at every call site, so a new one arrives every
+  // render; the fields are what `spend` actually depends on.
+  const action = ask.action;
+  const bookId = "bookId" in ask ? ask.bookId : null;
 
   const spend = useCallback(() => {
-    if (!check()) return false;
-    // Idempotent, so every tool may call this on every action without working
-    // out whether this particular press is the first one on this book.
-    markToolUse(bookId);
+    if (allowance.blocked) {
+      setRefused(true);
+      setDialog(true);
+      return false;
+    }
+
+    // Daily counts are spent here; a book is marked here, idempotently, so a
+    // screen may call this on every action without working out whether this
+    // press is the first. An item limit records nothing at all — the caller's
+    // own append *is* the item, and counting it here as well would double it.
+    if (bookId !== null) markToolBook(action as BookLimit, bookId);
+    else if (action !== "arcReaders") spendDailyUse(action as DailyLimit);
+
     return true;
-  }, [check, bookId]);
+  }, [allowance.blocked, action, bookId]);
 
   return {
     allowance,
     refused,
     dialogOpen: dialog,
     spend,
-    check,
     closeDialog: () => setDialog(false),
   };
 }
@@ -362,53 +391,39 @@ export function LimitNote({
  *
  * Four lines and no more. A pricing table pasted into a dialog is a decision
  * nobody makes at the moment they were interrupted — what is wanted here is
- * enough to answer "is this worth nine dollars to me", and the page that
+ * enough to answer "is this worth eleven dollars to me", and the page that
  * answers the rest is one press away.
  */
 const WHAT_PRO_ADDS = [
-  "Comp searches, cover searches and title checks, unmetered",
-  "Manuscript imports with no ceiling",
+  "Comp searches, cover searches and title checks with no daily limit",
+  "The blurb, prose report and money tracking on every book",
+  "Advance reader lists with no ceiling",
   "The assistant, ranked comps and the audio routes",
-  "Money tracking, advance readers and the prose report",
 ];
 
 /**
  * The line for the wall this writer actually hit, put first.
  *
- * Four lines is the rule, so a fifth cannot simply be added for seats — and it
- * should not be, because the one that answers the question is the one about the
- * thing that just stopped them. So the reached limit leads and the rest follow,
- * deduplicated: for the three searches that is a line already in the list, which
- * is why it is filtered rather than prepended blindly.
+ * Four lines is the rule, so a fifth cannot simply be added for each new limit —
+ * and it should not be, because the one that answers the question is the one
+ * about the thing that just stopped them. So the reached limit leads and the
+ * rest follow, deduplicated: for most of these it is a line already in the list,
+ * which is why it is filtered rather than prepended blindly.
  */
 const REACHED_LINE: Record<Limited, string> = {
-  bookTools: "Every tool on every book, however many you write",
+  comps: "Comp searches, cover searches and title checks with no daily limit",
+  covers: "Comp searches, cover searches and title checks with no daily limit",
+  titleCheck: "Comp searches, cover searches and title checks with no daily limit",
+  blurb: "The blurb, prose report and money tracking on every book",
+  prose: "The blurb, prose report and money tracking on every book",
+  track: "The blurb, prose report and money tracking on every book",
+  arcReaders: "Advance reader lists with no ceiling",
   collaborators: `Up to ${SEATS_PER_BOOK.pro} people on a book instead of ${SEATS_PER_BOOK.free}`,
 };
 
 function proAdds(action: Limited): string[] {
   const first = REACHED_LINE[action];
   return [first, ...WHAT_PRO_ADDS.filter((line) => line !== first)].slice(0, 4);
-}
-
-/**
- * The headline, which has to name what was reached in that limit's own terms.
- *
- * **Neither of these is a spend, so neither says "your last of ten".** A book
- * is full of people or it is not; the free plan reaches five manuscripts or it
- * does not. One sentence each rather than a shared template with a hole in it,
- * because the template that fits both says neither well.
- *
- * The tools line names the *books* and not the search that was refused, which
- * is the whole point of the change it belongs to: nothing has run out on the
- * screen the writer is looking at, and saying otherwise would be false as well
- * as discouraging.
- */
-function reachedHeadline(action: Limited): string {
-  if (action === "collaborators") {
-    return `A free book holds ${SEATS_PER_BOOK.free} people`;
-  }
-  return `The free plan covers ${FREE_TOOL_BOOKS} books`;
 }
 
 /**
@@ -667,55 +682,3 @@ export function LimitDialog({
   );
 }
 
-/**
- * What stands where the drop zone was, once the ten are gone.
- *
- * The import screens are the two that get this rather than a banner, because
- * the whole screen exists to do the one thing that is no longer available — a
- * disabled drop zone with a footnote would leave a writer dragging a file onto
- * a target that says nothing back.
- *
- * It states the limit, says plainly that nothing has been touched, and offers
- * the one thing that lifts it. What it does not do is hide: they arrived to
- * import a book and are entitled to know why they cannot.
- */
-export function ImportLimitReached({
-  used,
-  className = "",
-}: {
-  used: number;
-  /** Spacing is the caller's — one of these sits on a page, one in a dialog. */
-  className?: string;
-}) {
-  return (
-    <section
-      className={`rounded-xl bg-linear-to-r from-upgrade-from to-upgrade-to
-                  p-7 ${className}`}
-    >
-      <p className="font-sans text-xs tracking-wide text-white/85 uppercase">
-        Free plan
-      </p>
-      <h2 className="mt-2 font-sans text-lg font-bold text-white">
-        {used.toLocaleString()} of {FREE_TOOL_BOOKS} books
-      </h2>
-      <p className="mt-1.5 max-w-prose font-sans text-sm leading-relaxed text-white/85">
-        The free plan runs every tool on {FREE_TOOL_BOOKS} books, as often as
-        you like. Pro lifts the number of books — nothing about the tools
-        themselves changes, and that is the only thing this lifts.
-      </p>
-      <Link
-        href="/upgrade"
-        className="mt-5 inline-block rounded-lg bg-white px-5 py-2.5 font-sans
-                   text-sm font-semibold text-upgrade-ink outline-none
-                   transition-opacity hover:opacity-90 focus-visible:ring-2
-                   focus-visible:ring-white/70"
-      >
-        See what Pro adds
-      </Link>
-      <p className="mt-4 font-sans text-xs text-white/85">
-        Every book you have already brought in is untouched, and starting a new
-        book here is still free and unlimited.
-      </p>
-    </section>
-  );
-}

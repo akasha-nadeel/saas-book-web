@@ -20,7 +20,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Import",
-        desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you. Importing is unlimited; what the free plan limits is how many books you use the tools on — five — and an imported book is one of them.",
+        desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you. Importing is unlimited on either plan.",
       },
       {
         name: "Templates",
@@ -86,7 +86,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Import into a book",
-        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after. Importing is unlimited on either plan. It does put this book among the five the free plan runs the tools on, and undoing the import does not release that — the book is still here and still yours to work on.",
+        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after. Importing is unlimited on either plan.",
       },
       {
         name: "Autosave",
@@ -127,7 +127,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
         name: "Cover checker",
-        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Checks the file you drop in, which is also the one your exports use. Measured in your browser and never uploaded, and never counted against anything — it is the wall above it, where you search for the covers your book has to sit beside, that spends one of the free plan's ten. Whether the cover is any good is the wall's job, not a number's.",
+        desc: "Under the cover wall: drop in the artwork you are about to upload and it says whether a shop will refuse it — dimensions, shape, file weight, and whether the image is very flat. Checks the file you drop in, which is also the one your exports use. Measured in your browser and never uploaded, and never counted against anything — it is the wall above it, where you search for the covers your book has to sit beside, that spends one of the free plan's three a day. Whether the cover is any good is the wall's job, not a number's.",
       },
       {
         name: "Blurb",
@@ -143,7 +143,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Comp titles",
-        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key. Searching is unlimited on either plan. What the free plan limits is how many books you use the tools on — five — and the screen says so only when you open a sixth.",
+        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key. The free plan runs two of these searches a day and Pro has no limit; the shelf this screen opens on is not one of them, and neither is looking at what is already there. Whatever you have found stays where it is when the day's two are gone, and there are two more tomorrow.",
       },
       {
         name: "Track",
@@ -314,7 +314,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Plans",
-        desc: "Writing a book and getting it out are free, whole: unlimited books, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. The free plan runs the per-book tools on five books, and inside those five nothing is metered — search the catalogues, redo the covers shelf, check as many titles as naming actually takes. Pro lifts the number of books. A book you never open a tool on costs nothing, so the shelf itself is not the limit. This replaced four separate meters of ten (imports, comp searches, cover searches, title checks), which charged for trying rather than for scale — and naming a book is a thing you do twenty times, not ten. Seats work differently again: a book holds 2 people including you on the free plan and 10 on Pro, and that is a number at a time rather than a number spent — take somebody off and the place comes back. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly or yearly. See Pricing in the header.",
+        desc: "Writing a book and getting it out are free, whole: unlimited books, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Each tool is limited in the unit its own work comes in, and nothing else is limited at all. The three that ask a catalogue something are counted per day and start again the next morning: two comparable-title searches, two title checks, three cover searches. The ones that work on one manuscript are counted in books: the blurb on 5, the prose report on 6, money tracking on 2 — and a book already counted never costs again however much you redraft there. Advance copies hold 10 readers on each book. Seats work differently again: a book holds 2 people including you on the free plan and 10 on Pro, and that is a number at a time rather than a number spent — take somebody off and the place comes back. Everything else is unlimited on both plans, including the writing record, the story bible across a whole series, and the keyword boxes. Pro lifts every one of those numbers and adds the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), plus reading a shop's sales export into the ledger and the book-over-book curve. Monthly or yearly. See Pricing in the header.",
       },
       {
         name: "Paying",

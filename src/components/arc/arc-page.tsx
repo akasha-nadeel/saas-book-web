@@ -4,7 +4,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { GatedTool, useEntitled } from "@/components/upgrade/pro-gate";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+  useLimitGate,
+} from "@/components/upgrade/free-limit";
 import {
   fromDay,
   isOverdue,
@@ -46,10 +51,15 @@ export function ArcPage({ bookId }: { bookId: string }) {
   // Read here with the other hooks rather than beside the early return
   // below: hooks cannot sit after a conditional, and this screen has
   // several of its own already.
-  const entitled = useEntitled();
   const hydrated = useHydrated();
   const shelf = useShelf();
   const readers = useArc(bookId);
+  /*
+   * Occupancy, not a spend — the same shape as seats. It is handed the list's
+   * current length, so taking a reader off gives the place back, and the count
+   * is read in the same render as the `add()` that follows it.
+   */
+  const gate = useLimitGate({ action: "arcReaders", items: readers.length });
   const book = findBook(shelf, bookId);
 
   const [name, setName] = useState("");
@@ -91,6 +101,15 @@ export function ArcPage({ bookId }: { bookId: string }) {
   function add() {
     const trimmed = name.trim();
     if (!trimmed) return;
+    /*
+     * Refused *before* the commit, and the typed fields are deliberately left
+     * standing: somebody who has just written a reader's name and where they
+     * found them should not lose it to a limit. The list itself is untouched —
+     * a lapsed plan with thirty readers still shows all thirty, exactly as a
+     * full book still shows its collaborators. Only Add is refused.
+     */
+    if (!gate.spend()) return;
+
     const dueAt = due ? fromDay(due) : null;
     commit([
       ...readers,
@@ -153,24 +172,6 @@ export function ArcPage({ bookId }: { bookId: string }) {
     );
   }
 
-  // The gate stands *after* the not-found guard above: a writer who
-  // followed a stale link to a deleted book should be told the book is
-  // gone, not asked to pay for one that does not exist.
-  if (!entitled) {
-    return (
-      <GatedTool
-        book={book}
-        tool="Advance copies"
-        what="Who holds an advance copy, who read it and who is late — one list instead of six sites and a spreadsheet. Late readers sort to the top, and if the book has a publication date it works back to when copies need to go out."
-        deck={
-          <>
-            Who has the book, who read it, and who is late. One list instead of six
-        sites and a spreadsheet.
-          </>
-        }
-      />
-    );
-  }
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">
@@ -232,7 +233,11 @@ export function ArcPage({ bookId }: { bookId: string }) {
         )}
 
         {/* ---- Add a reader --------------------------------------------- */}
-        <h2 className="mt-10 text-xl font-extrabold text-fg">Add a reader</h2>
+        <div className="mt-10 flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-extrabold text-fg">Add a reader</h2>
+          <LeftPill allowance={gate.allowance} />
+        </div>
+        <LimitBanner allowance={gate.allowance} className="mt-4" />
         <form
           className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-panel p-5"
           onSubmit={(e) => {
@@ -321,6 +326,9 @@ export function ArcPage({ bookId }: { bookId: string }) {
           </p>
         </div>
       </div>
+      {gate.dialogOpen && (
+        <LimitDialog action="arcReaders" onClose={gate.closeDialog} />
+      )}
     </div>
   );
 }

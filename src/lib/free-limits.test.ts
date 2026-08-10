@@ -1,69 +1,171 @@
 import { describe, expect, it } from "vitest";
 import {
-  bookToolAllowance,
-  FREE_TOOL_BOOKS,
+  bookAllowance,
+  dailyAllowance,
+  FREE_LIMITS,
+  itemAllowance,
   leftBadge,
   leftLine,
+  localDay,
+  reachedHeadline,
   seatAllowance,
   SEATS_PER_BOOK,
   spentLine,
-  WARN_WHEN_LEFT,
+  warnAt,
+  type Limited,
 } from "./free-limits";
 
-describe("bookToolAllowance", () => {
+const TODAY = "2026-08-10";
+const YESTERDAY = "2026-08-09";
+
+describe("localDay", () => {
+  it("is the local date, zero-padded", () => {
+    // Built from the local parts on purpose: `toISOString` is UTC, and would
+    // turn a writer's allowance over in the middle of their evening.
+    expect(localDay(new Date(2026, 0, 5, 23, 30).getTime())).toBe("2026-01-05");
+  });
+
+  it("never returns the empty day a fresh library carries", () => {
+    expect(localDay()).not.toBe("");
+  });
+});
+
+describe("dailyAllowance", () => {
+  const fresh = { day: TODAY, counts: {} };
+
   it("gives a new writer the whole allowance", () => {
-    expect(bookToolAllowance(0, false, false)).toEqual({
-      action: "bookTools",
+    expect(dailyAllowance("comps", fresh, false, TODAY)).toEqual({
+      action: "comps",
       used: 0,
-      limit: FREE_TOOL_BOOKS,
-      left: FREE_TOOL_BOOKS,
+      limit: FREE_LIMITS.comps.free,
+      left: FREE_LIMITS.comps.free,
       blocked: false,
     });
   });
 
-  it("counts books down as they are opened", () => {
-    expect(bookToolAllowance(3, false, false).left).toBe(FREE_TOOL_BOOKS - 3);
-    expect(bookToolAllowance(3, false, false).blocked).toBe(false);
-  });
-
-  it("allows the last book and refuses the one after it", () => {
-    expect(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false).blocked).toBe(false);
-    expect(bookToolAllowance(FREE_TOOL_BOOKS, false, false).blocked).toBe(true);
+  it("allows the last one and refuses the one after it", () => {
+    const limit = FREE_LIMITS.titleCheck.free;
+    const at = (n: number) => ({ day: TODAY, counts: { titleCheck: n } });
+    expect(dailyAllowance("titleCheck", at(limit - 1), false, TODAY).blocked).toBe(false);
+    expect(dailyAllowance("titleCheck", at(limit), false, TODAY).blocked).toBe(true);
   });
 
   /*
-   * **The one not to "fix", and the whole point of counting books.** A writer
-   * whose five are full is never stopped on a book already among them, however
-   * many titles or comps they search there. If this goes red the limit has gone
-   * back to charging for effort, which is what it was changed to stop.
+   * **The one not to "fix".** Yesterday's record reads as nought without
+   * anything having swept it — that is what makes these the only limits here
+   * that come back, and a writer stopped last night is not stopped this morning.
    */
-  it("never blocks a book already being worked on", () => {
-    expect(bookToolAllowance(FREE_TOOL_BOOKS, true, false).blocked).toBe(false);
-    expect(bookToolAllowance(FREE_TOOL_BOOKS + 3, true, false).blocked).toBe(false);
+  it("reads a record from another day as nought", () => {
+    const yesterday = { day: YESTERDAY, counts: { comps: 99 } };
+    expect(dailyAllowance("comps", yesterday, false, TODAY).used).toBe(0);
+    expect(dailyAllowance("comps", yesterday, false, TODAY).blocked).toBe(false);
   });
 
-  it("never reports a negative remainder", () => {
-    // The list can overshoot: this is checked in the browser, and a writer whose
-    // plan lapses keeps every book they had already opened a tool on.
-    expect(bookToolAllowance(FREE_TOOL_BOOKS + 5, false, false).left).toBe(0);
+  it("keeps each tool's count to itself", () => {
+    const record = { day: TODAY, counts: { comps: FREE_LIMITS.comps.free } };
+    expect(dailyAllowance("comps", record, false, TODAY).blocked).toBe(true);
+    expect(dailyAllowance("covers", record, false, TODAY).blocked).toBe(false);
+    expect(dailyAllowance("titleCheck", record, false, TODAY).used).toBe(0);
+  });
+
+  it("treats anything storage may hold as nought", () => {
+    for (const value of [-1, Number.NaN, Number.POSITIVE_INFINITY, "7"]) {
+      const record = { day: TODAY, counts: { comps: value as number } };
+      expect(dailyAllowance("comps", record, false, TODAY).used).toBe(0);
+    }
+    expect(dailyAllowance("comps", undefined, false, TODAY).used).toBe(0);
+  });
+
+  it("rounds a fractional count down rather than up", () => {
+    const record = { day: TODAY, counts: { comps: 1.7 } };
+    expect(dailyAllowance("comps", record, false, TODAY).used).toBe(1);
   });
 
   it("has no limit at all on Pro", () => {
-    const pro = bookToolAllowance(40, false, true);
+    const spent = { day: TODAY, counts: { comps: 40 } };
+    const pro = dailyAllowance("comps", spent, true, TODAY);
     expect(pro.limit).toBeNull();
     expect(pro.left).toBeNull();
     expect(pro.blocked).toBe(false);
   });
+});
 
-  it("treats anything storage may hold as nought", () => {
-    for (const value of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(bookToolAllowance(value, false, false).used).toBe(0);
-    }
-    expect(bookToolAllowance("7" as unknown as number, false, false).used).toBe(0);
+describe("bookAllowance", () => {
+  it("counts books down as they are used", () => {
+    expect(bookAllowance("blurb", 3, false, false).left).toBe(
+      FREE_LIMITS.blurb.free - 3,
+    );
   });
 
-  it("rounds a fractional count down rather than up", () => {
-    expect(bookToolAllowance(2.7, false, false).used).toBe(2);
+  it("allows the last book and refuses the one after it", () => {
+    const limit = FREE_LIMITS.prose.free;
+    expect(bookAllowance("prose", limit - 1, false, false).blocked).toBe(false);
+    expect(bookAllowance("prose", limit, false, false).blocked).toBe(true);
+  });
+
+  /*
+   * **The one not to "fix", and the whole reason this shape takes two
+   * arguments.** A writer whose books are full is never stopped on one they are
+   * already working on, however much work happens there. If this goes red the
+   * limit has gone back to charging for effort.
+   */
+  it("never blocks a book already being worked on", () => {
+    const full = FREE_LIMITS.blurb.free;
+    expect(bookAllowance("blurb", full, true, false).blocked).toBe(false);
+    expect(bookAllowance("blurb", full + 3, true, false).blocked).toBe(false);
+  });
+
+  it("gives each tool its own books", () => {
+    // Five is the blurb's whole allowance and one short of the prose report's.
+    expect(bookAllowance("blurb", 5, false, false).blocked).toBe(true);
+    expect(bookAllowance("prose", 5, false, false).blocked).toBe(false);
+  });
+
+  it("never reports a negative remainder", () => {
+    expect(bookAllowance("track", FREE_LIMITS.track.free + 5, false, false).left).toBe(0);
+  });
+
+  it("has no limit at all on Pro", () => {
+    expect(bookAllowance("prose", 40, false, true).limit).toBeNull();
+  });
+});
+
+describe("itemAllowance", () => {
+  it("refuses the one after the last", () => {
+    const limit = FREE_LIMITS.arcReaders.free;
+    expect(itemAllowance("arcReaders", limit - 1, false).blocked).toBe(false);
+    expect(itemAllowance("arcReaders", limit, false).blocked).toBe(true);
+  });
+
+  /*
+   * Occupancy rather than a spend, exactly as seats are: taking a reader off the
+   * list gives the place back. A tally could not do that.
+   */
+  it("gives the place back when a reader is removed", () => {
+    expect(itemAllowance("arcReaders", FREE_LIMITS.arcReaders.free - 1, false).left).toBe(1);
+  });
+
+  it("never reports a negative remainder when a plan lapses", () => {
+    // A Pro list of thirty whose owner stops paying keeps all thirty — nobody is
+    // evicted — so the count legitimately overshoots the free ceiling.
+    expect(itemAllowance("arcReaders", 30, false).left).toBe(0);
+    expect(itemAllowance("arcReaders", 30, false).blocked).toBe(true);
+  });
+});
+
+describe("warnAt", () => {
+  /*
+   * Three of these limits are 2 or 3. At a flat `WARN_WHEN_LEFT` a writer who
+   * had used nothing would be told they had two left — a meter in front of
+   * somebody who has not started, which is the failure the constant exists to
+   * prevent.
+   */
+  it("never lets a small limit announce itself on arrival", () => {
+    for (const action of Object.keys(FREE_LIMITS) as Limited[]) {
+      expect(warnAt(FREE_LIMITS[action].free)).toBeLessThan(
+        FREE_LIMITS[action].free,
+      );
+    }
   });
 });
 
@@ -86,8 +188,8 @@ describe("seats", () => {
   });
 
   /*
-   * Seats are the one limit Pro raises rather than lifts, so unlike the four
-   * counted actions a paying writer *can* reach the end of them.
+   * Seats are the one limit Pro raises rather than lifts, so unlike every other
+   * limit here a paying writer *can* reach the end of them.
    */
   it("raises the cap on Pro rather than removing it", () => {
     expect(seatAllowance(1, true).limit).toBe(SEATS_PER_BOOK.pro);
@@ -127,72 +229,135 @@ describe("seats", () => {
 });
 
 describe("the badge", () => {
-  /* It read "1 books left" before `shortOne` existed. */
   it("says one of a thing in the singular", () => {
-    expect(leftBadge(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false))).toBe(
-      "1 book left",
+    const one = { day: TODAY, counts: { covers: FREE_LIMITS.covers.free - 1 } };
+    expect(leftBadge(dailyAllowance("covers", one, false, TODAY))).toBe(
+      "1 search left today",
     );
-    expect(leftBadge(bookToolAllowance(FREE_TOOL_BOOKS - 2, false, false))).toBe(
-      "2 books left",
-    );
+    expect(
+      leftBadge(bookAllowance("blurb", FREE_LIMITS.blurb.free - 1, false, false)),
+    ).toBe("1 book left");
     expect(leftBadge(seatAllowance(1, false))).toBe("1 seat left");
+  });
+
+  /* Without "today" a pause reads as a wall. */
+  it("says today on a daily limit and not on the others", () => {
+    const two = { day: TODAY, counts: { covers: FREE_LIMITS.covers.free - 2 } };
+    expect(leftBadge(dailyAllowance("covers", two, false, TODAY))).toContain("today");
+    expect(
+      leftBadge(bookAllowance("prose", FREE_LIMITS.prose.free - 1, false, false)),
+    ).not.toContain("today");
   });
 });
 
 describe("the lines", () => {
   /*
-   * The one not to "fix": a fresh account is told nothing. "0 of 5 used" in
-   * front of somebody who has used nothing teaches them this is a metered
-   * product before they have had anything out of it, which is the freemium
-   * pattern this audience has been burned by. The number is on the pricing page
-   * and in Help; the screen speaks when it is nearly spent.
+   * The one not to "fix": a fresh account is told nothing. A meter in front of
+   * somebody who has used nothing teaches them this is a metered product before
+   * they have had anything out of it, which is the freemium pattern this
+   * audience has been burned by.
    */
-  it("says nothing until the allowance is nearly gone", () => {
-    for (let used = 0; used < FREE_TOOL_BOOKS - WARN_WHEN_LEFT; used += 1) {
-      expect(leftLine(bookToolAllowance(used, false, false))).toBeNull();
-    }
-    expect(
-      leftLine(bookToolAllowance(FREE_TOOL_BOOKS - WARN_WHEN_LEFT, false, false)),
-    ).toBe(`The free plan covers ${WARN_WHEN_LEFT} more books.`);
+  it("says nothing to anybody who has used nothing, on any limit", () => {
+    const fresh = [
+      dailyAllowance("comps", { day: TODAY, counts: {} }, false, TODAY),
+      dailyAllowance("covers", { day: TODAY, counts: {} }, false, TODAY),
+      dailyAllowance("titleCheck", { day: TODAY, counts: {} }, false, TODAY),
+      bookAllowance("blurb", 0, false, false),
+      bookAllowance("prose", 0, false, false),
+      bookAllowance("track", 0, false, false),
+      itemAllowance("arcReaders", 0, false),
+    ];
+    for (const allowance of fresh) expect(leftLine(allowance)).toBeNull();
   });
 
   it("counts what is left rather than what was spent", () => {
-    expect(leftLine(bookToolAllowance(FREE_TOOL_BOOKS - 2, false, false))).toBe(
-      "The free plan covers 2 more books.",
-    );
-  });
-
-  it("says the last one in the singular", () => {
-    expect(leftLine(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false))).toBe(
-      "The free plan covers 1 more book.",
+    const record = { day: TODAY, counts: { comps: FREE_LIMITS.comps.free - 1 } };
+    expect(leftLine(dailyAllowance("comps", record, false, TODAY))).toBe(
+      "1 more search today on the free plan.",
     );
   });
 
   /*
-   * The words are about *books*, never about searches. A reader told "2 checks
-   * left" would ration the one thing this plan does not ration.
+   * Blurb and the prose report would otherwise both say "1 more book" and mean
+   * different things, so a book sentence has to name its tool.
    */
-  it("never names the work, only the books", () => {
-    const nearly = leftLine(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false)) ?? "";
-    const spent = spentLine(bookToolAllowance(FREE_TOOL_BOOKS, false, false)) ?? "";
-    for (const word of ["search", "check", "import"]) {
-      expect(nearly).not.toContain(word);
-      expect(spent).not.toContain(word);
+  it("names the tool on a book limit", () => {
+    expect(
+      leftLine(bookAllowance("blurb", FREE_LIMITS.blurb.free - 1, false, false)),
+    ).toContain("the blurb");
+    expect(
+      leftLine(bookAllowance("prose", FREE_LIMITS.prose.free - 1, false, false)),
+    ).toContain("the prose report");
+  });
+
+  it("asks how many more will fit on an occupancy limit", () => {
+    expect(
+      leftLine(itemAllowance("arcReaders", FREE_LIMITS.arcReaders.free - 2, false)),
+    ).toBe("Room for 2 more readers on this book.");
+  });
+
+  /*
+   * **A daily limit has to say it comes back.** It is the only kind here that
+   * does, and a sentence stopping at "today's are used" reads as the end of the
+   * road on a screen the writer could simply revisit tomorrow.
+   */
+  it("promises tomorrow on a daily limit", () => {
+    const spent = {
+      day: TODAY,
+      counts: { titleCheck: FREE_LIMITS.titleCheck.free },
+    };
+    const line = spentLine(dailyAllowance("titleCheck", spent, false, TODAY)) ?? "";
+    expect(line).toContain("a day");
+    expect(line).toContain("tomorrow");
+  });
+
+  /* And a limit that does *not* come back must not imply that it does. */
+  it("promises nothing of the kind on the others", () => {
+    const lines = [
+      spentLine(bookAllowance("blurb", FREE_LIMITS.blurb.free, false, false)) ?? "",
+      spentLine(itemAllowance("arcReaders", FREE_LIMITS.arcReaders.free, false)) ?? "",
+    ];
+    for (const line of lines) {
+      expect(line).not.toContain("tomorrow");
+      expect(line).not.toContain("today");
     }
   });
 
   it("hands over to the spent line at nought", () => {
-    const none = bookToolAllowance(FREE_TOOL_BOOKS, false, false);
+    const none = bookAllowance("blurb", FREE_LIMITS.blurb.free, false, false);
     // Never both: two sentences about one limit is how a notice becomes
     // wallpaper.
     expect(leftLine(none)).toBeNull();
     expect(spentLine(none)).toBe(
-      `The free plan runs the tools on ${FREE_TOOL_BOOKS} books, and you are already using all ${FREE_TOOL_BOOKS}.`,
+      `The free plan covers the blurb on ${FREE_LIMITS.blurb.free} books, and you are already using all ${FREE_LIMITS.blurb.free}.`,
     );
   });
 
   it("says nothing at all on a plan with no limit", () => {
-    expect(leftLine(bookToolAllowance(9, false, true))).toBeNull();
-    expect(spentLine(bookToolAllowance(9, false, true))).toBeNull();
+    const pro = bookAllowance("blurb", 9, false, true);
+    expect(leftLine(pro)).toBeNull();
+    expect(spentLine(pro)).toBeNull();
+  });
+});
+
+describe("the dialog headline", () => {
+  /*
+   * Six limits of three shapes is more than a reader can hold, so the headline
+   * has to name the wall actually hit — "you have reached a limit" would leave
+   * somebody guessing which, on the screen that just refused them.
+   */
+  it("names the limit that was reached, in its own units", () => {
+    expect(reachedHeadline("comps")).toBe(
+      `The free plan runs ${FREE_LIMITS.comps.free} comp searches a day`,
+    );
+    expect(reachedHeadline("prose")).toBe(
+      `The free plan covers the prose report on ${FREE_LIMITS.prose.free} books`,
+    );
+    expect(reachedHeadline("arcReaders")).toBe(
+      `A free book holds ${FREE_LIMITS.arcReaders.free} readers`,
+    );
+    expect(reachedHeadline("collaborators")).toBe(
+      `A free book holds ${SEATS_PER_BOOK.free} people`,
+    );
   });
 });
