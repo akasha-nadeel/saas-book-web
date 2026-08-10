@@ -374,6 +374,57 @@
   --color-lp-device: #2a2a33; /* the drawn tablet's shell */
 
   /* ------------------------------------------------------------------------
+     The closing banner's sky — two stops that fall to `lp-ground`.
+
+     The section that makes the page's last ask is a vertical gradient with the
+     product cropped by its bottom edge, and the whole reason it reads as one
+     closing movement rather than as a coloured slab with a footer stuck under
+     it is that the gradient *ends on the ground the footer is painted with*.
+     So there is no third token: the last stop is `--color-lp-ground` itself,
+     in both themes, and the seam between banner and footer cannot drift.
+
+     **They are a second value at night rather than the same one twice**, which
+     is the opposite of what `--color-upgrade-*` does and for a reason that
+     does not apply there. That fill is a small block on a page; this one has
+     to *arrive* at the page's own ground, which is #ffffff by day and #0b0b0e
+     at night — a pair of daylight indigos falling into black would leave a
+     muddy band across the bottom third where the two systems meet.
+
+     `top` holds the upper 42% flat, so every word on the banner sits on one
+     even ground: white clears 12.9:1 on the light value and 11.4:1 on the dark
+     one, and `lp-accent-pale` clears 7.4:1 and 6.9:1. Only the drawing sits
+     below that, which is why the fade is allowed to happen at all. Move the
+     first stop down the section and the deck lands in the fade, where neither
+     of those numbers holds. */
+  --color-lp-cta-top: #1c1a4d;
+  --color-lp-cta-mid: #131228;
+
+  /* ------------------------------------------------------------------------
+     The marker — a highlighter pen behind one clause of the hero headline.
+
+     **This is a fourth documented exception to the page's one-hue rule, and
+     it is a design decision rather than a derivation.** Everything else on
+     this page is paper, ink and one indigo; the status family is the only
+     colour allowed, and there the colour *is* the information. A highlighter
+     yellow is none of those things — it is a device, borrowed from the reader
+     marking a line in a book, which happens to be exactly the gesture this
+     audience makes.
+
+     Two rules keep it from becoming a mess. **It appears once per screen.**
+     Two highlighted phrases and neither is highlighted; the eye needs
+     somewhere unmarked to compare against. And **the ink on it is literal,
+     stated the same in both themes**, for the reason `--color-upgrade-ink`
+     is: this is a saturated fill that carries its own ink, and `lp-ink` goes
+     near-white at night, which on a yellow band is unreadable.
+
+     The yellow itself does move between the blocks, unlike the upgrade fill.
+     A #f7f000 slab is right on white and glares on #0b0b0e, so the dark value
+     is deepened enough to sit on a black page without being the brightest
+     thing in the room. Dark ink clears 15:1 on both. */
+  --color-lp-marker: #e4dc00;
+  --color-lp-marker-ink: #14140f;
+
+  /* ------------------------------------------------------------------------
      The stage: the one section that goes dark in both themes.
 
      "Before you upload" is where the product is actually shown working, and it
@@ -604,6 +655,19 @@
   --color-lp-wordmark: #423ead;
   --color-lp-accent-pale: #c7d2fe;
   --color-lp-device: #e2e2e8;
+
+  /* The closing banner's sky in daylight — see the note in the dark block.
+     `top` is the accent itself, so the last section of the page is the brand
+     colour at full strength; `mid` is the same hue lifted, and the gradient
+     then falls to white, which is what the footer is. */
+  --color-lp-cta-top: #312e81;
+  --color-lp-cta-mid: #7b78c8;
+
+  /* The marker in daylight — see the note in the dark block. This is the
+     highlighter-pen yellow itself; the dark block deepens it so it does not
+     glare on a black page. */
+  --color-lp-marker: #f7f000;
+  --color-lp-marker-ink: #14140f;
 
   /* The stage — see the note in the dark block. Only the ground differs
      between the two: black under a white page, where at night it lifts off a
@@ -1362,6 +1426,139 @@ body {
     "SOFT" 0,
     "WONK" 0;
   letter-spacing: -0.005em;
+}
+
+/* --------------------------------------------------------------------------
+   The landing page's face — one grotesque, set tight, weight doing the work.
+
+   **The shop front and the app now part on type, on purpose.** Behind the
+   sign-in wall the display face is Fraunces, because those screens sit around
+   a manuscript and a serif belongs there. The landing page is a page of
+   argument, and the face it is set in now is the one modern software
+   marketing has settled on: a single grotesque at two ends of its weight
+   range, tracked in hard, with the loud line very heavy and everything else
+   plain. The contrast that a serif carries in its *shapes* is carried here by
+   weight and size instead.
+
+   **It is one class on the landing page's root and nothing else**, because
+   `font-serif` resolves `--font-serif` at use time — so re-pointing that
+   variable turns every heading on the page over at once, including the ones
+   inside the drawn figures, with no component edited and none left behind.
+   Same mechanism as `[data-paper]` on the writing surface. The consequence to
+   know: **`font-serif` inside `.lp-type` no longer means a serif.** It means
+   *the display face*, which is what that utility has always been used for on
+   this page, and renaming forty-two call sites to say so would be a large
+   diff for a word.
+
+   Inter rather than a new download: it is already loaded and self-hosted for
+   the app, it is the face this whole idiom is drawn from, and the body copy
+   on this page was already set in it — so the page becomes one family at
+   several weights rather than two families sharing a page.
+
+   **What is *not* changed here is weight.** Only the family and the tracking
+   move; every component keeps saying how heavy its own heading is. It is
+   tempting to set one weight for the whole page from here — the rules are
+   unlayered and would beat the `font-*` utilities on the same element — and
+   that is exactly why it is worth naming as a decision rather than an
+   oversight: a forced weight silently inverts any heading built from two
+   volumes, because the emphasised half is a child element and would end up
+   *lighter* than the parent it is meant to stand out from.
+   -------------------------------------------------------------------------- */
+.lp-type {
+  --font-serif: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Fraunces' axes mean nothing to a grotesque. Cleared rather than left to be
+   ignored, so nobody reads the declaration above and expects it to be doing
+   something here. */
+.lp-type .oc-display,
+.lp-type .oc-heading,
+.lp-type .oc-lead {
+  font-variation-settings: normal;
+}
+
+/* **Tracking only — no weight is set here.** Each component still says how
+   heavy its own heading is, the way it did in the serif, so the two volumes
+   the hero and the closing banner are built on survive the change of face. */
+.lp-type .oc-display {
+  /* Hard. At display sizes a grotesque set at its default tracking reads as a
+     road sign; the negative is what makes it a headline. It is deliberately
+     past the -0.02em the serif took, because the letterforms here are wider
+     and flatter and can afford to be closed up further. */
+  letter-spacing: -0.035em;
+}
+
+.lp-type .oc-heading {
+  letter-spacing: -0.025em;
+}
+
+/* The deck under a heading. Barely tracked: this is a reading size, and the
+   tightness that gives a headline its authority costs legibility the moment
+   the line is long enough to be read rather than seen. */
+.lp-type .oc-lead {
+  letter-spacing: -0.011em;
+}
+
+/* --------------------------------------------------------------------------
+   The hero's moving wall — two columns of cards travelling opposite ways.
+
+   **The -50% is the whole trick and it is why there is no JavaScript here.**
+   The track holds its cards *twice*; half the track is therefore one exact
+   copy, so at the moment the loop restarts the pixels are identical and the
+   seam cannot be seen. Nothing is measured, nothing is recalculated on resize,
+   and a card added to `book-tools.ts` simply makes the loop longer. Change the
+   doubling in `hero-wall.tsx` and this stops working silently — the wall will
+   jump once a minute and look like a dropped frame.
+
+   Linear, not eased: this is meant to read as continuous travel rather than as
+   a thing that starts and stops. Sixty seconds is slow enough that a reader
+   trying to read a card can, which is the point at which an ambient animation
+   turns into a distraction.
+
+   `transform` only, promoted with `will-change`, so both columns run on the
+   compositor and never lay anything out — a hero that drops frames while
+   somebody is reading the one headline that has to land is worse than no wall
+   at all.
+   -------------------------------------------------------------------------- */
+@keyframes lp-scroll-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+@keyframes lp-scroll-down {
+  from {
+    transform: translateY(-50%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.lp-scroll-up,
+.lp-scroll-down {
+  will-change: transform;
+}
+
+.lp-scroll-up {
+  animation: lp-scroll-up 60s linear infinite;
+}
+
+.lp-scroll-down {
+  animation: lp-scroll-down 60s linear infinite;
+}
+
+/* Asked to stop, it stops — and stays a wall of cards rather than vanishing.
+   The information was never in the movement. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-scroll-up,
+  .lp-scroll-down {
+    animation: none;
+    will-change: auto;
+  }
 }
 
 /* --------------------------------------------------------------------------

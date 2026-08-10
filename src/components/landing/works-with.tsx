@@ -101,7 +101,11 @@ export const DESTINATIONS: Destination[] = [
     },
   },
   {
-    name: "Kindle",
+    /* Named for the shop rather than the device, because the mark is Amazon's
+       own smile and a row that draws one brand's logo under another brand's
+       name is the kind of mismatch a logo strip cannot survive. There is no
+       accurate Kindle mark in the open sets — see the note at the top. */
+    name: "Amazon Kindle",
     format: "EPUB",
     mark: {
       viewBox: "0 0 448 512",

@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { HERO_CHECK_ANCHOR, HERO_FILE_INPUT } from "./book-check";
 
 /**
  * The landing page's header: invisible over the hero, and it gets out of the
@@ -149,7 +148,18 @@ export function LandingHeader({ ink }: { ink: string }) {
             : "border-transparent opacity-0"
         }`}
       />
-      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:gap-6 sm:px-6 sm:py-3.5">
+      {/* `max-w-6xl px-6`, which is the page's one measure — the wordmark has
+          to start on the same line as every heading below it. It was `px-4` up
+          to `sm`, which put the bar's left edge 8px inside every section's on
+          a phone: small, and exactly the kind of small that reads as the
+          header belonging to a different page. */}
+      {/* The bar's height is the button height plus this, and the button is
+          the part that may not shrink — it is the offer. So the trimming
+          happens here. Note that nothing downstream has to be adjusted with
+          it: the hero is pulled up by a fixed `-mt-16` and its wall of cards
+          is pushed down by the same `top-16`, which lands the wall on the
+          header's bottom edge whatever height the header settles at. */}
+      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-1.5 sm:gap-6 sm:py-2">
         {/* The same wordmark the dashboard sidebar carries, at the same size:
             a visitor who signs up should not have to learn a second mark on
             the other side of the door.
@@ -172,100 +182,79 @@ export function LandingHeader({ ink }: { ink: string }) {
         >
           Open<span className="text-lp-wordmark">Chapter</span>
         </Link>
-        {/* `text-base`, not `text-sm`. The links sat a size under the two
-            buttons at the end of the bar, so the row read as small print with
-            two controls stuck on it rather than as one navigation. The buttons
-            inherit it and grow with them, which keeps the pair the anchor of
-            the bar rather than making it shout. */}
-        <nav className="flex items-center gap-5 font-sans text-base text-lp-body sm:gap-7">
-          {/* **Where you are on the page, then what you can do about it.**
-              The bar used to run order · what it does · tools · log in, then
-              the two buttons — so an account link sat in the middle of a group
-              of anchors to sections of this page, and the row had no seam
-              between "navigation" and "action". Now the anchors are one group
-              and the buttons are another.
+        {/* **Three groups across the bar, not two.** The links used to sit in
+            the same flex row as the buttons, hard against the right edge, so
+            the bar read as a wordmark and then a crowd. Held in the middle
+            with the actions at the far end, each group is one kind of thing:
+            *where you are on the page*, then *what you can do about it*. The
+            seam between them is the whole layout.
 
-              **Log in is gone at the user's request.** Worth knowing what it
-              costs: a returning writer arriving at the marketing page has no
-              way back to their books from this bar, and has to go through
-              "Start free" to find the sign-in link on the signup screen. */}
-          <span className="hidden items-center gap-5 sm:flex sm:gap-7">
-            <a href="#order" className="hover:text-lp-ink">
-              The order
-            </a>
-            <a href="#does" className="hover:text-lp-ink">
-              What it does
-            </a>
-            <a href="#tools" className="hover:text-lp-ink">
-              Tools
-            </a>
-            {/* **The one item here that leaves the page, and it belongs with
-                the anchors anyway.** The objection above was to an *account*
-                action standing in a row of navigation; a price is information,
-                the same kind of thing as Tools.
+            `text-[0.9375rem]`, a shade under the buttons: the links are
+            navigation and the pair at the end is the offer, and a row where
+            all six things are the same size has no offer in it. */}
+        <nav className="hidden items-center gap-8 font-sans text-[0.9375rem] font-medium text-lp-body md:flex">
+          <a href="#order" className="hover:text-lp-ink">
+            The order
+          </a>
+          <a href="#does" className="hover:text-lp-ink">
+            What it does
+          </a>
+          <a href="#tools" className="hover:text-lp-ink">
+            Tools
+          </a>
+          {/* **The one item here that leaves the page, and it belongs with the
+              anchors anyway** — a price is information, the same kind of thing
+              as Tools, rather than an account action.
 
-                It is not optional furniture: Paddle reviews this domain before
-                it will let anybody take a card, and "pricing details or a
-                pricing page" is on the list it checks. This page states no
-                figure of its own by design — every number is read from the
-                modules that enforce it — so without this link the prices live
-                at a URL a visitor is never told about. */}
-            <Link href="/upgrade" className="hover:text-lp-ink">
-              Pricing
-            </Link>
-          </span>
-
-          {/* **A label, not a button or a link.** It is bound to the hero
-              check's own file input, so pressing it opens the picker and the
-              file lands in the check exactly as if it had been dropped on the
-              box. No second input, no ref, no shared state — and it cannot
-              drift out of step with the thing it feeds, because it *is* the
-              thing that feeds it.
-
-              The scroll is the other half: the header outlives the hero, so
-              this can be pressed from halfway down the page, and a check that
-              ran off screen would look like nothing happened. Bringing the
-              card back first means the picker closes onto the answer.
-
-              **Secondary, and that is the point.** "Start free" is the way
-              forward and keeps the only fill on the bar; this is the way
-              forward for somebody who has a manuscript and wants to see the
-              check before they will hear about an account. Border and type in
-              the same ink, no ground — so it reads as the same family, one
-              step quieter. */}
-          {/* The two actions are one group, and the nav's own `gap-6` was
-              spacing them as if they were two more links. Wrapped, they sit at
-              `gap-2.5` from each other and keep the wider gap from "Log in" —
-              so the bar reads as *links, then a pair of buttons* rather than
-              as five evenly spaced things of three different kinds. */}
-          <span className="flex items-center gap-2.5">
-            <label
-              htmlFor={HERO_FILE_INPUT}
-              onClick={() =>
-                document
-                  .getElementById(HERO_CHECK_ANCHOR)
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
-              }
-              style={{ borderColor: ink, color: ink }}
-              /* `border-2`: at one pixel the outline was lighter than the type
-                 inside it and the button read as a hairline box round a word.
-                 Two matches the weight of the filled button beside it, which
-                 is what makes the pair look like two of the same thing. */
-              className="hidden cursor-pointer rounded-full border-2 px-3.5 py-1.5
-                         font-semibold transition-colors hover:bg-lp-tint
-                         sm:inline-block sm:px-4 sm:py-2"
-            >
-              Check your book
-            </label>
-            <Link
-              href="/signup"
-              style={{ backgroundColor: ink }}
-              className="rounded-full px-3.5 py-1.5 font-semibold text-lp-accent-ink hover:opacity-90 sm:px-4 sm:py-2"
-            >
-              Start free
-            </Link>
-          </span>
+              It is not optional furniture: Paddle reviews this domain before
+              it will let anybody take a card, and "pricing details or a
+              pricing page" is on the list it checks. This page states no
+              figure of its own by design — every number is read from the
+              modules that enforce it — so without this link the prices live at
+              a URL a visitor is never told about. */}
+          <Link href="/upgrade" className="hover:text-lp-ink">
+            Pricing
+          </Link>
         </nav>
+
+        {/* ---- The pair -------------------------------------------------
+
+            **Outline, then fill — one shape at two volumes.** Both are the
+            same pill at the same height in the same ink, and the only thing
+            separating them is whether the ink is the ground or the border.
+            That is what makes them read as one control with two answers
+            rather than as two unrelated buttons.
+
+            `border`, one pixel. A previous pair here used `border-2`, on the
+            finding that a hairline outline read as a box drawn round a word —
+            true at the padding it had then. These are wider and taller, and at
+            this size a heavy outline is the thing that looks unresolved.
+
+            **"Log in" is back, and "Check your book" has gone.** The check was
+            a `<label>` bound to the hero's own file input, which is a genuinely
+            nice trick and cost nothing to keep; what it cost to *lose* is the
+            only route from this bar to the check, which now lives in a band of
+            its own below the logo strip and has to be scrolled to. What it
+            buys is the pairing every visitor already knows how to read: the
+            way in for somebody who has an account, beside the way in for
+            somebody who does not. A returning writer had no way back to their
+            books from this bar at all, which was the older complaint. */}
+        <span className="flex items-center gap-2.5">
+          <Link
+            href="/signin"
+            style={{ borderColor: ink, color: ink }}
+            className="rounded-full border px-5 py-1.5 text-[0.9375rem] font-semibold transition-colors hover:bg-lp-tint sm:px-6 sm:py-2"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/signup"
+            style={{ backgroundColor: ink }}
+            className="rounded-full px-5 py-1.5 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90 sm:px-6 sm:py-2"
+          >
+            Start free
+          </Link>
+        </span>
       </div>
     </header>
   );

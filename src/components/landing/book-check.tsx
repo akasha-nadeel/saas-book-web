@@ -197,7 +197,15 @@ export function BookCheck() {
   const done = state.phase === "done";
 
   return (
-    <div id={HERO_CHECK_ANCHOR} className="mx-auto mt-14 max-w-4xl scroll-mt-24">
+    /* No top margin of its own: it used to sit under the hero deck and had to
+       hold itself off it, and now it is the only thing in a band of its own,
+       where the section's padding is what sets the space. A margin here would
+       be added to that. */
+    /* `max-w-6xl`, the section's full measure. It was `4xl`, which was right
+       while this sat under a hero deck and had to look like a card the page
+       had placed there. It owns a band now, and a device narrower than the
+       heading above it reads as a widget rather than as the product. */
+    <div id={HERO_CHECK_ANCHOR} className="mx-auto max-w-6xl scroll-mt-24">
       {/* The frame is shared with the two figures further down the page — see
           `app-window.tsx`. This is the one that holds a working control
           rather than a drawing, so it passes no `label`: a screen reader has
@@ -208,6 +216,11 @@ export function BookCheck() {
           the frame, which is where it used to be and where it read as small
           print about the thing rather than as part of it. */}
       <AppWindow
+        /* The dark shell, and this is the one window on the page entitled to
+           it — see the note on the prop. The other two are figures inside
+           sections that argue around them; this one *is* its section, and a
+           pale ring at this width vanishes into the band behind it. */
+        bezel
         title="Manuscript check"
         badge={
           <span
@@ -308,7 +321,13 @@ function Dropzone({
           setDragging(false);
           onPick(event.dataTransfer.files);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors sm:px-6 sm:py-14 ${
+        /* A floor rather than padding alone. The zone is the whole point of
+           this window, and it now spans the section's full width — at the old
+           `py-14` a wide box only an inch or two tall reads as a strip to type
+           into rather than as somewhere to drop a file. A minimum height keeps
+           it square enough to look like a target at every width, and the
+           padding still sets the space around the words inside it. */
+        className={`flex min-h-[18rem] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-10 text-center transition-colors sm:min-h-[24rem] sm:px-6 sm:py-14 ${
           dragging
             ? "border-[var(--color-lp-accent)] bg-lp-tint"
             : "border-lp-edge bg-lp-well/60 hover:border-lp-edge-strong"

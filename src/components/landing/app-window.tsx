@@ -34,6 +34,7 @@ export function AppWindow({
   title,
   badge,
   label,
+  bezel = false,
   hostRef,
   screenRef,
   screenClassName = "",
@@ -53,6 +54,22 @@ export function AppWindow({
   badge?: ReactNode;
   /** Present when the contents are a drawn picture rather than a control. */
   label?: string;
+  /**
+   * Draw the shell as a dark bezel instead of the pale ring.
+   *
+   * **Still one frame, at two volumes — not a second device.** The pale ring
+   * is right for a figure floating inside a section: it separates the product
+   * from the ground without drawing a machine round it. It is *wrong* for the
+   * one window that is the whole point of its section, where the frame has to
+   * hold the eye and say "look here" — a pale ring on a pale band simply
+   * disappears at that size.
+   *
+   * The bezel does the holding. Same rounding, same glass, same hairline
+   * inside it; only the shell's value changes, so the two still read as one
+   * component rather than as two products. Reserve it for a window that owns
+   * its section, or the page is back to having several devices on it.
+   */
+  bezel?: boolean;
   hostRef?: Ref<HTMLDivElement>;
   screenRef?: Ref<HTMLDivElement>;
   screenClassName?: string;
@@ -75,9 +92,15 @@ export function AppWindow({
     <div
       ref={hostRef}
       {...(picture ? { role: "img", "aria-label": label } : {})}
-      className={`rounded-[1.4rem] border border-lp-edge bg-lp-ground p-1.5 shadow-[0_28px_70px_-28px_rgba(15,15,16,0.45),0_8px_24px_-12px_rgba(15,15,16,0.25)] sm:p-2 ${
-        picture ? "select-none" : ""
-      }`}
+      className={`rounded-[1.4rem] shadow-[0_28px_70px_-28px_rgba(15,15,16,0.45),0_8px_24px_-12px_rgba(15,15,16,0.25)] ${
+        bezel
+          ? /* A real bezel, so it needs real depth: thicker than the ring it
+               replaces, drawn in the page's own darkest ink rather than a
+               borrowed grey, and no border of its own — the value *is* the
+               edge, and a hairline round a dark bezel reads as a seam. */
+            "bg-lp-stage p-2 sm:p-3"
+          : "border border-lp-edge bg-lp-ground p-1.5 sm:p-2"
+      } ${picture ? "select-none" : ""}`}
     >
       {/* The glass carries the hairline and the rounding, so whatever is
           inside can be square-edged and simply be clipped by it. Ring and
