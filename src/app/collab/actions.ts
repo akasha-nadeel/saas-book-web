@@ -1,5 +1,6 @@
 "use server";
 
+import { accountFromClaims } from "@/lib/account";
 import { billingConfigured } from "@/lib/billing/provider";
 import { subscriptionFor } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
@@ -32,6 +33,63 @@ import { createClient } from "@/lib/supabase/server";
  */
 
 export type CollabResult = { error: string } | { ok: true; link?: string };
+
+/**
+ * Said in one place because two screens and three actions say it, and a reader
+ * who meets two different wordings for one state reads them as two states.
+ */
+const CONFIRM_FIRST =
+  "Confirm your email address first — check your inbox for the link we sent when you signed up.";
+const LOOKUP_FAILED =
+  "We couldn’t check your account just now. Try again in a moment.";
+
+/**
+ * The signed-in account: the address on it, and whether that address is
+ * confirmed.
+ *
+ * **The lookup's own error is the whole reason this exists.** All three callers
+ * read `getUserById`'s `data` and dropped its `error`, which turns a lookup that
+ * *failed* into a confident false statement about somebody's account — and each
+ * one failed differently:
+ *
+ *   - `acceptInvite` answered "confirm your email address first", which is
+ *     advice that cannot help, about a state nobody had established. It is also
+ *     how that action and `offerFor` came to disagree about one account: two
+ *     calls, one of them failing, the failure discarded, so the page offered
+ *     Accept and the press was refused for a reason that was not true.
+ *   - `declineInvite` fell through to `address = ""` and matched
+ *     `invited_email = ""`, which matches no row, raises no error, and told the
+ *     writer their invitation was declined when nothing had happened at all.
+ *   - `offerFor` read it as "not confirmed", which is the harmless one, and only
+ *     by luck.
+ *
+ * A lookup that did not happen must not read as a fact about the account, so
+ * this returns null and every caller says so in its own words.
+ *
+ * The address is read from the account rather than from the token's claims for
+ * the reason `offerFor` documents: Supabase puts `email` in the access token
+ * whether or not it has been confirmed, so matching on the claim would let
+ * somebody sign up as victim@company.com, never confirm it, and accept their
+ * invitation. `email_confirmed_at` is the only honest answer.
+ */
+async function accountFor(
+  db: NonNullable<ReturnType<typeof createAdminClient>>,
+  id: string,
+): Promise<{ email: string; confirmed: boolean } | null> {
+  const { data, error } = await db.auth.admin.getUserById(id);
+
+  if (error || !data?.user) {
+    console.error(
+      `[collab] could not read the signed-in account: ${error?.message ?? "no user returned"}`,
+    );
+    return null;
+  }
+
+  return {
+    email: normalizeEmail(data.user.email ?? ""),
+    confirmed: Boolean(data.user.email_confirmed_at),
+  };
+}
 
 /** The seat cap for whoever owns this book, which is the plan that governs it. */
 async function seatsFor(ownerId: string): Promise<number> {
@@ -323,13 +381,38 @@ export async function removeMember(memberId: string): Promise<CollabResult> {
  * an invitation addressed to somebody else.
  */
 export interface InviteOffer {
+  /** Where accepting sends them — the book itself, not a confirmation screen. */
+  bookId: string;
   bookTitle: string;
   role: CollabRole;
   invitedEmail: string;
   /** Whether the signed-in account is the one this was addressed to. */
   forMe: boolean;
+  /**
+   * The address this reader is signed in as, so the page can name both sides of
+   * a mismatch. Their own address and nobody else's — the page is gated, so the
+   * only person who can read it is the person it belongs to.
+   */
+  signedInAs?: string;
   /** Why it cannot be accepted, if it cannot. */
   problem?: string;
+  /**
+   * They already took this invitation up — the commonest repeat visit there is,
+   * since an invitation link sits in a message somebody scrolls back to.
+   *
+   * Kept apart from `problem` because it is not one: the link did exactly what
+   * it promised. "That invitation has already been answered" is true, useless,
+   * and a dead end in front of a book they own the right to open — which is why
+   * every large product sends a second click straight through to the resource
+   * rather than reporting on the token.
+   */
+  alreadyMember?: boolean;
+  /**
+   * Their email is not confirmed yet, so nothing can be accepted. Separate from
+   * `problem` because it is the one blocked state the reader can clear
+   * themselves, and so the only one that earns a control of its own.
+   */
+  needsConfirmation?: boolean;
 }
 
 export async function offerFor(token: string): Promise<InviteOffer | null> {
@@ -357,40 +440,57 @@ export async function offerFor(token: string): Promise<InviteOffer | null> {
   const me = typeof claims?.claims?.sub === "string" ? claims.claims.sub : null;
 
   let mine = false;
+  let signedInAs: string | undefined;
   let problem: string | undefined;
+  let alreadyMember = false;
+  let needsConfirmation = false;
 
-  if (invite.status !== "pending") {
+  /*
+   * **The account is resolved before the token is judged**, which is the order
+   * that makes "you already have this" reachable at all. Judging the row first
+   * turns an accepted invitation into "already been answered" for everybody —
+   * including the person who accepted it, standing one click from a book they
+   * are entitled to open.
+   */
+  const account = me ? await accountFor(db, me) : null;
+  const isInvitee = Boolean(account && account.email === invite.invited_email);
+
+  if (me && !account) {
+    // The lookup failed, so nothing about this account is known. Saying so is
+    // the only honest answer: "signed in as somebody else" and "confirm your
+    // email" are both claims, and neither has been established.
+    problem = LOOKUP_FAILED;
+  } else if (account) {
+    signedInAs = account.email || undefined;
+
+    if (invite.status === "accepted" && isInvitee) {
+      alreadyMember = true;
+    } else if (invite.status !== "pending") {
+      problem = "That invitation has already been answered.";
+    } else if (Date.parse(invite.expires_at) <= Date.now()) {
+      problem = `That invitation has expired. Invitations last ${INVITE_DAYS} days — ask for another.`;
+    } else if (isInvitee && !account.confirmed) {
+      needsConfirmation = true;
+      problem = CONFIRM_FIRST;
+    } else {
+      mine = isInvitee && account.confirmed;
+    }
+  } else if (invite.status !== "pending") {
     problem = "That invitation has already been answered.";
   } else if (Date.parse(invite.expires_at) <= Date.now()) {
     problem = `That invitation has expired. Invitations last ${INVITE_DAYS} days — ask for another.`;
   }
 
-  if (me) {
-    /*
-     * **The address is read from the account, not from the token's claims.**
-     *
-     * Supabase puts `email` in the access token whether or not it has been
-     * confirmed, so matching on the claim would let somebody sign up as
-     * victim@company.com, never confirm it, and accept their invitation.
-     * `getUserById` carries `email_confirmed_at`, which is the only honest answer.
-     */
-    const { data: account } = await db.auth.admin.getUserById(me);
-    const address = normalizeEmail(account?.user?.email ?? "");
-    const confirmed = Boolean(account?.user?.email_confirmed_at);
-    mine = confirmed && address === invite.invited_email;
-
-    if (!problem && address === invite.invited_email && !confirmed) {
-      problem =
-        "Confirm your email address first — check your inbox for the link we sent when you signed up.";
-    }
-  }
-
   return {
+    bookId: invite.book_id,
     bookTitle: book?.title ?? "a book",
     role: invite.role,
     invitedEmail: invite.invited_email,
     forMe: mine,
+    signedInAs,
     problem,
+    alreadyMember,
+    needsConfirmation,
   };
 }
 
@@ -420,6 +520,160 @@ export async function acceptOwnInvite(memberId: string): Promise<CollabResult> {
   return acceptInvite(data.token);
 }
 
+/**
+ * Send the confirmation email again.
+ *
+ * The one blocked state on this page a reader can clear without anybody else
+ * doing anything, so it is the one that earns a button. Telling somebody to
+ * check an inbox for a message that may have been sent days ago, gone to spam,
+ * or never arrived — and giving them no way to ask for another — is the dead end
+ * this removes.
+ *
+ * The address comes from the session rather than from the caller: a parameter
+ * would let anybody use this to send mail to any address they liked.
+ */
+export async function resendConfirmation(): Promise<CollabResult> {
+  if (!isSupabaseConfigured() || !isAdminConfigured()) {
+    return { error: "Accounts aren't configured on this server." };
+  }
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const me = typeof claims?.claims?.sub === "string" ? claims.claims.sub : null;
+  if (!me) return { error: "Sign in first." };
+
+  const db = createAdminClient();
+  if (!db) return { error: "Accounts aren't configured on this server." };
+
+  const account = await accountFor(db, me);
+  if (!account) return { error: LOOKUP_FAILED };
+  if (account.confirmed) return { ok: true };
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: account.email,
+  });
+
+  if (error) {
+    console.error(`[collab] could not resend confirmation: ${error.message}`);
+    return { error: "Could not send it just now. Try again in a moment." };
+  }
+
+  return { ok: true };
+}
+
+/** A collaborator as the face pile draws them. */
+export interface Face {
+  name: string | null;
+  avatarUrl: string | null;
+}
+
+/**
+ * The name and photo behind each person on the caller's books.
+ *
+ * The face pile has always drawn initials, and the comment above it said why:
+ * nothing in this app had ever collected an avatar for a collaborator. That was
+ * a gap in the data rather than a decision — Drive, Notion and Figma all show
+ * real faces, and the pile exists to answer "who can see my work" by *looking*.
+ * This closes it.
+ *
+ * **It has to be a server action, and it takes no arguments — both for the same
+ * reason.** Photos live in `auth.users.user_metadata`, which the browser cannot
+ * read for anybody but itself, so the secret key is the only way to them. And a
+ * function that accepted a list of user ids would be an oracle: hand it any
+ * uuid and it hands back a name and a face. So the list is *derived* here from
+ * the books the caller is actually on, and an id they have no business seeing
+ * can never enter it.
+ *
+ * Only Google accounts have a photo at all. An email-and-password signup has
+ * none and never will, so every caller of this must keep the initial as its
+ * fallback rather than treating a null as a failure.
+ */
+export async function memberFaces(): Promise<Record<string, Face>> {
+  if (!isSupabaseConfigured() || !isAdminConfigured()) return {};
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const me = typeof claims?.claims?.sub === "string" ? claims.claims.sub : null;
+  if (!me) return {};
+
+  const db = createAdminClient();
+  if (!db) return {};
+
+  // The books this caller may see people on: their own, plus any they have
+  // accepted an invitation to.
+  const [{ data: owned }, { data: joined }] = await Promise.all([
+    db.from("books").select("id").eq("owner", me),
+    db
+      .from("book_members")
+      .select("book_id")
+      .eq("user_id", me)
+      .eq("status", "accepted"),
+  ]);
+
+  const bookIds = [
+    ...new Set([
+      ...(owned ?? []).map((b) => b.id as string),
+      ...(joined ?? []).map((m) => m.book_id as string),
+    ]),
+  ];
+
+  // Themselves always — the pile leads with the owner, and on their own shelf
+  // that is this caller.
+  const ids = new Set<string>([me]);
+
+  if (bookIds.length > 0) {
+    // Together, not one after the other: neither reads the other's answer, and
+    // this runs on every visit to the Collaborators screen.
+    const [{ data: people }, { data: owners }] = await Promise.all([
+      db
+        .from("book_members")
+        .select("user_id")
+        .in("book_id", bookIds)
+        .eq("status", "accepted"),
+      db.from("books").select("owner").in("id", bookIds),
+    ]);
+
+    for (const row of people ?? []) {
+      if (typeof row.user_id === "string") ids.add(row.user_id);
+    }
+
+    for (const row of owners ?? []) {
+      if (typeof row.owner === "string") ids.add(row.owner);
+    }
+  }
+
+  const faces: Record<string, Face> = {};
+
+  await Promise.all(
+    [...ids].map(async (id) => {
+      const { data, error } = await db.auth.admin.getUserById(id);
+      if (error || !data?.user) return;
+
+      // The same chain of fallbacks the chrome uses for the signed-in writer,
+      // rather than a second reading of the same provider metadata: `avatar_url`
+      // or `picture` depending on the provider, https only, and a name that is
+      // usually absent.
+      const account = accountFromClaims({
+        email: data.user.email,
+        user_metadata: data.user.user_metadata,
+      });
+
+      faces[id] = { name: account.name, avatarUrl: account.avatarUrl };
+    }),
+  );
+
+  /*
+   * The caller again, under a name the client can reach without knowing their
+   * own uuid. The pile leads with the owner, and on the caller's own shelf that
+   * disc is them — but nothing on that screen has their id to look up. A uuid
+   * can never collide with this, so the map stays one shape.
+   */
+  if (faces[me]) faces.self = faces[me];
+
+  return faces;
+}
+
 export async function acceptInvite(token: string): Promise<CollabResult> {
   if (!isSupabaseConfigured() || !isAdminConfigured()) {
     return { error: "Sharing isn't available on this server." };
@@ -433,13 +687,9 @@ export async function acceptInvite(token: string): Promise<CollabResult> {
   const db = createAdminClient();
   if (!db) return { error: "Sharing isn't available on this server." };
 
-  const { data: account } = await db.auth.admin.getUserById(me);
-  if (!account?.user?.email_confirmed_at) {
-    return {
-      error:
-        "Confirm your email address first — check your inbox for the link we sent when you signed up.",
-    };
-  }
+  const account = await accountFor(db, me);
+  if (!account) return { error: LOOKUP_FAILED };
+  if (!account.confirmed) return { error: CONFIRM_FIRST };
 
   // Whose invitation this is decides which plan governs the seat count, so the
   // book's owner is read rather than assumed to be the accepter.
@@ -460,7 +710,7 @@ export async function acceptInvite(token: string): Promise<CollabResult> {
   const { error } = await db.rpc("accept_book_invite", {
     invite_token: token,
     caller: me,
-    caller_email: normalizeEmail(account.user.email ?? ""),
+    caller_email: account.email,
     // Re-checked here and not only at invitation: an owner can drop off Pro with
     // nine invitations outstanding.
     max_seats: await seatsFor(book.owner),
@@ -519,8 +769,9 @@ export async function declineInvite(token: string): Promise<CollabResult> {
   const db = createAdminClient();
   if (!db) return { error: "Sharing isn't available on this server." };
 
-  const { data: account } = await db.auth.admin.getUserById(me);
-  const address = normalizeEmail(account?.user?.email ?? "");
+  const account = await accountFor(db, me);
+  if (!account) return { error: LOOKUP_FAILED };
+  const address = account.email;
 
   // Only the person it was addressed to may decline it, or a leaked link becomes
   // a way of cancelling other people's invitations.

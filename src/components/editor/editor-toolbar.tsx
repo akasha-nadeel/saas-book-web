@@ -134,10 +134,6 @@ function ToolButton({
   );
 }
 
-const Divider = () => (
-  <span aria-hidden="true" className="my-1 h-px w-7 shrink-0 bg-line" />
-);
-
 const Icon = ({ children }: { children: React.ReactNode }) => (
   <svg
     aria-hidden="true"
@@ -204,25 +200,11 @@ function Flyout({
   const [rect, setRect] = useState<DOMRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const show = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
     setRect(triggerRef.current?.getBoundingClientRect() ?? null);
     setOpen(true);
   };
-  const hideSoon = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    // Long enough to cross the gap, short enough not to linger.
-    closeTimer.current = setTimeout(() => setOpen(false), 220);
-  };
-
-  useEffect(
-    () => () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
-    },
-    [],
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -268,10 +250,22 @@ function Flyout({
       <button
         ref={triggerRef}
         type="button"
+        /*
+         * **Opened by a press, and only by a press.**
+         *
+         * It used to open on hover as well, and the two together cancelled each
+         * other out in the commonest gesture there is: moving the pointer to
+         * the button opened the panel, and the click that follows — which is
+         * what everybody does — found it already open and shut it again. The
+         * panel flashed and vanished, and pressing again did the same thing,
+         * because the pointer never left.
+         *
+         * Hover was the wrong half to keep even on its own. This is not a
+         * tooltip; it is eight form controls laid over the manuscript, and a
+         * pointer travelling across the rail on its way somewhere else should
+         * not pull them onto the page.
+         */
         onClick={() => (open ? setOpen(false) : show())}
-        onMouseEnter={show}
-        onMouseLeave={hideSoon}
-        onFocus={show}
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={label}
@@ -292,8 +286,6 @@ function Flyout({
         createPortal(
           <div
             ref={panelRef}
-            onMouseEnter={show}
-            onMouseLeave={hideSoon}
             onBlur={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) {
                 setOpen(false);
@@ -303,8 +295,9 @@ function Flyout({
               position: "fixed",
               top: rect.top,
               left: rect.left,
-              // Sits to the left of the rail, with the gap as padding so the
-              // pointer never crosses dead space on its way over.
+              // Sits to the left of the rail. The padding is the gap between
+              // the two, kept inside the panel so a press that lands a pixel
+              // short of the edge still counts as inside it.
               transform: "translateX(-100%)",
               paddingRight: 8,
             }}
@@ -381,7 +374,10 @@ export function ToolRail({
       role="toolbar"
       aria-label="Formatting"
       aria-orientation="vertical"
-      className="flex flex-col items-center gap-1"
+      // The rail's own spacing, not a tighter one. These three sit in a column
+      // with the cover above them and the view toggles below, and a group set
+      // closer together than its neighbours reads as a sub-list of one of them.
+      className="flex flex-col items-center gap-2"
     >
       <Flyout
         label="Text & type"
@@ -652,8 +648,11 @@ export function ToolRail({
         </div>
       </Flyout>
 
-      <Divider />
-
+      {/* No divider between these three. Type, a picture and dictation are one
+          thing — putting words and marks on the page — and the rail already
+          separates that whole group from the cover above it and the view
+          toggles below. Three rules inside a five-icon column made every icon
+          look like a section of its own. */}
       <ToolButton
         label="Insert image"
         disabled={busy}
@@ -689,8 +688,6 @@ export function ToolRail({
           editor.chain().focus().setImage({ src: result.src }).run();
         }}
       />
-
-      <Divider />
 
       {/* Dictation. Hidden entirely where the browser has no speech engine,
           rather than shown disabled: a control that can never work on this

@@ -227,11 +227,16 @@ export function BookCheck() {
             it. Under the frame it arrived after the reader had already
             decided whether to hand over a manuscript, which is the wrong side
             of the decision for the sentence that settles it. */}
+        {/* Set at heading size rather than as a caption. It is the instruction
+            the whole box turns on — a reader deciding whether to hand over a
+            manuscript reads this line and nothing else — and at `text-sm` it
+            was the smallest type in the hero, competing with the legal note
+            below it rather than with the headline above. Serif and
+            `oc-heading`, so it belongs to the page's headings rather than to
+            its captions. */}
         {!done && (
-          <p className="px-5 pt-5 text-center text-sm leading-relaxed text-lp-ink sm:px-6">
-            <span className="font-semibold">
-              Test your own manuscript for the problems a shop would find.
-            </span>
+          <p className="oc-heading px-5 pt-5 text-center font-serif text-xl leading-snug font-semibold text-lp-ink sm:px-6 sm:text-2xl">
+            Test your own manuscript for the problems a shop would find.
           </p>
         )}
 
@@ -489,11 +494,29 @@ function Result({
         </p>
 
         {clean ? (
+          /*
+           * **The clean pass is the harder result to answer, and it used to
+           * end the conversation.** A reader whose file is refused has an
+           * obvious next move; a reader whose file passes has just been told
+           * everything is fine, and the only thing on screen after that was a
+           * sign-up button for a problem they no longer have.
+           *
+           * So the sentence after the verdict names what this *is* rather than
+           * what it found: the manuscript goes on being written and edited
+           * here, and the publishing job carries on after the file is valid.
+           * Both halves are true of the product and neither claims the check
+           * found anything it did not.
+           */
           <p className="mt-3 text-sm leading-relaxed">
             That is the upload checked — the parts a shop refuses files over.
-            What it cannot tell you is whether the blurb sells, which categories
-            put you on the right shelf, or whether your advance readers were
-            lined up early enough to matter. That is the rest of the job.
+            The book itself carries on from here:{" "}
+            <strong className="font-semibold text-lp-ink">
+              it opens in the editor as chapters you can keep writing
+            </strong>
+            , with the blurb, the categories, the cover and the advance readers
+            waiting where they fall in the order. What a file check cannot tell
+            you is whether the blurb sells or which shelf you land on — and that
+            is the rest of the job.
           </p>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">

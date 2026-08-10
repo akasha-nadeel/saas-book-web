@@ -2,15 +2,18 @@
 
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
+import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
 import { steppedFontSize } from "@/lib/editor/font-size";
+import { previewFont } from "@/lib/editor/font-preview";
 import { FONTS } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 
@@ -151,13 +154,29 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
    */
   const pointerOnBar = useRef(false);
 
+  /**
+   * Whether the font menu is open.
+   *
+   * The same answer as `pointerOnBar` to a second version of the same question,
+   * and it is needed for a specific reason: pressing a control on this bar
+   * collapses the browser's selection, ProseMirror syncs that collapse into its
+   * own state a tick later, and from then on `from === to`. Every other control
+   * has finished its work by then. The font menu has not — it is open, waiting
+   * to be chosen from — so the moment the pointer wandered off the bar on its
+   * way to the list, the whole bar and the list with it disappeared.
+   *
+   * A ref, like the one above, because a render here makes new props for the
+   * menu and new props start a loop.
+   */
+  const menuOpen = useRef(false);
+
   // Stable references, or the BubbleMenu re-dispatches an "updateOptions"
   // transaction on every render — which re-renders this toolbar, which makes
   // new props, and so on without end. Memoising breaks that loop.
   const shouldShow = useCallback(
     ({ state, from, to }: { state: EditorState; from: number; to: number }) => {
       if (!editor?.isEditable) return false;
-      if (pointerOnBar.current) return true;
+      if (pointerOnBar.current || menuOpen.current) return true;
       if (from === to) return false;
       if (!(state.selection instanceof TextSelection)) return false;
       return state.doc.textBetween(from, to).trim().length > 0;
@@ -222,7 +241,7 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
           Every control on this row is an inline mark — none of them touches a
           character outside the selection. */}
       <div className="flex items-center gap-0.5">
-        <FontPicker editor={editor} />
+        <FontPicker editor={editor} onOpenChange={(v) => (menuOpen.current = v)} />
 
         <Sep />
 
@@ -410,51 +429,318 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
 /**
  * The face the selected words are set in.
  *
- * A select rather than a row of buttons: there are six faces and they are told
- * apart by seeing them, not by an icon, so each option is drawn in the face it
- * names. That is also why it sits first — it is the widest thing here and the
- * one a reader looks at rather than scans.
+ * Three things about it, and each of them is how the tools writers already
+ * use behave.
+ *
+ * **It names the face it is on.** It read "Aa", drawn in the current face, on
+ * the reasoning that a name takes six times the width and a reader picks a
+ * typeface by looking at it. Half right: a *list* of faces has to be drawn in
+ * its faces, and the closed control has to say which one you are on — two
+ * letters cannot, because at 12px the difference between Garamond and Palatino
+ * is a serif or two, and "Aa" in the book's own face and "Aa" in Georgia look
+ * the same to anybody not comparing them side by side. Google Docs, Word and
+ * every type tool print the name. So does this, drawn in that face, which is
+ * both answers at once.
+ *
+ * **Hovering an option sets the words in it** — Word's Live Preview, and the
+ * reason it has survived twenty years is that a typeface is the one choice
+ * nobody can make from a name. It is a decoration rather than the real mark, so
+ * nothing is written, nothing enters undo and nothing reaches autosave; see
+ * `font-preview.ts`.
+ *
+ * **The range is remembered when the menu opens**, and this is the bug fix
+ * rather than a nicety. Every other control on this bar acts on the *first*
+ * click, so the selection is still there when the command runs. This one takes
+ * two — open, then choose — and the selection does not survive the gap: the
+ * bar's `preventDefault` keeps focus in the prose but the caret still collapses
+ * on the press, and by the time the second click arrives there is nothing
+ * highlighted to set a face on. So the command ran against an empty cursor and
+ * a writer watched the font not change. Holding the range and putting it back
+ * (`setTextSelection`) makes the second click as good as the first — and gives
+ * the preview above something stable to draw on.
  *
  * "Book" is the empty value, and it means *no mark at all* rather than the
  * book's face written in: a chapter set explicitly to Garamond would keep
  * Garamond after the writer changed the book to Baskerville, which is not what
  * leaving it alone means.
  */
-function FontPicker({ editor }: { editor: Editor }) {
+/**
+ * Roughly how tall the list wants to be — seven rows, a rule and the padding.
+ *
+ * A measured height would need the menu rendered before it can be placed, which
+ * is a frame of it in the wrong position. An approximation is enough for what
+ * is being asked.
+ */
+const MENU_HEIGHT = 270;
+
+/** The gap between the trigger and the list, and from the list to the edge. */
+const MENU_GAP = 8;
+
+function FontPicker({
+  editor,
+  onOpenChange,
+}: {
+  editor: Editor;
+  /** Tells the bar to stay put while the list is up — see `menuOpen`. */
+  onOpenChange: (open: boolean) => void;
+}) {
   const [open, setOpen] = useState(false);
   const current =
     (editor.getAttributes("fontFamily").font as string | null) ?? null;
   const chosen = FONTS.find((f) => f.id === current) ?? null;
 
-  const choose = (id: string | null) => {
-    editor.chain().focus().setFontFamily(id).run();
+  /** The words this menu is about, taken the moment it opens. See above. */
+  const range = useRef<{ from: number; to: number } | null>(null);
+  /**
+   * Whether to put a collapsed selection back — see the guard below.
+   *
+   * **A ref set inside the click handler, not state read by an effect**, and
+   * that is the whole difference between this working and not. An effect is
+   * armed when React commits, and the collapse it exists to undo can fire
+   * before that commit: the browser changes the selection, ProseMirror's DOM
+   * observer notices, and `selectionUpdate` has come and gone while the
+   * subscription is still queued. Sometimes it won the race and sometimes it
+   * did not, which is exactly how this looked — the bar staying put on one
+   * press and jumping to a caret on the next.
+   */
+  const guarding = useRef(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  /**
+   * Where the list is drawn — always above the trigger, in window coordinates.
+   *
+   * **It only ever opens upwards, and it is allowed over the chrome.** This bar
+   * floats *above* the selected words, so a list dropping downwards lands on
+   * the very sentence being previewed — and looking at their own prose in each
+   * face is the entire reason a writer opened it. Flipping to whichever side
+   * had more room was worse than useless: near the top of the page it chose
+   * down, covering the text, which is the one thing it must not do. So it goes
+   * up, and where the page runs out it goes over the manuscript's desk bar
+   * rather than turning round. A menu over some chrome for a moment costs
+   * nothing; a menu over the words being chosen for costs the whole feature.
+   *
+   * That is why it is **portalled and fixed** rather than absolutely positioned
+   * inside the bar. It has to paint above the desk bar, and a `z-index` on a
+   * descendant of the editor cannot escape the stacking contexts between it and
+   * the top — which is exactly what put its first rows behind that bar before.
+   * The same reason the Aa flyout in the rail is portalled.
+   */
+  const [place, setPlace] = useState<{
+    left: number;
+    bottom: number;
+    maxHeight: number;
+  } | null>(null);
+
+  const shut = () => {
+    // Disarmed first: everything after this may move the selection, and the
+    // guard must not treat the writer's next click as a collapse to undo.
+    guarding.current = false;
+    previewFont(editor, null, null);
+    onOpenChange(false);
     setOpen(false);
   };
+
+  const toggle = () => {
+    if (open) {
+      shut();
+      return;
+    }
+    const { from, to } = editor.state.selection;
+    if (from === to) return;
+    // Both set synchronously, inside the press, so the guard is already live
+    // when the collapse this press causes arrives. See `guarding`.
+    range.current = { from, to };
+    guarding.current = true;
+
+    /*
+     * Pinned above the trigger, in window coordinates, capped to the window.
+     *
+     * `bottom` rather than `top`, so the list grows upwards from a fixed foot
+     * — the row nearest the trigger stays where it is however many faces there
+     * are, which is what makes the first one predictable to hit.
+     */
+    const box = triggerRef.current?.getBoundingClientRect();
+    if (!box) return;
+    setPlace({
+      left: box.left,
+      bottom: window.innerHeight - box.top + MENU_GAP,
+      maxHeight: Math.min(MENU_HEIGHT, Math.max(0, box.top - MENU_GAP * 2)),
+    });
+
+    previewFont(editor, range.current, null);
+    onOpenChange(true);
+    setOpen(true);
+  };
+
+  const choose = (id: string | null) => {
+    // The chain below sets the selection deliberately; the guard would see
+    // nothing to undo, but it has no business running during a real edit.
+    guarding.current = false;
+    previewFont(editor, null, null);
+    const chain = editor.chain().focus();
+    // Put the selection back before acting on it. Without this the command
+    // lands on whatever the two clicks left behind, which is a collapsed
+    // cursor — see the note above.
+    if (range.current) chain.setTextSelection(range.current);
+    chain.setFontFamily(id).run();
+    // The selection is genuinely back after that chain, so the bar can look
+    // after itself again.
+    onOpenChange(false);
+    setOpen(false);
+  };
+
+  /*
+   * Three ways it shuts, and all three were missing.
+   *
+   * **Escape**, like every other menu in the app.
+   *
+   * **A press anywhere but the list.** Clicking the page left it standing —
+   * and worse, left the *bar* standing, because the bar is told to stay put
+   * while the list is open (`menuOpen`). So a writer who clicked away to carry
+   * on reading was followed around by a toolbar and a font menu for something
+   * they had stopped selecting. The trigger is excluded or the press that
+   * closes it would be followed by the click that opens it again.
+   *
+   * **A new selection.** The open flag is component state and the toolbar is
+   * not remounted between selections, so the list stayed open — and reappeared
+   * over every phrase highlighted afterwards, having been asked for once. A
+   * menu is about the words it was opened on; select different words and it is
+   * about nothing. This is the one Word gets right by having no state to leak:
+   * its mini toolbar is rebuilt per selection.
+   */
+  useEffect(() => {
+    if (!open) return;
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      shut();
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      shut();
+    };
+
+    /* A fixed position taken from a rect goes stale the moment the page moves,
+       so the list shuts on a resize or on a scroll outside itself. Scrolling
+       *inside* the list must not dismiss it — its own position has not moved. */
+    const onScroll = (e: Event) => {
+      if (menuRef.current?.contains(e.target as Node)) return;
+      shut();
+    };
+
+    document.addEventListener("keydown", onKey, true);
+    document.addEventListener("pointerdown", onPointerDown, true);
+    window.addEventListener("resize", shut);
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("keydown", onKey, true);
+      document.removeEventListener("pointerdown", onPointerDown, true);
+      window.removeEventListener("resize", shut);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+    // `shut` closes over `editor` and refs, all stable for this mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editor]);
+
+  /*
+   * **Put the collapse back before it is ever painted.**
+   *
+   * The press that opens this menu collapses the browser's selection, and
+   * ProseMirror syncs that collapse into its own state. The bubble is anchored
+   * to the selection, so a selection that becomes a caret takes the bar with
+   * it — and a caret sits at the *start* of what was highlighted, which is why
+   * the whole toolbar jumped away the instant the list opened, and why the
+   * words it was about stopped looking selected.
+   *
+   * Two things had to be true to fix it, and the first attempt only had one.
+   * It runs **inside the selection event**, so the correcting transaction lands
+   * in the same task as the collapse and the position the bar would have taken
+   * is never laid out — a `requestAnimationFrame` fixed where the bar ended up
+   * and not the lurch, because that is a whole frame drawn in the wrong place.
+   * And it is **subscribed for the life of the component**, gated by a ref
+   * rather than mounted when the menu opens: an effect is armed at commit time
+   * and the collapse can beat it there.
+   *
+   * Only a *collapse* is undone. A writer deliberately highlighting something
+   * else is a real selection, and the effect below closes the menu on it —
+   * which is also what stops this recursing: the restored selection is not
+   * collapsed, so the next event through here does nothing.
+   */
+  useEffect(() => {
+    const onSelection = () => {
+      if (!guarding.current) return;
+      const at = range.current;
+      if (!at || editor.isDestroyed) return;
+      const { from, to } = editor.state.selection;
+      if (from === to) editor.commands.setTextSelection(at);
+    };
+    editor.on("selectionUpdate", onSelection);
+    return () => {
+      editor.off("selectionUpdate", onSelection);
+    };
+  }, [editor]);
+
+  // Highlighting something else closes it. `selection` is read from the tick
+  // above, so this runs whenever ProseMirror's selection moves — including the
+  // restore above, which lands back on the remembered range and so reads as no
+  // change at all.
+  const { from: selFrom, to: selTo } = editor.state.selection;
+  useEffect(() => {
+    if (!open) return;
+    const at = range.current;
+    if (!at) return;
+    // The collapse this menu causes is not a new selection — it is the old one
+    // on its way to being put back, and closing on it would shut the list on
+    // the frame it opened.
+    if (selFrom === selTo) return;
+    if (selFrom !== at.from || selTo !== at.to) shut();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, selFrom, selTo]);
+
+  // A preview left behind by an unmount would be a stray face on the page with
+  // no menu to explain it.
+  useEffect(() => {
+    return () => {
+      previewFont(editor, null, null);
+    };
+  }, [editor]);
+
+  const label = chosen?.label ?? "Book";
 
   return (
     <span className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onMouseDown={(e) => e.preventDefault()}
-        onClick={() => setOpen((was) => !was)}
+        onClick={toggle}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Font of the selected text"
-        title="Font of the selected text"
+        aria-label={`Font of the selected text — ${chosen?.label ?? "the book’s own"}`}
+        title={`Font of the selected text — ${chosen?.label ?? "the book’s own"}`}
         className={`flex h-6 cursor-pointer items-center gap-0.5 rounded pr-0.5
                     pl-2 outline-none transition-colors focus-visible:ring-2
                     focus-visible:ring-accent/60 ${
                       open ? "bg-raised" : "hover:bg-raised"
                     }`}
       >
-        {/* "Aa" in the face itself rather than its name spelled out. A name
-            takes six times the width and says less — a reader picks a typeface
-            by looking at it. */}
+        {/* The name, set in its own face.
+
+            **A fixed width, not a maximum.** Sized to its content the control
+            grew and shrank with the name — "Book" to "Baskerville" is half an
+            inch — so the whole bar changed width and, being centred over the
+            selection, slid sideways every time a face was chosen. It is also
+            what keeps the row from outgrowing the paragraph it is formatting,
+            which is why it was capped in the first place. */}
         <span
-          className="text-xs leading-none text-fg"
+          className="w-[5.25rem] truncate text-left text-xs leading-none text-fg"
           style={{ fontFamily: chosen ? chosen.stack : undefined }}
         >
-          Aa
+          {label}
         </span>
         <svg
           aria-hidden="true"
@@ -470,35 +756,77 @@ function FontPicker({ editor }: { editor: Editor }) {
         </svg>
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          // A list of our own, not a native select. A select cannot be opened
-          // without taking focus, and taking focus out of the manuscript is
-          // what closes this whole bar — the dropdown would have been torn off
-          // its own hinge before anyone could pick from it.
-          className="absolute top-full left-0 z-20 mt-1.5 w-44 rounded-lg border
-                     border-line bg-panel p-1 shadow-xl"
-        >
-          <FontOptionRow
-            label="Book default"
-            active={current === null}
-            onSelect={() => choose(null)}
-          />
-          <span aria-hidden="true" className="my-1 block h-px bg-line" />
-          {FONTS.map((font) => (
+      {open &&
+        place &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            // A list of our own, not a native select. A select cannot be opened
+            // without taking focus, and taking focus out of the manuscript is
+            // what closes this whole bar — the dropdown would have been torn
+            // off its own hinge before anyone could pick from it.
+            //
+            // Back to the highlight with no face on it, not to nothing: the
+            // menu is still open and still about those words. Cleared on the
+            // list rather than per row, so travelling between two rows never
+            // flashes the original face in between.
+            onMouseLeave={() => previewFont(editor, range.current, null)}
+            style={{
+              position: "fixed",
+              left: place.left,
+              bottom: place.bottom,
+              maxHeight: place.maxHeight,
+            }}
+            // Above the manuscript's desk bar, and under the app's dialogs.
+            className="scroll-slim z-[45] w-44 overflow-y-auto rounded-lg
+                       border border-line bg-panel p-1 shadow-xl"
+          >
             <FontOptionRow
-              key={font.id}
-              label={font.label}
-              stack={font.stack}
-              active={current === font.id}
-              onSelect={() => choose(font.id)}
+              label="Book default"
+              active={current === null}
+              onSelect={() => choose(null)}
+              // The book's own face is what the words already look like with no
+              // mark on them, so previewing it is previewing nothing — which is
+              // exactly right, and is how a writer sees what removing the face
+              // would do while some other face is applied.
+              onPreview={() =>
+                previewFont(editor, range.current, bookFontCss())
+              }
             />
-          ))}
-        </div>
-      )}
+            <span aria-hidden="true" className="my-1 block h-px bg-line" />
+            {FONTS.map((font) => (
+              <FontOptionRow
+                key={font.id}
+                label={font.label}
+                stack={font.stack}
+                active={current === font.id}
+                onSelect={() => choose(font.id)}
+                onPreview={() => previewFont(editor, range.current, font.stack)}
+              />
+            ))}
+          </div>,
+          document.body,
+        )}
     </span>
   );
+}
+
+/**
+ * The book's own face, as CSS, for previewing "Book default".
+ *
+ * Read off the manuscript container rather than passed down, because that is
+ * where `typography.ts` puts it — one place, whatever the book is set to. The
+ * fallback matches the CSS's own (`.manuscript .tiptap`), so a preview before
+ * any book has overridden it shows the same thing the page does.
+ */
+function bookFontCss(): string {
+  if (typeof document === "undefined") return "var(--font-serif)";
+  const surface = document.querySelector(".manuscript .tiptap");
+  const value = surface
+    ? getComputedStyle(surface).fontFamily
+    : "";
+  return value || "var(--font-serif)";
 }
 
 function FontOptionRow({
@@ -506,12 +834,15 @@ function FontOptionRow({
   stack,
   active,
   onSelect,
+  onPreview,
 }: {
   label: string;
   /** Absent for "Book default", which is the absence of a face, not a face. */
   stack?: string;
   active: boolean;
   onSelect: () => void;
+  /** Set the selected words in this face without applying it. */
+  onPreview: () => void;
 }) {
   return (
     <button
@@ -520,6 +851,11 @@ function FontOptionRow({
       aria-checked={active}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onSelect}
+      // Pointer rather than mouse, so a pen or a touch drag previews too; and
+      // on focus, so a writer arrowing through the list with the keyboard gets
+      // the same preview a pointer does.
+      onPointerEnter={onPreview}
+      onFocus={onPreview}
       style={stack ? { fontFamily: stack } : undefined}
       className={`flex w-full cursor-pointer items-center justify-between
                   rounded-md px-2.5 py-1.5 text-left text-sm outline-none

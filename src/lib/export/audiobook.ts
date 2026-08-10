@@ -1,5 +1,5 @@
 import { toBlocks, type Block, type LoadedChapter } from "./blocks";
-import { download } from "./index";
+import { download, type ExportResult } from "./index";
 import { speechChunks, trackName } from "./narrate";
 
 /**
@@ -83,7 +83,7 @@ export async function exportAudiobook(
   voice: string,
   onProgress: (progress: NarrationProgress) => void,
   signal?: AbortSignal,
-): Promise<void> {
+): Promise<ExportResult> {
   // Dynamic, as the other heavy exporters are: a writer who never makes an
   // audiobook never downloads the zip library.
   const { default: JSZip } = await import("jszip");
@@ -123,7 +123,9 @@ export async function exportAudiobook(
   }
 
   const blob = await zip.generateAsync({ type: "blob" });
-  download(blob, `${title || "Audiobook"} (audiobook).zip`);
+  const filename = `${title || "Audiobook"} (audiobook).zip`;
+  download(blob, filename);
+  return { blob, filename };
 }
 
 /** One chapter's fragments end to end. */

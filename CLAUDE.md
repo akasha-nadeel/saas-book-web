@@ -210,7 +210,7 @@ area kept arriving as Overview.
 
 **Place a writer can be sent back to lives in the query string**, and there are
 four of them: `?area=` on the dashboard, `?phase=` and `?open=` on the roadmap
-(which phase is expanded, which step's tool is open beside the road), and
+(which phase is expanded, which step's tool is open over the road), and
 `?from=` on any link *into* a tool. That last one is why `src/lib/areas.ts`
 exists — `areaLabel()` turns the id back into the words the back control says.
 A tool is reached from the book cards, from Prepare and from the roadmap, so a
@@ -274,7 +274,7 @@ line. The export screen is the one that never took
 this header; TODO.md records the decision as open.
 
 **A tool screen has two frames, and `src/lib/tool-page.ts` is the contract.**
-The roadmap opens six of them *beside* the road rather than instead of it, so a
+The roadmap opens six of them **over** the road rather than instead of it, so a
 writer can do a step without losing their place — which a component assuming it
 owns the viewport cannot do. So every tool component takes `ToolPageProps`
 (`bookId`, `embedded`, `heading`) rather than a bare `bookId`, and `embedded`
@@ -286,6 +286,20 @@ title bar). `toolShell()` writes that class pair so the six cannot drift.
 Nothing else may hang off the flag: the moment `embedded` starts hiding
 *features* there are two products in one file and the panel is the lesser one,
 which is what makes a writer navigate away to "the real screen".
+
+**That frame is a sheet over the road, and it is the second answer rather than
+the first.** A two-column split kept the road on screen by reflowing it to 55%
+— every card re-wrapped, the phase controls stacked, and the row being read
+moved under them, so "where you were" survived in the sense that the page had
+not navigated and not in the sense that anybody could find it again. It also
+gave a `7xl` tool 45% of the window and left two scroll contexts fighting for
+the wheel. The sheet is `fixed` rather than absolute (the road scrolls, and a
+sheet that scrolled with it would leave the window on the way down),
+right-anchored and inset from the left so the order stays visible with nothing
+underneath moving, and sits at **`z-40`** — under the app's dialogs at 50, so a
+tool's own dialog still opens over it. The backdrop is a real `<button>` rather
+than a div with an `onClick`, and Escape closes it through `confirmLeave` like
+every other exit.
 
 `src/components/roadmap/step-panel.tsx` is the registry — comps, title-check,
 blurb, categories, covers, export — keyed by **URL segment**, so it is checked
@@ -439,6 +453,37 @@ against terms stored as "cozi", while a bare `myst` finds the computer game and
 no mystery shelf. A failed lookup returns an empty list, never an error — a
 dropdown that cannot suggest is just the text box it was before.
 
+**A fifth route writes the query itself, before the search rather than after
+it.** `/api/comps/query` (POST, `requirePro()`, a model via `ai.ts`) over the
+pure `src/lib/comps/query.ts` sits *upstream* of the ranking, which is where
+the leverage is: `rank.ts` reorders what was fetched and cannot rescue a fetch
+that brought back the wrong books, and a writer describes a *story* while a
+catalogue indexes *subjects*. What is sent is the words in the box and the
+genre already chosen — not the manuscript, not the blurb — so it is the
+cheapest of the model routes by a wide margin. Five things hold it:
+
+- **Nothing here invents a book**, which is what makes it allowed. The model
+  writes a *search*; the catalogues still supply every record, so the failure
+  `rank.ts` exists to prevent — a plausible title that does not exist, about to
+  be pasted into a query letter — is structurally impossible in this direction.
+  The worst a bad query can do is find nothing.
+- **A prefix neither catalogue takes is dropped**, not passed on (`ALLOWED`),
+  because Open Library answers an unknown prefix with zero results rather than
+  an error — one stray `isbn:` would empty the shelf with nothing on screen to
+  explain why.
+- **The query goes back into the box**, editable and undoable. A model quietly
+  rewriting somebody's search and presenting the results as theirs is the
+  invisible hand this app refuses everywhere else.
+- **A translation that finds nothing loses to the words it replaced.** Measured,
+  and not a rare edge: a stacked four-term query is ANDed by the catalogue and
+  returns 0 where the raw words returned 6. The prompt was tightened, but a
+  prompt is a request rather than a guarantee — so the client re-runs the
+  writer's own words on an empty result and the box goes back to showing what
+  was actually searched.
+- **Only plain words are translated at all.** `looksPlain()` skips anything
+  already carrying a field prefix, since the shelf chips and the seeded search
+  send `subject:"…"` — the very thing a model would be asked to produce.
+
 **Ranking those comps is a separate route, and the split is the design.**
 `/api/comps/rank` (POST, `requirePro()`, a model via `ai.ts`) over the
 pure `src/lib/comps/rank.ts` is the one place in the cluster where a model
@@ -525,6 +570,67 @@ must leave the indent alone, which is why the two aren't one attribute.
 `caret-scroll.ts` is the other pure one: move the view only when the caret would
 leave it, and then only as far as the edge.
 
+**The selection bar's font picker is the one control on it that takes two
+clicks, and that is what made it the one control that did not work.** Every
+other button acts on the first press, while the selection is still there.
+Opening a menu and then choosing does not: the press collapses the browser's
+selection — `preventDefault` keeps *focus* in the prose but not the range — and
+ProseMirror syncs that collapse into its own state a tick later. So the command
+landed on an empty cursor and the face never changed. Three things hold it
+together now, and each fixes a different symptom of that one cause. The picker
+**remembers the range when it opens** and puts it back with `setTextSelection`
+before applying, so the command lands. It also **puts that range back from
+inside the `selectionUpdate` event itself** — the bubble is anchored to the
+selection, and a caret sits at the *start* of what was highlighted, so opening
+the list threw the whole toolbar leftwards away from the words it was about.
+Restoring it on the next animation frame fixed where the bar ended up and not
+the lurch: that is a frame with the bar drawn in the wrong place, and a frame is
+plenty to see. Handled in the event, the second transaction lands in the same
+task as the first and the wrong position is never laid out — measured at one
+distinct x across forty frames. For the same reason the trigger's name has a
+**fixed** width: sized to its content, "Book" to "Baskerville" changed the bar's
+width, and a bar centred on the selection slides when it resizes. And
+`menuOpen` joins `pointerOnBar` in `shouldShow`, so the bar cannot vanish out
+from under a list that is still open.
+
+**It shuts three ways, and all three were missing**: Escape, a press anywhere
+but the list, and *a new selection*. That last one is the one to keep: `open` is
+component state and this toolbar is not remounted between selections, so a list
+asked for once reappeared over every phrase highlighted afterwards. Word gets
+this right by having no state to leak — its mini toolbar is rebuilt per
+selection. The press-outside rule matters more than it looks, too: while the
+list is open the bar is *told* to stay put, so without it a writer who clicked
+away was followed around the page by a toolbar and a font menu for a selection
+they had abandoned.
+
+**The list only ever opens upwards, and it is allowed over the chrome.** The bar
+floats above the selected words, so a list dropping downwards lands on the very
+sentence being previewed — and looking at their own prose in each face is the
+whole reason it was opened. Flipping to whichever side had more room was worse
+than useless: near the top of the page it chose down, covering the text. So it
+goes up, capped to the window and scrolling, and where the page runs out it goes
+over the manuscript's desk bar rather than turning round. That is why it is
+**portalled to the body and fixed** — it has to paint above that bar, and a
+`z-index` on a descendant of the editor cannot escape the stacking contexts
+between it and the top, which is what put its first rows behind the bar. Same
+reason the Aa flyout in the rail is portalled; same consequence, that it shuts
+on an outside scroll or a resize, since a fixed position from a rect goes stale
+the moment the page moves.
+
+Around that sit the two behaviours the tools writers already use have taught
+them to expect. **The trigger names the face** rather than showing "Aa" in it,
+which is what Google Docs and Word do: two letters cannot tell Garamond from
+Palatino at 12px, and the *list* is where a face is shown in itself. And
+**hovering an option sets the words in it** — Word's Live Preview, which has
+survived twenty years because a typeface is the one choice nobody can make from
+a name. That preview is a **decoration, never the mark**
+(`src/lib/editor/font-preview.ts`): applying and unapplying the real thing would
+put six entries in undo for a decision nobody has made, mark the chapter dirty
+for autosave, and strand a face on the page if the pointer left on the wrong
+frame. The transaction carries no steps, so Tiptap's `update` never fires, and
+it paints no background of its own — the real selection is still there and the
+browser is still drawing it, so a second band would be the same colour twice.
+
 The one to understand is `pagination.ts`: it sets the manuscript on real page
 sheets by *measuring* the rendered text and inserting
 spacer **decorations** at each page break — never document content, so undo,
@@ -543,8 +649,68 @@ of the column; `src/lib/image-import.ts` handles paste/drop, capped at 900KB.
 **The editor shell is a rail, a tool panel, and the book panel.**
 `workspace-rail.tsx` selects which tool panel (`PanelTab` in `left-panel.tsx`:
 chapters, search, notes, ideas, bible, bookmarks, assistant, history, trash) is
-open, and clicking the active tab closes it — one control, never two. Three of
-those tabs are writer-pain features, each a panel over a pure module:
+open, and clicking the active tab closes it — one control, never two.
+
+**The tool panel floats over the manuscript; it does not push it.** It was a
+static column at `md` and up, so opening Search slid the panel, the sheet and
+the right rail 15rem across and closing it slid them back — the sentence being
+read moved under the eye and the paragraph re-wrapped at a new measure. These
+panels are *consulted* and dismissed, and a surface you glance at may not reflow
+the one you are working in. It is `fixed` at every width now, with a shadow,
+because a layer over another layer has to say so.
+
+Four things follow. **One header for all nine tabs**, written by `LeftPanel`:
+four of them drew their own and five drew none, so the panel's top edge moved
+with the tab and only some of them said what you were looking at. The names live
+in `PANEL_TITLES` and the rail reads them for its tooltips, so the button and
+the panel it opens cannot end up with two names for one thing. Two tabs also
+carry a **scope** (`panelScope`) — Notes is per *chapter* and the parking lot is
+per *library*, they sit next to each other in the rail, and both were a plain
+box under a one-word heading, so a note about Chapter 3 was one debounced save
+from a place nobody would look for it. The chapter's name is set in the writer's
+own casing, not uppercased with the heading beside it.
+
+**Four ways out and they are one toggle** — the rail's tab, the header's control
+at the top right, Escape from inside the panel only (it is a layer, not a modal,
+so Escape in the manuscript must not close it), and **a press anywhere else**.
+That last one is what a floating panel owes the page under it: it is consulted
+and dismissed, and the dismissal should be the gesture you were making anyway.
+Both rails are excluded from "anywhere else" (`data-rail`) and that is not a
+nicety — they hold the controls that open and close it, so pressing the tab you
+are on would close the panel on `pointerdown` and have it opened straight back
+up by the `click` behind it.
+
+**The panel-toggle button is in exactly one place at a time**: in the rail while
+shut, in the panel's header while open, never both. Its divider goes with it, so
+the tabs close up to the top of the rail — a divider at the top of a list
+separates it from nothing. Holding the slot open instead was tried, to stop the
+icons below shifting by one position as the button leaves; it was worse to look
+at than the shift it prevented, since an invisible 48px box plus a hairline is
+sixty-odd pixels of nothing at the top of a narrow column and reads as a rail
+that failed to load.
+
+**It animates both ways, so `LeftPanel` owns its own mounting.** The caller
+passes `open` rather than writing `{open && …}`: a panel removed from the tree
+cannot animate its exit, so it stays mounted for `EXIT_MS` (in step with
+`.oc-drawer-out`) and then takes itself down; nothing mounts at all before the
+first open, so a writer who never opens a panel never pays for the bible, the
+assistant or the history reading storage. The travel is a whole drawer's width
+from behind the rail — which is why the left rail is `z-[45]`, above the panel's
+40 and under the app's dialogs — rather than a nudge, because a nudge reads as a
+layer that was always there. In decelerating, out accelerating and quicker.
+
+**The rail is grouped, and the groups are the argument** (`GROUPS` / `FOOTER` in
+`workspace-rail.tsx`): finding a place in the book (search, bookmarks), then
+what is kept beside the book (notes, ideas, bible, assistant), then the two
+safety nets — versions and the trash — pinned to the foot, where Material's own
+rail guidance puts this class of item and for the reason that matters here: the
+trash is the one button in the column nobody wants to press by accident, so it
+must never sit where the eye has learned to find something else. The right rail
+is the same idea read top to bottom: **write · view · leave** — type, image and
+dictation as one undivided group, the two view toggles, then the assistant and
+Export together at the foot, since neither acts on the page.
+
+Three of those tabs are writer-pain features, each a panel over a pure module:
 **ideas** (`ideas.ts`) is a parking lot for the shiny idea that would otherwise
 stall book two — being *in the rail* is the feature, since leaving the book to
 write it down is itself the interruption; **bible** (`bible.ts`) is people and
@@ -742,6 +908,24 @@ dynamically imported so a writer who never exports never downloads them.
   orchestrates; `xhtml.ts` is the shared XHTML renderer behind epub, PDF and the
   reader; `typeset.ts` controls the look of the outputs that are ours;
   `front-matter.ts` generates the title/copyright/contents pages.
+
+  **A finished export says so, and PDF is the one that cannot.** `runExport`
+  answers with an `ExportResult` — the filename and the blob — and
+  `ExportDoneDialog` (`components/export/export-done.tsx`) is what a writer sees
+  after the press: a download is the only action in the app with no visible
+  result, since the browser takes the file to a folder we cannot name and,
+  depending on its settings, says nothing at all. It carries the name to look
+  for, the size, the *same bytes* offered again (a blocked or missed download is
+  the commonest failure here and is invisible from this side), where the format
+  opens — from `DESTINATIONS`, so it cannot name a shop the export does not
+  reach — and the next step on the road, searched from *after* the export step
+  since that one is hand-ticked and un-ticked by definition at that moment. It
+  is opened by the press and never by an effect, the `LimitDialog` rule: an
+  effect would fire again on a remount and congratulate somebody for a file they
+  downloaded yesterday. **`runExport` returns null for PDF** and no dialog
+  shows — the print engine is the browser's, so whether anything was saved, or
+  the writer pressed Cancel, is not knowable from here, and "your PDF is ready"
+  over a cancelled print dialog is a claim the code cannot back.
 
   **The copyright page is on by default and left out when there is no author.**
   It was off for a while, on the reasoning that it needs a name the writer may
@@ -1185,11 +1369,16 @@ one-off price every month, that there is no period end to store, and that
 
 **What is free is what a book needs to exist and leave.** Unlimited books, all
 four exports, sync, the pre-upload check and the roadmap, comps search, blurb,
-categories, covers, structure, progress, and one book's story bible. Pro is the
-metered routes plus the business layer — money, advance readers, the book-three
-curve, the writing record, the prose report, and the *series* read of the
-bible. Every competitor charges for formatting, which is why export is the one
-thing that must never move.
+categories, covers, structure, progress, **`money`** ("Before you spend", which
+is the planning tool and not the tracking one) and one book's story bible. Pro
+is the metered routes plus the business layer — **`track`** (costs against
+earnings) and the book-three curve, advance readers, **`provenance`** (the
+writing record), the prose report, and the *series* read of the bible. Note the
+two names that read backwards: the tool called `money` is free and the tool
+called `track` is not, and the pricing row that covers the paid one is "Money
+tracking & the curve". Four screens mount `GatedTool` — arc, prose,
+provenance, track — and that list is the check. Every competitor charges for
+formatting, which is why export is the one thing that must never move.
 
 **Four things are counted on the free plan, and `src/lib/free-limits.ts` is the
 whole of the policy.** Ten each — **imports**, **comp searches**, **cover
@@ -1258,8 +1447,9 @@ which is the shape the rest of the trade uses and the part worth keeping:
   ~300px editor rails, and `ImportLimitReached` is the panel the two import
   screens get instead, since there the missing thing is the whole screen.
 
-  **That gradient is the one exception to the palette's hue rule, and it is
-  three tokens wide.** `--color-upgrade-from` / `-to` / `-ink`, stated
+  **That gradient is a documented exception to the palette's hue rule, and it
+  is three tokens wide.** (The pricing table's badges are the palette's other
+  hue exception, and they work the opposite way — see the styling section.) `--color-upgrade-from` / `-to` / `-ink`, stated
   **identically in both theme blocks** — unlike everything else in the file,
   because a saturated mid-tone fill carries white type on either ground and a
   value that need not change should not. It does *not* follow `--color-accent`,
@@ -1473,7 +1663,13 @@ writer research and the one claim a competitor cannot answer by shipping a
 feature, because it is the shape of the problem rather than a part of it. So the
 page leads with the order, proves it by naming where the ARC step sits, and only
 then says what the software does. It opened on a feature for a while, which is
-an answer to a question the reader has not been asked yet.
+an answer to a question the reader has not been asked yet. **Sharing a book is
+on the page but after the tools, never in the hero**, for that same reason — a
+co-writer feature is exactly the kind of thing a competitor can answer by
+shipping one. Its figure is drawn in markup and its seat numbers come from
+`SEATS_PER_BOOK`, so it can only go wrong if the product does, and an FAQ entry
+answers the question the section invites: this is not Google Docs, and you will
+not see each other type.
 
 **It follows the theme, through its own token set.** It used to be always light
 and state every colour literally, on the argument that a shop front should not
@@ -1585,11 +1781,12 @@ The sixteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
-`/api/comps` · `/api/comps/subjects` · `/api/comps/rank` ·
+`/api/comps` · `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
 `/api/comps/categories` · `/api/billing/*`. All of those except
 `/api/comps` and `/api/comps/subjects` are metered and gated by `requirePro()`;
 those two are free, keyless and stay that way — which is the whole reason the
-ranking is a route of its own rather than a flag on it.
+three model steps around the comps search (query, rank, categories) are routes
+of their own rather than flags on it.
 
 ## Styling
 
@@ -1656,21 +1853,27 @@ Three more things follow from the palette, and each has bitten already:
   near-black by day, so a fixed `text-white` on `bg-accent` is invisible in
   exactly one theme — the half nobody tests. `bg-danger` and the matter fills
   each carry their own `-ink` token for the same reason.
-- **The three parts of a book are three values, not three hues** — front
-  strongest, back palest, in binding order — and the five papers are five greys.
-  **In the book panel the ladder is down to two jobs: the card's border, and
-  the two rules that run from the selected card to the page.** It used to dress
-  every surface — the button, the shrunk strip, the open row, the focus ring —
-  which put three fills down a panel whose job is to list a book and made the
-  chrome louder than the contents. All of those take the app's own chrome now
-  (`CARD_BUTTON`, `CARD_OUTLINE`, `CARD_STRIP`, `ROW_ACTIVE` in
-  `book-panel.tsx`: a hairline and the raised value, the same as the four
-  controls at the top of the panel), so the panel has one button style top to
-  bottom. What is left is the one thing only the ladder can say — which part of
-  the book this card is, and that the sheet you are writing on belongs to it,
-  since the page's edge wears the same value. Note what that costs: charcoal on
-  near-black is almost nothing, so the *back* card's selected border is faint,
-  and the fact that it is the expanded one is what actually reads.
+- **The three parts of a book were a three-step ladder, and are not any more.**
+  Front strongest, back palest, in binding order: it dressed every surface on
+  the card — the button, the shrunk strip, the open row, the focus ring — which
+  put three fills down a panel whose job is to list a book, so all of those took
+  the app's own chrome (`CARD_BUTTON`, `CARD_OUTLINE`, `CARD_STRIP`,
+  `ROW_ACTIVE` in `book-panel.tsx`: a hairline and the raised value, the same as
+  the controls at the top of the panel). What was left of the ladder was the
+  card's border and the two rules that run from it to the page — and **that last
+  step has gone too, because the border was doing two jobs and failing at the
+  one that mattered.** It said *which part this card is* and *whether you are
+  in it*, and the palest step is a few percent off the ground it sits on, so the
+  back card looked identical selected and unselected. A writer sees one card at
+  a time and cannot compare three to work out which is "the dark one"; what they
+  need from it is whether it is the part they are in. So there is **one edge**
+  now — `CARD_EDGE` / `CARD_EDGE_ACTIVE`, `border-line` against `border-fg` —
+  the two rules take the same value, and so does the sheet's own edge
+  (`--paper-edge-on`, one token per paper, replacing the three per-part ones).
+  The parts are told apart by their names, which was always going to be the
+  thing that told them apart. `book-guide.tsx` explained the ladder in prose and
+  was rewritten with it; so was its account of front matter, which still
+  described the one-page design.
   **`ROW_ACTIVE` carries three signals, not one**, because the hairline that
   separates it from a hover is `line` against `raised` — a few percent apart in
   daylight. The title also takes medium weight and the number comes up out of
@@ -1728,6 +1931,41 @@ Three more things follow from the palette, and each has bitten already:
   every link and button is indigo, where a white "Chapter" would read as a
   third colour rather than as the brand. So that one stays the accent's hue,
   lifted — the same relationship, at a different brightness.
+
+- **The pricing table's value badges are the fourth, and they are a tint rather
+  than a fill.** `--color-badge-{gold,blue,pro}-{bg,line,ink}` in
+  `globals.css`: a tinted ground, a hairline of the same hue, ink of that hue.
+  The **blue** set is the one that has since left that table: the shared-book
+  badge (`components/collab/shared-badge.tsx`) takes it, because a book somebody
+  else owns needs a label that is a *state* rather than a warning, and inventing
+  a second blue three shades off this one is how a palette starts lying. Gold
+  and pro have not moved, and gold especially must not — see below. They were saturated gradient pills with halos and a
+  shine, and the lesson in the change is general — twenty-odd filled lozenges
+  down two columns all shout at one volume, so the hue meant to *separate* them
+  had nothing quiet to separate them from, and the gold that meant "no ceiling"
+  was one glint among two dozen. A value in a table is a label; a fill is what
+  you spend on the thing being sold.
+
+  Which pattern the exception follows changed with it, and that is the part to
+  get right. `--color-upgrade-*` is stated identically in both theme blocks
+  because a saturated fill carries its own ink on any ground. A **tint is a
+  ground**, so these belong to their theme and follow the status family
+  (`ok`/`note`/`stop`) instead: pale ground with dark ink by day, near-black
+  ground with light ink at night — a pale blue slab on #000 is a hole in the
+  page. The ink is what had to pass, and it picked the values: #1d4ed8 clears
+  6.4:1 on its own tint where blue-500 would be 3.4:1, which is the same
+  constraint that ruled blue-500 out when this was a fill, arriving at the same
+  answer from the other direction.
+
+  The meanings are unchanged. Gold is *unbounded* and is spent on the word
+  "Unlimited" and nothing else — the moment a second kind of thing wears it, it
+  stops meaning "this has no ceiling" and becomes decoration. Blue is every
+  other value on Starter, purple is Pro's (and is the purple that card already
+  wears), because the *card* is the context: a reader comparing columns can tell
+  which side they are on without reading a heading. None of the three follows
+  `--color-accent`, for the reason the upgrade fill does not. And the radius is
+  `rounded-lg` rather than a capsule — a full pill is a *control* in this app,
+  and a value you cannot press should not borrow the shape of one.
 
 The writer-facing looks stored in `prefs` are each applied their own way:
 `theme` as `[data-theme]` on `<html>` (above), `paper` as `[data-paper]` on the

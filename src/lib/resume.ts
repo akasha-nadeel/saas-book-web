@@ -20,6 +20,30 @@
  * that already exists, and the paragraph is read back out of the manuscript.
  */
 
+import { orderedChapters, type Book, type ChapterMeta } from "@/lib/library-store";
+
+/**
+ * The chapter to carry on in, or null for a book with nothing written.
+ *
+ * `lastOpenedId` first, because it is the literal answer to the question. The
+ * fallback covers the two cases it cannot: a book opened on a machine that has
+ * not synced, and a remembered chapter that is *empty* — a writer who opened
+ * chapter twelve to start it, wrote nothing and shut the laptop is not resuming
+ * there, and sending them to a blank page would be worse than sending them
+ * nowhere.
+ *
+ * Pulled out of the card that used to be the only caller so the book panel's
+ * own button can ask the same question and get the same answer. Two places
+ * working out "where was I" separately is two answers to one question.
+ */
+export function resumeChapter(book: Book): ChapterMeta | null {
+  const chapters = orderedChapters(book);
+  const remembered = chapters.find(
+    (c) => c.id === book.lastOpenedId && c.words > 0,
+  );
+  return remembered ?? [...chapters].reverse().find((c) => c.words > 0) ?? null;
+}
+
 /**
  * The last paragraph of a stored chapter.
  *

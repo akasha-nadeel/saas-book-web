@@ -29,8 +29,14 @@ export function BookmarksPanel({ bookId }: { bookId: string }) {
     return (
       <div className="h-full overflow-y-auto p-4">
         <p className="font-sans text-sm text-muted">No bookmarks yet.</p>
-        <p className="mt-2 font-sans text-xs text-muted">
-          Star a chapter in the Chapters tab to keep it here.
+        {/* **Where the star actually is.** This said "the Chapters tab" — a
+            tab neither screen offers any more, because the book panel beside
+            the manuscript became the chapter list and the rail stopped drawing
+            a second one. An empty state that sends a writer to a control that
+            is not there is worse than one that says nothing. */}
+        <p className="mt-2 font-sans text-xs leading-relaxed text-muted">
+          Open Body matter beside the manuscript and use a chapter’s ⋯ menu to
+          star it. Starred chapters are kept here, across every book.
         </p>
       </div>
     );

@@ -232,6 +232,32 @@ export function buildMarkdownFile(
   return parts.join("\n\n");
 }
 
+/**
+ * A file this app produced and handed over.
+ *
+ * Returned rather than swallowed so the screen can confirm what happened. A
+ * download is the one action in the app with no visible result — the browser
+ * takes the file to a folder we cannot name and, depending on its settings,
+ * says nothing at all. The blob is kept because the commonest failure here is
+ * a download that was blocked or missed, and offering it again costs nothing
+ * once it is in hand.
+ */
+export interface ExportResult {
+  filename: string;
+  blob: Blob;
+}
+
+/** Bytes as a person reads them. Binary units, which is what a file manager shows. */
+export function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} ${bytes === 1 ? "byte" : "bytes"}`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${Math.round(kb)} KB`;
+  const mb = kb / 1024;
+  // One decimal up to 10MB and none above it: "1.4 MB" is a size somebody
+  // weighs against an upload limit, "23.7 MB" is precision nobody asked for.
+  return mb < 10 ? `${mb.toFixed(1)} MB` : `${Math.round(mb)} MB`;
+}
+
 /** Hands a generated file to the browser. */
 export function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -255,13 +281,23 @@ export interface ExportRequest {
   typeset?: TypesetOptions;
 }
 
+/**
+ * Answers with the file it handed over, or **null for PDF**.
+ *
+ * Null is not an omission. Every other format here is a file this app built and
+ * gave to the browser, which is a thing that can be confirmed. A PDF is made by
+ * the browser's own print engine: what leaves is a print dialog, and whether
+ * anything was saved — or the writer pressed Cancel, or chose a real printer —
+ * is not knowable from here. Saying "your PDF is ready" over a cancelled print
+ * dialog is a claim the code cannot back.
+ */
 export async function runExport({
   book,
   chapterId,
   format,
   manuscript,
   typeset = DEFAULT_TYPESET,
-}: ExportRequest): Promise<void> {
+}: ExportRequest): Promise<ExportResult | null> {
   const chapters = loadChapters(book, chapterId);
   const single = Boolean(chapterId);
   const base = single
@@ -270,22 +306,23 @@ export async function runExport({
 
   if (format === "markdown") {
     const text = buildMarkdownFile(book, chapters, { single });
-    download(new Blob([text], { type: "text/markdown" }), `${base}.md`);
-    return;
+    return handed(new Blob([text], { type: "text/markdown" }), `${base}.md`);
   }
 
   if (format === "docx") {
     // Dynamic import: ~1MB of library that a writer who never exports should
     // never download.
     const { buildDocx } = await import("./docx");
-    download(await buildDocx(book, chapters, { manuscript }), `${base}.docx`);
-    return;
+    return handed(
+      await buildDocx(book, chapters, { manuscript }),
+      `${base}.docx`,
+    );
   }
 
   if (format === "pdf") {
     const { printBook } = await import("./print");
     printBook(book, chapters, typeset);
-    return;
+    return null;
   }
 
   const { buildEpub } = await import("./epub");
@@ -300,10 +337,16 @@ export async function runExport({
      A browser that cannot hold the original still exports, with the smaller
      copy, exactly as it did before. */
   const print = await getPrintCover(book.id);
-  download(
+  return handed(
     await buildEpub(book, chapters, typeset, {
       cover: print?.dataUrl ?? getCover(book.id),
     }),
     `${base}.epub`,
   );
+}
+
+/** Downloads it and says what it was, so the two cannot describe different files. */
+function handed(blob: Blob, filename: string): ExportResult {
+  download(blob, filename);
+  return { blob, filename };
 }

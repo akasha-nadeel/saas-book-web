@@ -148,13 +148,43 @@ export const shelfIcons = {
   ),
   /* Two writers rather than three, and no speech bubble: this is the *people*,
      and Support already owns the bubble. Two heads at different depths read as
-     "others" at 18px where three become a smudge. */
-  community: (
+     "others" at 18px where three become a smudge.
+
+     **This is Collaborators', and it used to be Community's as well** — the two
+     rows sat four apart in the sidebar wearing the identical mark, which is a
+     sidebar that answers "which one is which" with nothing. It stays with
+     Collaborators because that is the row it is literally true of (two writers,
+     one book) and because that row ships, so the writers already using it keep
+     the mark they learned. Community, which is not built, took the new one. */
+  collab: (
     <Svg>
       <circle cx="9" cy="8" r="3.2" />
       <path d="M3.5 20a5.5 5.5 0 0 1 11 0" />
       <path d="M16.2 5.3a3.2 3.2 0 0 1 0 5.9" />
       <path d="M18 14.6a5.5 5.5 0 0 1 2.5 4.6" />
+    </Svg>
+  ),
+  /**
+   * Community: a globe, which is the one thing left that this row can wear.
+   *
+   * Everything nearer the meaning was already spoken for, and each rejection is
+   * the same rule — a mark that repeats is a mark that stops naming anything.
+   * *People* belongs to Collaborators above, and it is the more literal fit
+   * there. A *speech bubble* belongs to Support, two rows down, which is why
+   * Feedback is a paper plane rather than a third bubble. And *three heads* —
+   * the obvious "more than two" — is what the note above rules out at this
+   * size, where the third becomes a smudge against the other two.
+   *
+   * What is left says the true thing anyway: Collaborators is the two people on
+   * *your* book, Community is everybody else's. Somewhere you go rather than
+   * somebody you added — which is also why the row sits beside Tools instead of
+   * among the four stages.
+   */
+  community: (
+    <Svg>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a13.8 13.8 0 0 1 3.6 9 13.8 13.8 0 0 1-3.6 9 13.8 13.8 0 0 1-3.6-9 13.8 13.8 0 0 1 3.6-9Z" />
     </Svg>
   ),
   pricing: (

@@ -159,12 +159,25 @@ export function sortReaders(
 /**
  * How long before publication advance copies should go out.
  *
- * Four weeks is the convention the shops and the review sites both work to, and
- * it is a convention rather than a rule — but a writer who has never done this
- * needs a number, and "some time before" is what left the person in the research
- * chasing reviews for a book already out.
+ * **Six weeks, and it was four until 2026-08-09.** Four was wrong, and wrong in
+ * the direction that costs a writer the launch: it was described here as "the
+ * convention the shops and the review sites both work to", and the review sites
+ * do not work to it. BookSirens, which distributes the things, asks for a book
+ * **at least 40 days** before publication and notes that many authors send 60 or
+ * 90; the general indie guidance is four to eight weeks. Twenty-eight sat under
+ * the floor of every source, on the one step this product's own landing page
+ * names as the reason it exists.
+ *
+ * Six weeks clears the 40-day minimum, sits mid-range of four-to-eight, and is a
+ * whole number of weeks — which matters, because a writer reads this as "six
+ * weeks before" and counts back on a calendar rather than in days.
+ *
+ * It is a convention rather than a rule, and longer is generally better: a
+ * reader needs time to finish the book *and* to get round to posting. But a
+ * writer who has never done this needs a number, and "some time before" is what
+ * left the person in the research chasing reviews for a book already out.
  */
-export const LEAD_DAYS = 28;
+export const LEAD_DAYS = 42;
 
 /** When copies should go out, for a given publication date. */
 export function sendBy(publishAt: number): number {

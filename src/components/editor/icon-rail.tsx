@@ -16,13 +16,29 @@ export function RailButton({
   active,
   onClick,
   href,
+  glyph,
   children,
 }: {
   label: string;
   active?: boolean;
   onClick?: () => void;
   href?: string;
-  children: React.ReactNode;
+  /**
+   * A typographic mark instead of a drawn icon — ¶ and nothing else so far.
+   *
+   * **This exists because the alternative silently drew nothing.** `children`
+   * is placed inside the `<svg>` below, which is right for the paths every
+   * other button passes and wrong for anything else: an HTML element inside an
+   * SVG is in the SVG namespace, where the browser does not know it and simply
+   * does not paint it. The paragraph-marks button was passing a `<span>` and
+   * had been rendering as an empty 48px hole in the rail — a control that is
+   * there, is clickable, is announced to a screen reader, and cannot be seen.
+   *
+   * Set at the icons' own size and weight so the mark sits in the column with
+   * them rather than reading as a piece of text that fell into the rail.
+   */
+  glyph?: string;
+  children?: React.ReactNode;
 }) {
   // A large filled tile for the active rail item, as in the reference, rather
   // than a subtle tint — at this size the rail is the primary navigation.
@@ -34,7 +50,15 @@ export function RailButton({
                          : "text-muted hover:bg-raised hover:text-fg"
                      }`;
 
-  const icon = (
+  const icon = glyph ? (
+    <span
+      aria-hidden="true"
+      className="flex h-5 w-5 items-center justify-center font-sans text-lg
+                 leading-none font-medium"
+    >
+      {glyph}
+    </span>
+  ) : (
     <svg
       aria-hidden="true"
       viewBox="0 0 20 20"
@@ -94,16 +118,38 @@ export function Rail({
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
       data-paper={paper}
+      /* Marks both rails as "not outside the tool panel".
+​
+         The panel closes on a press anywhere else, and the controls that open
+         and close it live here — on the left as tabs, on the right as the
+         Assistant button. Without this the toggle eats itself: pressing the tab
+         you are on would close the panel on `pointerdown` and the `click`
+         behind it would find it shut and open it straight back up. */
+      data-rail={side}
       // The left rail is app navigation, so it wears the nav chrome (see
       // .nav-chrome) to match the shelf's sidebar. The right rail takes the
       // paper's colours instead: its tools belong to the page, not the app.
+      /* **The left rail sits above the tool panel, so the panel can come out
+         from behind it.** Both surfaces are opaque, so with the rail underneath
+         a drawer sliding in from `translateX(-100%)` would travel *across* it
+         and the rail's icons would flicker under a moving sheet. Above it, the
+         panel appears from the rail's own edge, which is where it comes from.
+         45 rather than 50: under the app's dialogs, over the panel at 40. */
       className={`scroll-slim flex w-(--rail-width) shrink-0 flex-col
                   items-center gap-2 overflow-y-auto pt-4 pb-14 ${
                     paper ? "rail-paper" : "nav-chrome"
-                  } ${side === "left" ? "border-r" : "border-l"} border-line ${className}`}
+                  } ${
+                    side === "left" ? "relative z-[45] border-r" : "border-l"
+                  } border-line ${className}`}
     >
       {children}
-      {footer && <div className="mt-auto flex flex-col gap-1">{footer}</div>}
+      {/* Pinned to the foot, and at the rail's own spacing rather than a
+          tighter one — a group that sits closer together than the rest reads
+          as a sub-list of whatever is above it, which is the opposite of what
+          being down here says. */}
+      {footer && (
+        <div className="mt-auto flex flex-col items-center gap-2">{footer}</div>
+      )}
     </nav>
   );
 }

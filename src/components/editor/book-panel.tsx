@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PagePreview } from "@/components/editor/page-preview";
+import { SharedBadge } from "@/components/collab/shared-badge";
 import { relativeTime } from "@/lib/relative-time";
+import { resumeChapter } from "@/lib/resume";
 import {
   bookWordCount,
   chapterMatterOf,
@@ -14,6 +16,7 @@ import {
   createMatterPages,
   deleteChapter,
   importIntoBook,
+  isSharedBook,
   orderedChapters,
   rememberMatterAsked,
   renameChapter,
@@ -83,14 +86,36 @@ export type BookPanelMode = "book" | "chapters";
  * deepens towards it (#e9e9ec → #e2e2e5), because the two blocks cross over —
  * which is the same reason `raised` means different things in each.
  */
-const CARD_BUTTON = `border border-line bg-raised text-fg
-                     hover:border-accent/60 hover:bg-line
+/**
+ * **The fill is stated against `fg`, not taken from `raised`, and that is the
+ * fix rather than a preference.**
+ *
+ * These cards live inside `.panel-chrome`, which re-points the greys for the
+ * left chrome: `raised` there is *6% ink on white*, and `line` is 10%. Those
+ * are the right values for a hover wash and a hairline and the wrong ones for
+ * the only control on a card — the button came out at 94% white with a border
+ * you had to look for, which is what a *disabled* control looks like in every
+ * other app a writer has used. Pressable and dark are the same signal.
+ *
+ * An alpha of the ink instead, so one pair of numbers works in both themes:
+ * `fg` is near-black by day and near-white at night, so 14% is a legible grey
+ * slab on the white card and a legible lift on the near-black one, and the
+ * hover deepens by day and brightens at night without a second rule.
+ *
+ * Still grey, and deliberately. The palette spends its one hue on *the way
+ * forward* and nothing else — three indigo buttons down a panel that lists a
+ * book would make the chrome the loudest thing on the screen again, which is
+ * the whole reason the parts' colour ladder came off these cards.
+ */
+const CARD_BUTTON = `border border-fg/20 bg-fg/14 text-fg
+                     hover:border-accent/60 hover:bg-fg/24
                      focus-visible:ring-accent/50`;
 
 /** The second control, when a card has one. Outlined, so the pair is not two
- *  identical slabs — the same relationship the header's controls have. */
-const CARD_OUTLINE = `border border-line bg-transparent text-fg
-                      hover:border-accent/60 hover:bg-raised
+ *  identical slabs — the same relationship the header's controls have. Its edge
+ *  matches the filled one's, or the two read as different kinds of thing. */
+const CARD_OUTLINE = `border border-fg/20 bg-transparent text-fg
+                      hover:border-accent/60 hover:bg-fg/10
                       focus-visible:ring-accent/50`;
 
 /**
@@ -122,56 +147,35 @@ const CARD_STRIP = `bg-raised text-fg hover:bg-line
                     focus-visible:ring-accent/50`;
 
 /**
- * What is left of the three parts' colour ladder: the card's border, and the
- * two rules that run from the selected card to the page.
+ * The card's edge — one value for all three parts, and it says *selected*
+ * rather than *which part*.
  *
- * It used to dress every surface on the card — the button, the shrunk strip,
- * the open row, the focus ring — which put three fills down a panel whose job
- * is to list a book and made the chrome louder than the contents. All of that
- * is the app's own chrome now (`CARD_BUTTON`, `CARD_STRIP`, `ROW_ACTIVE`), and
- * the ladder is spent on the one thing only it can say: which part of the book
- * this card is, and that the page you are writing on belongs to it — the edge
- * of the sheet wears the same value.
+ * **It used to be a three-step ladder** — white on Front matter, mid-grey on
+ * Body, charcoal on Back, in the order a book is bound — so the border was
+ * doing two jobs at once: telling you which part a card was, and telling you
+ * which one you were in. It could not do both, and the half it failed at is the
+ * half that matters. The palest step is a few percent off the ground it sits
+ * on, so the *back matter card looked identical selected and unselected*; the
+ * middle step was ambiguous; only the strongest one read at all. A writer
+ * cannot compare three cards to work out which of them is "the dark one" — they
+ * see one card at a time, and what they need to know from it is whether it is
+ * the part they are in.
  *
- * They were green, purple and near-black; the palette is greyscale now, so they
- * are the same ladder in white, mid-grey and charcoal — lightest first, in the
- * order a book is bound.
+ * So there is one edge now, at full ink, and the three cards are told apart by
+ * the thing that was always going to tell them apart: their names. The two
+ * rules that run from the selected card to the page take the same value, and so
+ * does the sheet's own edge (`--paper-edge-on` in globals.css) — the point of
+ * those was never the hue, it was that the page and the card it came from are
+ * plainly the same colour.
  *
  * Written out as whole class names rather than built from a part name, because
  * Tailwind finds its utilities by reading the source: `border-matter-${part}`
  * is a string at runtime and an empty stylesheet at build time.
- *
- * The border is a wash of the same colour so a card is placeable even when it
- * is not the one you are in; being *in* it takes the colour to full.
  */
-const MATTER_TONE = {
-  front: {
-    border: "border-matter-front/30",
-    borderActive: "border-matter-front",
-    // The raw token, for the two rules that run from the selected card to the
-    // page. Those are drawn inline rather than from a utility, so they need the
-    // variable itself and not a class name.
-    cssVar: "--color-matter-front",
-  },
-  body: {
-    border: "border-matter-body/30",
-    borderActive: "border-matter-body",
-    // The raw token, for the two rules that run from the selected card
-    // to the page. Those are drawn from an inline gradient rather than a
-    // utility, so they need the variable itself and not a class name.
-    cssVar: "--color-matter-body",
-  },
-  back: {
-    border: "border-matter-back/30",
-    borderActive: "border-matter-back",
-    // The raw token, for the two rules that run from the selected card
-    // to the page. Those are drawn from an inline gradient rather than a
-    // utility, so they need the variable itself and not a class name.
-    cssVar: "--color-matter-back",
-  },
-} as const;
-
-type MatterTone = keyof typeof MATTER_TONE;
+const CARD_EDGE = "border-line";
+const CARD_EDGE_ACTIVE = "border-fg";
+/** The raw token, for the two rules drawn inline rather than from a utility. */
+const CARD_EDGE_VAR = "--color-fg";
 
 /**
  * Which part's list is open, remembered at module scope. Null is all three
@@ -472,6 +476,28 @@ export function BookPanel({
   const handleCreate = () => open(createChapter(bookId));
 
   /**
+   * Where this book carries on — the chapter, or null for an empty one.
+   *
+   * Asked through `resumeChapter` rather than worked out here, so this button
+   * and anything else that wants to know cannot arrive at different answers.
+   */
+  const resume = resumeChapter(book);
+
+  /**
+   * Back into the writing: the chapter list, and the chapter.
+   *
+   * The face change and the navigation both, because they are one intention.
+   * `remember` rather than a plain toggle, since opening a page remounts this
+   * panel and would cut the card's collapse off mid-move — see `arriving`.
+   */
+  const openBook = () => {
+    onMode("chapters");
+    if (!resume) return;
+    body.remember("body");
+    open(resume.id);
+  };
+
+  /**
    * Reveal a part's list — and, the first time, go to a page in it.
    *
    * Pressing Chapters used to reveal the list and leave the writer looking at
@@ -637,6 +663,17 @@ export function BookPanel({
         always ? "flex" : "hidden lg:flex"
       }`}
     >
+      {/* **Outside both modes' scroll containers, so it cannot be scrolled
+          away.** This panel is the one piece of chrome mounted on the overview
+          *and* the editor, which makes it the only place a single badge is
+          present wherever a writer is inside the book. It draws nothing at all
+          on a book of their own. */}
+      {isSharedBook(book) && (
+        <div className="px-6 pt-6">
+          <SharedBadge book={book} />
+        </div>
+      )}
+
       {mode === "book" ? (
         /* Three bands, in the order a writer reads them: the page, what the
            book is, and the way out of here. `gap-7` sets the rhythm once
@@ -728,16 +765,43 @@ export function BookPanel({
               Opened {relativeTime(book.lastOpenedAt)}
             </p>
 
+            {/* **The one way back into the writing, and it carries on where
+                the writer left off.**
+
+                There used to be two: this button, which opened the chapter
+                list, and a "Where you left off" card in the middle of the
+                overview with a Carry on button under it. Two controls for one
+                intention, on one screen, a hand's width apart — and the card
+                was the one with the answer while this was the one that looked
+                like the way in. So the card is gone and its job is here: press
+                it and the chapter list opens *and* the chapter you were in
+                does.
+
+                It says which of the two it is doing, because "Chapters" on a
+                button that jumps you into chapter nine is a name for the
+                lesser half of what happens. A book with nothing written in it
+                has nowhere to carry on to, and there it stays "Chapters". */}
             <button
               type="button"
-              onClick={() => onMode("chapters")}
+              onClick={openBook}
               className="mt-4 w-full cursor-pointer rounded-lg bg-accent py-2.5
                          font-sans text-sm font-semibold text-accent-ink outline-none
                          transition-colors hover:bg-accent-strong
                          focus-visible:ring-2 focus-visible:ring-accent/50"
             >
-              Chapters
+              {resume ? "Carry on" : "Chapters"}
             </button>
+
+            {/* Which chapter, and when — the two lines of the old card that
+                were doing real work. The rest of it (the last paragraph, the
+                note, who is in the scene) is on the page itself the moment the
+                button is pressed, which is one press away rather than one
+                screen away. */}
+            {resume && (
+              <p className="mt-2 text-center font-sans text-xs text-muted">
+                {resume.title} · {relativeTime(book.lastOpenedAt)}
+              </p>
+            )}
           </div>
         </div>
       ) : (
@@ -956,7 +1020,6 @@ export function BookPanel({
 
             <MatterCard
               gapToPage={gapToPage}
-              tone="body"
               label="Body matter"
               description={
                 body.open === "body"
@@ -1254,7 +1317,6 @@ function ChapterPill({
  * over half a second instead of jumping.
  */
 function MatterCard({
-  tone,
   label,
   description,
   meta,
@@ -1268,7 +1330,6 @@ function MatterCard({
   gapToPage = 0,
   children,
 }: {
-  tone: MatterTone;
   label: string;
   /** Dropped once the card has been opened: a sentence explaining what body
    *  matter is has done its work the moment the chapters are on screen, and the
@@ -1318,7 +1379,6 @@ function MatterCard({
   gapToPage?: number;
   children?: React.ReactNode;
 }) {
-  const paint = MATTER_TONE[tone];
   const listOpen = grow && !!children;
   // How far the rules run. Only the selected card draws them, and never a
   // shrunk one — three cards each trailing rules would be a diagram of
@@ -1364,7 +1424,7 @@ function MatterCard({
                     compact
                       ? `${CARD_STRIP} border-line`
                       : `bg-panel/60 ${
-                          active ? paint.borderActive : paint.border
+                          active ? CARD_EDGE_ACTIVE : CARD_EDGE
                         }`
                   }
                   min-h-0
@@ -1403,7 +1463,7 @@ function MatterCard({
             // the distance was a guess and a rule had to have no endpoint to get
             // wrong — measured, it lands on the paper, and the fade was only ever
             // reading as a smear.
-            backgroundColor: `var(${paint.cssVar})`,
+            backgroundColor: `var(${CARD_EDGE_VAR})`,
             // The lower one a beat behind the upper, so the pair draws itself
             // rather than arriving.
             transitionDelay: `${i * 110}ms`,
@@ -1697,7 +1757,6 @@ function MatterPagesCard({
   return (
     <MatterCard
       gapToPage={gapToPage}
-      tone={part}
       label={label}
       description={open ? undefined : description}
       meta={

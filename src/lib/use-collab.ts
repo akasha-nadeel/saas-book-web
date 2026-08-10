@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { memberFaces, type Face } from "@/app/collab/actions";
 import type { BookRole, Member } from "./collab";
 import { findBook, type Book, type Shelf } from "./library-store";
 import { createClient } from "./supabase/client";
@@ -102,6 +103,62 @@ function toMember(row: MemberRowShape): Member {
  * and live invitations to your address. Nothing else. So "select the lot" is
  * both the smallest query and the right answer.
  */
+/**
+ * Names and photos for everyone on the caller's books, keyed by user id.
+ *
+ * One request for the whole screen, like `useAllMembers` — a face pile per book
+ * row would otherwise be a lookup per person per row. It fetches rather than
+ * derives for the reason `use-plan.ts` does: this lives in `auth.users`, which
+ * nothing local has a copy of.
+ *
+ * An empty map is the honest resting state. Most accounts have no photo — only
+ * Google hands one over — so callers fall back to the initial rather than
+ * waiting, and nothing on screen moves when the answer arrives for nobody.
+ */
+/**
+ * One request per page, not per visit to the screen.
+ *
+ * Held at module scope rather than in state: the Collaborators area unmounts
+ * whenever `?area=` moves, so a plain effect refetches every time a writer
+ * looks at another tab and comes back — several round trips for a set of
+ * photographs that change about once a year. Seeded synchronously on the second
+ * mount, so the pile is right in the first frame.
+ *
+ * The *promise* is cached rather than the answer, so two mounts in the same tick
+ * share one request. It is deliberately never invalidated: a stale avatar is
+ * invisible, and the page reloads often enough.
+ */
+let facesPromise: Promise<Record<string, Face>> | null = null;
+let facesAnswer: Record<string, Face> = {};
+
+export function useMemberFaces(): Record<string, Face> {
+  const [faces, setFaces] = useState<Record<string, Face>>(facesAnswer);
+  const enabled = isSupabaseConfigured();
+
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+
+    facesPromise ??= memberFaces().catch(() => {
+      // A face is decoration over an initial that already works. Clearing the
+      // slot lets the next mount try again rather than caching the failure.
+      facesPromise = null;
+      return {};
+    });
+
+    void facesPromise.then((answer) => {
+      facesAnswer = answer;
+      if (live) setFaces(answer);
+    });
+
+    return () => {
+      live = false;
+    };
+  }, [enabled]);
+
+  return faces;
+}
+
 export function useAllMembers(): {
   loading: boolean;
   byBook: Map<string, Member[]>;

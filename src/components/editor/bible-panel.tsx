@@ -181,16 +181,19 @@ export function BiblePanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-2 border-b border-line p-3">
-        <span className="font-sans text-xs tracking-wide text-muted uppercase">
-          Story bible
-        </span>
+      {/* The name is on the panel's shared header now; what is left here is the
+          one action, which takes the full row rather than sitting in the corner
+          of a duplicated title. */}
+      <div className="border-b border-line p-3">
         <button
           type="button"
           onClick={() => setAdding((a) => !a)}
-          className="rounded-md bg-accent px-2.5 py-1 font-sans text-xs font-semibold text-accent-ink"
+          className="w-full rounded-md bg-accent py-1.5 font-sans text-xs
+                     font-semibold text-accent-ink outline-none
+                     transition-colors hover:bg-accent-strong
+                     focus-visible:ring-2 focus-visible:ring-accent/50"
         >
-          {adding ? "Cancel" : "Add"}
+          {adding ? "Cancel" : "Add a person or place"}
         </button>
       </div>
 

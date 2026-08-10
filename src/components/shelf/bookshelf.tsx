@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CollabArea } from "@/components/collab/collab-area";
+import { SharedBadge } from "@/components/collab/shared-badge";
 import { InviteWatch } from "@/components/collab/invite-watch";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { BookToolsDialog } from "@/components/shelf/book-tools-dialog";
@@ -23,6 +24,7 @@ import {
   bookWordCount,
   booksIn,
   deleteBook,
+  dismissBanner,
   getArcRaw,
   getCoverFacts,
   hasCover,
@@ -47,6 +49,7 @@ import {
   useHydrated,
   useLedger,
   useCoverEpoch,
+  usePrefs,
   useShelf,
 } from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
@@ -193,7 +196,7 @@ const AREAS: {
     label: "Collaborators",
     live: true,
     blurb: "Some books have two writers. Say who, and what they may do.",
-    icon: shelfIcons.community,
+    icon: shelfIcons.collab,
     // Not a stage in a book's life — it is something you consult, like Tools.
     stage: false,
   },
@@ -682,7 +685,11 @@ export function Bookshelf({
 
           {/* Mounted only when the area is open, so the member-list request is
               never made by a writer who does not share books. */}
-          {area === "collab" && <CollabArea />}
+          {/* The signed-in writer's own face is already here — resolved on the
+              server and handed down with the page — so the disc that leads
+              every pile paints with the first frame instead of waiting on a
+              round trip for something we were already holding. */}
+          {area === "collab" && <CollabArea account={account} />}
 
           {/* **The one collaboration request the dashboard always makes**, and it
               earns its place: this app sends no email, so an invitation whose link
@@ -896,12 +903,20 @@ function Overview({
    * and the moment the situation changes the banner returns with the new
    * figures.
    *
-   * Deliberately not persisted. It lasts while the writer is on the screen,
-   * which is what "I have read it" means, and it comes back on a fresh visit —
-   * the safe direction for a diagnosis to fail in, and one that needs no new
-   * key in a store that does not sync.
+   * **Persisted now, where it used to live only in component state.** The
+   * argument for memory was that coming back on a fresh visit is the safe
+   * direction for a diagnosis to fail in. That is true of a *changed*
+   * diagnosis and false of an unchanged one: pressing × and finding the same
+   * red row on the next visit is not a safe failure, it is the app not
+   * listening — and a banner that ignores its own dismiss control teaches a
+   * writer to ignore the banner. The signature keeps the safety where it was
+   * doing the work, so a new blocking problem still speaks up.
+   *
+   * `prefs.dismissed` rather than a field on the book, for the reason
+   * `matterAsked` is there: it records something about the reader, not the
+   * manuscript.
    */
-  const [waved, setWaved] = useState<string | null>(null);
+  const waved = usePrefs().dismissed;
 
   /* Same staleness as the list below: the badge counts a missing cover, and a
      cover written after this ran leaves `book` unchanged. */
@@ -987,11 +1002,19 @@ function Overview({
                       first screen a writing prompt — wrong for most people who
                       arrive, who already have a manuscript and want to know
                       what is standing between it and a shop. */}
-                  <p className="text-xs font-bold tracking-widest text-muted uppercase">
-                    {progress?.next
-                      ? PHASE_STATE[progress.next.phase]
-                      : "Every step done"}
-                  </p>
+                  {/* The badge rides the phase line rather than sitting under
+                      the title, the same place the book's own overview puts it:
+                      whose book this is belongs *above* the name, and here it
+                      also costs no height on a shelf of one's own books, where
+                      it draws nothing. */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <p className="text-xs font-bold tracking-widest text-muted uppercase">
+                      {progress?.next
+                        ? PHASE_STATE[progress.next.phase]
+                        : "Every step done"}
+                    </p>
+                    <SharedBadge book={book} />
+                  </div>
                   <p className="mt-1.5 text-xl font-bold text-fg">
                     {book.title}
                   </p>
@@ -1088,7 +1111,7 @@ function Overview({
                   first screen a writer sees it would be the most damaging place
                   to print one. Two counts and a way to the detail say more and
                   claim less. */}
-              {waved !== `${book.id}:${counts.fix}:${counts.note}` && (
+              {!waved.includes(`${book.id}:${counts.fix}:${counts.note}`) && (
               <div
                 className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
                             border px-3.5 py-3 ${
@@ -1177,9 +1200,7 @@ function Overview({
                     put it down. */}
                 <button
                   type="button"
-                  onClick={() =>
-                    setWaved(`${book.id}:${counts.fix}:${counts.note}`)
-                  }
+                  onClick={() => dismissBanner(book.id, counts.fix, counts.note)}
                   aria-label="Dismiss until this changes"
                   title="Dismiss until this changes"
                   className={`shrink-0 rounded-md p-1 transition-opacity hover:opacity-70 ${

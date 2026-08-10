@@ -1996,6 +1996,30 @@ export interface Prefs {
    */
   matterAsked: string[];
   /**
+   * Readiness banners the writer has waved away, by signature.
+   *
+   * **Persisted, where it used to live only in component state.** The argument
+   * for keeping it in memory was that a dismissal means "I have read it" rather
+   * than "never again", and that coming back on a fresh visit is the safe
+   * direction for a diagnosis to fail in. That is true of a *changed*
+   * diagnosis and false of an unchanged one: pressing × and having the same
+   * red row return on the next visit is not a safe failure, it is the app not
+   * listening, and a banner that ignores its own dismiss control teaches a
+   * writer to ignore the banner.
+   *
+   * The signature is the book and its two counts, so the safety is kept where
+   * it was actually doing work: waving away "1 to fix · 4 worth doing" hides
+   * exactly that, and a *new* blocking problem carries a new signature and
+   * speaks up. Fixing something changes it too, which is the right kind of
+   * wrong — a banner that returns to say fewer things are outstanding is
+   * information, not nagging.
+   *
+   * Here rather than on a book for the reason `matterAsked` is: it records
+   * something about the reader, not the manuscript, and a field on the book
+   * would need a Postgres column to survive `sync.ts` at all.
+   */
+  dismissed: string[];
+  /**
    * What the free plan counts, counted: imports, comp searches, cover searches
    * and title checks. See `lib/free-limits.ts` for the policy — the numbers,
    * the names and the arithmetic all live there. This is only the tally.
@@ -2037,6 +2061,7 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Nobody has been asked yet. Frozen with the rest, so it is shared — never
   // pushed to; `rememberMatterAsked` writes a new array.
   matterAsked: [],
+  dismissed: [],
   // Nothing spent yet, which is also what a library stored before this existed
   // reads as. Erring low is deliberate: charging a writer for work they cannot
   // be shown any evidence of is the wrong way round to be wrong. Frozen with
@@ -2096,6 +2121,9 @@ function parsePrefs(raw: string | null): Prefs {
       // Narrowed on the way in like everything else here: this key is written
       // by us but read out of storage a version later, and a non-array would
       // throw on the first `.includes`.
+      dismissed: Array.isArray(parsed.dismissed)
+        ? parsed.dismissed.filter((s): s is string => typeof s === "string")
+        : [],
       matterAsked: Array.isArray(parsed.matterAsked)
         ? parsed.matterAsked.filter((id): id is string => typeof id === "string")
         : [],
@@ -2244,6 +2272,23 @@ export function countUse(action: Counted) {
 export function refundUse(action: Counted) {
   const usage = getPrefs().usage;
   setPref("usage", { ...usage, [action]: Math.max(0, usage[action] - 1) });
+}
+
+/**
+ * Wave away a book's readiness banner at its current counts.
+ *
+ * Keyed by the book *and* the two figures, so it hides the thing that was read
+ * rather than the row forever — see `Prefs.dismissed`. Older signatures for the
+ * same book are dropped on the way in: they can never match again (the counts
+ * they name have already changed), and a list that only grows would carry one
+ * entry per state a book has ever been in.
+ */
+export function dismissBanner(bookId: string, fix: number, note: number) {
+  const signature = `${bookId}:${fix}:${note}`;
+  const kept = getPrefs().dismissed.filter(
+    (s) => !s.startsWith(`${bookId}:`),
+  );
+  setPref("dismissed", [...kept, signature]);
 }
 
 /** Records that the question has been put, whatever the answer was. */

@@ -137,63 +137,53 @@
   --color-upgrade-to: #4f46e5; /* indigo */
   --color-upgrade-ink: #7c3aed; /* the button's text, on white */
 
-  /* Gold, for the word "Unlimited" on the pricing table and nothing else.
+  /* The pricing table's value badges — a tinted ground, a hairline of the same
+     hue, and ink of that hue rather than white.
      ------------------------------------------------------------------------
-     **The second exception to the palette's hue rule, and it is narrow on
-     purpose** — the first is `--color-upgrade-*` above, and both earn it the
-     same way: a saturated fill carries its own ink whatever it sits on, so the
-     value need not change between themes and a value that need not change
-     should not. All five are stated identically in both blocks.
+     **These were saturated gradient pills and are not any more**, and the
+     reason is worth keeping. Twenty-odd filled badges down two columns is a
+     page that reads as a page of badges: every value shouted at the same
+     volume, so the hue that was supposed to separate them had nothing quiet to
+     separate them *from*, and the gold that meant "no ceiling" was one glinting
+     lozenge among two dozen. A tint says the same three things — which column,
+     which value, which one is unbounded — at the volume of a label, which is
+     what a value in a table is.
 
-     It does *not* follow `--color-accent`, for the reason the upgrade fill does
-     not: the accent is #ffffff at night, and a badge is a fill, so following it
-     would put a white pill where a gold one was meant.
+     **The palette's hue rule still applies and this is still the exception to
+     it**, along with `--color-upgrade-*` above. What changed is which pattern
+     the exception follows. A saturated fill carries its own ink on any ground,
+     which is why the upgrade gradient is stated identically in both blocks; a
+     *tint* is a ground, and a ground has to belong to the theme it sits on. So
+     these follow the status family (`ok`/`note`/`stop`) instead: pale ground
+     with dark ink by day, near-black ground with light ink at night. A pale
+     blue slab on #000 is a hole in the page.
 
-     Reserved for the one row value that is genuinely unbounded. The moment a
-     second kind of thing wears it, it stops meaning "this has no ceiling" and
-     becomes decoration — which is the whole cost of spending a hue. */
-  --color-gold-a: #fde68a; /* the lit edge the shimmer runs along */
-  --color-gold-b: #f5c33b; /* the body of the badge */
-  --color-gold-c: #dfa11c; /* the shaded edge, so it reads as metal not paint */
-  --color-gold-ink: #4a2c06; /* dark enough to clear 4.5:1 on all three above */
-  --color-gold-glow: #eab308; /* the halo, used only at low alpha */
+     None of the three follows `--color-accent`, for the reason the upgrade fill
+     does not — the accent is #ffffff at night, and these are grounds.
 
-  /* Blue, for every other value on the pricing table.
-     ------------------------------------------------------------------------
-     Same posture as the gold above and stated identically in both blocks, for
-     the same reason: a saturated fill carries its own ink whatever it sits on.
+     **Gold means *unbounded* and is spent on the word "Unlimited" and nothing
+     else.** The moment a second kind of thing wears it, it stops meaning "this
+     has no ceiling" and becomes decoration, which is the whole cost of spending
+     a hue. Blue is every other value on Starter; purple is Pro's, and is the
+     purple that card already wears — `--color-upgrade-from` is #7c3aed to this
+     #7e22ce family — so the badges join the card rather than adding a third
+     idea to it. Two hues for one component because the *card* is the context: a
+     reader comparing columns can tell which side they are on without reading a
+     heading.
 
-     **The lightest stop is the one that has to pass.** Text sits across the
-     whole gradient, so the top of it — not the average — decides whether the
-     badge is readable. #2563eb carries white at 5.17:1 and #1d4ed8 at 6.70:1,
-     so both ends clear AA; the obvious brighter choice, #3b82f6, is 3.68:1 and
-     would have been a badge nobody could read at 15px.
+     Every pair below was picked by contrast against its own ground, not by eye.
+     The dark values run 9:1 or better; the light ones 6:1 or better. */
+  --color-badge-gold-bg: #241a06;
+  --color-badge-gold-line: #6b4e0f;
+  --color-badge-gold-ink: #fcd34d; /* 11.8:1 on the ground above */
 
-     Deliberately *not* `--color-accent`. The accent is white at night, so a
-     badge following it would be a white pill with white text — and by day it is
-     #312e81, a much deeper, more violet indigo. Keeping this its own value is
-     also what keeps the accent meaning "the way forward" rather than becoming
-     the colour every chip happens to wear. */
-  --color-pill-a: #2563eb; /* the lit top of the fill — 5.17:1 against white */
-  --color-pill-b: #1d4ed8; /* the shaded foot — 6.70:1 */
-  --color-pill-ink: #ffffff;
-  --color-pill-glow: #3b82f6; /* the halo, used only at low alpha */
+  --color-badge-blue-bg: #10192e;
+  --color-badge-blue-line: #24365f;
+  --color-badge-blue-ink: #93c5fd; /* 10.0:1 */
 
-  /* And the same pill on the Pro card, in purple.
-     ------------------------------------------------------------------------
-     Two fills for one component, because the *card* is the context: Starter's
-     values are blue and Pro's are purple, so a reader comparing the columns can
-     tell which side they are looking at without reading a heading. It is also
-     the purple the Pro card already wears — `--color-upgrade-from` is this
-     exact value — so the badges join the card rather than adding a third idea
-     to it.
-
-     White clears AA on both stops (5.38:1 and 6.98:1), and that constraint is
-     what picked them: purple-500 is prettier and 3.96:1, which would have been
-     a badge nobody could read. */
-  --color-pill-pro-a: #9333ea;
-  --color-pill-pro-b: #7e22ce;
-  --color-pill-pro-glow: #a855f7;
+  --color-badge-pro-bg: #1a1130;
+  --color-badge-pro-line: #3b1f6b;
+  --color-badge-pro-ink: #d8b4fe; /* 9.1:1 */
 
   /* The second half of the wordmark — the "Chapter" in OpenChapter, and
      nothing else. It is a *brand* colour rather than chrome, which is why it
@@ -494,21 +484,26 @@
   --color-upgrade-to: #4f46e5;
   --color-upgrade-ink: #7c3aed;
 
-  /* Identical to the dark block on purpose — see the note there. */
-  --color-gold-a: #fde68a;
-  --color-gold-b: #f5c33b;
-  --color-gold-c: #dfa11c;
-  --color-gold-ink: #4a2c06;
-  --color-gold-glow: #eab308;
+  /* The badges in daylight — the same three hues the other way up. Unlike the
+     upgrade fill above, these *do* change between blocks: a tint is a ground,
+     and a ground belongs to its theme. See the note in the dark block.
 
-  /* Identical to the dark block — see the note there. */
-  --color-pill-a: #2563eb;
-  --color-pill-b: #1d4ed8;
-  --color-pill-ink: #ffffff;
-  --color-pill-glow: #3b82f6;
-  --color-pill-pro-a: #9333ea;
-  --color-pill-pro-b: #7e22ce;
-  --color-pill-pro-glow: #a855f7;
+     The ink is what had to pass, and it picked the values: #1d4ed8 clears
+     6.4:1 on its own tint where blue-500 would have been 3.4:1, and #7e22ce
+     clears 6.7:1 where purple-500 would have been 3.6:1 — the same constraint
+     that ruled those two out when this was a fill, arriving at the same
+     answer from the opposite direction. */
+  --color-badge-gold-bg: #fffbeb;
+  --color-badge-gold-line: #fcd77f;
+  --color-badge-gold-ink: #92400e; /* 7.3:1 on the ground above */
+
+  --color-badge-blue-bg: #eff6ff;
+  --color-badge-blue-line: #bfdbfe;
+  --color-badge-blue-ink: #1d4ed8; /* 6.4:1 */
+
+  --color-badge-pro-bg: #faf5ff;
+  --color-badge-pro-line: #e9d5ff;
+  --color-badge-pro-ink: #7e22ce; /* 6.7:1 */
 
   /* The wordmark's second half, in daylight: the indigo of the landing page's
      closing banner, lifted a step. That family is the whole reason for the
@@ -815,20 +810,22 @@ body {
   --paper-muted: #6b6b6b;
   --paper-rule: #d9d9d9;
 
-  /* The edge of the sheet, in the value of the part of the book being written
-     — the same ladder the chapter panel's cards carry, so the page answers the
-     panel.
+  /* The edge of the sheet when the panel has a part selected — the same value
+     the panel's selected card carries, so the page answers the panel.
+
+     **One value, not a ladder.** It was three — near-black for front matter,
+     mid-grey for the body, pale grey for back — matching the three-step border
+     the cards used to wear. Both have collapsed to one for the same reason:
+     the palest step was invisible against the sheet, so the mechanism worked
+     for one part of the book and quietly did nothing for another. What the
+     edge has to say is *this sheet belongs to the card you have open*, and one
+     legible value says it for all three.
 
      Tuned to the paper rather than to the theme, because that is what the edge
-     sits on. On a white sheet the edges have to be *dark* to be seen at all,
-     which is the exact inverse of the tokens above; the dark papers below take
-     the light set instead. */
-  --paper-edge-front: #111111;
-  --paper-edge-body: #6b6b6b;
-  --paper-edge-back: #a3a3a3;
-  /* Book View selects no part — it shows the book whole. The page follows the
-     panel, so it takes the plain ink of the sheet. */
-  --paper-edge-book: #111111;
+     sits on. On a white sheet it has to be dark to be seen at all, which is the
+     exact inverse of the tokens above; the dark papers below take the light
+     value instead. */
+  --paper-edge-on: #111111;
 }
 
 /* Was cream. A paper-white that has had the glare taken off it. */
@@ -853,11 +850,8 @@ body {
   --paper-muted: #8f8f8f;
   --paper-rule: #333333;
 
-  /* Lifted off the dark sheet: on black, the edges run the other way up. */
-  --paper-edge-front: #ffffff;
-  --paper-edge-body: #8f8f8f;
-  --paper-edge-back: #4d4d4d;
-  --paper-edge-book: #ffffff;
+  /* Lifted off the dark sheet: on black, the edge runs the other way up. */
+  --paper-edge-on: #ffffff;
 }
 
 [data-paper="black"] {
@@ -869,10 +863,7 @@ body {
   --paper-muted: #8f8f8f;
   --paper-rule: #262626;
 
-  --paper-edge-front: #ffffff;
-  --paper-edge-body: #8f8f8f;
-  --paper-edge-back: #4d4d4d;
-  --paper-edge-book: #ffffff;
+  --paper-edge-on: #ffffff;
 }
 
 /* --------------------------------------------------------------------------
@@ -1829,23 +1820,14 @@ body {
 /* Set on the manuscript container by the editor, so every sheet in the chapter
    picks it up. Two pixels, matching the border on the panel's cards: the point
    is that the page and the card it came from are plainly the same colour. */
-[data-matter="front"] {
-  --paper-edge: var(--paper-edge-front);
-  --paper-edge-w: 2px;
-}
-[data-matter="body"] {
-  --paper-edge: var(--paper-edge-body);
-  --paper-edge-w: 2px;
-}
-[data-matter="back"] {
-  --paper-edge: var(--paper-edge-back);
-  --paper-edge-w: 2px;
-}
-/* Not a part of the book but a state of the panel: Book View shows the book
-   whole and selects nothing, so the page takes the accent of the one button it
-   offers. Kept with the three so the rule stays in one place. */
+/* Book View is not a part of the book but a state of the panel — it shows the
+   book whole and selects nothing — and it is in the list for the same reason
+   the other three are: the panel has something open, and the sheet says so. */
+[data-matter="front"],
+[data-matter="body"],
+[data-matter="back"],
 [data-matter="book"] {
-  --paper-edge: var(--paper-edge-book);
+  --paper-edge: var(--paper-edge-on);
   --paper-edge-w: 2px;
 }
 /* The editable itself carries no paper — the sheets behind do — so it can float
@@ -2273,6 +2255,23 @@ body {
   background: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
+/* The words being previewed while the font menu is open.
+
+   **It paints no background, and that is deliberate.** It used to, standing in
+   for a selection the browser had stopped drawing after the press that opened
+   the menu collapsed it. That collapse is fixed at the source now — the picker
+   re-asserts the range, so the real selection is still there and the browser
+   paints it — and a second band over the top of it would be the same colour
+   twice, which reads as a darker, differently-selected patch.
+
+   Kept as a hook rather than dropped: the decoration carries the face as an
+   inline style, and a class on it is what makes the previewed range findable
+   in the DOM when this goes wrong. See lib/editor/font-preview.ts. */
+.manuscript .tiptap .oc-font-preview {
+  /* No paint of its own. */
+  font-synthesis: none;
+}
+
 /* Inline code and links also belong to the page, not the chrome. */
 .manuscript .tiptap code {
   background: color-mix(in srgb, var(--paper-fg) 8%, transparent);
@@ -2495,57 +2494,6 @@ body {
   }
 }
 
-/* The shine crossing a gold badge.
-   --------------------------------------------------------------------------
-   A pseudo-element sweeping a soft white band across the fill, clipped by the
-   badge's own `overflow-hidden`. Not a background-position animation: that
-   animates paint on the main thread, and this runs on `transform`, which the
-   compositor handles — twenty of these on one screen and the difference is the
-   page scrolling smoothly or not.
-
-   **It rests for most of the cycle.** The sweep takes about a fifth of the
-   loop and the rest is still, so it reads as an occasional glint rather than a
-   thing permanently in motion. A badge that shimmers without pause is a badge
-   nobody can read the word on.
-
-   Stopped outright under `prefers-reduced-motion`. The gradient, the glow and
-   the contrast all survive it, so nothing is lost but the movement — which is
-   the test for whether an animation was decoration or information. */
-@keyframes oc-shine {
-  0% {
-    transform: translateX(-140%) skewX(-18deg);
-  }
-  22%,
-  100% {
-    transform: translateX(240%) skewX(-18deg);
-  }
-}
-
-.oc-shine::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 45%;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgb(255 255 255 / 0.7),
-    transparent
-  );
-  animation: oc-shine 4.5s ease-in-out infinite;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .oc-shine::after {
-    animation: none;
-    /* Parked off-screen rather than left mid-sweep across the word. */
-    transform: translateX(-140%);
-  }
-}
-
 .oc-scrim-in {
   animation: oc-scrim-in 180ms ease-out both;
 }
@@ -2577,6 +2525,132 @@ body {
   .oc-panel-in,
   .oc-step-in,
   .oc-save-bar {
+    animation: none;
+  }
+}
+
+/* The tool panel coming out of the rail, and going back into it.
+
+   **A whole drawer's travel, not a nudge.** It slides the full width of itself
+   from behind the rail, which is the true story of where it came from — the
+   rail is opaque and sits a layer above (see `data-rail="left"`), so the panel
+   is genuinely hidden behind it at rest and genuinely emerges. A fade, or a
+   20px nudge, reads as a layer that was always there and has just been made
+   visible, which is what a *pushed* column looks like and the exact impression
+   this panel stopped giving when it started floating.
+
+   **Both directions, because the panel outlives its own dismissal.** It used
+   to slide in and then vanish on the frame it was closed — two mechanisms for
+   one gesture, and the closing half was the one a writer sees most. `LeftPanel`
+   keeps itself mounted for `EXIT_MS` so this has something to run on; that
+   constant and the duration below are one number in two places.
+
+   Asymmetric on purpose, which is the usual rule for a panel: it arrives
+   decelerating (ease-out, it is coming to rest where you will read it) and
+   leaves accelerating (ease-in, it is going somewhere you no longer care
+   about), and leaving is quicker than arriving. Both are short — this is opened
+   and shut many times an hour, and anything done that often has to feel
+   instant rather than animated.
+   -------------------------------------------------------------------------- */
+@keyframes oc-drawer-in {
+  from {
+    opacity: 0.4;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oc-drawer-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0.4;
+    transform: translateX(-100%);
+  }
+}
+
+.oc-drawer-in {
+  animation: oc-drawer-in 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* 180ms — kept in step with `EXIT_MS` in left-panel.tsx, which is how long the
+   component stays mounted after being closed. Lengthen one and lengthen both,
+   or the panel is unmounted mid-slide. */
+.oc-drawer-out {
+  animation: oc-drawer-out 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* The phone's scrim, which has to fade back out with it rather than being cut
+   away — the panel is still sliding, and a dimmed page snapping to full
+   brightness under a moving sheet is more noticeable than the sheet. */
+.oc-scrim-out {
+  animation: oc-scrim-in 180ms ease-in reverse both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-drawer-in,
+  .oc-drawer-out,
+  .oc-scrim-out {
+    animation: none;
+  }
+}
+
+/* The dialog that confirms an export.
+
+   Two motions rather than one, because they say two different things. The card
+   arrives — a small rise and a fade, the same easing as everything else that
+   enters in this app. The tick *lands*: it overshoots and settles, which is the
+   only place in the chrome that a spring is spent, and it is spent here because
+   this mark is the answer to "did that work" and the eye has to be taken to it.
+
+   No confetti and no bounce on the card itself. The file is out; a writer
+   exporting for the fourth time this afternoon is fixing something, not
+   celebrating.
+   -------------------------------------------------------------------------- */
+@keyframes oc-done-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oc-done-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.oc-done-in {
+  animation: oc-done-in 240ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Held back a beat, so the card is standing still before the tick lands in it —
+   two things moving at once read as one thing wobbling. */
+.oc-done-pop {
+  animation: oc-done-pop 380ms cubic-bezier(0.34, 1.56, 0.64, 1) 120ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-done-in,
+  .oc-done-pop {
     animation: none;
   }
 }

@@ -103,8 +103,26 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/signin";
     url.search = "";
-    // Come back to where they were headed once they are in.
-    url.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
+
+    /*
+     * Come back to where they were headed once they are in — and for an
+     * invitation, remember that signing in *was* the errand.
+     *
+     * `via=link` is the difference between somebody who followed an invitation
+     * and authenticated in order to take it up, and somebody already signed in
+     * who opens the same URL later. The first has already said yes twice, by
+     * following the link and by signing in for it, and gets no third question;
+     * the second is being asked for the first time and gets the card. Marked
+     * here because this redirect is the moment the errand is known — the auth
+     * screens only ever see a `next` they must not interpret.
+     */
+    const target = `${pathname}${request.nextUrl.search}`;
+    const errand =
+      pathname.startsWith("/invite/") && !request.nextUrl.searchParams.has("via")
+        ? `${target}${request.nextUrl.search ? "&" : "?"}via=link`
+        : target;
+
+    url.searchParams.set("next", errand);
     return withCookies(NextResponse.redirect(url), response);
   }
 

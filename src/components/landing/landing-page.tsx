@@ -11,6 +11,8 @@ import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
 import { SEATS_PER_BOOK } from "@/lib/free-limits";
 import { LEGAL_PAGES } from "@/lib/legal";
+import { MIN_LONG_EDGE } from "@/lib/cover-check";
+import { CONTACT_EMAIL, REFUND_DAYS } from "@/lib/legal";
 
 /**
  * The landing page.
@@ -426,6 +428,94 @@ const REFUSALS = [
   ],
 ] as const;
 
+/**
+ * The three ways a finished book is turned away, and what each one costs.
+ *
+ * **This is the problem section, and the page did not have one.** Every other
+ * block here answers a question the reader has not been asked yet: what the
+ * product does, what order the work goes in, what we refuse. The research on
+ * landing pages says the same thing in the aggregate — most visitors are
+ * *problem-aware* rather than product-aware, and a page that opens on its
+ * solution talks past them. So this sits directly under the hero: the reader
+ * has just been told they can find out what is wrong before they upload, and
+ * this is what "wrong" means in practice.
+ *
+ * Sourced rather than imagined. Each row is a rejection cause documented across
+ * the self-publishing help material and author forums — cover dimensions are
+ * the single commonest refusal, metadata mismatch between the file and the
+ * dashboard is next, and EPUB validation failure is the one that hurts longest.
+ * Each is checked in `storeReadiness()` or guaranteed by the export, and the
+ * third column says which — a claim on this page has to be answerable by
+ * pointing at code.
+ *
+ * **The third row is the one worth the section.** Amazon's converter silently
+ * repairs structural EPUB faults that Apple, Kobo and IngramSpark refuse
+ * outright, so a file that "worked on Amazon" is a fault that surfaces weeks
+ * later, at the moment a writer tries to go wide, with nothing connecting the
+ * two events. That is a specific, checkable, expensive failure — and an
+ * exported EPUB that clears EPUBCheck at zero errors is a direct answer to it.
+ * No competitor can respond with a nicer illustration.
+ */
+const REJECTIONS = [
+  [
+    "shelf",
+    "The cover is the wrong size",
+    "The commonest refusal there is. A shop wants at least 1,000px on the long edge and about 1.6:1; anything else is bounced or letterboxed into looking cheap beside its neighbours.",
+    `Measured from the file you picked — not the copy we resized — against ${MIN_LONG_EDGE}px and the shape shops set their thumbnails at.`,
+  ],
+  [
+    "search",
+    "The details do not match",
+    "Title, author and ISBN inside the file have to match what you typed into the dashboard, down to the punctuation. A check digit one out is a rejection with no explanation attached.",
+    "One set of details fills both the file and the listing, so there are not two versions to disagree. The ISBN's check digit is arithmetic, and we do it.",
+  ],
+  [
+    "check",
+    "The file is broken in a way Amazon hides",
+    "Amazon's converter quietly repairs structural faults that Apple, Kobo and IngramSpark refuse outright. So the book goes up, sells, and the file is only found to be broken weeks later when you try to go wide.",
+    "The EPUB is built here rather than converted, and clears EPUBCheck 5.3 at zero errors and zero warnings — for a fully filled-in book and a bare one.",
+  ],
+] as const;
+
+/**
+ * What is checkable about this page, for a reader who has been sold to.
+ *
+ * **Last block before the ask, which is where risk reversal belongs.** The
+ * research is blunt about the audience this page has: no testimonials, no
+ * customer logos, and a reader who has bought a course that taught nothing and
+ * a cover that turned out to be AI. What works on that reader is not louder
+ * claims — it is claims they can check without trusting anybody, plus the
+ * absence of anything to lose by trying.
+ *
+ * Every row is *verifiable by the reader themselves*, which is the bar. Not
+ * "we care about your privacy" but "open devtools" — not "trusted by
+ * thousands" but "there is nobody to count yet and we are not going to invent
+ * any". The last row is the one most pages would never print, and it is the
+ * reason the others get believed.
+ */
+const PROOFS = [
+  [
+    "shelf",
+    "Your manuscript stays in this browser",
+    "Writing, importing, page setup, the check, all four exports — none of it sends the book anywhere. The few features that do send text name themselves before they run, and the privacy page lists every one.",
+  ],
+  [
+    "check",
+    "The export is verified, not asserted",
+    "EPUBCheck 5.3, zero errors, zero warnings. Run it yourself on the file you get — the checker is free and it does not take our word either.",
+  ],
+  [
+    "formats",
+    "Leaving costs nothing and needs no permission",
+    "All four formats are free forever, on the free plan, with no export limit. Markdown is plain text: it opens in an editor written thirty years ago.",
+  ],
+  [
+    "steps",
+    "Nothing here is a made-up number",
+    "No score, no grade, no rating out of a hundred. Every figure on this page is counted out of the source when it builds, so it cannot flatter and cannot drift.",
+  ],
+] as const;
+
 const FAQ = [
   [
     "I have a finished manuscript. Where does it go?",
@@ -556,9 +646,9 @@ export function LandingPage() {
                 **No number in the second line, deliberately.** A draft read
                 "before it costs you a month", which sounds concrete and is not
                 defensible: a rejected upload is a few days' loop at most shops,
-                not four weeks. The only real month in this product is the 28
-                days `arc.ts` works back for advance copies — a true figure
-                attached to an entirely different problem. Borrowing it here
+                not four weeks. The nearest real span in this product is the
+                six weeks `arc.ts` works back for advance copies — a sourced
+                figure attached to an entirely different problem. Borrowing it here
                 would have been the invented number this app refuses everywhere
                 else, on the first line a reader sees.
 
@@ -662,6 +752,56 @@ export function LandingPage() {
             <BookCheck />
           </div>
         </section>
+
+        {/* ---- What actually goes wrong ---------------------------------
+
+            **The problem section, placed before anything is sold.**
+
+            The reader has just been told they can find out what is wrong
+            before they upload, and has been handed a box to prove it. This
+            says what "wrong" means — three documented refusals, in the order
+            of how often they happen, each with the thing on our side of it.
+
+            It sits *above* the logo strip on purpose. The strip is a
+            reassurance ("your book comes back out"), and a reassurance before
+            the fear has been named is an answer to a question nobody asked.
+            Named first, the strip becomes its first reply.
+
+            **One section each, rather than three cards in one.** Stacked as
+            cards they read as a list — the eye takes the three headings and
+            moves on, and each refusal gets a glance. Given a band of its own,
+            each one is a beat the reader has to pass through, which is the
+            right weight for the only part of this page that is about *their*
+            problem rather than our answer to it.
+
+            The grounds alternate so the seam between them does the dividing,
+            and the numeral carries the count that the shared heading used to.
+            No timescales are claimed for any of them: how long a rejection
+            costs depends on the shop, the queue and the writer, and the one
+            number this page could honestly print there is nought. */}
+        <section className="border-b border-lp-line px-6 pt-14 pb-4 sm:pt-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="Before you upload"
+              title="Three ways a finished book gets turned away"
+              lead="None of them is about the writing. All of them are knowable while the file is still on your machine."
+            />
+          </div>
+        </section>
+
+        {REJECTIONS.map(([mark, title, hurt, fix], i) => (
+          <Rejection
+            key={title}
+            n={String(i + 1).padStart(2, "0")}
+            mark={mark}
+            title={title}
+            hurt={hurt}
+            fix={fix}
+            /* Alternating ground, so consecutive bands are told apart by the
+               floor changing under them rather than by another hairline. */
+            tint={i % 2 === 1}
+          />
+        ))}
 
         {/* ---- The logo strip -------------------------------------------
 
@@ -1361,6 +1501,109 @@ export function LandingPage() {
           </div>
         </section>
 
+        {/* ---- What you can check yourself ------------------------------
+
+            **The last block before the ask, which is where risk reversal
+            goes.** The FAQ above answers the objections a reader raises; this
+            answers the one they do not raise, because it is not a question so
+            much as a posture — *why would I believe any of this*.
+
+            The only thing that works on that reader is claims they can settle
+            without trusting us, so every row here is checkable by them, today,
+            without an account: devtools for the first, a free validator for
+            the second, the export button for the third, and this page's own
+            source for the fourth.
+
+            **The strip underneath is risk reversal, stated as an invitation
+            rather than as an apology.** An earlier draft opened by pointing at
+            what the page does not have; that is a real tactic and the wrong
+            one here, because it makes the reader think about the absence
+            instead of about the afternoon it costs them to find out for
+            themselves. The stronger move on the same reader is to make trying
+            it free, reversible and answerable by a person.
+
+            The three facts are read from the same modules the pricing page and
+            the refunds page read, so they cannot drift into being untrue. */}
+        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
+          <div className="mx-auto max-w-5xl">
+            <Head
+              eyebrow="Before you trust us"
+              title="Four things you can check without believing a word"
+              lead="Every claim on this page can be settled by you, today, without an account and without taking anybody's word for it."
+            />
+
+            <ul className="mt-12 grid gap-5 md:grid-cols-2">
+              {PROOFS.map(([mark, title, detail]) => (
+                <li
+                  key={title}
+                  className="rounded-2xl border border-lp-edge bg-lp-ground p-6 sm:p-7"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <span style={{ color: PASS }} className="mt-0.5 shrink-0">
+                      <Icon name={mark} className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <h3 className="oc-heading font-serif text-lg leading-snug text-lp-ink">
+                        {title}
+                      </h3>
+                      <p className="mt-2 text-[0.9375rem] leading-relaxed">
+                        {detail}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* The invitation, then the three things that make accepting it
+                cost nothing. Set as one quiet strip rather than as cards: it
+                is an aside to the four proofs above, not a fifth one. */}
+            <div className="mt-8 rounded-2xl border border-lp-edge bg-lp-well p-6 sm:p-8">
+              <p className="leading-relaxed">
+                <strong className="text-lp-ink">
+                  You do not have to decide from a landing page.
+                </strong>{" "}
+                Import the book you already have, run the check on it, and
+                export all four files. That is the whole claim, testable in an
+                afternoon, before you have paid anything or told us much.
+              </p>
+              <ul className="mt-5 grid gap-4 sm:grid-cols-3">
+                {[
+                  ["No card to start", "The free plan needs no payment details at all, and writing, importing and all four exports stay on it."],
+                  [
+                    `${REFUND_DAYS} days to change your mind`,
+                    "Ask within the first week of a first payment and you get it back, no reason needed. Cancel any time and the plan runs to the end of what you paid for.",
+                  ],
+                  [
+                    "One person answers",
+                    "Not a ticket queue. Slower on a Sunday, considerably more useful on a Tuesday.",
+                  ],
+                ].map(([label, note]) => (
+                  <li key={label}>
+                    <span className="font-code text-[0.6875rem] font-semibold tracking-[0.14em] text-lp-faint uppercase">
+                      {label}
+                    </span>
+                    <p className="mt-2 text-[0.875rem] leading-relaxed">{note}</p>
+                  </li>
+                ))}
+              </ul>
+              {/* A real address, because the research on this is unambiguous:
+                  a reachable human is one of the few trust signals available
+                  to a business with no customers to count. It is the same
+                  address `/contact` prints, from the same module. */}
+              <p className="mt-6 text-[0.875rem] leading-relaxed text-lp-faint">
+                Questions before you start?{" "}
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="font-medium underline decoration-lp-edge-strong underline-offset-2 hover:text-lp-ink"
+                >
+                  {CONTACT_EMAIL}
+                </a>
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* ---- Close ---------------------------------------------------- */}
         <section className="px-6 py-16 text-center sm:py-24" style={{ backgroundColor: INK }}>
           <div className="mx-auto max-w-2xl">
@@ -1467,6 +1710,81 @@ function Head({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * One way a book gets refused, as a band of its own.
+ *
+ * Two halves, and the split is the argument: the injury on the left in the
+ * page's ordinary ink, the answer on the right in a panel of its own. The
+ * numeral is set large and quiet — it carries the count that a shared heading
+ * used to, and it gives the eye somewhere to land at the top of each band so
+ * three consecutive sections do not read as one long one.
+ *
+ * The two hues are the app's own ladder rather than decoration: `STOP` for what
+ * a shop refuses, `PASS` for what is handled. They appear on the mark and the
+ * label and nowhere else, so the bands stay paper-and-ink like the rest of the
+ * page.
+ */
+function Rejection({
+  n,
+  mark,
+  title,
+  hurt,
+  fix,
+  tint,
+}: {
+  n: string;
+  mark: keyof typeof icons;
+  title: string;
+  hurt: string;
+  fix: string;
+  tint?: boolean;
+}) {
+  return (
+    <section
+      className={`border-b border-lp-line px-6 py-12 sm:py-16 ${
+        tint ? "bg-lp-tint-soft" : ""
+      }`}
+    >
+      <div className="mx-auto grid max-w-5xl gap-8 md:grid-cols-[1.1fr_1fr] md:items-start md:gap-14">
+        <div>
+          <div className="flex items-center gap-3">
+            {/* `Icon` strokes in `currentColor`, so the hue is set on the
+                wrapper rather than passed in. */}
+            <span style={{ color: STOP }} className="shrink-0">
+              <Icon name={mark} className="h-[22px] w-[22px]" weight={1.9} />
+            </span>
+            <span className="font-code text-[0.6875rem] font-semibold tracking-[0.18em] text-lp-faint uppercase">
+              Refusal {n}
+            </span>
+          </div>
+
+          <h3 className="oc-heading mt-4 font-serif text-2xl leading-tight text-lp-ink sm:text-[1.75rem]">
+            {title}
+          </h3>
+          <p className="mt-4 leading-relaxed">{hurt}</p>
+        </div>
+
+        {/* Panelled on its own ground rather than divided by a rule. Given a
+            whole band each, a hairline was too quiet to mark the turn from
+            the problem to the answer — and the panel is what makes the right
+            half read as *ours* against the left half, which is theirs. */}
+        <div className="rounded-2xl border border-lp-edge bg-lp-ground p-6 sm:p-7">
+          <span
+            className="font-code flex items-center gap-2.5 text-[0.6875rem] font-semibold tracking-[0.14em] uppercase"
+            style={{ color: PASS }}
+          >
+            <Icon name="check" className="h-4 w-4" weight={2.2} />
+            What this does about it
+          </span>
+          <p className="mt-3 text-[0.9375rem] leading-relaxed text-lp-soft">
+            {fix}
+          </p>
+        </div>
+      </div>
+    </section>
   );
 }
 

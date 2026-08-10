@@ -524,8 +524,9 @@ than replacing it.
       Three things carry the feature. **The deadline**, which is what turns
       thirty contacts into the two people to email this morning — late readers
       sort to the top, and if the book has a publication date the page works
-      back to when copies need to go out (28 days, the convention the shops and
-      the review sites both work to). **What each reader actually reads**,
+      back to when copies need to go out (**42 days** — six weeks; it was 28
+      until 2026-08-09, which was under the floor of every source and is
+      written up in `arc.ts`). **What each reader actually reads**,
       recorded at the point of adding them, because the review everybody
       remembers comes from someone outside the genre. And **the review rate is
       counted against those who answered**, not against everyone — the silent
@@ -1395,6 +1396,35 @@ should either ship or lose the card.
       (Paddle defaults to 90 days), and `cancelled_at` for a scheduled cancel
       is stored as the change's *effective* date, because Paddle leaves its own
       `canceled_at` null until the period runs out.
+
+- [ ] **Live Paddle, applied for 2026-08-09 and waiting on three reviews.**
+      Seller ID 397664, Sri Lanka, sole trader. What is already done in the
+      live account: the product and both prices (`pro_01kzjxz78fknh3hr9dvg2rkr58`,
+      `pri_01kzjy5ewf255ssnrew3fjazsk` monthly, `pri_01kzjyce7089qb9q9p315asyqv`
+      yearly), the payout profile (Payoneer, $100 threshold), the domain
+      submitted for approval, and verification submitted.
+
+      Three things are pending and none of them is ours to hurry: **account
+      verification** (Paddle, ~1–3 days), **domain approval** for
+      `openchapterapp.com`, and **Payoneer's own ID check**. Live checkout
+      cannot open until the first two pass.
+
+      Two details worth keeping. **Business verification is skipped entirely
+      for a sole trader** — only domain review and identity verification run,
+      which is why no BR certificate was needed anywhere in the flow. And
+      **Paddle checks that the site's prices match the live catalog**, which is
+      the reason the live product had to exist *before* verification rather
+      than after: a pricing page advertising $10.99/$99 against an empty
+      catalog is a mismatch a reviewer would flag.
+
+      Still to do once approved: a live API key (**make it non-expiring** —
+      the sandbox default of 90 days would silently break checkout), a live
+      client-side token, a notification destination at
+      `https://openchapterapp.com/api/billing/paddle/notify` with all events,
+      the five `PADDLE_*` values in Vercel's **Production** environment with
+      `PADDLE_ENV=production`, and one real payment, cancelled and refunded.
+      Until those are set, production quietly falls back to PayHere, which is
+      the right state rather than a broken one.
 
 - [ ] **When to move back to PayHere, and it is arithmetic.** The switch is a
       config change now, not a migration:

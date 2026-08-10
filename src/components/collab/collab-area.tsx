@@ -4,10 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { acceptOwnInvite, declineOwnInvite } from "@/app/collab/actions";
 import { memberState, ROLE_LABELS, type Member } from "@/lib/collab";
+import type { Account } from "@/lib/account";
 import type { Book } from "@/lib/library-store";
 import { timeUntil } from "@/lib/relative-time";
 import {
   useAllMembers,
+  useMemberFaces,
   useMyBooks,
   useMyInvites,
   useSharedWithMe,
@@ -75,32 +77,63 @@ function SectionHead({
  *
  * **A face pile is the answer to the question this screen exists for**, and it
  * is what Drive, Notion, Figma and Slack all reach for: "who can see my work" is
- * answered by *looking*, not by opening a dialog per book. There are no avatars
- * to show — nothing in this app has ever collected one for a collaborator — so
- * the initial of the invited address is what there is, and it is enough to tell
- * two people apart at a glance.
+ * answered by *looking*, not by opening a dialog per book.
+ *
+ * **A real photo when there is one, the initial when there is not**, and the
+ * fallback is the permanent case rather than a loading state: only Google hands
+ * over a picture, so an email-and-password account has none and never will. The
+ * initial is drawn either way and the image sits on top of it, which means a
+ * photo that 404s or is blocked leaves the letter showing rather than a hole.
  *
  * A **pending** invitation is drawn as a dashed outline rather than a filled
  * disc, because somebody who has not accepted is not on the book yet, and a face
- * that looks identical either way would overstate what has happened.
+ * that looks identical either way would overstate what has happened. A pending
+ * one gets no photo even if we have it, for the same reason.
  */
-function Face({ member, index }: { member: Member; index: number }) {
+function Face({
+  member,
+  index,
+  face,
+}: {
+  member: Member;
+  index: number;
+  face?: { name: string | null; avatarUrl: string | null };
+}) {
   const pending = memberState(member) === "pending";
-  const initial = (member.name ?? member.email).trim().charAt(0).toUpperCase();
+  const initial = (face?.name ?? member.name ?? member.email)
+    .trim()
+    .charAt(0)
+    .toUpperCase();
+  const photo = pending ? null : face?.avatarUrl;
 
   return (
     <span
-      title={`${member.email}${pending ? " · invited, not yet accepted" : ""}`}
+      title={`${face?.name ? `${face.name} · ` : ""}${member.email}${
+        pending ? " · invited, not yet accepted" : ""
+      }`}
       style={{ zIndex: 10 - index }}
       className={`relative -ml-1.5 flex h-6 w-6 shrink-0 items-center justify-center
-                  rounded-full text-[10px] font-semibold ring-2 ring-panel
-                  first:ml-0 ${
+                  overflow-hidden rounded-full text-[10px] font-semibold ring-2
+                  ring-panel first:ml-0 ${
                     pending
                       ? "border border-dashed border-muted text-muted"
                       : "bg-raised text-fg"
                   }`}
     >
       {initial || "?"}
+      {photo && (
+        /* A plain <img>, not next/image: these are arbitrary provider hosts
+           (googleusercontent and whatever comes next), and every one would have
+           to be listed in next.config for the optimiser to touch it — a config
+           change per identity provider, to resize something already 24px. */
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={photo}
+          alt=""
+          referrerPolicy="no-referrer"
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
     </span>
   );
 }
@@ -116,9 +149,15 @@ function Face({ member, index }: { member: Member; index: number }) {
 function People({
   members,
   loading,
+  faces = {},
+  selfAvatar,
 }: {
   members: readonly Member[];
   loading: boolean;
+  /** Photos by user id, plus `self` for the caller. Empty until they arrive. */
+  faces?: Record<string, { name: string | null; avatarUrl: string | null }>;
+  /** The caller's own, already on the page — no request to wait for. */
+  selfAvatar?: string | null;
 }) {
   if (loading) {
     return <Spinner className="h-3.5 w-3.5 shrink-0 text-muted" />;
@@ -161,9 +200,23 @@ function People({
             <circle cx="10" cy="7" r="3" />
             <path d="M4.5 16a5.5 5.5 0 0 1 11 0" />
           </svg>
+          {(selfAvatar ?? faces.self?.avatarUrl) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={(selfAvatar ?? faces.self?.avatarUrl) as string}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="absolute inset-0 h-full w-full rounded-full object-cover"
+            />
+          )}
         </span>
         {shown.map((m, i) => (
-          <Face key={m.id} member={m} index={i + 1} />
+          <Face
+            key={m.id}
+            member={m}
+            index={i + 1}
+            face={m.userId ? faces[m.userId] : undefined}
+          />
         ))}
         {extra > 0 && (
           <span
@@ -185,11 +238,16 @@ function BookRow({
   book,
   people,
   loadingPeople = false,
+  faces,
+  selfAvatar,
   right,
 }: {
   book: Book;
   people?: readonly Member[];
   loadingPeople?: boolean;
+  faces?: Record<string, { name: string | null; avatarUrl: string | null }>;
+  /** The caller's own photo, known without a request. */
+  selfAvatar?: string | null;
   right: React.ReactNode;
 }) {
   return (
@@ -205,7 +263,14 @@ function BookRow({
           {book.title}
         </Link>
       </div>
-      {people && <People members={people} loading={loadingPeople} />}
+      {people && (
+        <People
+          members={people}
+          loading={loadingPeople}
+          faces={faces}
+          selfAvatar={selfAvatar}
+        />
+      )}
       {right}
     </li>
   );
@@ -234,13 +299,15 @@ function BookRow({
  * decides. A roster page that also edited would be a second place for the same
  * facts to disagree.
  */
-export function CollabArea() {
+export function CollabArea({ account = null }: { account?: Account | null }) {
   const hydrated = useHydrated();
   const mine = useMyBooks();
   const shared = useSharedWithMe();
   const { invites, loading: loadingInvites } = useMyInvites();
   // One request for every book's people, not one per row — see `useAllMembers`.
   const { byBook, loading: loadingPeople } = useAllMembers();
+  // One request for every face on the screen, like the members above it.
+  const faces = useMemberFaces();
   const [sharing, setSharing] = useState<Book | null>(null);
 
   return (
@@ -337,6 +404,8 @@ export function CollabArea() {
                 book={book}
                 people={byBook.get(book.id) ?? []}
                 loadingPeople={loadingPeople}
+                faces={faces}
+                selfAvatar={account?.avatarUrl}
                 right={
                   <button
                     type="button"

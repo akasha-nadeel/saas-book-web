@@ -39,13 +39,9 @@ export function TrashPanel({ bookId }: { bookId: string }) {
   };
 
   return (
+    // No heading of its own: the panel's shared header already carries
+    // "Deleted chapters", and two of them was two rows saying one thing.
     <div className="flex h-full flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-line px-4">
-        <span className="font-sans text-xs tracking-wide text-muted uppercase">
-          Deleted chapters
-        </span>
-      </div>
-
       {trash.length === 0 ? (
         <div className="p-4">
           <p className="font-sans text-sm text-muted">Nothing deleted.</p>

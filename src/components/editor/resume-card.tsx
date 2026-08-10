@@ -11,6 +11,22 @@ import { useBible, useChapterBody, useNotes } from "@/lib/use-library";
 /**
  * Where you left off.
  *
+ * **Nothing renders this now.** It sat on the book overview above the guide,
+ * and a hand's width to its left the book panel's own card offered the same
+ * move under a different name — two controls for one intention on one screen,
+ * with the *card* holding the answer and the *button* looking like the way in.
+ * The button won: it carries on where the writer left off and names the chapter
+ * (see `openBook` in `book-panel.tsx`), and this came off the screen.
+ *
+ * Kept rather than deleted, on the same footing as `works-with.tsx`: what it
+ * knows how to do is the top-voted pain in the writer research, and what it
+ * lost was a fight about *where a control goes*, not about whether the three
+ * things it shows are worth showing. `resumeChapter` — the half that answers
+ * "which chapter" — moved into `lib/resume.ts` and is live. The prose half
+ * (`lastParagraph`, `noteHint`, `tail`, and the bible's `mentionedIn`) has no
+ * other caller, so those are tested against this file alone until it has a home
+ * again. Putting it back is one import.
+ *
  * Built for the writer who said they get seventeen uninterrupted minutes a day,
  * and the one who said it takes forever to get back into the groove after a
  * gap. Those are the same complaint: **most of a short session is spent

@@ -73,6 +73,8 @@ export function AuthForm({
   next,
   problem,
   email,
+  heading,
+  lede,
 }: {
   mode: "signin" | "signup";
   next: string;
@@ -80,8 +82,31 @@ export function AuthForm({
   problem?: string;
   /** Typed into the landing page's hero, carried here rather than asked twice. */
   email?: string;
+  /**
+   * Replace the standing heading and lede when the writer was sent here *for*
+   * something. "Welcome back — enter your details to reach your shelf" is true
+   * of somebody who came to sign in and wrong twice over for somebody arriving
+   * from an invitation: the shelf is not what they are trying to reach, and an
+   * invitee may never have had an account to come back to.
+   */
+  heading?: string;
+  lede?: string;
 }) {
   const copy = COPY[mode];
+
+  /*
+   * **The switch to the other mode keeps `next` and `email`.** It was a bare
+   * `/signup`, which is a dead end for the one visitor most likely to press it:
+   * somebody invited to a book who has no account yet loses the invitation *and*
+   * the address it has to be accepted with, creates an account, and lands on an
+   * empty shelf with nothing to say what became of the link they followed.
+   */
+  const switchQuery = new URLSearchParams();
+  if (next !== "/") switchQuery.set("next", next);
+  if (email) switchQuery.set("email", email);
+  const switchHref = switchQuery.toString()
+    ? `${copy.switchHref}?${switchQuery}`
+    : copy.switchHref;
   const [state, formAction, isPending] = useActionState<AuthState, FormData>(
     mode === "signin" ? signIn : signUp,
     {},
@@ -93,11 +118,11 @@ export function AuthForm({
       headerAction={
         <p className="font-sans text-sm text-muted">
           {copy.switchLede}{" "}
-          <AuthLink href={copy.switchHref}>{copy.switchLabel}</AuthLink>
+          <AuthLink href={switchHref}>{copy.switchLabel}</AuthLink>
         </p>
       }
     >
-      <AuthHeading title={copy.heading} lede={copy.lede} />
+      <AuthHeading title={heading ?? copy.heading} lede={lede ?? copy.lede} />
 
       {problemText && (
         <div className="mt-6">

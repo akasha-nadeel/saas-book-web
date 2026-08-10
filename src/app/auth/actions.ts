@@ -203,12 +203,38 @@ export async function updatePassword(
   redirect("/");
 }
 
-export async function signOut() {
+/**
+ * Sign out, and optionally say where sign-in should land afterwards.
+ *
+ * The `next` field is what makes "switch account" possible rather than merely
+ * "sign out": an invitation addressed to another account is a dead end without
+ * it — the reader signs out, signs in as the right address, and arrives back at
+ * the shelf with no memory of the link they were trying to open. Guarded by
+ * `safeNext` like every other destination read out of a form or a query string,
+ * because this one reaches the browser as a hidden input.
+ *
+ * The parameter is optional so the account menu's plain `<form action={signOut}>`
+ * keeps working untouched — a form with no `next` field lands on `/signin`, as
+ * it always did.
+ */
+export async function signOut(formData?: FormData) {
   if (!isSupabaseConfigured()) redirect("/");
+
+  const next = safeNext(formData?.get("next"));
+  // Which address to sign in *as*, when the caller knows. Only ever the one
+  // already on screen — the invitation names it — and it is put in the field
+  // rather than merely suggested, because the browser will otherwise autofill
+  // the account being signed out of, which is the one that cannot be used.
+  const email = formData?.get("email");
 
   const supabase = await createClient();
   await supabase.auth.signOut();
 
   revalidatePath("/", "layout");
-  redirect("/signin");
+
+  if (next === "/") redirect("/signin");
+
+  const query = new URLSearchParams({ next });
+  if (typeof email === "string" && email) query.set("email", email);
+  redirect(`/signin?${query}`);
 }

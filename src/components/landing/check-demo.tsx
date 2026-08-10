@@ -285,8 +285,12 @@ const PATHS = {
   archive: "M3 6.5h18v3.5H3zM5 10v10h14V10M9.5 14h5",
   chart: "M4 18.5l5.2-6 3.8 2.8L20 7",
   tools: "M3.5 9.5h17V20h-17zM8.5 9.5V6h7v3.5M3.5 14h17",
-  users:
-    "M9.5 11.2a3.1 3.1 0 100-6.2 3.1 3.1 0 000 6.2M3.5 20c0-3.2 2.7-5.2 6-5.2s6 2 6 5.2M17 5.4a2.6 2.6 0 010 5.1M18.6 14.6c1.4.7 2.4 2 2.4 4",
+  // Community wears the globe, because two people is Collaborators' mark in the
+  // app and this figure is a picture of that sidebar. The two-people path that
+  // used to sit here went with the swap: the row it would now belong to is
+  // Collaborators, which this figure does not draw.
+  globe:
+    "M12 21a9 9 0 100-18 9 9 0 000 18M3 12h18M12 3a13.8 13.8 0 013.6 9 13.8 13.8 0 01-3.6 9 13.8 13.8 0 01-3.6-9 13.8 13.8 0 013.6-9z",
   help: "M12 21a9 9 0 100-18 9 9 0 000 18M9.4 9.4a2.7 2.7 0 015.3.7c0 1.8-2.7 2.2-2.7 4M12 17.3v.1",
   chat: "M4 5h16v10.5H9.5L4 19.5z",
   send: "M3 11.2L21 4l-7.2 17-2.9-6.9z",
@@ -1567,7 +1571,7 @@ export function CheckDemo() {
               <div style={{ padding: "0 8px", display: "flex", flexDirection: "column", gap: 2 }}>
                 <NavRow icon="tools" label="Tools" />
                 {/* Not built, and saying so on the real screen too. */}
-                <NavRow icon="users" label="Community" soon />
+                <NavRow icon="globe" label="Community" soon />
               </div>
 
               <div style={{ flex: "1 1 auto" }} />

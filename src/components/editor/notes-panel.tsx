@@ -49,23 +49,45 @@ export function NotesPanel({ chapterId }: { chapterId: string }) {
 
   // Debounced, so a paragraph of notes isn't one localStorage write per key.
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* What the timer is holding, so the unmount below has something to write.
+     Without it the cleanup can only cancel, which is the bug it was meant to
+     prevent. */
+  const pending = useRef<string | null>(null);
+
   const persist = (nextSynopsis: string, nextNotes: string) => {
     if (timer.current) clearTimeout(timer.current);
+    const combined =
+      nextSynopsis || nextNotes ? `${nextSynopsis}${SEPARATOR}${nextNotes}` : "";
+    pending.current = combined;
     timer.current = setTimeout(() => {
-      const combined =
-        nextSynopsis || nextNotes
-          ? `${nextSynopsis}${SEPARATOR}${nextNotes}`
-          : "";
       saveNotes(chapterId, combined);
+      pending.current = null;
     }, 500);
   };
 
-  // Flush on unmount, or switching chapters loses the last half-second.
+  /*
+   * **Flush on unmount — which is what this said and not what it did.**
+   *
+   * It cleared the timer and stopped, so the last half-second of typing was
+   * cancelled rather than saved: type a line and switch chapters inside 500ms
+   * and the line was gone. Harmless enough while the panel only closed on a
+   * deliberate press; not harmless now that a click into the manuscript puts it
+   * away, which is exactly what a writer does immediately after jotting a note
+   * about the page they are looking at.
+   *
+   * The ref is read in the cleanup rather than the state, because a cleanup
+   * with an empty dependency list closes over the *first* render's values.
+   */
   useEffect(() => {
     return () => {
       if (timer.current) clearTimeout(timer.current);
+      if (pending.current !== null) {
+        saveNotes(chapterId, pending.current);
+        pending.current = null;
+      }
     };
-  }, []);
+    // The panel is keyed on the chapter, so this id cannot change under it.
+  }, [chapterId]);
 
   const value = { synopsis, notes };
   const setValue = { synopsis: setSynopsis, notes: setNotes };

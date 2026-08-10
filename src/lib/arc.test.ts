@@ -200,10 +200,23 @@ describe("sortReaders", () => {
 });
 
 describe("sendBy", () => {
-  it("is four weeks before the day the book goes on sale", () => {
+  it("is six weeks before the day the book goes on sale", () => {
     const publish = Date.UTC(2026, 8, 1);
     expect(sendBy(publish)).toBe(publish - LEAD_DAYS * DAY);
-    expect(LEAD_DAYS).toBe(28);
+    expect(LEAD_DAYS).toBe(42);
+  });
+
+  it("clears the lead time the ARC services actually ask for", () => {
+    // This is the assertion worth keeping. The number was 28 for months,
+    // described in the source as the convention the review sites work to —
+    // and BookSirens, which distributes them, asks for 40 days minimum while
+    // the general indie guidance is four to eight weeks. A figure under that
+    // floor is not a conservative default, it is advice that arrives too late
+    // to be worth taking, on the one step this product is best known for.
+    expect(LEAD_DAYS).toBeGreaterThanOrEqual(40);
+    expect(LEAD_DAYS).toBeLessThanOrEqual(56);
+    // Whole weeks: a writer counts back on a calendar, not in days.
+    expect(LEAD_DAYS % 7).toBe(0);
   });
 });
 
@@ -242,11 +255,12 @@ describe("fromDay", () => {
     expect(isOverdue(reader({ dueAt: due }), nextMorning)).toBe(true);
   });
 
-  it("reads a publication date into a send-by four weeks earlier", () => {
+  it("reads a publication date into a send-by six weeks earlier", () => {
     // publishing.published is the same YYYY-MM-DD shape, so the two compose.
+    // 1 September back six weeks is 21 July.
     const publish = fromDay("2026-09-01") as number;
-    expect(new Date(sendBy(publish)).getDate()).toBe(4);
-    expect(new Date(sendBy(publish)).getMonth()).toBe(7);
+    expect(new Date(sendBy(publish)).getDate()).toBe(21);
+    expect(new Date(sendBy(publish)).getMonth()).toBe(6);
   });
 });
 

@@ -17,6 +17,10 @@ import {
   StoreReadiness,
 } from "@/components/export/publishing-card";
 import {
+  ExportDoneDialog,
+  type ExportDone,
+} from "@/components/export/export-done";
+import {
   loadChapters,
   runExport,
   skippedMatterPages,
@@ -259,6 +263,17 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * The file that just left, or null.
+   *
+   * Set by the press that produced it and by nothing else — an effect watching
+   * for a finished export would fire again on a remount, which is a success
+   * dialog about something the writer did yesterday. See `ExportDoneDialog`.
+   * Null for a PDF, which `runExport` answers with because the print dialog's
+   * outcome is the browser's and not ours to state.
+   */
+  const [done, setDone] = useState<ExportDone | null>(null);
+
   // Narration keeps its own state rather than sharing the export flags: it runs
   // for minutes, reports progress as it goes, and a writer should still be able
   // to move around the wizard while it does.
@@ -396,7 +411,10 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     setBusy(true);
     setError(null);
     try {
-      await runExport({ book, format: output, manuscript, typeset });
+      const file = await runExport({ book, format: output, manuscript, typeset });
+      // Null is the PDF, which went to the browser's print dialog rather than
+      // to a file we made.
+      if (file) setDone({ format: output, ...file });
     } catch (err) {
       console.error("[export] failed", err);
       setError(
@@ -413,7 +431,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     setNarrationLabel("Starting…");
     try {
       const { exportAudiobook } = await import("@/lib/export/audiobook");
-      await exportAudiobook(
+      const file = await exportAudiobook(
         book.title,
         loadChapters(book),
         "onyx",
@@ -424,6 +442,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
         },
       );
       setNarrationLabel("");
+      setDone({ format: "audiobook", ...file });
     } catch (err) {
       console.error("[narrate] failed", err);
       // The route's own message when it has one — "no key", "sign in", "too
@@ -769,6 +788,20 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           </div>
         </div>
       </div>
+
+      {/* The one thing this screen does that leaves no trace on it. A `<dialog>`
+          opened with `showModal` sits in the browser's top layer, so it clears
+          the roadmap's sheet and this flow's own rail without a z-index to keep
+          in step with either. */}
+      {done && (
+        <ExportDoneDialog
+          done={done}
+          book={book}
+          save={save}
+          blocking={blocking}
+          onClose={() => setDone(null)}
+        />
+      )}
     </main>
   );
 }

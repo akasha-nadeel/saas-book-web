@@ -200,9 +200,12 @@ export function ArcPage({ bookId }: { bookId: string }) {
               <Link href={`/book/${bookId}/export`} className="text-accent">
                 export screen
               </Link>{" "}
-              and this will work out when copies need to go out. The convention
-              is {LEAD_DAYS} days ahead — long enough for someone to read a
-              novel and write about it before the book is on sale.
+              and this will work out when copies need to go out. {LEAD_DAYS}{" "}
+              days ahead is the figure used here — the services that distribute
+              advance copies ask for at least forty, and a reader needs time to
+              finish a novel <em>and</em> to get round to posting about it.
+              Earlier is better; later is how a book arrives with no reviews on
+              it.
             </p>
           ) : (
             <SendBy publishAt={publishAt} now={now} sent={readers.length} />
@@ -325,7 +328,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
 /**
  * How long until copies have to be out, counted from the book's own date.
  *
- * It states the day and the gap and stops there. A launch four weeks out with
+ * It states the day and the gap and stops there. A launch six weeks out with
  * nobody on the list is a real problem, but "you are behind" from a tool that
  * cannot know what the writer has arranged off-screen is a scold, and the
  * research was clear about how writers feel regarding apps that scold.

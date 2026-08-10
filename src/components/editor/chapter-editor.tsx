@@ -26,6 +26,7 @@ import { clickToType } from "@/lib/editor/click-to-type";
 import { keepCaretInView } from "@/lib/editor/caret-scroll";
 import { FontSize } from "@/lib/editor/font-size";
 import { FontFamily } from "@/lib/editor/font-family";
+import { FontPreview } from "@/lib/editor/font-preview";
 import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
 import {
@@ -329,16 +330,18 @@ export function ChapterEditor({
           than separate sections. The children below are transparent; only the
           rails and the open left panel lay their own chrome over it. */}
       <div className="shelf-hero flex min-h-0 min-w-0 flex-1">
-        {panelOpen && (
-          <LeftPanel
-            tab={tab}
-            bookId={bookId}
-            chapterId={chapterId}
-            chapterTitle={chapter.title}
-            getChapterText={() => liveEditor?.getText() ?? ""}
-            onClose={() => setPanelOpen(false)}
-          />
-        )}
+        {/* Rendered whether or not it is open: it owns its own mounting so it
+            can animate its way out, and it renders nothing until first opened.
+            See LeftPanel's `open`. */}
+        <LeftPanel
+          open={panelOpen}
+          tab={tab}
+          bookId={bookId}
+          chapterId={chapterId}
+          chapterTitle={chapter.title}
+          getChapterText={() => liveEditor?.getText() ?? ""}
+          onClose={() => setPanelOpen(false)}
+        />
 
         {/* The book panel sits on the left, the manuscript to its right. */}
         <BookPanel
@@ -364,7 +367,7 @@ export function ChapterEditor({
               on dispose, so nothing typed is lost, and a hidden manuscript is a
               manuscript whose pagination measures a zero-height column. */}
           {panelMode === "book" ? (
-            <BookGuide title={book.title} entering={entering} />
+            <BookGuide title={book.title} book={book} entering={entering} />
           ) : (
             /* Keyed on the id and a cross-tab reload counter — not the stored
                text — so a save from another tab reloads the surface, while this
@@ -408,10 +411,40 @@ export function ChapterEditor({
             // the screen has neither to spare next to the page. Export moves to the
             // manuscript header there instead.
             className="hidden md:flex"
+            /* **The two that leave the page, together at the foot.**
+​
+               Everything above this acts on the sheet — the type, an image,
+               the microphone, how the page is shown. These two do not: one
+               opens a panel to talk *about* the writing and the other takes
+               the book out of the app. They were split, with the assistant
+               loose at the end of the view toggles and Export alone down here,
+               so the rail's last group was a formatting group with a chat
+               button stuck on it. Grouped, the rail reads top to bottom as
+               write · view · leave. */
             footer={
-              <RailButton label="Export" href={`/book/${bookId}/export`}>
-                {icons.export}
-              </RailButton>
+              <>
+                <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+                {/* Reachable from the manuscript's own rail as well as the
+                    left one, the way dictation already has two controls — the
+                    rule for a second press is shared (`selectPanel`), so both
+                    stay lit together and both close what the other opened. */}
+                <RailButton
+                  label="Assistant"
+                  active={panelOpen && tab === "assistant"}
+                  onClick={() =>
+                    selectPanel(
+                      "assistant",
+                      { tab, open: panelOpen },
+                      { onSelectTab: setTab, onPanel: setPanelOpen },
+                    )
+                  }
+                >
+                  {icons.assistant}
+                </RailButton>
+                <RailButton label="Export" href={`/book/${bookId}/export`}>
+                  {icons.export}
+                </RailButton>
+              </>
             }
           >
             {/* Which book these tools act on, as the object rather than another
@@ -457,43 +490,16 @@ export function ChapterEditor({
             >
               {icons.typewriter}
             </RailButton>
-            {/* Word's ¶ button: what is actually on the page, as against what can
-              be seen of it. */}
+            {/* Word's ¶ button: what is actually on the page, as against what
+              can be seen of it. Passed as `glyph` rather than as a child —
+              a child goes inside the rail's `<svg>`, where an HTML span is in
+              the SVG namespace and is never painted. See RailButton. */}
             <RailButton
               label="Show paragraph marks"
               active={prefs.marks}
               onClick={() => setPref("marks", !prefs.marks)}
-            >
-              <span
-                aria-hidden="true"
-                className="font-sans text-base leading-none"
-              >
-                ¶
-              </span>
-            </RailButton>
-
-            <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
-
-            {/* Its own group at the foot of the rail, because it is not a
-                formatting tool: everything above acts on the page directly,
-                and this opens a panel to talk about it. Reachable from the
-                manuscript's own rail as well as the left one, the way dictation
-                already has two controls — the rule for a second press is shared
-                (`selectPanel`), so both stay lit together and both close what
-                the other opened. */}
-            <RailButton
-              label="Assistant"
-              active={panelOpen && tab === "assistant"}
-              onClick={() =>
-                selectPanel(
-                  "assistant",
-                  { tab, open: panelOpen },
-                  { onSelectTab: setTab, onPanel: setPanelOpen },
-                )
-              }
-            >
-              {icons.assistant}
-            </RailButton>
+              glyph="¶"
+            />
           </Rail>
         )}
       </div>
@@ -772,6 +778,8 @@ function EditorSurface({
       // whole paragraph into a heading.
       FontSize,
       FontFamily,
+      // Draws only — see font-preview.ts. No mark, no history, no autosave.
+      FontPreview,
       // Per-paragraph alignment (left / centre / right / justify).
       TextAlign,
       // The flush-at-the-margin mark a click-placed line carries, so it begins

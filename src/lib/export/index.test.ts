@@ -6,7 +6,7 @@ import {
   getShelf,
   saveBody,
 } from "@/lib/library-store";
-import { buildMarkdownFile, loadChapters, slugify } from "@/lib/export";
+import { buildMarkdownFile, fileSize, loadChapters, slugify } from "@/lib/export";
 
 beforeEach(() => {
   localStorage.clear();
@@ -17,6 +17,17 @@ it("slugifies a book title for a filename", () => {
   expect(slugify("  Mixed  CASE  ")).toBe("mixed-case");
   expect(slugify("A Book: Part Two!")).toBe("a-book-part-two");
   expect(slugify("—")).toBe("untitled");
+});
+
+it("reports a file size the way a file manager does", () => {
+  expect(fileSize(1)).toBe("1 byte");
+  expect(fileSize(940)).toBe("940 bytes");
+  expect(fileSize(1024)).toBe("1 KB");
+  expect(fileSize(422_000)).toBe("412 KB");
+  expect(fileSize(1_468_006)).toBe("1.4 MB");
+  // Past ten megabytes the decimal is noise: nobody weighs an upload limit to
+  // a tenth of a megabyte at that size.
+  expect(fileSize(24_000_000)).toBe("23 MB");
 });
 
 it("loads every chapter of a book in order", () => {
