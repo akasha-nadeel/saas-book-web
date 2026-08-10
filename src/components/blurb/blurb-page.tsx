@@ -194,34 +194,45 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
             against the shops’ limits and tells you where it is unusual.
           </p>
         )}
-        {/* **One column at a writing measure, not a stretched leftover.**
-            This was a two-column grid with a 320px rail; the rail is gone, and
-            a `1fr` column with nothing beside it would have run the field the
-            full width of a 5xl page — about 150 characters a line, which is
-            twice a readable measure and about six times a blurb's own line
-            length on a shop page.
+        {/* **A composer at a writing measure, and a rail beside it — not one
+            column with half a window of nothing to its right.**
 
-            So the composer is capped at `3xl` and left-aligned, which keeps its
-            left edge on the same rule as the breadcrumb and the heading above
-            it. Centring it was the other option and it breaks that alignment
-            the moment the window is wide. */}
-        <div className="max-w-3xl">
-          {/* Standing above the composer, because what is refused here is the
-              *save* — a writer may draft freely either way, and the thing they
-              need to know before spending an evening on it is that keeping it
-              is what costs. `LimitNote` in the roadmap's panel, which is a
-              ~300px column the wide banner does not fit. */}
-          {embedded ? (
-            <LimitNote allowance={gate.allowance} className="mb-4" />
-          ) : (
-            <LimitBanner allowance={gate.allowance} className="mb-4" />
-          )}
-          <LeftPill allowance={gate.allowance} className="mb-4" />
+            The measure is the fixed part: a blurb is read as a paragraph, and a
+            field run to the full width of a 7xl page is about 150 characters a
+            line — twice a readable measure and roughly six times the line
+            length the same words will have on a shop's page. So the left column
+            is capped at `48rem` (the `3xl` it was) rather than given `1fr`, and
+            the rail takes a fixed `20rem` beside it. Widening the window now
+            widens the margin, which is the correct thing for it to widen.
+
+            A rail was here before and was removed with good reason: it held
+            *examples*, fetched from a comps search that returned Dostoevsky for
+            "Mystery" and measured catalogue summaries as if they were blurbs.
+            What goes back into it is only what this screen already knew — the
+            count of what is in the box, and the findings computed from it.
+            Nothing here is fetched and nothing is invented.
+
+            **`@3xl:` off the container, not `lg:` off the viewport**, for the
+            reason the block above gives: in the roadmap's panel the window is
+            wide while this screen is not, and a viewport breakpoint would put a
+            20rem rail beside a composer squeezed to nothing. Below that width
+            the grid is one column and the rail falls underneath, which is
+            exactly the layout the panel had. */}
+        <div className="grid items-start gap-6 @3xl:grid-cols-[minmax(0,48rem)_minmax(0,20rem)]">
+          {/* The left column: what the writer types into, and the two notices
+              that qualify the act of saving it. */}
           <div>
-            {/* The counters live inside the box's frame rather than under it.
-                They were fourteen rows down, which on this screen meant below
-                the fold — and a character count nobody can see while typing is
-                a character count that does its job after the fact. */}
+            {/* Standing above the composer, because what is refused here is the
+                *save* — a writer may draft freely either way, and the thing they
+                need to know before spending an evening on it is that keeping it
+                is what costs. `LimitNote` in the roadmap's panel, which is a
+                ~300px column the wide banner does not fit. */}
+            {embedded ? (
+              <LimitNote allowance={gate.allowance} className="mb-4" />
+            ) : (
+              <LimitBanner allowance={gate.allowance} className="mb-4" />
+            )}
+            <LeftPill allowance={gate.allowance} className="mb-4" />
             <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/50">
               <textarea
                 value={text}
@@ -260,79 +271,157 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                            leading-7 text-fg outline-none
                            placeholder:text-muted/70"
               />
-              {/* The character count leads and is the only figure that can go
-                  red, because it is the only one with a limit behind it. Words
-                  and paragraphs are context, so they are set quieter — three
-                  numbers at one weight made the reader work out which of them
-                  they were being warned about. */}
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line bg-surface px-5 py-2.5 text-xs">
-                <span className="tabular-nums">
-                  <span
-                    className={
-                      over ? "font-bold text-danger" : "font-medium text-fg"
-                    }
-                  >
-                    {report.stats.characters.toLocaleString()} /{" "}
-                    {BLURB_MAX.toLocaleString()}
-                  </span>
-                  <span className="text-muted">
-                    {" "}
-                    characters · {report.stats.words} words ·{" "}
-                    {report.stats.paragraphs} paragraph
-                    {report.stats.paragraphs === 1 ? "" : "s"}
-                  </span>
-                </span>
+              {/* All that is left in the box's own frame is whether the words
+                  in it are safe. The counts moved to the rail — see there —
+                  but this one cannot: it is a fact about *this box*, it changes
+                  on the keystroke, and a writer looking at their own paragraph
+                  should not have to look away to find out whether it is
+                  stored. */}
+              <div className="flex items-center justify-end border-t border-line bg-surface px-5 py-2.5 text-xs">
                 <span className={save.dirty ? "text-note-fg" : "text-muted"}>
                   {save.dirty ? "Not saved yet" : "Saved"}
                 </span>
               </div>
             </div>
-
-            {report.issues.length > 0 && (
-              <ul className="mt-6 flex flex-col gap-2">
-                {report.issues.map((issue) => (
-                  <li
-                    key={issue.field + issue.message}
-                    className={`flex gap-3 rounded-lg border px-4 py-3 ${
-                      issue.level === "problem"
-                        ? "border-note-line bg-note-bg"
-                        : "border-line bg-panel"
-                    }`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={`mt-0.5 text-sm font-bold ${
-                        issue.level === "problem"
-                          ? "text-note-fg"
-                          : "text-muted"
-                      }`}
-                    >
-                      {issue.level === "problem" ? "!" : "·"}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="text-sm font-bold text-fg">
-                        {issue.field}
-                      </span>
-                      <span className="mt-0.5 block text-sm text-muted">
-                        {issue.message}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {/* Attached to the counters it qualifies, not floating under
-                them. It was a third grey paragraph in a column of grey
-                paragraphs, so the one *rule* on the screen read as more
-                commentary. */}
-            <p className="mt-2 text-xs text-muted">
-              Only two things here are facts: an empty blurb, and one over{" "}
-              {BLURB_MAX.toLocaleString()} characters, which shops refuse.
-              Everything else is a measurement, not a rule.
-            </p>
           </div>
 
+          {/* **The rail, and it is sticky on purpose.**
+
+              The counts used to sit in a strip under the textarea, which was
+              itself a fix for their having been fourteen rows down the page —
+              a character count nobody can see while typing does its job after
+              the fact. Moving them sideways only keeps that fix if they stay
+              on screen while the writer works, and this box is 14 rows tall,
+              so the rail is pinned. Below `@3xl` it is not pinned and not
+              beside anything: the grid is one column there and this falls under
+              the composer, which is the layout the roadmap's panel gets.
+
+              Two boxes rather than one, because they answer different
+              questions. The first is *how much have I written*, which is true
+              of any blurb and changes every keystroke. The second is *what
+              about it is unusual*, which is a reading of those numbers and is
+              often empty. Stacked in one panel, an empty second half would read
+              as a broken first. */}
+          <aside className="flex flex-col gap-4 @3xl:sticky @3xl:top-6">
+            {/* Length. The character count leads at display size because it is
+                the only figure here with a limit behind it and the only one
+                that can be wrong; words and paragraphs are context and are set
+                as a quiet pair beneath. Three numbers at one weight — which is
+                what the old strip was — made a reader work out which of them
+                they were being warned about. */}
+            <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <h2 className="font-sans text-xs font-semibold tracking-[0.12em] text-muted uppercase">
+                Length
+              </h2>
+              <p className="mt-3 flex items-baseline gap-1.5 tabular-nums">
+                <span
+                  className={`font-display text-3xl font-bold ${
+                    over ? "text-danger" : "text-fg"
+                  }`}
+                >
+                  {report.stats.characters.toLocaleString()}
+                </span>
+                <span className="text-sm text-muted">
+                  / {BLURB_MAX.toLocaleString()} characters
+                </span>
+              </p>
+              {/* A ratio of two real numbers rather than a score: what is drawn
+                  is the count against the shops' own limit, which is the one
+                  hard edge on this screen. It is `aria-hidden` because the line
+                  above states both numbers — a bar repeating them is a second
+                  announcement of one fact. */}
+              <div
+                aria-hidden="true"
+                className="mt-3 h-1.5 overflow-hidden rounded-full bg-line"
+              >
+                <div
+                  className={`h-full rounded-full ${over ? "bg-danger" : "bg-accent"}`}
+                  style={{
+                    width: `${Math.min(100, (report.stats.characters / BLURB_MAX) * 100)}%`,
+                  }}
+                />
+              </div>
+              <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4">
+                <div>
+                  <dt className="text-xs text-muted">Words</dt>
+                  <dd className="mt-0.5 text-lg font-semibold tabular-nums text-fg">
+                    {report.stats.words.toLocaleString()}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted">
+                    Paragraph{report.stats.paragraphs === 1 ? "" : "s"}
+                  </dt>
+                  <dd className="mt-0.5 text-lg font-semibold tabular-nums text-fg">
+                    {report.stats.paragraphs.toLocaleString()}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+
+            {/* What the report found. The heading is deliberately not "Issues"
+                or "Problems": one of the two things this screen can state as
+                fact is that a blurb is missing, and everything else in the list
+                is a measurement that may be perfectly fine on somebody's book.
+
+                The caption sits at the foot of *this* box rather than under the
+                page, which is where it was — a third grey paragraph in a column
+                of grey paragraphs, so the one rule on the screen read as more
+                commentary. Here it qualifies the list directly above it and
+                nothing else. */}
+            <section className="rounded-xl border border-line bg-panel p-5 shadow-sm">
+              <h2 className="font-sans text-xs font-semibold tracking-[0.12em] text-muted uppercase">
+                What stands out
+              </h2>
+
+              {report.issues.length > 0 ? (
+                <ul className="mt-3 flex flex-col gap-2">
+                  {report.issues.map((issue) => (
+                    <li
+                      key={issue.field + issue.message}
+                      className={`flex gap-2.5 rounded-lg border px-3.5 py-3 ${
+                        issue.level === "problem"
+                          ? "border-note-line bg-note-bg"
+                          : "border-line bg-surface"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`mt-0.5 text-sm font-bold ${
+                          issue.level === "problem"
+                            ? "text-note-fg"
+                            : "text-muted"
+                        }`}
+                      >
+                        {issue.level === "problem" ? "!" : "·"}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="text-sm font-bold text-fg">
+                          {issue.field}
+                        </span>
+                        <span className="mt-0.5 block text-sm text-muted">
+                          {issue.message}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                /* Stated as a measurement, not as praise. Nothing here knows
+                   whether a blurb is any good — only that none of the things it
+                   can count came out unusual, which is what it says. */
+                <p className="mt-3 text-sm text-muted">
+                  Nothing unusual in what can be counted.
+                </p>
+              )}
+
+              <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
+                Only two things here are facts: an empty blurb, and one over{" "}
+                {BLURB_MAX.toLocaleString()} characters, which shops refuse.
+                Everything else is a measurement, not a rule.
+              </p>
+            </section>
+          </aside>
         </div>
       </div>
     </div>
