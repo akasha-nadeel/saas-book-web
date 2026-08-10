@@ -1072,6 +1072,40 @@ work out what to do next, and should never hit a screen that cannot help them.**
 
 Ranked. The first and third together are most of it.
 
+- [ ] **"Change book" inside every tool.** Asked for 2026-08-10. The dashboard's
+      Tools area has a book picker — `Menu` with a checked row per book, in
+      `bookshelf.tsx` (~1034), shown only when `all.length > 1` — and the tool
+      screens themselves have none. So a writer comparing the same job across two
+      manuscripts has to go **out** to the launcher and back in for every switch:
+      breadcrumb → All tools → pick the book → pick the same tool again. Four
+      presses to change one variable.
+
+      **It belongs in `ToolHeader`**, which every tool mounts and which already
+      draws the book as a chip with its cover — so the control has a natural home
+      beside the thing it changes, and building it there gets all sixteen at once
+      rather than sixteen times. The existing `Menu` and `shelfIcons.check` come
+      across unchanged; this is mostly assembly.
+
+      Three things to get right, none of them obvious:
+
+      - **Switching must keep the tool and swap only the book**, which means
+        rewriting `/book/<a>/comps` to `/book/<b>/comps` rather than navigating
+        to the launcher. The tool segment is already in the URL, so it is a
+        substitution rather than a lookup.
+      - **`?from=` has to survive the switch.** A writer who reached the tool
+        from Prepare and then changes book should still go back to Prepare — see
+        `areas.ts` and the `?from=` note in CLAUDE.md. Dropping it silently
+        returns them to the launcher, which is the exact errand this removes.
+      - **Some tools hold an unsaved draft** (blurb, listing, ARC). Switching
+        book is leaving the screen as far as the writer's work is concerned, so
+        it must go through `confirmLeave` like the roadmap panel's Close, or a
+        half-typed blurb vanishes with no question asked.
+
+      Not in `ToolHeader`'s `embedded` mode: the roadmap panel opens a tool
+      *over* the road for the book the road is about, and a book switch inside it
+      would leave the panel and the page disagreeing about which book is on
+      screen.
+
 - [x] **Ask an imported book what it is.** Done 2026-08-02. `/book/new` defaults
       the genre to Fantasy, so books made there were always fine.
       `createBookFromImport` sets none — and with no genre and no blurb,
