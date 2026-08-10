@@ -2,10 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { acceptOwnInvite, declineOwnInvite } from "@/app/collab/actions";
+import {
+  acceptOwnInvite,
+  declineOwnInvite,
+  leaveBook,
+} from "@/app/collab/actions";
 import { memberState, ROLE_LABELS, type Member } from "@/lib/collab";
 import type { Account } from "@/lib/account";
-import type { Book } from "@/lib/library-store";
+import { deleteBook, type Book } from "@/lib/library-store";
 import { timeUntil } from "@/lib/relative-time";
 import {
   useAllMembers,
@@ -309,6 +313,43 @@ export function CollabArea({ account = null }: { account?: Account | null }) {
   // One request for every face on the screen, like the members above it.
   const faces = useMemberFaces();
   const [sharing, setSharing] = useState<Book | null>(null);
+  /*
+   * **Leaving asks first, and the question is asked on the row itself.**
+   * A dialog for this would be the heavier control: what is being confirmed is
+   * one line long, and the book it is about is the thing you are pointing at.
+   * The confirm also has to exist at all — leaving is undoable only by asking
+   * the owner for another invitation, which is a favour rather than a button.
+   */
+  const [leaving, setLeaving] = useState<string | null>(null);
+  const [leftError, setLeftError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function leave(book: Book) {
+    setBusy(book.id);
+    setLeftError(null);
+
+    const result = await leaveBook(book.id);
+
+    if ("error" in result) {
+      setBusy(null);
+      setLeftError(result.error);
+      return;
+    }
+
+    /*
+     * Taken off this browser as well as off the server, or it would sit on the
+     * shelf until the next sync noticed it had stopped arriving and marked it
+     * "No longer shared" — which is the wording for *being removed*, and reads
+     * as something having gone wrong rather than as the thing just done.
+     *
+     * `deleteBook` is safe on a shared book: it refuses to push a deletion for
+     * a book somebody else owns, so this removes the local copy and leaves the
+     * owner's untouched.
+     */
+    deleteBook(book.id);
+    setBusy(null);
+    setLeaving(null);
+  }
 
   return (
     <div className="space-y-6">
@@ -353,23 +394,83 @@ export function CollabArea({ account = null }: { account?: Account | null }) {
                 key={book.id}
                 book={book}
                 right={
-                  <span
-                    className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium ${
-                      book.access === "lost"
-                        ? "bg-note-bg text-note-fg"
-                        : "bg-raised text-muted"
-                    }`}
-                  >
-                    {book.access === "lost"
-                      ? "No longer shared"
-                      : book.role
-                        ? ROLE_LABELS[book.role].label
-                        : "Shared"}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium ${
+                        book.access === "lost"
+                          ? "bg-note-bg text-note-fg"
+                          : "bg-raised text-muted"
+                      }`}
+                    >
+                      {book.access === "lost"
+                        ? "No longer shared"
+                        : book.role
+                          ? ROLE_LABELS[book.role].label
+                          : "Shared"}
+                    </span>
+
+                    {/* Nothing to leave once access has already ended — the row
+                        is a local copy at that point, and the button would
+                        promise a server call with nothing to call about. */}
+                    {book.access !== "lost" &&
+                      (leaving === book.id ? (
+                        <>
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => void leave(book)}
+                            className="flex shrink-0 items-center gap-1.5 rounded-lg
+                                       bg-danger px-3 py-1.5 text-xs font-semibold
+                                       text-accent-ink disabled:opacity-60"
+                          >
+                            {busy === book.id && <Spinner className="h-3 w-3" />}
+                            Leave
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busy !== null}
+                            onClick={() => setLeaving(null)}
+                            className="shrink-0 rounded-lg px-2 py-1.5 text-xs
+                                       font-semibold text-muted hover:text-fg"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLeftError(null);
+                            setLeaving(book.id);
+                          }}
+                          className="shrink-0 rounded-lg border border-line px-3 py-1.5
+                                     text-xs font-semibold text-fg hover:bg-raised"
+                        >
+                          Leave
+                        </button>
+                      ))}
+                  </div>
                 }
               />
             ))}
           </ul>
+
+          {leftError && (
+            <p role="alert" className="mt-2.5 text-xs text-stop-fg">
+              {leftError}
+            </p>
+          )}
+
+          {/* Said once under the list rather than on every row: leaving is not
+              a delete, and the thing a reader wants to know before pressing it
+              is what happens to the manuscript. */}
+          {leaving !== null && (
+            <p className="mt-2.5 text-xs leading-relaxed text-muted">
+              Leaving takes the book off your shelf and gives the owner their
+              place back. Nothing you wrote in it is removed, and nobody is
+              told — but you would need a fresh invitation to come back.
+            </p>
+          )}
 
           {shared.some((b) => b.access === "lost") && (
             <p className="mt-2.5 text-xs leading-relaxed text-muted">

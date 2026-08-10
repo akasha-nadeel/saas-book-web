@@ -1292,6 +1292,25 @@ the billing tables keep their `*_owner_*` policies on purpose, so a schema-wide
 scan reports the design as a failure. All of it passed against the live project on
 2026-08-07, injection probe included.
 
+**A collaborator may take themselves off a book**, and until the invite links
+started auto-accepting they could not: only the owner could remove anybody, so a
+stray link was a book on your shelf permanently and a message to the owner to
+get it off again. `leaveBook` in `src/app/collab/actions.ts` is the invitee's
+side of `removeMember`, and the two are kept apart rather than sharing one
+function precisely because they authorise differently: **`leaveBook` takes a
+book id and never a member id**, finding the row by the caller's own user id, so
+there is no argument anybody can pass that reaches somebody else's membership.
+`removeMember` may take a member id because it checks book ownership first; this
+one has no such check to make, so it must not accept the id at all. The row is
+revoked rather than deleted, like a removal — the seat comes back either way,
+and a deleted row would lose the record that this address was ever on the book,
+which the invitation's unique index needs to let them be invited again cleanly.
+The client follows with `deleteBook`, which is safe on a shared book because it
+refuses to push a deletion for a book somebody else owns: without it the shelf
+would keep the book until the next sync marked it "No longer shared", which is
+the wording for *being removed* and reads as a fault rather than as the thing
+just done.
+
 *Not built:* presence, the resolve-a-conflict control, and ownership transfer. The
 conflict guard's *data* half is done (`rev`, a conditional update, and a conflict
 set that stops `applyRemote` overwriting the text it preserved) but nothing yet

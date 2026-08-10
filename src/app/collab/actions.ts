@@ -756,6 +756,65 @@ function acceptError(error: { code?: string; message?: string }): string {
   return "Could not accept that invitation. Try again in a moment.";
 }
 
+/**
+ * Take yourself off somebody else's book.
+ *
+ * **The one thing a collaborator could not do**, and it mattered more the day
+ * an invitation stopped needing an Accept: following a link and signing in puts
+ * a writer on a book, so without this a stray link is a book on your shelf
+ * permanently and a message to the owner to get it off again. `removeMember`
+ * above is the same row from the other side — the owner's — and the two are
+ * kept apart rather than sharing one function precisely because they authorise
+ * differently.
+ *
+ * **It takes a book id and never a member id, and that is the security of it.**
+ * The row is found by the *caller's own* user id, so there is no argument
+ * anybody can put here that reaches somebody else's membership. `removeMember`
+ * can be handed any member id because it checks book ownership first; this one
+ * has no such check to make, so it must not accept the id at all.
+ *
+ * The row is revoked rather than deleted, the way a removal is: the seat comes
+ * back to the owner either way, and a deleted row would lose the fact that this
+ * address was ever on the book — which the invitation's own unique index needs
+ * in order to let them be invited again cleanly.
+ *
+ * Nobody is told. A writer leaving a book is the mirror of an owner revoking
+ * access, and that is silent too.
+ */
+export async function leaveBook(bookId: string): Promise<CollabResult> {
+  if (!isSupabaseConfigured() || !isAdminConfigured()) {
+    return { error: "Sharing isn't available on this server." };
+  }
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  const me = typeof claims?.claims?.sub === "string" ? claims.claims.sub : null;
+  if (!me) return { error: "Sign in first." };
+
+  const db = createAdminClient();
+  if (!db) return { error: "Sharing isn't available on this server." };
+
+  const { data, error } = await db
+    .from("book_members")
+    .update({ status: "revoked", user_id: null })
+    .eq("book_id", bookId)
+    .eq("user_id", me)
+    .eq("status", ON_THE_BOOK)
+    .select("id");
+
+  if (error) {
+    console.error(`[collab] could not leave a book: ${error.message}`);
+    return { error: "Could not do that. Try again in a moment." };
+  }
+
+  // No row matched: they are not on this book. Answered as success rather than
+  // as an error, because the writer's intent — not being on it — is already
+  // true, and an error here would strand them on a book they cannot leave.
+  if (!data || data.length === 0) return { ok: true };
+
+  return { ok: true };
+}
+
 /** Declining from the dashboard, where the row's id is all the browser has. */
 export async function declineOwnInvite(memberId: string): Promise<CollabResult> {
   if (!isAdminConfigured()) {
