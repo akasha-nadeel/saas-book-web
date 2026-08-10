@@ -1538,9 +1538,13 @@ should either ship or lose the card.
       yearly), the payout profile, the domain submitted for approval, and
       verification submitted.
 
-      **Those two live prices are stale as of 2026-08-10** — they hold $10.99
-      and $99, and `plans.ts` now says $9.99 and $90. See the note below on why
-      that matters during a review, and the price-change entry under it.
+      **Both were replaced on 2026-08-10** when the price moved to $9.99 /
+      $89.99. The live catalog now holds `pri_01kznxm0d86ytgwqbnsrfzjhvy`
+      ($9.99 monthly) and `pri_01kznxqx4j47kspyjt55vh0avb` ($89.99 yearly), with
+      the original pair **archived** — existing transactions are untouched, and
+      neither can be used for a new checkout. The ids still have to reach
+      `PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` in Vercel Production; see
+      the entry below.
 
       Two things are pending and neither is ours to hurry: **account
       verification** (Paddle, ~1–3 days) and **domain approval** for
@@ -1579,28 +1583,32 @@ should either ship or lose the card.
       Until those are set, production quietly falls back to PayHere, which is
       the right state rather than a broken one.
 
-- [ ] **Re-price the Paddle catalogs to $9.99 / $90.** `plans.ts` moved on
-      2026-08-10; the catalogs did not, and nothing in code can fix that half.
-      Both accounts need it — the **live** one so a reviewer does not meet a
-      site and a catalog quoting different figures, and the **sandbox** so
-      local testing charges what the page advertises.
+- [ ] **Carry the new price ids into the sandbox and the environment.**
+      `plans.ts` moved to $9.99 / $89.99 on 2026-08-10 and the **live** catalog
+      was re-priced with it, which is the half that mattered for the review —
+      Paddle checks a site's figures against its live catalog. Two pieces are
+      left:
 
-      **Add two new prices; do not edit the old ones.** A Paddle price is
-      referenced by id, an existing subscription stays on the price it was
-      bought at, and editing in place muddles the record of what anybody
-      actually agreed to pay. Archive the old pair once the new ids are in.
-      Give them descriptions that carry the figure ("Pro monthly 9.99") so the
-      catalog can be read at a glance.
+      - **The sandbox catalog still holds $10.99 / $99**, so local testing
+        charges what the page no longer advertises. Same shape as the live fix:
+        two new prices, the old pair archived, the ids into `.env.local`.
+      - **`PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` in Vercel
+        Production** want `pri_01kznxm0d86ytgwqbnsrfzjhvy` and
+        `pri_01kznxqx4j47kspyjt55vh0avb`, alongside the rest of the go-live
+        values above. A **redeploy** is needed either way, since the figure on
+        the page is inlined at build time.
 
-      Then the ids go into `PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` — the
-      sandbox pair in `.env.local`, the live pair in Vercel **Production** — and
-      the app must be **redeployed**, since the figure on the page is inlined at
-      build time.
+      **The rule for any future move: add prices, do not edit them.** A price is
+      referenced by id and an existing subscription stays on the one it was
+      bought at, so editing in place muddles the record of what somebody agreed
+      to pay. The $89.99 row is the one exception and only because it had been
+      created minutes earlier and never sold. Descriptions carry the figure
+      (`openchapter-pro-annual-89.99`) so the catalog reads at a glance.
 
-      This could not be done from here: the API key in `.env.local` is scoped to
-      transactions and subscriptions, so it answers `forbidden` on the price
-      endpoints, and no live key exists yet. Dashboard work, or a key with
-      catalog write on it.
+      None of this is scriptable from here yet: the key in `.env.local` is
+      scoped to transactions and subscriptions and answers `forbidden` on
+      `/prices`. It was done through the dashboard. A key with catalog write
+      would make it an API call next time.
 
 - [ ] **When to move back to PayHere, and it is arithmetic.** The switch is a
       config change now, not a migration:

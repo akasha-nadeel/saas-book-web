@@ -46,11 +46,19 @@ export const CURRENCY: Currency =
  * cycle.
  *
  * **`total` is exactly twelve times `perMonth`, and that is a rule rather than a
- * coincidence** — the annual card says "$7.50 a month, billed yearly", and the
- * two figures disagreeing by a cent would make one of them a lie. A test asserts
- * it, so a future price change cannot quietly break the pair. It is also what
- * rules out most round-looking annual figures: $89 is $7.4166… a month, and
- * there is no honest way to print that on a card.
+ * coincidence** — the card shows both, and two figures disagreeing would make
+ * one of them a lie. A test asserts it, so a future price change cannot quietly
+ * break the pair.
+ *
+ * **Which is why `perMonth` on the annual row is divided rather than typed.**
+ * $89.99 does not go into twelve — it is $7.4991666… — so a hand-written 7.50
+ * would claim a year costs $90.00 when the card charges $89.99. Dividing keeps
+ * the stored pair exact and moves the rounding to the one place it is
+ * survivable: `displayPrice`, which shows $7.50. That figure is therefore an
+ * *approximation to the nearest cent*, and it is only honest because the exact
+ * total is printed directly beneath it ("$89.99 billed annually"). Anyone
+ * changing that card must keep the two together — a per-month rate shown alone,
+ * with no total beside it, would be a claim this table cannot back.
  *
  * **The USD pair has moved twice, and the discount is what drives the annual
  * figure each time.** It was $10.99 / $87 — 34% off, roughly double what this
@@ -64,11 +72,11 @@ export const CURRENCY: Currency =
  * **Monthly is $9.99 as of 2026-08-10, and the annual followed it rather than
  * standing still.** Holding $99 against the lower monthly would have quietly
  * cut the saving to 17% — a different offer, arrived at by leaving a number
- * alone. $90 keeps the 25% that was decided on, and divides by twelve into
- * $7.50 with nothing left over, which the rule above requires. Both changes
- * were made while there were no subscribers; after that a price rise is an
- * announcement rather than an edit, and Paddle would leave existing
- * subscriptions on the price they bought in any case.
+ * alone. $89.99 keeps the 25% that was decided on, and puts the annual in the
+ * same charm-priced shape as the monthly rather than beside it at a round $90.
+ * Both changes were made while there were no subscribers; after that a price
+ * change is an announcement rather than an edit, and Paddle would leave an
+ * existing subscription on the price it was bought at in any case.
  *
  * The comparison worth keeping in view is not the other subscriptions, though.
  * Atticus is $147 **once**, Vellum $199–$250 once, Scrivener $60 once: this
@@ -79,7 +87,9 @@ export const CURRENCY: Currency =
 const PRICES: Record<Currency, Record<Period, { total: number; perMonth: number }>> = {
   USD: {
     monthly: { total: 9.99, perMonth: 9.99 },
-    annual: { total: 90.0, perMonth: 7.5 },
+    // Divided rather than typed: $89.99 does not go into twelve, and a typed
+    // 7.5 would make the total a cent more than the charge. See the note above.
+    annual: { total: 89.99, perMonth: 89.99 / 12 },
   },
   LKR: {
     monthly: { total: 2900, perMonth: 2900 },
