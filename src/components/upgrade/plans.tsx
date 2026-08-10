@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { Fragment, useActionState, useState } from "react";
 import Link from "next/link";
 import { startCheckout, type CheckoutState } from "@/app/upgrade/actions";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
@@ -118,7 +118,47 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
  * nothing implements is the same failure as a claim the code cannot back, and
  * this is the page a sceptical reader checks hardest.
  */
+/**
+ * The three headings the rows are filed under, in the order a book is made.
+ *
+ * **Twenty-two rows in one column is a list nobody finishes.** That was the
+ * shape of this card until now, and the order inside it had no argument at all
+ * — the three Pro-only rows sat in the middle, "Prose report" came after
+ * "Audiobook", and the writing record landed under the sales curve. A reader
+ * scanning for the one thing they came to check had to read every line.
+ *
+ * Grouping is what the pricing pages that carry this many rows do (Airtable and
+ * Notion both file theirs under headings), and for a measurable reason: nobody
+ * reads a long feature list, they scan for their own question, and a heading is
+ * what tells them which ten lines to look at. It also stops the list reading as
+ * a boast — clarity over completeness.
+ *
+ * **The headings are the job, not the software's parts.** "Writing the book",
+ * "Getting it ready", "Selling it" is the same order the roadmap walks and the
+ * same claim the landing page makes: nobody tells you the order. A reader who
+ * has only written should be able to see where they are on this card.
+ */
+const GROUPS = ["Writing the book", "Getting it ready", "Selling it"] as const;
+
+type Group = (typeof GROUPS)[number];
+
+/**
+ * Two rules order the rows inside a group, and both are about scanning.
+ *
+ * **What everyone gets comes first, what Pro alone gives comes last.** A reader
+ * on the free card meets the strength of the free plan before its edges; a
+ * reader on the Pro card reaches the reason to pay at the end of each block,
+ * where it is the thing they are looking at when the block finishes. Scattering
+ * the crosses through the middle — which is what this list used to do — hides
+ * the differences among the twenty rows that are identical on both cards.
+ *
+ * **Rows that answer one question stay together.** The three daily searches read
+ * as a block down the column, which is what makes "a day" legible as a shape
+ * rather than three separate numbers, so "Ranked comps" sits after them rather
+ * than next to the comp search it belongs to topically.
+ */
 const ROWS: {
+  group: Group;
   label: string;
   /**
    * A quieter aside after the label, set in parentheses and a size down.
@@ -133,7 +173,58 @@ const ROWS: {
   starter: string;
   pro: string;
 }[] = [
-  { label: "Books and words", starter: "Unlimited", pro: "Unlimited" },
+  /* ---- Writing the book ------------------------------------------------- */
+  { group: "Writing the book", label: "Books and words", starter: "Unlimited", pro: "Unlimited" },
+  { group: "Writing the book", label: "Imports", starter: "Unlimited", pro: "Unlimited" },
+  { group: "Writing the book", label: "Sync", starter: "Every device", pro: "Every device" },
+  // Free on both because it costs nothing to run: dictation is the browser's
+  // own SpeechRecognition, not the paid transcriber. The value says which
+  // browsers rather than "Included" — it is a Chrome and Edge feature, the
+  // button hides itself elsewhere, and a plan row is the wrong place to find
+  // that out later.
+  {
+    group: "Writing the book",
+    label: "Voice typing",
+    starter: "Chrome & Edge",
+    pro: "Chrome & Edge",
+  },
+  /*
+   * **Both numbers, because Pro raises this rather than lifting it.**
+   *
+   * Every other metered row reads "Unlimited" on the right; a book's seats do
+   * not, and printing "Unlimited" here would be the one false cell on the page.
+   * Read from `SEATS_PER_BOOK` for the same reason the four below are read from
+   * `FREE_LIMITS` — one number, one place — and counting the owner, so the figure
+   * a reader sees is the number of faces on the book.
+   */
+  {
+    group: "Writing the book",
+    label: "People per book",
+    starter: `${SEATS_PER_BOOK.free} incl. you`,
+    pro: `${SEATS_PER_BOOK.pro} incl. you`,
+  },
+  {
+    group: "Writing the book",
+    label: "Story bible",
+    starter: "Across a series",
+    pro: "Across a series",
+  },
+  {
+    group: "Writing the book",
+    label: "Structure & progress",
+    starter: "Included",
+    pro: "Included",
+  },
+  { group: "Writing the book", label: "Writing record", starter: "Included", pro: "Included" },
+  {
+    group: "Writing the book",
+    label: "Prose report",
+    starter: `${FREE_LIMITS.prose.free} books`,
+    pro: "Unlimited",
+  },
+  { group: "Writing the book", label: "Assistant", starter: NOT_INCLUDED, pro: "Included" },
+
+  /* ---- Getting it ready -------------------------------------------------- */
   /*
    * **Named in the label, counted in the badge.**
    *
@@ -151,8 +242,35 @@ const ROWS: {
    * deal of code to drag into a pricing page for four words. `Format` there is a
    * type and cannot be counted at runtime anyway. If a fifth format ever ships,
    * this line is part of shipping it.
+   *
+   * It opens this group because it is the row the whole page rests on, and the
+   * first line under a heading is the one that gets read.
    */
-  { label: "Exports", detail: "EPUB, DOCX, PDF, Markdown", starter: "All four", pro: "All four" },
+  {
+    group: "Getting it ready",
+    label: "Exports",
+    detail: "EPUB, DOCX, PDF, Markdown",
+    starter: "All four",
+    pro: "All four",
+  },
+  {
+    group: "Getting it ready",
+    label: "Pre-upload check & roadmap",
+    starter: "Included",
+    pro: "Included",
+  },
+  {
+    group: "Getting it ready",
+    label: "Blurb",
+    starter: `${FREE_LIMITS.blurb.free} books`,
+    pro: "Unlimited",
+  },
+  {
+    group: "Getting it ready",
+    label: "Categories & keywords",
+    starter: "Included",
+    pro: "Included",
+  },
   /*
    * **Each tool metered in its own unit, and every number read out of
    * `FREE_LIMITS`** so the page and the gate cannot drift — the same rule the
@@ -165,45 +283,55 @@ const ROWS: {
    *
    * The three searches say "a day" because they come back — the only limits
    * here that do, and a row reading "2" would look like a lifetime allowance.
-   */
-  { label: "Imports", starter: "Unlimited", pro: "Unlimited" },
-  { label: "Comp searches", starter: `${FREE_LIMITS.comps.free} a day`, pro: "Unlimited" },
-  { label: "Cover searches", starter: `${FREE_LIMITS.covers.free} a day`, pro: "Unlimited" },
-  { label: "Title checks", starter: `${FREE_LIMITS.titleCheck.free} a day`, pro: "Unlimited" },
-  { label: "Pre-upload check & roadmap", starter: "Included", pro: "Included" },
-  { label: "Blurb", starter: `${FREE_LIMITS.blurb.free} books`, pro: "Unlimited" },
-  { label: "Categories & keywords", starter: "Included", pro: "Included" },
-  { label: "Structure & progress", starter: "Included", pro: "Included" },
-  { label: "Story bible", starter: "Across a series", pro: "Across a series" },
-  /*
-   * **Both numbers, because Pro raises this rather than lifting it.**
-   *
-   * Every other metered row reads "Unlimited" on the right; a book's seats do
-   * not, and printing "Unlimited" here would be the one false cell on the page.
-   * Read from `SEATS_PER_BOOK` for the same reason the four above are read from
-   * `FREE_LIMITS` — one number, one place — and counting the owner, so the figure
-   * a reader sees is the number of faces on the book.
+   * They are kept adjacent for that reason: three of them running together is
+   * what makes "a day" read as the shape of this plan rather than as a footnote
+   * on one line.
    */
   {
-    label: "People per book",
-    starter: `${SEATS_PER_BOOK.free} incl. you`,
-    pro: `${SEATS_PER_BOOK.pro} incl. you`,
+    group: "Getting it ready",
+    label: "Comp searches",
+    starter: `${FREE_LIMITS.comps.free} a day`,
+    pro: "Unlimited",
   },
-  // Free on both because it costs nothing to run: dictation is the browser's
-  // own SpeechRecognition, not the paid transcriber. The value says which
-  // browsers rather than "Included" — it is a Chrome and Edge feature, the
-  // button hides itself elsewhere, and a plan row is the wrong place to find
-  // that out later.
-  { label: "Voice typing", starter: "Chrome & Edge", pro: "Chrome & Edge" },
-  { label: "Sync", starter: "Every device", pro: "Every device" },
-  { label: "Assistant", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Audiobook & audio import", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Prose report", starter: `${FREE_LIMITS.prose.free} books`, pro: "Unlimited" },
-  { label: "Money tracking", starter: `${FREE_LIMITS.track.free} books`, pro: "Unlimited" },
-  { label: "Sales report import & the curve", starter: NOT_INCLUDED, pro: "Included" },
-  { label: "Advance copies", starter: `${FREE_LIMITS.arcReaders.free} a book`, pro: "Unlimited" },
-  { label: "Writing record", starter: "Included", pro: "Included" },
+  {
+    group: "Getting it ready",
+    label: "Cover searches",
+    starter: `${FREE_LIMITS.covers.free} a day`,
+    pro: "Unlimited",
+  },
+  {
+    group: "Getting it ready",
+    label: "Title checks",
+    starter: `${FREE_LIMITS.titleCheck.free} a day`,
+    pro: "Unlimited",
+  },
+  { group: "Getting it ready", label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
+  {
+    group: "Getting it ready",
+    label: "Audiobook & audio import",
+    starter: NOT_INCLUDED,
+    pro: "Included",
+  },
+
+  /* ---- Selling it -------------------------------------------------------- */
+  {
+    group: "Selling it",
+    label: "Advance copies",
+    starter: `${FREE_LIMITS.arcReaders.free} a book`,
+    pro: "Unlimited",
+  },
+  {
+    group: "Selling it",
+    label: "Money tracking",
+    starter: `${FREE_LIMITS.track.free} books`,
+    pro: "Unlimited",
+  },
+  {
+    group: "Selling it",
+    label: "Sales report import & the curve",
+    starter: NOT_INCLUDED,
+    pro: "Included",
+  },
 ];
 
 export function Plans({
@@ -316,7 +444,12 @@ export function Plans({
             name="Starter"
             blurb="For everything it takes to write a book — on your own or with one other — and get it out."
             price="$0"
-            rows={ROWS.map((r) => ({ label: r.label, detail: r.detail, value: r.starter }))}
+            rows={ROWS.map((r) => ({
+              group: r.group,
+              label: r.label,
+              detail: r.detail,
+              value: r.starter,
+            }))}
             action={
               // Not a disabled "current plan" chip: a writer who is already in
               // has somewhere to be, and one who is not has an account to make.
@@ -341,7 +474,12 @@ export function Plans({
             blurb="For the assistant, the money, the readers and the book read aloud."
             price={headline}
             note={note}
-            rows={ROWS.map((r) => ({ label: r.label, detail: r.detail, value: r.pro }))}
+            rows={ROWS.map((r) => ({
+              group: r.group,
+              label: r.label,
+              detail: r.detail,
+              value: r.pro,
+            }))}
             action={
               alreadyPro ? (
                 // Nothing to sell someone who has already bought it. A disabled
@@ -620,7 +758,7 @@ function PlanCard({
   price: string;
   /** Shown under the price when the cycle needs explaining. */
   note?: string;
-  rows: { label: string; detail?: string; value: string }[];
+  rows: { group: Group; label: string; detail?: string; value: string }[];
   action: React.ReactNode;
 }) {
   const card = (
@@ -677,17 +815,55 @@ function PlanCard({
       {/* No "Features" heading. The rule already says a new part of the card
           has started, and the reference reads better without a word between
           the button and the list. */}
-      <dl className="mt-6 space-y-4">
-        {rows.map((row) => {
-          // What the plan gives you is set in the card's own ink — mark, label
-          // and value alike — and what it withholds is the only thing faded.
-          const has = row.value !== NOT_INCLUDED;
+      {/* **Walked group by group rather than row by row**, and the difference
+          is not style: driving the headings off `GROUPS` means a row filed in
+          the wrong place lands under its own heading instead of printing that
+          heading a second time halfway down the card. Reading the flag off each
+          row as it passed would have made the list's *sort order* load-bearing,
+          which is the kind of thing a later edit breaks silently.
 
-          return (
+          It also keeps the two cards in step. Both render the same array
+          through the same walk, so a heading falls at the same point in each
+          and every row stays on one line across the pair — which is the whole
+          reason the two columns can be compared at a glance. */}
+      <dl className="mt-6 space-y-4">
+        {GROUPS.map((group) => (
+          <Fragment key={group}>
+            {/* Small, uppercase and muted: it separates the blocks without
+                competing with the labels under it, which are the thing being
+                scanned. The hairline does the separating — the words only say
+                which block this is.
+
+                `first:mt-0` because the list already opens directly under the
+                card's own rule, and a second gap there would leave the first
+                block floating.
+
+                `aria-hidden`, because a screen reader is walking a definition
+                list term by term and a bare heading spliced between the pairs
+                announces itself as another term. The labels underneath are
+                self-describing; the heading is a scanning aid for the eye. */}
             <div
-              key={row.label}
-              className={`flex items-center gap-2.5 ${has ? "" : "text-muted"}`}
+              className="mt-7 flex items-center gap-3 first:mt-0"
+              aria-hidden="true"
             >
+              <span className="font-sans text-xs font-semibold tracking-[0.12em] text-muted uppercase">
+                {group}
+              </span>
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            {rows
+              .filter((row) => row.group === group)
+              .map((row) => {
+                // What the plan gives you is set in the card's own ink — mark,
+                // label and value alike — and what it withholds is the only
+                // thing faded.
+                const has = row.value !== NOT_INCLUDED;
+
+                return (
+                  <div
+                    key={row.label}
+                    className={`flex items-center gap-2.5 ${has ? "" : "text-muted"}`}
+                  >
               {/* The same circle either way, so the column of marks stays a
                   column. Only what is inside it changes: a tick for a line the
                   plan gives you, a cross for one it does not — because a tick
@@ -746,17 +922,19 @@ function PlanCard({
                   the mark in front has already said both, and a word repeating
                   a glyph is the kind of line a reader learns to skip — which
                   costs the rows that do carry a value. */}
-              {row.value !== "Included" && !has === false && (
-                <dd className="ml-auto shrink-0 pl-2 text-right">
-                  <ValueBadge
-                    value={row.value}
-                    tone={badgeTone(row.label, row.value, Boolean(featured))}
-                  />
-                </dd>
-              )}
-            </div>
-          );
-        })}
+                    {row.value !== "Included" && !has === false && (
+                      <dd className="ml-auto shrink-0 pl-2 text-right">
+                        <ValueBadge
+                          value={row.value}
+                          tone={badgeTone(row.label, row.value, Boolean(featured))}
+                        />
+                      </dd>
+                    )}
+                  </div>
+                );
+              })}
+          </Fragment>
+        ))}
       </dl>
     </section>
   );
