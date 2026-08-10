@@ -1395,11 +1395,16 @@ Five things in there are load-bearing.
   is a number the pricing page cannot honestly print. `undoChapterImport` gives
   one back, which is what makes counting the second path fair.
 - **A search the app ran is never counted, only one the writer asked for.** The
-  comps screen and the title check both open by searching for the book already
-  on screen; charging for that would spend the ten on ten page loads, which is
-  a limit on *visiting*. So the seed calls the plain search and the button calls
-  the counted one. The covers screen seeds only the box, so every search there
-  is a press.
+  comps screen still opens by searching for the book already on screen;
+  charging for that would spend the ten on ten page loads, which is a limit on
+  *visiting*. So its seed calls the plain search and its button calls the
+  counted one. **The covers screen and the title check seed only the box**, so
+  every search on those is a press and every press counts. The title check
+  searched on arrival until it was changed: the seed was the right instinct and
+  the search was not, because a finding is an answer, and the loudest element on
+  the page answering a question nobody had asked yet reads as a claim about the
+  name rather than a result. Seeding without searching is the same split the
+  comps shelf chips make — picking one fills the field and spends nothing.
 - **The tallies live in `prefs.usage`**, not on a book — they are facts about
   the account, prefs sync as one blob so a second machine does not hand out ten
   more of each, and a field on the book would have needed a Postgres column to

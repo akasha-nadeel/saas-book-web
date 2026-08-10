@@ -84,23 +84,11 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Seed the box with this book's title and check it, once.
+   * The genre shelf, fetched once and only when it is about to be needed.
    *
-   * **Arriving on a blank result was the fault.** The screen asks one question
-   * about one title, and it already knows which title the writer most likely
-   * means — so making them press a button to be told about their own book is
-   * asking them to prove they meant it. The comps screen made the same change
-   * for the same reason.
-   *
-   * The seed stays editable and the caption says so: any title can be checked,
-   * not just this one, and nothing is saved either way.
-   */
-  /**
-   * Fetched once, and only when it is about to be needed.
-   *
-   * Not on mount: the screen opens on a checked title, so this would be a
-   * second request nobody looks at. It loads the first time the writer clears
-   * the box, which is the only way to reach the state that shows it.
+   * Not on mount: the box arrives holding this book's title, so this would be a
+   * request for something nothing is showing. It loads the first time the writer
+   * clears the box, which is the only way to reach the state that draws it.
    */
   const askedShelf = useRef(false);
   useEffect(() => {
@@ -124,11 +112,12 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   /**
    * The free plan's ten title checks.
    *
-   * **The book's own title is checked free, every time.** The seed below is the
-   * answer this screen exists to give about *this* book, and charging for it
-   * would spend the ten on ten visits — a limit on arriving rather than on
-   * checking. What is counted is a title the writer typed and pressed for,
-   * which is the part that turns this into a naming tool.
+   * **Every check is a press now, so every check counts.** While the screen
+   * searched on arrival, that one had to be free or the ten would have been
+   * spent on ten page loads — a limit on visiting rather than on checking. The
+   * seed no longer searches, so there is no longer a search nobody asked for,
+   * and the rule underneath is unchanged: what is counted is a title the writer
+   * pressed for.
    */
   const gate = useLimitGate("titleChecks");
   const checks = gate.allowance;
@@ -143,12 +132,27 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   /** So "Try another" can leave the caret where the next title goes. */
   const fieldRef = useRef<HTMLInputElement>(null);
 
+  /**
+   * Put this book's title in the box, and **do not search**.
+   *
+   * The screen used to arrive having already checked, on the reasoning that it
+   * knows which title the writer most likely means and making them press for it
+   * is asking them to prove they meant it. The cost of that is a verdict nobody
+   * asked for: a green bar declaring the name clear is the loudest thing on the
+   * page, delivered before the reader has decided they were asking, and a red
+   * one lands harder still. A finding is an answer, and an answer to an unasked
+   * question reads as a claim rather than a result.
+   *
+   * The field is still seeded, which is the half worth keeping: the title is one
+   * press away rather than something to retype, and this is the same split the
+   * comps screen already makes with its shelf chips — picking one fills the
+   * field and does not spend a search.
+   */
   const seeded = useRef(false);
   useEffect(() => {
     if (!book || seeded.current) return;
     seeded.current = true;
     setTitle(book.title);
-    void check(book.title);
   }, [book]);
 
   /*
