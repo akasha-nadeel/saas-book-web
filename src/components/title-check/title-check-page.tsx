@@ -349,10 +349,17 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
             sources &&
             (sources.google || sources.openLibrary) &&
             dismissed !== checked &&
-            /* Not while the plan is spent: the upgrade banner is standing in
-               that space and two filled bars stacked read as one thing said
-               twice. The covers underneath still carry the finding. */
-            !checks.blocked && (
+            /* **Shown even when the plan is spent, and it did not used to be.**
+               The argument for hiding it was that the upgrade banner stands in
+               this space and two filled bars read as one thing said twice —
+               fair while the limit was ten for the lifetime of the account,
+               where being blocked was a rare terminal state. At two a day it is
+               the *second* search that spends the last one, so hiding it meant
+               the writer paid for a check and never saw the answer, every day,
+               on the press they were entitled to. The banner beside it says
+               "everything you have already found stays where it is", which that
+               made a lie. */
+            (
               <VerdictBanner
                 tone={verdictLine(clashes).tone}
                 /* **Only on the amber one.** A finding of "nothing uses this
