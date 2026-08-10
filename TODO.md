@@ -1531,25 +1531,44 @@ should either ship or lose the card.
       is stored as the change's *effective* date, because Paddle leaves its own
       `canceled_at` null until the period runs out.
 
-- [ ] **Live Paddle, applied for 2026-08-09 and waiting on three reviews.**
+- [ ] **Live Paddle, applied for 2026-08-09 and waiting on two reviews.**
       Seller ID 397664, Sri Lanka, sole trader. What is already done in the
       live account: the product and both prices (`pro_01kzjxz78fknh3hr9dvg2rkr58`,
       `pri_01kzjy5ewf255ssnrew3fjazsk` monthly, `pri_01kzjyce7089qb9q9p315asyqv`
-      yearly), the payout profile (Payoneer, $100 threshold), the domain
-      submitted for approval, and verification submitted.
+      yearly), the payout profile, the domain submitted for approval, and
+      verification submitted.
 
-      Three things are pending and none of them is ours to hurry: **account
-      verification** (Paddle, ~1–3 days), **domain approval** for
-      `openchapterapp.com`, and **Payoneer's own ID check**. Live checkout
-      cannot open until the first two pass.
+      **Those two live prices are stale as of 2026-08-10** — they hold $10.99
+      and $99, and `plans.ts` now says $9.99 and $90. See the note below on why
+      that matters during a review, and the price-change entry under it.
+
+      Two things are pending and neither is ours to hurry: **account
+      verification** (Paddle, ~1–3 days) and **domain approval** for
+      `openchapterapp.com`. Live checkout cannot open until both pass.
+
+      **Payoneer was the third and is abandoned.** Its activation form offers
+      no Sri Lanka in the bank-country list at all, matching reports that it has
+      stopped accepting new Sri Lankan accounts — money would have arrived there
+      and never come out. The payout profile is a **wire transfer to Sampath
+      Bank PLC (`BSAMLKLX`), in USD**, set 2026-08-10. Paddle pays out two ways
+      only, wire or Payoneer, so this was the only path; PayPal was never one.
+      USD because LKR is not among Paddle's thirteen payout currencies and the
+      balance is USD already, so there is one conversion, done by Sampath on
+      arrival, rather than Paddle taking up to 1.5% first. A plain rupee account
+      receives it — **Rs 575 per inward credit** plus their TT spread, on top of
+      Paddle's possible $15 SWIFT. That is 2–4% on a $100 payout and noise on
+      $500, so raising the threshold above $100 is worth doing once sales are
+      regular.
 
       Two details worth keeping. **Business verification is skipped entirely
       for a sole trader** — only domain review and identity verification run,
       which is why no BR certificate was needed anywhere in the flow. And
       **Paddle checks that the site's prices match the live catalog**, which is
       the reason the live product had to exist *before* verification rather
-      than after: a pricing page advertising $10.99/$99 against an empty
-      catalog is a mismatch a reviewer would flag.
+      than after: a pricing page advertising a figure against an empty catalog
+      is a mismatch a reviewer would flag. That cuts both ways, which is why
+      the price change below has to reach the live catalog rather than only the
+      site.
 
       Still to do once approved: a live API key (**make it non-expiring** —
       the sandbox default of 90 days would silently break checkout), a live
@@ -1559,6 +1578,29 @@ should either ship or lose the card.
       `PADDLE_ENV=production`, and one real payment, cancelled and refunded.
       Until those are set, production quietly falls back to PayHere, which is
       the right state rather than a broken one.
+
+- [ ] **Re-price the Paddle catalogs to $9.99 / $90.** `plans.ts` moved on
+      2026-08-10; the catalogs did not, and nothing in code can fix that half.
+      Both accounts need it — the **live** one so a reviewer does not meet a
+      site and a catalog quoting different figures, and the **sandbox** so
+      local testing charges what the page advertises.
+
+      **Add two new prices; do not edit the old ones.** A Paddle price is
+      referenced by id, an existing subscription stays on the price it was
+      bought at, and editing in place muddles the record of what anybody
+      actually agreed to pay. Archive the old pair once the new ids are in.
+      Give them descriptions that carry the figure ("Pro monthly 9.99") so the
+      catalog can be read at a glance.
+
+      Then the ids go into `PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` — the
+      sandbox pair in `.env.local`, the live pair in Vercel **Production** — and
+      the app must be **redeployed**, since the figure on the page is inlined at
+      build time.
+
+      This could not be done from here: the API key in `.env.local` is scoped to
+      transactions and subscriptions, so it answers `forbidden` on the price
+      endpoints, and no live key exists yet. Dashboard work, or a key with
+      catalog write on it.
 
 - [ ] **When to move back to PayHere, and it is arithmetic.** The switch is a
       config change now, not a migration:
@@ -1574,9 +1616,9 @@ should either ship or lose the card.
         payment), which needs the BR. Premium is LKR 9,990.
 
       Paddle answered that, and the entry above records it. What remains is
-      **when to come back**: the crossover is around **18 subscribers** —
-      Paddle takes 5% + $0.50 = $1.05 a month on $10.99 with no fixed cost,
-      PayHere Plus takes 2.99% = $0.33 plus ~$13 fixed, and 13 ÷ 0.72 ≈ 18.
+      **when to come back**: the crossover is around **19 subscribers** —
+      Paddle takes 5% + $0.50 = $1.00 a month on $9.99 with no fixed cost,
+      PayHere Plus takes 2.99% = $0.30 plus ~$13 fixed, and 13 ÷ 0.70 ≈ 19.
       Below that Paddle is cheaper *and* needs no BR; above it Plus wins and
       the gap widens with every subscriber. Recompute rather than quoting 18 if
       the price or the rupee has moved. Two things the saving does not cover:

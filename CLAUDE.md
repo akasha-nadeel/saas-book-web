@@ -1368,15 +1368,27 @@ signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
 
-**Two cycles, and both renew.** $10.99 monthly, $99 a year — 25% off, and the
+**Two cycles, and both renew.** $9.99 monthly, $90 a year — 25% off, and the
 annual total is exactly twelve times the per-month figure the card prints,
-which is a rule with a test on it rather than a coincidence. **The annual was
-$87 until 2026-08-09**, which was 34% off: roughly double what this trade does.
-The convention is "two months free" (16.7%), the usual band is 15–20%, and 20–25%
-is the aggressive end — so the old figure was not cheap for the market, it was
-discounted past it by arithmetic rather than by a decision. $99 keeps a visible
-saving, lands on Plottr Pro's annual, and divides by twelve into $8.25 exactly,
-which the rule above requires. It was changed while there were no subscribers.
+which is a rule with a test on it rather than a coincidence. **The USD pair has
+moved twice and the discount is what set the annual each time.** It was $10.99 /
+$87 — 34% off, roughly double what this trade does. The convention is "two
+months free" (16.7%), the usual band is 15–20%, and 20–25% is the aggressive
+end, so $87 was not cheap for the market, it was discounted past it by
+arithmetic rather than by a decision. On 2026-08-09 it became $10.99 / $99, 25%
+off and divisible by twelve into $8.25. On **2026-08-10 monthly became $9.99 and
+the annual followed it to $90** rather than standing still: holding $99 against
+the lower monthly would have cut the saving to 17% by leaving a number alone,
+where $90 keeps the 25% that was decided on and divides into $7.50 exactly. That
+rule is also what rules out most round-looking annuals — $89 is $7.4166… a month
+and cannot be honestly printed. Both changes were made while there were no
+subscribers; after that a price change is an announcement rather than an edit,
+and Paddle leaves an existing subscription on the price it was bought at
+regardless. **A price change is three edits, not one:** this table, two *new*
+prices in Paddle's catalog (never an edit of the live ones), and the resulting
+`PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` ids in the environment — and
+Paddle checks that the site's prices match the live catalog, so the two must
+not sit out of step across a review.
 The LKR table is priced for its own market and is not the USD one converted. A lifetime tier was
 built on 2026-08-03 and removed the same day — worth knowing only because the
 removal is a decision rather than an omission: selling outright is what this

@@ -207,8 +207,8 @@ export async function POST(request: Request) {
       | null;
     const total = details?.totals?.grandTotal;
 
-    // Paddle sends money in the currency's smallest unit as a string — "1099"
-    // is $10.99. Storing it raw would put a hundredfold error in the ledger.
+    // Paddle sends money in the currency's smallest unit as a string — "999"
+    // is $9.99. Storing it raw would put a hundredfold error in the ledger.
     const amount =
       typeof total === "string" && total.length > 0 ? Number(total) / 100 : null;
 
