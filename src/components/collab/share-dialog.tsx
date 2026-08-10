@@ -80,7 +80,7 @@ export function ShareDialog({
    * **Whether a *press* has been refused — not whether the book is full.**
    *
    * `LimitBanner`'s own rule is that it stands for as long as the limit lasts,
-   * and for the four counted actions that is right: ten searches spent means the
+   * and for a spend that is right: ten searches spent would mean the
    * screen cannot do the thing it exists for, and a writer returning tomorrow
    * should be told where they are without pressing a dead button to find out.
    *

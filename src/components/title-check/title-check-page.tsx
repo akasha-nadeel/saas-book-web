@@ -110,16 +110,16 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   }, [title, book?.genre]);
 
   /**
-   * The free plan's ten title checks.
+   * The free plan's five tooled books.
    *
-   * **Every check is a press now, so every check counts.** While the screen
-   * searched on arrival, that one had to be free or the ten would have been
-   * spent on ten page loads — a limit on visiting rather than on checking. The
-   * seed no longer searches, so there is no longer a search nobody asked for,
-   * and the rule underneath is unchanged: what is counted is a title the writer
-   * pressed for.
+   * **Checking is unlimited; what is limited is books.** Naming is the most
+   * iterative thing this app does — type a title, read the shelf, change one
+   * word, try again — and the per-search meter this replaced ran out in the
+   * middle of exactly that. The gate now refuses nothing on a book already
+   * being worked on, so a writer is only ever stopped when they open the tools
+   * on a *sixth* manuscript.
    */
-  const gate = useLimitGate("titleChecks");
+  const gate = useLimitGate(bookId);
   const checks = gate.allowance;
   /**
    * The title whose finding has been closed.
@@ -475,7 +475,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
       </div>
 
       {gate.dialogOpen && (
-        <LimitDialog action="titleChecks" onClose={gate.closeDialog} />
+        <LimitDialog action="bookTools" onClose={gate.closeDialog} />
       )}
     </div>
   );

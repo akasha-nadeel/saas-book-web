@@ -11,7 +11,7 @@ import {
   priceOf,
 } from "@/lib/billing/plans";
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
-import { FREE_LIMITS, SEATS_PER_BOOK } from "@/lib/free-limits";
+import { FREE_TOOL_BOOKS, SEATS_PER_BOOK } from "@/lib/free-limits";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -154,25 +154,26 @@ const ROWS: {
    */
   { label: "Exports", detail: "EPUB, DOCX, PDF, Markdown", starter: "All four", pro: "All four" },
   /*
-   * The four counted rows, and every number is read out of `FREE_LIMITS` so the
-   * page and the gate cannot drift — the same rule the prices follow.
+   * **One row where there were four**, and the number is read out of
+   * `FREE_TOOL_BOOKS` so the page and the gate cannot drift — the same rule the
+   * prices follow.
    *
-   * Imports are counted **files, not books**: a manuscript brought into a book
-   * that already exists spends one too, or "make a book first" is one click
-   * round it. The three searches count a press rather than a screen — both the
-   * comps page and the title check open by searching for the book already in
-   * front of the writer, and that arrival search is free, or the ten would go
-   * on ten visits. Blurb and categories are not counted at all, which is why
-   * they moved off the search row and onto their own.
+   * The four rows it replaced each metered an *attempt*: ten imports, ten comp
+   * searches, ten cover searches, ten title checks. Four numbers is four things
+   * for a reader to hold while comparing two columns, and every one of them
+   * charged for iteration on screens whose whole use is iterative. One row that
+   * says "5 books, everything unlimited inside them" is the same plan stated in
+   * a sentence somebody can act on — Figma's free tier reads the same way, and
+   * for the same reason.
+   *
+   * The rows underneath say "Unlimited" on *both* columns now, because they are:
+   * what Pro lifts is the number of books, not the work done in them.
    */
-  { label: "Imports", starter: `${FREE_LIMITS.imports} files`, pro: "Unlimited" },
-  { label: "Comp searches", starter: `${FREE_LIMITS.comps}`, pro: "Unlimited" },
-  { label: "Cover searches", starter: `${FREE_LIMITS.covers}`, pro: "Unlimited" },
-  {
-    label: "Title checks",
-    starter: `${FREE_LIMITS.titleChecks}`,
-    pro: "Unlimited",
-  },
+  { label: "Books with tools", starter: `${FREE_TOOL_BOOKS}`, pro: "Unlimited" },
+  { label: "Imports", starter: "Unlimited", pro: "Unlimited" },
+  { label: "Comp searches", starter: "Unlimited", pro: "Unlimited" },
+  { label: "Cover searches", starter: "Unlimited", pro: "Unlimited" },
+  { label: "Title checks", starter: "Unlimited", pro: "Unlimited" },
   { label: "Pre-upload check & roadmap", starter: "Included", pro: "Included" },
   { label: "Blurb & categories", starter: "Included", pro: "Included" },
   { label: "Structure & progress", starter: "Included", pro: "Included" },

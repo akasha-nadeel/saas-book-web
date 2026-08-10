@@ -5,18 +5,16 @@ import Image from "next/image";
 import Link from "next/link";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
 import {
-  allowanceOf,
-  COUNTED_LABELS,
-  FREE_LIMITS,
+  bookToolAllowance,
+  FREE_TOOL_BOOKS,
   leftBadge,
   leftLine,
   SEATS_PER_BOOK,
   spentLine,
   type Allowance,
-  type Counted,
   type Limited,
 } from "@/lib/free-limits";
-import { countUse } from "@/lib/library-store";
+import { markToolUse } from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
 import { usePlan } from "@/lib/use-plan";
 
@@ -43,17 +41,25 @@ import { usePlan } from "@/lib/use-plan";
  */
 
 /**
- * The plan and one tally, in a single answer.
+ * The plan and the list of tooled books, in a single answer.
  *
  * **A loading plan counts as entitled**, exactly as `ProGate` does: half a
  * second of a paywall shown to somebody who is paying is worse than half a
  * second of nothing, and here it would be a search button refusing to work on
  * arrival. The plan resolves in a moment and the notice arrives with it.
+ *
+ * `bookId` is what makes the answer specific: a book already on the list is
+ * never blocked, so the same writer on the same day gets a live screen on their
+ * fourth book and a refusal on their sixth.
  */
-export function useAllowance(action: Counted): Allowance {
+export function useAllowance(bookId: string): Allowance {
   const plan = usePlan();
-  const used = usePrefs().usage[action];
-  return allowanceOf(action, used, plan.loading || plan.pro);
+  const books = usePrefs().toolBooks;
+  return bookToolAllowance(
+    books.length,
+    books.includes(bookId),
+    plan.loading || plan.pro,
+  );
 }
 
 /**
@@ -72,17 +78,23 @@ export function useAllowance(action: Counted): Allowance {
  * control that is merely dark explains nothing on its own anyway. The press is
  * refused, and the refusal is what speaks.
  *
- * Two ways to ask, because the counting happens in two places:
+ * **The refusal only ever lands on a book that is not already on the list.** A
+ * book being worked on is never blocked, however many searches it takes, so the
+ * writer who is refused is the one opening a *sixth* manuscript — never the one
+ * in the middle of naming their fourth. That is the whole reason the limit
+ * counts books rather than attempts.
  *
- * - **`spend()`** for the three searches, which count here.
- * - **`check()`** for the imports, which count inside the store — at the
- *   funnel every import screen goes through, so counting here as well would
- *   charge twice for one file.
+ * Two ways to ask, because the marking happens in two places:
+ *
+ * - **`spend()`** for the searches, which mark here.
+ * - **`check()`** for the imports, which mark inside the store — at the funnel
+ *   every import screen goes through, so marking here as well would be a second
+ *   write for one file.
  *
  * Both answer `true` when the caller may go ahead, and `false` having already
  * put the refusal on screen.
  */
-export function useLimitGate(action: Counted): {
+export function useLimitGate(bookId: string): {
   allowance: Allowance;
   /** True once a press has been refused. Drives the banner, which stays. */
   refused: boolean;
@@ -98,14 +110,14 @@ export function useLimitGate(action: Counted): {
    * the interruption and goes when it is dismissed.
    */
   dialogOpen: boolean;
-  /** Ask, and count it. */
+  /** Ask, and put this book on the list if it is not there already. */
   spend: () => boolean;
-  /** Ask without counting — for the paths the store counts for itself. */
+  /** Ask without marking — for the paths the store marks for itself. */
   check: () => boolean;
   /** Close the dialog. The banner stays: the limit has not moved. */
   closeDialog: () => void;
 } {
-  const allowance = useAllowance(action);
+  const allowance = useAllowance(bookId);
   const [refused, setRefused] = useState(false);
   const [dialog, setDialog] = useState(false);
 
@@ -118,9 +130,11 @@ export function useLimitGate(action: Counted): {
 
   const spend = useCallback(() => {
     if (!check()) return false;
-    countUse(action);
+    // Idempotent, so every tool may call this on every action without working
+    // out whether this particular press is the first one on this book.
+    markToolUse(bookId);
     return true;
-  }, [check, action]);
+  }, [check, bookId]);
 
   return {
     allowance,
@@ -368,10 +382,7 @@ const WHAT_PRO_ADDS = [
  * is why it is filtered rather than prepended blindly.
  */
 const REACHED_LINE: Record<Limited, string> = {
-  imports: "Manuscript imports with no ceiling",
-  comps: "Comp searches, cover searches and title checks, unmetered",
-  covers: "Comp searches, cover searches and title checks, unmetered",
-  titleChecks: "Comp searches, cover searches and title checks, unmetered",
+  bookTools: "Every tool on every book, however many you write",
   collaborators: `Up to ${SEATS_PER_BOOK.pro} people on a book instead of ${SEATS_PER_BOOK.free}`,
 };
 
@@ -383,18 +394,21 @@ function proAdds(action: Limited): string[] {
 /**
  * The headline, which has to name what was reached in that limit's own terms.
  *
- * A spend has a last one — "that was your last of ten". A book does not spend
- * people; it is full or it is not. One sentence each rather than a shared
- * template with a hole in it, because the template that fits both says neither
- * well.
+ * **Neither of these is a spend, so neither says "your last of ten".** A book
+ * is full of people or it is not; the free plan reaches five manuscripts or it
+ * does not. One sentence each rather than a shared template with a hole in it,
+ * because the template that fits both says neither well.
+ *
+ * The tools line names the *books* and not the search that was refused, which
+ * is the whole point of the change it belongs to: nothing has run out on the
+ * screen the writer is looking at, and saying otherwise would be false as well
+ * as discouraging.
  */
 function reachedHeadline(action: Limited): string {
   if (action === "collaborators") {
     return `A free book holds ${SEATS_PER_BOOK.free} people`;
   }
-  return `That was your last of ${FREE_LIMITS[action]} free ${
-    COUNTED_LABELS[action].many
-  }`;
+  return `The free plan covers ${FREE_TOOL_BOOKS} books`;
 }
 
 /**
@@ -682,12 +696,12 @@ export function ImportLimitReached({
         Free plan
       </p>
       <h2 className="mt-2 font-sans text-lg font-bold text-white">
-        {used.toLocaleString()} manuscripts imported
+        {used.toLocaleString()} of {FREE_TOOL_BOOKS} books
       </h2>
       <p className="mt-1.5 max-w-prose font-sans text-sm leading-relaxed text-white/85">
-        The free plan brings in {FREE_LIMITS.imports}. Pro has no limit —
-        everything else about importing is the same, and that is the only thing
-        this lifts.
+        The free plan runs every tool on {FREE_TOOL_BOOKS} books, as often as
+        you like. Pro lifts the number of books — nothing about the tools
+        themselves changes, and that is the only thing this lifts.
       </p>
       <Link
         href="/upgrade"

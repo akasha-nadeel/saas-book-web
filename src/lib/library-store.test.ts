@@ -11,8 +11,8 @@ import {
   chapterNumberOf,
   createBookFromImport,
   chapterLabel,
-  countUse,
-  refundUse,
+  markToolUse,
+  isToolBook,
   createBookFromTemplate,
   createChapter,
   createMatterPage,
@@ -543,24 +543,24 @@ it("refuses an import with no chapters", () => {
 });
 
 /*
- * The tally behind the free plan's ten imports. It is only a count here — the
- * limit itself is `lib/free-limits.ts` — but the count has to be taken at the
+ * The list behind the free plan's five tooled books. It is only a list here —
+ * the limit itself is `lib/free-limits.ts` — but the mark has to be made at the
  * funnels or the number on the pricing page means nothing.
  */
-it("counts a manuscript brought in as a book", () => {
-  expect(getPrefs().usage.imports).toBe(0);
+it("marks a manuscript brought in as a book", () => {
+  expect(getPrefs().toolBooks).toEqual([]);
 
-  createBookFromImport("One", [
+  const one = createBookFromImport("One", [
     { title: "Chapter One", doc: { type: "doc" }, words: 10 },
-  ]);
-  createBookFromImport("Two", [
+  ])!;
+  const two = createBookFromImport("Two", [
     { title: "Chapter One", doc: { type: "doc" }, words: 10 },
-  ]);
+  ])!;
 
-  expect(getPrefs().usage.imports).toBe(2);
+  expect(getPrefs().toolBooks).toEqual([one.bookId, two.bookId]);
 });
 
-it("does not spend an import on a file it could not store", () => {
+it("does not mark a book it could not store", () => {
   const setItem = localStorage.setItem.bind(localStorage);
   let calls = 0;
   vi.spyOn(Storage.prototype, "setItem").mockImplementation((k, v) => {
@@ -576,12 +576,12 @@ it("does not spend an import on a file it could not store", () => {
   vi.restoreAllMocks();
 
   expect(getShelf().books).toHaveLength(0);
-  expect(getPrefs().usage.imports).toBe(0);
+  expect(getPrefs().toolBooks).toEqual([]);
 });
 
-it("counts a manuscript brought into a book that already exists", () => {
-  // The way round the limit if this one did not count: make an empty book,
-  // then import into it.
+it("marks a manuscript brought into a book that already exists", () => {
+  // The way round the limit if this one did not mark: make an empty book, then
+  // import into it.
   const { bookId } = createBook("Started here");
   importIntoBook(
     bookId,
@@ -589,59 +589,58 @@ it("counts a manuscript brought into a book that already exists", () => {
     "add",
   );
 
-  expect(getPrefs().usage.imports).toBe(1);
+  expect(getPrefs().toolBooks).toEqual([bookId]);
 });
 
-it("gives the import back when the writer undoes it", () => {
+/*
+ * **The one not to "fix".** Undoing an import used to hand back a spend,
+ * because the old limit counted files. It counts *books* now, and the book is
+ * still here and still being worked on — so the slot stays taken. Releasing it
+ * would make "five books" mean "five at a time".
+ */
+it("keeps the book marked when an import into it is undone", () => {
   const { bookId } = createBook("Started here");
   const result = importIntoBook(
     bookId,
     [{ title: "Chapter One", doc: { type: "doc" }, words: 900 }],
     "add",
   )!;
-  expect(getPrefs().usage.imports).toBe(1);
+  expect(getPrefs().toolBooks).toEqual([bookId]);
 
   undoChapterImport(result.undo);
-  expect(getPrefs().usage.imports).toBe(0);
+  expect(getPrefs().toolBooks).toEqual([bookId]);
 });
 
-it("counts each free-plan action on its own tally", () => {
-  countUse("comps");
-  countUse("comps");
-  countUse("titleChecks");
+it("marks a book once however many tools are used on it", () => {
+  markToolUse("book-a");
+  markToolUse("book-a");
+  markToolUse("book-b");
+  markToolUse("book-a");
 
-  expect(getPrefs().usage).toEqual({
-    imports: 0,
-    comps: 2,
-    covers: 0,
-    titleChecks: 1,
-  });
+  expect(getPrefs().toolBooks).toEqual(["book-a", "book-b"]);
+  expect(isToolBook("book-a")).toBe(true);
+  expect(isToolBook("book-c")).toBe(false);
 });
 
-it("never counts below nought", () => {
-  refundUse("covers");
-  expect(getPrefs().usage.covers).toBe(0);
-});
-
-it("carries a tally written before the counts were a record", () => {
-  // The first version counted imports alone, at the top level of prefs. A
-  // writer who had already brought books in must not have those forgiven by an
-  // upgrade — a limit that resets itself is not a limit.
-  localStorage.setItem("openchapter:prefs", JSON.stringify({ imports: 4 }));
-  expect(getPrefs().usage.imports).toBe(4);
-});
-
-it("keeps a tally that storage has had tampered with sane", () => {
+it("keeps a list that storage has had tampered with sane", () => {
   localStorage.setItem(
     "openchapter:prefs",
-    JSON.stringify({ usage: { imports: -3, comps: "lots" } }),
+    JSON.stringify({ toolBooks: ["a", 7, null, "a", "b"] }),
   );
-  expect(getPrefs().usage).toEqual({
-    imports: 0,
-    comps: 0,
-    covers: 0,
-    titleChecks: 0,
-  });
+  expect(getPrefs().toolBooks).toEqual(["a", "b"]);
+});
+
+it("starts an older library on an empty list rather than guessing", () => {
+  // Before this, the plan metered four actions ten times each and kept the
+  // counts in `prefs.usage`. Those numbers say nothing about *which* books the
+  // work happened on, so nothing is migrated: erring generous is the only
+  // defensible direction when the alternative is charging somebody for work
+  // there is no evidence of.
+  localStorage.setItem(
+    "openchapter:prefs",
+    JSON.stringify({ usage: { imports: 9, comps: 10 } }),
+  );
+  expect(getPrefs().toolBooks).toEqual([]);
 });
 
 it("keeps chapter ids unique across books", () => {

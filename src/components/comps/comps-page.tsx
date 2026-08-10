@@ -308,7 +308,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
    * on opening the screen rather than on searching it. So `ask` is what the
    * button and the shelf chips call, and the seed keeps calling `search`.
    */
-  const gate = useLimitGate("comps");
+  const gate = useLimitGate(bookId);
   const comps = gate.allowance;
   const ask = useCallback(
     (q: string, genre?: string) => {
@@ -723,7 +723,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
       </div>
 
       {gate.dialogOpen && (
-        <LimitDialog action="comps" onClose={gate.closeDialog} />
+        <LimitDialog action="bookTools" onClose={gate.closeDialog} />
       )}
     </div>
   );

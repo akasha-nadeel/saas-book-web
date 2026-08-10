@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  allowanceOf,
-  COUNTED,
-  COUNTED_LABELS,
-  FREE_LIMITS,
+  bookToolAllowance,
+  FREE_TOOL_BOOKS,
   leftBadge,
   leftLine,
   seatAllowance,
@@ -12,81 +10,60 @@ import {
   WARN_WHEN_LEFT,
 } from "./free-limits";
 
-describe("allowanceOf", () => {
+describe("bookToolAllowance", () => {
   it("gives a new writer the whole allowance", () => {
-    expect(allowanceOf("imports", 0, false)).toEqual({
-      action: "imports",
+    expect(bookToolAllowance(0, false, false)).toEqual({
+      action: "bookTools",
       used: 0,
-      limit: FREE_LIMITS.imports,
-      left: FREE_LIMITS.imports,
+      limit: FREE_TOOL_BOOKS,
+      left: FREE_TOOL_BOOKS,
       blocked: false,
     });
   });
 
-  it("counts down as they are spent", () => {
-    expect(allowanceOf("comps", 3, false).left).toBe(FREE_LIMITS.comps - 3);
-    expect(allowanceOf("comps", 3, false).blocked).toBe(false);
+  it("counts books down as they are opened", () => {
+    expect(bookToolAllowance(3, false, false).left).toBe(FREE_TOOL_BOOKS - 3);
+    expect(bookToolAllowance(3, false, false).blocked).toBe(false);
   });
 
-  it("allows the last one and refuses the one after it", () => {
-    const limit = FREE_LIMITS.titleChecks;
-    expect(allowanceOf("titleChecks", limit - 1, false).blocked).toBe(false);
-    expect(allowanceOf("titleChecks", limit, false).blocked).toBe(true);
+  it("allows the last book and refuses the one after it", () => {
+    expect(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false).blocked).toBe(false);
+    expect(bookToolAllowance(FREE_TOOL_BOOKS, false, false).blocked).toBe(true);
+  });
+
+  /*
+   * **The one not to "fix", and the whole point of counting books.** A writer
+   * whose five are full is never stopped on a book already among them, however
+   * many titles or comps they search there. If this goes red the limit has gone
+   * back to charging for effort, which is what it was changed to stop.
+   */
+  it("never blocks a book already being worked on", () => {
+    expect(bookToolAllowance(FREE_TOOL_BOOKS, true, false).blocked).toBe(false);
+    expect(bookToolAllowance(FREE_TOOL_BOOKS + 3, true, false).blocked).toBe(false);
   });
 
   it("never reports a negative remainder", () => {
-    // A tally can overshoot: these are checked in the browser, and a writer
-    // whose plan lapses keeps whatever they already spent.
-    expect(allowanceOf("covers", FREE_LIMITS.covers + 5, false).left).toBe(0);
+    // The list can overshoot: this is checked in the browser, and a writer whose
+    // plan lapses keeps every book they had already opened a tool on.
+    expect(bookToolAllowance(FREE_TOOL_BOOKS + 5, false, false).left).toBe(0);
   });
 
   it("has no limit at all on Pro", () => {
-    for (const action of COUNTED) {
-      const pro = allowanceOf(action, 40, true);
-      expect(pro.limit).toBeNull();
-      expect(pro.left).toBeNull();
-      expect(pro.blocked).toBe(false);
-    }
+    const pro = bookToolAllowance(40, false, true);
+    expect(pro.limit).toBeNull();
+    expect(pro.left).toBeNull();
+    expect(pro.blocked).toBe(false);
   });
 
   it("treats anything storage may hold as nought", () => {
     for (const value of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
-      expect(allowanceOf("imports", value, false).used).toBe(0);
+      expect(bookToolAllowance(value, false, false).used).toBe(0);
     }
-    expect(allowanceOf("imports", "7" as unknown as number, false).used).toBe(0);
+    expect(bookToolAllowance("7" as unknown as number, false, false).used).toBe(0);
   });
 
-  it("rounds a fractional tally down rather than up", () => {
-    expect(allowanceOf("imports", 2.7, false).used).toBe(2);
-  });
-});
-
-describe("the table", () => {
-  /*
-   * A limit with no name on screen is a number a writer meets without a word
-   * for it; a label with no limit is a row on the pricing page that counts
-   * nothing. Both halves have to cover the same four.
-   */
-  it("names and numbers every counted action", () => {
-    for (const action of COUNTED) {
-      expect(typeof FREE_LIMITS[action]).toBe("number");
-      expect(COUNTED_LABELS[action].one).toBeTruthy();
-      expect(COUNTED_LABELS[action].many).toBeTruthy();
-      expect(COUNTED_LABELS[action].shortOne).toBeTruthy();
-    }
-    expect(Object.keys(FREE_LIMITS).sort()).toEqual([...COUNTED].sort());
-    expect(Object.keys(COUNTED_LABELS).sort()).toEqual([...COUNTED].sort());
-  });
-
-  /*
-   * Seats are deliberately *not* one of the counted four — they are current
-   * occupancy rather than a spend, and joining `Counted` would put them in the
-   * `prefs.usage` tally, where removing a collaborator could not give the seat
-   * back. This is the assertion that keeps them out of it.
-   */
-  it("keeps seats out of the spend tally", () => {
-    expect([...COUNTED]).not.toContain("collaborators");
-    expect(Object.keys(FREE_LIMITS)).not.toContain("collaborators");
+  it("rounds a fractional count down rather than up", () => {
+    expect(bookToolAllowance(2.7, false, false).used).toBe(2);
   });
 });
 
@@ -150,13 +127,13 @@ describe("seats", () => {
 });
 
 describe("the badge", () => {
-  /* It read "1 searches left" before `shortOne` existed. */
+  /* It read "1 books left" before `shortOne` existed. */
   it("says one of a thing in the singular", () => {
-    expect(leftBadge(allowanceOf("comps", FREE_LIMITS.comps - 1, false))).toBe(
-      "1 search left",
+    expect(leftBadge(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false))).toBe(
+      "1 book left",
     );
-    expect(leftBadge(allowanceOf("comps", FREE_LIMITS.comps - 2, false))).toBe(
-      "2 searches left",
+    expect(leftBadge(bookToolAllowance(FREE_TOOL_BOOKS - 2, false, false))).toBe(
+      "2 books left",
     );
     expect(leftBadge(seatAllowance(1, false))).toBe("1 seat left");
   });
@@ -164,45 +141,58 @@ describe("the badge", () => {
 
 describe("the lines", () => {
   /*
-   * The one not to "fix": a fresh account is told nothing. "0 of 10 used" in
+   * The one not to "fix": a fresh account is told nothing. "0 of 5 used" in
    * front of somebody who has used nothing teaches them this is a metered
    * product before they have had anything out of it, which is the freemium
    * pattern this audience has been burned by. The number is on the pricing page
    * and in Help; the screen speaks when it is nearly spent.
    */
   it("says nothing until the allowance is nearly gone", () => {
-    for (let used = 0; used < FREE_LIMITS.comps - WARN_WHEN_LEFT; used += 1) {
-      expect(leftLine(allowanceOf("comps", used, false))).toBeNull();
+    for (let used = 0; used < FREE_TOOL_BOOKS - WARN_WHEN_LEFT; used += 1) {
+      expect(leftLine(bookToolAllowance(used, false, false))).toBeNull();
     }
     expect(
-      leftLine(allowanceOf("comps", FREE_LIMITS.comps - WARN_WHEN_LEFT, false)),
-    ).toBe(`${WARN_WHEN_LEFT} free comp searches left.`);
+      leftLine(bookToolAllowance(FREE_TOOL_BOOKS - WARN_WHEN_LEFT, false, false)),
+    ).toBe(`The free plan covers ${WARN_WHEN_LEFT} more books.`);
   });
 
   it("counts what is left rather than what was spent", () => {
-    expect(leftLine(allowanceOf("comps", FREE_LIMITS.comps - 2, false))).toBe(
-      "2 free comp searches left.",
+    expect(leftLine(bookToolAllowance(FREE_TOOL_BOOKS - 2, false, false))).toBe(
+      "The free plan covers 2 more books.",
     );
   });
 
   it("says the last one in the singular", () => {
-    expect(leftLine(allowanceOf("imports", FREE_LIMITS.imports - 1, false))).toBe(
-      "1 free import left.",
+    expect(leftLine(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false))).toBe(
+      "The free plan covers 1 more book.",
     );
   });
 
+  /*
+   * The words are about *books*, never about searches. A reader told "2 checks
+   * left" would ration the one thing this plan does not ration.
+   */
+  it("never names the work, only the books", () => {
+    const nearly = leftLine(bookToolAllowance(FREE_TOOL_BOOKS - 1, false, false)) ?? "";
+    const spent = spentLine(bookToolAllowance(FREE_TOOL_BOOKS, false, false)) ?? "";
+    for (const word of ["search", "check", "import"]) {
+      expect(nearly).not.toContain(word);
+      expect(spent).not.toContain(word);
+    }
+  });
+
   it("hands over to the spent line at nought", () => {
-    const none = allowanceOf("comps", FREE_LIMITS.comps, false);
+    const none = bookToolAllowance(FREE_TOOL_BOOKS, false, false);
     // Never both: two sentences about one limit is how a notice becomes
     // wallpaper.
     expect(leftLine(none)).toBeNull();
     expect(spentLine(none)).toBe(
-      `All ${FREE_LIMITS.comps} free comp searches are used.`,
+      `The free plan runs the tools on ${FREE_TOOL_BOOKS} books, and you are already using all ${FREE_TOOL_BOOKS}.`,
     );
   });
 
   it("says nothing at all on a plan with no limit", () => {
-    expect(leftLine(allowanceOf("comps", 9, true))).toBeNull();
-    expect(spentLine(allowanceOf("comps", 9, true))).toBeNull();
+    expect(leftLine(bookToolAllowance(9, false, true))).toBeNull();
+    expect(spentLine(bookToolAllowance(9, false, true))).toBeNull();
   });
 });

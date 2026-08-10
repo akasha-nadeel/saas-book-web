@@ -37,9 +37,9 @@ import {
   type MatterPart,
 } from "./matter";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
-// Type and table only. free-limits.ts is pure and imports nothing back, so the
-// policy stays out of the store and the store stays the only place that counts.
-import { COUNTED, type Counted } from "./free-limits";
+// Nothing is imported from free-limits.ts any more: the policy is a number and
+// two functions there, and the store's only job is to keep the list of books.
+// It stays pure and imports nothing back, so the policy stays out of the store.
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
 import { isEmptyDetail, type PublishingMeta } from "./publishing";
@@ -1259,19 +1259,18 @@ export function createBookFromImport(
   });
 
   /*
-   * Counted here, at the funnel, rather than at each screen that imports.
+   * Marked here, at the funnel, rather than at each screen that imports.
    *
-   * Three of them call this — the import page, the shelf's dialog and the
-   * landing page's check — and the same argument that put `setupFromImport`
-   * in all three applies harder to a limit: a screen that forgets to count is
-   * an eleventh import nobody notices, and the one that would forget is
-   * whichever one is written next.
+   * Three of them arrive this way — the import page, the shelf's dialog and the
+   * landing page's check — and the same argument that put `setupFromImport` in
+   * all three applies harder to a plan limit: a screen that forgets to mark is
+   * a book the plan never sees, and the one that would forget is whichever is
+   * written next.
    *
-   * After the commit, so a rolled-back import costs nothing, and only for a
-   * *book* — chapters appended to an existing one go through `importIntoBook`
-   * and are not what the plan counts.
+   * Importing *is* using a tool on a book, so the new book joins the five. It
+   * is marked after the commit, so a rolled-back import leaves nothing behind.
    */
-  countUse("imports");
+  markToolUse(book.id);
 
   return { bookId, chapterId: metas[0].id };
 }
@@ -1450,14 +1449,15 @@ export function importIntoBook(
   }
 
   /*
-   * Counted, like `createBookFromImport`.
+   * Marked, like `createBookFromImport`.
    *
    * A manuscript brought into a book made thirty seconds ago is the same
    * manuscript arriving by a different door, and a plan limit with a door left
-   * open is a number the pricing page cannot honestly print. The undo below
-   * gives it back, which is the half that makes counting it fair.
+   * open is a number the pricing page cannot honestly print. Marking the book
+   * rather than counting the file is what closes it: "new book, then import
+   * into it" now lands on the same book either way.
    */
-  countUse("imports");
+  markToolUse(bookId);
 
   return { firstId: metas[0].id, undo };
 }
@@ -1514,9 +1514,9 @@ export function undoChapterImport(undo: ImportUndo) {
     };
   });
 
-  // The import is being taken back in full, so the plan's tally comes back
-  // with it. `refundUse` is the only caller of that direction in the app.
-  refundUse("imports");
+  // Nothing to give back. The book itself is still here and still tooled, so
+  // undoing an import into it does not release a slot — under the old
+  // per-import meter this refunded a spend, and there is no longer a spend.
 }
 
 export function renameChapter(
@@ -2027,15 +2027,16 @@ export interface Prefs {
    * **Here rather than on a book** for the reason `matterAsked` is: these are
    * facts about the account rather than about any manuscript, and a field on
    * the book would need a Postgres column to survive `sync.ts` at all. Prefs go
-   * up as one JSON blob, so the counts travel between a writer's machines,
-   * which is what stops a second browser handing out ten more of each.
+   * up as one JSON blob, so the list travels between a writer's machines, which
+   * is what stops a second browser handing out five more.
    *
-   * They only go up, with one exception: undoing an import gives that import
-   * back, because the writer reversed the thing they were charged for. Deleting
-   * an imported book does not, or "ten imports" would quietly mean "ten at a
+   * **A set, not a tally.** A book on this list costs nothing more however much
+   * work is done on it — that is the whole of "unlimited within a book". An id
+   * is added the first time a tool does real work there and is never removed:
+   * dropping it when a book is deleted would make "five books" mean "five at a
    * time", which is a different promise from the one the pricing page makes.
    */
-  usage: Record<Counted, number>;
+  toolBooks: string[];
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -2065,14 +2066,13 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Nothing spent yet, which is also what a library stored before this existed
   // reads as. Erring low is deliberate: charging a writer for work they cannot
   // be shown any evidence of is the wrong way round to be wrong. Frozen with
-  // the rest, so it is shared — `countUse` writes a new object rather than
+  // the rest, so it is shared — `markToolUse` writes a new array rather than
   // adding to this one.
-  usage: Object.freeze({
-    imports: 0,
-    comps: 0,
-    covers: 0,
-    titleChecks: 0,
-  }) as Record<Counted, number>,
+  // Nothing tooled yet, which is also what a library stored before this existed
+  // reads as. Erring low is deliberate: charging a writer for work they cannot
+  // be shown any evidence of is the wrong way round to be wrong. Frozen with
+  // the rest, so it is shared — `markToolUse` writes a new array.
+  toolBooks: [],
 });
 
 const prefsListeners = new Set<() => void>();
@@ -2128,9 +2128,9 @@ function parsePrefs(raw: string | null): Prefs {
         ? parsed.matterAsked.filter((id): id is string => typeof id === "string")
         : [],
       // Narrowed on the way in for the same reason, and once more where it is
-      // used: `allowanceOf` refuses anything that is not a whole positive
+      // used: `bookToolAllowance` refuses anything that is not a whole positive
       // number, so a hand-edited key cannot make the arithmetic nonsense.
-      usage: parseUsage(parsed),
+      toolBooks: parseToolBooks(parsed),
     };
   } catch {
     return DEFAULT_PREFS;
@@ -2146,19 +2146,21 @@ function parsePrefs(raw: string | null): Prefs {
  * writer who had already brought books in must not have that forgiven silently
  * — a limit that resets itself is not a limit.
  */
-function parseUsage(
-  parsed: Partial<Prefs> & { imports?: unknown },
-): Record<Counted, number> {
-  const stored = (parsed.usage ?? {}) as Record<string, unknown>;
-  const whole = (value: unknown) =>
-    typeof value === "number" && Number.isFinite(value) && value > 0
-      ? Math.floor(value)
-      : 0;
-
-  const usage = {} as Record<Counted, number>;
-  for (const action of COUNTED) usage[action] = whole(stored[action]);
-  if (!("imports" in stored)) usage.imports = whole(parsed.imports);
-  return usage;
+/**
+ * The books the tools have been used on, narrowed on the way in.
+ *
+ * **It also carries an older library forward without punishing anyone.** Before
+ * this, the free plan metered four actions ten times each and kept the counts in
+ * `prefs.usage`. Those numbers say nothing about *which* books the work happened
+ * on, so there is nothing to migrate and nothing is guessed: a writer who
+ * arrives from that version starts with an empty list and five books in hand.
+ * Erring generous is the only defensible direction — the alternative is charging
+ * somebody for work they cannot be shown any evidence of.
+ */
+function parseToolBooks(parsed: Partial<Prefs>): string[] {
+  return Array.isArray(parsed.toolBooks)
+    ? [...new Set(parsed.toolBooks.filter((id): id is string => typeof id === "string"))]
+    : [];
 }
 
 /**
@@ -2250,28 +2252,32 @@ export function shouldAskMatter(book: Book): boolean {
 }
 
 /**
- * Spend one of the free plan's ten.
+ * Record that the tools have been used on this book.
  *
- * The only way anything writes to `usage`, so the four counters cannot each
- * grow their own read-modify-write. What is counted and what it costs are not
- * decided here — `lib/free-limits.ts` holds the policy and the screens hold the
- * gate; this only keeps the score.
+ * The only way anything writes `toolBooks`, so no screen grows its own
+ * read-modify-write. What the limit *is* is not decided here —
+ * `lib/free-limits.ts` holds the policy and the screens hold the gate; this
+ * only keeps the list.
+ *
+ * **Idempotent, and that is the feature.** Calling it on a book already in the
+ * list writes nothing at all: no storage write, no fan-out, no push. Every tool
+ * can therefore call it on every action without anybody having to work out
+ * whether this particular search is the first one.
  */
-export function countUse(action: Counted) {
-  const usage = getPrefs().usage;
-  setPref("usage", { ...usage, [action]: usage[action] + 1 });
+export function markToolUse(bookId: string) {
+  const books = getPrefs().toolBooks;
+  if (books.includes(bookId)) return;
+  setPref("toolBooks", [...books, bookId]);
 }
 
 /**
- * Give one back.
+ * Whether this book is one of the ones already being tooled.
  *
- * One caller — undoing an import, which takes back the very thing that was
- * charged for. Floored at nought, because a stored tally that has been tampered
- * with must not send this negative.
+ * Read by the gate before it refuses anything, because a book on the list is
+ * never refused however much work happens there.
  */
-export function refundUse(action: Counted) {
-  const usage = getPrefs().usage;
-  setPref("usage", { ...usage, [action]: Math.max(0, usage[action] - 1) });
+export function isToolBook(bookId: string): boolean {
+  return getPrefs().toolBooks.includes(bookId);
 }
 
 /**

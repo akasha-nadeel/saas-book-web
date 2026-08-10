@@ -20,7 +20,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Import",
-        desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you. The free plan brings in ten files; the screen says how many of them you have used, and Pro has no limit.",
+        desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you. Importing is unlimited; what the free plan limits is how many books you use the tools on — five — and an imported book is one of them.",
       },
       {
         name: "Templates",
@@ -86,7 +86,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Import into a book",
-        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after. This counts against the free plan's ten imports like any other file, and undoing gives it back.",
+        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after. Importing is unlimited on either plan. It does put this book among the five the free plan runs the tools on, and undoing the import does not release that — the book is still here and still yours to work on.",
       },
       {
         name: "Autosave",
@@ -143,7 +143,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Comp titles",
-        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key. On the free plan you get ten searches of your own; the shelf this screen opens on is not one of them, and neither is looking at what is already there. The screen tells you when three are left.",
+        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key. Searching is unlimited on either plan. What the free plan limits is how many books you use the tools on — five — and the screen says so only when you open a sixth.",
       },
       {
         name: "Track",
@@ -314,7 +314,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Plans",
-        desc: "Writing a book and getting it out are free, whole: unlimited books, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. Four things are counted on the free plan, ten each: imports (files, whether one becomes a new book or goes into a book you already have), comp searches, cover searches and title checks. Pro has no limit on any of them. A fifth is counted differently: a book holds 2 people including you on the free plan and 10 on Pro, and that is a number at a time rather than a number spent — take somebody off and the place comes back. The searches those screens run for you when you arrive — your genre’s shelf, your own title — are free and always were; what is counted is a search you asked for. Nothing you have already done is affected either way. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly or yearly. See Pricing in the header.",
+        desc: "Writing a book and getting it out are free, whole: unlimited books, all four export formats, syncing to every device, the pre-upload check and the roadmap, comps, blurb, categories, covers, structure and progress. The free plan runs the per-book tools on five books, and inside those five nothing is metered — search the catalogues, redo the covers shelf, check as many titles as naming actually takes. Pro lifts the number of books. A book you never open a tool on costs nothing, so the shelf itself is not the limit. This replaced four separate meters of ten (imports, comp searches, cover searches, title checks), which charged for trying rather than for scale — and naming a book is a thing you do twenty times, not ten. Seats work differently again: a book holds 2 people including you on the free plan and 10 on Pro, and that is a number at a time rather than a number spent — take somebody off and the place comes back. Pro covers two kinds of thing — the parts that spend a model's time or an audio bill per use (the assistant, ranked comps, the audiobook and audio import), and the parts you only need once a book is out (the prose report, money tracking and the book-over-book curve, advance copies, the writing record, and reading your story bible across a whole series). Monthly or yearly. See Pricing in the header.",
       },
       {
         name: "Paying",

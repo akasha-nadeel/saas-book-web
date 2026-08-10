@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
-import { FREE_LIMITS } from "@/lib/free-limits";
+import { FREE_TOOL_BOOKS } from "@/lib/free-limits";
 import {
   CONTACT_EMAIL,
   COUNTRY,
@@ -82,10 +82,10 @@ export default function TermsPage() {
         <p>
           Writing, importing, all four export formats, sync, the pre-upload
           check and the publishing roadmap are free and stay free. The free plan
-          counts four things — {FREE_LIMITS.imports} imports,{" "}
-          {FREE_LIMITS.comps} comparable-title searches, {FREE_LIMITS.covers}{" "}
-          cover searches and {FREE_LIMITS.titleChecks} title checks — and the
-          paid plan lifts those and adds the tools listed on the pricing page.
+          runs the per-book tools — comparable titles, cover research, the title
+          check and the rest — on {FREE_TOOL_BOOKS} books, as often as you like
+          on each. The paid plan lifts the number of books and adds the tools
+          listed on the pricing page.
         </p>
         <p>
           {TRADING_NAME} Pro is {displayPrice(priceOf("monthly"))} a month or{" "}
