@@ -142,43 +142,59 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
           </ul>
         )}
 
-        {/* ---- The wrap, to scale --------------------------------------- */}
-        <h2 className="mt-8 font-bold text-fg">The cover you send</h2>
-        <p className="max-w-prose mt-1 text-sm text-muted">
-          One image, this shape — not three files. Drawn to scale from the
-          numbers below.
-        </p>
-        <CoverWrap spec={spec} trimWidth={size.width} />
+        {/* ---- The wrap and its arithmetic, side by side ----------------
+            The drawing is a tall portrait rectangle and the figures are a
+            short grid, so stacked they left half the screen empty beside the
+            wrap and pushed the numbers under the fold — a reader checking a
+            spine width against the picture of the spine had to scroll between
+            the two. They are one thought: the shape, and where the shape came
+            from. Paired only from `lg`, since below that the drawing needs the
+            full width to stay legible at all. */}
+        <div className="mt-8 grid gap-x-8 gap-y-8 lg:grid-cols-2 lg:items-start">
+          <section>
+            <h2 className="font-bold text-fg">The cover you send</h2>
+            <p className="max-w-prose mt-1 text-sm text-muted">
+              {/* Not "below" or "beside": the two columns stack under `lg`, so
+                  either word is wrong at one width or the other. */}
+              One image, this shape — not three files. Drawn to scale from the
+              numbers shown.
+            </p>
+            <CoverWrap spec={spec} trimWidth={size.width} />
+          </section>
 
-        {/* ---- The numbers ---------------------------------------------- */}
-        <h2 className="mt-8 font-bold text-fg">The numbers</h2>
-        <section className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Figure
-            label="Spine width"
-            value={spec.spine}
-            note={`${using.toLocaleString()} pages × ${PAPER[stock].perPage}″ per page`}
-          />
-          <Figure
-            label="Inside margin (gutter)"
-            value={spec.gutter}
-            note="Grows with the page count, because a thick book does not open flat"
-          />
-          <Figure
-            label="Cover width"
-            value={spec.coverWidth}
-            note={`Back ${size.width}″ + spine + front ${size.width}″ + bleed both sides`}
-          />
-          <Figure
-            label="Cover height"
-            value={spec.coverHeight}
-            note={`Trim ${size.height}″ + bleed top and bottom`}
-          />
-        </section>
+          <section>
+            <h2 className="font-bold text-fg">The numbers</h2>
+            {/* Two across while there is room for two, one down the narrower
+                column the split creates, and two again on a wide monitor. */}
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
+              <Figure
+                label="Spine width"
+                value={spec.spine}
+                note={`${using.toLocaleString()} pages × ${PAPER[stock].perPage}″ per page`}
+              />
+              <Figure
+                label="Inside margin (gutter)"
+                value={spec.gutter}
+                note="Grows with the page count, because a thick book does not open flat"
+              />
+              <Figure
+                label="Cover width"
+                value={spec.coverWidth}
+                note={`Back ${size.width}″ + spine + front ${size.width}″ + bleed both sides`}
+              />
+              <Figure
+                label="Cover height"
+                value={spec.coverHeight}
+                note={`Trim ${size.height}″ + bleed top and bottom`}
+              />
+            </div>
 
-        <p className="max-w-prose mt-4 text-sm text-muted">
-          Trim size is {size.label}, from this book&rsquo;s page setup. Outside
-          margins need at least {spec.outsideMargin}″.
-        </p>
+            <p className="max-w-prose mt-4 text-sm text-muted">
+              Trim size is {size.label}, from this book&rsquo;s page setup.
+              Outside margins need at least {spec.outsideMargin}″.
+            </p>
+          </section>
+        </div>
 
         <p className="mt-8 rounded-xl border border-line bg-panel p-5 text-sm text-muted">
           <strong className="text-fg">Check these against the shop.</strong>{" "}
