@@ -4,7 +4,13 @@ import { accountFromClaims } from "@/lib/account";
 import { billingConfigured } from "@/lib/billing/provider";
 import { subscriptionFor } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
-import { INVITE_DAYS, inviteProblem, normalizeEmail, type CollabRole } from "@/lib/collab";
+import {
+  INVITE_DAYS,
+  inviteProblem,
+  normalizeEmail,
+  type CollabRole,
+  type MemberStatus,
+} from "@/lib/collab";
 import { SEATS_PER_BOOK } from "@/lib/free-limits";
 import { createAdminClient, isAdminConfigured } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -42,6 +48,18 @@ const CONFIRM_FIRST =
   "Confirm your email address first — check your inbox for the link we sent when you signed up.";
 const LOOKUP_FAILED =
   "We couldn’t check your account just now. Try again in a moment.";
+
+/**
+ * "On the book", as the column actually spells it.
+ *
+ * **A literal here is a filter that silently matches nothing.** This was written
+ * as `"accepted"` — a reasonable word, and not one of the three the CHECK
+ * constraint allows — so every query using it returned an empty set with no
+ * error: the face pile lost every collaborator, and the "you are already on this
+ * book" screen became unreachable, falling back to the dead end it was built to
+ * remove. Typed against `MemberStatus`, the same mistake stops the build instead.
+ */
+const ON_THE_BOOK = "active" satisfies MemberStatus;
 
 /**
  * The signed-in account: the address on it, and whether that address is
@@ -463,7 +481,7 @@ export async function offerFor(token: string): Promise<InviteOffer | null> {
   } else if (account) {
     signedInAs = account.email || undefined;
 
-    if (invite.status === "accepted" && isInvitee) {
+    if (invite.status === ON_THE_BOOK && isInvitee) {
       alreadyMember = true;
     } else if (invite.status !== "pending") {
       problem = "That invitation has already been answered.";
@@ -608,7 +626,7 @@ export async function memberFaces(): Promise<Record<string, Face>> {
       .from("book_members")
       .select("book_id")
       .eq("user_id", me)
-      .eq("status", "accepted"),
+      .eq("status", ON_THE_BOOK),
   ]);
 
   const bookIds = [
@@ -630,7 +648,7 @@ export async function memberFaces(): Promise<Record<string, Face>> {
         .from("book_members")
         .select("user_id")
         .in("book_id", bookIds)
-        .eq("status", "accepted"),
+        .eq("status", ON_THE_BOOK),
       db.from("books").select("owner").in("id", bookIds),
     ]);
 
