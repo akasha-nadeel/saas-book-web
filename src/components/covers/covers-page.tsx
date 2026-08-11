@@ -379,7 +379,18 @@ function CoverChecker({ bookId }: { bookId: string }) {
   /** What was just put right, shown in green until the next file or fix. */
   const [done, setDone] = useState<string | null>(null);
 
-  async function read(file: File) {
+  /**
+   * Measure a file and report on it.
+   *
+   * `upscaledFrom` is passed only by the enlarge fix, which is the one caller
+   * that *knows* the result is stretched — see `CoverFacts.upscaledFrom`. It is
+   * recorded rather than detected, so it survives the reload that used to lose
+   * the warning entirely.
+   */
+  async function read(
+    file: File,
+    upscaledFrom?: { width: number; height: number },
+  ) {
     setError(null);
     setDone(null);
     const url = URL.createObjectURL(file);
@@ -449,6 +460,7 @@ function CoverChecker({ bookId }: { bookId: string }) {
         ...(contrast !== undefined ? { contrast } : {}),
         ...(edge !== undefined ? { edge } : {}),
         ...(components !== undefined ? { components } : {}),
+        ...(upscaledFrom ? { upscaledFrom } : {}),
       };
       setFacts(measured);
       setPreview(url);
@@ -617,9 +629,17 @@ function CoverChecker({ bookId }: { bookId: string }) {
        reports `""` — which the checker treats as "no file to read a type off"
        and skips. The result of a fix would then come back with the format row
        silently missing from its report. */
+    /* **And the stretch is written down with it.** `plan.factor > 1` is only
+       true of the enlarge, and `facts` here is still the *source* — so this is
+       the one moment the app knows both sizes for certain. Recording it is
+       what stops the reload turning a 6× upscale into seven green ticks. */
     const made = `cover-${out.width}x${out.height}.jpg`;
+    const stretched =
+      plan.factor > 1
+        ? { width: facts.width, height: facts.height }
+        : undefined;
     setName(made);
-    await read(new File([blob], made, { type: "image/jpeg" }));
+    await read(new File([blob], made, { type: "image/jpeg" }), stretched);
     /* Three outcomes, three sentences. The reshape message used to be the
        fallback for everything, so the format fix — which changes the container
        and nothing else — would have announced a shape it had not touched. A
@@ -668,7 +688,15 @@ function CoverChecker({ bookId }: { bookId: string }) {
       return;
     }
     setName(made);
-    await read(new File([blob], made, { type: "image/jpeg" }));
+    /* Stretched here too, and it matters more on this path than on the
+       download: this one puts the picture *on the book*, so the note is what
+       the dashboard will later be reading. `facts` is still the source. */
+    await read(
+      new File([blob], made, { type: "image/jpeg" }),
+      plan.factor > 1 && facts
+        ? { width: facts.width, height: facts.height }
+        : undefined,
+    );
     /* **Says what the export will actually package.** The old wording —
        "that copy is compressed for the shelf here" — was true of the *only*
        copy this app kept, and told a writer their file was worse than it was

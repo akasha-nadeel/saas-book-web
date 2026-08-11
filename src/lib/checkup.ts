@@ -174,6 +174,20 @@ const DESTINATIONS: Record<string, Fix> = {
     path: "covers?check=1",
     action: "Check the colour mode",
   },
+  /* The two detail notes. No `fix=` and there cannot be one — the answer to
+     both is a bigger original, which is not something any button here can
+     produce. Offering an enlarge would be the app suggesting the very thing
+     that caused the finding. */
+  "cover-upscaled": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the cover",
+  },
+  "cover-thin": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the cover",
+  },
   description: { kind: "route", path: "blurb", action: "Work on the blurb" },
   subjects: {
     kind: "route",

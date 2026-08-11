@@ -186,6 +186,68 @@ describe("checkCover — what is only worth knowing", () => {
     expect(ids()).not.toContain("pale-edge");
   });
 
+  /**
+   * **The bug this exists to close.** The enlarge fix wrote a 1600×2560 file
+   * out of a 259×414 one, warned about it once in a confirmation that vanished
+   * on the next load, and the stretched cover then read as seven clean ticks
+   * for ever. Recorded rather than detected: the tool that stretched it knows.
+   */
+  it("says a cover was stretched, and by how much, every time", () => {
+    const found = checkCover(
+      facts({
+        width: 1600,
+        height: 2560,
+        upscaledFrom: { width: 259, height: 414 },
+      }),
+    ).find((f) => f.id === "upscaled")!;
+    expect(found.level).toBe("note");
+    expect(found.detail).toContain("6.2×");
+    expect(found.detail).toContain("259×414");
+  });
+
+  it("says nothing about stretching for a file we did not enlarge", () => {
+    expect(ids()).not.toContain("upscaled");
+  });
+
+  /**
+   * For somebody else's upscale, where there is nothing recorded: a JPEG's
+   * weight tracks its detail, so pixels against bytes catches a hollow file.
+   */
+  it("notices a JPEG carrying almost nothing for its size", () => {
+    // The real case: 1600×2560 at 72KB, which is 18KB per megapixel.
+    const found = checkCover(facts({ bytes: 73_385, type: "image/jpeg" })).find(
+      (f) => f.id === "thin",
+    )!;
+    expect(found.level).toBe("note");
+    expect(found.detail).toContain("72KB");
+    // It must not read as a verdict: a plain cover is legitimately small.
+    expect(found.detail).toContain("deliberately plain");
+  });
+
+  it("leaves an ordinary cover's weight alone", () => {
+    expect(ids({ bytes: 371_080, type: "image/jpeg" })).not.toContain("thin");
+  });
+
+  /**
+   * A PNG's size says nothing about detail — flat artwork is tiny, a photo is
+   * enormous — and it is refused on format anyway.
+   */
+  it("only weighs a JPEG", () => {
+    expect(ids({ bytes: 73_385, type: "image/png" })).not.toContain("thin");
+    expect(ids({ bytes: 73_385 })).not.toContain("thin");
+  });
+
+  /** The certain answer wins; saying both would be the same fact twice. */
+  it("does not also weigh a file it already knows was stretched", () => {
+    const found = ids({
+      bytes: 73_385,
+      type: "image/jpeg",
+      upscaledFrom: { width: 259, height: 414 },
+    });
+    expect(found).toContain("upscaled");
+    expect(found).not.toContain("thin");
+  });
+
   it("mentions a cover that is acceptable but under the recommendation", () => {
     expect(ids({ width: 1000, height: 1600 })).toContain("small-ish");
   });
@@ -248,6 +310,8 @@ describe("coverReport — the checklist a writer reads", () => {
       { contrast: 0.02 },
       { edge: 0.98 },
       { components: 4 },
+      { upscaledFrom: { width: 259, height: 414 } },
+      { bytes: 73_385, type: "image/jpeg" },
     ];
     for (const over of cases) {
       const claimed = new Set(
@@ -269,7 +333,7 @@ describe("coverReport — the checklist a writer reads", () => {
     expect(small.detail).toBe(finding.detail);
   });
 
-  it("folds all three pixel findings onto the one size rule", () => {
+  it("folds every pixel finding onto the one size rule", () => {
     expect(byId({ width: 400, height: 640 }).get("size")!.from).toBe(
       "too-small",
     );
@@ -279,6 +343,26 @@ describe("coverReport — the checklist a writer reads", () => {
     expect(byId({ width: 1000, height: 1600 }).get("size")!.from).toBe(
       "small-ish",
     );
+    expect(
+      byId({ upscaledFrom: { width: 259, height: 414 } }).get("size")!.from,
+    ).toBe("upscaled");
+    expect(byId({ bytes: 73_385, type: "image/jpeg" }).get("size")!.from).toBe(
+      "thin",
+    );
+  });
+
+  /**
+   * A cover both under the recommendation *and* stretched has to be told it
+   * was stretched: "smaller than recommended" sends somebody to enlarge the
+   * very file that was already enlarged.
+   */
+  it("prefers the detail findings to the recommendation on one row", () => {
+    const row = byId({
+      width: 1000,
+      height: 1600,
+      upscaledFrom: { width: 259, height: 414 },
+    }).get("size")!;
+    expect(row.from).toBe("upscaled");
   });
 
   it("folds both shape findings onto the one shape rule", () => {

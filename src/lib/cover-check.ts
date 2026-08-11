@@ -202,6 +202,26 @@ export function jpegComponents(bytes: Uint8Array): number | null {
 /** Components that mean a JPEG is not in the RGB Amazon asks for. */
 export const CMYK_COMPONENTS = 4;
 
+/**
+ * Bytes per megapixel below which a JPEG is carrying almost nothing.
+ *
+ * **The cheapest honest test for a hollow picture.** A JPEG's compressed size
+ * tracks how much detail is really in it, so pixels-against-bytes catches the
+ * file that has been stretched to look big: 1600×2560 at 72KB is 18KB per
+ * megapixel, where the same frame with real detail in it runs 60–500KB. It
+ * needs no image processing and cannot be argued with — the bytes are the
+ * bytes.
+ *
+ * Set well under the lowest ordinary cover rather than close to it, because
+ * the honest false positive is a *deliberately* plain design — a flat ground
+ * and a title compresses to almost nothing and is not blurry at all. So this
+ * only ever produces a note, and the note says that out loud.
+ *
+ * JPEG only. A PNG's size says nothing about detail — flat artwork is tiny and
+ * a photograph is enormous — and a PNG is already refused on format anyway.
+ */
+export const THIN_BYTES_PER_MP = 25 * 1024;
+
 export type CheckLevel = "problem" | "note";
 
 export interface CoverFinding {
@@ -246,6 +266,23 @@ export interface CoverFacts {
    * every other check here.
    */
   components?: number;
+  /**
+   * The size this picture really came from, when we are the ones who enlarged
+   * it.
+   *
+   * **Recorded rather than detected, which is what makes it certain.** The
+   * enlarge fix on the covers screen scales a small cover up to 1600×2560; the
+   * result passes every measurement here, because it *is* 1600×2560, and
+   * carries no more detail than the file it came from. The screen said so once,
+   * in a confirmation that vanished on the next load — so a stretched cover
+   * then read as spotless for ever after, on the strength of work this app had
+   * done to it.
+   *
+   * Nothing has to be inferred: the tool that stretched it knows exactly what
+   * it stretched. Absent for every file we did not make, which is what
+   * `THIN_BYTES_PER_MP` is for.
+   */
+  upscaledFrom?: { width: number; height: number };
 }
 
 /**
@@ -360,6 +397,43 @@ export function checkCover(facts: CoverFacts): CoverFinding[] {
         detail: `This is ${ratio.toFixed(2)}:1. Amazon asks for at least ${IDEAL_RATIO}:1, so this meets the guidance — but a thumbnail is set at ${IDEAL_RATIO}:1, so it will be letterboxed and read slightly narrower than its neighbours.`,
       });
     }
+  }
+
+  /* **What we stretched, said every time and not only once.** A cover enlarged
+     by the fix on this screen measures 1600×2560 and holds the detail of
+     whatever it came from — so every pixel rule passes and the picture is
+     softer than it looks. Not a problem: Amazon accepts it, and a writer may
+     have decided the trade is worth it. It is a fact they must not have to
+     remember on their own. */
+  if (facts.upscaledFrom) {
+    const from = facts.upscaledFrom;
+    const factor = from.width > 0 ? width / from.width : 0;
+    findings.push({
+      id: "upscaled",
+      level: "note",
+      label: "Stretched to this size",
+      detail: `${width}×${height}, scaled up ${factor.toFixed(1)}× from ${from.width}×${from.height}. It passes on pixel count and carries the detail of the smaller picture — enlarging cannot add any. The way to a genuinely sharp cover this size is a bigger original.`,
+    });
+  }
+
+  /* **A picture too light to be as big as it says**, for the files we did not
+     make. See `THIN_BYTES_PER_MP`: a JPEG's weight tracks its detail, so this
+     catches somebody else's upscale as well as our own. JPEG only, and never
+     alongside the certain answer above. */
+  const megapixels = (width * height) / 1_000_000;
+  if (
+    !facts.upscaledFrom &&
+    facts.type === "image/jpeg" &&
+    bytes > 0 &&
+    megapixels > 0 &&
+    bytes / megapixels < THIN_BYTES_PER_MP
+  ) {
+    findings.push({
+      id: "thin",
+      level: "note",
+      label: "Very little detail for its size",
+      detail: `${Math.round(bytes / 1024)}KB across ${megapixels.toFixed(1)} megapixels. A cover this size with real detail in it usually runs several hundred KB, so this is often a small picture that has been enlarged. It can also be a deliberately plain design, which is fine — look at it at full size and decide.`,
+    });
   }
 
   if (
@@ -479,7 +553,12 @@ export function coverReport(facts: CoverFacts): CoverCheck[] {
        question — is this the right number of pixels — asked in three
        directions, and three separate rows for it would push the rules a writer
        has never heard of down below the fold. */
-    rule("size", ["too-small", "too-big", "small-ish"], {
+    /* Five findings on one row, and they are one question asked five ways: is
+       this picture really the size it claims. The two that speak to detail
+       rather than dimensions come before `small-ish`, because "stretched from
+       259px" is the more useful thing to be told than "under the
+       recommendation". */
+    rule("size", ["too-small", "too-big", "upscaled", "thin", "small-ish"], {
       label: "Big enough",
       detail: `${width}×${height}. Amazon asks for at least ${MIN_HEIGHT} × ${MIN_WIDTH}, no more than ${MAX_EDGE.toLocaleString()} on a side, and recommends ${IDEAL_WIDTH}×${IDEAL_HEIGHT}.`,
     }),
