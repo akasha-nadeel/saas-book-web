@@ -159,6 +159,19 @@ export default function PrivacyPage() {
               is not.
             </>,
             <>
+              <Term>Keyword suggestions</Term> — the description you typed, your
+              genre, the categories you chose, and your title, author and series
+              names so the suggestions can avoid words the shop already indexes.
+              Sent to a language model when you press &ldquo;Suggest
+              keywords&rdquo;. No part of the manuscript goes.
+            </>,
+            <>
+              <Term>Talking through your keywords</Term> — the conversation you
+              type, plus the same fields as above and the seven boxes as they
+              stand, sent to a language model when you send a message. No part
+              of the manuscript goes.
+            </>,
+            <>
               <Term>Ranking comparable titles</Term> — this one sends prose.
               Your blurb and the <em>opening</em> of your manuscript, capped at
               a couple of pages and cut at a paragraph, go with the list of
@@ -166,6 +179,15 @@ export default function PrivacyPage() {
               another cannot be answered from keywords. It goes only when you
               press the button, and the screen lists exactly what will be sent
               before you press it.
+            </>,
+            <>
+              <Term>Working on your blurb</Term> — this one sends prose. The
+              conversation you type, your draft, title and genre, and the{" "}
+              <em>opening</em> of your first chapter, capped at a few pages and
+              cut at a paragraph, so the description sounds like the book. The
+              rest of the manuscript never goes, and neither does your ending.
+              It goes only when you send a message, and the panel names exactly
+              what will be sent before you do.
             </>,
             <>
               <Term>Reading your blurb</Term> — the description you typed, your

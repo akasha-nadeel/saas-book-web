@@ -40,7 +40,13 @@ import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 // Types and one date helper. free-limits.ts is pure and imports nothing back, so
 // the policy stays out of the store and the store stays the only place that keeps
 // the score.
-import { localDay, type BookLimit, type DailyLimit, type DailyUse } from "./free-limits";
+import {
+  localDay,
+  type BookLimit,
+  type DailyLimit,
+  type DailyUse,
+  type TotalLimit,
+} from "./free-limits";
 // Type-only, and publishing.ts imports Book the same way — a cycle that exists
 // for the compiler and never at runtime.
 import { isEmptyDetail, type PublishingMeta } from "./publishing";
@@ -2017,6 +2023,19 @@ export interface Prefs {
    * makes.
    */
   usedOn: Partial<Record<BookLimit, string[]>>;
+  /**
+   * How many of each lifetime allowance have been spent. Never reset.
+   *
+   * The plainest of the three counters and the only one with nothing that can
+   * give a count back — no day to compare against, no set to union. That is
+   * what "for the life of the account" means, and it is why the sentences
+   * built from it may not borrow the daily ones' vocabulary.
+   *
+   * It counts *presses that produced something*: the screen records here when
+   * a reply lands, not when the button is pressed, so a failed request does
+   * not cost a writer one of five.
+   */
+  usedTotal: Partial<Record<TotalLimit, number>>;
 }
 
 const DEFAULT_PREFS: Prefs = Object.freeze({
@@ -2055,6 +2074,7 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // objects rather than adding to these.
   usedToday: Object.freeze({ day: "", counts: Object.freeze({}) }) as DailyUse,
   usedOn: Object.freeze({}) as Partial<Record<BookLimit, string[]>>,
+  usedTotal: Object.freeze({}) as Partial<Record<TotalLimit, number>>,
 });
 
 const prefsListeners = new Set<() => void>();
@@ -2115,6 +2135,7 @@ function parsePrefs(raw: string | null): Prefs {
       // nonsense.
       usedToday: parseUsedToday(parsed),
       usedOn: parseUsedOn(parsed),
+      usedTotal: parseUsedTotal(parsed),
     };
   } catch {
     return DEFAULT_PREFS;
@@ -2178,7 +2199,28 @@ function parseUsedOn(parsed: Partial<Prefs>): Partial<Record<BookLimit, string[]
 }
 
 /**
- * The two usage counters, merged rather than replaced, on the way down.
+ * The lifetime counters, as whatever storage happens to hold.
+ *
+ * A string, a fraction, a negative or a missing key all read as nought — no
+ * compiler has ever checked what is in `localStorage`, and this number decides
+ * whether somebody is refused. Erring at nought is the generous direction, and
+ * it is the right one: charging a writer for work there is no evidence of is
+ * worse than handing out one extra suggestion.
+ */
+function parseUsedTotal(parsed: Partial<Prefs>): Partial<Record<TotalLimit, number>> {
+  const stored = parsed.usedTotal;
+  if (!stored || typeof stored !== "object") return {};
+
+  const usedTotal: Partial<Record<TotalLimit, number>> = {};
+  for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+    if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) continue;
+    usedTotal[key as TotalLimit] = Math.floor(value);
+  }
+  return usedTotal;
+}
+
+/**
+ * The three usage counters, merged rather than replaced, on the way down.
  *
  * **Every other pref is last-writer-wins and should be** — a writer who picks a
  * light theme on their phone means it, and the newest answer is the right one.
@@ -2194,6 +2236,13 @@ function parseUsedOn(parsed: Partial<Prefs>): Partial<Record<BookLimit, string[]
  *   of a set of books over a tally of attempts: two machines can each mark a
  *   different book and neither mark is lost, where two tallies can only be
  *   guessed between.
+ * - **`usedTotal` takes the larger count per tool**, which is the only answer
+ *   available and is deliberately not the sum. Summing would charge a writer
+ *   twice for one press whenever a machine downloads a count it has already
+ *   pushed — five would become two or three within a day of ordinary syncing.
+ *   Taking the larger loses a genuine second press made offline on the other
+ *   machine, which costs us one model call and never costs a writer anything
+ *   they paid for. That is the direction to be wrong in.
  * - **`usedToday` takes the larger count per tool** when both machines are on
  *   the same local day, and otherwise the *later* day outright. A day string
  *   sorts correctly as text, and the empty day a fresh library carries sorts
@@ -2210,12 +2259,13 @@ function parseUsedOn(parsed: Partial<Prefs>): Partial<Record<BookLimit, string[]
  * storage, so a merge can be asserted without staging two browsers.
  */
 export function mergeUsage(
-  local: Pick<Prefs, "usedToday" | "usedOn">,
+  local: Pick<Prefs, "usedToday" | "usedOn" | "usedTotal">,
   remote: Partial<Prefs>,
-): Pick<Prefs, "usedToday" | "usedOn"> {
+): Pick<Prefs, "usedToday" | "usedOn" | "usedTotal"> {
   const theirs = {
     usedToday: parseUsedToday(remote),
     usedOn: parseUsedOn(remote),
+    usedTotal: parseUsedTotal(remote),
   };
 
   const usedOn: Partial<Record<BookLimit, string[]>> = {};
@@ -2228,6 +2278,12 @@ export function mergeUsage(
     ];
   }
 
+  const usedTotal: Partial<Record<TotalLimit, number>> = { ...local.usedTotal };
+  for (const [key, value] of Object.entries(theirs.usedTotal)) {
+    const action = key as TotalLimit;
+    usedTotal[action] = Math.max(usedTotal[action] ?? 0, value ?? 0);
+  }
+
   if (theirs.usedToday.day !== local.usedToday.day) {
     return {
       usedToday:
@@ -2235,6 +2291,7 @@ export function mergeUsage(
           ? theirs.usedToday
           : local.usedToday,
       usedOn,
+      usedTotal,
     };
   }
 
@@ -2244,7 +2301,7 @@ export function mergeUsage(
     counts[action] = Math.max(counts[action] ?? 0, value ?? 0);
   }
 
-  return { usedToday: { day: local.usedToday.day, counts }, usedOn };
+  return { usedToday: { day: local.usedToday.day, counts }, usedOn, usedTotal };
 }
 
 /**
@@ -2376,6 +2433,25 @@ export function markToolBook(action: BookLimit, bookId: string) {
 /** Whether this book is already one of the ones that tool is counted on. */
 export function isToolBook(action: BookLimit, bookId: string): boolean {
   return (getPrefs().usedOn[action] ?? []).includes(bookId);
+}
+
+/**
+ * Spend one of a lifetime allowance. The only way anything writes `usedTotal`.
+ *
+ * **Not idempotent, unlike `markToolBook`**, and it cannot be: there is no id
+ * here to recognise a repeat by, and a second suggestion really is a second
+ * call to pay for. So this is called exactly once per successful reply, by the
+ * screen that received it — never by `useLimitGate`, which fires on the press
+ * and would charge for a request that failed.
+ */
+export function spendTotalUse(action: TotalLimit) {
+  const usedTotal = getPrefs().usedTotal;
+  setPref("usedTotal", { ...usedTotal, [action]: (usedTotal[action] ?? 0) + 1 });
+}
+
+/** How many of a lifetime allowance have gone. */
+export function totalUsed(action: TotalLimit): number {
+  return getPrefs().usedTotal[action] ?? 0;
 }
 
 /**

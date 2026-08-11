@@ -78,6 +78,71 @@ describe("words the listing already carries", () => {
   });
 });
 
+// Amazon's own example of the rule is a shelf name repeated whole ("19th
+// Century History"), and matching it word by word instead would condemn "cozy
+// mystery with cats" — the single best keyword a cozy writer could spend a box
+// on. The segment rule is the feature; loosening it to words would break it.
+describe("shelves the book is already on", () => {
+  const listing = { categories: ["Fiction / Mystery & Detective / Women Sleuths"] };
+
+  it("flags a keyword carrying a whole shelf name", () => {
+    const found = of(keywordReport(["women sleuths in cornwall"], listing).issues, "wasted");
+    expect(found).toHaveLength(1);
+    expect(found[0].where).toBe("your categories");
+  });
+
+  it("matches a shelf name through the punctuation a shop writes it with", () => {
+    const found = of(keywordReport(["cosy mystery detective tales"], listing).issues, "wasted");
+    expect(found[0].words).toContain("mystery & detective");
+  });
+
+  it("leaves a keyword that merely shares a word with the shelf", () => {
+    expect(of(keywordReport(["mystery with cats"], listing).issues, "wasted")).toEqual([]);
+  });
+
+  it("ignores a one-word shelf, which is half the shop", () => {
+    expect(
+      of(keywordReport(["historical fiction saga"], { categories: ["Fiction"] }).issues, "wasted"),
+    ).toEqual([]);
+  });
+
+  it("says the words came from both places when they do", () => {
+    const found = of(
+      keywordReport(["women sleuths of return"], {
+        title: "The House of Return",
+        categories: ["Fiction / Women Sleuths"],
+      }).issues,
+      "wasted",
+    );
+    expect(found[0].where).toContain("your title");
+    expect(found[0].where).toContain("your categories");
+  });
+});
+
+describe("quotation marks", () => {
+  it("flags a field wrapped in double quotes", () => {
+    expect(of(keywordReport(['"cozy mystery"']).issues, "quoted")).toHaveLength(1);
+  });
+
+  it("flags a curly quote anywhere in the field", () => {
+    expect(of(keywordReport(["a “cozy” mystery"]).issues, "quoted")).toHaveLength(1);
+  });
+
+  it("flags a field wrapped in single quotes", () => {
+    expect(of(keywordReport(["'cozy mystery'"]).issues, "quoted")).toHaveLength(1);
+  });
+
+  // An apostrophe inside a word is ordinary English, and a keyword tool that
+  // fires on it is a keyword tool nobody reads.
+  it("leaves an apostrophe inside a word alone", () => {
+    expect(of(keywordReport(["reader's choice"]).issues, "quoted")).toEqual([]);
+  });
+
+  it("says nothing about an ordinary phrase", () => {
+    expect(of(keywordReport(["small town mystery"]).issues, "quoted")).toEqual([]);
+  });
+});
+
 describe("a word spent twice", () => {
   it("flags a word used in two fields, naming both", () => {
     const found = of(keywordReport(["small town mystery", "town secrets"]).issues, "repeated");

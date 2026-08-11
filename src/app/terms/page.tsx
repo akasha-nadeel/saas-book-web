@@ -86,10 +86,14 @@ export default function TermsPage() {
           searches and {FREE_LIMITS.titleCheck.free} title checks a day,{" "}
           {FREE_LIMITS.covers.free} cover searches a day, the blurb on{" "}
           {FREE_LIMITS.blurb.free} books, the prose report on{" "}
-          {FREE_LIMITS.prose.free}, money tracking on {FREE_LIMITS.track.free}, and{" "}
-          {FREE_LIMITS.arcReaders.free} advance readers on each book. The daily
-          ones start again the next day. The paid plan lifts all of them and adds
-          the tools listed on the pricing page.
+          {FREE_LIMITS.prose.free}, money tracking on {FREE_LIMITS.track.free},{" "}
+          {FREE_LIMITS.arcReaders.free} advance readers on each book, and{" "}
+          {FREE_LIMITS.keywordsAi.free} sets of keyword suggestions and{" "}
+          {FREE_LIMITS.blurbChat.free} blurb conversations in total. The daily
+          ones start again the next day; the keyword suggestions and the blurb
+          conversations do not, and are the allowances here that do not return.
+          The paid plan lifts all of them and adds the tools listed on the
+          pricing page.
         </p>
         <p>
           {TRADING_NAME} Pro is {displayPrice(priceOf("monthly"))} a month or{" "}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
@@ -11,12 +12,38 @@ import {
   type SubjectHeading,
 } from "@/lib/comps/subjects";
 import { COMMON_SUBJECTS } from "@/lib/comps/common-subjects";
+/* The one place the mark and its licence note live together — see the comment
+   on the export. */
+import { AMAZON_MARK } from "@/components/landing/works-with";
 import { keywordReport, SLOTS, SLOT_MAX, type Issue } from "@/lib/keywords";
+import { KeywordWorkshop } from "@/components/categories/keyword-workshop";
+/* Several pages of prose that most visits never open, so it is a chunk of its
+   own — the same reasoning the roadmap loads its tool panels under. */
+const KeywordGuide = dynamic(
+  () => import("@/components/categories/keyword-guide").then((m) => m.KeywordGuide),
+  { ssr: false },
+);
 import { ToolSaveBar } from "@/components/ui/tool-save";
+import { CopyButton } from "@/components/ui/copy-button";
 import { findBook, setPublishing } from "@/lib/library-store";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { useToolSave } from "@/lib/use-tool-save";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
+
+/**
+ * The height of the keyword row's two cards.
+ *
+ * **The blurb screen's own numbers, taken deliberately.** That screen is the
+ * same idea — a thing you write in beside a thing you talk to — and it settled
+ * these two figures already: a page gets `36rem`, and the roadmap's panel gets
+ * `22rem` because the sheet there is short and a card taller than its window
+ * cannot be scrolled to the bottom of. Stated once here so both children of
+ * the grid take it and end on the same line; if the blurb screen ever moves,
+ * move this with it, because two tool screens differing by four rem look like
+ * two products.
+ */
+const COMPOSER_HEIGHT_PAGE = "h-[36rem]";
+const COMPOSER_HEIGHT_PANEL = "h-[22rem]";
 
 /**
  * Categories, worked out from where comparable books are actually filed.
@@ -66,6 +93,8 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * what the seven boxes are wasting, both of which are checkable.
  */
 export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
+  const COMPOSER_HEIGHT = embedded ? COMPOSER_HEIGHT_PANEL : COMPOSER_HEIGHT_PAGE;
+
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -161,6 +190,65 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
           i === index ? text : (current[i] ?? ""),
         ),
     });
+  }
+
+  /* ---- Candidates from the workshop -----------------------------------
+   *
+   * **The model writes candidates; the writer keeps or discards them.** Both
+   * doors in `KeywordWorkshop` — the one press and the conversation — come
+   * back here, so there is one place that touches the boxes and three rules
+   * hold all of it.
+   *
+   * *Empty slots only.* Words a writer typed are never overwritten. A model
+   * quietly replacing somebody's work and presenting the result as theirs is
+   * the invisible hand this app refuses everywhere — the comps query goes back
+   * into the search box editable for the same reason.
+   *
+   * *It lands in the draft, not in the store.* Candidates go through `edit()`
+   * like any typed character, so the save bar appears and nothing reaches the
+   * book until the writer presses it. Undo is then honest rather than
+   * cosmetic: it puts back exactly what was there.
+   *
+   * *The allowances are spent where the replies land*, which is inside the
+   * workshop — a gateway error must not cost an allowance a writer never got
+   * the benefit of, and this function is only ever reached once something
+   * arrived.
+   */
+  /** The seven as they were before the last fill, or null when there is none. */
+  const [beforeSuggest, setBeforeSuggest] = useState<string[] | null>(null);
+
+  /* The guide sheet. Loaded on demand below rather than imported at the top:
+     it is several pages of prose that most visits never open. */
+  const [guideOpen, setGuideOpen] = useState(false);
+
+  /* `description` is the blurb — `publishing.ts` names the field for the shops'
+     own form rather than for what writers call it. */
+  const blurb = book?.publishing?.description ?? "";
+
+  function applyCandidates(found: string[]) {
+    if (found.length === 0) return;
+
+    setBeforeSuggest([...keywords]);
+    edit({
+      keywords: (current) => {
+        const next = [...current];
+        let take = 0;
+        for (let i = 0; i < SLOTS && take < found.length; i += 1) {
+          if (!(next[i] ?? "").trim()) {
+            next[i] = found[take];
+            take += 1;
+          }
+        }
+        return next;
+      },
+    });
+  }
+
+  function undoSuggest() {
+    if (!beforeSuggest) return;
+    const previous = beforeSuggest;
+    edit({ keywords: () => [...previous] });
+    setBeforeSuggest(null);
   }
 
   /**
@@ -278,7 +366,13 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
+      {/* `@container`, so the keyword row below can size itself off the column
+          it is in rather than off the window — the same reasoning the blurb
+          screen documents, and the reason the two now agree: in the roadmap's
+          panel this page is a ~700px column inside a full-width viewport, so a
+          `lg:` breakpoint reading the window would put a 24rem sidebar beside
+          a 200px one. */}
+      <div className="@container mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
         {/* ---- What is chosen --------------------------------------------
             A strip rather than the card this was. Before the first search a
@@ -315,21 +409,37 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
 
           <div className="mt-3 rounded-xl border border-line bg-panel p-4">
             {chosen.length > 0 ? (
+              /* **The chip is two controls now, and the split is forced.** It
+                 was one button whose whole surface removed the category; a
+                 copy control cannot go inside a button, so the name and the ✕
+                 became siblings. Copying is what the name does, because a
+                 shop's category selector is a search box somebody has to type
+                 this path into — and removing keeps the ✕ it always drew,
+                 which was the visible affordance for it either way. Both carry
+                 an aria-label saying which is which, since "Fiction ✕" read
+                 aloud says nothing about what pressing it will do. */
               <ul className="flex flex-wrap gap-2">
                 {chosen.map((name) => (
-                  <li key={name}>
+                  <li
+                    key={name}
+                    className="flex items-center rounded-full bg-accent pr-1.5 pl-1
+                               text-sm font-medium text-accent-ink"
+                  >
                     <button
                       type="button"
                       onClick={() => toggle(name)}
                       aria-label={`Remove ${name}`}
-                      className="flex items-center gap-1.5 rounded-full bg-accent px-3.5 py-1.5
-                                 text-sm font-medium text-accent-ink"
+                      className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5
+                                 outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
                     >
                       {name}
                       <span aria-hidden="true" className="text-accent-ink/70">
                         ✕
                       </span>
                     </button>
+                    {/* Inherits the chip's own ink; a muted grey here would be
+                        a smudge on the fill. */}
+                    <CopyButton value={name} label={`Copy ${name}`} />
                   </li>
                 ))}
               </ul>
@@ -377,37 +487,212 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
             use: heading and its figure, then a panel whose first line explains
             it, a divider, and the control. Three sections, one pattern. */}
         <section className="mt-12">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-            <h2 className="text-xl font-bold tracking-tight text-fg">
-              Your seven keywords
-            </h2>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h2 className="text-xl font-bold tracking-tight text-fg">
+                Your seven keywords
+              </h2>
+
+              {/* **A scope label, next to the heading it qualifies.**
+                  Everything under it is Amazon's shape — seven fields, fifty
+                  characters, its own refusals — where the categories above are
+                  a librarian's subjects that any shop's form can be matched
+                  to. A reader who publishes wide should be able to see which
+                  of the two they are looking at without reading a paragraph,
+                  and that is what a chip beside a heading is for.
+
+                  **Nominative use, kept at label size.** The mark comes from
+                  `works-with.tsx`, which carries the licence note the artwork
+                  needs, and it is drawn *beside the word Amazon* rather than
+                  standing in for it. That is the line: naming the shop whose
+                  form this is, is fair; wearing their mark as decoration on
+                  our own work implies they endorse it, which they do not.
+
+                  It keeps its own orange in both themes, like every other
+                  brand mark here — a trademark is a trademark, and a
+                  greyscale Amazon smile is a different mark from the one
+                  people recognise. The chip around it is ours, so it takes
+                  the chrome. */}
+              {/* Full ink rather than `muted`. It was the grey a caption takes,
+                  which is right for something you may ignore and wrong for
+                  this: the chip says *which shop this whole section is about*,
+                  and a reader who publishes wide has to be able to see it
+                  without looking for it. The mark itself was always at full
+                  strength — it is the brand's own #FF9900 with no opacity on
+                  it — and it only read as faded because the words beside it
+                  were. */}
+              <span className="inline-flex items-center gap-2 rounded-full border border-line
+                               bg-raised py-1 pr-3.5 pl-2.5 text-sm font-semibold text-fg">
+                {/* The mark leads at 20px — the chip is a scope label, so the
+                    logo is the thing scanned and the words are the caption
+                    that proves what it means. Smaller than this and Amazon's
+                    smile is an orange smudge; larger and a label starts
+                    competing with the heading beside it. */}
+                <svg
+                  aria-hidden="true"
+                  viewBox={AMAZON_MARK.viewBox}
+                  className="h-5 w-5 shrink-0"
+                >
+                  {AMAZON_MARK.paths.map((p) => (
+                    <path key={p.d} d={p.d} fill={p.fill} />
+                  ))}
+                </svg>
+                Amazon KDP
+              </span>
+            </div>
+
             <span className="text-sm text-muted tabular-nums">
               {keywords.filter((k) => k.trim()).length} of {SLOTS} used
             </span>
           </div>
 
-          <div className="mt-3 rounded-xl border border-line bg-panel p-4">
-            <p className="max-w-prose text-sm text-muted">
-              A shop&rsquo;s listing form gives you seven boxes of {SLOT_MAX}{" "}
-              characters. They are not tags &mdash; they are extra words the
-              shop indexes the book under, so the whole game is spending them on
-              words your listing does not already carry.
-            </p>
+          {/* **The boxes and the offer are two boxes, side by side.** The
+              suggestion control sat inside this panel, above the fields, on
+              the reasoning that it is what somebody looking at seven empty
+              inputs needs. It is — but stacked it pushed the seven down the
+              page and read as a step to take before typing, when the whole
+              design is that a writer fills these in themselves and the model
+              only fills what is left empty. Beside them it is an offer
+              standing next to the work rather than in front of it, and the
+              fields start at the top of the section where they belong.
 
-            <div className="mt-3.5 border-t border-line pt-3.5">
-              <KeywordBoxes
+              **The same measurements as the blurb screen, and that is the
+              point.** Both screens are a thing you write beside a thing you
+              talk to, so they take one grid — `@3xl` off the *container* and a
+              24rem rail, not `lg:` off the window, because in the roadmap's
+              panel the window is wide while this column is not — and one
+              height, stated on both children so the two cards end on the same
+              line. Two tool screens that differ by four rem in the sidebar and
+              a hand's width in the card look like two products. */}
+          <div className="mt-3 grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_24rem]">
+            <div
+              className={`flex ${COMPOSER_HEIGHT} flex-col overflow-hidden rounded-xl
+                          border border-line bg-panel p-4`}
+            >
+              {/* **The paragraph and the way into the guide, as one block.**
+                  Contextual help belongs beside the thing it explains — the
+                  paragraph says what the boxes are in three sentences, and the
+                  button is where somebody goes when three sentences are not
+                  enough. In the section header it was a control floating above
+                  a card; here it is the end of the explanation.
+
+                  It opens a *sheet* rather than a dialog, because this is read
+                  while carrying on working, with the form still visible
+                  behind it. And it is not the Help dialog, which is the app's
+                  index of what exists: this is one subject in depth, and most
+                  of what is in it is Amazon's rules rather than ours.
+
+                  Stacked below `sm`, where a button beside a paragraph would
+                  leave the text a four-word column. */}
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-5">
+                {/* **"Amazon", not "a shop", and the difference is a claim we
+                    can back.** Seven boxes of fifty characters is Amazon's
+                    shape and nobody else's: Kobo has one keywords field, Apple
+                    Books none, IngramSpark works from BISAC codes. This screen
+                    is built to the strictest of them, which is the useful
+                    choice — a set of phrases that fits here fits anywhere —
+                    but saying "a shop's form" made a claim about shops in
+                    general that is simply untrue. The guide answers it
+                    properly. */}
+                {/* Two sentences. It ran to four, and the two that went are
+                    both answered at length behind the button beside it: that
+                    these are not tags, and that other shops ask differently.
+                    What has to survive is the shape, the attribution — seven
+                    of fifty is Amazon's and not a standard — and the one rule
+                    that decides every keyword. */}
+                <p className="max-w-prose text-sm text-muted">
+                  Seven boxes of {SLOT_MAX} characters, on Amazon&rsquo;s
+                  listing form. They are extra words the shop indexes your book
+                  under, so spend them on what your listing does not already
+                  carry.
+                </p>
+
+                {/* **A green fill, from `--color-guide`, and the token is
+                    where the reasoning lives.** Two things about the shape.
+                    The label carries a chevron rather than a question mark,
+                    because the press *goes* somewhere — a sheet in from the
+                    right — and the glyph should say which way rather than
+                    repeat the word "help". And the ink is literal white rather
+                    than `accent-ink`, which is black at night: ink that
+                    inverts on a ground that does not is the one way to get a
+                    filled button wrong. */}
+                <button
+                  type="button"
+                  onClick={() => setGuideOpen(true)}
+                  className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg
+                             bg-guide px-3.5 py-2 text-sm font-semibold text-white
+                             outline-none transition-colors hover:bg-guide-hover
+                             focus-visible:ring-2 focus-visible:ring-accent/50"
+                >
+                  How these work
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-3.5 w-3.5"
+                  >
+                    <path d="m9 6 6 6-6 6" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* The fields scroll inside the card rather than stretching it.
+                  Seven rows fit at this height; the findings underneath do not
+                  always, and a card that grew with them would put the two
+                  columns out of step again the first time somebody typed their
+                  own title into box one. `min-h-0`, or a flex child with
+                  overflow grows its parent instead of scrolling in it. */}
+              <div className="scroll-slim mt-3.5 min-h-0 flex-1 overflow-y-auto border-t border-line pt-3.5">
+                <KeywordBoxes
+                  keywords={keywords}
+                  title={book.title}
+                  subtitle={book.subtitle}
+                  author={book.author}
+                  series={book.publishing?.series}
+                  categories={chosen}
+                  onChange={setKeyword}
+                />
+              </div>
+            </div>
+
+            {/* ---- The workshop --------------------------------------------
+
+                One card, two doors: the press for somebody who wants seven
+                candidates and nothing else, and the conversation for the two
+                questions a button cannot answer — *what are these boxes* and
+                *which seven should this book spend them on*.
+
+                **A stated height, not `flex-1`, and the same one the card
+                beside it takes.** A grid row is `auto` and grows to its
+                tallest item, so a chat left to size itself would stretch the
+                row with every turn and never scroll — and the two cards would
+                end on different lines, which is the thing that made this
+                screen and the blurb screen look like two products.
+                `COMPOSER_HEIGHT` is the one place that number lives. */}
+            <div className={`flex ${COMPOSER_HEIGHT} flex-col`}>
+              <KeywordWorkshop
+                blurb={blurb}
+                genre={book.genre}
+                categories={chosen}
                 keywords={keywords}
                 title={book.title}
                 subtitle={book.subtitle}
                 author={book.author}
                 series={book.publishing?.series}
-                onChange={setKeyword}
+                onCandidates={applyCandidates}
+                onUndo={undoSuggest}
+                canUndo={beforeSuggest !== null}
+                onOpenGuide={() => setGuideOpen(true)}
               />
             </div>
           </div>
         </section>
 
-        <div className="mt-10 border-t border-line pt-6">
+        <div className="mt-10 flex flex-col gap-3 border-t border-line pt-6">
           {/* The rule spans the page and the sentence does not.
               They were one element while a tool page was 3xl wide,
               where the two widths happened to agree; at 5xl a line of
@@ -420,8 +705,45 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
             as the answer to &ldquo;what is this book, to a librarian&rdquo;, and
             match them to the shop&rsquo;s own list yourself.
           </p>
+
+          {/* **A shelf a category cannot reach.** Some of Amazon's
+              subcategories are gated on the keywords rather than on the
+              category selector: the book appears there only if one of these
+              seven boxes carries a particular word. Its own LGBT page is the
+              plain example — Bisexual Romance requires the word "bisexual" —
+              and there are sibling pages per genre.
+
+              **The list is deliberately not shipped.** It changes, it is
+              published per genre, and a stale copy of somebody else's rules
+              read as ours is exactly the invented-data failure this screen
+              exists to avoid. So the mechanism is named, and the link goes to
+              Amazon. */}
+          <p className="max-w-3xl text-xs text-muted">
+            One thing the three categories cannot do: a few of Amazon&rsquo;s
+            subcategories are reached <em>only</em> through these boxes — a book
+            appears in them if a keyword carries the word they are gated on, and
+            not otherwise. Amazon publishes which, genre by genre, and changes
+            them, so it is worth a look at{" "}
+            <a
+              href="https://kdp.amazon.com/en_US/help/topic/G201298500"
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-line underline-offset-2 hover:text-fg"
+            >
+              their own keyword page
+            </a>{" "}
+            before you settle the seven.
+          </p>
         </div>
       </div>
+
+      {/* Both limit dialogs live inside the workshop now, with the presses
+          that are refused — opened by a press and never by an effect, since an
+          effect watching `blocked` would fire on arrival for somebody who ran
+          out last week, which is a paywall shown to a writer who pressed
+          nothing. */}
+
+      {guideOpen && <KeywordGuide onClose={() => setGuideOpen(false)} />}
     </div>
   );
 }
@@ -442,6 +764,7 @@ function KeywordBoxes({
   subtitle,
   author,
   series,
+  categories,
   onChange,
 }: {
   keywords: readonly string[];
@@ -449,11 +772,20 @@ function KeywordBoxes({
   subtitle?: string;
   author?: string;
   series?: string;
+  /** The shelves chosen above, which a shop indexes the book under already. */
+  categories: readonly string[];
   onChange: (index: number, text: string) => void;
 }) {
   const report = useMemo(
-    () => keywordReport(keywords, { title, subtitle, author, series }),
-    [keywords, title, subtitle, author, series],
+    () =>
+      keywordReport(keywords, {
+        title,
+        subtitle,
+        author,
+        series,
+        categories,
+      }),
+    [keywords, title, subtitle, author, series, categories],
   );
 
   return (
@@ -506,14 +838,33 @@ function KeywordBoxes({
                 {slot.chars}/{SLOT_MAX}
               </span>
             </div>
+
+            {/* **A copy control per box, because the shop has seven boxes.**
+                These are never uploaded from here — a writer retypes them into
+                Amazon's own form, and retyping a fifty-character phrase into a
+                fifty-character field is where a typo becomes a keyword nobody
+                searches for. One press per box rather than one press for all
+                seven: a joined string would have to be taken apart at the
+                other end, which is the work this removes rather than moves.
+
+                The slot keeps its width whether or not the button is in it, so
+                the field does not narrow the moment the first character is
+                typed. */}
+            <span className="flex w-7 shrink-0 justify-center">
+              <CopyButton
+                value={slot.text}
+                label={`Copy keyword ${slot.index + 1}`}
+                className="text-muted hover:border-line hover:text-fg"
+              />
+            </span>
           </li>
         ))}
       </ol>
 
-      {/* The count moved up beside the heading, where every other section on
-          this page carries its figure. Saying it twice, four hundred pixels
-          apart, made the reader check whether they were two different counts. */}
-      <p className="mt-3 text-xs text-muted">Saved as you type.</p>
+      {/* "Saved as you type" stood here and had been false since both halves
+          of this screen became one draft behind the save bar at the foot of
+          the window. The count it used to sit beside moved up to the heading,
+          where every other section on this page carries its figure. */}
 
       {report.issues.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2">
@@ -556,6 +907,8 @@ function issueText(issue: Issue): string {
       return `${box(issue.slot)} is ${issue.chars} characters. A shop takes ${SLOT_MAX} and refuses the rest of the field.`;
     case "refused":
       return `${box(issue.slot)} uses “${issue.term}”, which shops ask you not to — ${issue.why}.`;
+    case "quoted":
+      return `${box(issue.slot)} has quotation marks in it. Shops ask for the words on their own — the marks are read as part of the phrase.`;
     case "wasted":
       return `${box(issue.slot)} repeats ${issue.words.map((w) => `“${w}”`).join(", ")} from ${issue.where}. A shop already indexes that, so the box buys nothing.`;
     case "repeated":

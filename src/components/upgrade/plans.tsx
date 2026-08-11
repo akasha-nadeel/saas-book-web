@@ -316,6 +316,27 @@ const ROWS: {
     starter: `${FREE_LIMITS.titleCheck.free} a day`,
     pro: "Unlimited",
   },
+  /*
+   * **The one row here counted for the life of the account**, so it says "in
+   * total" and must never say "a day". It sits directly under the three daily
+   * rows on purpose: read against them the difference in wording is the whole
+   * of the difference in meaning, and a reader comparing the column can see at
+   * a glance which numbers come back and which do not.
+   */
+  {
+    group: "Getting it ready",
+    label: "Keyword suggestions",
+    starter: `${FREE_LIMITS.keywordsAi.free} in total`,
+    pro: "Unlimited",
+  },
+  {
+    group: "Getting it ready",
+    label: "Blurb conversations",
+    // Counted in conversations, so the cell has to say so — beside a chat
+    // feature, a bare "3 in total" reads as three messages.
+    starter: `${FREE_LIMITS.blurbChat.free} conversations`,
+    pro: "Unlimited",
+  },
   { group: "Getting it ready", label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
   {
     group: "Getting it ready",

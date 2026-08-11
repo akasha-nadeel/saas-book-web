@@ -9,8 +9,8 @@
  * general-purpose research desk for any number of manuscripts. A container limit
  * only ever bound the tools that read the manuscript.
  *
- * So there are three shapes, and which one a tool takes follows from what it
- * does:
+ * So there are four shapes, and which one a tool takes follows from what it
+ * does — and, for the fourth, from what it costs:
  *
  * - **Per day** — the three that send a query to a catalogue. This is what every
  *   serious research tool does (Semrush's free plan is ten queries a day,
@@ -25,11 +25,17 @@
  *   listings to build is running a business.
  * - **Per book, by occupancy** — advance readers and collaborator seats. Both
  *   count what is *currently* there, so removing one gives the place back.
+ * - **In total, for the life of the account** — the keyword suggestions, and so
+ *   far only those. This is the shape for work that **costs us money every
+ *   press**: five in total means a free account can spend at most five model
+ *   calls, where five a day would be seven hundred a year. It is also the only
+ *   shape here that does not come back, which changes what its sentences may
+ *   say — see `TotalLimit`.
  *
  * Everything else stays unbounded on both plans: books, words, chapters,
  * **imports**, all four exports, sync, the pre-upload check and the roadmap,
  * structure, progress, the writing record, the series read of the story bible
- * and the keyword boxes.
+ * and typing in the keyword boxes yourself.
  *
  * **These are browser gates and cannot be otherwise.** The work they guard runs
  * in the browser or through a route that is deliberately free and keyless, so no
@@ -37,9 +43,17 @@
  * ones are resettable by anybody willing to move their machine's clock — worth
  * writing down rather than leaving to be discovered, and worth accepting: the
  * routes that actually cost money (the assistant, narration, transcription and
- * the three model steps around comps) are gated by `requirePro()` on the server
+ * the model steps around comps) are gated by `requirePro()` on the server
  * and none of this touches them. What this file is for is telling a writer the
  * truth about the plan they are on.
+ *
+ * **`keywordsAi` is the one row where that needs stating carefully**, because
+ * it is the first counter here in front of a route that bills. Clearing
+ * storage really does hand somebody another five — and the damage is five
+ * calls on a prompt of a few hundred words, which is not worth a table in
+ * Postgres to prevent. What is *not* left to the browser is the wall itself:
+ * `/api/comps/keywords` carries `requirePro()` like every other model route,
+ * so the sixth press is refused by the server whatever the client believes.
  *
  * With no payment gateway configured the subscription route answers `pro: true`
  * for everyone, so a self-hosted copy has no limits at all — the same shape as
@@ -55,7 +69,35 @@ export type BookLimit = "blurb" | "prose" | "track";
 /** Counted by what is on one book right now, like seats. */
 export type ItemLimit = "arcReaders";
 
-export type Limited = DailyLimit | BookLimit | ItemLimit | "collaborators";
+/**
+ * Counted once for the life of the account, and **the only shape here that
+ * never comes back**.
+ *
+ * Every other limit in this file resets — tomorrow, or on the next book, or
+ * when somebody is removed from a list — and the sentences say so, because a
+ * pause that reads as a wall is the thing they are written to avoid. This one
+ * really is a wall, and the wording rules invert with it: a `total` line may
+ * not say "today" or "tomorrow" or "a day", because all three would be untrue.
+ *
+ * **The shape follows the cost.** The three daily limits guard work that is
+ * free to us — two keyless catalogues and arithmetic in the browser — so a
+ * writer who resets the counter costs nothing and gets more of something that
+ * was free anyway. Keyword suggestions cost a model call every press. Counted
+ * per day, one free account could spend seven hundred of them a year; counted
+ * five in total, a free account costs at most five, ever.
+ *
+ * Five is what it takes to do one book properly: a writer runs this two or
+ * three times before they like the seven boxes, so five covers the listing
+ * they came here for and does not cover a backlist.
+ */
+export type TotalLimit = "keywordsAi" | "blurbChat" | "keywordChat";
+
+export type Limited =
+  | DailyLimit
+  | BookLimit
+  | ItemLimit
+  | TotalLimit
+  | "collaborators";
 
 /**
  * Every free-plan number, in one table.
@@ -76,6 +118,24 @@ export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> 
   prose: { free: 6, pro: null },
   track: { free: 2, pro: null },
   arcReaders: { free: 10, pro: null },
+  keywordsAi: { free: 5, pro: null },
+  /*
+   * Three rather than the keyword suggester's five, and the difference is the
+   * bill. A keyword press is one short model call; a blurb conversation is
+   * five to fifteen, so one of these costs roughly fifty times what one of
+   * those does. Three is still enough to work a blurb properly — the interview
+   * is four questions and a draft — and it is the number this app can hand out
+   * to somebody who has paid nothing.
+   */
+  blurbChat: { free: 3, pro: null },
+  /*
+   * The same three, for the same reason: it is a conversation, so it bills like
+   * one. It sits beside `keywordsAi` on one screen deliberately — the press is
+   * one call and answers "give me seven", the conversation is many and answers
+   * "which seven, and why" — and a writer who only wants candidates should not
+   * have to spend a third of their chats to get them.
+   */
+  keywordChat: { free: 3, pro: null },
   collaborators: { free: 2, pro: 10 },
 };
 
@@ -258,6 +318,22 @@ export function itemAllowance(
 }
 
 /**
+ * How many of a lifetime allowance are left.
+ *
+ * The simplest of the four: a running total, never reset, with none of
+ * `dailyAllowance`'s day comparison and none of `bookAllowance`'s exemption.
+ * That plainness is the point — there is nothing here that could give the
+ * count back, which is exactly what the sentences have to convey.
+ */
+export function totalAllowance(
+  action: TotalLimit,
+  used: number,
+  pro: boolean,
+): Allowance {
+  return make(action, whole(used), pro);
+}
+
+/**
  * How many more people will fit on one book.
  *
  * `people` includes the owner — see `seatsUsed` in `collab.ts`, which is what
@@ -273,7 +349,7 @@ export function seatAllowance(people: number, pro: boolean): Allowance {
 // The words
 // ---------------------------------------------------------------------------
 
-type Shape = "daily" | "book" | "item" | "seat";
+type Shape = "daily" | "book" | "item" | "total" | "seat";
 
 const SHAPE: Record<Limited, Shape> = {
   comps: "daily",
@@ -283,6 +359,9 @@ const SHAPE: Record<Limited, Shape> = {
   prose: "book",
   track: "book",
   arcReaders: "item",
+  keywordsAi: "total",
+  blurbChat: "total",
+  keywordChat: "total",
   collaborators: "seat",
 };
 
@@ -310,6 +389,18 @@ const WORDS: Record<
   prose: { one: "book", many: "books", short: "books", shortOne: "book", work: "the prose report" },
   track: { one: "book", many: "books", short: "books", shortOne: "book", work: "money tracking" },
   arcReaders: { one: "reader", many: "readers", short: "readers", shortOne: "reader", work: "advance readers" },
+  // `short` reads "2 suggestions left" rather than "2 left today" — the badge
+  // is the one place the missing "today" is most likely to be assumed, so the
+  // noun stays in it.
+  keywordsAi: { one: "suggestion", many: "suggestions", short: "suggestions", shortOne: "suggestion", work: "keyword suggestions" },
+  // Counted in *conversations*, and the noun has to say so — "3 chats left"
+  // beside a chat box would otherwise be read as three messages, which is a
+  // different and much smaller promise.
+  blurbChat: { one: "conversation", many: "conversations", short: "chats", shortOne: "chat", work: "blurb conversations" },
+  // `work` names the tool, and this one shares a screen with `keywordsAi`:
+  // "keyword suggestions" and "keyword conversations" have to be tellable
+  // apart in a sentence, because both can run out on the same card.
+  keywordChat: { one: "conversation", many: "conversations", short: "chats", shortOne: "chat", work: "keyword conversations" },
   collaborators: { one: "person", many: "people", short: "seats", shortOne: "seat", work: "people" },
 };
 
@@ -345,6 +436,13 @@ export function leftLine(allowance: Allowance): string | null {
       return `${left} more ${label(action, left)} today on the free plan.`;
     case "book":
       return `The free plan covers ${words.work} on ${left} more ${label(action, left)}.`;
+    case "total":
+      // **No "today", and none is implied.** Every other sentence in this file
+      // is about a limit that returns, and the vocabulary of those — today,
+      // tomorrow, a day, more books — would each be a small lie here. What is
+      // left is said plainly, with the word "free" carrying the reason there
+      // is a number at all.
+      return `${left} free ${label(action, left)} left.`;
     default:
       // Occupancy reads the other way round. Nobody thinks of a book as having
       // spent people or readers; the question being asked is how many more fit.
@@ -366,6 +464,8 @@ export function leftBadge(allowance: Allowance): string | null {
 
   const words = WORDS[action];
   const noun = left === 1 ? words.shortOne : words.short;
+  // Only the daily shape says when it comes back, because only the daily shape
+  // does. A test asserts both halves of that.
   return SHAPE[action] === "daily"
     ? `${left} ${noun} left today`
     : `${left} ${noun} left`;
@@ -391,6 +491,13 @@ export function spentLine(allowance: Allowance): string | null {
       return `The free plan covers ${words.work} on ${limit} books, and you are already using all ${limit}.`;
     case "item":
       return `A free book holds ${limit} ${words.many}, and this list is full.`;
+    case "total":
+      // **It must not promise a return, and it must not sound like a scolding
+      // either.** This is the only wall in the app that stays shut, so the
+      // sentence says what was given, that it is spent, and stops. The dialog
+      // beside it is where Pro is offered; a spent line that also sold
+      // something would be doing two jobs at the moment of refusal.
+      return `The free plan includes ${limit} ${words.work}, and you have used them.`;
     default:
       // A book is not "used up", and saying so would blame the owner for having
       // co-writers. Seats are also the one limit Pro raises rather than lifts, so
@@ -421,6 +528,8 @@ export function reachedHeadline(action: Limited): string {
       return `The free plan covers ${words.work} on ${limit} books`;
     case "item":
       return `A free book holds ${limit} ${words.many}`;
+    case "total":
+      return `The free plan includes ${limit} ${words.work}`;
     default:
       return `A free book holds ${limit} people`;
   }

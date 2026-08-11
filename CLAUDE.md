@@ -542,15 +542,50 @@ cluster.** That is the figure a writer wants and it cannot be had honestly:
 Amazon’s Product Advertising API shut down in May 2026, its replacement needs
 ten affiliate sales a month, and the tools quoting a figure buy scraped data
 from a vendor. Scraping is forbidden by Amazon’s own terms and would put the
-risk on us. `keywords.ts` and `shelves.ts` each have a test asserting their
-shape carries no such number, and both are tests not to "fix". What is offered
-instead is `keywordReport()`: the seven backend keyword boxes counted — over
-the 50-character limit, words the title already owns so the shop indexes them
-anyway, the same word spent twice, and phrases shops publish a rule against.
+risk on us. `keywords.ts`, `keywords/suggest.ts` and `shelves.ts` each have a
+test asserting their shape carries no such number, and all three are tests not
+to "fix". What is offered instead is `keywordReport()`: the seven backend
+keyword boxes counted — over the 50-character limit, words the title already
+owns so the shop indexes them anyway, the same word spent twice, and phrases
+shops publish a rule against.
 
-**This is the second route that sends prose**, after the assistant: the opening
-of the manuscript goes, because whether a book *sounds* like another is what a
-keyword search cannot answer. Capped at a couple of pages, cut at a paragraph
+**A sixth route writes candidates for those boxes**, and the reason it is
+allowed is that the ground moved. `/api/comps/keywords` (POST, `requirePro()`,
+a model via `ai.ts`) over the pure `src/lib/keywords/suggest.ts` suggests
+phrases for the seven fields. Amazon's search stopped being literal — since
+2024 it carries a semantic layer that reads a listing the way a person would,
+so *coverage of the right ideas* is what earns a book its place and keyword
+stuffing is explicitly less effective than it was. That is a judgement, which
+is the only thing a model is worth paying for here. It also means the figure
+the competitors sell is becoming less decisive while the thing that matters can
+be produced honestly, so the refusal above stops being a limitation.
+
+Four things hold it, and the first is the interesting one:
+
+- **The checker is the filter.** Every candidate is run through
+  `keywordReport()` as though it were already in a box, and anything raising an
+  issue is dropped — too long, a word the title already owns, a phrase the
+  shops publish a rule against, a word already spent in an earlier suggestion.
+  A prompt is a request; this is a guarantee, and it is what stops the two
+  halves of the screen disagreeing about what a good keyword is.
+- **Dropped, never truncated or repaired.** A phrase cut at fifty characters is
+  a different phrase and one with its offending word removed is a phrase nobody
+  wrote. Losing a suggestion costs a writer nothing; showing them a mangled one
+  costs the trust the screen runs on.
+- **Empty slots only, and Undo.** Words a writer typed are never overwritten,
+  and suggestions land in the *draft* so nothing reaches the book until Save.
+- **The manuscript does not go** — the blurb, genre, categories and the
+  listing's own names, all of it typed into form fields. That keeps this off
+  the short list of routes that send prose. Add a field and it needs a line on
+  the privacy page in the same commit. KDP requires no AI disclosure for
+  metadata, so the screen carries no warning; what it does carry is *check each
+  one is true of your book*, because a shop requires the keywords, title and
+  description to describe the same book — a suggested trope the book lacks is a
+  rule broken rather than bad advice.
+
+**This is the second of three routes that send prose** — the assistant, this,
+and the blurb workshop — and the opening of the manuscript goes, because
+whether a book *sounds* like another is what a keyword search cannot answer. Capped at a couple of pages, cut at a paragraph
 (a severed clause is a false signal about how the writer ends sentences),
 images dropped, sent only on a press — and the card lists exactly what leaves
 *before* the button, the same shape the feedback dialog uses. Add a field to
@@ -1363,7 +1398,8 @@ can do nothing but open a checkout. An accidental client import of the rest
 reads empty strings, so `isPaddleConfigured()` answers false rather than leaking
 a secret. `server.ts` is `requirePro()`, the
 gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe`,
-`/api/comps/query`, `/api/comps/rank` and `/api/comps/categories` — 401 when
+`/api/comps/query`, `/api/comps/rank`, `/api/comps/categories`,
+`/api/comps/keywords`, `/api/blurb/critique` and `/api/blurb/workshop` — 401 when
 signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
@@ -1403,7 +1439,9 @@ one-off price every month, that there is no period end to store, and that
 
 **What is free is what a book needs to exist and leave.** Unlimited books,
 words, chapters and **imports**, all four exports, sync, the pre-upload check and
-the roadmap, structure, progress, categories and its keyword boxes, the writing
+the roadmap, structure, progress, categories and typing in its keyword boxes
+yourself — having those boxes *suggested* is the one part of that screen with a
+number on it, five for the life of the account — the writing
 record, and the story bible **across a whole series**. Pro is the metered routes
 plus two things a writer only wants once there are real sales: reading a shop's
 sales export into the ledger, and the book-three curve. Note the two names that
@@ -1427,9 +1465,49 @@ product grounds: generated blurbs are generic exactly where a blurb cannot
 afford to be, and generating one honestly would mean sending the whole book,
 which yields a synopsis with the ending in it. And **no prose leaves** — what
 goes is the description, the title and the genre, all typed into form fields, so
-this route is not on the short list of places the manuscript can travel. Send a
-chapter from here and it needs a line on the privacy page and a sentence above
-the button, as the prose report has.
+this route is not on the short list of places the manuscript can travel.
+
+**Its sibling writes, and the shape is what makes that allowed.**
+`/api/blurb/workshop` over the pure `src/lib/blurb-workshop.ts` is a
+*conversation*: it asks who the book is about, what they want, what is in the
+way and what failure costs, and assembles a draft **from the writer's own
+answers**. The specifics are theirs; the model does the shaping. That is a
+different thing from the generator refused above, and the two failures that
+refusal names are avoided by construction rather than by prompting — the
+prompt forbids stating any fact the writer did not give it, and only the
+*opening* is sent, so there is no ending to leak onto the back cover. The
+public promise is untouched either way: the landing page refuses covers and
+*prose*, and a blurb is metadata.
+
+Five things hold it, and the first is the interesting one:
+
+- **The draft is tagged, not guessed at.** An earlier shape asked for prose and
+  tried to work out which paragraph was the blurb; every heuristic for that is
+  wrong somewhere, because a long answer to "why does that opening not work"
+  looks exactly like a draft. `<blurb>` is a signal the model either sends or
+  does not, so a turn that is a question simply has no button — and a draft
+  over `BLURB_MAX` is **refused rather than truncated**, since a paragraph cut
+  mid-sentence would be offered as though somebody had written it.
+- **It sends prose, which is the third such route**, so it carries the
+  obligations: `/privacy` names it, and the panel lists what leaves *above the
+  input, before the press*. The opening is capped **shorter than `rank.ts`'s**
+  — everything past the opening is where the ending lives — and cut again
+  server-side, because a browser is not where that promise is kept.
+- **Nothing reaches the book without a press.** A draft lands in the *draft*,
+  so the save bar appears and the writer commits it; the box is never
+  overwritten silently.
+- **Nothing is persisted**, exactly as the assistant's chat is not — a
+  conversation about a draft is scaffolding.
+- **It is not streamed, and that is a deployment decision.** The assistant can
+  afford to be Anthropic-only; this has to run on whichever provider is
+  configured, and `ai.ts` is the only path that does both. Streaming would mean
+  an SSE reader for Gemini's REST API, which is the complication `ai.ts` was
+  scoped to avoid. If it is ever worth streaming, it belongs in `ai.ts` for
+  both providers rather than as a second Anthropic-only route.
+
+Send a chapter from the *critique* route and it needs a line on the privacy
+page and a sentence above the button, as the prose report and the workshop
+have.
 
 **Everything else is metered in the unit its own work comes in, and
 `src/lib/free-limits.ts` is the whole of the policy.** There is no single global
@@ -1437,13 +1515,51 @@ number, and there was: a version of this gave the free plan "every tool,
 unlimited, on five books". A *container* limit cannot hold a container whose
 contents are arbitrary — the comps box and the title-check box take any words a
 writer types, so one book slot was a general-purpose research desk for any number
-of manuscripts. Three shapes replaced it:
+of manuscripts. Four shapes replaced it:
 
 | Shape | Tools | Free |
 |---|---|---|
 | **Per day** | comps, covers, title check | 2 / 3 / 2 a day |
 | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
 | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
+| **In total, for good** | keyword suggestions, blurb chat | 5 / 3 ever |
+
+**The fourth shape follows the cost, not the work, and it is the only one that
+never comes back.** The three daily limits guard things that are free to us —
+two keyless catalogues and arithmetic in a browser — so a writer who resets the
+counter costs nothing and gets more of something that was free anyway. Keyword
+suggestions ask a model on every press. Counted per day, one free account could
+spend seven hundred model calls a year; counted five in total, it costs at most
+five, ever. Five is what it takes to do one book properly (two or three runs
+before the seven boxes look right), which covers the listing somebody came here
+for and does not cover a backlist.
+
+**The two members of that shape carry different numbers, and the ratio is the
+bill.** A keyword press is one short model call; a blurb conversation is five
+to fifteen, so one of those costs roughly fifty times one of these — hence
+three rather than five. **A blurb conversation is the unit, not a message**:
+counting messages would stop a writer mid-brainstorm, and the interview asks
+four questions before it offers anything. It is spent on the *first message*
+of a chat, so opening the panel and reading it costs nothing, and a reload with
+nothing said costs nothing either. `WORDS.blurbChat` says "conversations" for
+that reason — "3 chats left" beside a chat box would otherwise be read as three
+messages, which is a different and much smaller promise.
+
+**Its sentences may not borrow the daily vocabulary**, and a test enforces that:
+no "today", no "tomorrow", no "a day", because all three would be untrue of a
+wall that stays shut. `leftLine` says "2 free suggestions left."; `spentLine`
+says the plan includes five and they are used, and stops — the dialog beside it
+is where Pro is offered, and a spent line that also sold something would be
+doing two jobs at the moment of refusal.
+
+**It is also the first counter here in front of a route that bills**, which is
+worth stating plainly: clearing storage really does hand somebody another five,
+and the damage is five short prompts, which is not worth a table in Postgres to
+prevent. What is *not* left to the browser is the wall — `/api/comps/keywords`
+carries `requirePro()` like every other model route, so the sixth press is
+refused by the server whatever the client believes. And **`useLimitGate` does
+not record for this shape**: the screen calls `spendTotalUse` when a reply
+actually lands, because a gateway 502 must not cost one of five.
 
 Which shape a tool takes follows from what it does. The three that send a query
 to a catalogue are counted **per day**, which is what every serious research tool
@@ -1876,11 +1992,13 @@ grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
 `/api/comps` · `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
-`/api/comps/categories` · `/api/blurb/critique` · `/api/billing/*`. All of those except
+`/api/comps/categories` · `/api/comps/keywords` · `/api/blurb/critique` ·
+`/api/blurb/workshop` ·
+`/api/billing/*`. All of those except
 `/api/comps` and `/api/comps/subjects` are metered and gated by `requirePro()`;
 those two are free, keyless and stay that way — which is the whole reason the
-three model steps around the comps search (query, rank, categories) are routes
-of their own rather than flags on it.
+four model steps around the comps search (query, rank, categories, keywords)
+are routes of their own rather than flags on it.
 
 ## Styling
 

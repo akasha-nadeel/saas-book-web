@@ -42,6 +42,46 @@ export interface Listing {
   subtitle?: string;
   author?: string;
   series?: string;
+  /**
+   * The shelves chosen on this book, matched **as whole names rather than word
+   * by word** — see `categorySegments`.
+   */
+  categories?: readonly string[];
+}
+
+/**
+ * The shelf names in a chosen category, for matching against a keyword.
+ *
+ * **Segments, not words, and this is the decision the whole check rests on.**
+ * Amazon says to avoid what the categories already carry, and its own example
+ * is the category *name* repeated: a history book shelved under "19th Century
+ * History" should not spend a box on "19th century history". Taken word by
+ * word instead, a path like `Fiction / Mystery & Detective / Women Sleuths`
+ * would flag "fiction", "mystery", "detective", "women" and "sleuths" — which
+ * would condemn "cozy mystery with cats", the single best keyword a cozy
+ * writer could spend a box on, and the tool would be arguing with itself.
+ *
+ * So a whole segment has to appear as a phrase. A shop's selector writes these
+ * paths with a slash and a librarian's index with a chevron; both are split,
+ * and each part is trimmed of the ampersands and commas that would break a
+ * word-boundary match.
+ */
+function categorySegments(categories: readonly string[]): string[] {
+  const parts: string[] = [];
+  for (const path of categories) {
+    for (const raw of path.split(/[/>›»]/)) {
+      const name = raw.trim();
+      /*
+       * **Two words at least.** A one-word segment is "Fiction", "Mystery",
+       * "Romance" — the top of every path, true of half the shop, and also an
+       * ordinary word inside a keyword somebody should be allowed to write.
+       * Amazon's own example of the rule is a whole shelf name, and every
+       * shelf name worth flagging has more than one word in it.
+       */
+      if (wordsIn(name).length > 1) parts.push(name);
+    }
+  }
+  return parts;
 }
 
 /**
@@ -83,6 +123,8 @@ export interface Slot {
 export type Issue =
   /** Longer than the field allows. */
   | { kind: "over"; slot: number; chars: number }
+  /** Quotation marks, which Amazon bans in these fields outright. */
+  | { kind: "quoted"; slot: number }
   /** Words the listing already carries, so indexing them again buys nothing. */
   | { kind: "wasted"; slot: number; words: string[]; where: string }
   /** The same word spent in more than one field. */
@@ -128,6 +170,10 @@ export function keywordReport(
     }
   }
 
+  // The shelves, kept apart from the words above because they are matched
+  // whole rather than word by word.
+  const shelves = categorySegments(listing.categories ?? []);
+
   const seen = new Map<string, number[]>();
 
   for (const slot of slots) {
@@ -135,6 +181,10 @@ export function keywordReport(
 
     if (slot.over) {
       issues.push({ kind: "over", slot: slot.index, chars: slot.chars });
+    }
+
+    if (isQuoted(slot.text)) {
+      issues.push({ kind: "quoted", slot: slot.index });
     }
 
     const lower = slot.text.toLowerCase();
@@ -145,9 +195,10 @@ export function keywordReport(
     }
 
     // Wasted words, grouped so one field reports one issue rather than four.
+    const words = wordsIn(slot.text);
     const wasted: string[] = [];
     const wheres = new Set<string>();
-    for (const word of wordsIn(slot.text)) {
+    for (const word of words) {
       const where = already.get(word);
       if (where) {
         wasted.push(word);
@@ -157,6 +208,16 @@ export function keywordReport(
       if (at) at.push(slot.index);
       else seen.set(word, [slot.index]);
     }
+
+    // A shelf name repeated whole. Reported through the same issue as the
+    // title, because it is the same fact — this is already indexed — and the
+    // screen has one sentence for it.
+    const onShelf = shelves.filter((name) => hasRun(words, wordsIn(name)));
+    if (onShelf.length > 0) {
+      wasted.push(...onShelf.map((name) => name.toLowerCase()));
+      wheres.add("your categories");
+    }
+
     if (wasted.length > 0) {
       issues.push({
         kind: "wasted",
@@ -187,6 +248,9 @@ export function keywordReport(
 
 const ORDER: Record<Issue["kind"], number> = {
   over: 0,
+  // A published rule, like `refused`: the field is spoiled rather than merely
+  // spent badly, so both sort above a word that only buys nothing.
+  quoted: 1,
   refused: 1,
   wasted: 2,
   repeated: 3,
@@ -232,5 +296,37 @@ function wordsIn(text: string): string[] {
 function hasPhrase(haystack: string, phrase: string): boolean {
   return new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(
     haystack,
+  );
+}
+
+/**
+ * Does one run of words appear inside another, in order and unbroken?
+ *
+ * Used for shelf names, where a plain string match is too brittle: a shop
+ * writes "Mystery & Detective" and a writer types "mystery detective", which
+ * is the same shelf named the same way. Comparing the *word runs* both sides
+ * have been reduced to lets the punctuation and the filler differ while the
+ * name still has to be there whole and in order.
+ */
+function hasRun(words: readonly string[], run: readonly string[]): boolean {
+  if (run.length === 0 || run.length > words.length) return false;
+  return words.some((_, i) => run.every((word, j) => words[i + j] === word));
+}
+
+/**
+ * Quotation marks, which Amazon bans in a keyword field outright.
+ *
+ * **Double quotes anywhere, single quotes only around the whole phrase.** An
+ * apostrophe inside a word is ordinary English — "reader's choice" is a
+ * keyword somebody should be allowed to write — so only a pair wrapping the
+ * field counts, which is the shape somebody quoting a search term produces.
+ */
+function isQuoted(text: string): boolean {
+  if (/["“”]/.test(text)) return true;
+  const trimmed = text.trim();
+  return (
+    trimmed.length > 1 &&
+    /^['’]/.test(trimmed) &&
+    /['’]$/.test(trimmed)
   );
 }

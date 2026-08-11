@@ -674,11 +674,11 @@ it("starts an older library clean rather than guessing", () => {
  * says holds two — and would lose counts just as easily in the other direction.
  */
 describe("mergeUsage", () => {
-  const empty = { usedToday: { day: "", counts: {} }, usedOn: {} };
+  const empty = { usedToday: { day: "", counts: {} }, usedOn: {}, usedTotal: {} };
 
   it("takes the larger count for each tool on the same day", () => {
     const merged = mergeUsage(
-      { usedToday: { day: "2026-08-10", counts: { comps: 2, covers: 1 } }, usedOn: {} },
+      { usedToday: { day: "2026-08-10", counts: { comps: 2, covers: 1 } }, usedOn: {}, usedTotal: {} },
       { usedToday: { day: "2026-08-10", counts: { comps: 1, titleCheck: 2 } } },
     );
 
@@ -690,7 +690,7 @@ describe("mergeUsage", () => {
   });
 
   it("takes the later day outright when the two machines disagree", () => {
-    const yesterday = { usedToday: { day: "2026-08-09", counts: { comps: 2 } }, usedOn: {} };
+    const yesterday = { usedToday: { day: "2026-08-09", counts: { comps: 2 } }, usedOn: {}, usedTotal: {} };
     const today = { usedToday: { day: "2026-08-10", counts: { comps: 1 } } };
 
     // A new day supersedes: the older machine's spent allowance is not carried
@@ -703,14 +703,14 @@ describe("mergeUsage", () => {
     // yesterday's tally.
     expect(
       mergeUsage(
-        { usedToday: today.usedToday, usedOn: {} },
+        { usedToday: today.usedToday, usedOn: {}, usedTotal: {} },
         { usedToday: yesterday.usedToday },
       ).usedToday,
     ).toEqual({ day: "2026-08-10", counts: { comps: 1 } });
   });
 
   it("never lets a machine that has counted nothing overwrite one that has", () => {
-    const used = { usedToday: { day: "2026-08-10", counts: { comps: 2 } }, usedOn: {} };
+    const used = { usedToday: { day: "2026-08-10", counts: { comps: 2 } }, usedOn: {}, usedTotal: {} };
     // The empty day a fresh library carries sorts below every real one.
     expect(mergeUsage(used, empty).usedToday).toEqual(used.usedToday);
   });
@@ -722,13 +722,36 @@ describe("mergeUsage", () => {
    */
   it("unions the books each tool has been used on", () => {
     const merged = mergeUsage(
-      { usedToday: { day: "", counts: {} }, usedOn: { blurb: ["a", "b"], prose: ["x"] } },
+      { usedToday: { day: "", counts: {} }, usedOn: { blurb: ["a", "b"], prose: ["x"] }, usedTotal: {} },
       { usedOn: { blurb: ["b", "c"], track: ["z"] } },
     );
 
     expect(merged.usedOn.blurb).toEqual(["a", "b", "c"]);
     expect(merged.usedOn.prose).toEqual(["x"]);
     expect(merged.usedOn.track).toEqual(["z"]);
+  });
+
+  /*
+   * **The larger, never the sum**, and this is the test that says why. Syncing
+   * downloads a count a machine has already pushed; adding them would charge a
+   * writer twice for one press, and five would become two or three inside a
+   * day of ordinary use. The cost of taking the larger is a genuine second
+   * press made offline elsewhere going unrecorded — one model call, against a
+   * writer being refused something they never spent.
+   */
+  it("takes the larger lifetime count rather than adding the two", () => {
+    const merged = mergeUsage(
+      { ...empty, usedTotal: { keywordsAi: 3 } },
+      { usedTotal: { keywordsAi: 2 } },
+    );
+    expect(merged.usedTotal.keywordsAi).toBe(3);
+
+    // And the other way round, so neither side is privileged.
+    expect(
+      mergeUsage({ ...empty, usedTotal: { keywordsAi: 1 } }, {
+        usedTotal: { keywordsAi: 4 },
+      }).usedTotal.keywordsAi,
+    ).toBe(4);
   });
 
   it("survives a remote with nothing in it", () => {

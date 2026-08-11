@@ -860,6 +860,174 @@ from them as *what is out there*, never as *the answer*.
       at all; matching to a shop and spending the seven boxes well is
       optimising a listing, which is work for a book that is going out. Both
       new sections are `ProGate`d.
+- [x] **Suggested keywords, and a fourth limit shape.** Done 2026-08-11.
+      `/api/comps/keywords` over the pure `src/lib/keywords/suggest.ts`
+      (17 tests), with the control at the top of the keyword panel on the
+      categories screen.
+
+      **What changed is the search, not our position on it.** Amazon's keyword
+      matching stopped being literal in 2024 — a semantic layer now reads a
+      listing for meaning, so covering the right ideas earns a book its place
+      and stuffing the right strings does not. That makes the judgement worth a
+      model call, and it makes the figure every competitor sells (search
+      volume, bought from resellers, disagreed on between tools) *less*
+      decisive rather than more. So the refusal in `keywords.ts` stops being a
+      limitation. There is still no volume, no score and no rank, and
+      `suggest.ts` now carries the same test.
+
+      **The checker is the filter, which is the whole design.** Every candidate
+      goes through `keywordReport()` as though it were already in a box, and
+      anything raising an issue is dropped rather than truncated or repaired. A
+      prompt is a request; this is a guarantee, and it means the suggesting
+      half and the checking half of one screen cannot drift into disagreeing.
+      Suggestions fill empty slots only, land in the draft rather than the
+      store, and Undo puts the previous seven back.
+
+      **The limit is a new shape.** Five for the life of the account — not per
+      day, not per book — because this is the first thing here that costs money
+      on every press: five a day would be seven hundred model calls a year per
+      free account. `TotalLimit` in `free-limits.ts`, `usedTotal` in prefs,
+      merged by taking the larger count rather than the sum. Its sentences may
+      not say "today", "tomorrow" or "a day", and a test walks all four of them
+      — this is the only allowance in the app that does not come back, and
+      borrowing the daily vocabulary would be a small lie told at the moment
+      somebody is refused. `useLimitGate` deliberately does not record for this
+      shape: the screen calls `spendTotalUse` when a reply lands, so a gateway
+      502 cannot cost one of five.
+
+      **Nothing about the manuscript is sent** — the blurb, the genre, the
+      categories and the listing's own names, all typed into form fields. KDP
+      requires no AI disclosure for metadata, so there is no warning; what the
+      screen does carry is *check each one is true of your book*, because a
+      shop requires the keywords, title and description to describe the same
+      book and a suggested trope the book lacks is a rule broken rather than
+      bad advice.
+- [x] **The keyword workshop, and three rules the checker was missing.** Done
+      2026-08-11. `/api/comps/keywords/chat` over the pure
+      `src/lib/keywords/workshop.ts` (22 tests), in a card where the one-press
+      suggester's box used to be — the press moved *inside* it.
+
+      **Two doors, because they answer different questions.** The press asks
+      "give me seven from the blurb" and costs one model call; the conversation
+      asks "which seven, and why" and costs one per turn. Making the chat the
+      only way in would charge a writer one of three conversations for a job
+      that used to cost one of five cheaper presses. So both live in one card,
+      with two counters: `keywordsAi` (5, total) and the new `keywordChat` (3,
+      total), the number and the wording rules taken from `blurbChat` for the
+      same reason — a conversation is five to fifteen calls where a press is
+      one.
+
+      **Half of what it does is documentation, and that half is free
+      everywhere else.** What a model is actually paid for here is judgement —
+      which seven, given this book's own subject and what its title and
+      shelves already carry. The explaining is in the prompt as *given facts*
+      rather than recalled ones (seven boxes, fifty characters, combinations
+      indexed, quotation marks refused, the ban list, the semantic-search
+      shift), because a model answering from memory about a form Amazon has
+      changed several times is the failure this feature would be judged on.
+
+      **Same tag discipline as the blurb workshop.** Candidates arrive inside
+      `<keywords>`, so a turn that answers a question has no button under it —
+      every heuristic for "was that a suggestion?" is wrong somewhere. They go
+      through `keepUsable`, split out of `suggest.ts` so both doors share one
+      filter and the chat cannot offer a phrase the checker below it would
+      flag. Empty boxes only, into the draft, Undo intact.
+
+      **Three checker gaps closed, all from KDP's own pages rather than
+      folklore.** Quotation marks are refused outright (double anywhere, single
+      only when they wrap the field, so "reader's choice" is untouched). Words
+      the *categories* already carry now count, matched **as whole shelf names
+      rather than word by word** — a path like `Fiction / Mystery & Detective /
+      Women Sleuths` taken word by word would condemn "cozy mystery with cats",
+      the best keyword a cozy writer could spend a box on, and Amazon's own
+      example of the rule is a shelf name repeated whole. One-word segments
+      ("Fiction") are skipped for the same reason.
+
+      **And the mechanism nobody mentions: keyword-gated subcategories.** A few
+      Amazon shelves cannot be reached through the category selector at all —
+      the book appears only if a keyword carries the word they are gated on
+      (its own LGBT page is the plain example). The screen names the mechanism
+      and links to Amazon; **the list is deliberately not shipped**, and the
+      prompt forbids the model reciting one. It changes, it is published per
+      genre, and a stale copy of somebody else's rules read as ours is the
+      invented-data failure this screen exists to avoid. Same reasoning that
+      keeps a search volume off it.
+- [x] **The keyword guide — the whole method, with the model switched off.**
+      Done 2026-08-11. `src/lib/keywords/guide.ts` (8 tests) in
+      `keyword-guide.tsx`, opened by **How these work** beside the count.
+
+      **It exists because the model is the part most likely not to be there.**
+      A self-hosted copy has no key and the route answers 501; a free account
+      spends its five and its three; a gateway has an afternoon. In every one
+      of those the writer still has seven empty boxes and a book to publish,
+      and a screen whose only answer is a button that is not working today has
+      failed them. So everything the chat knows is also written down — free,
+      offline, and reachable from the chat's own error, which is the one place
+      somebody is certain to be standing when they need it.
+
+      **A sheet, not a dialog, and the research agrees with the app's own
+      precedent.** A modal is for a decision that must be made before anything
+      else; a drawer is for something read *while* carrying on — which is this,
+      since the form being explained is visible behind it. Same layer the
+      roadmap opens a tool in: fixed, right-anchored, inset, `z-40` so a dialog
+      still opens over it, a real `<button>` for the backdrop, Escape.
+
+      **Two panes, because a guide is a list of topics and a list of
+      questions.** Topics in a card down the left, the chosen one's questions
+      as `<details>` on the right — the browser's own disclosure, so it needs
+      no JavaScript, is announced correctly, and the browser's own find
+      searches inside it. The rows are keyed on the topic, or the third
+      question of a new topic arrives already open because the third of the
+      last one was.
+
+      **Every fact is the shop's, and the sheet says so with links.** This is
+      the subject with more confident wrong advice attached to it than any
+      other part of self-publishing, so the only honest answer to "says who?"
+      is a link — including the correction of the most-quoted mistake, that
+      "single words work better than phrases" is a sentence about quotation
+      marks rather than general advice. No volume, no score, no rank; a test
+      asserts it, because a guide is where an invented number would be *most*
+      believable.
+- [x] **The blurb workshop — a chat that drafts from your own answers.** Done
+      2026-08-11. `/api/blurb/workshop` over the pure
+      `src/lib/blurb-workshop.ts` (21 tests), in the blurb screen's rail above
+      "Ask a reader".
+
+      **The refusal moved, and it moved on purpose.** This screen said it would
+      not write a blurb, and it still refuses the thing that refusal was
+      about — paste your book, get a paragraph. What it does now is *ask*: who
+      the book is about, what they want, what stands in the way, what failure
+      costs, and the draft is assembled from the writer's own answers. The odd,
+      specific details are theirs. Both failures the old note named are avoided
+      by construction rather than by prompting: the system prompt forbids
+      stating any fact the writer did not give, and only the *opening* is sent,
+      so there is no ending to put on the back cover. The public promise is
+      untouched — the landing page refuses covers and *prose*, and a blurb is
+      metadata, which is also why the shops ask for no AI declaration.
+
+      **The draft is tagged rather than guessed at.** An earlier shape asked
+      for prose and tried to spot which paragraph was the blurb; a long answer
+      to "why does that opening not work" looks exactly like a draft. A
+      `<blurb>` tag is a signal the model either sends or does not, so a turn
+      that is a question has no button. Over `BLURB_MAX` it is refused, not
+      truncated.
+
+      **Third route that sends prose**, so it carries the obligations: a line
+      on `/privacy`, and the panel names what leaves above the input before the
+      press. The opening is cut shorter than `rank.ts`'s and cut again
+      server-side.
+
+      **Not streamed**, and that is about deployment rather than taste: it goes
+      through `askModel`, so it runs on Gemini in development and Claude in
+      production without branching. Streaming would need an SSE reader for
+      Gemini's REST API — the complication `ai.ts` exists to avoid. If it is
+      worth doing, it belongs in `ai.ts` for both providers.
+
+      **Three conversations free, not five, and a conversation is the unit.**
+      One of these costs roughly fifty times one keyword press. Counting
+      messages would stop a writer mid-brainstorm, and the interview asks four
+      questions before offering anything — so the use is spent on the first
+      message of a chat, and opening the panel costs nothing.
 - [x] **A cover wall for the genre.** Done 2026-08-01. `/book/[bookId]/covers`.
       The writer's cover beside the shelf it has to sit on — the thing they
       would do themselves given a bookshop and an afternoon, which is all we can

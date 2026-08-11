@@ -137,6 +137,31 @@
   --color-upgrade-to: #4f46e5; /* indigo */
   --color-upgrade-ink: #7c3aed; /* the button's text, on white */
 
+  /* ------------------------------------------------------------------------
+     The guide button: a green fill, on one control.
+
+     **A documented exception, and a narrow one.** Green already means
+     something here — it is the `ok` of the status family, *passed or earned* —
+     and this borrows the hue for a door rather than a state. That is a real
+     cost, paid on purpose: the guide is the answer when nothing else on the
+     screen is answering, and a quiet outline beside a filled indigo chat
+     button is not found at the moment it is wanted. It is spent on **one
+     control on one screen**; a second thing wearing it and the hue stops
+     meaning anything, exactly as the gold badge note below says.
+
+     **Stated identically in both theme blocks**, like `--color-upgrade-*` and
+     for the same reason: a saturated mid-tone fill carries its own ink on
+     either ground, and a value that need not change should not.
+
+     **It is darker than a lime, and that was forced by the text on it.** The
+     bright yellow-greens this was drawn from carry white at about 3:1, which
+     fails at this size; #2f7d32 clears **5.1:1**, which is the whole reason it
+     is this green and not that one. The ink is literal white rather than
+     `accent-ink`, which is black at night — ink that inverts on a ground that
+     does not is the one way to get this wrong. */
+  --color-guide: #2f7d32;
+  --color-guide-hover: #276b2a; /* deepens, since a mid-tone cannot brighten */
+
   /* The pricing table's value badges — a tinted ground, a hairline of the same
      hue, and ink of that hue rather than white.
      ------------------------------------------------------------------------
@@ -534,6 +559,13 @@
   --color-upgrade-from: #9333ea;
   --color-upgrade-to: #4f46e5;
   --color-upgrade-ink: #7c3aed;
+
+  /* The guide button in daylight: the same two values as the dark block. See
+     the note there — a saturated fill carries white on either ground, and a
+     token stated in one block and not the other is the bug this file's own
+     rule warns about. */
+  --color-guide: #2f7d32;
+  --color-guide-hover: #276b2a;
 
   /* The badges in daylight — the same three hues the other way up. Unlike the
      upgrade fill above, these *do* change between blocks: a tint is a ground,

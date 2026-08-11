@@ -4,11 +4,19 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
-import { Spinner } from "@/components/ui/spinner";
 import { ToolSaveBar } from "@/components/ui/tool-save";
 import { blurbReport } from "@/lib/blurb";
-import { MIN_BLURB, type Question } from "@/lib/blurb-critique";
-import { findBook, setPublishing } from "@/lib/library-store";
+import { BlurbWorkshop } from "@/components/blurb/blurb-workshop";
+import { MAX_WORKSHOP_OPENING } from "@/lib/blurb-workshop";
+import { openingFrom, proseFrom } from "@/lib/comps/rank";
+import { toBlocks } from "@/lib/export/blocks";
+import {
+  chapterMatterOf,
+  findBook,
+  getBody,
+  orderedChapters,
+  setPublishing,
+} from "@/lib/library-store";
 import { BLURB_MAX } from "@/lib/publishing";
 import { useHydrated, useShelf } from "@/lib/use-library";
 import { useToolSave } from "@/lib/use-tool-save";
@@ -58,7 +66,24 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * measured. See `blurb.ts` — it still accepts a `benchmark`, deliberately
  * unused here, so a future caller with trustworthy data can pass one.
  */
+/**
+ * How tall the composer is, and therefore how tall the conversation is.
+ *
+ * **One number, written once**, because the two columns have to agree: the
+ * grid stretches the chat to whatever the left column comes to, so this is the
+ * only place a height is stated and there is nothing for the other side to
+ * drift from.
+ *
+ * Shorter in the roadmap's panel, where the whole screen is a sheet over the
+ * road and a box this tall would be most of it. Tailwind reads class names as
+ * literals, so both are written out rather than built from a variable — a name
+ * assembled at runtime ships no rule at all.
+ */
+const COMPOSER_HEIGHT_PAGE = "h-[36rem]";
+const COMPOSER_HEIGHT_PANEL = "h-[22rem]";
+
 export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
+  const COMPOSER_HEIGHT = embedded ? COMPOSER_HEIGHT_PANEL : COMPOSER_HEIGHT_PAGE;
   const hydrated = useHydrated();
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -83,6 +108,40 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
     () => blurbReport(text, { title: book?.title }),
     [text, book?.title],
   );
+
+  /**
+   * The opening of the manuscript, for the workshop.
+   *
+   * The first *body* chapter with prose in it — front matter is a title page
+   * and a dedication, which say nothing about the book — walked through the
+   * export path and cut at a paragraph. The same `useMemo` the comps screen
+   * uses, and deliberately the same helpers: two ways of deciding what "the
+   * opening" means would eventually disagree.
+   *
+   * **Cut short of `rank.ts`'s length on purpose.** Everything past the
+   * opening is where the ending lives, and this is the one feature where a
+   * model that has read too far writes the ending onto the back cover. It is
+   * cut again on the server, because a browser is not where that promise is
+   * kept.
+   */
+  const opening = useMemo(() => {
+    if (!book) return "";
+    for (const chapter of orderedChapters(book)) {
+      if (chapterMatterOf(chapter) !== "body") continue;
+      const raw = getBody(chapter.id);
+      if (!raw) continue;
+      try {
+        const prose = openingFrom(
+          proseFrom(toBlocks(JSON.parse(raw))),
+          MAX_WORKSHOP_OPENING,
+        );
+        if (prose) return prose;
+      } catch {
+        // A corrupt body contributes nothing, as it does to search.
+      }
+    }
+    return "";
+  }, [book]);
 
   /* Saved on a press now, not on blur.
      "Saved when you click away" was true and nobody believed it — this is the
@@ -110,65 +169,6 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
     discard: () => setDraft(null),
   });
 
-  /*
-   * **The reader, and what it is allowed to be.**
-   *
-   * This is the one model call on this screen, and it answers "what is a reader
-   * still asking" rather than "write me one". The reasoning lives in
-   * `lib/blurb-critique.ts`; the part that matters here is that the answer is a
-   * list of *questions* with no field to put a rewritten sentence in, so there
-   * is nothing on this screen to paste into the box.
-   *
-   * `askedAbout` holds the exact words that were sent. It is what lets the box
-   * say the answer is about an earlier draft rather than quietly describing a
-   * blurb that no longer exists — the same rule the title check's toast follows
-   * in remembering which title its verdict was about.
-   */
-  const [reading, setReading] = useState<Question[] | null>(null);
-  const [askedAbout, setAskedAbout] = useState<string | null>(null);
-  const [asking, setAsking] = useState(false);
-  const [askError, setAskError] = useState<string | null>(null);
-
-  async function askAReader() {
-    if (asking) return;
-    setAsking(true);
-    setAskError(null);
-    const sent = text;
-
-    try {
-      const response = await fetch("/api/blurb/critique", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          blurb: sent,
-          title: book?.title,
-          // On the book, not in `publishing`: the genre is what the book *is*,
-          // and it is set at creation or in the listing details rather than
-          // being one of the fields a shop's form asks for.
-          genre: book?.genre,
-        }),
-      });
-      const payload = await response.json();
-
-      if (!response.ok) {
-        // The route's own words: 402 explains the plan, 501 explains the
-        // missing key, and both are more use than "something went wrong".
-        setAskError(
-          typeof payload?.error === "string"
-            ? payload.error
-            : "That did not work. Your blurb is unaffected.",
-        );
-        return;
-      }
-
-      setReading(Array.isArray(payload?.questions) ? payload.questions : []);
-      setAskedAbout(sent);
-    } catch {
-      setAskError("That did not work. Your blurb is unaffected.");
-    } finally {
-      setAsking(false);
-    }
-  }
 
   // The app's splash is for the app. In the roadmap's panel it would take
   // over half the window with a logo, so an embedded tool waits silently —
@@ -316,7 +316,12 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
           {/* No `items-start`: the two columns stretch to a shared height, so
               the rail ends on the same line as the composer instead of being a
               short card with a column of empty under it. */}
-          <div className="mt-6 grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
+          {/* `24rem`, up from `20rem`: the rail now holds a conversation as
+              well as the findings, and at the old width a chat bubble wrapped
+              every four or five words. Below `@3xl` it is one column and both
+              cards fall under the composer, which is the layout the roadmap's
+              panel gets. */}
+          <div className="mt-6 grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_24rem]">
             {/* The left column: what the writer types into, and the two notices
               that qualify the act of saving it. */}
             <div>
@@ -331,7 +336,25 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                 <LimitBanner allowance={gate.allowance} className="mb-4" />
               )}
               <LeftPill allowance={gate.allowance} className="mb-4" />
-              <div className="overflow-hidden rounded-xl border border-line bg-panel shadow-sm focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/50">
+              {/* **A fixed height, shared with the conversation beside it.**
+                  Both boxes used to size themselves — the composer by its row
+                  count, the chat by its contents — so the two columns were
+                  different heights on arrival and the right-hand one grew as
+                  the conversation did, walking the page down under a writer
+                  who was mid-sentence in the left. A screen where one column
+                  moves because the other is busy is a screen that cannot be
+                  written in.
+
+                  So the box is the height, and the text scrolls inside it.
+                  `COMPOSER_HEIGHT` is the one place that number lives; the
+                  chat is stretched to it by the grid rather than repeating it,
+                  which is what stops the two drifting when either is edited.
+
+                  `flex` here so the textarea can take the space the footer
+                  leaves rather than being told a row count. */}
+              <div
+                className={`flex ${COMPOSER_HEIGHT} flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-sm focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/50`}
+              >
                 <textarea
                   value={text}
                   onChange={(e) => setDraft(e.target.value)}
@@ -355,7 +378,12 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
 
                    `resize-y` stays either way: whatever we pick is a guess at
                    somebody else's paragraph. */
-                  rows={embedded ? 6 : 14}
+                  /* **No row count and no `resize-y` any more.** The box's
+                     height is set above and shared with the conversation, so a
+                     handle that let a writer drag one column taller than the
+                     other would undo the thing that fix was for. What the
+                     writer gets instead is a thin scrollbar and a box that
+                     never moves. */
                   placeholder="What happens, who it happens to, and what is at stake."
                   aria-label="Your blurb"
                   /* Set like copy, because that is what it is. This is the only
@@ -365,8 +393,8 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                    aloud, cut, and read aloud again, so it wants the measure and
                    the leading of something being read, not the density of
                    something being filled in. */
-                  className="w-full resize-y bg-transparent px-5 py-4 text-[15px]
-                           leading-7 text-fg outline-none
+                  className="scroll-slim min-h-0 w-full flex-1 resize-none bg-transparent
+                           px-5 py-4 text-[15px] leading-7 text-fg outline-none
                            placeholder:text-muted/70"
                 />
                 {/* All that is left in the box's own frame is whether the words
@@ -382,76 +410,6 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                 </div>
               </div>
 
-              {/* **Under the box, not above it.** These are findings *about the
-                  words in that box*, so they belong where a reader arrives
-                  after reading them rather than in a panel passed on the way
-                  in. Above the composer they also had to be read before there
-                  was anything to say — on an empty blurb the only finding is
-                  that it is empty, which is a poor first thing to meet on a
-                  screen for writing one.
-
-                  The heading is deliberately not "Issues" or "Problems": one of
-                  the two things this screen can state as fact is that a blurb is
-                  missing, and everything else in the list is a measurement that
-                  may be perfectly fine on somebody's book.
-
-                  The caption sits at the foot of this box rather than under the
-                  page, which is where it was — a third grey paragraph in a
-                  column of grey paragraphs, so the one rule on the screen read
-                  as more commentary. Here it qualifies the list directly above
-                  it and nothing else. */}
-              <section className="mt-4 rounded-xl border border-line bg-panel p-5 shadow-sm">
-                <h2 className="font-sans text-xs font-semibold tracking-[0.12em] text-muted uppercase">
-                  What stands out
-                </h2>
-
-                {report.issues.length > 0 ? (
-                  <ul className="mt-3 flex flex-col gap-2">
-                    {report.issues.map((issue) => (
-                      <li
-                        key={issue.field + issue.message}
-                        className={`flex gap-2.5 rounded-lg border px-3.5 py-3 ${
-                          issue.level === "problem"
-                            ? "border-note-line bg-note-bg"
-                            : "border-line bg-surface"
-                        }`}
-                      >
-                        <span
-                          aria-hidden="true"
-                          className={`mt-0.5 text-sm font-bold ${
-                            issue.level === "problem"
-                              ? "text-note-fg"
-                              : "text-muted"
-                          }`}
-                        >
-                          {issue.level === "problem" ? "!" : "·"}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="text-sm font-bold text-fg">
-                            {issue.field}
-                          </span>
-                          <span className="mt-0.5 block text-sm text-muted">
-                            {issue.message}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  /* Stated as a measurement, not as praise. Nothing here knows
-                     whether a blurb is any good — only that none of the things
-                     it can count came out unusual, which is what it says. */
-                  <p className="mt-3 text-sm text-muted">
-                    Nothing unusual in what can be counted.
-                  </p>
-                )}
-
-                <p className="mt-4 border-t border-line pt-3 text-xs text-muted">
-                  Only two things here are facts: an empty blurb, and one over{" "}
-                  {BLURB_MAX.toLocaleString()} characters, which shops refuse.
-                  Everything else is a measurement, not a rule.
-                </p>
-              </section>
             </div>
 
             {/* **The rail holds one thing, and that is what makes it a rail.**
@@ -472,237 +430,54 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
               Below `@3xl` it is not beside anything at all: the grid is one
               column there and this falls under the box, which is the layout the
               roadmap's panel gets. */}
-            <aside className="flex flex-col">
-              {/* **The reader — and it reads, it does not write.**
+            {/* `items-start`, so this column is its content's height rather
+                than being stretched to the row's. Both boxes state the same
+                height themselves; a stretched aside would add whatever else
+                the left column carries — the upgrade banner, the count pill —
+                onto the chat's box and put the two out of step again. */}
+            <aside className="flex flex-col items-stretch gap-6 self-start">
+              {/* **The workshop first, the reader second, and the order is the
+                  argument.** Both cards involve a model and they answer
+                  opposite moments: this one is for an empty box, which is
+                  where writers say they are stuck, and the reader below needs
+                  a blurb to already exist. A screen that put the critic on top
+                  would be offering to mark work nobody has written.
 
-                The heading is a question rather than a verdict, and that is the
-                whole feature: the app refuses to generate a blurb, so what a
-                model is asked here is what somebody in a bookshop would still
-                be wondering after reading this one. There is nothing on this
-                card to paste into the box, by design — the shape it parses into
-                has no field for a rewritten sentence, and a note long enough to
-                be one is dropped server-side.
+                  `min-h` rather than a fixed height: the chat scrolls inside
+                  itself, so it needs a floor to be worth scrolling in, and a
+                  ceiling would waste the column on a screen with room.
 
-                Kept in its own box beside the measured findings rather than
-                mixed into them, because the two have different provenance and
-                this screen's rule is that every finding says where it came
-                from. Those are arithmetic and always true; this one is
-                somebody's reading and had to be asked for.
+                  `embedded` is the narrow flag — in the roadmap's panel this
+                  column is ~300px, where the wide upgrade banner does not fit
+                  and `LimitNote` is the stacked version of the same fill. */}
+              {/* **The same fixed height as the composer, stated the same
+                  way — not `flex-1`.**
 
-                `flex-1` so the box fills the column and ends level with the
-                composer. It is short until it has been pressed, and a card
-                sized to its own contents left a tall band of empty beside a
-                fourteen-row box — which reads as a column that failed to load
-                rather than as one waiting to be used. */}
-              <section className="flex flex-1 flex-col rounded-xl border border-line bg-panel p-5 shadow-sm">
-                {/* **A mark, a name, and a line saying what it does** — the
-                    header every panel of this kind carries. The mark is a tile
-                    rather than a loose glyph so a 16px drawing has some weight
-                    beside the type, and it is tinted with the accent, which is
-                    the one place on this screen anything is: it marks the one
-                    box that *does* something rather than reporting something.
+                  `flex-1` inside a stretched grid cell looks like it should
+                  match the other column, and does not: a grid row is `auto`,
+                  so it grows to fit its *tallest* item. The chat was that
+                  item, the row grew with the conversation, and the composer
+                  sat at 32rem beside a column twice its height with no
+                  scrollbar in sight — because nothing was ever overflowing.
 
-                    The heading is set as a heading rather than as the small
-                    uppercase eyebrow the measured boxes use. Those label a
-                    figure; this one names a feature, and a feature announced in
-                    footnote type reads as a footnote. */}
-                <div className="flex items-center gap-2.5">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent/12 text-accent">
-                    <SparkIcon />
-                  </span>
-                  <h2 className="font-display text-base font-semibold tracking-tight text-fg">
-                    A reader’s questions
-                  </h2>
-                </div>
-                <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                  What somebody in a bookshop would still be wondering after
-                  reading your description.
-                </p>
-
-                {/* **Filled, and the only filled control on the screen.** It
-                    was an outline in the panel's own grey, which beside a
-                    greyed-out state read as a button that had already been
-                    disabled — and this is the one thing on this screen a writer
-                    is being invited to press. The accent is the app's reserved
-                    "this is the way forward" hue and this is what it is for.
-                    `accent-ink` rather than a literal white: the fill inverts
-                    between themes and a fixed colour is invisible in one. */}
-                <button
-                  type="button"
-                  onClick={askAReader}
-                  disabled={asking || text.trim().length < MIN_BLURB}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2
-                             rounded-lg bg-accent px-4 py-2.5 font-sans text-sm
-                             font-semibold text-accent-ink transition-opacity
-                             hover:opacity-90 focus-visible:ring-2
-                             focus-visible:ring-accent/60 focus-visible:outline-none
-                             disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {asking ? <Spinner className="h-4 w-4" /> : <SparkIcon />}
-                  {asking
-                    ? "Reading"
-                    : reading
-                      ? "Read it again"
-                      : "Ask a reader"}
-                </button>
-
-                {/* Said plainly rather than left to a greyed button nobody can
-                    explain to themselves. */}
-                {text.trim().length < MIN_BLURB && (
-                  <p className="mt-2 text-center text-xs text-muted">
-                    Write a little more and this turns on.
-                  </p>
-                )}
-
-                {askError && (
-                  <p
-                    role="alert"
-                    className="mt-3 rounded-lg border border-stop-line bg-stop-bg px-3.5 py-3 text-sm text-stop-fg"
-                  >
-                    {askError}
-                  </p>
-                )}
-
-                {asking ? (
-                  /* **Skeleton rows rather than a spinner alone.** The button
-                     already says it heard you; what this says is *what is
-                     coming*, at the size and shape it will arrive in, so the
-                     panel does not jump when it does. Three because the answer
-                     is usually three or four. */
-                  <ul aria-hidden="true" className="mt-5 flex flex-col gap-2">
-                    {[0, 1, 2].map((row) => (
-                      <li
-                        key={row}
-                        className="animate-pulse rounded-lg border border-line bg-surface px-3.5 py-3"
-                      >
-                        <span className="block h-3 w-24 rounded bg-line" />
-                        <span className="mt-2 block h-3 w-full rounded bg-line" />
-                        <span className="mt-1.5 block h-3 w-2/3 rounded bg-line" />
-                      </li>
-                    ))}
-                  </ul>
-                ) : reading ? (
-                  <div className="mt-5">
-                    {/* An answer about words that have since changed is the one
-                        failure this box can have without looking wrong, so it
-                        says so rather than letting the list describe a draft
-                        that no longer exists. */}
-                    {askedAbout !== null && askedAbout !== text && (
-                      <p className="mb-3 text-xs text-note-fg">
-                        Your blurb has changed since this was read.
-                      </p>
-                    )}
-
-                    {reading.length > 0 ? (
-                      <ul className="flex flex-col gap-2">
-                        {reading.map((question) => (
-                          <li
-                            key={question.about}
-                            className="rounded-lg border border-line bg-surface px-3.5 py-3"
-                          >
-                            <span className="text-sm font-bold text-fg">
-                              {question.about}
-                            </span>
-                            <span className="mt-0.5 block text-sm text-muted">
-                              {question.note}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      /* A real answer rather than a failure: the prompt says an
-                         invented complaint is worse than a short one, so
-                         nothing coming back has to be allowed to mean
-                         nothing. */
-                      <p className="rounded-lg border border-ok-line bg-ok-bg px-3.5 py-3 text-sm text-ok-fg">
-                        Nothing a reader would still be asking.
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  /* **The empty state teaches rather than waits.**
-
-                     A blank half-column is not neutral — it reads as a panel
-                     that failed to load, and it tells a writer nothing about
-                     what pressing the button would get them. So the space
-                     carries the four things a reader looks for, which are the
-                     four things the prompt actually asks about. Nothing here is
-                     invented or a placeholder for real content: it is the
-                     feature, described before it runs.
-
-                     Set as a quiet list rather than as sample findings on
-                     purpose. Fake rows in a real row's clothing are the one
-                     thing that would make a writer distrust the real ones when
-                     they arrive. */
-                  <div className="mt-5">
-                    <p className="font-sans text-xs font-semibold tracking-[0.12em] text-muted uppercase">
-                      What it looks for
-                    </p>
-                    <ul className="mt-3 flex flex-col gap-2.5">
-                      {[
-                        "Who the story is about, and what they want",
-                        "What stands in the way, and what it costs them",
-                        "Where and when it happens",
-                        "Anything so general it would fit any book in the genre",
-                      ].map((line) => (
-                        <li
-                          key={line}
-                          className="flex gap-2.5 text-sm leading-snug text-muted"
-                        >
-                          <span
-                            aria-hidden="true"
-                            className="mt-2 h-1 w-1 shrink-0 rounded-full bg-muted"
-                          />
-                          {line}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* **The fine print, on the floor of the box.** Both lines are
-                    obligations rather than decoration: the first is what leaves
-                    this machine, which this app states before the button on
-                    every screen that sends anything, and the second is where
-                    the answer came from, which is the rule the measured boxes
-                    are held to as well. `mt-auto` puts them at the bottom
-                    whatever is above, so they read as the panel's terms rather
-                    than as another finding. */}
-                <div className="mt-auto space-y-1.5 border-t border-line pt-4 text-xs leading-relaxed text-muted">
-                  <p>
-                    Sends the words in the box, your title and your genre. Your
-                    manuscript is never sent.
-                  </p>
-                  <p>Read by a model, not measured. It writes nothing.</p>
-                </div>
-              </section>
+                  A height, shared from one constant, is what actually pins
+                  them. It is also what makes the scroll real: the messages can
+                  only overflow a box that has a size. */}
+              <div className={`flex ${COMPOSER_HEIGHT} flex-col`}>
+                <BlurbWorkshop
+                  title={book.title}
+                  genre={book.genre}
+                  draft={text}
+                  getOpening={() => opening}
+                  onUseDraft={setDraft}
+                  narrow={embedded}
+                />
+              </div>
             </aside>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * The four-point star, which is what this decade uses to mean "a model did
- * this".
- *
- * Drawn here rather than imported: it is nine points of path, and it is the
- * only glyph on this screen. `currentColor` so it takes the accent in the tile
- * and the button's own ink inside the button — one drawing, two grounds.
- */
-function SparkIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-4 w-4 shrink-0"
-      fill="currentColor"
-    >
-      <path d="M12 2c.3 3.9 1.4 5.6 3.4 6.9 1.2.8 2.8 1.2 4.6 1.4-1.8.2-3.4.6-4.6 1.4-2 1.3-3.1 3-3.4 6.9-.3-3.9-1.4-5.6-3.4-6.9-1.2-.8-2.8-1.2-4.6-1.4 1.8-.2 3.4-.6 4.6-1.4C10.6 7.6 11.7 5.9 12 2Z" />
-      <path d="M18.5 15c.15 1.9.7 2.8 1.7 3.4.6.4 1.4.6 2.3.7-.9.1-1.7.3-2.3.7-1 .6-1.55 1.5-1.7 3.4-.15-1.9-.7-2.8-1.7-3.4-.6-.4-1.4-.6-2.3-.7.9-.1 1.7-.3 2.3-.7 1-.6 1.55-1.5 1.7-3.4Z" />
-    </svg>
   );
 }
 

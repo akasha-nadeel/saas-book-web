@@ -11,6 +11,7 @@ import {
   seatAllowance,
   SEATS_PER_BOOK,
   spentLine,
+  totalAllowance,
   warnAt,
   type Limited,
 } from "./free-limits";
@@ -358,6 +359,115 @@ describe("the dialog headline", () => {
     );
     expect(reachedHeadline("collaborators")).toBe(
       `A free book holds ${SEATS_PER_BOOK.free} people`,
+    );
+    expect(reachedHeadline("keywordsAi")).toBe(
+      `The free plan includes ${FREE_LIMITS.keywordsAi.free} keyword suggestions`,
+    );
+  });
+});
+
+describe("a lifetime total", () => {
+  const LIMIT = FREE_LIMITS.keywordsAi.free;
+
+  it("counts down and refuses the one after the last", () => {
+    expect(totalAllowance("keywordsAi", 0, false).left).toBe(LIMIT);
+    expect(totalAllowance("keywordsAi", LIMIT - 1, false).blocked).toBe(false);
+    expect(totalAllowance("keywordsAi", LIMIT, false).blocked).toBe(true);
+  });
+
+  it("never reports a negative remainder", () => {
+    expect(totalAllowance("keywordsAi", LIMIT + 4, false).left).toBe(0);
+  });
+
+  it("treats anything storage may hold as nought", () => {
+    for (const junk of [undefined, null, "3", -2, NaN]) {
+      expect(
+        totalAllowance("keywordsAi", junk as unknown as number, false).used,
+      ).toBe(0);
+    }
+  });
+
+  it("has no limit at all on Pro", () => {
+    const pro = totalAllowance("keywordsAi", 99, true);
+    expect(pro.limit).toBeNull();
+    expect(pro.blocked).toBe(false);
+  });
+
+  /*
+   * **The one not to "fix".** Every other limit in this file comes back, and
+   * every other sentence says so; this one does not, so borrowing that
+   * vocabulary would be a small lie told at the moment somebody is refused.
+   * A writer who reads "today" on a wall that never opens comes back tomorrow
+   * to find it shut.
+   */
+  it("never promises a return it cannot make", () => {
+    const lines = [
+      leftLine(totalAllowance("keywordsAi", LIMIT - 1, false)),
+      leftBadge(totalAllowance("keywordsAi", LIMIT - 1, false)),
+      spentLine(totalAllowance("keywordsAi", LIMIT, false)),
+      reachedHeadline("keywordsAi"),
+    ];
+
+    for (const line of lines) {
+      expect(line).not.toBeNull();
+      expect(line).not.toMatch(/today|tomorrow|a day/i);
+    }
+  });
+
+  it("says nothing to somebody who has used nothing", () => {
+    expect(leftLine(totalAllowance("keywordsAi", 0, false))).toBeNull();
+  });
+
+  it("says what is left rather than what was spent", () => {
+    expect(leftLine(totalAllowance("keywordsAi", LIMIT - 1, false))).toBe(
+      "1 free suggestion left.",
+    );
+    expect(leftBadge(totalAllowance("keywordsAi", LIMIT - 2, false))).toBe(
+      "2 suggestions left",
+    );
+  });
+
+  it("states plainly that they are gone", () => {
+    expect(spentLine(totalAllowance("keywordsAi", LIMIT, false))).toBe(
+      `The free plan includes ${LIMIT} keyword suggestions, and you have used them.`,
+    );
+  });
+
+  /*
+   * **Every member of the shape, not just the first.** A new `TotalLimit` that
+   * was added to the type and forgotten in `SHAPE` or `WORDS` would fall
+   * through to the seat wording — which says "a free book holds N people" —
+   * and nothing else in the suite would catch it.
+   */
+  it("holds for every lifetime-counted tool, not only the first", () => {
+    for (const action of ["keywordsAi", "blurbChat"] as const) {
+      const limit = FREE_LIMITS[action].free;
+      const lines = [
+        leftLine(totalAllowance(action, limit - 1, false)),
+        leftBadge(totalAllowance(action, limit - 1, false)),
+        spentLine(totalAllowance(action, limit, false)),
+        reachedHeadline(action),
+      ];
+      for (const line of lines) {
+        expect(line).not.toBeNull();
+        expect(line).not.toMatch(/today|tomorrow|a day/i);
+        expect(line).not.toMatch(/book holds/i);
+      }
+    }
+  });
+
+  /*
+   * A chat counted in *conversations* must not be described in a word a reader
+   * would take for a message. "3 chats left" beside a chat box is honest; "3
+   * messages left" would be a different and much smaller promise.
+   */
+  it("counts blurb chats in conversations", () => {
+    const limit = FREE_LIMITS.blurbChat.free;
+    expect(leftLine(totalAllowance("blurbChat", limit - 1, false))).toBe(
+      "1 free conversation left.",
+    );
+    expect(spentLine(totalAllowance("blurbChat", limit, false))).toContain(
+      "blurb conversations",
     );
   });
 });
