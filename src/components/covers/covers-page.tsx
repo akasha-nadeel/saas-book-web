@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
@@ -8,12 +8,16 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { buildQuery, coversOf, type CompTitle } from "@/lib/comps/comps";
 import {
-  checkCover,
   contrastOf,
+  COVER_TYPES,
+  edgeLightness,
+  jpegComponents,
+  coverReport,
   enlarge,
   IDEAL_HEIGHT,
   IDEAL_RATIO,
   reshape,
+  type CoverCheck,
   type CoverFacts,
 } from "@/lib/cover-check";
 import {
@@ -45,13 +49,28 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * it will not do. So this module is the two things that are left, and they
  * divide cleanly:
  *
- * - **`CoversPage`, the wall.** The writer's cover beside twenty others in the
- *   same genre — what they would do themselves given a bookshop and an
- *   afternoon. The size control is the feature rather than a convenience:
- *   nobody buys a book at the size a cover is designed at, they see it sixty
- *   pixels wide next to nine others and decide in about a second, so the wall
- *   opens at thumbnail. A cover whose title cannot be read at 60px has a
- *   problem no amount of admiring it at full size will reveal.
+ * - **`CoversPage`, the wall.** Twenty covers already selling in the same
+ *   genre — what a writer would do themselves given a bookshop and an
+ *   afternoon. The wall loads on arrival — the query is built from the book's
+ *   own genre and blurb — because a search box over an empty page asks a
+ *   writer to describe their book in words a catalogue will answer, which is
+ *   the part nobody guesses cold. The size control is the feature rather than
+ *   a convenience: nobody buys a book at the size a cover is designed at, they
+ *   see it sixty pixels wide next to nine others and decide in about a second.
+ *   A cover whose title cannot be read at 60px has a problem no amount of
+ *   admiring it at full size will reveal — which is what Thumbnail is for, one
+ *   press from the Large the wall opens at.
+ *
+ *   **The writer's own cover is the first tile in that wall**, and the route
+ *   there is worth knowing. It began as a "Yours" panel above the shelf, came
+ *   off on 2026-08-11 for being a large card holding one picture and a lot of
+ *   empty desk, and came back the same day *inside* the wall rather than
+ *   above it. That is the better answer and not merely a smaller one: a cover
+ *   in its own frame at its own size always looks fine, which is precisely
+ *   the illusion this tool exists to break. In the wall it takes the size
+ *   control with everything else, so Thumbnail sets it at 60px against thirty
+ *   real competitors at 60px — the comparison the screen is named for, which
+ *   a separate panel could not make.
  *
  * - **`CoverChecker`, the file.** Whether a shop will refuse it: dimensions,
  *   shape, weight, contrast. Mechanical, and that is the whole list.
@@ -372,9 +391,27 @@ function CoverChecker({ bookId }: { bookId: string }) {
         image.src = url;
       });
 
-      // Contrast is measured on a small copy: a 2560px cover is six million
-      // pixels and the answer does not change past a few thousand.
+      /* **The colour mode, read off the bytes rather than the picture.**
+         Only the head of the file is needed — the frame header sits before the
+         image data, after however many EXIF and ICC segments a designer's tool
+         left behind — so 256KB is generous and costs nothing on a local file.
+         `jpegComponents` answers null for anything that is not a JPEG it can
+         follow, and null stays null: the rule is dropped from the report
+         rather than passed. */
+      let components: number | undefined;
+      try {
+        const head = new Uint8Array(await file.slice(0, 262_144).arrayBuffer());
+        components = jpegComponents(head) ?? undefined;
+      } catch {
+        // A file that cannot be re-read is not a reason to lose the six checks
+        // that only need the picture.
+      }
+
+      // Contrast and edge lightness are measured on a small copy: a 2560px
+      // cover is six million pixels and neither answer changes past a few
+      // thousand. One canvas read serves both.
       let contrast: number | undefined;
+      let edge: number | undefined;
       const canvas = document.createElement("canvas");
       canvas.width = 120;
       canvas.height = Math.max(
@@ -385,13 +422,17 @@ function CoverChecker({ bookId }: { bookId: string }) {
       if (context) {
         context.drawImage(image, 0, 0, canvas.width, canvas.height);
         try {
-          contrast = contrastOf(
-            context.getImageData(0, 0, canvas.width, canvas.height).data,
-            4,
-          );
+          const pixels = context.getImageData(
+            0,
+            0,
+            canvas.width,
+            canvas.height,
+          ).data;
+          contrast = contrastOf(pixels, 4);
+          edge = edgeLightness(pixels, canvas.width, canvas.height);
         } catch {
           // A tainted canvas cannot be read. Every other check still works, so
-          // the contrast note is simply absent rather than the whole thing
+          // these two notes are simply absent rather than the whole thing
           // failing.
         }
       }
@@ -400,7 +441,14 @@ function CoverChecker({ bookId }: { bookId: string }) {
         width: image.naturalWidth,
         height: image.naturalHeight,
         bytes: file.size,
+        /* The browser's own sniffed type, not the extension: a `.jpg` that is
+           really a PNG is refused by Amazon on what it *is*, and that is the
+           writer who has no idea why. Empty for a type the browser cannot
+           name, and the check is skipped rather than guessed at. */
+        ...(file.type ? { type: file.type } : {}),
         ...(contrast !== undefined ? { contrast } : {}),
+        ...(edge !== undefined ? { edge } : {}),
+        ...(components !== undefined ? { components } : {}),
       };
       setFacts(measured);
       setPreview(url);
@@ -441,7 +489,27 @@ function CoverChecker({ bookId }: { bookId: string }) {
       }
     } catch {
       URL.revokeObjectURL(url);
-      setError("That file could not be read as an image.");
+      /* **A TIFF is not a broken file and must not be reported as one.**
+
+         This screen tells writers Amazon takes JPEG *and* TIFF, which is true
+         — and then no browser but Safari can decode a TIFF in an `<img>`, so a
+         perfectly good cover arrived here and was told it "could not be read
+         as an image". The screen contradicting its own advice, on the one
+         format a careful designer is most likely to hand over.
+
+         Nothing here can measure it — decoding TIFF would mean shipping a
+         decoder for a format almost nobody drops — so the honest answer is to
+         say which of the two things happened. A writer whose TIFF is fine
+         needs to know it is fine and that we simply cannot look; a writer with
+         a corrupt JPEG needs the opposite. Guessing from the file name as well
+         as the type, since a `.tif` often arrives with no type at all. */
+      const isTiff =
+        file.type === "image/tiff" || /\.tiff?$/i.test(file.name ?? "");
+      setError(
+        isTiff
+          ? "This is a TIFF, and browsers cannot open one — so it cannot be measured here. That is a limit of this page, not a problem with your file: Amazon accepts TIFF. Upload it as it is, or save a JPEG copy and drop that in to have it checked."
+          : "That file could not be read as an image.",
+      );
       setFacts(null);
       setPreview(null);
       setCoverFacts(bookId, null);
@@ -503,8 +571,21 @@ function CoverChecker({ bookId }: { bookId: string }) {
       plan.drawHeight,
     );
 
+    /* **JPEG, and this was PNG until the Amazon rules were read properly.**
+       Every fix on this screen wrote a `.png` — the one format Amazon does not
+       take for an ebook cover. So the repair produced a file that failed the
+       check that offered it, and after 2026-08-11 it would have failed *our*
+       check too: press Crop, and the reloaded result reports "PNG is not a
+       format Amazon takes" on a file this screen had just written. A tool
+       whose fix breaks a different rule is worse than a tool with no fix.
+
+       0.92 rather than the browser's 0.8 default: this is somebody's cover
+       and the only compression it will ever get from us. The one thing lost
+       with PNG is transparency, which no ebook cover may have anyway — a
+       shop composites onto white, and a transparent cover is how a title
+       ends up invisible on the page. */
     return new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/png"),
+      canvas.toBlob(resolve, "image/jpeg", 0.92),
     );
   }
 
@@ -518,7 +599,7 @@ function CoverChecker({ bookId }: { bookId: string }) {
     const href = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = href;
-    link.download = `cover-${out.width}x${out.height}.png`;
+    link.download = `cover-${out.width}x${out.height}.jpg`;
     link.click();
     URL.revokeObjectURL(href);
 
@@ -531,13 +612,26 @@ function CoverChecker({ bookId }: { bookId: string }) {
        nothing. Loading the result makes the check catch up with it, which is
        also what every crop tool does: what you are looking at afterwards is
        what you made. */
-    const made = `cover-${out.width}x${out.height}.png`;
+    /* **The type is passed, and it has to be.** `read` records `file.type` so
+       the format rule has something to check, and a `File` built without one
+       reports `""` — which the checker treats as "no file to read a type off"
+       and skips. The result of a fix would then come back with the format row
+       silently missing from its report. */
+    const made = `cover-${out.width}x${out.height}.jpg`;
     setName(made);
-    await read(new File([blob], made));
+    await read(new File([blob], made, { type: "image/jpeg" }));
+    /* Three outcomes, three sentences. The reshape message used to be the
+       fallback for everything, so the format fix — which changes the container
+       and nothing else — would have announced a shape it had not touched. A
+       confirmation that overstates what it did is the same fault as a check
+       that clears a bad file. */
+    const sameSize = out.width === facts.width && out.height === facts.height;
     setDone(
       plan.factor > 1
         ? `Written at ${out.width} × ${out.height}. It now passes the size check — but it was scaled up ${plan.factor.toFixed(1)}×, so it carries no more detail than the file you started with.`
-        : `Written at ${out.width} × ${out.height}, ${IDEAL_RATIO}:1. Check the download and upload that file, not this one.`,
+        : sameSize
+          ? `Written as a JPEG at ${out.width} × ${out.height}. Every pixel is where it was — only the format changed. Upload the download, not this file.`
+          : `Written at ${out.width} × ${out.height}, ${IDEAL_RATIO}:1. Check the download and upload that file, not this one.`,
     );
   }
 
@@ -564,17 +658,17 @@ function CoverChecker({ bookId }: { bookId: string }) {
     const blob = await renderShape(plan, place);
     if (!blob) return;
 
-    const made = `cover-${plan.width}x${plan.height}.png`;
+    const made = `cover-${plan.width}x${plan.height}.jpg`;
     const result = await saveCover(
       bookId,
-      new File([blob], made, { type: "image/png" }),
+      new File([blob], made, { type: "image/jpeg" }),
     );
     if (!result.ok) {
       setError(result.error);
       return;
     }
     setName(made);
-    await read(new File([blob], made));
+    await read(new File([blob], made, { type: "image/jpeg" }));
     /* **Says what the export will actually package.** The old wording —
        "that copy is compressed for the shelf here" — was true of the *only*
        copy this app kept, and told a writer their file was worse than it was
@@ -607,7 +701,12 @@ function CoverChecker({ bookId }: { bookId: string }) {
 
   /* What is on screen: the file just checked, or the last one measured. */
   const shown = facts ?? stored;
-  const findings = shown ? checkCover(shown) : [];
+  /* Every rule with its answer, passes included — see `coverReport`. The
+     failing rows *are* `checkCover`'s findings, so this screen and the
+     dashboard cannot say different things about one file. */
+  const report = shown ? coverReport(shown) : [];
+  const problems = report.filter((c) => c.status === "problem").length;
+  const notes = report.filter((c) => c.status === "note").length;
 
   /*
    * Open the promised window on the cover the book already has.
@@ -676,39 +775,59 @@ function CoverChecker({ bookId }: { bookId: string }) {
   const smallerThanIdeal = shown
     ? Math.max(shown.width, shown.height) < IDEAL_HEIGHT
     : false;
+  /**
+   * A format Amazon will not take, and one it will.
+   *
+   * **The one finding on this screen with a fix that is purely mechanical.**
+   * Cropping asks which part of the picture survives; enlarging invents
+   * pixels and has to say so. Re-encoding a PNG as a JPEG asks nothing and
+   * costs nothing a cover can use — the only thing PNG carries that JPEG does
+   * not is transparency, and a transparent ebook cover is a fault rather than
+   * a feature, since a shop composites it onto its own white page.
+   *
+   * It goes through the same `reshape`/render path as the others rather than a
+   * second one, drawing at the artwork's own size so not a pixel moves: the
+   * output differs from the input in its container and nothing else.
+   */
+  const wrongFormat = Boolean(
+    facts?.type && !COVER_TYPES.includes(facts.type as never),
+  );
 
   return (
-    /* Sized for the card it now sits in. It was written as a standalone
-       section — `mt-6` and a `text-xl font-extrabold` heading — which inside a
-       panel titled "Yours" at `text-sm` put the sub-part in larger type than
-       the thing containing it. The divider above supplies the gap, and the
-       heading drops to the card's own scale. */
+    /* **No heading of its own.** It carried one — "Check the file" — from when
+       it was a block below the Yours card. It now *is* the panel's contents
+       when the file half is picked, and the panel's own `h2` says exactly
+       that, so a second one under it was the same words twice. The deck stays:
+       it is the one place that tells a writer to use their original file
+       rather than the copy this app stored, which is the mistake that makes
+       the check report a failure the real artwork does not have. */
     <section>
-      <h2 className="text-sm font-bold text-fg">Check the file</h2>
-      <p className="mt-1.5 max-w-2xl text-sm text-muted">
-        Whether a shop would refuse the artwork. Use your original file, not the
-        compressed copy stored here — that one would fail on size.
+      <p className="mt-3 max-w-2xl text-sm text-muted">
+        Whether a shop would refuse the artwork. It is measured in your browser
+        and never sent anywhere. Use your original file, not the compressed copy
+        stored here — that one would fail on size.
       </p>
 
-      {/* **The drop zone goes once a file is in, and comes back on Remove.**
-          Carbon writes this one down: once a file is uploaded the drop area is
-          removed, so the control shows the single file it holds rather than an
-          invitation to add another beside it. Ours kept both on screen, which
-          left a screen-wide dashed rectangle saying "drop another to check it
-          instead" directly above the file it had already checked — two ways to
-          do the same thing, and the larger of them was the one that was no
-          longer the point.
+      {/* ---- Nothing dropped yet ------------------------------------------
 
-          Removing is now the only way back to it, which is why that control is
-          named and coloured rather than quiet. */}
-      {/* A real drop target, because the sentence above promises one. This was
-          a bare `<input type="file">`, which the browser draws as "Choose File |
-          No file chosen" — the one undesigned control on a screen about how
-          things look, under a line inviting the writer to *drop* a file on
-          something that could not be dropped on. The words and the control now
-          agree, and clicking still opens the picker, because the label wraps
+          **The drop zone is the whole screen only while it is the whole
+          job.** It was drawn at the page's full `7xl` width — a 1700px dashed
+          rectangle holding two centred lines, which is the shape a drop target
+          takes when nobody has decided how big it should be. Every file input
+          worth copying (Vercel, Linear, Figma, GitHub) constrains it: the
+          target is generous, not unbounded, because a drop area wider than
+          about a card stops reading as an object you can aim at.
+
+          `max-w-xl` and the aspect of a book. That second part is the useful
+          bit — the outline is roughly the shape of the thing it wants, so the
+          control says what it takes before anybody reads the words in it.
+
+          It is a real drop target, because the sentence promises one. This was
+          a bare `<input type="file">`, which the browser draws as "Choose File
+          | No file chosen" — the one undesigned control on a screen about how
+          things look. Clicking still opens the picker, because the label wraps
           the input rather than replacing it. */}
-      {!facts && (
+      {!shown && (
         <label
           onDragOver={(e) => {
             e.preventDefault();
@@ -724,11 +843,12 @@ function CoverChecker({ bookId }: { bookId: string }) {
               void read(file);
             }
           }}
-          className={`mt-4 flex cursor-pointer flex-col items-center gap-1.5 rounded-xl
-                      border-2 border-dashed px-6 py-7 text-center transition-colors ${
+          className={`mt-5 flex max-w-xl cursor-pointer flex-col items-center justify-center
+                      gap-2 rounded-xl border-2 border-dashed px-6 py-12 text-center
+                      transition-colors ${
                         dragging
                           ? "border-accent bg-accent/8"
-                          : "border-line bg-surface hover:border-accent/50"
+                          : "border-line bg-surface hover:border-accent/50 hover:bg-raised"
                       }`}
         >
           <input
@@ -743,108 +863,310 @@ function CoverChecker({ bookId }: { bookId: string }) {
             }}
             className="sr-only"
           />
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-7 w-7 text-muted"
+          >
+            <path d="M12 16V4m0 0L8 8m4-4 4 4" />
+            <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+          </svg>
           <span className="text-sm font-semibold text-fg">
-            {name ?? "Drop your cover here, or choose a file"}
+            Drop your cover here, or choose a file
           </span>
-          <span className="text-xs text-muted">
-            {name
-              ? "Drop another to check it instead."
-              : "The file you are about to upload — not the copy stored here."}
+          {/* **Not "JPEG or PNG", which is what this said for about an hour
+              and is the exact advice that gets a cover rejected.** Amazon takes
+              JPEG and TIFF for an ebook cover; PNG is what every design tool
+              exports by default, so naming it here would have been this screen
+              causing the refusal it exists to prevent. The `accept` attribute
+              deliberately stays wider than the rule — a writer who picks a PNG
+              anyway must be *told* it is a PNG, not have the file quietly
+              hidden by a picker with no explanation. */}
+          {/* **What this page can check, which is not the same list.** Amazon
+              takes JPEG and TIFF; browsers cannot open a TIFF at all, so
+              naming both here promised a check that fails on one of them. The
+              `accept` attribute deliberately stays wider than either list — a
+              writer who picks a PNG must be *told* it is a PNG, not have the
+              file quietly hidden by a picker that explains nothing. */}
+          <span className="max-w-xs text-xs text-muted">
+            The file you are about to upload — not the copy stored here. JPEG is
+            what Amazon wants and what this page can measure.
           </span>
         </label>
       )}
 
-      {error && <p className="mt-4 text-sm text-fg">{error}</p>}
-
-      {/* **Green, and only ever for something that happened.** The status
-          family in this app is red for refused, amber for worth doing, green
-          for passed or earned — so a fix that has actually been written is the
-          one thing on this screen entitled to it. It clears when a new file is
-          read or the file is removed, because a confirmation outliving the
-          thing it confirms is how a screen ends up congratulating somebody for
-          work they have since undone. */}
-      {done && (
-        <p
-          role="status"
-          className="mt-4 rounded-lg border border-ok-line bg-ok-bg px-3.5 py-2.5 text-sm text-ok-fg"
-        >
-          {done}
+      {error && (
+        <p className="mt-4 max-w-xl rounded-lg border border-stop-line bg-stop-bg px-3.5 py-2.5 text-sm text-stop-fg">
+          {error}
         </p>
       )}
 
-      {/* **A way back out, which there was not one of.**
+      {/* ---- A file, and its report ----------------------------------------
 
-          Once a file was checked it stayed checked: the only escape was
-          dropping a different one, and nothing on screen said so except a line
-          of small print inside the drop zone. Every design system that has
-          written this pattern down puts a named file and an explicit remove
-          beside it — Carbon removes the drop zone once a file is in and gives
-          the entry a close control; the Image Upload pattern lists *select,
-          preview, validate, replace* as the four things the control has to
-          let somebody do. Ours did three.
+          **Two columns: the thing, and what is true of it.** This was one
+          stack — a drop zone, then a named-file row, then a small preview with
+          everything else in a column beside it — so the artwork the writer is
+          deciding about was an 80px stamp two thirds of the way down, and the
+          drop zone stayed at full width above a report about a file it had
+          already taken. (It stayed because it hid on `facts` while the report
+          drew from `facts ?? stored`: arriving from a dashboard finding showed
+          both at once, which is the exact duplication the old comment claimed
+          to have removed.)
 
-          The row names the file as well, because "the file you checked" is
-          otherwise a picture at 80px and a writer with three exports in a
-          folder cannot tell which one this was. */}
-      {facts && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-line bg-surface px-3.5 py-2.5">
-          <span className="min-w-0 truncate text-sm text-fg">
-            {name ?? "Checked file"}
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setFacts(null);
-              setPreview(null);
-              setName(null);
-              setError(null);
-              setDone(null);
-              setFromStored(false);
-              // The measurement goes with the file it measured; the dashboard
-              // must not keep reporting a cover nobody is checking any more.
-              setCoverFacts(bookId, null);
-            }}
-            /* Red, because it is now the only way out of this state and it
-               throws the checked file away. Grey read as a secondary label
-               rather than a control. */
-            className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-danger
-                       hover:bg-stop-bg focus-visible:ring-2
-                       focus-visible:ring-accent/50 focus-visible:outline-none"
-          >
-            Remove
-          </button>
-        </div>
-      )}
-
+          The shape is the one every asset inspector settles on — Figma's file
+          panel, Squoosh, a Vercel image preview: the artifact on the left at a
+          size worth looking at, with its identity and the actions that act on
+          it; the report on the right. `20rem` is a fixed rail rather than a
+          fraction, so the preview does not grow into a poster on a wide
+          window, and `@2xl` reads the *container* because this screen is also
+          drawn in the roadmap's panel at about half the width. */}
       {shown && (
-        <div className="mt-6 flex flex-wrap gap-6">
-          {preview && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={preview}
-              alt=""
-              className="h-[120px] w-[80px] shrink-0 rounded object-cover shadow-sm"
-            />
-          )}
-          <div className="min-w-[16rem] flex-1">
-            <p className="max-w-prose text-sm text-muted">
-              {shown.width.toLocaleString()} × {shown.height.toLocaleString()}{" "}
-              pixels
-              {/* No weight for the stored copy: its size on disk is an artefact
-                  of this app's own compression, not a fact about the writer's
-                  artwork, and printing it beside a shop's 50MB limit would
-                  invite exactly the wrong conclusion. */}
-              {shown.bytes > 0 ? ` · ${(shown.bytes / 1024).toFixed(0)}KB` : ""}{" "}
-              · {(shown.height / shown.width).toFixed(2)}:1
+        <div className="mt-5 grid gap-6 @2xl:grid-cols-[20rem_minmax(0,1fr)]">
+          {/* **Capped at the rail's own width whether or not it is in the
+              rail.** Below `@2xl` the grid stacks and this column becomes the
+              full width of the panel — and everything in it is sized by the
+              artwork's proportions, so an unbounded column drew a cover the
+              width of the page and well over a thousand pixels tall. A
+              preview is a preview at every width; it is the report beside it
+              that wants the room. */}
+          <div className="min-w-0 max-w-[20rem]">
+            {/* The picture at a size a decision can be made from. Framed
+                rather than bare: a cover with a white ground and no border
+                bleeds into the panel and stops looking like a file. */}
+            {preview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={preview}
+                alt=""
+                className="w-full rounded-lg border border-line bg-surface object-contain shadow-sm"
+              />
+            ) : (
+              /* **The numbers outlived the picture, and the box says so —
+                 briefly.** Arriving from a dashboard finding, the
+                 measurements are read back from `coverfacts:` and the artwork
+                 itself is not kept.
+
+                 It was drawn at the aspect ratio those numbers describe, on
+                 the reasoning that the shape *is* one of the findings. In
+                 practice that made an empty 320 × 512 rectangle holding one
+                 line of grey text — the largest thing on the screen, saying
+                 the least, and towering over the report it was supposed to
+                 support. Absence is not worth an illustration. Two lines and
+                 a rule under them, with the shape stated properly in the list
+                 below where every other measurement is. */
+              <div
+                className="rounded-lg border border-dashed border-line bg-surface
+                           px-3.5 py-3 text-xs text-muted"
+              >
+                The artwork itself is not kept here — only what was measured.
+                Drop the file again to see it.
+              </div>
+            )}
+
+            {/* The file's identity and the two things you can do to it. Named,
+                because "the file you checked" is otherwise a picture and a
+                writer with three exports in a folder cannot tell which.
+
+                Three states, because there are three: a file handed over now,
+                the cover already on the book, and a set of numbers left from a
+                check that happened on some earlier visit. Calling that third
+                one "Checked file" implied a file was present. */}
+            <p className="mt-3 truncate text-sm font-medium text-fg">
+              {name ??
+                (fromStored
+                  ? "The cover on this book"
+                  : facts
+                    ? "Checked file"
+                    : "Last checked file")}
             </p>
+
+            {/* **Replace is a first-class control now, not small print.** It
+                was a line inside the drop zone reading "drop another to check
+                it instead", which is an instruction rather than a control —
+                and once the drop zone went there was no way to check a second
+                file except Remove, then drop. The Image Upload pattern names
+                four things this has to allow: select, preview, validate,
+                *replace*. This is the fourth. */}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <label
+                className="cursor-pointer rounded-md border border-line px-2.5 py-1
+                           text-xs font-semibold text-fg transition-colors hover:bg-raised"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setName(file.name);
+                      void read(file);
+                    }
+                  }}
+                  className="sr-only"
+                />
+                Check another
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setFacts(null);
+                  setPreview(null);
+                  setName(null);
+                  setError(null);
+                  setDone(null);
+                  setFromStored(false);
+                  // The measurement goes with the file it measured; the
+                  // dashboard must not keep reporting a cover nobody is
+                  // checking any more.
+                  setCoverFacts(bookId, null);
+                }}
+                /* Quiet until hovered. It throws the checked file away, so it
+                   carries the danger colour — but sitting permanently red
+                   beside a neutral control it read as the primary action of
+                   the pair, which it is not. */
+                className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted
+                           transition-colors hover:bg-stop-bg hover:text-danger
+                           focus-visible:ring-2 focus-visible:ring-accent/50
+                           focus-visible:outline-none"
+              >
+                Remove
+              </button>
+            </div>
+
+            {/* **The measurements as a labelled list, not a run of numbers.**
+                They were one grey line — `679 × 960 pixels · 69KB · 1.41:1` —
+                which is three different kinds of fact separated by dots, none
+                of them named. A definition list is what every inspector panel
+                uses, and the labels are what make "1.41:1" mean anything to
+                somebody who has not read the checks below yet. */}
+            <dl className="mt-4 border-t border-line pt-3 text-sm">
+              {[
+                [
+                  "Pixels",
+                  `${shown.width.toLocaleString()} × ${shown.height.toLocaleString()}`,
+                ],
+                ["Shape", `${(shown.height / shown.width).toFixed(2)}:1`],
+                /* No weight for the stored copy: its size on disk is an
+                   artefact of this app's own compression, not a fact about the
+                   writer's artwork, and printing it beside a shop's 50MB limit
+                   would invite exactly the wrong conclusion. */
+                ...(shown.bytes > 0
+                  ? ([["File", fileSize(shown.bytes)]] as const)
+                  : []),
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between gap-4 py-1">
+                  <dt className="text-muted">{label}</dt>
+                  <dd className="font-medium text-fg tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+
+          <div className="min-w-0">
+            {/* **Green, and only ever for something that happened.** Red for
+                refused, amber for worth doing, green for passed or earned — so
+                a fix that has actually been written is the one thing here
+                entitled to it. It clears when a new file is read or the file is
+                removed, because a confirmation outliving the thing it confirms
+                is how a screen congratulates somebody for work they have
+                undone. */}
+            {done && (
+              <p
+                role="status"
+                className="mb-4 rounded-lg border border-ok-line bg-ok-bg px-3.5 py-2.5 text-sm text-ok-fg"
+              >
+                {done}
+              </p>
+            )}
 
             {fromStored && (
               /* Which picture this is, said before anything is done to it. */
-              <p className="mt-2 max-w-prose rounded-lg border border-note-line bg-note-bg px-3.5 py-2.5 text-sm text-note-fg">
+              <p className="mb-4 rounded-lg border border-note-line bg-note-bg px-3.5 py-2.5 text-sm text-note-fg">
                 This is the cover already on the book, not your original — the
                 copy kept here is compressed to fit a browser. Putting its shape
                 right fixes the cover in your EPUB and on the shelf. For the
                 file you upload to a shop, fix the original and check that.
+              </p>
+            )}
+
+            {/* **One line saying how it went, before the detail.** Every
+                report worth reading opens with its own summary — a deploy's
+                check count, Lighthouse's category line — because the first
+                question is "am I all right?" and the second is "which one".
+                Counted from the rows below rather than stated, so it cannot
+                disagree with them. */}
+            <p className="text-sm font-semibold text-fg">
+              {problems > 0
+                ? `${problems} thing${problems === 1 ? "" : "s"} a shop would refuse`
+                : notes > 0
+                  ? `Nothing a shop would refuse · ${notes} worth knowing`
+                  : "Nothing a shop would refuse"}
+              <span className="ml-2 font-normal text-muted tabular-nums">
+                {report.length} checks
+              </span>
+            </p>
+
+            {/* **The passes are shown, and that is the change that matters.**
+
+                This drew only the failures, so a clean file rendered as one
+                grey paragraph and a writer never learned what had been
+                examined — which reads exactly like a check that did not run.
+                It is the failure mode the title check has a standing rule
+                about, and the fix is the one GitHub, Vercel and Lighthouse all
+                use: list every rule, mark each one. A tick is what makes the
+                two crosses beside it believable.
+
+                One row per rule, in a fixed order, so the list does not
+                reshuffle when a different file is dropped — see `coverReport`.
+                Rows rather than cards: four bordered boxes down a column is
+                four times the furniture for four sentences, and it made the
+                two that mattered the same weight as the two that did not. The
+                mark carries the status and the row carries the words. */}
+            <ul className="mt-3 divide-y divide-line border-y border-line">
+              {report.map((check) => (
+                <li key={check.id} className="flex gap-3 py-3">
+                  <CheckMark status={check.status} />
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-semibold ${
+                        check.status === "pass" ? "text-muted" : "text-fg"
+                      }`}
+                    >
+                      {check.label}
+                    </p>
+                    {/* A pass needs no argument, so its detail is the
+                        measurement and the rule in small print; a finding is
+                        the thing the writer came for and is set at reading
+                        size. Capped at a measure — this column is half of a
+                        `7xl` page and an uncapped sentence here runs to about
+                        a hundred and thirty characters. */}
+                    <p
+                      className={`mt-0.5 max-w-prose ${
+                        check.status === "pass"
+                          ? "text-xs text-muted"
+                          : "text-sm text-muted"
+                      }`}
+                    >
+                      {check.detail}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+
+            {/* Only when everything passed. Under a list of ticks it is the
+                one thing left to say; under a list with two crosses in it, it
+                would be a change of subject at the moment somebody is reading
+                what is wrong. */}
+            {problems === 0 && notes === 0 && (
+              <p className="mt-3 max-w-prose text-sm text-muted">
+                That is the <em>file</em> checked. Whether the cover works is a
+                different question, and the shelf is how you answer it.
               </p>
             )}
 
@@ -878,13 +1200,68 @@ function CoverChecker({ bookId }: { bookId: string }) {
                 the dialog, and in the confirmation afterwards, and it is the
                 only fix whose green message declines to call the result
                 better. */}
-            {facts && (shapeOff || smallerThanIdeal) && (
-              <div className="mt-3 rounded-lg border border-line bg-panel p-4">
+            {/* **Under the report, not over it.** It sat above the findings,
+                so a writer met three buttons offering to change their file
+                before reading a word about what was wrong with it — a remedy
+                ahead of the diagnosis. The order is what the report is for:
+                here is the file, here is what each rule says, here is what can
+                be done about the two that failed. */}
+            {facts && (shapeOff || smallerThanIdeal || wrongFormat) && (
+              <div className="mt-5 rounded-lg border border-line bg-surface p-4">
                 <p className="text-sm font-bold text-fg">Fix the file</p>
                 <p className="mt-1 max-w-prose text-sm text-muted">
                   You choose what shows before anything is written. Nothing is
                   uploaded and this file is not changed — you get a copy.
                 </p>
+
+                {/* **The format fix, and it is the plainest one here.**
+
+                    It had no button at first, on the reasoning that re-saving
+                    is the writer's job. That was wrong twice over. The remedy
+                    is entirely mechanical — the same canvas the other two fixes
+                    already use, drawing the artwork at its own size so not a
+                    pixel moves — and the writers who most need it are the ones
+                    least likely to own something that re-encodes an image.
+                    Telling somebody their file is the wrong container while
+                    holding the one line of code that changes the container is
+                    the sort of help that is really a shrug.
+
+                    Straight to the file with no dialog, like the enlarge: there
+                    is nothing to choose. Nothing is cropped, nothing is scaled,
+                    and the only thing that can be lost is transparency, which
+                    an ebook cover must not have anyway. */}
+                {wrongFormat && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void downloadShape(
+                        {
+                          id: "crop",
+                          width: facts.width,
+                          height: facts.height,
+                          drawWidth: facts.width,
+                          drawHeight: facts.height,
+                          factor: 1,
+                          tooSmall: false,
+                        },
+                        { x: 0, y: 0 },
+                      )
+                    }
+                    className="mt-3 flex w-full flex-wrap items-center justify-between gap-x-4
+                               gap-y-1 rounded-lg border border-line bg-panel px-4 py-3
+                               text-left transition-colors hover:border-accent/40
+                               hover:bg-raised focus-visible:ring-2
+                               focus-visible:ring-accent/50 focus-visible:outline-none"
+                  >
+                    <span className="text-sm font-semibold text-fg">
+                      Save it as a JPEG
+                    </span>
+                    <span className="text-xs text-muted tabular-nums">
+                      {facts.width} × {facts.height} · same pixels, a format
+                      Amazon takes
+                    </span>
+                  </button>
+                )}
                 {/* **Banners, not chips.** These were small boxes in a row
                     while the findings under them were full-width bordered
                     rows, so the *actions* were the smallest thing in a panel
@@ -919,9 +1296,10 @@ function CoverChecker({ bookId }: { bookId: string }) {
                             })
                           }
                           className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1
-                                     rounded-lg border border-line bg-surface px-4 py-3 text-left
-                                     hover:border-accent/40 focus-visible:ring-2
-                                     focus-visible:ring-accent/50 focus-visible:outline-none"
+                                     rounded-lg border border-line bg-panel px-4 py-3 text-left
+                                     transition-colors hover:border-accent/40 hover:bg-raised
+                                     focus-visible:ring-2 focus-visible:ring-accent/50
+                                     focus-visible:outline-none"
                         >
                           <span className="text-sm font-semibold text-fg">
                             {mode === "crop" ? "Crop to fit" : "Pad with bars"}
@@ -967,9 +1345,10 @@ function CoverChecker({ bookId }: { bookId: string }) {
                             )
                           }
                           className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1
-                                     rounded-lg border border-line bg-surface px-4 py-3 text-left
-                                     hover:border-accent/40 focus-visible:ring-2
-                                     focus-visible:ring-accent/50 focus-visible:outline-none"
+                                     rounded-lg border border-line bg-panel px-4 py-3 text-left
+                                     transition-colors hover:border-accent/40 hover:bg-raised
+                                     focus-visible:ring-2 focus-visible:ring-accent/50
+                                     focus-visible:outline-none"
                         >
                           <span className="text-sm font-semibold text-fg">
                             Enlarge to {big.width} × {big.height}
@@ -988,53 +1367,24 @@ function CoverChecker({ bookId }: { bookId: string }) {
               /* Arrived from the dashboard: the numbers survived, the picture
                  did not. Saying which is better than either hiding the
                  findings — the writer came here *because* of them — or showing
-                 fix buttons that have nothing to work on. */
-              <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-muted">
-                Measured when you last checked this file. The artwork itself is
-                never kept here, so drop the same file again to put any of this
-                right.
+                 fix buttons that have nothing to work on.
+
+                 It stands where the fix panel would have been, which is what
+                 makes it read as the answer to "so what do I do about it" — the
+                 question the report directly above has just raised. */
+              <p className="mt-5 max-w-prose rounded-lg border border-line bg-surface p-4 text-sm text-muted">
+                These were measured when you last checked this file. The artwork
+                itself is never kept here, so drop the same file again to put
+                any of it right.
               </p>
             )}
 
-            {findings.length === 0 ? (
-              <p className="mt-3 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-                Nothing a shop would refuse, and nothing worth flagging. That is
-                the <em>file</em> checked. Whether the cover works is a
-                different question, and the shelf above is how you answer it.
-              </p>
-            ) : (
-              <ul className="mt-3 flex flex-col gap-2">
-                {findings.map((finding) => (
-                  <li
-                    key={finding.id}
-                    className="rounded-lg border border-line bg-panel p-4"
-                  >
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase ${
-                          finding.level === "problem"
-                            ? "bg-stop-bg text-stop-fg"
-                            : "bg-raised text-muted"
-                        }`}
-                      >
-                        {finding.level === "problem" ? "problem" : "note"}
-                      </span>
-                      <span className="font-bold text-fg">{finding.label}</span>
-                    </span>
-                    <p className="max-w-prose mt-1.5 text-sm text-muted">
-                      {finding.detail}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <p className="mt-4 text-xs text-muted">
+            <p className="mt-4 max-w-prose text-xs text-muted">
               Measured in your browser; the file is never uploaded. These are
               Amazon KDP&rsquo;s published figures and do not replace the
               shop&rsquo;s own check. Two things decide a cover and neither can
               be measured: whether the title is readable at 60px, and whether it
-              looks like its genre. Both are up there on the wall.
+              looks like its genre. Both are on the shelf.
             </p>
           </div>
         </div>
@@ -1071,7 +1421,87 @@ function CoverChecker({ bookId }: { bookId: string }) {
   );
 }
 
-/** Thumbnail first: it is the size the decision is actually made at. */
+/**
+ * A file size in the unit a person would use for it.
+ *
+ * It was always KB, which is right for a 69KB thumbnail and reads as noise the
+ * moment a real cover turns up: a 4MB JPEG printed `4145KB`, four digits nobody
+ * converts in their head, against a limit stated in MB two lines below. One
+ * decimal above a megabyte, none below — the second decimal of a file size has
+ * never told anybody anything.
+ */
+function fileSize(bytes: number): string {
+  const kb = bytes / 1024;
+  return kb >= 1024 ? `${(kb / 1024).toFixed(1)}MB` : `${Math.round(kb)}KB`;
+}
+
+/**
+ * The mark against one check.
+ *
+ * **A shape as well as a colour**, which is not decoration: red-versus-green is
+ * the one distinction about one in twelve men cannot make, and a checklist
+ * whose entire meaning is carried in a hue fails for them completely. A cross,
+ * an exclamation and a tick are legible in greyscale — the reason every serious
+ * status list draws glyphs rather than dots.
+ *
+ * It takes the app's own status family — `stop` for what a shop refuses, `note`
+ * for what is worth knowing, `ok` for what passed — so it is right in both
+ * themes without a second palette. `aria-hidden`, because the row's own words
+ * already say which it is; a screen reader hearing "problem" and then reading
+ * "Too small to upload" has been told the same thing twice.
+ */
+function CheckMark({ status }: { status: CoverCheck["status"] }) {
+  const look =
+    status === "problem"
+      ? {
+          ring: "border-stop-line bg-stop-bg text-stop-fg",
+          d: "M6 6l8 8M14 6l-8 8",
+        }
+      : status === "note"
+        ? {
+            ring: "border-note-line bg-note-bg text-note-fg",
+            d: "M10 5v6M10 14v.5",
+          }
+        : {
+            ring: "border-ok-line bg-ok-bg text-ok-fg",
+            d: "M5 10.5l3.5 3.5L15 7",
+          };
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${look.ring}`}
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2.2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-3 w-3"
+      >
+        <path d={look.d} />
+      </svg>
+    </span>
+  );
+}
+
+/**
+ * Smallest first, and **Large is the one it opens on.**
+ *
+ * The order is the ramp — thumbnail, browsing, large — because that is how a
+ * reader's own view of a cover grows as they get interested, and the two small
+ * ones are the test this screen exists to run: a title that dissolves at 60px
+ * is a cover that fails in the place the decision is actually made.
+ *
+ * The *default* is the other question, and it went the other way. The wall now
+ * loads on arrival, so the first thing anybody sees is thirty covers they did
+ * not ask for — at 60px that is a grid of unreadable stamps, and a writer who
+ * has never opened this tool cannot tell it is working, let alone what it is
+ * showing them. Large is where a cover reads as a cover. Shrinking it is then
+ * a deliberate press, which is the press this screen wants them to make.
+ */
 const SIZES = [
   { id: "thumb", label: "Thumbnail", width: 60, note: "as a shop shows it" },
   { id: "browse", label: "Browsing", width: 110, note: "as a shelf shows it" },
@@ -1079,6 +1509,18 @@ const SIZES = [
 ] as const;
 
 type SizeId = (typeof SIZES)[number]["id"];
+
+/**
+ * The shelf shown when the book says nothing about itself.
+ *
+ * A `subject:` term rather than a bare word, because both catalogues index
+ * subjects and a plain "fiction" matches every book with the word in its
+ * title. It is deliberately the broadest shelf there is: a narrower guess
+ * would be a guess *about this book*, and the whole point of this fallback is
+ * that we do not know what the book is. The caption never calls it theirs —
+ * see `shelfIs`.
+ */
+const GENERAL_SHELF = 'subject:"Fiction"';
 
 export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
@@ -1101,7 +1543,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
 
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
-  const [size, setSize] = useState<SizeId>("thumb");
+  const [size, setSize] = useState<SizeId>("large");
 
   /**
    * Which half of this tool is on screen.
@@ -1142,21 +1584,14 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   );
   const [error, setError] = useState<string | null>(null);
 
-  const seeded = useRef(false);
-  useEffect(() => {
-    if (!book || seeded.current) return;
-    seeded.current = true;
-    setQuery(
-      buildQuery({ genre: book.genre, blurb: book.publishing?.description }),
-    );
-  }, [book]);
-
   /**
-   * The free plan's ten cover searches.
+   * The free plan's three cover searches a day.
    *
-   * Every search here is one the writer pressed for — this screen seeds the box
-   * but never runs it — so there is no free arrival search to carve out, as
-   * there is on comps and the title check.
+   * **Only a search the writer asked for is counted.** The seed below now
+   * *runs*, and charging for that would spend the three on three visits — a
+   * limit on opening the screen rather than on searching it, which is the
+   * standing rule everywhere in `free-limits.ts`. So the form calls
+   * `gate.spend()` and the seed calls `search` straight.
    */
   const gate = useLimitGate({ action: "covers" });
   const shelfSearches = gate.allowance;
@@ -1164,7 +1599,10 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   const wall = useMemo(() => coversOf(books), [books]);
   const width = SIZES.find((s) => s.id === size)!.width;
 
-  async function search(q: string) {
+  /* `useCallback` so the arrival effect below can depend on it honestly rather
+     than lie to the linter about what it closes over. It captures nothing but
+     setters, which are stable, so the list is empty and it is built once. */
+  const search = useCallback(async (q: string) => {
     if (q.trim().length < 2) return;
     setState("loading");
     setError(null);
@@ -1182,7 +1620,81 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
       setError("Could not reach the search. Check your connection.");
       setState("error");
     }
-  }
+  }, []);
+
+  const seeded = useRef(false);
+  /**
+   * Whether the writer has touched the box — the same guard comps carries.
+   *
+   * The seed fires when `book` arrives, which is after hydration and can be
+   * after somebody has started typing, since the shelf is read from storage on
+   * the client. Without this a query typed on a slow load is silently replaced
+   * by ours, and the results are for something nobody asked.
+   */
+  const touched = useRef(false);
+
+  /**
+   * Whether the wall on screen is this book's shelf or a stand-in.
+   *
+   * `null` while nothing has been seeded, `"book"` when the query came off the
+   * book's own genre, blurb or categories, `"general"` when it did not. The
+   * caption reads this, and that is the whole reason it exists: a wall of
+   * general fiction presented as "the shelf your book sits on" is a claim
+   * about somebody's book that nothing in the data supports. Cleared the
+   * moment the writer edits the box, since after that the wall is theirs.
+   */
+  const [shelfIs, setShelfIs] = useState<"book" | "general" | null>(null);
+
+  /**
+   * **It opens on a shelf, not on an empty screen**, which is what comps has
+   * always done and what this screen was the odd one out for.
+   *
+   * A writer arriving here has been sent to look at other people's covers. A
+   * search box above an empty page asks them to describe their own book first
+   * — in words a catalogue will answer, which nobody guesses right cold — and
+   * the thing they came for is behind a press they have no reason to trust.
+   * So the wall is there before anything is asked of them, with their own
+   * cover beside it from the first paint.
+   *
+   * **Three seeds, in falling order of how much they know about the book**,
+   * because the obvious one is silent far more often than it looks. A book
+   * with no genre *and* no blurb — an import, or anything started before those
+   * screens were visited — gives `buildQuery` nothing, and this screen then
+   * showed the empty page it was supposed to have stopped showing.
+   *
+   * 1. The genre and blurb, as comps does.
+   * 2. The categories, if any were set. They are the same kind of thing a
+   *    `subject:` search takes, and a book that has been through the listing
+   *    screen has them when it has nothing else.
+   * 3. Failing both, **a general fiction shelf, said out loud.** These are real
+   *    covers from the same catalogues, and they answer the question this tool
+   *    is actually for — does a title still read at 60px, does mine look like a
+   *    book — which does not need the right genre to be worth looking at. What
+   *    it is *not* is this book's shelf, so `shelfIs` carries that and the
+   *    caption says so rather than letting the page imply it.
+   *
+   * `/api/comps` is free, keyless and cached for a week, so an arrival search
+   * costs a request nobody pays for — and it costs the writer none of the
+   * three, per the gate above.
+   */
+  useEffect(() => {
+    if (!book || seeded.current || touched.current) return;
+    seeded.current = true;
+
+    const fromBook =
+      buildQuery({
+        genre: book.genre,
+        blurb: book.publishing?.description,
+      }) ||
+      (book.publishing?.subjects ?? [])
+        .slice(0, 2)
+        .map((s) => `subject:"${s}"`)
+        .join(" ");
+
+    setShelfIs(fromBook ? "book" : "general");
+    setQuery(fromBook);
+    void search(fromBook || GENERAL_SHELF);
+  }, [book, search]);
 
   // The app's splash is for the app. In the roadmap's panel it would take
   // over half the window with a logo, so an embedded tool waits silently —
@@ -1213,19 +1725,49 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
         <ToolHeader
           book={book}
           tool="Covers"
+          /* **The trail keeps the trade word, the heading says the job** — the
+             split comps, the title check, the blurb and the categories screen
+             all make. "Covers" is the word in the launcher and on the road, so
+             it stays in the breadcrumb where a writer goes looking for it; as
+             the `h1` it named the subject and not the work, which on a screen
+             holding a wall of other people's artwork and a file checker left
+             somebody to guess which of the two they had arrived at. */
+          title="Does your cover hold up beside the shelf?"
           /* Matched to the container below. This screen's whole content is a
              wall of covers, and at 5xl the wall stopped a long way short of
              the window on both sides — the one page where extra width buys
              another column of the thing you came to look at. */
+          /* **The deck runs the page, as comps' does.** Capped at 2xl it broke
+             into three short lines under a heading spanning the full width,
+             with an acre of empty header beside it — a column of text that
+             lost its column. `ToolHeader`'s own note is the condition that
+             comes with widening it: shorten the words in the same change, or
+             the cap returns as a hundred-and-sixty-character line. So the
+             closing flourish went and the two claims that cannot go — that we
+             do not design covers, and will not generate one — stayed. */
+          deckWidth="full"
           action={<ToolStepDone state={save} />}
         >
-          Your cover, next to the shelf it has to sit on. We do not design
-          covers and we will not generate one — this is the thing you would do
-          yourself in a bookshop, if you had the afternoon.
+          Your cover, in the shelf it has to sit on, at the size a reader meets
+          it. We do not design covers and we will not generate one — this is the
+          thing you would do yourself in a bookshop.
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
+      {/* `@container`, so the checker's two columns size themselves off this
+          column rather than off the window — the same reasoning the blurb and
+          categories screens document. It matters here for the same reason it
+          matters there: in the roadmap's panel this page is a ~700px column
+          inside a full-width viewport, so a `lg:` breakpoint reading the
+          window would put a 20rem rail beside a 200px one.
+
+          Its absence was a real bug rather than a missing nicety. The checker
+          asks for `@2xl:grid-cols-[20rem_…]` and with no container to measure
+          that query never matched at any width, so the two columns silently
+          stayed stacked and the artwork panel — which sizes itself by aspect
+          ratio — grew to the full width of a `7xl` page and stood about 1,300
+          pixels tall. */}
+      <div className="@container mx-auto max-w-7xl px-6 pt-6 pb-16">
         {heading}
 
         {/* The line the header carries when this screen owns the window.
@@ -1243,265 +1785,313 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
             <ToolStepDone state={save} />
           </div>
         )}
-        {/* **Yours is on screen from the start, not summoned by a search.**
-            It used to sit inside `wall.length > 0`, so a writer arriving on
-            this tool saw a search box and a dashed box of instructions — and
-            the one thing the screen could show them without asking anything,
-            their own cover, was hidden behind a button. The shelf needs a
-            query; this does not.
+        {/* **The switch, above the panel it switches and outside it.**
 
-            The space beside it was empty because the cover is a fixed width
-            and the panel is not. What fills it is what a writer is deciding
-            *about* — the words printed on the artwork, at the size they are
-            actually read — plus whether this is real artwork or the generated
-            stand-in. Facts off the book, not advice about it. */}
-        <section className="mt-8 rounded-xl border border-line bg-panel p-5">
-          <h2 className="text-sm font-bold text-fg">Yours</h2>
-          <div className="mt-3 flex flex-wrap items-start gap-6">
-            <div className="shrink-0" style={{ width }}>
-              <BookCover
-                title={book.title}
-                subtitle={book.subtitle}
-                author={book.author}
-                words={bookWordCount(book)}
-                image={myCover ?? undefined}
-                bare={book.bareCover}
-                seed={book.id}
-              />
-            </div>
+            Outside because it is not part of either half — it is the thing
+            that chooses between them, and drawn inside it would have to be
+            drawn twice, once in each.
 
-            {/* **The controls live in the card, beside what they act on.**
-                They were stacked above it — a tab strip, then a search row,
-                then the cover — so the screen read as three unrelated bands
-                and the widest element on it was a text field. Put beside the
-                cover they explain themselves: this is yours, and this is how
-                you want to look at it.
+            **Two segments rather than one toggling button.** A single button
+            naming the other half was tried and is the weaker shape: it makes a
+            reader work out that the word on the control is where they are
+            *not*, and it never shows that there are exactly two halves at all.
+            A segmented control states the whole choice and marks which one is
+            on, which is why the size control below and the pricing page's
+            cycle switch both take this form.
 
-                The metadata that briefly sat here (title, subtitle, author,
-                artwork) is gone. It was true and it was the wrong thing: a
-                writer on this screen is not checking their own title, they are
-                deciding whether the artwork survives a shelf, and four rows
-                restating the fields printed on the picture beside them is a
-                caption nobody needs.
+            It is that same control, deliberately: `rounded-lg` box, a hairline,
+            `bg-panel` under `bg-accent` on the chosen one. One screen with two
+            switches drawn differently is a screen that has to be learned
+            twice. `w-fit`, so it hugs its words instead of stretching the page
+            — a full-width segmented control reads as two buttons. */}
+        <div
+          role="tablist"
+          aria-label="Cover tools"
+          className="mt-8 flex w-fit gap-1 rounded-lg border border-line bg-panel p-1"
+        >
+          {(
+            [
+              ["shelf", "The shelf"],
+              ["file", "Check a file"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={half === id}
+              onClick={() => setHalf(id)}
+              className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                half === id
+                  ? "bg-accent text-accent-ink"
+                  : "text-muted hover:text-fg"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-                `w-full` under the fold and `flex-1` beside it, so on a phone
-                the controls sit under the cover at full width rather than
-                squeezing into whatever the cover leaves. */}
-            <div className="w-full min-w-[16rem] flex-1">
-              <div
-                role="tablist"
-                aria-label="Cover tools"
-                className="flex gap-1 rounded-lg border border-line bg-surface p-1"
-              >
-                {(
-                  [
-                    ["shelf", "The shelf"],
-                    ["file", "Check a file"],
-                  ] as const
-                ).map(([id, label]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    role="tab"
-                    aria-selected={half === id}
-                    onClick={() => setHalf(id)}
-                    className={`flex-1 rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
-                      half === id
-                        ? "bg-accent text-accent-ink"
-                        : "text-muted hover:text-fg"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+        {/* **One panel, two halves, and the button above swaps which is in
+            it.** The two used to be a card and a block underneath it, with the
+            checker appearing inside the *Yours* card while the wall sat loose
+            below — so pressing a switch changed something in one container and
+            something else in another. They are the same box now, at the same
+            place on the page, and only the contents change. */}
+        <section className="mt-3 rounded-xl border border-line bg-panel p-5">
+          {/* Well above the `xl` other tool sections take, and it earns it: at
+              `text-sm` this was a label stuck on a box rather than the name of
+              the half of the screen that carries the answer, and this panel is
+              the tallest block on the page with a search of its own at the
+              top. `3xl` is a step under the page's own `h1`, which is the
+              right relationship — the heading asks the question, this names
+              the thing that answers it. Kept in step with "Yours" above.
 
-              {half === "shelf" ? (
-                <>
-                  <form
-                    className="mt-3 flex flex-wrap gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      // Refused rather than disabled — the eleventh press
-                      // is what puts the banner and the dialog on screen.
-                      if (!gate.spend()) return;
-                      void search(query);
-                    }}
-                  >
-                    <input
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Words that describe your book"
-                      aria-label="Search for comparable books"
-                      className="min-w-[10rem] flex-1 rounded-lg border border-line bg-surface px-4 py-2.5
-                                 text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-                    />
-                    <button
-                      type="submit"
-                      disabled={state === "loading" || query.trim().length < 2}
-                      className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
-                    >
-                      {state === "loading" ? "Looking…" : "Show me the shelf"}
-                    </button>
-                  </form>
-
-                  {/* The other half of this screen — checking a file you
-                      already have — is not counted and not affected, which is
-                      why the note sits under this form rather than the tabs. */}
-                  <LeftPill allowance={shelfSearches} className="mt-2" />
-                  <LimitBanner allowance={shelfSearches} className="mt-4" />
-                  <p className="mt-3 max-w-prose text-xs text-muted">
-                    {myCover
-                      ? "Shown at the size a reader meets it. Whether the title still reads at thumbnail size is what the shelf below answers."
-                      : "No artwork on this book yet, so that is the generated one. Search, and compare it with the shelf."}
-                  </p>
-                </>
-              ) : (
-                <p className="mt-3 max-w-prose text-xs text-muted">
-                  Drop the file you are about to upload just here. It is
-                  measured in your browser and never sent anywhere.
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* **The half's own content, inside the same box.** The card held the
-              controls and then handed off to a separate block underneath — so
-              choosing "Check a file" lit a tab in one container and drew the
-              answer in another, with desk showing between them. A tab strip
-              and the thing it switches belong to one surface; that is what
-              makes it read as a switch rather than as two features that happen
-              to be stacked.
-
-              Divided rather than boxed again: a nested card inside a card is
-              the pattern this page has just finished removing elsewhere. */}
-          {/* Tightened twice now. The gap above this rule is set by the cover's
-              height rather than by the controls beside it — in file mode the
-              right column is a tab strip and two lines, so the row is as tall
-              as the picture and the divider lands well under the text. Trimming
-              the margins is the part that is ours to trim. */}
-          <div className="mt-2 border-t border-line pt-3">
-            {half === "shelf" ? (
-              wall.length === 0 &&
-              state !== "loading" &&
-              !error && (
-                <>
-                  <p className="text-sm font-semibold text-fg">
-                    We do not design covers.
-                  </p>
-                  <p className="mt-1.5 max-w-2xl text-sm text-muted">
-                    Press <strong className="text-fg">Show me the shelf</strong>{" "}
-                    to see yours beside the covers already selling in your
-                    genre, at the size a reader meets them.
-                  </p>
-                </>
-              )
-            ) : (
-              <CoverChecker bookId={book.id} />
+              It also names which half you are in, which is what lets the
+              control above it be one button rather than two. */}
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-3xl font-bold tracking-tight text-fg">
+              {half === "shelf" ? "The shelf" : "Check the file"}
+            </h2>
+            {half === "shelf" && wall.length > 0 && (
+              <span className="text-sm text-muted tabular-nums">
+                {wall.length} covers
+              </span>
             )}
           </div>
-        </section>
 
-        <div hidden={half !== "shelf"}>
-          {error && (
-            <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
-              {error}
-            </p>
-          )}
-
-          {wall.length > 0 && (
+          {half === "file" ? (
+            <CoverChecker bookId={book.id} />
+          ) : (
             <>
-              {/* The control that matters. Thumbnail is the default because it
-                is where the decision is really made. */}
-              <div className="mt-8 flex flex-wrap items-center gap-3">
-                <div className="flex gap-1 rounded-lg border border-line bg-panel p-1">
-                  {SIZES.map((s) => (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSize(s.id)}
-                      className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
-                        size === s.id
-                          ? "bg-accent text-accent-ink"
-                          : "text-muted"
-                      }`}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="max-w-prose text-sm text-muted">
-                  {/* The count moved onto the shelf panel's own heading, where
-                    it is beside the thing it counts. Said in both places it
-                    read as two figures a reader had to reconcile. */}
-                  {SIZES.find((s) => s.id === size)!.note}
-                </p>
-              </div>
+              {/* **Everything that acts on this wall is inside it**, in the
+                order comps settled on: the search, then the size, then the
+                covers. The search used to live up in the Yours panel beside
+                the tab strip that revealed this half — which made sense while
+                a writer had to press before anything appeared, and stopped
+                making sense the moment the wall loaded on arrival: the control
+                that changes what you are looking at was a panel away from the
+                thing it changes. Every shop that sells books puts its search
+                directly above the covers it produces. */}
+              <form
+                className="mt-3 flex flex-wrap gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  // Refused rather than disabled — the press past the limit is
+                  // what puts the banner and the dialog on screen.
+                  if (!gate.spend()) return;
+                  void search(query);
+                }}
+              >
+                <input
+                  value={query}
+                  onChange={(e) => {
+                    // The seed is a starting point; once there is anything of
+                    // the writer's in the box there is nothing left to start,
+                    // so the arrival effect must not overwrite it.
+                    touched.current = true;
+                    // And the wall stops being ours to describe.
+                    setShelfIs(null);
+                    setQuery(e.target.value);
+                  }}
+                  placeholder="Words that describe your book"
+                  aria-label="Search for comparable books"
+                  className="min-w-[10rem] flex-1 rounded-lg border border-line bg-surface px-4 py-2.5
+                           text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+                />
+                <button
+                  type="submit"
+                  disabled={state === "loading" || query.trim().length < 2}
+                  className="rounded-lg bg-accent px-5 py-2.5 font-semibold text-accent-ink disabled:opacity-50"
+                >
+                  {state === "loading" ? "Looking…" : "Show me the shelf"}
+                </button>
+              </form>
 
-              {/* **The shelf, boxed like Yours.** It was a bare heading over a
-                loose grid, so the two halves of the one comparison — your
-                cover and the wall it has to survive — were drawn as different
-                kinds of thing. Same panel, same padding: the eye reads them as
-                a pair, which is the entire point of the screen. */}
-              <section className="mt-8 rounded-xl border border-line bg-panel p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <h2 className="text-sm font-bold text-fg">The shelf</h2>
-                  <span className="text-xs text-muted tabular-nums">
-                    {wall.length} covers
-                  </span>
+              {/* The other half of this screen — checking a file you already
+                have — is not counted and not affected, which is why these sit
+                under this form rather than under the tabs. */}
+              <LeftPill allowance={shelfSearches} className="mt-2" />
+              <LimitBanner allowance={shelfSearches} className="mt-4" />
+
+              {/* Only when the wall is *not* this book's shelf. A caption naming
+                the obvious case is furniture; this one has something to
+                correct, and it belongs beside the covers it is correcting
+                rather than up in the panel about your artwork. */}
+              {shelfIs === "general" && (
+                <p className="mt-3 max-w-prose text-xs text-muted">
+                  This book has no genre, blurb or categories set, so these are
+                  fiction generally rather than your own shelf. Describe the
+                  book above to see that one.
+                </p>
+              )}
+
+              {error && (
+                <p className="mt-4 rounded-lg border border-line bg-surface p-4 text-sm text-fg">
+                  {error}
+                </p>
+              )}
+
+              {/* The control that matters. It opens on Large — see `SIZES` —
+                  and the two smaller ones are the test: a title that dissolves
+                  at 60px is a cover that fails where the decision is actually
+                  made. Between the search and the covers because it acts on
+                  the covers and not on the search: the row above changes
+                  *which* books these are, this one changes how big they are
+                  drawn — **including the writer's own, which is the whole
+                  point of it now that theirs is in the wall.** */}
+              {wall.length > 0 && (
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                  <div className="flex gap-1 rounded-lg border border-line bg-surface p-1">
+                    {SIZES.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSize(s.id)}
+                        className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
+                          size === s.id
+                            ? "bg-accent text-accent-ink"
+                            : "text-muted"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="max-w-prose text-sm text-muted">
+                    {/* The count sits on the heading above, beside the thing it
+                      counts. Said in both places it read as two figures a
+                      reader had to reconcile. */}
+                    {SIZES.find((s) => s.id === size)!.note}
+                  </p>
                 </div>
-                <ul className="mt-3 flex flex-wrap gap-4">
-                  {wall.map((comp) => (
-                    <li key={comp.key} style={{ width }}>
-                      {/* A plain img: two third-party hosts whose URLs we do not
-                        control, and next/image would mean a config file listing
-                        them that goes stale. */}
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={comp.coverUrl}
-                        alt={`Cover of ${comp.title}`}
-                        style={{ width }}
-                        className="rounded shadow-sm"
+              )}
+
+              {/* ---- The wall, and the writer's own cover leading it --------
+
+                  **Theirs is *in* the shelf rather than in a panel above it.**
+                  It used to be a card of its own headed "Yours", which was
+                  taken off on 2026-08-11 for being a big box holding one
+                  picture and a lot of empty desk. Putting it back as a card
+                  would put the empty desk back with it — and it was never the
+                  right shape anyway: a cover in its own frame, at its own
+                  size, above a wall of other covers is a picture of your book
+                  *near* the shelf rather than on it.
+
+                  In the wall it is the comparison the screen is named for. It
+                  takes the size control with everything else, so Thumbnail
+                  draws it at 60px beside thirty real competitors at 60px —
+                  which is the test this tool exists to run and the one thing a
+                  separate panel could never do honestly, since a cover shown
+                  alone always looks fine.
+
+                  First, so it is found without hunting, and marked two ways:
+                  the word **Yours** at full ink where a comp carries a muted
+                  title, and a ring. The ring is `fg` rather than the accent —
+                  the palette reserves indigo for what you can press, and this
+                  is the same "you are here" job `CARD_EDGE_ACTIVE` does with
+                  `border-fg` in the book panel.
+
+                  It renders while the shelf is still loading, too: their own
+                  cover needs no request, and a writer who arrives to a column
+                  of grey rectangles should at least see the one thing this
+                  screen never has to fetch. */}
+              {(wall.length > 0 || state === "loading") && (
+                <ul className="mt-4 flex flex-wrap gap-4">
+                  <li style={{ width }}>
+                    <div className="overflow-hidden rounded shadow-sm ring-2 ring-fg">
+                      <BookCover
+                        title={book.title}
+                        subtitle={book.subtitle}
+                        author={book.author}
+                        words={bookWordCount(book)}
+                        image={myCover ?? undefined}
+                        bare={book.bareCover}
+                        seed={book.id}
                       />
-                      {size !== "thumb" && (
-                        <p className="mt-1.5 line-clamp-2 text-xs text-muted">
-                          {comp.title}
-                        </p>
+                    </div>
+                    {/* Always named, at every size, unlike a comp's title —
+                        without it this is just the first cover in a row and
+                        the writer is comparing their book against itself. */}
+                    <p className="mt-1.5 text-xs font-bold text-fg">
+                      Yours
+                      {!myCover && (
+                        <span className="font-normal text-muted">
+                          {" "}
+                          · generated
+                        </span>
                       )}
-                    </li>
-                  ))}
+                    </p>
+                  </li>
+
+                  {state === "loading" && wall.length === 0
+                    ? /* Shaped like the covers that replace them, at the size
+                         currently picked, so nothing jumps when they land. */
+                      Array.from({ length: 11 }, (_, i) => (
+                        <li
+                          key={`skeleton-${i}`}
+                          aria-hidden
+                          className="animate-pulse"
+                          style={{ width }}
+                        >
+                          <div className="aspect-[2/3] w-full rounded bg-raised" />
+                        </li>
+                      ))
+                    : wall.map((comp) => (
+                        <li key={comp.key} style={{ width }}>
+                          {/* A plain img: two third-party hosts whose URLs we do
+                          not control, and next/image would mean a config file
+                          listing them that goes stale. */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={comp.coverUrl}
+                            alt={`Cover of ${comp.title}`}
+                            style={{ width }}
+                            className="rounded shadow-sm"
+                          />
+                          {size !== "thumb" && (
+                            <p className="mt-1.5 line-clamp-2 text-xs text-muted">
+                              {comp.title}
+                            </p>
+                          )}
+                        </li>
+                      ))}
                 </ul>
-              </section>
+              )}
+
+              {/* Inside the panel, where the covers would have been — it is the
+                answer to the search two lines above it, and outside the box it
+                read as a note about the page. */}
+              {state === "done" && wall.length === 0 && (
+                <p className="mt-5 text-sm text-muted">
+                  No covers came back for that search. Try describing the story
+                  rather than naming the genre.
+                </p>
+              )}
             </>
           )}
+        </section>
 
-          {state === "done" && wall.length === 0 && (
-            <p className="mt-8 text-muted">
-              No covers came back for that search. Try describing the story
-              rather than naming the genre.
+        {/* Only once there is a wall to describe, and only while it is on
+            screen. It ran unconditionally once, so a writer who had not
+            searched yet read a paragraph about "the wall" and the fact that it
+            is not scored, with nothing on screen it could be about — and the
+            file half has no wall at all. */}
+        {half === "shelf" && wall.length > 0 && (
+          <div className="mt-10 border-t border-line pt-6">
+            {/* The rule spans the page and the sentence does not.
+                They were one element while a tool page was 3xl wide,
+                where the two widths happened to agree; at 5xl a line of
+                text run to the full container is about 160 characters,
+                which is twice a readable measure. */}
+            <p className="max-w-3xl text-xs text-muted">
+              Covers are shown from Google Books and Open Library, at the size a
+              reader meets them. The wall is not scored — a number comparing
+              your cover to a genre would be invented to look like an answer.
+              Look at the wall, then look at yours.
             </p>
-          )}
-
-          {/* Only once there is a wall to describe. It ran unconditionally, so
-            a writer who had not searched yet read a paragraph about "the wall"
-            and the fact that it is not scored, with nothing on screen it could
-            be about. */}
-          {wall.length > 0 && (
-            <div className="mt-10 border-t border-line pt-6">
-              {/* The rule spans the page and the sentence does not.
-              They were one element while a tool page was 3xl wide,
-              where the two widths happened to agree; at 5xl a line of
-              text run to the full container is about 160 characters,
-              which is twice a readable measure. */}
-              <p className="max-w-3xl text-xs text-muted">
-                Covers are shown from Google Books and Open Library, at the size
-                a reader meets them. The wall is not scored — a number comparing
-                your cover to a genre would be invented to look like an answer.
-                Look at the wall, then look at yours.
-              </p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {gate.dialogOpen && (

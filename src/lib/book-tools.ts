@@ -131,17 +131,25 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: "categories",
         icon: "tag",
         name: "Categories & keywords",
-        // The subject search was pulled on 2026-08-04 to get a release out;
-        // what ships is the list you keep and the seven boxes counted. Put the
-        // "worked out from where comparable books are filed" half back only
-        // when the search is back.
-        what: "The categories you will type into a shop's form, kept in one place — and the seven keyword boxes counted.",
+        // Twice narrowed, and the description follows the screen both times.
+        // The subject search was pulled on 2026-08-04 to get a release out, and
+        // on 2026-08-11 the categories half went with it, to be rebuilt — so
+        // what ships today is the seven boxes and the checker. The name keeps
+        // both words because the roadmap step and the dashboard finding still
+        // land here; the sentence may only claim what is on the screen. Put
+        // each half back as it returns, and not before.
+        what: "The seven keyword boxes a shop asks for, counted and checked against what your listing already says.",
       },
       {
         path: "covers",
         icon: "image",
         name: "Covers",
-        what: "Yours at thumbnail size beside the shelf it competes on, and a check on the file itself.",
+        // Twice rewritten on 2026-08-11 and back to nearly where it started:
+        // the "Yours" panel came off the screen, so the "beside the shelf"
+        // half stopped being true, and then the cover went into the wall
+        // itself, which made it true again in a stronger sense. The size is no
+        // longer named, because the wall opens at Large and the writer picks.
+        what: "Yours in the shelf it competes on, at the size a reader meets it — and a check on the file itself.",
       },
       {
         path: "title-check",

@@ -13,22 +13,26 @@ import { spendTotalUse } from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
 
 /**
- * The keyword conversation, and the one press that skips it.
+ * The keyword conversation.
  *
- * **Two model features in one card, because they answer different questions.**
- * The press asks *give me seven from the blurb* — one call, five free, and the
- * whole of what somebody wants when they already know their book and just need
- * the boxes filled. The conversation asks *which seven, and why* — a call per
- * turn, three free, and the only way to answer "is 'cozy mystery' worth a box
- * when it is already my category?" or "what are these boxes even for?". Making
- * the chat the only door would charge a writer a third of their conversations
- * for a job that used to cost a fifth of a cheaper allowance.
+ * **One door, and it used to be two.** A "Suggest seven from my blurb" button
+ * sat above the chat on its own allowance, answering the commonest question in
+ * a single press. It was removed: both doors already emptied into one handler in
+ * `categories-page.tsx`, and the second one cost a route, a limit, a row on the
+ * pricing page and a paragraph in Help to say the same thing the chat says when
+ * asked. `STARTERS` carries the sentence, so the cheap answer is still one click
+ * — it just spends the allowance the conversation already had.
  *
- * Everything the model offers, from either door, goes back to the *page* rather
- * than to the book: it lands in the draft, in empty boxes only, and the save
- * bar at the foot of the window is what commits it. See `workshop.ts` for why
- * the candidates are tagged rather than guessed at, and why the checker under
- * the boxes is also the filter above them.
+ * The trade is real and worth naming: somebody who only wanted the boxes filled
+ * now spends a third of three conversations rather than a fifth of five. That is
+ * the cost of one surface instead of two, and it is the direction this app
+ * usually chooses.
+ *
+ * Everything the model offers goes back to the *page* rather than to the book:
+ * it lands in the draft, in empty boxes only, and the save bar at the foot of
+ * the window is what commits it. See `workshop.ts` for why the candidates are
+ * tagged rather than guessed at, and why the checker under the boxes is also the
+ * filter above them.
  *
  * **The conversation is not persisted**, exactly as the assistant's and the
  * blurb workshop's are not. Reloading starts fresh — which is why a use is
@@ -38,9 +42,6 @@ import { usePrefs } from "@/lib/use-library";
 
 /** What the screen holds. Local, because nothing is stored. */
 type Turn = KeywordMessage & { keywords?: string[]; at: number };
-
-/** Enough description to be worth a model call; the route enforces the same. */
-const MIN_BLURB = 40;
 
 /** The name the replies answer under. */
 const HELPER = "Keywords";
@@ -87,7 +88,6 @@ export function KeywordWorkshop({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [suggesting, setSuggesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -97,10 +97,6 @@ export function KeywordWorkshop({
   const chat = useLimitGate({
     action: "keywordChat",
     used: prefs.usedTotal.keywordChat ?? 0,
-  });
-  const press = useLimitGate({
-    action: "keywordsAi",
-    used: prefs.usedTotal.keywordsAi ?? 0,
   });
 
   useEffect(() => {
@@ -120,65 +116,10 @@ export function KeywordWorkshop({
     };
   }
 
-  /**
-   * The one press: seven candidates from the blurb, no conversation.
-   *
-   * The blurb is checked here as well as on the server so the refusal arrives
-   * without a round trip, and it is checked **before** the gate, so a press
-   * that could not have worked never opens the upgrade dialog.
-   */
-  async function suggest() {
-    if (suggesting || busy) return;
-
-    if (blurb.trim().length < MIN_BLURB) {
-      setError(
-        "Write the blurb first. Keyword suggestions are drawn from your description, and there is not enough of it yet.",
-      );
-      return;
-    }
-    if (!press.spend()) return;
-
-    setSuggesting(true);
-    setError(null);
-    try {
-      const response = await fetch("/api/comps/keywords", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(book()),
-      });
-      const data: { keywords?: string[]; error?: string } = await response
-        .json()
-        .catch(() => ({}));
-
-      if (!response.ok) {
-        setError(data.error ?? "That did not work. Try again in a moment.");
-        return;
-      }
-
-      const found = data.keywords ?? [];
-      if (found.length === 0) {
-        // Not an error: the checker did its job and nothing survived it. It
-        // costs no allowance either, because none was recorded.
-        setError(
-          "Nothing came back that was not already in your title, your categories or against a shop's rules. Try again, or add more to the blurb.",
-        );
-        return;
-      }
-
-      onCandidates(found);
-      // The only place this allowance is recorded — a reply that landed and
-      // produced something.
-      spendTotalUse("keywordsAi");
-    } catch {
-      setError("That did not work. Check your connection and try again.");
-    } finally {
-      setSuggesting(false);
-    }
-  }
 
   async function send(text: string) {
     const said = text.trim();
-    if (!said || busy || suggesting) return;
+    if (!said || busy) return;
 
     /*
      * **A use is one conversation, spent on its first message.** Counting
@@ -250,7 +191,7 @@ export function KeywordWorkshop({
     }
   }
 
-  const open = chat.dialogOpen ? "keywordChat" : press.dialogOpen ? "keywordsAi" : null;
+  const open = chat.dialogOpen ? "keywordChat" : null;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-line bg-panel">
@@ -259,48 +200,31 @@ export function KeywordWorkshop({
         <LeftPill allowance={chat.allowance} className="ml-auto" />
       </div>
 
-      {/* **The press, above the conversation and set apart from it.** It is the
-          cheap answer to the commonest question on this screen, and a writer
-          who wants only that should not have to type a sentence to get it. */}
-      <div className="border-b border-line px-4 py-3">
-        <button
-          type="button"
-          onClick={() => void suggest()}
-          /* Live with nothing left and live with no blurb: a disabled button
-             gives a refusal nowhere to be explained. Only work already in
-             flight turns it off. */
-          disabled={suggesting || busy}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-lg
-                     bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink
-                     transition-opacity hover:opacity-90 disabled:opacity-45"
-        >
-          {suggesting ? (
-            <>
-              <Spinner className="h-4 w-4" />
-              Reading your blurb
-            </>
-          ) : (
-            "Suggest seven from my blurb"
-          )}
-        </button>
+      {/* **The one-press suggestion is gone; the conversation does this now.**
+          It sat above the chat as the cheap answer to the commonest question,
+          and it was a second door onto the same room — its candidates and the
+          chat's went through one handler in `categories-page.tsx`, spent from
+          two allowances, and had to be explained twice on the pricing page and
+          in Help. One door that answers "suggest seven from my blurb" as a
+          sentence is the same feature with half the surface.
 
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <LeftPill allowance={press.allowance} />
-          {/* Offered only while there is something to undo, and gone as soon
-              as it is used: a control that says Undo with nothing behind it is
-              the dead UI the house rules forbid. */}
-          {canUndo && !suggesting && (
-            <button
-              type="button"
-              onClick={onUndo}
-              className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium
-                         text-muted hover:border-fg/25 hover:text-fg"
-            >
-              Undo
-            </button>
-          )}
+          **Undo stays**, because it never belonged to the press: it puts back
+          whatever the last batch of candidates replaced, and the chat produces
+          those too. Rendered only when there is something to undo — a control
+          saying Undo with nothing behind it is the dead UI the house rules
+          forbid — so the strip is absent rather than empty most of the time. */}
+      {canUndo && (
+        <div className="border-b border-line px-4 py-3">
+          <button
+            type="button"
+            onClick={onUndo}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium
+                       text-muted hover:border-fg/25 hover:text-fg"
+          >
+            Undo the last suggestions
+          </button>
         </div>
-      </div>
+      )}
 
       {/* The scroll area. `min-h-0` on both this and the section, or a flex
           child with overflow grows the column instead of scrolling in it. */}
@@ -467,7 +391,7 @@ export function KeywordWorkshop({
           <button
             type="submit"
             /* Live even with nothing left, for the reason above. */
-            disabled={busy || suggesting || !input.trim()}
+            disabled={busy || !input.trim()}
             className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-semibold
                        text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-45"
           >
@@ -475,20 +399,25 @@ export function KeywordWorkshop({
           </button>
         </form>
 
-        {/* **What leaves, said before the press.** This route sends no prose,
-            and saying so is the point: a writer must never discover afterwards
-            that the manuscript went. `/privacy` carries the long version. Add
-            a field to what is sent and name it here. */}
-        <p className="mt-2 text-xs text-muted">
-          Reads this screen and your blurb, never the manuscript. Check each
-          suggestion is true of your book. Can make mistakes.
+        {/* **What leaves, said before the press**, and cut to the one clause
+            that is load-bearing. This route sends no prose, and a writer must
+            never discover afterwards that the manuscript went — so that clause
+            stays. The other two went: "check each suggestion is true of your
+            book" is already said where suggestions land, and "can make
+            mistakes" under a chat box is a line every reader has learned to
+            skip. Three sentences of footnote under an input is a paragraph
+            nobody reads, which loses the one sentence that mattered.
+            `/privacy` carries the long version. Add a field to what is sent
+            and name it here. */}
+        <p className="mt-2 text-[11px] text-muted">
+          Reads this screen and your blurb — never the manuscript.
         </p>
       </div>
 
       {open && (
         <LimitDialog
           action={open}
-          onClose={open === "keywordChat" ? chat.closeDialog : press.closeDialog}
+          onClose={chat.closeDialog}
         />
       )}
     </section>

@@ -131,6 +131,49 @@ const DESTINATIONS: Record<string, Fix> = {
     path: "covers?check=1",
     action: "Check the cover",
   },
+  /*
+   * The four that arrived on 2026-08-11 with Amazon's published rules read
+   * properly — the pixel ceiling, the accepted formats, taller-than-thumbnail,
+   * and the pale-edge border note.
+   *
+   * **Each needs an entry here or it lands on the dashboard as a dead end**,
+   * which is the whole reason the walk test over `storeReadiness` exists. None
+   * of them carries a `fix=` intent, and that is the point rather than an
+   * omission: `fix=` opens a window that *writes a new file*, and there is no
+   * honest one to write for any of these. A 12,000px cover has to be exported
+   * again at a sane size, a PNG has to be re-saved as a JPEG, a border is a
+   * design decision, and a taller-than-1.6 cover is within Amazon's guidance
+   * and may not need touching at all. So the button goes to the checker, which
+   * is where the sentence explaining each of them lives.
+   */
+  "cover-too-big": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the cover",
+  },
+  "cover-format": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the format",
+  },
+  "cover-tall": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the shape",
+  },
+  "cover-pale-edge": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the cover",
+  },
+  /* CMYK. No `fix=` either: re-exporting in RGB is done in whatever drew the
+     cover, and a canvas conversion here would hand back a file whose colours
+     have shifted from the ones somebody approved. */
+  "cover-cmyk": {
+    kind: "route",
+    path: "covers?check=1",
+    action: "Check the colour mode",
+  },
   description: { kind: "route", path: "blurb", action: "Work on the blurb" },
   subjects: {
     kind: "route",
@@ -249,7 +292,8 @@ export function checkup({
   chapterCount,
   arcCount,
 }: CheckupInput): Finding[] {
-  const phase = progressOf(roadmapFor(book, book.roadmapDone ?? [])).next?.phase;
+  const phase = progressOf(roadmapFor(book, book.roadmapDone ?? [])).next
+    ?.phase;
   const selling = phase === undefined || SELLING.has(phase);
 
   const findings: Finding[] = [];

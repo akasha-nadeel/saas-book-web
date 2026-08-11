@@ -17,18 +17,190 @@
  * **The figures are Amazon KDP's published guidance**, held in named constants
  * so a change is one line and a failed test. As with the paperback numbers,
  * this does not replace the shop's own checker.
+ *
+ * ---
+ *
+ * **Read against Amazon's own page on 2026-08-11, and four of the rules here
+ * were wrong.** They had been written from the trade's summary of the spec
+ * rather than the spec, which is how a checker ends up confidently clearing a
+ * file the shop refuses:
+ *
+ * - The floor is **1000px tall and 625px wide** — two conditions. This tested
+ *   `Math.max` against 1000, so a 1200 × 500 cover passed here and was refused
+ *   there.
+ * - There is a **ceiling of 10,000px** on either side, and nothing checked it.
+ *   A cover exported from a print template is the ordinary way to hit it.
+ * - The ratio guidance is **"at least 1.6:1"**, not "about 1.6:1". Squarer is
+ *   under it; taller is within it. One symmetric band called both unusual.
+ * - **JPEG and TIFF only.** PNG — what every design tool and image generator
+ *   exports by default — is refused, and nothing here looked at the format at
+ *   all. This screen's own drop zone briefly advertised PNG as acceptable.
+ *
+ * A second pass over the same page found three more:
+ *
+ * - **RGB, "without color separation".** A CMYK JPEG is refused, and it is the
+ *   one rule invisible to every other check here — a canvas decodes it to RGB
+ *   before anything can look, so the pixels, shape, contrast and edge all read
+ *   normally. Only the file's own bytes know. See `jpegComponents`.
+ * - The weight limit is "**less than** 50MB", so a file of exactly 50MB is
+ *   refused there and used to pass here.
+ * - **TIFF is accepted by Amazon and cannot be opened by a browser.** Nothing
+ *   in this module is wrong about that, but the screen was: it advertised TIFF
+ *   and then reported a perfectly good one as unreadable. Handled in
+ *   `covers-page.tsx`, which now says which of the two things happened.
+ *
+ * One recommendation was also being missed: Amazon asks for a **narrow 3–4px
+ * grey border** on covers with white or very light backgrounds, because they
+ * "seem to disappear" against the shop's page. That is measurable at the frame
+ * — see `edgeLightness` — and it is a real complaint rather than a technicality.
+ *
+ * **Also read and deliberately not checked: dpi.** Amazon names 72dpi for an
+ * ebook cover and recommends designing at 300. It is metadata rather than a
+ * property of the picture — the same pixels carry any dpi you like, and only
+ * the pixel count decides how an ebook cover looks — so reporting it would
+ * invite somebody to "fix" a number that changes nothing. It belongs to the
+ * paperback, where it is real.
+ *
+ * **What was deliberately left out, having been read.** Amazon's content rules
+ * refuse a cover carrying a price, a reference to another retailer, a barcode,
+ * placeholder text, or artwork that does not match the title and author in the
+ * listing; and it refuses covers that are simply blurry or low quality. Every
+ * one of those needs OCR, a model, or a judgement about quality, and this
+ * module's whole standing is that it reports what can be measured and refuses
+ * to score what cannot. A checker that guessed at "is this blurry" and cleared
+ * a bad file would cost more trust than the check is worth. They belong in the
+ * *guide* — words a writer reads — not in a list of ticks.
  */
 
-/** KDP's minimum on the longest side, and what it recommends. */
-export const MIN_LONG_EDGE = 1000;
+/**
+ * KDP's floor, **per edge rather than on the longest one**.
+ *
+ * Amazon's own wording is "a minimum of 1000 pixels in height and 625 pixels
+ * in width" — two conditions, not one. This module read it as one for a long
+ * time (`MIN_LONG_EDGE = 1000`, tested against `Math.max`), which passes a
+ * 1000 × 400 landscape image that Amazon refuses on width, and a 1200 × 1000
+ * one that it refuses on neither but which our own note called fine at any
+ * shape. A floor on "the longest side" is a rule about a rectangle; theirs is
+ * a rule about a cover, which has a top and a bottom.
+ */
+export const MIN_HEIGHT = 1000;
+export const MIN_WIDTH = 625;
+
+/**
+ * The ceiling, which was not checked at all.
+ *
+ * "Your image should not exceed 10,000 pixels in height and in width." A cover
+ * exported at 12,000px from a print template is refused outright, and until now
+ * this screen told its writer everything was fine — the worst kind of miss,
+ * because the whole promise is *before you upload*.
+ */
+export const MAX_EDGE = 10_000;
+
 export const IDEAL_WIDTH = 1600;
 export const IDEAL_HEIGHT = 2560;
 
-/** Height divided by width. KDP's recommended shape for an ebook cover. */
+/**
+ * Height divided by width, and Amazon's phrasing is **"at least 1.6:1"**.
+ *
+ * That asymmetry is the whole of it and this module used to miss it, flagging
+ * squarer and taller by the same ±0.15 band as though both broke the same
+ * rule. Squarer than 1.6 is under what Amazon asks for. Taller is not — it is
+ * within the guidance, and the only cost is that a 1.6 thumbnail letterboxes
+ * it. Two different statements, and telling a writer their 1.78:1 cover is
+ * "unusual" sends them to redraw artwork that Amazon is perfectly happy with.
+ */
 export const IDEAL_RATIO = 1.6;
 
 /** KDP refuses a cover file larger than this. */
 export const MAX_BYTES = 50 * 1024 * 1024;
+
+/**
+ * The two Amazon takes, and the reason this check had to exist.
+ *
+ * "Save your cover as a TIFF or JPEG file." PNG is not on that list — and PNG
+ * is what every design tool exports by default, what most AI image tools hand
+ * back, and what this app's own drop zone briefly told writers to bring. It is
+ * the single most avoidable rejection on the list, it is knowable from the
+ * file's own type before anything is uploaded, and re-saving is thirty seconds
+ * of work rather than a redraw.
+ */
+export const COVER_TYPES = ["image/jpeg", "image/tiff"] as const;
+
+/**
+ * Above this, an edge is light enough to vanish into a shop's white page.
+ *
+ * Amazon says it in as many words: covers with "white or very light
+ * backgrounds" can "seem to disappear" against the page, and asks for a narrow
+ * 3–4px medium-grey border. Luminance 0–1, sampled around the frame.
+ */
+export const PALE_EDGE = 0.9;
+
+/**
+ * How many colour components a JPEG declares, or null if it cannot be read.
+ *
+ * **The one Amazon rule a browser hides from you.** Amazon asks for RGB "without
+ * color separation", and a CMYK JPEG — what a designer working to a print
+ * profile exports without thinking about it — is refused. The trap is that
+ * every other check on this screen passes it: a canvas decodes CMYK to RGB
+ * before anyone can look, so the pixels, the shape, the contrast and the edge
+ * all read normally and the writer is rejected with no idea which of the six
+ * green ticks was lying. It is only knowable from the file's own bytes.
+ *
+ * Three components is YCbCr, which is what an ordinary RGB JPEG is stored as.
+ * Four is CMYK or YCCK. One is greyscale, which shops do take, so it is
+ * reported and not judged here.
+ *
+ * Walks the marker chain to the frame header rather than guessing at an offset:
+ * a JPEG carries any number of EXIF, ICC and comment segments first, and their
+ * lengths are the only way past them. Returns null on anything it does not
+ * recognise — a truncated read, or simply not a JPEG — because "cannot tell" and
+ * "is wrong" must not become the same answer.
+ */
+export function jpegComponents(bytes: Uint8Array): number | null {
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) return null;
+
+  let i = 2;
+  while (i + 3 < bytes.length) {
+    if (bytes[i] !== 0xff) return null;
+    const marker = bytes[i + 1];
+
+    // Padding: any run of 0xFF before a marker is legal and carries no length.
+    if (marker === 0xff) {
+      i += 1;
+      continue;
+    }
+    // Standalone markers, which have no payload to skip.
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd9)) {
+      i += 2;
+      continue;
+    }
+
+    const length = (bytes[i + 2] << 8) | bytes[i + 3];
+    if (length < 2) return null;
+
+    /* Every SOF except the four that share the 0xC_ range without being frame
+       headers: DHT (C4), JPG (C8) and DAC (CC). The component count is the
+       ninth byte of the segment — marker, length, precision, height, width,
+       then the count. */
+    const isFrame =
+      marker >= 0xc0 &&
+      marker <= 0xcf &&
+      marker !== 0xc4 &&
+      marker !== 0xc8 &&
+      marker !== 0xcc;
+    if (isFrame) return i + 9 < bytes.length ? bytes[i + 9] : null;
+
+    // Start of scan: the frame header is always before this, so there is
+    // nothing further to find and the rest is entropy-coded data.
+    if (marker === 0xda) return null;
+
+    i += 2 + length;
+  }
+  return null;
+}
+
+/** Components that mean a JPEG is not in the RGB Amazon asks for. */
+export const CMYK_COMPONENTS = 4;
 
 export type CheckLevel = "problem" | "note";
 
@@ -49,6 +221,31 @@ export interface CoverFacts {
    * check here works without one.
    */
   contrast?: number;
+  /**
+   * The file's own MIME type, when there was a file.
+   *
+   * Optional, and the absence is load-bearing: measurements read back from
+   * storage carry no file, and the copy this app keeps has been re-encoded by
+   * `image-import.ts`, so its type is a fact about *us*. A format rule with
+   * nothing to read is left out rather than passed — see `coverReport`.
+   */
+  type?: string;
+  /**
+   * Mean luminance around the outer frame, 0–1. Near 1 is a white edge.
+   *
+   * Sampled rather than the whole image: what Amazon's border guidance is
+   * about is specifically where the cover meets the page.
+   */
+  edge?: number;
+  /**
+   * Colour components declared by a JPEG's frame header — see `jpegComponents`.
+   *
+   * Absent for anything that is not a readable JPEG, and the absence has to
+   * stay meaningful: a file whose colour mode could not be determined must be
+   * left out of the report rather than passed, because CMYK is invisible to
+   * every other check here.
+   */
+  components?: number;
 }
 
 /**
@@ -67,44 +264,132 @@ export function checkCover(facts: CoverFacts): CoverFinding[] {
 
   // ---- Things a shop refuses ----------------------------------------------
 
-  if (longEdge < MIN_LONG_EDGE) {
+  if (height < MIN_HEIGHT || width < MIN_WIDTH) {
+    /* Which edge failed, because "too small" over a 1200×500 cover sends
+       somebody to scale the whole picture up when the answer is that it is the
+       wrong shape and the height is fine. */
+    const short =
+      height < MIN_HEIGHT && width < MIN_WIDTH
+        ? `${width}×${height} is under both`
+        : height < MIN_HEIGHT
+          ? `${height}px tall is under the ${MIN_HEIGHT}px floor`
+          : `${width}px wide is under the ${MIN_WIDTH}px floor`;
     findings.push({
       id: "too-small",
       level: "problem",
       label: "Too small to upload",
-      detail: `${width}×${height}. The longest side has to be at least ${MIN_LONG_EDGE}px, and ${IDEAL_WIDTH}×${IDEAL_HEIGHT} is what shops ask for.`,
+      detail: `${short}. Amazon asks for at least ${MIN_HEIGHT}px tall and ${MIN_WIDTH}px wide, and recommends ${IDEAL_WIDTH}×${IDEAL_HEIGHT}.`,
     });
   }
 
-  if (bytes > MAX_BYTES) {
+  /* The ceiling, which nothing checked until 2026-08-11. A cover exported from
+     a print template at 12,000px is refused outright, and this screen exists to
+     catch exactly that before the upload rather than after it. */
+  if (longEdge > MAX_EDGE) {
+    findings.push({
+      id: "too-big",
+      level: "problem",
+      label: "Too large to upload",
+      detail: `${width}×${height}. Neither side may be over ${MAX_EDGE.toLocaleString()}px — this is usually a print-resolution file being sent as an ebook cover. ${IDEAL_WIDTH}×${IDEAL_HEIGHT} is what Amazon recommends.`,
+    });
+  }
+
+  /* **The commonest avoidable rejection, and the cheapest to fix.** Amazon
+     takes JPEG and TIFF. PNG is what every design tool exports by default, so
+     it arrives constantly — and thirty seconds of re-saving is the whole
+     remedy, provided somebody is told before they upload. Skipped when the
+     type is unknown: stored measurements carry no file. */
+  if (facts.type && !COVER_TYPES.includes(facts.type as never)) {
+    const named = facts.type.split("/")[1]?.toUpperCase() ?? facts.type;
+    findings.push({
+      id: "format",
+      level: "problem",
+      label: `${named} is not a format Amazon takes`,
+      detail:
+        "It takes JPEG and TIFF for an ebook cover. Re-save it as a JPEG at high quality — the picture is unchanged, and this is the one rejection on the list that costs nothing to avoid.",
+    });
+  }
+
+  /* `>=`, because Amazon's wording is "must be **less than** 50MB" — so a file
+     of exactly 50MB is refused there and used to pass here. One byte of
+     difference, and the writer it happens to has no way of knowing why. */
+  if (bytes >= MAX_BYTES) {
     findings.push({
       id: "too-heavy",
       level: "problem",
       label: "Too large a file",
-      detail: `${(bytes / 1024 / 1024).toFixed(1)}MB. The limit is 50MB — save it again at a lower JPEG quality rather than shrinking the picture.`,
+      detail: `${(bytes / 1024 / 1024).toFixed(1)}MB. It has to be under 50MB — save it again at a lower JPEG quality rather than shrinking the picture.`,
+    });
+  }
+
+  /* **CMYK, which nothing else on this screen can see.** A canvas decodes it
+     to RGB before any other check runs, so a print-profile export passes every
+     one of them and is refused by Amazon on a rule none of them tested. Read
+     off the file's own frame header. */
+  if (facts.components === CMYK_COMPONENTS) {
+    findings.push({
+      id: "cmyk",
+      level: "problem",
+      label: "Saved in CMYK, not RGB",
+      detail:
+        "Amazon asks for RGB and refuses colour-separated files. This is the print colour space, so it is usually a cover exported from a print template — open it and export again as RGB. Nothing else on this page can see the difference, which is why it is worth checking.",
     });
   }
 
   // ---- Things worth knowing ------------------------------------------------
 
+  /* **Amazon's rule is one-sided and this used to read it as two-sided.**
+     "An ideal height/width ratio of at least 1.6:1" — so squarer is under what
+     they ask for, and taller is not a breach at all. Both were flagged by one
+     symmetric ±0.15 band, which told a writer with a 1.78:1 cover that their
+     artwork was "unusual" when Amazon is content with it. They are separate
+     statements now, and only the squarer one cites the guidance. */
   if (width > 0 && height > 0) {
-    const off = Math.abs(ratio - IDEAL_RATIO);
-    if (off > 0.15) {
+    if (ratio < IDEAL_RATIO - 0.05) {
       findings.push({
         id: "shape",
         level: "note",
-        label: ratio < IDEAL_RATIO ? "Squarer than usual" : "Taller than usual",
-        detail: `This is ${ratio.toFixed(2)}:1; shops set their thumbnails at about ${IDEAL_RATIO}:1. A cover of another shape is not refused — it is letterboxed, so it appears smaller than its neighbours in a list.`,
+        label: "Squarer than Amazon asks for",
+        detail: `This is ${ratio.toFixed(2)}:1, and the guidance is at least ${IDEAL_RATIO}:1. It is not refused — it is letterboxed into a ${IDEAL_RATIO}:1 thumbnail, so it appears smaller than the covers beside it in a list.`,
+      });
+    } else if (ratio > IDEAL_RATIO + 0.15) {
+      findings.push({
+        id: "tall",
+        level: "note",
+        label: "Taller than a shop's thumbnail",
+        detail: `This is ${ratio.toFixed(2)}:1. Amazon asks for at least ${IDEAL_RATIO}:1, so this meets the guidance — but a thumbnail is set at ${IDEAL_RATIO}:1, so it will be letterboxed and read slightly narrower than its neighbours.`,
       });
     }
   }
 
-  if (longEdge >= MIN_LONG_EDGE && longEdge < IDEAL_HEIGHT) {
+  if (
+    height >= MIN_HEIGHT &&
+    width >= MIN_WIDTH &&
+    longEdge <= MAX_EDGE &&
+    longEdge < IDEAL_HEIGHT
+  ) {
     findings.push({
       id: "small-ish",
       level: "note",
       label: "Smaller than recommended",
       detail: `${width}×${height} will be accepted. ${IDEAL_WIDTH}×${IDEAL_HEIGHT} is what shops recommend, and it is what a reader on a high-resolution phone sees the difference in.`,
+    });
+  }
+
+  /* **Amazon's own border guidance, which nothing checked.** Its wording is
+     that covers with "white or very light backgrounds" can "seem to
+     disappear" against the page, and it asks for a narrow 3–4px medium-grey
+     border. That is a real and very common pain — a writer sees a clean white
+     cover in their design tool and a shapeless smudge on the shop page — and
+     unlike "is this cover any good" it is measurable. Sampled at the frame,
+     because where the cover meets the page is exactly what the rule is about. */
+  if (facts.edge !== undefined && facts.edge > PALE_EDGE) {
+    findings.push({
+      id: "pale-edge",
+      level: "note",
+      label: "Its edges are nearly white",
+      detail:
+        "Amazon says a cover with a white or very light background can seem to disappear against the shop's own white page, and asks for a narrow 3–4px border in medium grey. Deliberate on plenty of literary covers, so it is a thing to look at rather than a thing to fix.",
     });
   }
 
@@ -119,6 +404,156 @@ export function checkCover(facts: CoverFacts): CoverFinding[] {
   }
 
   return findings;
+}
+
+/** One rule, and how this file did against it. */
+export interface CoverCheck {
+  /**
+   * The *rule*, not the finding — stable whatever the answer is.
+   *
+   * `checkCover` has two ids for the pixel rule (`too-small`, `small-ish`)
+   * because each maps to its own readiness field and its own button on the
+   * dashboard. A checklist needs the opposite: one row per rule, so the list
+   * is the same four lines for every file and a reader can learn where to
+   * look. The rule that produced a finding is named in `from`.
+   */
+  id: "size" | "shape" | "format" | "colour" | "weight" | "contrast" | "edge";
+  status: CheckLevel | "pass";
+  label: string;
+  detail: string;
+  /** The `checkCover` finding this came from, absent on a pass. */
+  from?: string;
+}
+
+/**
+ * Every rule this module knows, with what this file scored against it.
+ *
+ * **The point is the passes.** `checkCover` answers "what is wrong", which is
+ * the right shape for the dashboard, where a clean file should say nothing at
+ * all. It is the wrong shape for the screen a writer opens *to check a file*:
+ * a report listing two problems tells them what is broken and never what was
+ * examined, so a file with no findings renders as a blank — indistinguishable
+ * from a check that did not run. That is the same failure the title check has
+ * a standing rule about: an empty result is not a good result unless you can
+ * see what produced it.
+ *
+ * **It is derived from `checkCover`, never written twice.** Every failing row
+ * here *is* that function's finding, looked up by id; this only adds the line
+ * for the case where there is no finding. A test asserts that every id
+ * `checkCover` can emit is claimed by a rule here, so a new check cannot be
+ * added there and silently go missing from the list a writer reads.
+ *
+ * **A rule with nothing to measure is left out rather than passed.** Weight is
+ * absent when `bytes` is 0 — which is what the stored measurements carry, since
+ * the size on disk of this app's own compressed copy is not a fact about the
+ * writer's artwork — and contrast is absent when the canvas could not be read.
+ * A green tick against a number nobody has is an invented answer, and it is the
+ * most believable kind.
+ */
+export function coverReport(facts: CoverFacts): CoverCheck[] {
+  const found = new Map(checkCover(facts).map((f) => [f.id, f]));
+  const { width, height, bytes } = facts;
+  const ratio = width > 0 ? height / width : 0;
+
+  const rule = (
+    id: CoverCheck["id"],
+    ids: readonly string[],
+    pass: { label: string; detail: string },
+  ): CoverCheck => {
+    for (const key of ids) {
+      const finding = found.get(key);
+      if (finding)
+        return {
+          id,
+          status: finding.level,
+          label: finding.label,
+          detail: finding.detail,
+          from: finding.id,
+        };
+    }
+    return { id, status: "pass", ...pass };
+  };
+
+  const checks: CoverCheck[] = [
+    /* Both pixel findings *and* the ceiling on one row: they are the one
+       question — is this the right number of pixels — asked in three
+       directions, and three separate rows for it would push the rules a writer
+       has never heard of down below the fold. */
+    rule("size", ["too-small", "too-big", "small-ish"], {
+      label: "Big enough",
+      detail: `${width}×${height}. Amazon asks for at least ${MIN_HEIGHT} × ${MIN_WIDTH}, no more than ${MAX_EDGE.toLocaleString()} on a side, and recommends ${IDEAL_WIDTH}×${IDEAL_HEIGHT}.`,
+    }),
+    rule("shape", ["shape", "tall"], {
+      label: "The shape Amazon asks for",
+      detail: `${ratio.toFixed(2)}:1, against a guideline of at least ${IDEAL_RATIO}:1 — so it fills a shop's thumbnail rather than being letterboxed into one.`,
+    }),
+  ];
+
+  /* Only when there was a file to read it off. A measurement read back from
+     storage carries no type, and the copy this app keeps has been re-encoded
+     by `image-import.ts` — so its format is a fact about us rather than about
+     the writer's artwork, and a tick against it would be a tick against the
+     wrong file. */
+  if (facts.type) {
+    checks.push(
+      rule("format", ["format"], {
+        label: "A format Amazon takes",
+        detail: `${facts.type.split("/")[1]?.toUpperCase() ?? facts.type}. Amazon takes JPEG and TIFF for an ebook cover.`,
+      }),
+    );
+  }
+
+  /* Only for a file whose colour mode could actually be read. Absent for a
+     TIFF, a PNG, or a JPEG too truncated to parse — and absent has to mean
+     absent here rather than "fine", since this is the one rule no other check
+     on the screen can stand in for. */
+  if (facts.components !== undefined) {
+    checks.push(
+      rule("colour", ["cmyk"], {
+        label: "RGB, as Amazon asks",
+        detail:
+          facts.components === 1
+            ? "Greyscale, which shops accept. Not colour-separated, which is what Amazon refuses."
+            : "Not colour-separated. A CMYK file is the print colour space and is refused, and nothing else on this page could tell you.",
+      }),
+    );
+  }
+
+  if (bytes > 0) {
+    checks.push(
+      rule("weight", ["too-heavy"], {
+        label: "Under the size limit",
+        detail: `${(bytes / 1024 / 1024).toFixed(1)}MB. It has to be under ${MAX_BYTES / 1024 / 1024}MB.`,
+      }),
+    );
+  }
+
+  if (facts.contrast !== undefined) {
+    checks.push(
+      rule("contrast", ["flat"], {
+        label: "Enough contrast",
+        /* **Three decimals, because two land on the threshold.** `FLAT` is
+           0.08, and a cover measuring 0.084 printed as "0.08" against "under
+           0.08 is where a cover disappears" — the same number twice, in a
+           sentence saying one is safely above the other. Observed on a real
+           file. A measurement shown beside its own limit needs enough
+           resolution to sit visibly on one side of it. */
+        detail: `Measured at ${facts.contrast.toFixed(3)}; under ${FLAT} is where a cover starts to disappear against a white shop page.`,
+      }),
+    );
+  }
+
+  if (facts.edge !== undefined) {
+    checks.push(
+      rule("edge", ["pale-edge"], {
+        label: "It has an edge against a white page",
+        detail:
+          "Amazon asks for a narrow border on covers with white or very light backgrounds, so they do not seem to disappear against the shop's own page. This one has edges dark enough to stand on their own.",
+      }),
+    );
+  }
+
+  return checks;
 }
 
 /**
@@ -141,6 +576,57 @@ export function contrastOf(pixels: Uint8ClampedArray, step = 4 * 37): number {
   const deviation =
     values.reduce((sum, v) => sum + Math.abs(v - mean), 0) / values.length;
   return Math.round(deviation * 1000) / 1000;
+}
+
+/**
+ * Mean luminance around the outer frame, 0–1. Near 1 is a white edge.
+ *
+ * **The frame rather than the whole picture, because that is what the rule is
+ * about.** Amazon's guidance is that a cover with a white or very light
+ * background "seems to disappear" against the shop's own white page, and asks
+ * for a narrow 3–4px border in medium grey. What decides that is where the
+ * cover *meets* the page — a bright sky in the middle of an otherwise dark
+ * jacket is nobody's problem, and a mean over the whole image would call it
+ * one.
+ *
+ * One ring of pixels is enough and two is steadier: a single row picks up a
+ * stray light line from a JPEG's own edge artefacts. Takes raw RGBA and the
+ * canvas dimensions, so the caller owns the canvas and this stays pure.
+ */
+export function edgeLightness(
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  ring = 2,
+): number {
+  if (width <= 0 || height <= 0 || pixels.length < 4) return 0;
+
+  let total = 0;
+  let count = 0;
+  const at = (x: number, y: number) => {
+    const i = (y * width + x) * 4;
+    if (i < 0 || i + 2 >= pixels.length) return;
+    total +=
+      (0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2]) / 255;
+    count += 1;
+  };
+
+  const band = Math.min(ring, Math.floor(Math.min(width, height) / 2) || 1);
+  for (let r = 0; r < band; r += 1) {
+    for (let x = 0; x < width; x += 1) {
+      at(x, r);
+      at(x, height - 1 - r);
+    }
+    /* The corners are already counted by the rows above, so the columns skip
+       the band at each end — otherwise four pixels of a mostly-dark cover's
+       lightest corner count twice each. */
+    for (let y = band; y < height - band; y += 1) {
+      at(r, y);
+      at(width - 1 - r, y);
+    }
+  }
+
+  return count === 0 ? 0 : Math.round((total / count) * 1000) / 1000;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -210,7 +696,11 @@ export function reshape(
   return {
     ...out,
     changed: Math.abs(changed),
-    tooSmall: Math.max(out.width, out.height) < MIN_LONG_EDGE,
+    /* Against both floors, like the check itself. Cropping trims one edge, so
+       the edge it trims is exactly the one that can fall under — testing only
+       the longest side missed a crop that took the width under 625 while
+       leaving a tall enough picture. */
+    tooSmall: out.height < MIN_HEIGHT || out.width < MIN_WIDTH,
   };
 }
 

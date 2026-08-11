@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { checkCover } from "@/lib/cover-check";
 import type { Book } from "@/lib/library-store";
 import {
   BLURB_MAX,
@@ -146,7 +147,11 @@ describe("storeReadiness", () => {
     // `createBook` and five other sites in library-store.ts write it that way,
     // while `sync.ts` falls back to the lowercase spelling. This check was
     // written against the lowercase one and so never fired on a real book.
-    for (const title of ["Untitled Book", "untitled book", "  Untitled Book "]) {
+    for (const title of [
+      "Untitled Book",
+      "untitled book",
+      "  Untitled Book ",
+    ]) {
       expect(fields({ ...READY, book: makeBook({ title }) })).toContain(
         "blocking:title",
       );
@@ -235,10 +240,17 @@ describe("cover findings on the readiness list", () => {
 
   // Sending only the detail produced "This is 0.56:1; shops set…" — a sentence
   // with no subject, in a column where every neighbour names its problem first.
+  //
+  // Asserted against `checkCover`'s own label rather than a copy of the words,
+  // so rewording a finding does not fail a test about *sentence shape*. This
+  // one did exactly that when the shape label was corrected to say what Amazon
+  // actually asks for.
   it("opens with the label, like every other line", () => {
     const issues = storeReadiness({ ...READY, coverFacts: facts });
     const shape = issues.find((i) => i.field === "cover-shape");
-    expect(shape?.message.startsWith("Squarer than usual.")).toBe(true);
+    const finding = checkCover(facts).find((f) => f.id === "shape")!;
+    expect(shape?.message.startsWith(`${finding.label}.`)).toBe(true);
+    expect(shape?.message).toContain(finding.detail);
   });
 
   it("says nothing about the cover file when it has not been measured", () => {

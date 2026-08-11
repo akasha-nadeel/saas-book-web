@@ -13,7 +13,7 @@ import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
 import { SEATS_PER_BOOK } from "@/lib/free-limits";
-import { MIN_LONG_EDGE } from "@/lib/cover-check";
+import { MIN_HEIGHT, MIN_WIDTH } from "@/lib/cover-check";
 import { CONTACT_EMAIL, REFUND_DAYS, REPLY_DAYS } from "@/lib/legal";
 
 /**
@@ -507,8 +507,8 @@ const REJECTIONS = [
   [
     "shelf",
     "The cover is the wrong size",
-    "The commonest refusal there is. A shop wants at least 1,000px on the long edge and about 1.6:1; anything else is bounced or letterboxed into looking cheap beside its neighbours.",
-    `Measured from the file you picked — not the copy we resized — against ${MIN_LONG_EDGE}px and the shape shops set their thumbnails at.`,
+    "The commonest refusal there is. Amazon wants at least 1,000px tall and 625 wide, no more than 10,000 on a side, at least 1.6:1, and a JPEG or TIFF; anything else is bounced or letterboxed into looking cheap beside its neighbours.",
+    `Measured from the file you picked — not the copy we resized — against Amazon's own published figures: ${MIN_HEIGHT} × ${MIN_WIDTH}, the shape its thumbnails are set at, and the formats it accepts.`,
   ],
   [
     "search",
@@ -719,7 +719,7 @@ export function LandingPage() {
                 column of cards — and `overflow-hidden` on the section means it
                 would not even scroll into view, it would simply be gone. */}
             <div className="lg:max-w-[32rem] xl:max-w-[38rem]">
-            {/* Two-tone, the way both references split a headline. There is no
+              {/* Two-tone, the way both references split a headline. There is no
                 accent hue in this product to split on, so the two lines split
                 on weight of ink: the quiet half sets up the loud one.
 
@@ -729,7 +729,7 @@ export function LandingPage() {
                 all made again below, where they land against something. The
                 first thing on the page should be the sentence the page is
                 about. */}
-            {/* An instruction, then what it saves — which is the shape that
+              {/* An instruction, then what it saves — which is the shape that
                 works on somebody who arrived with a finished book and a
                 problem, because they know what they would get by the fourth
                 word.
@@ -767,7 +767,7 @@ export function LandingPage() {
                 the same two-volume sentence is drawn with the volumes the
                 other way round. Both values live on `lp-accent-soft`; see the
                 note there. */}
-            {/* **Three lines, and the breaks are written rather than left to
+              {/* **Three lines, and the breaks are written rather than left to
                 the box.** The headline shares its screen with the wall now, so
                 it has roughly half the width it used to and wraps where the
                 measure happens to run out — which landed the fold mid-phrase
@@ -789,16 +789,16 @@ export function LandingPage() {
                 fit the measure. That one ends the quiet half on a whole
                 preposition, and it lets the loud half open on "you" — the only
                 word in the sentence that is about the reader. */}
-            <h1 className="oc-display font-serif text-[2rem] leading-[1.1] font-semibold sm:text-[2.75rem] sm:leading-[1.05] lg:text-[3rem] xl:text-[3.5rem]">
-              <span className="block text-lp-accent-soft">
-                Nobody sees your book
-                <br />
-                in the shop until
-              </span>
-              <span className="block" style={{ color: INK_TEXT }}>
-                you upload it right.
-              </span>
-              {/* **The reassurance, marked.** The three lines above are the
+              <h1 className="oc-display font-serif text-[2rem] leading-[1.1] font-semibold sm:text-[2.75rem] sm:leading-[1.05] lg:text-[3rem] xl:text-[3.5rem]">
+                <span className="block text-lp-accent-soft">
+                  Nobody sees your book
+                  <br />
+                  in the shop until
+                </span>
+                <span className="block" style={{ color: INK_TEXT }}>
+                  you upload it right.
+                </span>
+                {/* **The reassurance, marked.** The three lines above are the
                   problem, and a hero that stops there has told a writer they
                   are in trouble and left. This line is the answer, and it is
                   the one thing on the page wearing the highlighter — see the
@@ -823,18 +823,18 @@ export function LandingPage() {
                   that wraps otherwise gets its band only on the first and last
                   line. `w-fit` keeps the pen to the words rather than letting
                   it run the width of the block. */}
-              <span
-                style={{
-                  backgroundColor: "var(--color-lp-marker)",
-                  color: "var(--color-lp-marker-ink)",
-                }}
-                className="mt-3 box-decoration-clone inline-block w-fit rounded-md px-2.5 py-0.5"
-              >
-                We help you do it.
-              </span>
-            </h1>
+                <span
+                  style={{
+                    backgroundColor: "var(--color-lp-marker)",
+                    color: "var(--color-lp-marker-ink)",
+                  }}
+                  className="mt-3 box-decoration-clone inline-block w-fit rounded-md px-2.5 py-0.5"
+                >
+                  We help you do it.
+                </span>
+              </h1>
 
-            {/* The three commonest refusals, then the sting. Concrete beats
+              {/* The three commonest refusals, then the sting. Concrete beats
                 abstract here — a reader who has had that email recognises their
                 own one in the list — and every item is a check the app really
                 performs, so the deck is as checkable as the headline above it.
@@ -845,7 +845,7 @@ export function LandingPage() {
                 the qualifying ones ("eleven characters", "with a bad check
                 digit") — precision the reader does not need to feel the point,
                 and which is made properly further down where there is room. */}
-            {/* **It answers the question the headline provokes**, which the
+              {/* **It answers the question the headline provokes**, which the
                 deck before it did not: "upload it right" is only a warning
                 until somebody says what *right* means. Five nouns say it, and
                 the second sentence gives the consequence in the reader's own
@@ -858,7 +858,7 @@ export function LandingPage() {
                 than as the second half of the sentence. `lp-soft` and medium
                 weight; still a step under the ink of the headline itself, or
                 the two compete. */}
-            {/* **It answers the question the headline provokes** — "upload it
+              {/* **It answers the question the headline provokes** — "upload it
                 right" is only a warning until somebody says what *right*
                 means. Five nouns say it, and the second sentence gives the
                 consequence in the reader's own terms, filed where nobody
@@ -868,19 +868,19 @@ export function LandingPage() {
                 The promise that used to end this line has moved up into the
                 headline, where it is marked. Two highlighted phrases on one
                 screen and neither is highlighted. */}
-            <p className="oc-lead mt-6 max-w-xl font-serif text-xl leading-relaxed font-medium text-lp-soft sm:mt-7 sm:text-[1.375rem]">
-              Cover, ISBN, blurb, categories, keywords. Get one wrong and the
-              shop files your book where nobody looks.
-            </p>
+              <p className="oc-lead mt-6 max-w-xl font-serif text-xl leading-relaxed font-medium text-lp-soft sm:mt-7 sm:text-[1.375rem]">
+                Cover, ISBN, blurb, categories, keywords. Get one wrong and the
+                shop files your book where nobody looks.
+              </p>
 
-            {/* Smaller and quieter than they were, because they are no longer
+              {/* Smaller and quieter than they were, because they are no longer
                 the only way forward on this screen: the check below is, and
                 two full-sized pills directly above a drop zone made three
                 primary actions competing inside one viewport. A reader who
                 arrived ready to sign up still finds them first; a reader who
                 arrived sceptical — which the research says is most of them —
                 gets to test the claim before being asked for anything. */}
-            {/* On a phone they stack and go full width, capped at `max-w-xs`
+              {/* On a phone they stack and go full width, capped at `max-w-xs`
                 so they do not run the whole way across a tablet held upright.
                 Two pills of *different* widths centred one above the other is
                 the commonest tell of a desktop layout that was never looked at
@@ -888,25 +888,25 @@ export function LandingPage() {
                 before it reads either label. `items-stretch` is what does it:
                 the Google control renders its own `<form>`, so the button
                 inside can only fill the width the form is given. */}
-            <div className="mt-8 flex w-full max-w-xs flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:items-center sm:justify-start">
-              <Link
-                href="/signup"
-                style={{ backgroundColor: INK }}
-                className="w-full rounded-full px-6 py-3 text-center text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90 sm:w-auto"
-              >
-                Start free
-              </Link>
-              {/* `GoogleButton` renders its own form; `next` is where the
+              <div className="mt-8 flex w-full max-w-xs flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:items-center sm:justify-start">
+                <Link
+                  href="/signup"
+                  style={{ backgroundColor: INK }}
+                  className="w-full rounded-full px-6 py-3 text-center text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90 sm:w-auto"
+                >
+                  Start free
+                </Link>
+                {/* `GoogleButton` renders its own form; `next` is where the
                   writer lands once Supabase is done, which for a new signup is
                   the shelf at `/`. inline-flex, or its mark and label stack
                   into two rows and it stands taller than the pill beside it. */}
-              <GoogleButton
-                action={signInWithGoogle}
-                next="/"
-                label="Continue with Google"
-                className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge bg-lp-ground px-6 py-3 text-[0.9375rem] font-semibold text-lp-ink hover:border-lp-edge-strong sm:w-auto"
-              />
-            </div>
+                <GoogleButton
+                  action={signInWithGoogle}
+                  next="/"
+                  label="Continue with Google"
+                  className="inline-flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge bg-lp-ground px-6 py-3 text-[0.9375rem] font-semibold text-lp-ink hover:border-lp-edge-strong sm:w-auto"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -1095,7 +1095,11 @@ export function LandingPage() {
             drift and cannot flatter. */}
         <section className="border-b border-lp-line px-6 py-10 sm:py-14">
           <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 text-center md:grid-cols-4">
-            <Counted icon="steps" n={String(STEPS.length)} label="steps, in order" />
+            <Counted
+              icon="steps"
+              n={String(STEPS.length)}
+              label="steps, in order"
+            />
             <Counted
               icon="tools"
               n={String(ALL_TOOLS.length)}
@@ -1110,7 +1114,10 @@ export function LandingPage() {
         </section>
 
         {/* ---- Three up, one lit ---------------------------------------- */}
-        <section id="does" className="border-b border-lp-line px-6 py-14 sm:py-20">
+        <section
+          id="does"
+          className="border-b border-lp-line px-6 py-14 sm:py-20"
+        >
           <div className="mx-auto max-w-6xl">
             <Head
               eyebrow="What it does"
@@ -1236,7 +1243,7 @@ export function LandingPage() {
               lead="A shop refusing your upload is a slow, silent thing. The check names what would actually stop it — and separates that from what merely costs you readers."
             />
 
-          {/* The figure, centred, and deliberately smaller than the panel it
+            {/* The figure, centred, and deliberately smaller than the panel it
               sits on: about three fifths of it, so there is a full hand's
               width of black down either side. A screen that fills its stage is
               a section with a picture in it; one with room around it is a
@@ -1256,7 +1263,7 @@ export function LandingPage() {
               </WideFigure>
             </div>
 
-          {/* **The four headings are the list; the notes are the footnotes.**
+            {/* **The four headings are the list; the notes are the footnotes.**
               Set a step apart on the page's own scale — 24px serif against 14px
               sans — they can be read on their own, in order, without a word of
               the small text, which is how a reader who has just watched the
@@ -1363,7 +1370,9 @@ export function LandingPage() {
           <ul className="mt-6 flex flex-col gap-3">
             {TRACK.slice(0, 4).map(([name, note]) => (
               <li key={name}>
-                <p className="oc-heading font-serif text-lg text-lp-ink">{name}</p>
+                <p className="oc-heading font-serif text-lg text-lp-ink">
+                  {name}
+                </p>
                 <p className="text-sm leading-relaxed">{note}</p>
               </li>
             ))}
@@ -1376,7 +1385,10 @@ export function LandingPage() {
             a tool that does not exist or miss one that does. Cards of two
             sizes, the way the reference mixes them, with the group that answers
             the most expensive question given the wide cell. */}
-        <section id="tools" className="border-b border-lp-line px-6 py-14 sm:py-20">
+        <section
+          id="tools"
+          className="border-b border-lp-line px-6 py-14 sm:py-20"
+        >
           <div className="mx-auto max-w-6xl">
             <Head
               eyebrow="All of it included"
@@ -1391,7 +1403,9 @@ export function LandingPage() {
                   // "the parts a shop sees" is the question this audience
                   // arrives with, so it is the one that should be read first.
                   className={`rounded-2xl border p-6 ${
-                    i === 0 ? "text-lp-accent-pale md:col-span-2" : "border-lp-edge"
+                    i === 0
+                      ? "text-lp-accent-pale md:col-span-2"
+                      : "border-lp-edge"
                   }`}
                   style={
                     i === 0
@@ -1647,11 +1661,10 @@ export function LandingPage() {
                     <strong className="text-lp-ink">
                       Nothing here will make you finish it.
                     </strong>{" "}
-                    Nothing can. What you can stop doing is writing into a
-                    void: put one person on the book — a co-writer, an editor,
-                    whoever keeps asking how it is going — and they can read
-                    what you wrote this week, or write the next chapter
-                    themselves.
+                    Nothing can. What you can stop doing is writing into a void:
+                    put one person on the book — a co-writer, an editor, whoever
+                    keeps asking how it is going — and they can read what you
+                    wrote this week, or write the next chapter themselves.
                   </p>
 
                   <p className="mt-4 max-w-md text-[0.9375rem] leading-relaxed text-lp-faint">
@@ -1833,7 +1846,6 @@ export function LandingPage() {
           </div>
         </section>
 
-
         {/* ---- FAQ ------------------------------------------------------
 
             **Two columns: the invitation on the left, the questions on the
@@ -1874,7 +1886,11 @@ export function LandingPage() {
 
             <div className="flex flex-col lg:pt-2">
               {FAQ.map(([q, a], i) => (
-                <details key={q} open={i === 0} className="group border-b border-lp-edge">
+                <details
+                  key={q}
+                  open={i === 0}
+                  className="group border-b border-lp-edge"
+                >
                   {/* `list-none` and the WebKit rule together: Safari draws its
                       triangle through a pseudo-element the standard property
                       does not reach, so one without the other leaves a marker
@@ -1982,7 +1998,10 @@ export function LandingPage() {
               </p>
               <ul className="mt-5 grid gap-4 sm:grid-cols-3">
                 {[
-                  ["No card to start", "The free plan needs no payment details at all, and writing, importing and all four exports stay on it."],
+                  [
+                    "No card to start",
+                    "The free plan needs no payment details at all, and writing, importing and all four exports stay on it.",
+                  ],
                   [
                     `${REFUND_DAYS} days to change your mind`,
                     "Ask within the first week of a first payment and you get it back, no reason needed. Cancel any time and the plan runs to the end of what you paid for.",
@@ -1996,7 +2015,9 @@ export function LandingPage() {
                     <span className="font-code text-[0.6875rem] font-semibold tracking-[0.14em] text-lp-faint uppercase">
                       {label}
                     </span>
-                    <p className="mt-2 text-[0.875rem] leading-relaxed">{note}</p>
+                    <p className="mt-2 text-[0.875rem] leading-relaxed">
+                      {note}
+                    </p>
                   </li>
                 ))}
               </ul>
@@ -2339,8 +2360,15 @@ function Phase({
       className="rounded-2xl border p-7"
       style={
         lit
-          ? { borderColor: INK, backgroundColor: INK, color: "var(--color-lp-accent-pale)" }
-          : { borderColor: "var(--color-lp-edge)", backgroundColor: "var(--color-lp-ground)" }
+          ? {
+              borderColor: INK,
+              backgroundColor: INK,
+              color: "var(--color-lp-accent-pale)",
+            }
+          : {
+              borderColor: "var(--color-lp-edge)",
+              backgroundColor: "var(--color-lp-ground)",
+            }
       }
     >
       {/* The lit card is the brand indigo rather than black: it is the phase
@@ -2468,7 +2496,10 @@ function MoneyFigure() {
           <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
             Spent
           </p>
-          <p className="oc-heading mt-2 font-serif text-2xl" style={{ color: STOP }}>
+          <p
+            className="oc-heading mt-2 font-serif text-2xl"
+            style={{ color: STOP }}
+          >
             £1,240
           </p>
           <p className="mt-1 text-xs">Cover · editing · ads · proofs</p>
@@ -2477,7 +2508,10 @@ function MoneyFigure() {
           <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
             Earned
           </p>
-          <p className="oc-heading mt-2 font-serif text-2xl" style={{ color: PASS }}>
+          <p
+            className="oc-heading mt-2 font-serif text-2xl"
+            style={{ color: PASS }}
+          >
             £410
           </p>
           <p className="mt-1 text-xs">From your own sales report</p>

@@ -1389,6 +1389,44 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **"On this book" — the categories half of the categories screen,** taken off
+  on **2026-08-11** at the owner's request, who is writing another version of
+  it. **This is a rebuild waiting to happen, not a cut**: raise it if the
+  categories screen comes up and nothing has replaced it yet.
+
+  What went: the heading, the three-shop "Every shop asks" chip, the *n* chosen
+  count, the token field holding the chosen categories, the quick-add row off
+  `COMMON_SUBJECTS`, and the two footnotes at the foot of the page (the
+  librarian-subjects caveat and the note about Amazon's keyword-gated
+  subcategories). The seven keyword boxes and the workshop beside them are
+  untouched and are now the whole of that screen.
+
+  What was kept, and must not be tidied away:
+  **`src/components/categories/subject-combobox.tsx`** — the picker itself,
+  moved out whole and exported with nothing calling it. It is the expensive
+  part of any replacement: the debounce with last-reply-wins, the local
+  `COMMON_SUBJECTS` index answering the first keystroke that the live one
+  cannot, the merge that stops rows reshuffling under the reader, and the
+  keyboard handling. Same standing as `templates-dialog.tsx` and `ambience.ts`
+  below.
+
+  What still works without it: `book.publishing.subjects` is read on that
+  screen (the keyword checker needs it — a keyword repeating a category is a
+  box spent on nothing) and the draft still carries a `chosen` field through
+  the save bar, so the new section has a store, a save and a checker waiting
+  for it. The export, the EPUB and `checkup()` all read the field as before.
+
+  **The gap, and it is the reason to finish the rebuild rather than leave it:**
+  categories can only be set from the *listing* screen now, which is a
+  comma-separated box in `ListingDetails` with no suggestions behind it — while
+  two places still send a writer to `/book/<id>/categories` to set them. The
+  roadmap's "Choose categories" step (`roadmap.ts`) and the dashboard finding
+  for `subjects` (`DESTINATIONS` in `checkup.ts`) both land there, and neither
+  now offers the control it promised. That is the dead-end shape those
+  destinations exist to prevent. Both were left pointing where they point
+  because the section is coming back; if it does not, repoint them at
+  `listing`.
+
 - **The light/dark theme,** removed 2026-08-01 at the owner's request. It is one
   commit in the history if it is ever wanted back — search for the one that
   removes `ThemeSync`.

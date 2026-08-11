@@ -436,7 +436,12 @@ counting what it fetched reads as counting the world. It is an estimate, wobbles
 between identical requests, and so is shown as an approximation and never used
 in arithmetic.
 
-**A fourth route feeds the category box as it is typed into.**
+**A fourth route feeds the category box as it is typed into** — and **nothing
+calls it at the moment**, because that box came off the categories screen on
+2026-08-11 to be rebuilt. The picker it feeds is kept whole and callerless in
+`categories/subject-combobox.tsx`, the same standing `templates-dialog.tsx`
+has; the route is what it will reach for. Do not tidy either away, and see
+TODO.md under "Taken out on purpose" for what went and what is owed.
 `/api/comps/subjects` (GET, **free and keyless**, like `/api/comps` and for the
 same reasons — it is a lookup rather than a judgement) queries Open Library's
 subject index so the suggestions are real shelves with real sizes. It is not a
@@ -1049,8 +1054,8 @@ enough for `sync.ts`), the **original artwork** to IndexedDB via
 writer picked rather than from what survived the resize).
 
 This exists because the app was **checking a standard and then breaking it
-itself**: the check told a writer their cover had to be 1000px on the long edge
-and ideally 1600×2560, `image-import.ts` stored it at 700px as WebP, and the
+itself**: the check told a writer their cover had to be 1000px tall and 625
+wide and ideally 1600×2560, `image-import.ts` stored it at 700px as WebP, and the
 export packaged that — so perfect artwork shipped as a 495×700 picture with
 nothing on any screen saying so. `runExport` now reads `getPrintCover` first
 and falls back to `getCover`.

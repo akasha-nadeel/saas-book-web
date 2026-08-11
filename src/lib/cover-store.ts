@@ -3,7 +3,7 @@
  *
  * **This exists because the app was checking a standard and then breaking it
  * itself.** `cover-check.ts` tells a writer their cover has to be at least
- * 1000px on the long edge and that 1600×2560 is what the shops ask for.
+ * 1000px tall and 625 wide and that 1600×2560 is what the shops recommend.
  * `image-import.ts` then stored every cover at 700px — right for the shelf,
  * where a cover is rendered about 150px wide and every book in the library
  * shares one 5MB origin budget — and the EPUB packaged *that*. So a writer
@@ -137,9 +137,7 @@ export async function putPrintCover(
 export async function getPrintCover(
   bookId: string,
 ): Promise<PrintCover | null> {
-  const found = await run<PrintCover>("readonly", (store) =>
-    store.get(bookId),
-  );
+  const found = await run<PrintCover>("readonly", (store) => store.get(bookId));
   // Written by us, but read back a version later out of a store no compiler
   // has checked — the same narrowing `sync.ts` does on the way out of Postgres.
   if (
