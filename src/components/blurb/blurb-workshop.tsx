@@ -14,6 +14,7 @@ import {
 } from "@/components/upgrade/free-limit";
 import { STARTERS, type WorkshopMessage } from "@/lib/blurb-workshop";
 import { spendTotalUse } from "@/lib/library-store";
+import { useChatScroll } from "@/lib/use-chat-scroll";
 import { usePrefs } from "@/lib/use-library";
 
 /**
@@ -83,7 +84,7 @@ export function BlurbWorkshop({
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useChatScroll();
 
   const account = useAccount();
   /* "You" rather than a name nobody has set. `displayName` falls back to the
@@ -96,10 +97,6 @@ export function BlurbWorkshop({
     action: "blurbChat",
     used: prefs.usedTotal.blurbChat ?? 0,
   });
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [turns, busy]);
 
   // Abandon an in-flight reply if the screen goes.
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -205,7 +202,10 @@ export function BlurbWorkshop({
 
       {/* The scroll area. `min-h-0` on both this and the section, or a flex
           child with overflow grows the column instead of scrolling in it. */}
-      <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div
+        ref={listRef}
+        className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-4"
+      >
         {turns.length === 0 ? (
           <div>
             <p className="max-w-prose text-sm leading-relaxed text-muted">
@@ -323,8 +323,6 @@ export function BlurbWorkshop({
             {error}
           </p>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
       <div className="border-t border-line px-5 py-3">

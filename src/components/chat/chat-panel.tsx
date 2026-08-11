@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useChatScroll } from "@/lib/use-chat-scroll";
 
 /**
  * The assistant panel.
@@ -35,11 +36,7 @@ export function ChatPanel({
   const [error, setError] = useState<string | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
+  const listRef = useChatScroll();
 
   // Abandon an in-flight reply if the panel closes.
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -99,7 +96,7 @@ export function ChatPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="scroll-slim flex-1 overflow-y-auto px-3 py-4">
+      <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-3 py-4">
         {messages.length === 0 ? (
           <div className="px-1">
             <p className="font-sans text-sm text-muted">
@@ -148,8 +145,6 @@ export function ChatPanel({
             {error}
           </p>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
       <form
