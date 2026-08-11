@@ -425,13 +425,12 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           tool="Comp titles"
           title="What books is yours like?"
           width="7xl"
-          /* Two sentences, run across the page. It was five lines in a narrow
-             column beside an empty half-header — the shape a deck takes when
-             it is written long and then capped. Shortened first: the aside
-             about reaching for a bestseller was the best-written part of it
-             and the least useful, since the two shelves below make the same
-             point by showing it. */
-          deckWidth="full"
+          /* Two sentences, which is what a deck running the header's full
+             width has to be. It was five lines in a narrow column beside an
+             empty half-header — the shape a deck takes when it is written
+             long. Shortened first: the aside about reaching for a bestseller
+             was the best-written part of it and the least useful, since the
+             two shelves below make the same point by showing it. */
           action={<ToolStepDone state={save} />}
         >
           {/* **The problem before the definition.** This used to open on what

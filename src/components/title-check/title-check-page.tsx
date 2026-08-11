@@ -250,11 +250,10 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
           tool="Title check"
           title="Is this title taken?"
           width="7xl"
-          /* Across the page, and shortened to earn it — the same trade the
-             comps deck makes. "Strictly" and the aside about trademarks were
-             three lines in a narrow column beside an empty half-header; the
-             point survives in one. */
-          deckWidth="full"
+          /* Shortened to suit a deck that runs the header's full width — the
+             same trade the comps deck makes. "Strictly" and the aside about
+             trademarks were three lines in a narrow column beside an empty
+             half-header; the point survives in one. */
           action={<ToolStepDone state={save} />}
         >
           No title is taken — titles cannot be copyrighted. The useful question

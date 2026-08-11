@@ -289,19 +289,11 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
              band of empty desk down both sides of a screen whose widest block
              is a row of seven full-width keyword fields, and `ToolHeader`'s
              own note is explicit that the two must agree or the left edges
-             disagree. The deck stays capped at 2xl inside it, so widening the
-             page never widens a line of prose. */
-          /* **The one exception to that, taken here as comps takes it.** Capped
-             at 2xl the deck broke into four short lines under a heading running
-             the full width, which reads as a column of text that lost its
-             column. Widened, it is two lines across the header.
+             disagree.
 
-             `ToolHeader`'s own note is the warning that comes with this: widen
-             the deck and shorten the words in the same change, or the cap comes
-             straight back as a hundred-and-sixty-character line. So it did —
-             three sentences to two, with the clause that cannot be dropped
-             still on the end. */
-          deckWidth="full"
+             The deck was cut from three sentences to two to suit a header
+             whose deck runs that full width — the clause that cannot be
+             dropped is still on the end. */
         >
           {/* **The problem before the method.** The old deck opened on "which
               shelf your book lands on", which describes the output; a writer

@@ -88,20 +88,19 @@ export function ToolHeader({
    * **One measure for every tool, so the margins do not jump between them.**
    * It was `5xl` with three screens opting wider, which meant walking from the
    * blurb to the comps moved both edges of the page. The widest of them is now
-   * the default and the opt-outs are gone: the deck is capped separately and
-   * every page caps its own prose, so a wider container never widens a line of
-   * text — it only stops wasting the sides of an ordinary laptop.
+   * the default and the opt-outs are gone. Every page caps its own prose, so a
+   * wider container never widens a line of body text — it only stops wasting
+   * the sides of an ordinary laptop. The deck is the one thing here that does
+   * run the whole width, and it is held short enough to take it.
    *
    * **The default is a page width, not a reading measure.** It was `3xl` — 768
    * pixels — which is right for a column of prose and wrong for what these
    * screens actually hold: forms, stat rows, card grids and drawn figures. On
    * an ordinary laptop that left a third of the window empty down each side
-   * while the content crowded itself in the middle. The deck below is capped
-   * separately at `2xl`, so widening the page does not stretch the one thing
-   * here that *is* prose.
+   * while the content crowded itself in the middle. Every page still caps its
+   * own prose, so a wider container never widens a line of body text.
    */
   width = "7xl",
-  deckWidth = "measure",
   /**
    * The tool's Save control, drawn at the top right.
    *
@@ -119,12 +118,6 @@ export function ToolHeader({
   tool: string;
   title?: string;
   width?: keyof typeof WIDTHS;
-  /**
-   * How wide the deck runs. `measure` (the default) caps it at a readable
-   * eighty characters; `full` lets it run the page's own width, which is only
-   * right for a deck of a line or two — see the note beside it below.
-   */
-  deckWidth?: "measure" | "full";
   action?: React.ReactNode;
   children?: React.ReactNode;
 }) {
@@ -254,12 +247,19 @@ export function ToolHeader({
                 {title ?? tool}
               </h1>
 
-              {/* Capped at a readable measure. Running the full width of a 5xl
-                page gave a line nobody wants to read twice, and it was most of
-                why this header looked loose. At `text-base` that cap is about
-                eighty characters, which is shorter than it was at `text-sm` —
-                bigger type in the same column is fewer words per line, not
-                more.
+              {/* **It runs the header's own width, on every tool.** The cap was
+                `2xl` with a `deckWidth` prop to escape it, and five of the
+                sixteen screens had already taken the escape — at which point
+                the default was the exception, and walking between two tools
+                changed where the sentence under the heading stopped. A deck
+                stacked into a narrow column beside an acre of empty header
+                reads as a page that failed to fill itself.
+
+                **The obligation moved to the words.** A cap forgives a long
+                deck by wrapping it; the full width does not, so a deck is now
+                held to a sentence or two. Anything longer belongs on the page
+                below, where a tool's own prose caps itself at `max-w-prose`
+                and is read rather than glanced at.
 
                 **Not `text-muted`**, which is the grey this app spends on
                 metadata: a chapter count, a date, a figure's provenance. This
@@ -267,21 +267,9 @@ export function ToolHeader({
                 of these screens it is the only explanation of what the tool is
                 for. So it takes the page's own ink held slightly back, the
                 same treatment the pricing page's deck already uses, with the
-                weight lifted to match.
-
-                **`deckWidth` is the escape hatch, and the cap is still the
-                default.** A deck of two short sentences reads better across
-                the page than stacked into a narrow column beside an acre of
-                empty header — but that is only true once it is short. Widen
-                this on a screen and shorten the words in the same commit, or
-                the cap comes back as a line of a hundred and sixty
-                characters. */}
+                weight lifted to match. */}
               {children && (
-                <p
-                  className={`mt-2 text-base leading-relaxed font-medium text-fg/75 ${
-                    deckWidth === "full" ? "" : "max-w-2xl"
-                  }`}
-                >
+                <p className="mt-2 text-base leading-relaxed font-medium text-fg/75">
                   {children}
                 </p>
               )}

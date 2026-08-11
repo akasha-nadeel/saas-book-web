@@ -214,13 +214,11 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
           book={book}
           tool="Blurb"
           title="What goes on the back cover?"
-          /* The deck runs the page's width here rather than taking the default
-             cap. Held at `2xl` it stacked into four short lines beside an acre
-             of empty header, which on a screen whose whole content is one wide
-             row read as a column that had failed to fill. Three sentences
-             across the page is two lines. The rule the cap exists for still
-             applies: lengthen this deck and the cap has to come back. */
-          deckWidth="full"
+          /* Three sentences, which is two lines across the header's own width.
+             Stacked into a narrow column it was four short lines beside an
+             acre of empty header, and on a screen whose whole content is one
+             wide row that read as a column which had failed to fill. Keep it
+             to this length: nothing wraps a deck that runs the page. */
         >
           {/* **The problem before the definition**, and the refusal before the
               feature. Every shop makes a writer supply this before it will

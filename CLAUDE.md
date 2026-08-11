@@ -263,15 +263,16 @@ to the comps moved both edges of the page; one measure is what keeps the
 margins still. It is a page width rather than a reading measure — these screens
 hold forms, stat rows and card grids — and where a screen really is a column of
 prose the *content* caps itself inside the shared container, as the listing
-form does at `3xl`. The header's
-deck is capped separately at `2xl`, and the tool pages cap their own prose at
-`max-w-prose`, so widening the page never widens a line of text. **`deckWidth`
-is the one way out of that cap** and comps is the one screen that takes it: a
-deck of two short sentences reads better across the page than stacked in a
-narrow column beside an empty half-header. Widen it and shorten the words in
-the same commit, or the cap comes straight back as a hundred-and-sixty-character
-line. The export screen is the one that never took
-this header; TODO.md records the decision as open.
+form does at `3xl`. **The deck runs that same full width on every tool**, and
+the obligation that comes with it is on the words: it was capped at `2xl` with
+a `deckWidth` prop to escape the cap, five of the sixteen screens had already
+taken the escape, and at that point the default was the exception and walking
+between two tools moved where the sentence under the heading stopped. So the
+prop is gone and a deck is held to a sentence or two — a cap forgives a long
+deck by wrapping it and the full width does not. Anything longer belongs on the
+page below, where the tool's own prose caps itself at `max-w-prose`; widening
+the container still never widens a line of body text. The export screen is the
+one that never took this header; TODO.md records the decision as open.
 
 **A tool screen has two frames, and `src/lib/tool-page.ts` is the contract.**
 The roadmap opens six of them **over** the road rather than instead of it, so a

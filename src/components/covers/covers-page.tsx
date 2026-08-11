@@ -1765,15 +1765,11 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
              wall of covers, and at 5xl the wall stopped a long way short of
              the window on both sides — the one page where extra width buys
              another column of the thing you came to look at. */
-          /* **The deck runs the page, as comps' does.** Capped at 2xl it broke
-             into three short lines under a heading spanning the full width,
-             with an acre of empty header beside it — a column of text that
-             lost its column. `ToolHeader`'s own note is the condition that
-             comes with widening it: shorten the words in the same change, or
-             the cap returns as a hundred-and-sixty-character line. So the
+          /* Shortened for a deck that runs the header's full width: the
              closing flourish went and the two claims that cannot go — that we
-             do not design covers, and will not generate one — stayed. */
-          deckWidth="full"
+             do not design covers, and will not generate one — stayed. Written
+             long it broke into three short lines under a heading spanning the
+             whole width, which is a column of text that lost its column. */
           action={<ToolStepDone state={save} />}
         >
           Your cover, in the shelf it has to sit on, at the size a reader meets
