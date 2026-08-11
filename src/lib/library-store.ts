@@ -1266,6 +1266,31 @@ export function createBookFromImport(
     lastOpenedBookId: bookId,
   });
 
+  /*
+   * **Send the prose up, which for a long time nothing did.**
+   *
+   * The bodies above are written straight to localStorage rather than through
+   * `saveBody` — deliberately, because a hundred chapters through the autosave
+   * path is a hundred shelf writes and fan-outs for one gesture. But `saveBody`
+   * is also the *only* thing that calls `pushBody`, so the whole manuscript
+   * stayed on this machine while `commit` faithfully uploaded the book and
+   * every one of its chapter rows: word counts, titles, positions, and not a
+   * word of the writing.
+   *
+   * Nothing said so. The shelf reported the right totals on every machine, and
+   * the book opened empty on the second one. Found on a real library — 298
+   * chapters on the server and 30 bodies, the 30 being the ones that had since
+   * been edited in the editor, which does go through `saveBody`.
+   *
+   * After `commit`, never before: `pushBook` upserts the chapter rows and a
+   * body cannot land without one. The queue sorts `book:` ahead of `body:` for
+   * the same reason, so the pair arrives in the order the foreign keys need
+   * however the timers fall.
+   */
+  for (const meta of metas) {
+    const raw = window.localStorage.getItem(bodyKey(meta.id));
+    if (raw !== null) pushBody(meta.id, raw);
+  }
 
   return { bookId, chapterId: metas[0].id };
 }
@@ -3548,4 +3573,65 @@ async function reconcile(): Promise<void> {
   }
 
   applyRemote(remote);
+  repairMissingBodies(remote);
+}
+
+/**
+ * Send up any prose the server turns out not to have.
+ *
+ * **The strays path above only asks whether the *book* arrived**, and a book
+ * can be on the server complete with every chapter row and still be missing
+ * the writing in them. Nothing used to notice: `pushBody` fired once when the
+ * chapter was saved, and if that push was refused — for arriving before its
+ * chapter existed, or because the connection dropped — the old `flush` logged
+ * it and threw the job away. No later load compared what was here against what
+ * was there, so the gap was permanent and silent.
+ *
+ * It is not hypothetical. It was found on a real library: 23 books and 298
+ * chapters on the server, 30 of their bodies, and a manuscript that opened
+ * empty on a second machine while the shelf still reported its word count.
+ *
+ * So the comparison is made every load, and it is cheap: the download already
+ * carries every body this account owns, and a chapter whose id is absent from
+ * it while its text sits in this browser is unsaved work by definition.
+ *
+ * Three things about it are deliberate:
+ *
+ * - **The book goes with the bodies.** `pushBook` upserts the chapter rows, and
+ *   a body cannot land without one; the queue runs `book:` before `body:` so
+ *   the pair arrives in the order the foreign keys need.
+ * - **A book this writer may not write is skipped.** A viewer's browser holding
+ *   a body the owner has since replaced would otherwise push a stale copy back
+ *   over the owner's, in a repair pass they never asked for.
+ * - **It settles itself.** Once a body lands, the next download carries it and
+ *   this finds nothing, so a repaired library costs one `has` per chapter.
+ */
+function repairMissingBodies(
+  remote: Awaited<ReturnType<typeof fetchLibrary>>,
+): void {
+  if (!remote) return;
+
+  const onServer = new Set(remote.shelf.books.map((b) => b.id));
+  const books = getShelf().books;
+
+  books.forEach((book, position) => {
+    if (!onServer.has(book.id) || !canWriteBook(book)) return;
+
+    const missing = book.chapters.filter(
+      (c) => !remote.bodies.has(c.id) && getBody(c.id) !== null,
+    );
+    if (missing.length === 0) return;
+
+    console.warn(
+      `[sync] ${missing.length} chapter${missing.length === 1 ? "" : "s"} of "${
+        book.title
+      }" had text here and none on the server; sending it up.`,
+    );
+
+    pushBook(book, position, new Set(missing.map((c) => c.id)));
+    for (const chapter of missing) {
+      const raw = getBody(chapter.id);
+      if (raw !== null) pushBody(chapter.id, raw);
+    }
+  });
 }

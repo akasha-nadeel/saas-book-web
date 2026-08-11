@@ -818,13 +818,76 @@ const pending = new Map<string, Job>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 const FLUSH_MS = 800;
 
+/**
+ * **Parents before children, because the database says so.**
+ *
+ * `chapter_bodies` derives its `book_id` and `owner` from the chapter row in a
+ * trigger, and raises `foreign_key_violation` when there is no chapter to
+ * derive them from. So a body sent before its chapter is refused — and that is
+ * exactly the order a new chapter produces, because `saveBody` writes the prose
+ * and pushes it *before* the caller updates the word count that queues the
+ * book. Both land in one flush, and the body used to go first.
+ *
+ * A Map iterates in insertion order, which is the order the writer's actions
+ * happened in and not the order the foreign keys need. `uploadLibrary` already
+ * knew this — "books before chapters, chapters before their bodies" — and the
+ * incremental path is now held to the same rule.
+ */
+const ORDER = ["book", "chapter", "body", "notes", "cover", "prefs"];
+
+export function rank(key: string): number {
+  const at = ORDER.indexOf(key.split(":")[0]);
+  return at === -1 ? ORDER.length : at;
+}
+
+/**
+ * How many times a key has failed in a row.
+ *
+ * Cleared on success, and on a fresh `enqueue` for that key — a new save is a
+ * new fact about the row, and it starts with its own budget rather than
+ * inheriting the last one's.
+ */
+const attempts = new Map<string, number>();
+
+/**
+ * **A push that fails is tried again, and for a long time it simply was not.**
+ *
+ * `flush` logged the error and dropped the job, so one refusal lost that write
+ * for good: nothing re-queued it, and nothing on a later load noticed it was
+ * missing. A body refused for arriving before its chapter — the ordering bug
+ * above — was gone permanently, and so was one lost to a dropped connection.
+ * Measured on a real library: 298 chapters on the server, 30 of their bodies.
+ *
+ * Five attempts over roughly half a minute, doubling. Bounded because a push
+ * refused for a reason retrying cannot fix must not spin forever, and because a
+ * writer who has closed the tab is past helping — `syncWithServer`'s repair
+ * pass is what catches whatever is still missing on the next load.
+ */
+const MAX_ATTEMPTS = 5;
+const RETRY_MS = 1200;
+
 function enqueue(key: string, job: Job) {
   if (!isSupabaseConfigured()) return;
   // Replacing by key is the coalescing: only the newest state of a given row
   // is worth sending, and the older one is already stale.
   pending.set(key, job);
+  attempts.delete(key);
   if (flushTimer) return;
   flushTimer = setTimeout(flush, FLUSH_MS);
+}
+
+/**
+ * Whether trying this again could ever work.
+ *
+ * A refusal under RLS is the one failure that is *about* the writer rather than
+ * about the moment: access has been taken away, and four more attempts would
+ * be four more denials and four more lines in the console telling them so.
+ * Everything else — a foreign key that has not landed yet, a dropped
+ * connection, a gateway having a bad minute — is worth another go.
+ */
+export function worthRetrying(error: unknown): boolean {
+  const code = (error as { code?: string } | null)?.code;
+  return code !== "42501" && code !== "PGRST301";
 }
 
 /**
@@ -844,21 +907,45 @@ function denied<E extends { code?: string }>(error: E, table: string): E {
 
 async function flush() {
   flushTimer = null;
-  const jobs = [...pending.values()];
+  const jobs = [...pending.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
   pending.clear();
-  for (const job of jobs) {
+  for (const [key, job] of jobs) {
     try {
       await job();
+      attempts.delete(key);
     } catch (err) {
+      /*
+       * Put it back, unless a newer save for the same row has already been
+       * queued while this one was in flight — that one carries the writer's
+       * later text, and re-queueing this would send the older prose after it.
+       */
+      const tries = (attempts.get(key) ?? 0) + 1;
+      const retrying =
+        tries <= MAX_ATTEMPTS && worthRetrying(err) && !pending.has(key);
+
+      if (retrying) {
+        attempts.set(key, tries);
+        pending.set(key, job);
+        if (!flushTimer) {
+          flushTimer = setTimeout(flush, RETRY_MS * 2 ** (tries - 1));
+        }
+      } else {
+        attempts.delete(key);
+      }
+
       // Supabase rejects with a PostgrestError — a plain object, not an Error —
       // and both the dev overlay and console.error render one of those as `{}`.
       // A sync that is failing then looks exactly like a sync that is fine, so
       // the fields are pulled out by name rather than handed over as an object.
+      //
+      // Whether it will be tried again is part of the message: "failed" alone
+      // reads the same for a blip and for a write that has just been given up
+      // on, and only one of those is worth a writer's attention.
       const e = err as Partial<Record<"message" | "code" | "details" | "hint", string>>;
       console.error(
-        `[sync] push failed${e?.code ? ` [${e.code}]` : ""}: ${
-          e?.message ?? String(err)
-        }`,
+        `[sync] ${key} failed${e?.code ? ` [${e.code}]` : ""}${
+          retrying ? `, retrying (${tries}/${MAX_ATTEMPTS})` : ", giving up"
+        }: ${e?.message ?? String(err)}`,
         e?.details ?? "",
         e?.hint ?? "",
       );
