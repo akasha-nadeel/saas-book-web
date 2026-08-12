@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { proseReport, sentencesIn } from "./prose";
+import { combinedRates, proseReport, sentencesIn } from "./prose";
 
 const find = (text: string, id: string) =>
   proseReport(text).findings.find((f) => f.id === id);
@@ -112,6 +112,112 @@ describe("proseReport — long sentences", () => {
 
   it("leaves ordinary sentences alone", () => {
     expect(find("A perfectly normal sentence of modest length.", "long")).toBeUndefined();
+  });
+});
+
+describe("rhythm", () => {
+  const text = "One two three. Four five. Six seven eight nine.";
+
+  it("carries every sentence in reading order", () => {
+    // The order is the information: a distribution says how long the sentences
+    // are, this says where they fall, and three long ones together read as a
+    // wall however ordinary the average is.
+    expect(proseReport(text).rhythm.map((s) => s.text)).toEqual([
+      "One two three.",
+      "Four five.",
+      "Six seven eight nine.",
+    ]);
+  });
+
+  it("measures each one, and agrees with the totals beside it", () => {
+    const report = proseReport(text);
+    expect(report.rhythm.map((s) => s.words)).toEqual([3, 2, 4]);
+    expect(report.rhythm).toHaveLength(report.sentences);
+    expect(Math.max(...report.rhythm.map((s) => s.words))).toBe(
+      report.longestSentence,
+    );
+  });
+
+  it("is empty for empty text rather than holding a blank sentence", () => {
+    expect(proseReport("   ").rhythm).toEqual([]);
+  });
+});
+
+describe("showing where, not only how many", () => {
+  const long = (n: number) => `${Array.from({ length: n }, () => "word").join(" ")}.`;
+
+  /**
+   * The one not to "fix" by deleting.
+   *
+   * This finding shipped with an empty `examples` for its whole life: it said
+   * three sentences were over the line and showed none of them, which is the
+   * single finding here where seeing the instance is the entire point. A count
+   * a writer cannot act on is trivia.
+   */
+  it("hands back the long sentences it counted", () => {
+    const report = proseReport(`Short one. ${long(50)} Short two. ${long(60)}`);
+    const finding = report.findings.find((f) => f.id === "long");
+    expect(finding).toBeDefined();
+    expect(finding!.passages).toHaveLength(finding!.count);
+    for (const passage of finding!.passages!) {
+      expect(passage.words).toBeGreaterThan(45);
+      expect(passage.text.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("puts the worst offender first", () => {
+    // Somebody reading three of these wants the longest at the top, not
+    // whichever happened to come first in the chapter.
+    const report = proseReport(`${long(50)} ${long(70)} ${long(60)}`);
+    const words = report.findings
+      .find((f) => f.id === "long")!
+      .passages!.map((p) => p.words);
+    expect(words).toEqual([...words].sort((a, b) => b - a));
+  });
+
+  it("hands back the run of sentences that start the same way", () => {
+    // The note promises it "just says where", and the only thing it used to
+    // say was which word.
+    const finding = find("She ran. She stopped. She waited. Then rain fell.", "openers");
+    expect(finding).toBeDefined();
+    expect(finding!.passages).toHaveLength(3);
+    expect(finding!.passages![0].text).toBe("She ran.");
+  });
+
+  it("shows a word-counting finding in the sentences it lives in", () => {
+    // A word on its own cannot be acted on. "You used 'felt' twice" is not a
+    // finding; "She felt the cold" against "the cold got in" is a decision,
+    // and it is a decision about a sentence.
+    const finding = find("She felt the cold. Rain fell on the roof.", "filters");
+    expect(finding!.examples).toContain("felt");
+    expect(finding!.passages?.[0].text).toBe("She felt the cold.");
+    expect(finding!.passages?.[0].mark).toBe("felt");
+  });
+
+  it("does not show the same sentence twice for two words in it", () => {
+    const finding = find("She saw it and she knew.", "filters");
+    expect(finding!.passages).toHaveLength(1);
+  });
+});
+
+describe("combinedRates", () => {
+  it("is the writer's own book, counted the same way", () => {
+    // The only comparison this app can make honestly. A benchmark against
+    // "good prose" would be invented; a writer's own average across their own
+    // chapters is measured, and it answers the question they actually have —
+    // is *this* chapter unusual for me?
+    const reports = [
+      proseReport("She felt cold."),
+      proseReport("Rain fell. Wind rose. Nothing happened at all here."),
+    ];
+    const rates = combinedRates(reports);
+    // One "felt" across the twelve words of both chapters — 3 and 9.
+    expect(rates.filters).toBeCloseTo((1 / 12) * 1000, 1);
+  });
+
+  it("has nothing to say about a book with no words", () => {
+    expect(combinedRates([])).toEqual({});
+    expect(combinedRates([proseReport("")])).toEqual({});
   });
 });
 
