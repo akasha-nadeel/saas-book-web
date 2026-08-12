@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
@@ -78,7 +78,21 @@ export function ProsePage({ bookId }: { bookId: string }) {
   const [query, setQuery] = useState("");
   /** Whether the findings this chapter is unremarkable for are shown too. */
   const [showAll, setShowAll] = useState(false);
+  const searchRef = useRef<HTMLElement>(null);
   const gate = useLimitGate({ action: "prose", bookId });
+
+  /**
+   * Search for a word, and go to where the answer will be.
+   *
+   * The search sits above the findings, so a chip pressed further down the page
+   * fills a box the writer cannot see — the press looks like it did nothing.
+   * `nearest` rather than `center`: if the panel is already on screen, nothing
+   * should move at all.
+   */
+  function search(word: string) {
+    setQuery(word);
+    searchRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
 
   const chapters = useMemo(
     () => (book ? orderedChapters(book).filter((c) => c.words > 0) : []),
@@ -195,35 +209,6 @@ export function ProsePage({ bookId }: { bookId: string }) {
                 ))}
               </select>
 
-              {/* **The word search, which the research asked for by name.**
-                  "Targeted word searches reveal personal writing weaknesses" is
-                  how writers are told to hunt their own tics, and it was the
-                  one thing this screen made them leave to do — every finding
-                  ended at a word, and finding that word meant going back to the
-                  manuscript and using the editor's search. The chapter is
-                  already parsed into sentences here; searching it is free. */}
-              {showing && (
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Find a word in this chapter…"
-                    aria-label="Find a word in this chapter"
-                    className="w-full max-w-xs rounded-lg border border-line bg-panel
-                               px-3 py-2 text-sm text-fg placeholder:text-muted"
-                  />
-                  {query && (
-                    <button
-                      type="button"
-                      onClick={() => setQuery("")}
-                      className="text-xs font-semibold text-muted hover:text-fg"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
 
             {!showing && (
@@ -266,17 +251,20 @@ export function ProsePage({ bookId }: { bookId: string }) {
 
                 <Rhythm report={report} />
 
-                {query.trim() ? (
-                  <WordSearch report={report} query={query.trim()} />
-                ) : (
-                  <Findings
-                    report={report}
-                    bookRates={bookRates}
-                    showAll={showAll}
-                    onShowAll={() => setShowAll(true)}
-                    onSearch={setQuery}
-                  />
-                )}
+                <WordSearch
+                  report={report}
+                  query={query}
+                  onQuery={setQuery}
+                  panelRef={searchRef}
+                />
+
+                <Findings
+                  report={report}
+                  bookRates={bookRates}
+                  showAll={showAll}
+                  onShowAll={() => setShowAll(true)}
+                  onSearch={search}
+                />
               </>
             )}
           </>
@@ -582,35 +570,88 @@ function ShowAll({
  * It is also what makes the echo chips worth pressing: a repeated word is a
  * question about all of its uses at once, and this is the view of all of them.
  */
-function WordSearch({ report, query }: { report: ProseReport; query: string }) {
+function WordSearch({
+  report,
+  query,
+  onQuery,
+  panelRef,
+}: {
+  report: ProseReport;
+  query: string;
+  onQuery: (word: string) => void;
+  panelRef: React.RefObject<HTMLElement | null>;
+}) {
+  const term = query.trim();
+
   /* Whole-word, like every count on this screen: searching "her" should not
      answer with "there", or the number found would disagree with the numbers
      above it. */
-  const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`\\b${safe}\\b`, "i");
-  const hits = report.rhythm.filter((s) => pattern.test(s.text));
+  const safe = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hits = term
+    ? report.rhythm.filter((s) => new RegExp(`\\b${safe}\\b`, "i").test(s.text))
+    : [];
 
   return (
-    <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
-        <h2 className="font-bold text-fg">“{query}”</h2>
-        <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold text-fg">
-          {hits.length}
-        </span>
-        <span className="text-xs text-muted">
-          {hits.length === 1 ? "sentence in this chapter" : "sentences in this chapter"}
-        </span>
+    /* **The box lives with its answer.** It was up in the toolbar with the
+       chapter picker, which is where a *filter* belongs — but this is not a
+       filter, it is a question, and the results are the reply. Sat at the top
+       of the page it scrolled out of view the moment there was anything to
+       read, so refining a search meant scrolling back to a control you could
+       no longer see. */
+    <section
+      ref={panelRef}
+      className="mt-6 rounded-xl border border-line bg-panel p-5"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="prose-search" className="sr-only">
+          Find a word in this chapter
+        </label>
+        <input
+          id="prose-search"
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Find a word in this chapter…"
+          className="w-full max-w-sm rounded-lg border border-line bg-surface px-3 py-2
+                     text-sm text-fg placeholder:text-muted"
+        />
+        {term && (
+          <>
+            <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold text-fg">
+              {hits.length}
+            </span>
+            <span className="text-xs text-muted">
+              {hits.length === 1 ? "sentence" : "sentences"}
+            </span>
+            <button
+              type="button"
+              onClick={() => onQuery("")}
+              className="ml-auto rounded-lg border border-line px-3 py-1.5 text-xs
+                         font-semibold text-muted hover:bg-raised hover:text-fg"
+            >
+              Clear
+            </button>
+          </>
+        )}
       </div>
 
-      {hits.length === 0 ? (
+      {/* **Says what it is for before it is used.** An empty box with no line
+          under it is a box; the reason to press it is the thing writers are
+          told to do and would not guess this screen could. */}
+      {!term ? (
         <p className="mt-3 max-w-prose text-sm text-muted">
-          Not in this chapter. It may be in another one — the search covers the
-          chapter you are looking at.
+          Every writer has words they lean on without knowing it. Type one and
+          every sentence it appears in comes back — or press any word above.
+        </p>
+      ) : hits.length === 0 ? (
+        <p className="mt-3 max-w-prose text-sm text-muted">
+          Not in this chapter. The search covers the chapter you are looking at,
+          so it may still be in another one.
         </p>
       ) : (
         <ul className="mt-4 flex flex-col gap-2">
           {hits.map((passage, i) => (
-            <PassageBlock key={i} passage={{ ...passage, mark: query }} />
+            <PassageBlock key={i} passage={{ ...passage, mark: term }} />
           ))}
         </ul>
       )}
