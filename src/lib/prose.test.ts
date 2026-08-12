@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { combinedRates, proseReport, sentencesIn } from "./prose";
+import {
+  combinedRates,
+  echoes,
+  isNotable,
+  proseReport,
+  sentencesIn,
+} from "./prose";
 
 const find = (text: string, id: string) =>
   proseReport(text).findings.find((f) => f.id === id);
@@ -197,6 +203,77 @@ describe("showing where, not only how many", () => {
   it("does not show the same sentence twice for two words in it", () => {
     const finding = find("She saw it and she knew.", "filters");
     expect(finding!.passages).toHaveLength(1);
+  });
+});
+
+describe("echoes", () => {
+  it("hears a distinctive word used twice in a breath", () => {
+    // The pain every source names and no count of adverbs touches: writers
+    // repeat their favourite words, it is invisible on screen, and it is
+    // unmistakable read aloud.
+    const found = echoes("The lantern swung low. She raised the lantern again.");
+    expect(found.map((e) => e.word)).toContain("lantern");
+    expect(found.find((e) => e.word === "lantern")!.count).toBe(2);
+  });
+
+  it("says nothing about the words English repeats by itself", () => {
+    // "the" nine times in a paragraph is the language working, not the writer
+    // failing, and leaving them in would bury the one that matters.
+    expect(echoes("The door and the window and the wall and the floor.")).toEqual(
+      [],
+    );
+  });
+
+  it("ignores a word used once at each end of the chapter", () => {
+    // A motif or a coincidence, not something a reader trips over.
+    const far = `lantern ${"pad ".repeat(200)} lantern`;
+    expect(echoes(far)).toEqual([]);
+  });
+
+  it("counts only the uses that are actually near each other", () => {
+    // Two together and one far away is an echo of two, not of three —
+    // overstating it would misdescribe what the writer is being shown.
+    const text = `lantern lantern ${"pad ".repeat(200)} lantern`;
+    expect(echoes(text)[0].count).toBe(2);
+  });
+
+  it("puts the loudest first, and is stable between runs", () => {
+    const text = "harbour harbour harbour lantern lantern";
+    expect(echoes(text).map((e) => e.word)).toEqual(["harbour", "lantern"]);
+  });
+
+  it("leaves very short words alone", () => {
+    expect(echoes("She saw him and she saw him again.")).toEqual([]);
+  });
+});
+
+describe("isNotable", () => {
+  const finding = (per1000?: number) =>
+    ({ id: "x", label: "x", count: 1, note: "x", examples: [], per1000 }) as never;
+
+  it("is quiet about a chapter that writes the way the book writes", () => {
+    // One adverb in six hundred words got a full card, a heading, a rate and a
+    // paragraph saying one adverb is not a problem — at exactly the volume of
+    // the finding beside it that mattered. When everything is raised, nothing
+    // is.
+    expect(isNotable(finding(1.5), 5.1)).toBe(false);
+    expect(isNotable(finding(5.1), 5.1)).toBe(false);
+  });
+
+  it("raises a chapter doing something it does not do elsewhere", () => {
+    expect(isNotable(finding(9), 5.1)).toBe(true);
+  });
+
+  it("always raises a finding that has no rate to compare", () => {
+    // Structural rather than statistical: three sentences opening the same way
+    // is worth seeing once, and there is no per-thousand figure for it.
+    expect(isNotable(finding(undefined), 5.1)).toBe(true);
+  });
+
+  it("always raises when there is nothing to compare against", () => {
+    // Quieting a finding on the strength of a comparison that was never made
+    // would be hiding it.
+    expect(isNotable(finding(1.5), undefined)).toBe(true);
   });
 });
 

@@ -90,6 +90,103 @@ function passagesFor(
 /** How many sentences a word-counting finding shows. Enough to judge by. */
 const PASSAGE_LIMIT = 6;
 
+/**
+ * Words that repeat because English repeats them.
+ *
+ * Not a judgement about writing — "the" appearing nine times in a paragraph is
+ * the language working. The echo check is looking for the *distinctive* word a
+ * writer reached for twice without noticing, and every function word left in
+ * would bury it.
+ *
+ * Deliberately short. A long list starts excluding real echoes — a character
+ * name repeated eleven times in a page is worth seeing, and so is "salt" in a
+ * book called The Salt Ledger — and the writer is the one who decides whether
+ * a repetition is deliberate. This only removes the words nobody chooses.
+ */
+const COMMON = new Set([
+  "about", "after", "again", "against", "all", "also", "and", "any", "are",
+  "back", "because", "been", "before", "being", "both", "but", "came", "can",
+  "come", "could", "did", "does", "down", "each", "even", "ever", "every",
+  "for", "from", "get", "going", "gone", "got", "had", "has", "have", "her",
+  "here", "hers", "him", "his", "how", "into", "its", "itself", "just",
+  "like", "made", "make", "many", "may", "might", "more", "most", "much",
+  "must", "not", "now", "off", "once", "one", "only", "onto", "other", "our",
+  "out", "over", "own", "put", "said", "same", "she", "should", "since",
+  "some", "still", "such", "take", "than", "that", "the", "their", "them",
+  "then", "there", "these", "they", "thing", "think", "this", "those",
+  "though", "through", "time", "too", "took", "under", "until", "upon",
+  "very", "want", "was", "way", "well", "went", "were", "what", "when",
+  "where", "which", "while", "who", "why", "will", "with", "would", "you",
+  "your",
+]);
+
+/**
+ * How close two uses have to be to be heard as an echo, in words.
+ *
+ * About a paragraph. Further apart than this and a repeated word is a motif or
+ * a coincidence rather than the thing a reader trips over; closer, and it is
+ * the sort of repetition that is inaudible while writing and obvious the moment
+ * anybody reads the page aloud.
+ */
+export const ECHO_WINDOW = 60;
+
+/** A word this writer used twice without noticing, and where. */
+export interface Echo {
+  word: string;
+  count: number;
+}
+
+/**
+ * Words repeated close enough together to be heard.
+ *
+ * **The pain this answers is the one every source names and no count of adverbs
+ * touches.** Writers unconsciously repeat their favourite words; the repetition
+ * is invisible on the screen and unmistakable when the page is read aloud,
+ * because the ear catches what the eye scans straight past. It is the flagship
+ * of the two editing tools built for novelists — ProWritingAid calls it echo
+ * detection, AutoCrit calls it the repetition report — and it is the clearest
+ * case there is of a machine seeing something a writer structurally cannot.
+ *
+ * It is also exactly the shape this app is allowed to work in: a measurement,
+ * not an opinion. Repetition is a real device, and a writer repeating a word
+ * for effect is doing their job. So this says *what* and *where*, and nothing
+ * about whether it should stay.
+ */
+export function echoes(text: string, window = ECHO_WINDOW): Echo[] {
+  const tokens = text
+    .toLocaleLowerCase()
+    .split(/[^\p{L}']+/u)
+    .filter(Boolean);
+
+  const seen = new Map<string, number[]>();
+  tokens.forEach((token, i) => {
+    // Under four letters is almost entirely pronouns and articles, and the
+    // ones that are not are rarely distinctive enough to hear.
+    if (token.length < 4 || COMMON.has(token)) return;
+    const at = seen.get(token);
+    if (at) at.push(i);
+    else seen.set(token, [i]);
+  });
+
+  const found: Echo[] = [];
+  for (const [word, positions] of seen) {
+    if (positions.length < 2) continue;
+    // Only the uses that are near another use count — a word appearing on page
+    // one and again on page nine is not an echo, and counting all nine would
+    // overstate what the writer is being shown.
+    const close = positions.filter(
+      (at, i) =>
+        (i > 0 && at - positions[i - 1] <= window) ||
+        (i < positions.length - 1 && positions[i + 1] - at <= window),
+    );
+    if (close.length >= 2) found.push({ word, count: close.length });
+  }
+
+  // Most repeated first, then alphabetically so the order is stable between
+  // runs on the same chapter.
+  return found.sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
+}
+
 export interface Finding {
   id: string;
   label: string;
@@ -101,6 +198,14 @@ export interface Finding {
   note: string;
   /** A few real occurrences, so the writer can go and look. */
   examples: string[];
+  /**
+   * The bare words behind `examples`, where the two differ.
+   *
+   * An echo reads as "grey ×3", which is the useful thing to show and the wrong
+   * thing to search for. Parallel to `examples` by index; absent means the two
+   * are the same, which is true of every other finding.
+   */
+  terms?: string[];
   /**
    * The sentences themselves, where a *sentence* is the unit rather than a word.
    *
@@ -141,6 +246,37 @@ export interface ProseReport {
 
 /** Above this a sentence is long enough to be worth pointing at. */
 export const LONG_SENTENCE = 45;
+
+/**
+ * Whether a finding is worth a writer's attention, or merely true.
+ *
+ * **A count of one is not a finding.** Every one of these fired the moment it
+ * saw a single occurrence, so a chapter with one adverb in six hundred words
+ * got a full card, a heading, a rate and a paragraph explaining that one adverb
+ * is not a problem — the app taking up a row of the page to say nothing. Worse,
+ * it said it at exactly the volume of the finding beside it that *did* matter.
+ * When everything is raised, nothing is.
+ *
+ * The honest test is the one the comparison already makes possible: **is this
+ * chapter unlike the rest of this book?** A rate at or under the writer's own
+ * average is the writer writing normally, which is not news. Above it, they are
+ * doing something here they do not do elsewhere — and whether that is right is
+ * theirs to say, which is why this decides what gets a *card* and never what
+ * gets a verdict.
+ *
+ * Two things stay notable whatever the rate. A finding with no rate at all —
+ * repeated openers, sentences over the line — is structural rather than
+ * statistical: three sentences opening the same way is worth seeing once, and
+ * there is no per-thousand figure to compare. And with nothing to compare
+ * against — one chapter, or no book average — everything is shown, because
+ * quieting a finding on the strength of a comparison that was not made would be
+ * hiding it.
+ */
+export function isNotable(finding: Finding, bookRate?: number): boolean {
+  if (finding.per1000 === undefined) return true;
+  if (bookRate === undefined) return true;
+  return finding.per1000 > bookRate;
+}
 
 /**
  * The same rates across a whole book, so a chapter can be read against it.
@@ -305,6 +441,24 @@ export function proseReport(text: string): ProseReport {
       note: "Obvious on a printed page and nearly impossible to notice while writing. Deliberate repetition is a real device — this cannot tell the difference, so it just says where.",
       examples: [...new Set(runs)].slice(0, 6),
       passages: runPassages,
+    });
+  }
+
+  // ---- Echoes -------------------------------------------------------------
+  const heard = echoes(clean);
+  if (heard.length > 0) {
+    findings.push({
+      id: "echoes",
+      label: "Words repeated close together",
+      count: heard.length,
+      note: "Every writer has words they reach for twice without noticing. They are invisible on the screen and unmistakable when the page is read aloud, which is the one thing a machine can do here that you cannot do for your own draft. Repetition is also a real device — this cannot tell which is which, so it only says where.",
+      examples: heard.slice(0, 8).map((e) => `${e.word} ×${e.count}`),
+      terms: heard.slice(0, 8).map((e) => e.word),
+      passages: passagesFor(
+        rhythm,
+        heard.slice(0, 4).map((e) => e.word),
+        PASSAGE_LIMIT,
+      ),
     });
   }
 

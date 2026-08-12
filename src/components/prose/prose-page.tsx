@@ -13,6 +13,7 @@ import {
 import { findBook, getBody, orderedChapters } from "@/lib/library-store";
 import {
   combinedRates,
+  isNotable,
   LONG_SENTENCE,
   proseReport,
   type Finding,
@@ -73,6 +74,10 @@ export function ProsePage({ bookId }: { bookId: string }) {
    * appears at all on Pro.
    */
   const [ran, setRan] = useState(false);
+  /** The word being hunted, and the one control that overrides the findings. */
+  const [query, setQuery] = useState("");
+  /** Whether the findings this chapter is unremarkable for are shown too. */
+  const [showAll, setShowAll] = useState(false);
   const gate = useLimitGate({ action: "prose", bookId });
 
   const chapters = useMemo(
@@ -176,8 +181,11 @@ export function ProsePage({ bookId }: { bookId: string }) {
               <select
                 id="prose-chapter"
                 value={chosen ?? ""}
-                onChange={(e) => setChapterId(e.target.value)}
-                className="w-full max-w-sm rounded-lg border border-line bg-panel
+                onChange={(e) => {
+                  setChapterId(e.target.value);
+                  setQuery("");
+                }}
+                className="w-full max-w-xs rounded-lg border border-line bg-panel
                            px-3 py-2 text-sm text-fg"
               >
                 {chapters.map((c) => (
@@ -186,6 +194,36 @@ export function ProsePage({ bookId }: { bookId: string }) {
                   </option>
                 ))}
               </select>
+
+              {/* **The word search, which the research asked for by name.**
+                  "Targeted word searches reveal personal writing weaknesses" is
+                  how writers are told to hunt their own tics, and it was the
+                  one thing this screen made them leave to do — every finding
+                  ended at a word, and finding that word meant going back to the
+                  manuscript and using the editor's search. The chapter is
+                  already parsed into sentences here; searching it is free. */}
+              {showing && (
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Find a word in this chapter…"
+                    aria-label="Find a word in this chapter"
+                    className="w-full max-w-xs rounded-lg border border-line bg-panel
+                               px-3 py-2 text-sm text-fg placeholder:text-muted"
+                  />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="text-xs font-semibold text-muted hover:text-fg"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
             {!showing && (
@@ -228,23 +266,16 @@ export function ProsePage({ bookId }: { bookId: string }) {
 
                 <Rhythm report={report} />
 
-                {report.findings.length === 0 ? (
-                  <p className="mt-6 rounded-xl border border-line bg-panel p-5 text-muted">
-                    Nothing to point at in this chapter. That is not praise —
-                    there are only five things this looks for.
-                  </p>
+                {query.trim() ? (
+                  <WordSearch report={report} query={query.trim()} />
                 ) : (
-                  <ul className="mt-6 flex flex-col gap-3">
-                    {report.findings.map((finding) => (
-                      <FindingCard
-                        key={finding.id}
-                        finding={finding}
-                        {...(bookRates[finding.id] !== undefined
-                          ? { bookRate: bookRates[finding.id] }
-                          : {})}
-                      />
-                    ))}
-                  </ul>
+                  <Findings
+                    report={report}
+                    bookRates={bookRates}
+                    showAll={showAll}
+                    onShowAll={() => setShowAll(true)}
+                    onSearch={setQuery}
+                  />
                 )}
               </>
             )}
@@ -427,6 +458,167 @@ function Rhythm({ report }: { report: ProseReport }) {
 }
 
 /**
+ * What was found, loudest first — and most of it is usually not loud.
+ *
+ * **Everything used to be a card.** Five findings, five identical rows, one of
+ * them reporting a single adverb in six hundred words at exactly the volume of
+ * the one reporting a wall of forty-word sentences. A screen where everything
+ * is raised has raised nothing, and it costs the writer the work of deciding
+ * which row was worth their attention — which is the work the report was
+ * supposed to do for them.
+ *
+ * So a card means *this chapter is unlike the rest of your book*, and the rest
+ * become one line. Not hidden: a writer who wants the number can open it, and
+ * the line names every finding it covers. Quiet is not the same as absent, and
+ * the difference is what makes the cards mean something.
+ */
+function Findings({
+  report,
+  bookRates,
+  showAll,
+  onShowAll,
+  onSearch,
+}: {
+  report: ProseReport;
+  bookRates: Record<string, number>;
+  showAll: boolean;
+  onShowAll: () => void;
+  onSearch: (word: string) => void;
+}) {
+  const notable = showAll
+    ? report.findings
+    : report.findings.filter((f) => isNotable(f, bookRates[f.id]));
+  const quiet = report.findings.length - notable.length;
+
+  /* Furthest from the writer's own average first — the one thing on the page
+     that ranks anything, and it ranks by distance from their own habit rather
+     than against a standard nobody agreed to. */
+  const ranked = [...notable].sort((a, b) => {
+    const gap = (f: Finding) =>
+      f.per1000 !== undefined && bookRates[f.id] !== undefined
+        ? f.per1000 - bookRates[f.id]
+        : Infinity;
+    return gap(b) - gap(a);
+  });
+
+  /* **What is not notable is not shown.** A quiet summary was tried — one line
+     naming the ordinary findings with the cards folded behind it — and it was a
+     fold inside a fold on a screen that already has two, which is more chrome
+     than the thing it was hiding. Either a finding is worth the writer's
+     attention or it is not; there is no third state that earns a row. The
+     counts have not gone anywhere and come straight back the moment a chapter
+     runs above its book's own rate. */
+  if (ranked.length === 0) {
+    return (
+      <div className="mt-6 rounded-xl border border-line bg-panel p-5">
+        <p className="max-w-prose text-muted">
+          {report.findings.length === 0
+            ? "Nothing to point at in this chapter. That is not praise — there are only six things this looks for."
+            : "Nothing in this chapter stands out against the rest of your book. What was counted here, you do about as often everywhere else."}
+        </p>
+        {quiet > 0 && <ShowAll count={quiet} onShowAll={onShowAll} />}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ul className="mt-6 flex flex-col gap-3">
+        {ranked.map((finding) => (
+          <FindingCard
+            key={finding.id}
+            finding={finding}
+            onSearch={onSearch}
+            {...(bookRates[finding.id] !== undefined
+              ? { bookRate: bookRates[finding.id] }
+              : {})}
+          />
+        ))}
+      </ul>
+      {/* **A control, not a fold.** The findings this chapter is unremarkable
+          for were hidden behind a summary line with the cards nested inside it
+          — a fold inside a fold, more chrome than the thing it hid. As a button
+          it is one press, it says exactly what it will show, and it disappears
+          once pressed rather than becoming a permanent shut door. */}
+      {quiet > 0 && (
+        <div className="mt-3">
+          <ShowAll count={quiet} onShowAll={onShowAll} />
+        </div>
+      )}
+    </>
+  );
+}
+
+function ShowAll({
+  count,
+  onShowAll,
+}: {
+  count: number;
+  onShowAll: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onShowAll}
+      className="mt-3 rounded-lg border border-line px-3.5 py-2 text-xs font-semibold
+                 text-muted hover:bg-raised hover:text-fg"
+    >
+      Show the {count}{" "}
+      {count === 1 ? "finding" : "findings"} that match the rest of your book
+    </button>
+  );
+}
+
+/**
+ * Every sentence with one word in it.
+ *
+ * **The thing writers are told to do, that this screen used to send them away
+ * to do.** "Targeted word searches reveal personal writing weaknesses" is the
+ * standard advice for hunting your own tics — you learn that you overuse
+ * "just", and then you go and look for "just". Every finding here ended at a
+ * word and left the looking to the editor's search, in a different screen, in a
+ * different frame of mind.
+ *
+ * It is also what makes the echo chips worth pressing: a repeated word is a
+ * question about all of its uses at once, and this is the view of all of them.
+ */
+function WordSearch({ report, query }: { report: ProseReport; query: string }) {
+  /* Whole-word, like every count on this screen: searching "her" should not
+     answer with "there", or the number found would disagree with the numbers
+     above it. */
+  const safe = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\b${safe}\\b`, "i");
+  const hits = report.rhythm.filter((s) => pattern.test(s.text));
+
+  return (
+    <section className="mt-6 rounded-xl border border-line bg-panel p-5">
+      <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        <h2 className="font-bold text-fg">“{query}”</h2>
+        <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold text-fg">
+          {hits.length}
+        </span>
+        <span className="text-xs text-muted">
+          {hits.length === 1 ? "sentence in this chapter" : "sentences in this chapter"}
+        </span>
+      </div>
+
+      {hits.length === 0 ? (
+        <p className="mt-3 max-w-prose text-sm text-muted">
+          Not in this chapter. It may be in another one — the search covers the
+          chapter you are looking at.
+        </p>
+      ) : (
+        <ul className="mt-4 flex flex-col gap-2">
+          {hits.map((passage, i) => (
+            <PassageBlock key={i} passage={{ ...passage, mark: query }} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
  * One finding.
  *
  * **The count sits with its label**, which sounds too obvious to write down
@@ -440,9 +632,11 @@ function Rhythm({ report }: { report: ProseReport }) {
 function FindingCard({
   finding,
   bookRate,
+  onSearch,
 }: {
   finding: Finding;
   bookRate?: number;
+  onSearch: (word: string) => void;
 }) {
   const passages = finding.passages ?? [];
 
@@ -473,15 +667,26 @@ function FindingCard({
         /* Chips, not a mono run-on. These are words out of somebody's book;
            set as `font-code` in a single grey line they read as a stack
            trace. */
+        /* **Pressable, because a word is a question about all of its uses.**
+           A chip that only sat there left the writer to go and find the word
+           themselves — which is the errand the search box now saves. */
         <ul className="mt-3 flex flex-wrap gap-1.5">
-          {finding.examples.map((example) => (
-            <li
-              key={example}
-              className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-fg"
-            >
-              {example}
-            </li>
-          ))}
+          {finding.examples.map((example, i) => {
+            const term = finding.terms?.[i] ?? example;
+            return (
+              <li key={example}>
+                <button
+                  type="button"
+                  onClick={() => onSearch(term)}
+                  title={`Find every sentence with “${term}” in it`}
+                  className="rounded-md border border-line bg-surface px-2 py-1 text-xs
+                             text-fg hover:border-fg/25 hover:bg-raised"
+                >
+                  {example}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
 
