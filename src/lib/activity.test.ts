@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   dayKey,
   finishesOn,
+  heatLevel,
+  leadingBlanks,
   pace,
   parseActivity,
   recentDays,
@@ -10,6 +12,60 @@ import {
   trim,
   type Activity,
 } from "./activity";
+
+describe("heatLevel", () => {
+  it("gives a day with nothing on it no level at all", () => {
+    expect(heatLevel(0, 1000)).toBe(0);
+  });
+
+  it("gives one word a visible step", () => {
+    // The grid's first question is "did I turn up". A day of forty words drawn
+    // as blank answers it wrongly.
+    expect(heatLevel(1, 10_000)).toBe(1);
+    expect(heatLevel(40, 10_000)).toBe(1);
+  });
+
+  it("puts the busiest day at the top step", () => {
+    expect(heatLevel(1000, 1000)).toBe(4);
+  });
+
+  it("climbs with the share of the busiest day", () => {
+    expect(heatLevel(200, 1000)).toBe(1);
+    expect(heatLevel(400, 1000)).toBe(2);
+    expect(heatLevel(600, 1000)).toBe(3);
+    expect(heatLevel(800, 1000)).toBe(4);
+  });
+
+  it("is no level for a day of cutting, which the grid marks separately", () => {
+    // A cut cannot sit on a scale running light-to-dark for *more*, and it is
+    // still work — so it is marked rather than ranked. See the note in place.
+    expect(heatLevel(-900, 1000)).toBe(0);
+  });
+
+  it("does not divide by a month with nothing in it", () => {
+    expect(heatLevel(0, 0)).toBe(0);
+    expect(heatLevel(50, 0)).toBe(0);
+  });
+});
+
+describe("leadingBlanks", () => {
+  it("puts Monday at the start of the row", () => {
+    // 2026-08-10 is a Monday.
+    expect(leadingBlanks("2026-08-10")).toBe(0);
+  });
+
+  it("counts the days before it for every other weekday", () => {
+    expect(leadingBlanks("2026-08-11")).toBe(1); // Tuesday
+    expect(leadingBlanks("2026-08-15")).toBe(5); // Saturday
+    expect(leadingBlanks("2026-08-16")).toBe(6); // Sunday
+  });
+
+  it("reads the day at midday, so a clock change cannot shift the column", () => {
+    // The same trick `trim` and `daysBetween` use: a bare date parsed at
+    // midnight can land on the wrong side of a daylight-saving boundary.
+    expect(leadingBlanks("2026-03-29")).toBe(6); // Sunday
+  });
+});
 
 const DAY = 86_400_000;
 /** A fixed midday, so nothing here can trip over a timezone at a boundary. */

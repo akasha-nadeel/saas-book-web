@@ -93,6 +93,47 @@ export function recentDays(
 }
 
 /**
+ * Which ink step a day earns on the month grid — 0 for a day with nothing.
+ *
+ * **Four steps, and the lightest is deliberately reachable by one word.** The
+ * question the grid answers is "did I turn up", and a day of forty words that
+ * rendered as blank would answer it wrongly. Magnitude is the *second* thing it
+ * says, which is why the top step is the busiest day rather than a fixed count:
+ * a writer of three hundred words a day and one of three thousand should both
+ * see a month with shape in it.
+ *
+ * A day of cutting is not a level. It is real work — the whole page says so —
+ * but it cannot sit on a scale that runs light-to-dark for *more*, so the grid
+ * marks it separately and the legend names it.
+ */
+export type HeatLevel = 0 | 1 | 2 | 3 | 4;
+
+export function heatLevel(words: number, busiest: number): HeatLevel {
+  if (words <= 0 || busiest <= 0) return 0;
+  const share = words / busiest;
+  if (share > 0.75) return 4;
+  if (share > 0.5) return 3;
+  if (share > 0.25) return 2;
+  return 1;
+}
+
+/**
+ * How many blank cells go before the first day, so the columns are weekdays.
+ *
+ * A month grid whose columns are not weekdays is a grid of thirty squares in
+ * rows of seven, which tells a reader nothing they could not get from a list.
+ * Lined up, the column *is* the weekday — and "I never write on Wednesdays" is
+ * the pattern this whole screen exists to make visible.
+ *
+ * Monday-first, matching the ISO week. `getDay()` counts from Sunday, hence the
+ * shift rather than a lookup.
+ */
+export function leadingBlanks(firstDay: string): number {
+  const at = new Date(`${firstDay}T12:00:00`);
+  return (at.getDay() + 6) % 7;
+}
+
+/**
  * Consecutive days ending today, or ending yesterday.
  *
  * Yesterday counts, and that is a deliberate kindness rather than an
