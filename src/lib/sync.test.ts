@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rank, worthRetrying } from "./sync";
+import { pushOwner, rank, worthRetrying } from "./sync";
 
 /**
  * The two pure decisions in the push queue, and both of them were wrong.
@@ -61,5 +61,31 @@ describe("worthRetrying", () => {
     // console saying so.
     expect(worthRetrying({ code: "42501" })).toBe(false);
     expect(worthRetrying({ code: "PGRST301" })).toBe(false);
+  });
+});
+
+describe("pushOwner", () => {
+  const me = "11111111-1111-1111-1111-111111111111";
+  const them = "22222222-2222-2222-2222-222222222222";
+
+  it("attributes a book this browser made to whoever is signed in", () => {
+    expect(pushOwner({}, me)).toBe(me);
+  });
+
+  it("leaves somebody else's book attributed to them", () => {
+    // The whole of not stealing a manuscript: a shared book keeps its owner,
+    // and only its chapter rows go up.
+    expect(pushOwner({ ownerId: them }, me)).toBe(them);
+  });
+
+  it("sends nothing at all when nobody is signed in", () => {
+    // **The bug this exists for.** A book keeps the `ownerId` of the session
+    // that made it, so after a sign-out the stored value is still there and
+    // still looks like an answer — and `book.ownerId ?? me` handed it over.
+    // The push was then well-formed, attributed to a real person, and sent
+    // with no credentials, so only Postgres could tell it was wrong: 42501,
+    // with a hint recommending we grant `anon` write access to `books`.
+    expect(pushOwner({ ownerId: them }, null)).toBeNull();
+    expect(pushOwner({}, null)).toBeNull();
   });
 });

@@ -907,6 +907,34 @@ function denied<E extends { code?: string }>(error: E, table: string): E {
 
 async function flush() {
   flushTimer = null;
+
+  /*
+   * **Nobody signed in, nothing to push to.**
+   *
+   * Checked once here rather than in each job, because it is a fact about the
+   * session rather than about any one row, and because a queue flushed signed
+   * out is every job in it refused as `anon` — Postgres answering 42501, five
+   * times each, with a hint suggesting the cure is to grant `anon` write
+   * access to `books`. That "fix" would let any stranger write to any writer's
+   * shelf; the actual bug is that we asked at all.
+   *
+   * It happens the moment somebody signs out with a local library: the books
+   * keep their `ownerId` from the session that made them, so the push looked
+   * perfectly well-formed and only the database knew better.
+   *
+   * **Dropped rather than held**, which is safe for the reason the retry note
+   * above gives: signing in ends in a redirect or a full navigation, so an
+   * in-memory queue never survives to see it, and `syncWithServer()` uploads
+   * whatever the browser is holding on the next load anyway. Keeping the jobs
+   * would buy nothing and risk sending one writer's edits under the next
+   * writer's session.
+   */
+  if (!(await currentOwner())) {
+    pending.clear();
+    attempts.clear();
+    return;
+  }
+
   const jobs = [...pending.entries()].sort((a, b) => rank(a[0]) - rank(b[0]));
   pending.clear();
   for (const [key, job] of jobs) {
@@ -1021,9 +1049,33 @@ export function setDeniedHandler(fn: (table: string) => void) {
  * `currentOwner()`. The database no longer trusts this value either (a trigger
  * derives it), but sending the right one keeps the two halves saying the same
  * thing.
+ *
+ * **Signed out, there is no owner at all** — and that has to be checked before
+ * the book's own field rather than after it. A book carries the `ownerId` of
+ * the session that made it, so after a sign-out the stored value is still
+ * there and still looks like an answer; returning it produced a push that was
+ * well-formed, attributed to a real person, and sent with no credentials, so
+ * only the database could tell it was wrong. `flush` now stops a signed-out
+ * queue before any of this runs; this is the same rule stated where the
+ * mistake was actually made.
  */
 async function ownerOf(book: Book): Promise<string | null> {
-  return book.ownerId ?? (await currentOwner());
+  return pushOwner(book, await currentOwner());
+}
+
+/**
+ * The decision on its own, pure and tested, because it is where the mistake
+ * was: `book.ownerId ?? me` reads as "the book knows best, fall back to the
+ * session", and it is the wrong way round. The session decides *whether* to
+ * push at all; the book only decides who to attribute it to once there is a
+ * session to push with.
+ */
+export function pushOwner(
+  book: { ownerId?: string },
+  me: string | null,
+): string | null {
+  if (!me) return null;
+  return book.ownerId ?? me;
 }
 
 /**
