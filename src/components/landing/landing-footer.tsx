@@ -3,7 +3,8 @@ import { DESTINATIONS } from "@/components/landing/works-with";
 import { CONTACT_EMAIL, LEGAL_PAGES, TRADING_NAME } from "@/lib/legal";
 
 /**
- * The footer — five columns, then a rule and a bottom bar.
+ * The footer — a brand column, four columns of links, the name at poster size,
+ * and a thin bar under it.
  *
  * **It is not housekeeping.** A payment provider reviews this domain before it
  * will let anybody take a card, and the first things it looks for are a
@@ -13,44 +14,44 @@ import { CONTACT_EMAIL, LEGAL_PAGES, TRADING_NAME } from "@/lib/legal";
  * four legal links read from `LEGAL_PAGES` and the address from `legal.ts`, so
  * a page and its link cannot drift apart.
  *
- * **The layout is the app-store footer the banner above it belongs to**, which
- * is the one place borrowing a shape actually pays: a reader who has scrolled
- * a whole page of argument wants the exits arranged where every other site
- * puts them. Brand and one control on the left, three columns of links, and
- * one column of somewhere-to-go on the right.
+ * **The giant wordmark is the whole idea of this shape**, and it is worth
+ * saying why it is allowed on a page that refuses decoration everywhere else.
+ * It is not a claim, a figure or a control — it is the last thing on a long
+ * page, where the reader has finished and the only thing left to leave them
+ * with is the name. It is `aria-hidden`: the real mark is at the top of this
+ * footer and in the header, and a screen reader that met the word a third time
+ * would be reading a texture.
  *
- * **Two things in the reference could not be copied, and both for the same
- * reason.** Its left column is a newsletter box and there is no newsletter —
- * a field that pretends to subscribe you to something is the dead UI this app
- * refuses everywhere else. So the control keeps its shape and does the one
- * thing this product can honestly do with an address: it carries it into
- * `/signup`, which already reads `?email=` and fills the field in. It is a
- * plain GET form, so it works with no JavaScript and there is nothing to
- * mis-wire. And its bottom bar is a row of social marks; there are no accounts
- * to link to, and drawing five icons that go nowhere would be worse than the
- * gap. What sits there instead is the one line worth leaving a reader with and
- * an address a person answers.
+ * Three details in it are load-bearing. It is **cropped rather than fitted** —
+ * the wrapper clips it, so the descender of the *p* is cut and the word reads
+ * as bigger than its container rather than as text that happens to be large.
+ * It is **monochrome**, where the mark everywhere else is two-tone: at this
+ * size the indigo half would be the largest colour on the site, and this is a
+ * graphic of the name rather than the mark itself. And it is sized in `vw`
+ * with a ceiling, because a word that fills the measure at 1280px overflows a
+ * phone and underfills a 4K monitor — the clamp is what keeps one word one
+ * width.
  *
- * The last column is the reference's "Download From" with the only true
- * version of that claim available to a book: not where you get *this*, but
- * where what you make with it opens. The marks and the formats are read from
- * `DESTINATIONS`, so the row cannot name a shop the export does not reach.
+ * **Two things the reference has that this cannot.** Its brand column carries
+ * social marks; there are no accounts to link to, and three icons that go
+ * nowhere is the dead UI this app refuses everywhere else — so that slot holds
+ * the one line worth leaving a reader with and an address a person answers.
+ * And it has no newsletter box, which is what used to sit here: a field that
+ * carried an address into `/signup`. It went with this redesign rather than
+ * being squeezed in, because the closing banner immediately above the footer
+ * already asks for exactly that, twice, and the second ask a reader meets in
+ * ten centimetres is the one that reads as desperate.
  */
 
 /**
- * Which two destinations get the badge treatment.
+ * The programs named in the last column.
  *
- * Two rather than seven: this is the reference's pair of store badges, and the
- * full list already runs across the page higher up under a heading that
- * explains it. One of each format the shops actually take — an EPUB reader and
- * a word processor — so the pair says "both kinds of file" rather than "two
- * of the same".
- *
- * Filtered rather than looked up by index, so renaming or reordering
- * `DESTINATIONS` drops a badge instead of breaking the build or, worse,
- * silently printing the wrong mark beside the wrong name.
+ * Filtered out of `DESTINATIONS` by name rather than sliced by index, so
+ * reordering that module drops a name instead of silently printing a shop the
+ * export does not reach. Four rather than seven: this is a column, and the
+ * full list runs across the page higher up under a heading that explains it.
  */
-const BADGED = ["Amazon Kindle", "Microsoft Word"];
+const OPENS_IN = ["Amazon Kindle", "Apple Books", "Microsoft Word", "Google Docs"];
 
 const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
   [
@@ -78,19 +79,18 @@ const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
   ];
 
 export function LandingFooter() {
-  const badges = DESTINATIONS.filter((d) => BADGED.includes(d.name));
+  const opens = DESTINATIONS.filter((d) => OPENS_IN.includes(d.name));
 
   return (
     /* No top border. The banner above ends *on* this ground, so a hairline
        between them would draw a seam across the one place the page is trying
-       to have none. The rule inside, above the bottom bar, is the only one
-       here. */
-    <footer className="bg-lp-ground px-6 pt-14 pb-10 sm:pt-16">
+       to have none. The rule above the bottom bar is the only one here. */
+    <footer className="overflow-hidden bg-lp-ground pt-14 sm:pt-16">
       {/* `max-w-6xl px-6` — the page's one measure, shared with the header and
           every section. See the note in `landing-page.tsx`. */}
-      <div className="mx-auto max-w-6xl">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto] lg:gap-8">
-          {/* ---- Brand, and the one control ---------------------------- */}
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))] lg:gap-8">
+          {/* ---- Brand ------------------------------------------------- */}
           <div>
             {/* The same wordmark the header draws, at the size a footer takes
                 it — a reader should not meet a second mark on the way out. */}
@@ -102,54 +102,23 @@ export function LandingFooter() {
             </Link>
 
             <p className="mt-4 max-w-xs text-[0.9375rem] leading-relaxed">
-              Start with the book you already have.
+              Everything between a finished manuscript and a book somebody can
+              buy, in the order it has to happen. Start with the book you
+              already have.
             </p>
 
-            {/* A real control doing a real thing: the address is carried into
-                the signup form rather than into a list nobody sends. Native
-                GET, so it needs no client component and cannot break. */}
-            <form
-              action="/signup"
-              method="get"
-              className="relative mt-4 max-w-sm"
-            >
-              <label htmlFor="footer-email" className="sr-only">
-                Your email address
-              </label>
-              <input
-                id="footer-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="Enter your email"
-                className="w-full rounded-full border border-lp-edge bg-lp-well py-3.5 pr-14 pl-5 text-[0.9375rem] text-lp-ink placeholder:text-lp-faint focus:border-lp-edge-strong focus:outline-none"
-              />
-              <button
-                type="submit"
-                className="absolute top-1/2 right-1.5 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-lp-accent text-lp-accent-ink hover:opacity-90"
-              >
-                {/* The label is what the press actually does. "Subscribe"
-                    would be a promise about a thing that does not exist. */}
-                <span className="sr-only">Create an account with this address</span>
-                <svg
-                  viewBox="0 0 24 24"
-                  width="17"
-                  height="17"
-                  aria-hidden="true"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth={1.9}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M5 12h13m-5.5-5.5L18.5 12l-6 5.5" />
-                </svg>
-              </button>
-            </form>
-            <p className="mt-2.5 text-[0.75rem] leading-relaxed text-lp-faint">
-              Free, and no card. Your manuscript never leaves your machine.
+            {/* Where the reference puts its social marks. There are no accounts
+                to point at, so the slot carries the claim worth being the last
+                thing read and an address a person answers. */}
+            <p className="mt-5 text-[0.8125rem] leading-relaxed text-lp-soft">
+              Your manuscript stays in your browser.
             </p>
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="mt-2 inline-block text-[0.8125rem] font-medium underline decoration-lp-edge-strong underline-offset-2 hover:text-lp-ink"
+            >
+              {CONTACT_EMAIL}
+            </a>
           </div>
 
           {/* ---- The three link columns ------------------------------- */}
@@ -179,62 +148,70 @@ export function LandingFooter() {
             </nav>
           ))}
 
-          {/* ---- Where the book comes out ------------------------------ */}
+          {/* ---- Where the book comes out ------------------------------
+              A column of names rather than of links, and that is deliberate:
+              these are programs that read our exports, not partners, and a row
+              that navigated to Amazon would be making a relationship out of a
+              file format. Nominative use — see `works-with.tsx`. */}
           <div>
             <h2 className="oc-heading text-[0.9375rem] font-semibold text-lp-ink">
               Your book opens in
             </h2>
-            <ul className="mt-4 space-y-2.5">
-              {badges.map((destination) => (
-                <li key={destination.name}>
-                  {/* Not a link, and deliberately: these are programs that
-                      read our exports, not partners, and a badge that
-                      navigated to Amazon would be making a relationship out of
-                      a file format. Nominative use — see `works-with.tsx`. */}
-                  <span className="flex w-full items-center gap-3 rounded-xl border border-lp-edge bg-lp-well px-4 py-2.5 sm:w-56 lg:w-52">
-                    <svg
-                      viewBox={destination.mark.viewBox}
-                      aria-hidden="true"
-                      className="h-6 w-6 shrink-0"
-                    >
-                      {destination.mark.paths.map((path) => (
-                        <path key={path.d} d={path.d} fill={path.fill} />
-                      ))}
-                    </svg>
-                    <span className="min-w-0 leading-tight">
-                      <span className="block text-[0.6875rem] text-lp-faint">
-                        Opens the {destination.format}
-                      </span>
-                      <span className="block truncate text-[0.875rem] font-semibold text-lp-ink">
-                        {destination.name}
-                      </span>
-                    </span>
-                  </span>
+            <ul className="mt-4 space-y-3 text-[0.875rem]">
+              {opens.map((destination) => (
+                <li key={destination.name} title={`Opens the ${destination.format} export`}>
+                  {destination.name}
                 </li>
               ))}
             </ul>
-            <p className="mt-3 max-w-[13rem] text-[0.75rem] leading-relaxed text-lp-faint">
+            <p className="mt-4 text-[0.75rem] leading-relaxed text-lp-faint">
               Four formats in all, on the free plan.
             </p>
           </div>
         </div>
+      </div>
 
-        {/* ---- The bottom bar ------------------------------------------ */}
-        <div className="mt-12 flex flex-col gap-4 border-t border-lp-line pt-7 sm:flex-row sm:items-center sm:justify-between">
-          {/* Where the reference puts five social marks. There are no accounts
-              to point them at, so the slot carries the one claim worth being
-              the last thing read and an address a person answers. */}
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[0.8125rem]">
-            <span className="text-lp-soft">
-              Your manuscript stays in your browser.
-            </span>
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="font-medium underline decoration-lp-edge-strong underline-offset-2 hover:text-lp-ink"
-            >
-              {CONTACT_EMAIL}
-            </a>
-          </div>
+      {/* ---- The name, at poster size ---------------------------------
+          Inside the page's measure so its left edge starts on the same line as
+          the wordmark above it, and clipped by the footer's own
+          `overflow-hidden` so the crop reads as deliberate.
+
+          `leading-[0.78]` is what does the cropping: the line box is shorter
+          than the glyphs, so the baseline sits below the bottom of the block
+          and the descender is cut. The negative tracking is not decoration —
+          at this size the default spacing leaves the word visibly short of the
+          right margin, and the point of the thing is that it fills the
+          measure. */}
+      <div className="mx-auto mt-14 max-w-6xl px-6 sm:mt-16">
+        {/* The clip lives on this wrapper rather than on the footer, and that
+            is the fix for the one thing that goes wrong here: with a line box
+            shorter than the glyphs, the descender of the *p* paints outside
+            the block and lands on the copyright line under it. Clipped by its
+            own box, the crop is exactly the line box and the bar below is
+            untouched. */}
+        <div className="overflow-hidden">
+          <p
+            aria-hidden="true"
+            /* **The size is measured, not chosen, and 6.09 is the measurement.**
+               "OpenChapter" set in this face at this weight and tracking is
+               6.09em wide, so a font-size of (measure ÷ 6.09) fills the column
+               exactly at every width — which is the whole point of the thing,
+               and something a `clamp` of guessed steps cannot do: it overflowed
+               by 124px at 1280 and would have underfilled a wider screen. The
+               `3rem` is this container's own `px-6`, and `min()` caps it where
+               the container stops growing at `max-w-6xl`. Re-measure if the
+               face, the weight or the tracking changes. */
+            style={{ fontSize: "min(calc((100vw - 3rem) / 6.09), 11.3rem)" }}
+            className="oc-display font-serif leading-[0.78] font-semibold tracking-[-0.045em] text-lp-soft select-none"
+          >
+            OpenChapter
+          </p>
+        </div>
+      </div>
+
+      {/* ---- The bottom bar ------------------------------------------ */}
+      <div className="border-t border-lp-line">
+        <div className="mx-auto max-w-6xl px-6 py-5">
           <p className="font-code text-[0.6875rem] tracking-wider text-lp-faint uppercase">
             © {new Date().getFullYear()} {TRADING_NAME}. All rights reserved.
           </p>

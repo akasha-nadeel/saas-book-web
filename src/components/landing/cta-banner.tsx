@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppWindow } from "@/components/landing/app-window";
+import { SECTION_TITLE } from "@/components/landing/type";
 import { ALL_TOOLS } from "@/lib/book-tools";
 import { PHASES, STEPS } from "@/lib/roadmap";
 
@@ -192,14 +193,17 @@ export function CtaBanner() {
                 and a bold half, and set in this grotesque that is two
                 typographic voices in one sentence — the eye reads a break
                 where the sentence has none. The page's section headings are
-                one even weight at a size that does the ranking, and this is
-                the same `oc-heading` treatment at the same scale, so the last
-                heading a reader meets is set like all the ones before it.
+                one even weight at a size that does the ranking, and this takes
+                that scale from the same constant they do (`SECTION_TITLE`), so
+                the last heading a reader meets is set like all the ones
+                before it and cannot drift from them.
 
                 The line break is kept: at this measure the sentence would
                 otherwise turn after "Take", which puts the break inside the
                 clause rather than between the two. */}
-            <h2 className="oc-heading font-serif text-[1.75rem] leading-tight text-lp-accent-ink sm:text-4xl lg:text-[2.75rem]">
+            <h2
+              className={`oc-display font-serif text-lp-accent-ink ${SECTION_TITLE}`}
+            >
               You have the book.
               <br />
               Take the order for free.

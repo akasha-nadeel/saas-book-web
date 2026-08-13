@@ -328,21 +328,21 @@
   /* ------------------------------------------------------------------------
      The landing page.
 
-     It used to state its colours literally and stay white whatever the app was
-     wearing, on the argument that a shop front should not change colour because
-     of a setting made inside the product. The argument was wrong about one
-     thing, and it is the thing that matters: a reader who keeps their machine
-     dark is not expressing a preference about our marketing, they are telling
-     their whole screen how bright to be, and the one page that ignored it was
-     ours. A white page arriving at night is not brand consistency, it is a
-     flashbang.
+     **The landing page itself is pinned to daylight**, so the values in this
+     dark block are not what a visitor to `/` sees. It carries
+     `data-theme="light"` on its own root div — see the note on that block
+     below and the long one in `landing-page.tsx` — because a shop front is one
+     composition, measured against white, rather than a room somebody works in
+     for hours. What still reads the dark values here is the rest of the public
+     site: `/privacy`, `/terms`, `/refunds` and `/contact` share this palette
+     through `legal-shell.tsx` and are pages a *writer* opens, often from
+     inside the app, so those follow the theme like everything else.
 
-     So the page follows `data-theme` like everything else, and these are the
-     names it needs that the chrome has none for. Everything the app already has
-     a word for — `panel`, `line`, `fg`, `muted`, `raised`, and the whole
-     ok/note/stop family — the page now uses directly rather than restating in
-     hex, which is what stops the two drifting. The light values below are the
-     ones the page shipped with, so daylight is unchanged to the pixel.
+     That is why these tokens keep two values and why they must go on being
+     stated in both blocks. Everything the app already has a word for —
+     `panel`, `line`, `fg`, `muted`, `raised`, and the whole ok/note/stop
+     family — is used directly rather than restated in hex, which is what stops
+     the two drifting; these names exist only for what the chrome cannot say.
 
      Two of these deserve their reasoning written down.
 
@@ -376,6 +376,42 @@
   --color-lp-faint: #85858f; /* eyebrows, format tags, captions */
   --color-lp-accent: #5f5bd0; /* the fill: buttons, the closing banner */
   --color-lp-accent-ink: #ffffff; /* what rides on that fill */
+
+  /* ------------------------------------------------------------------------
+     The three refusal cards, and the page's one decorative hue.
+
+     **This is a documented exception to the one-hue rule, and it is three
+     tokens wide.** Everywhere else on this page a colour is carrying a fact:
+     indigo means *this is the way forward*, and the status family means a shop
+     refuses / this costs you readers / this has passed. These three mean
+     nothing. They are grounds, drawn from the reference the section is built
+     to, and their whole job is that three cards in a column are told apart by
+     the floor under them rather than by counting headings.
+
+     Two things keep the exception from leaking. They are **grounds only** —
+     nothing is ever set *in* them, and no control, badge or mark may take one,
+     which is what stops a reader learning that peach means something. And they
+     are held to about 4% saturation, a step off white: at any more the middle
+     card reads as amber, which on this page is a verdict.
+
+     The order is deliberate too. The first card is the accent's own hue, so
+     the section opens in the page's colour and the other two read as
+     variations on it rather than as three brands. */
+  --color-lp-card-1: #14141c;
+  --color-lp-card-2: #1a1512;
+  --color-lp-card-3: #17131c;
+
+  /* The field the order road is drawn on, and the fourth member of the set
+     above — same rules, same saturation, one extra thing to be careful about.
+
+     **Green already means something on this page.** It is the `ok` end of the
+     status family: passed, earned, nothing owed. A saturated green box around
+     the road would therefore say the road is *finished*, which is the one
+     thing this section must not say to somebody who has not started. At the
+     card tints' saturation it does not read as a verdict at all — it reads as
+     a floor, which is all it is. Keep it there: this is the token most likely
+     to be "improved" into a colour that states something untrue. */
+  --color-lp-road: #121a16;
   /* The same colour as *type on the page*, and it has to be a second value.
      One token cannot do both jobs at night: white needs the fill dark enough
      to sit on (luminance under ~0.18) and a link needs to be light enough to
@@ -505,8 +541,23 @@
    `system`: the bootstrap in layout.tsx resolves the writer's choice against
    `prefers-color-scheme` and writes the answer. So there is exactly one block
    to write here, not two.
+
+   **The selector is `[data-theme="light"]`, not `:root[data-theme="light"]`,
+   and that is what lets one subtree pin its own theme.** These are variable
+   re-points and nothing else, so they inherit: an element carrying the
+   attribute hands the light values to everything under it and touches nothing
+   outside. The landing page is the one caller — it is a shop front and stays
+   white whatever the machine behind it is wearing (see the note in
+   `landing-page.tsx`) — and it works by putting the attribute on its own root
+   `<div>` rather than on `<html>`, which nothing but the app's own theme may
+   write. `color-scheme` rides along and is inherited too, so that div's
+   scrollbar comes out light with it.
+
+   Specificity is not what decides this: `@theme`'s `:root` block is inside
+   `@layer theme` and everything here is unlayered, so an unlayered rule wins
+   whatever it is worth on paper.
    -------------------------------------------------------------------------- */
-:root[data-theme="light"] {
+[data-theme="light"] {
   color-scheme: light;
 
   /* The desk is grey and the cards are white *on* it. This is the inversion
@@ -601,10 +652,11 @@
      turned up — rather than a brighter indigo off the shelf, which would be a
      second brand colour pretending to be the first.
 
-     It has to be stated here rather than derived, because the landing page
-     states its colours literally (it is always light, whatever the app is
-     wearing) and cannot share a token with a screen that has two themes. The
-     two are kept in step by hand: change one, change the other. */
+     It is a second token rather than a share of the landing page's
+     `--color-lp-wordmark`, because the two marks part company at night: this
+     one sits in a black sidebar with nothing near it and goes plain white,
+     while the landing page is pinned to daylight and keeps the indigo always.
+     The two are kept in step by hand: change one, change the other. */
   --color-wordmark: #423ead;
 
   /* Chosen to sit on white; the dark set's #f87171 goes pale and sugary here. */
@@ -662,12 +714,13 @@
 
   /* The landing page in daylight — see the long note in the dark block.
 
-     These are the exact values the page shipped with while it was always
-     light, so nothing about it has moved for a reader who has never chosen a
-     theme on a machine that has never asked for one. The tinted grounds are
-     the accent at about 8% and 4% on white: one colour at four volumes, which
-     is what makes the page read as designed rather than assembled, and the
-     reason they are not a warm neutral. */
+     **This is the landing page, full stop**: it pins itself here with
+     `data-theme="light"`, so every visitor to `/` gets these values whatever
+     their machine is wearing. The dark set exists for the legal pages, which
+     share the palette and do follow the theme. The tinted grounds are the
+     accent at about 8% and 4% on white: one colour at four volumes, which is
+     what makes the page read as designed rather than assembled, and the reason
+     they are not a warm neutral. */
   --color-lp-ground: #ffffff;
   --color-lp-tint: #eeeef5;
   --color-lp-tint-soft: #f7f7fb;
@@ -682,6 +735,22 @@
   --color-lp-faint: #9a9aa2;
   --color-lp-accent: #312e81;
   --color-lp-accent-ink: #ffffff;
+
+  /* The three refusal cards in daylight — see the long note in the dark block.
+     Indigo, peach, violet, all a step off white: `lp-ink` clears 17:1 on every
+     one of them and `lp-body` clears 6.4:1, so the same type reads the same on
+     all three. These are the values the section is actually seen in; the dark
+     set exists only because every token in this file is stated twice. */
+  --color-lp-card-1: #eef1fb;
+  --color-lp-card-2: #fdf3ec;
+  --color-lp-card-3: #f6f0fb;
+
+  /* The order road's field in daylight — see the long note in the dark block,
+     and especially the part about green already meaning "passed" here. This is
+     a step off white at the same saturation as the three above, and it is
+     deliberately *not* `--color-ok-bg` (#ecfdf5), which is a mint carrying a
+     verdict. `lp-ink` clears 16:1 on it and `lp-body` 6.2:1. */
+  --color-lp-road: #eff6f1;
   --color-lp-accent-text: #312e81;
   --color-lp-accent-soft: #6e6c96;
   --color-lp-wordmark: #423ead;
@@ -850,7 +919,10 @@
   }
 }
 
-:root[data-theme="light"] {
+/* Attribute rather than `:root[…]`, like the token block above and for the
+   same reason: these inherit, so a subtree pinning its own theme gets the
+   framing that belongs to it. */
+[data-theme="light"] {
   --lp-hero: url("/hero-light.webp") center center / cover no-repeat;
   --lp-hero-veil: linear-gradient(
     to bottom,
@@ -1590,6 +1662,228 @@ body {
   .lp-scroll-down {
     animation: none;
     will-change: auto;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The order road — the winding path in "The whole point".
+
+   Everything here is the *choreography*; the words and the road itself are
+   drawn by `order-path.tsx` and need none of it. That split is what makes the
+   section safe to render with no JavaScript at all: nothing below hides
+   content, and the two things that would look wrong un-driven — a trail
+   claiming a journey nobody has made, and a marker parked at the top left
+   corner — start hidden and are revealed by the script that moves them.
+   -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   The row, and why it is written here rather than in classes on the element.
+
+   **This layout was three Tailwind utilities and all three were silently
+   dropped.** `md:grid-cols-[minmax(0,1fr)_18%_minmax(0,1fr)]`,
+   `md:min-h-[27rem]` and `md:max-w-[24rem]` produced no CSS at all — the
+   standing v4 hazard the build note warns about — so the row fell back to one
+   column, the words spanned the full width, and the road was drawn straight
+   through the middle of them. A line over prose is a strike-through.
+
+   The lesson is the general one: a layout whose *correctness* depends on the
+   rule existing does not belong in an arbitrary-value utility, because the
+   failure is silent and the fallback is not a worse version of the design, it
+   is a different one. Written here it is one place, legible, and it cannot go
+   missing without the file changing.
+
+   The middle column is empty by construction. That is the whole mechanism:
+   the words can only ever be in the outer two, so the road always has
+   somewhere to wander that nothing is written in.
+   -------------------------------------------------------------------------- */
+/* The field the whole road sits on.
+
+   It also **re-points the ground the marker and the station dots are filled
+   with**, which is the part worth knowing: those two are discs of the page's
+   own ground, and that is not decoration — it is what masks the road behind
+   them so the marker reads as an object travelling *along* the line rather
+   than as a bead threaded onto it. Set here rather than hard-coded in the SVG
+   so the fill and the floor it sits on cannot drift apart; change the field's
+   colour and the dots follow. */
+.oc-road-field {
+  --oc-road-ground: var(--color-lp-road);
+  background: var(--color-lp-road);
+  border-radius: 1.5rem;
+  padding: 2.5rem 1.5rem;
+}
+
+@media (min-width: 48rem) {
+  .oc-road-field {
+    border-radius: 2rem;
+    padding: 3.5rem 2.5rem;
+  }
+}
+
+.oc-road-row {
+  position: relative;
+  /* Room for the rail and its dots on a phone, where the road runs down the
+     left and every station's words sit to the right of it. */
+  padding-left: 3.5rem;
+  padding-top: 2.5rem;
+  padding-bottom: 2.5rem;
+}
+
+.oc-road-words {
+  max-width: 34rem;
+}
+
+@media (min-width: 48rem) {
+  .oc-road-row {
+    display: grid;
+    /* The lane. A proportion rather than a fixed width, so the swing stays in
+       step with how far apart the stations look — a fixed 8rem lane on a wide
+       screen is a straight line with a wobble in it. */
+    grid-template-columns: minmax(0, 1fr) 26% minmax(0, 1fr);
+    align-items: center;
+    /* **The pacing lives here.** The marker's vertical position *is* the
+       reading line, so how fast it feels is entirely how much scrolling
+       separates one station from the next. At four hundred-odd pixels the
+       whole road went past in a flick; a station now holds the screen for
+       most of a window's worth of scrolling, which is the pace somebody
+       reads at. */
+    min-height: 30rem;
+    padding: 0;
+  }
+
+  /* The cap that makes the description set as two lines, and it moves with the
+     type size: at the station scale a sentence of about seventy-five
+     characters wants a little over four hundred pixels to break in half. One
+     line is a caption and four is a paragraph; two is what reads as a label on
+     a station at the speed somebody scrolls past it. Re-check the break if
+     either the size or this number changes — they are a pair. */
+  .oc-road-words {
+    max-width: 26rem;
+  }
+
+  /* `grid-column` rather than a re-order, so what a screen reader hears is the
+     order of the road whichever side a station is drawn on — words first, then
+     the picture of the thing they describe. The words hug the lane from either
+     side, which is what makes the road read as the thing the stations are
+     attached to; the screen takes the column opposite, which is what that half
+     of the row was empty for. */
+  .oc-road-row[data-side="left"] .oc-road-words {
+    grid-column: 1;
+    justify-self: end;
+    text-align: right;
+  }
+
+  .oc-road-row[data-side="left"] .oc-road-screen {
+    grid-column: 3;
+    justify-self: start;
+  }
+
+  .oc-road-row[data-side="right"] .oc-road-words {
+    grid-column: 3;
+    justify-self: start;
+  }
+
+  .oc-road-row[data-side="right"] .oc-road-screen {
+    grid-column: 1;
+    justify-self: end;
+  }
+
+  /* Both halves sit on the same row, or the grid would stack them and the
+     station would be beside one of them and above the other. */
+  .oc-road-row[data-side] .oc-road-words,
+  .oc-road-row[data-side] .oc-road-screen {
+    grid-row: 1;
+  }
+}
+
+/* The screen. Capped rather than filling its column: a drawn window at the
+   full width of a `6xl` half is bigger than the words beside it, and the words
+   are what the station is for. */
+.oc-road-screen {
+  margin-top: 2rem;
+  max-width: 25rem;
+}
+
+@media (min-width: 48rem) {
+  .oc-road-screen {
+    margin-top: 0;
+    max-width: 24rem;
+    width: 100%;
+  }
+}
+
+/* The station's mark. On a phone they line up on a rail at the left; from `md`
+   up each takes its own place in the lane and the road winds between them. */
+.oc-road-stop {
+  position: absolute;
+  top: 3rem;
+  left: 1.25rem;
+  transform: translateX(-50%);
+}
+
+@media (min-width: 48rem) {
+  .oc-road-stop {
+    top: 50%;
+    /* Set inline, per station, and read only here — so the two layouts cannot
+       disagree about which one is in force. */
+    left: var(--at);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* The travelled road. `pathLength="1"` on the element makes these a *fraction*
+   rather than a length, which is what lets the starting state be written here
+   at all: the real length is not known until the path is in the document. */
+.oc-road-done {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
+
+/* No transition on the offset, deliberately. It is already tied frame by frame
+   to the scroll, and easing a value that is being set every frame makes the
+   trail lag the marker it is supposed to be behind. */
+
+.oc-road-marker {
+  opacity: 0;
+}
+
+.oc-road-marker[data-ready="yes"] {
+  opacity: 1;
+}
+
+/* The stations. Hollow while the reader is elsewhere, filled as the marker
+   arrives — the same before/after the roadmap's own markers use, and the
+   reason the road can say where somebody has got to without a word of it. */
+.oc-road-dot .ring {
+  fill: var(--oc-road-ground, var(--color-lp-ground));
+  stroke: var(--color-lp-edge-strong);
+  stroke-width: 1.5;
+}
+
+.oc-road-dot .pip {
+  fill: var(--color-lp-edge-strong);
+  transition: fill 220ms ease;
+}
+
+.oc-road-dot[data-lit="yes"] .pip {
+  fill: var(--color-lp-accent);
+}
+
+.oc-road-dot[data-lit="yes"] .ring {
+  stroke: var(--color-lp-accent);
+}
+
+/* Asked to stop, it stops — and what is left is the whole section: five
+   stations at full strength on a road drawn end to end. The marker and the
+   trail are the only things that were ever *moving*, so they are the only
+   things that go. Nothing here touches the words. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-road-marker,
+  .oc-road-done {
+    display: none;
+  }
+
+  .oc-road-dot .pip {
+    transition: none;
   }
 }
 

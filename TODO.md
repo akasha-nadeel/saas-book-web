@@ -1347,6 +1347,139 @@ Ranked. The first and third together are most of it.
       `-solid` for fills and a `-fg` for text for the same reason — using one
       for both gives either a pale block with white on it or text nobody can
       read. Every pair was checked by contrast rather than by eye.
+
+      **Reversed on 2026-08-12: the landing page is pinned to daylight again.**
+      The reasoning above holds for *the app*, a room somebody works in for
+      hours. It does not hold for a shop front, which is one composition: the
+      grounds, the marker, the drawn screens and the closing banner were all
+      drawn and measured against white, and the dark set was a second design of
+      the page that nobody could hold in their head beside the first. A brand
+      has one look and this is where a reader meets it.
+
+      **None of the work above was thrown away, and that is the point of how it
+      was done.** The `lp-*` tokens keep both values, because the four legal
+      pages share the palette through `legal-shell.tsx` and still follow the
+      theme — they are opened by writers from inside the app. What changed is
+      one attribute and one selector: the light block is now
+      `[data-theme="light"]` rather than `:root[data-theme="light"]`, so any
+      subtree can pin a theme, and the landing page's root `<div>` carries the
+      attribute. That covers the app tokens the page borrows as well as its own,
+      which is why it is a scope rather than a re-point. If the argument turns
+      again, deleting the attribute is the whole of putting it back.
+- [x] **"The order" is a road you travel down.** Done 2026-08-13.
+      `src/components/landing/order-path.tsx` over the pure, tested
+      `src/lib/landing-path.ts` (17 tests). The five phases are stations on one
+      curve, a marker rides it as the reader scrolls, and the station it has
+      reached is at full strength while the rest sit at a floor.
+
+      It was a two-column split — a paragraph beside a boxed list of five rows
+      — and a boxed list is a picture of the very thing this page says nobody's
+      problem is. What a writer is short of is not five names, it is the road
+      between them and where on it they are standing.
+
+      **The technique, since three are in circulation.** `getPointAtLength` on
+      a real path driven from a scroll handler, which is the long-standing
+      scrollytelling one: the browser solves the curve, so the marker is on the
+      line by construction. CSS `offset-path` with a scroll-driven timeline is
+      the right answer one day and not yet — still flagged in Firefox, and it
+      places the marker only, while the dimming is a function of the same
+      progress, so there would be two sources of truth for one number. An
+      `IntersectionObserver` per station answers a different question: three
+      stations can be *in view* at once and a marker cannot be in three places.
+
+      Four things worth not re-deriving:
+
+      - **The curve is drawn through measured station positions**, never a
+        hand-written `d`. That is what lets one code path serve the phone,
+        where the stations stack down a rail, and the desktop, where they
+        alternate across a lane.
+      - **The marker's vertical position *is* the reading line** — progress is
+        the line's position inside the section, so `progress × height + top` is
+        the line itself and the marker cannot appear to lag the scroll. Pacing
+        is therefore controlled by row height alone: it felt frantic at four
+        hundred pixels a station and reads properly at `min-height: 30rem`.
+      - **The stations must alternate exactly** and stay inside the empty
+        middle column. A cubic whose control x equals its endpoints' x cannot
+        overshoot, and perfect alternation is what zeroes those arms — two
+        stations on the same side running would bulge the curve into a
+        sentence.
+      - **The layout is in `globals.css`, not in utilities**, because
+        `md:grid-cols-[minmax(0,1fr)_18%_minmax(0,1fr)]`, `md:min-h-[27rem]`
+        and `md:max-w-[24rem]` all produced *no CSS at all* — the standing
+        Tailwind v4 hazard — which collapsed the row to one column and drew the
+        road straight through the prose. A layout whose correctness depends on
+        a rule existing does not belong where the rule can vanish quietly.
+
+      The road sits on `--color-lp-road`, a fourth decorative ground. Green is
+      the `ok` end of the status family here, so it is held at the card tints'
+      saturation on purpose: a saturated green field would tell somebody who
+      has not started that the road is finished.
+
+      **Each station also shows the screen it is talking about**
+      (`phase-screens.tsx`), in the column its words are not in — the road on
+      its own named the order and never showed the software, so a reader who
+      has not been inside the app finished the section knowing the sequence and
+      nothing else. Three of the five are computed rather than drawn from
+      memory: the writing and revising screens both run the real
+      `proseReport()` over one fixed passage, so the word count on the page and
+      every finding on the report are what the checker actually returns; the
+      advance-copy screen reads `STATUSES` and `LEAD_DAYS` out of `arc.ts`, so
+      its five states and its "6 weeks" are the tool's own; and the publishing
+      screen filters `DESTINATIONS` the way the export dialog does. The passage
+      is deliberately flawed in the ways the report looks for — a clean sample
+      would draw an empty report, which is a picture of a checker that does not
+      work.
+
+- [x] **The three refusal bands show the screen that catches each one.** Done
+      2026-08-12. `src/components/landing/refusal-figures.tsx`, drawn beside the
+      words in `Rejection`, sides alternating down the page.
+
+      Both halves of those bands used to be words: the injury on the left, a
+      panel on the right headed "What this does about it". That is a claim
+      answered by another claim — on the one part of this page that is about the
+      reader's problem rather than our solution to it, for a reader whose whole
+      history is of being told things by software that could not do them. The
+      proof went to a drawn screen, and the three settled as **cards rather
+      than bands**: one section holding three tinted panels, each with a badge,
+      a title, a couple of sentences and the same link back to the check at the
+      top of the page, the screen beside it. They were full-bleed bands with
+      alternating grounds and the figure changing sides, which gave each
+      refusal the weight of a chapter — three chapters is more than this idea
+      is worth to a reader who has not yet been told what the product does.
+
+      Two shapes were tried in between and both are worth not repeating. A
+      matched problem/solution pair — two badges, two titles, two paragraphs —
+      is a page inside a card at this width. And blending the two into one
+      paragraph loses the reply: the sentence about *this product* arrives
+      halfway down a paragraph about Amazon with nothing marking it. What
+      works is one description that names the problem and answers it in the
+      same breath, with the detail on the screen beside it.
+
+      **The three grounds are the page's only decorative colour**, and they are
+      documented as an exception at `--color-lp-card-*` — grounds only, never
+      ink, never a control, and held near 4% saturation so the middle card does
+      not read as amber. The figures wear the **pale ring**, not the bezel: they
+      had the bezel while these were bands on white, and a bezel inside a
+      tinted card is two frames around one screen.
+
+      **Two of the three are computed rather than drawn from memory**, which is
+      the shape to copy. The covers figure runs `coverReport()` over a fixed set
+      of measurements — a 500 × 800 PNG, the ordinary shape of that mistake — so
+      every row, every label and the counts in "2 things a shop would refuse ·
+      6 checks" are the checker's own answers; change a rule in `cover-check.ts`
+      and the picture changes with it. The export figure filters `DESTINATIONS`
+      the way the real dialog does, so it cannot name a shop the export does not
+      reach. Only the listing figure quotes strings, because that form's copy
+      lives inside `publishing-card.tsx` — and its ISBN is the field's own
+      placeholder with the last digit moved by one, so it really does fail the
+      check digit the screen would run on it.
+
+      Two small things worth not re-deriving. There are now two pictures of the
+      listing form on the page and that is deliberate: `store-listing-demo.tsx`
+      shows it filling in, this one shows it *refusing*, which is the only thing
+      refusal 02 is about. And refusal 03's mark had to stop being a tick —
+      drawn in `STOP` it sat four lines above the green tick on "What this does
+      about it", one glyph carrying two opposite meanings.
 - [ ] **One readiness model, not two.** Prepare says "3 to fix"; the roadmap
       says "1 of 18". Same question — is this book ready — two scores, and
       nothing reconciles them. The roadmap is the one with an opinion about
@@ -1388,6 +1521,34 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 `hidden md:flex` with a `<select>` fallback that has never been looked at.
 
 ## Taken out on purpose
+
+- **The landing page's counted band,** removed **2026-08-12** at the owner's
+  request. Four figures on a row of their own under the refusals — 19 steps,
+  16 tools, 4 export formats, 0 EPUBCheck errors — each imported and counted
+  rather than typed, in the slot a SaaS page fills with users and downloads.
+
+  It is worth being clear about what was wrong with it, because the *rule* it
+  embodied is still in force. The figures were never the problem: they are all
+  true, all counted out of the source, and all still on the page. Four numerals
+  on a band of their own ask a reader to be impressed by an arithmetic nobody
+  has yet given them a reason to care about — it arrives before the page has
+  said what the tools are for, and a number without a stake in it reads as
+  padding. Each one now sits where it means something: the steps in "The
+  order", the tool count in the tools heading, the formats in the strip under
+  the hero and in the footer, and the zero in "The export is verified, not
+  asserted".
+
+  The `Counted` component went with it, which is the *opposite* call from
+  `subject-combobox.tsx` and `templates-dialog.tsx` below, deliberately: those
+  are whole features waiting on a way in, while this was twenty lines of
+  presentation whose every input is imported elsewhere on the page. Keeping it
+  callerless would have bought a standing lint warning and nothing else.
+
+  **The rule survives the row**: nothing may go in that slot which cannot be
+  counted out of the source, and no user count, rating or testimonial goes
+  anywhere on the page until there is a real one. Both `CLAUDE.md` and the
+  header comment in `landing-page.tsx` now state it as a rule about the page
+  rather than about that band.
 
 - **"On this book" — the categories half of the categories screen,** taken off
   on **2026-08-11** at the owner's request, who is writing another version of

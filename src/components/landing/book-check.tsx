@@ -10,6 +10,8 @@ import {
   type FileFindings,
 } from "@/lib/file-check";
 import { AppWindow } from "@/components/landing/app-window";
+import { LEAD_DAYS } from "@/lib/arc";
+import { ALL_TOOLS } from "@/lib/book-tools";
 import type { Fix } from "@/lib/checkup";
 import type { ImportedBook } from "@/lib/import/split";
 
@@ -499,7 +501,7 @@ function Result({
         <p className="text-[0.9375rem]">
           {clean ? (
             <span className="font-semibold" style={{ color: PASS }}>
-              Nothing here would stop a shop taking this file.
+              Your file is ready to upload.
             </span>
           ) : (
             <>
@@ -514,29 +516,63 @@ function Result({
 
         {clean ? (
           /*
-           * **The clean pass is the harder result to answer, and it used to
-           * end the conversation.** A reader whose file is refused has an
-           * obvious next move; a reader whose file passes has just been told
-           * everything is fine, and the only thing on screen after that was a
-           * sign-up button for a problem they no longer have.
+           * **The clean pass is the harder result to answer, and it is where
+           * this page loses people.** A reader whose file is refused has an
+           * obvious next move. A reader whose file passes has just been told
+           * everything is fine — and a reader who has been told everything is
+           * fine leaves. The first version of this said only that, in green,
+           * and then asked for an account for a problem it had just announced
+           * they did not have.
            *
-           * So the sentence after the verdict names what this *is* rather than
-           * what it found: the manuscript goes on being written and edited
-           * here, and the publishing job carries on after the file is valid.
-           * Both halves are true of the product and neither claims the check
-           * found anything it did not.
+           * **The answer is not to invent a problem**, which is the one thing
+           * this whole page exists to refuse. It is to say what a file check
+           * structurally *cannot* see. That is not a sales line, it is the
+           * literal truth about the check: it reads the file. Whether the
+           * blurb makes somebody buy, whether those categories are shelves
+           * readers browse, whether one advance reader has the book — none of
+           * that is in a file, and between them they decide how the book does.
+           *
+           * So the shape is: confirm, then name the gap, then say what is
+           * here for it. Three rules hold it.
+           *
+           * - **Every claim is checkable and most are counted.** The six weeks
+           *   is `LEAD_DAYS` out of `arc.ts`, the tool count is `ALL_TOOLS`,
+           *   the step count is `STEPS` — the same figures the rest of the
+           *   page quotes, so this cannot drift into a boast.
+           * - **Nothing implies the check found something.** The green line
+           *   above still says the file is ready, and the gap named here is a
+           *   limit of *file checks*, not a finding about this book.
+           * - **The reader keeps what they came for.** The last sentence is
+           *   what happens to their manuscript, because the fear at this exact
+           *   moment is that signing up is how you get your book back.
            */
-          <p className="mt-3 text-sm leading-relaxed">
-            That is the upload checked — the parts a shop refuses files over.
-            The book itself carries on from here:{" "}
-            <strong className="font-semibold text-lp-ink">
-              it opens in the editor as chapters you can keep writing
-            </strong>
-            , with the blurb, the categories, the cover and the advance readers
-            waiting where they fall in the order. What a file check cannot tell
-            you is whether the blurb sells or which shelf you land on — and that
-            is the rest of the job.
-          </p>
+          <>
+            <p className="oc-heading mt-2 font-serif text-[1.375rem] leading-snug text-lp-ink sm:text-2xl">
+              What a file cannot tell you is whether anyone will find it.
+            </p>
+            {/* A step up from the card's own body size. This is the paragraph
+                that has to be *read* rather than skimmed — it is the only
+                thing between a reader being told their file is fine and a
+                reader leaving — and at footnote size it looked like the small
+                print under a result rather than the answer to it. */}
+            <p className="mt-3.5 text-[1.0625rem] leading-relaxed">
+              A shop refuses files over the things just checked, and yours
+              passes all of them. It says nothing about whether the blurb makes
+              somebody buy, whether those categories are shelves readers
+              actually browse, or whether a single advance reader has your book
+              — and advance copies go out{" "}
+              <strong className="font-semibold text-lp-ink">
+                {Math.round(LEAD_DAYS / 7)} weeks before publication
+              </strong>
+              , which is the one almost nobody is told in time.{" "}
+              {ALL_TOOLS.length} tools here take that on, in the order it
+              happens, and{" "}
+              <strong className="font-semibold text-lp-ink">
+                your book opens as chapters you can keep writing
+              </strong>
+              .
+            </p>
+          </>
         ) : (
           <ul className="mt-4 flex flex-col gap-2">
             {result.findings.map((finding) => {

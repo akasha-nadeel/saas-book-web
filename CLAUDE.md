@@ -44,7 +44,8 @@ Tiptap marks, pagination and click-to-type arithmetic, caret scrolling,
 narration chunking, transcript paragraphing, publishing details and the ISBN
 check digit, the billing price/cycle arithmetic, PayHere's two MD5s and
 Paddle's status mapping, the
-account fallbacks and the `?next=` redirect guard, ambience, relative time —
+account fallbacks and the `?next=` redirect guard, ambience, relative time,
+the landing road's curve and scroll arithmetic (`landing-path.ts`) —
 and one module per tool screen (see the tools section below). Components are
 not tested — jsdom is there for `localStorage`, not for a DOM.
 
@@ -1197,6 +1198,20 @@ test for "this book changed" — and a new mutation cannot forget to push.
 Deletions are found by comparing chapter id sets before and after, because
 `pushBook` upserts a book's chapters but cannot know one was removed.
 
+**Nothing is pushed while nobody is signed in**, checked once in `flush()`
+rather than per job, and the queue is dropped rather than held — signing in
+ends in a redirect, so an in-memory queue never survives to see it, and
+`syncWithServer()` uploads whatever the browser holds on the next load anyway.
+The reason it needs stating: a book keeps the `ownerId` of the session that
+made it, so after a sign-out that field is still there and still looks like an
+answer. `book.ownerId ?? currentOwner()` handed it over, and the resulting push
+was well-formed, attributed to a real person and sent with no credentials — so
+only Postgres could tell it was wrong, with **42501 and a hint recommending
+`GRANT ... ON public.books TO anon`**. Do not take that advice: it would let any
+stranger write to any writer's shelf. The decision is now the pure, tested
+`pushOwner(book, me)`, whose whole content is that the *session* decides
+whether to push and the book only decides who to attribute it to.
+
 **The mapping narrows values on the way out** (`matterOrNull`, `count`, `text`,
 the guard in `toIso`). The types describe today's code; `localStorage` holds
 whatever older versions left there, unchecked by any compiler, and the database
@@ -1887,16 +1902,28 @@ shipping one. Its figure is drawn in markup and its seat numbers come from
 answers the question the section invites: this is not Google Docs, and you will
 not see each other type.
 
-**It follows the theme, through its own token set.** It used to be always light
-and state every colour literally, on the argument that a shop front should not
-change because of a setting made inside the product. That was right about brand
-consistency and wrong about whose setting it is: a reader on a dark machine has
-not expressed a view about our marketing, and the one page ignoring them was the
-first one they ever saw. So the page reads `data-theme` like the app does, off
-the `--color-lp-*` block in `globals.css` — stated in both theme blocks, with
-the light values it shipped with, so daylight is unchanged to the pixel. The
-`prefers-color-scheme` bootstrap in `layout.tsx` already runs on `/`, so a
-signed-out visitor gets the right page with no flash.
+**It is always light, and it is the only screen that is.** It followed
+`data-theme` for a while, on the argument that a reader on a dark machine has
+not expressed a view about our marketing — they have told their whole screen
+how bright to be, and the one page ignoring them was the first one they ever
+saw. That holds for *the app*, a room somebody works in for hours, and is the
+wrong trade for a shop front: this page is one composition whose grounds,
+marker and closing banner were drawn and measured against white, and the dark
+set was a second design of it nobody could hold in their head at once.
+
+**The mechanism is one attribute, and it is why the light block's selector is
+`[data-theme="light"]` rather than `:root[data-theme="light"]`.** These tokens
+are inherited variable re-points, so the page's root `<div>` carries the
+attribute and everything under it resolves to daylight whatever `<html>` says —
+covering the `lp-*` set *and* the app tokens the page borrows in one place,
+which a per-token override could not. `color-scheme` rides along, so that div's
+scrollbar comes out light too. Nothing else may write that attribute below the
+root: it is the app's own theme everywhere else.
+
+**The dark `lp-*` values are still live** — the four legal pages share this
+palette through `legal-shell.tsx`, are opened by writers from inside the app,
+and do follow the theme. So every `lp-*` token goes on being stated in both
+blocks, like every other token in the file.
 
 Four things about that palette are worth knowing:
 
@@ -1904,7 +1931,9 @@ Four things about that palette are worth knowing:
   `muted`, `line`, `raised`, and the whole `ok`/`note`/`stop` family, whose
   light values already *were* the landing page's reds and ambers. The `lp-*`
   names exist only for what the chrome has no word for: two tinted grounds,
-  the drawn tablet's shell, and the accent shades below.
+  the drawn tablet's shell, and the accent shades below. That borrowing is the
+  reason pinning the theme had to be done by scope rather than by re-pointing
+  the `lp-*` names: half the page's colour does not come from them.
 - **`lp-accent` is the fill and `lp-accent-text` is the same colour as type**,
   and at night they must be two values: white has to sit on the fill and a link
   has to sit on near-black, and no single indigo clears 4.5:1 in both
@@ -1918,14 +1947,48 @@ Four things about that palette are worth knowing:
   figures, and the brand marks in `works-with.tsx`. A cover is a picture of an
   object and a trademark is a trademark. Only the drawn *interface* inside
   those figures follows the theme, because it is a picture of this app.
+- **`--color-lp-card-1/2/3` and `--color-lp-road` are the page's one
+  decorative hue, and the only one.** Indigo, peach and violet hold the three
+  refusal cards; the green holds the order road's field. Everywhere else here a
+  colour carries a fact — indigo is the way forward, the status family is a
+  verdict — and these carry none: they exist so cards in a column are told
+  apart by the floor under them. Two rules keep that from leaking, and both are
+  in the long note beside them in `globals.css`: they are **grounds only**,
+  never ink and never a control or a badge, and they stay at about 4%
+  saturation, because a stronger middle card reads as amber, which on this page
+  means *this costs you readers*. `--color-lp-road` is the one to watch — green
+  is the `ok` end of the status family, so a saturated version of it would say
+  the road is *finished* to somebody who has not started.
 
 Three things in it are load-bearing:
 
 - **The figures are drawn in markup, never screenshotted** — the phase list,
   the pre-upload check, the money panel. A screenshot is an asset that goes
   stale silently while the app moves, on the one page whose whole pitch is
-  being checkable. The hero is the exception and goes further: it carries the
-  **real check**, not a drawing of one — see `book-check.tsx`. The one bitmap
+  being checkable. **Three of them go further and are *computed*
+  (`refusal-figures.tsx`)**: the three refusal bands each carry a picture of
+  the screen that catches them, and the covers one runs `coverReport()` over a
+  fixed set of measurements while the export one filters `DESTINATIONS` the way
+  the real dialog does — so every row, label and count in them is the app's own
+  answer and there is nothing left to drift. Prefer that shape for any new
+  figure whose subject is a pure module. **The order road
+  (`order-path.tsx`, over the tested `landing-path.ts`) is the one figure that
+  is not a picture at all** — the five phases are stations on a curve and a
+  marker rides it as the reader scrolls, the station reached at full strength
+  and the rest at a floor. Three things in it are worth not re-deriving: the
+  curve is drawn **through measured station positions** rather than from a
+  hand-written `d`, which is what lets one code path serve the phone and the
+  desktop; the marker's vertical position *is* the reading line, so pacing is
+  controlled by the row height and nothing else; and its whole layout lives in
+  `globals.css` because three arbitrary-value Tailwind utilities were silently
+  dropped and collapsed the row to one column, drawing the road straight
+  through the prose. Each station carries a drawn screen
+  (`phase-screens.tsx`) in the column its words are not in, and three of the
+  five are computed — `proseReport()` over a fixed passage for the writing and
+  revising ones, `STATUSES`/`LEAD_DAYS` for advance copies, `DESTINATIONS` for
+  the export. The hero is the exception and goes
+  further still: it carries the **real check**, not a drawing of one — see
+  `book-check.tsx`. The one bitmap
   on the page is the hero *backdrop* (`public/hero-{dark,light}.webp`, per
   theme, behind `--lp-hero`), which is abstract artwork rather than a picture
   of the product, so it cannot go stale. Its framing is *measured*, not
@@ -1936,10 +1999,35 @@ Three things in it are load-bearing:
 - **Everything countable is imported and counted**: `STEPS`, `PHASES`,
   `ALL_TOOLS`, `TOOL_GROUPS`, the price from `plans.ts`. The ARC step's title,
   its number and its phase are all derived, because the page quotes them.
-- **The stat band is where a SaaS page puts "trusted by 5,000 brands".** There
-  are no customers to count and none may be invented, so it carries four figures
-  counted out of the source instead. Never put a user count, a rating or a
-  testimonial in that row until there is a real one.
+- **Every section title is one scale, and it is a constant** —
+  `SECTION_TITLE` in `components/landing/type.ts`, paired with `oc-display`.
+  Most headings go through `Head`, but three are hand-written (the FAQ's
+  column carries a marker dot and a description, the check's is centred over a
+  window, the closing banner's sits on a coloured ground), so the size has to
+  live somewhere all four can read it — `type.ts` has no `"use client"` for
+  the same reason `sections.ts` does not, and it avoids a cycle with
+  `cta-banner.tsx`. The scale tops out a little **above** the hero's own 56px:
+  a deliberate trade, since the hero holds its place by being three lines
+  against one and by the marker behind its last clause. Re-check that if the
+  hero is ever cut to a single line. The footer's column labels are not
+  section titles and stay small.
+- **Nothing on this page may be a number a SaaS page would invent.** There is
+  where "trusted by 5,000 brands" goes, and there are no customers to count —
+  so no user count, no rating, no testimonial goes anywhere on the page until
+  there is a real one. That rule outlived the row it was written for: a band of
+  four counted figures (steps, tools, formats, EPUBCheck errors) sat under the
+  refusals and was **removed on 2026-08-12**, because four numerals on a band
+  of their own ask a reader to be impressed by an arithmetic nobody has given
+  them a reason to care about. All four figures are still on the page, each
+  where it means something — the steps in "The order", the tool count in the
+  tools heading, the formats in the strip and the footer, the zero in "The
+  export is verified, not asserted".
+- **The testimonial slot holds the research, not customers** (`VOICES` in
+  `landing-page.tsx`): things writers said about the *problem*, quoted from the
+  module each one caused, with nobody named and nothing invented, under a
+  heading that says outright they are not our customers. Same rule as above,
+  answered rather than dodged. Replace it with real quotes — names, and their
+  permission — when there are any.
 
 **Every claim on it has to be true of the code, in both directions.** Nothing
 claims what the app cannot do — the print PDF is the browser's print engine and

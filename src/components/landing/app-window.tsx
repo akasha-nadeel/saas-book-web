@@ -58,16 +58,25 @@ export function AppWindow({
    * Draw the shell as a dark bezel instead of the pale ring.
    *
    * **Still one frame, at two volumes — not a second device.** The pale ring
-   * is right for a figure floating inside a section: it separates the product
-   * from the ground without drawing a machine round it. It is *wrong* for the
-   * one window that is the whole point of its section, where the frame has to
-   * hold the eye and say "look here" — a pale ring on a pale band simply
-   * disappears at that size.
+   * is right for a figure floating inside a section that is already about it:
+   * a heading above it, a paragraph beside it, the section's own words doing
+   * the pointing. It separates the product from the ground without drawing a
+   * machine round it. It is *wrong* for a window that has to carry its own
+   * half of the page, where the frame is what says "look here" — a pale ring
+   * on a pale band simply disappears at that size.
    *
    * The bezel does the holding. Same rounding, same glass, same hairline
    * inside it; only the shell's value changes, so the two still read as one
-   * component rather than as two products. Reserve it for a window that owns
-   * its section, or the page is back to having several devices on it.
+   * component rather than as two products.
+   *
+   * One window takes it: the hero's check, which owns its section outright and
+   * sits on the page's own ground. Everything else keeps the ring, including
+   * the three refusal figures — they wore the bezel while those refusals were
+   * bands on white, and lost it when they moved onto tinted cards, because a
+   * bezel inside a panel is two frames around one screen. That is the test:
+   * reach for it when the window is the loudest thing in its section and has
+   * nothing else framing it — not because it looks more finished, or the page
+   * is back to having several devices on it.
    */
   bezel?: boolean;
   hostRef?: Ref<HTMLDivElement>;
