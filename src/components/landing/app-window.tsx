@@ -35,6 +35,7 @@ export function AppWindow({
   badge,
   label,
   bezel = false,
+  fill = false,
   hostRef,
   screenRef,
   screenClassName = "",
@@ -79,6 +80,21 @@ export function AppWindow({
    * is back to having several devices on it.
    */
   bezel?: boolean;
+  /**
+   * Stretch to the height of whatever holds it, rather than sizing to the
+   * drawn screen inside.
+   *
+   * For a figure that shares a row with a column of words: content-sized, a
+   * short screen leaves the tinted card looking half-empty beside a full
+   * column of text, and the two read as unrelated heights that happen to be
+   * adjacent. Filled, the frame is the row — which is what makes a card read
+   * as *a page beside a screen* rather than as two things dropped in a box.
+   *
+   * The drawn screen keeps its own size and sits at the top of the glass. That
+   * is not a gap to be closed: a real application window has its content at
+   * the top and space below it, which is exactly what this then looks like.
+   */
+  fill?: boolean;
   hostRef?: Ref<HTMLDivElement>;
   screenRef?: Ref<HTMLDivElement>;
   screenClassName?: string;
@@ -102,6 +118,8 @@ export function AppWindow({
       ref={hostRef}
       {...(picture ? { role: "img", "aria-label": label } : {})}
       className={`rounded-[1.4rem] shadow-[0_28px_70px_-28px_rgba(15,15,16,0.45),0_8px_24px_-12px_rgba(15,15,16,0.25)] ${
+        fill ? "flex h-full flex-col" : ""
+      } ${
         bezel
           ? /* A real bezel, so it needs real depth: thicker than the ring it
                replaces, drawn in the page's own darkest ink rather than a
@@ -115,7 +133,11 @@ export function AppWindow({
           inside can be square-edged and simply be clipped by it. Ring and
           glass are both pale in daylight, and without that line between them
           the frame flattens back into a card. */}
-      <div className="overflow-hidden rounded-[1.05rem] border border-lp-line bg-lp-ground">
+      <div
+        className={`overflow-hidden rounded-[1.05rem] border border-lp-line bg-lp-ground ${
+          fill ? "min-h-0 flex-1" : ""
+        }`}
+      >
         {(title || badge) && (
           <div className="flex min-h-11 items-center gap-3 border-b border-lp-line bg-lp-well px-4 sm:px-5">
             {title && (

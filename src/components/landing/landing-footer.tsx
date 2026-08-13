@@ -1,220 +1,252 @@
 import Link from "next/link";
 import { DESTINATIONS } from "@/components/landing/works-with";
+import { TOOL_GROUPS } from "@/lib/book-tools";
 import { CONTACT_EMAIL, LEGAL_PAGES, TRADING_NAME } from "@/lib/legal";
+import { PHASES } from "@/lib/roadmap";
 
 /**
- * The footer — a brand column, four columns of links, the name at poster size,
- * and a thin bar under it.
+ * The footer — a card lifted onto the foot of the closing landscape, laid out
+ * the way the reference lays its own out: five columns across the top, a
+ * second row carrying one group hard left and one hard right, a hairline, and
+ * a bottom bar with the mark on the left and the small print centred.
  *
  * **It is not housekeeping.** A payment provider reviews this domain before it
  * will let anybody take a card, and the first things it looks for are a
  * privacy policy, a refund policy, reachable pricing and a way to contact a
  * human. A policy that exists at a URL nothing links to is reported as
  * missing, so this row is load-bearing in a way footers usually are not. The
- * four legal links read from `LEGAL_PAGES` and the address from `legal.ts`, so
- * a page and its link cannot drift apart.
+ * legal links read from `LEGAL_PAGES` and the address from `legal.ts`, so a
+ * page and its link cannot drift apart.
  *
- * **The giant wordmark is the whole idea of this shape**, and it is worth
- * saying why it is allowed on a page that refuses decoration everywhere else.
- * It is not a claim, a figure or a control — it is the last thing on a long
- * page, where the reader has finished and the only thing left to leave them
- * with is the name. It is `aria-hidden`: the real mark is at the top of this
- * footer and in the header, and a screen reader that met the word a third time
- * would be reading a texture.
+ * **The landscape is this element's own background, and that is what makes the
+ * card work.** It was the other way round first — a fixed-height band painted
+ * by the banner above, with this footer lifted onto it by a negative margin —
+ * and it had a flaw that only shows once the card is tall: the picture ran out.
+ * Landscape appeared down either side of the card for exactly the height of
+ * the lift and then stopped, leaving the lower two thirds of the card sitting
+ * on plain white. The reference runs its artwork behind the *entire* footer,
+ * edge texture and all, down to the last line of small print.
  *
- * Three details in it are load-bearing. It is **cropped rather than fitted** —
- * the wrapper clips it, so the descender of the *p* is cut and the word reads
- * as bigger than its container rather than as text that happens to be large.
- * It is **monochrome**, where the mark everywhere else is two-tone: at this
- * size the indigo half would be the largest colour on the site, and this is a
- * graphic of the name rather than the mark itself. And it is sized in `vw`
- * with a ceiling, because a word that fills the measure at 1280px overflows a
- * phone and underfills a 4K monitor — the clamp is what keeps one word one
- * width.
+ * Painting it here fixes that by construction rather than by tuning: the
+ * background covers however tall this element turns out to be, so the strips
+ * cannot run short whatever gets added to the card. `padding-top` on
+ * `.oc-closing` is the reveal — the picture with nothing on it before the card
+ * begins. That is also why the ground sits on the card `<div>` rather than on
+ * `<footer>`: this element has to keep the picture visible at its edges.
  *
- * **Two things the reference has that this cannot.** Its brand column carries
+ * **Nothing here sits on the picture.** The card brings its own ground, so the
+ * contrast note beside `.oc-closing` constrains what may go in the reveal
+ * above the card and nothing inside it.
+ *
+ * **The two-row split is the reference's, and it is not arbitrary.** Row one
+ * is where somebody goes *next* — what the thing is, how to start, what is in
+ * it, and the policies. Row two is reference material you look up rather than
+ * navigate by: the programs a finished file opens in, and the address. Hard
+ * left and hard right rather than packed against each other, because the point
+ * of the second row is that it is a different kind of thing, and two columns
+ * huddled under the first five read as a sixth and seventh that ran out of
+ * space.
+ *
+ * **Three of the five columns are counted rather than typed.** `THE ORDER`
+ * reads `PHASES`, `THE TOOLS` reads `TOOL_GROUPS`, and the programs read
+ * `DESTINATIONS` — so the footer cannot end up naming a phase that was
+ * renamed, a group that was merged, or a shop the export does not reach. Same
+ * rule the rest of the page is held to.
+ *
+ * **Two things the reference has that this cannot.** Its bottom bar carries
  * social marks; there are no accounts to link to, and three icons that go
- * nowhere is the dead UI this app refuses everywhere else — so that slot holds
- * the one line worth leaving a reader with and an address a person answers.
- * And it has no newsletter box, which is what used to sit here: a field that
- * carried an address into `/signup`. It went with this redesign rather than
- * being squeezed in, because the closing banner immediately above the footer
- * already asks for exactly that, twice, and the second ask a reader meets in
- * ten centimetres is the one that reads as desperate.
+ * nowhere is the dead UI this app refuses everywhere else — so that slot is
+ * simply empty and the small print keeps the centre it is drawn on. And the
+ * poster-sized wordmark that used to close this page is gone with the
+ * redesign: the reference ends on a bottom bar, the mark sits in it at
+ * reading size, and a cropped word the height of a hand above that bar is a
+ * second ending. The mark a reader leaves with is the one in the bar.
  */
+
+/** Row-one column headings are uppercase and small, as the reference sets them. */
+const HEADING =
+  "oc-heading text-[0.6875rem] font-semibold tracking-[0.12em] text-lp-ink uppercase";
+
+/** One row of links, shared by every column so they cannot drift apart. */
+const LINK = "text-[0.875rem] hover:text-lp-ink";
+
+type Column = { heading: string; links: { href: string; label: string }[] };
 
 /**
- * The programs named in the last column.
+ * The five columns across the top.
  *
- * Filtered out of `DESTINATIONS` by name rather than sliced by index, so
- * reordering that module drops a name instead of silently printing a shop the
- * export does not reach. Four rather than seven: this is a column, and the
- * full list runs across the page higher up under a heading that explains it.
+ * `THE ORDER` and `THE TOOLS` point every row at the section that holds them
+ * rather than at a page of their own, and that is honest rather than lazy —
+ * those sections *are* where the phases and the groups are explained, and a
+ * reader who presses "Money and reviews" lands on the part of the page that
+ * describes it. Nothing here is a link to a page that does not exist.
  */
-const OPENS_IN = ["Amazon Kindle", "Apple Books", "Microsoft Word", "Google Docs"];
-
-const COLUMNS: { heading: string; links: { href: string; label: string }[] }[] =
-  [
-    {
-      heading: "Product",
-      links: [
-        { href: "#order", label: "The order" },
-        { href: "#does", label: "What it does" },
-        { href: "#tools", label: "Tools" },
-        { href: "/upgrade", label: "Pricing" },
-      ],
-    },
-    {
-      heading: "Get started",
-      links: [
-        { href: "/signup", label: "Start free" },
-        { href: "/signin", label: "Log in" },
-        { href: "/forgot-password", label: "Reset your password" },
-      ],
-    },
-    {
-      heading: "Legal",
-      links: LEGAL_PAGES.map((page) => ({ ...page })),
-    },
-  ];
+const COLUMNS: Column[] = [
+  {
+    heading: "Product",
+    links: [
+      { href: "#order", label: "The order" },
+      { href: "#does", label: "What it does" },
+      { href: "#tools", label: "Tools" },
+      { href: "/upgrade", label: "Pricing" },
+    ],
+  },
+  {
+    heading: "Get started",
+    links: [
+      { href: "/signup", label: "Start free" },
+      { href: "/signin", label: "Log in" },
+      { href: "/forgot-password", label: "Reset your password" },
+    ],
+  },
+  {
+    heading: "The order",
+    links: PHASES.map((phase) => ({ href: "#order", label: phase.label })),
+  },
+  {
+    heading: "The tools",
+    links: TOOL_GROUPS.map((group) => ({ href: "#tools", label: group.title })),
+  },
+  {
+    heading: "Legal",
+    links: LEGAL_PAGES.map((page) => ({ ...page })),
+  },
+];
 
 export function LandingFooter() {
-  const opens = DESTINATIONS.filter((d) => OPENS_IN.includes(d.name));
-
   return (
-    /* No top border. The banner above ends *on* this ground, so a hairline
-       between them would draw a seam across the one place the page is trying
-       to have none. The rule above the bottom bar is the only one here. */
-    <footer className="overflow-hidden bg-lp-ground pt-14 sm:pt-16">
-      {/* `max-w-6xl px-6` — the page's one measure, shared with the header and
-          every section. See the note in `landing-page.tsx`. */}
-      <div className="mx-auto max-w-6xl px-6">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,1.3fr)_repeat(4,minmax(0,1fr))] lg:gap-8">
-          {/* ---- Brand ------------------------------------------------- */}
-          <div>
-            {/* The same wordmark the header draws, at the size a footer takes
-                it — a reader should not meet a second mark on the way out. */}
-            <Link
-              href="/"
-              className="text-xl font-bold tracking-tight text-lp-ink"
-            >
-              Open<span className="text-lp-wordmark">Chapter</span>
-            </Link>
-
-            <p className="mt-4 max-w-xs text-[0.9375rem] leading-relaxed">
-              Everything between a finished manuscript and a book somebody can
-              buy, in the order it has to happen. Start with the book you
-              already have.
-            </p>
-
-            {/* Where the reference puts its social marks. There are no accounts
-                to point at, so the slot carries the claim worth being the last
-                thing read and an address a person answers. */}
-            <p className="mt-5 text-[0.8125rem] leading-relaxed text-lp-soft">
-              Your manuscript stays in your browser.
-            </p>
-            <a
-              href={`mailto:${CONTACT_EMAIL}`}
-              className="mt-2 inline-block text-[0.8125rem] font-medium underline decoration-lp-edge-strong underline-offset-2 hover:text-lp-ink"
-            >
-              {CONTACT_EMAIL}
-            </a>
-          </div>
-
-          {/* ---- The three link columns ------------------------------- */}
-          {COLUMNS.map((column) => (
-            <nav key={column.heading}>
-              <h2 className="oc-heading text-[0.9375rem] font-semibold text-lp-ink">
-                {column.heading}
-              </h2>
-              <ul className="mt-4 space-y-3 text-[0.875rem]">
-                {column.links.map((link) => (
-                  <li key={link.href}>
-                    {/* In-page anchors stay anchors: a `<Link>` to `#order`
-                        would be a client navigation to the same route, which
-                        scrolls nothing. */}
-                    {link.href.startsWith("#") ? (
-                      <a href={link.href} className="hover:text-lp-ink">
-                        {link.label}
-                      </a>
-                    ) : (
-                      <Link href={link.href} className="hover:text-lp-ink">
-                        {link.label}
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
-
-          {/* ---- Where the book comes out ------------------------------
-              A column of names rather than of links, and that is deliberate:
-              these are programs that read our exports, not partners, and a row
-              that navigated to Amazon would be making a relationship out of a
-              file format. Nominative use — see `works-with.tsx`. */}
-          <div>
-            <h2 className="oc-heading text-[0.9375rem] font-semibold text-lp-ink">
-              Your book opens in
-            </h2>
-            <ul className="mt-4 space-y-3 text-[0.875rem]">
-              {opens.map((destination) => (
-                <li key={destination.name} title={`Opens the ${destination.format} export`}>
-                  {destination.name}
-                </li>
+    /* `.oc-closing` paints the landscape across the whole of this element and
+       reserves the reveal above the card with its own top padding. No ground
+       and no border here: the picture *is* the ground, and it has to show down
+       either side of the card inside it. */
+    <footer className="oc-closing">
+      {/* The inset. This is what leaves a strip of landscape either side, so
+          the card reads as lying *on* the picture rather than as the next
+          section down. It is a small inset on a phone, where a card indented
+          by the desktop amount would be a column of links in a gutter. */}
+      <div className="mx-auto w-full max-w-[120rem] px-3 sm:px-5 lg:px-8">
+        {/* Rounded at the top only, and square at the foot: the card runs to
+            the bottom of the document, so a radius down there would lift it
+            off an edge the window is already cutting. */}
+        <div className="rounded-t-3xl bg-lp-ground px-6 pt-14 sm:rounded-t-[2.5rem] sm:px-10 sm:pt-16 lg:px-14">
+          <div className="mx-auto max-w-6xl">
+            {/* ---- Row one: the five columns --------------------------- */}
+            <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6">
+              {COLUMNS.map((column) => (
+                <nav key={column.heading}>
+                  <h2 className={HEADING}>{column.heading}</h2>
+                  <ul className="mt-4 space-y-2.5">
+                    {column.links.map((link, i) => (
+                      /* Keyed on the label rather than the href: two of these
+                         columns point every row at one section, so hrefs
+                         repeat and React would drop all but the first. */
+                      <li key={`${link.label}-${i}`}>
+                        {/* In-page anchors stay anchors: a `<Link>` to
+                            `#order` would be a client navigation to the same
+                            route, which scrolls nothing. */}
+                        {link.href.startsWith("#") ? (
+                          <a href={link.href} className={LINK}>
+                            {link.label}
+                          </a>
+                        ) : (
+                          <Link href={link.href} className={LINK}>
+                            {link.label}
+                          </Link>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </nav>
               ))}
-            </ul>
-            <p className="mt-4 text-[0.75rem] leading-relaxed text-lp-faint">
-              Four formats in all, on the free plan.
-            </p>
+            </div>
+
+            {/* ---- Row two: hard left, hard right ----------------------
+                Placed into the same five-column grid rather than into a grid
+                of their own, so the left column lines up with Product and the
+                right one with Legal. Two separate grids would agree at one
+                width and part at every other. */}
+            <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-10 sm:mt-16 lg:grid-cols-5 lg:gap-x-6">
+              {/* Names rather than links, and that is deliberate: these are
+                  programs that read our exports, not partners, and a row that
+                  navigated to Amazon would be making a relationship out of a
+                  file format. Nominative use — see `works-with.tsx`. */}
+              {/* **Spans four rather than the Contact block starting at five,
+                  and the difference is a bug that only shows in dev.** Naming
+                  the start line is the direct way to say this, and it was
+                  tried: the class sat on the element, the rule was absent from
+                  the dev stylesheet, and the computed `grid-column-start` came
+                  back `auto` — so Contact auto-placed into column three and
+                  the row read as badly spaced rather than as broken. A
+                  production build *does* emit that utility, so this is
+                  Turbopack failing to rescan for a newly-introduced class
+                  rather than the silent-drop the build note in CLAUDE.md warns
+                  about. Either way a span needs no second class to survive,
+                  and the left block claiming one to four puts the right one in
+                  five by leaving it nowhere else to go.
+
+                  Worth knowing while reading this: Tailwind scans source
+                  *text*, so a class named in a comment is generated whether or
+                  not anything uses it. Grepping the built CSS to prove a
+                  utility shipped will find the mention as readily as the
+                  usage. */}
+              <div className="lg:col-span-4">
+                <h2 className={HEADING}>Your book opens in</h2>
+                <ul className="mt-4 space-y-2.5 text-[0.875rem]">
+                  {DESTINATIONS.map((destination) => (
+                    <li
+                      key={destination.name}
+                      title={`Opens the ${destination.format} export`}
+                    >
+                      {destination.name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Hard right, under Legal — placed by the span on its left
+                  rather than by a start line. See the note above. */}
+              <div>
+                <h2 className={HEADING}>Contact</h2>
+                <ul className="mt-4 space-y-2.5">
+                  <li>
+                    <a href={`mailto:${CONTACT_EMAIL}`} className={LINK}>
+                      {CONTACT_EMAIL}
+                    </a>
+                  </li>
+                  <li className="text-[0.875rem]">One person answers.</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* ---- The bottom bar ---------------------------------------
+                Three cells rather than a flex row with the middle pushed
+                about: the small print is centred on the *card*, not on
+                whatever is left over after the mark, and with an empty right
+                cell that is only true if the two sides are the same width. */}
+            <div className="mt-14 grid grid-cols-1 items-center gap-4 border-t border-lp-line py-8 sm:mt-16 sm:grid-cols-3">
+              <Link
+                href="/"
+                className="text-xl font-bold tracking-tight text-lp-ink"
+              >
+                Open<span className="text-lp-wordmark">Chapter</span>
+              </Link>
+
+              <div className="text-[0.8125rem] leading-relaxed sm:text-center">
+                <p className="font-semibold text-lp-ink">
+                  Your manuscript stays in your browser.
+                </p>
+                <p className="mt-0.5 text-lp-faint">
+                  © {new Date().getFullYear()} {TRADING_NAME}. All rights
+                  reserved.
+                </p>
+              </div>
+
+              {/* The reference's social marks would go here. There are no
+                  accounts to point at, so the cell holds nothing and exists
+                  only to keep the middle one centred. */}
+              <div aria-hidden="true" />
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* ---- The name, at poster size ---------------------------------
-          Inside the page's measure so its left edge starts on the same line as
-          the wordmark above it, and clipped by the footer's own
-          `overflow-hidden` so the crop reads as deliberate.
-
-          `leading-[0.78]` is what does the cropping: the line box is shorter
-          than the glyphs, so the baseline sits below the bottom of the block
-          and the descender is cut. The negative tracking is not decoration —
-          at this size the default spacing leaves the word visibly short of the
-          right margin, and the point of the thing is that it fills the
-          measure. */}
-      <div className="mx-auto mt-14 max-w-6xl px-6 sm:mt-16">
-        {/* The clip lives on this wrapper rather than on the footer, and that
-            is the fix for the one thing that goes wrong here: with a line box
-            shorter than the glyphs, the descender of the *p* paints outside
-            the block and lands on the copyright line under it. Clipped by its
-            own box, the crop is exactly the line box and the bar below is
-            untouched. */}
-        <div className="overflow-hidden">
-          <p
-            aria-hidden="true"
-            /* **The size is measured, not chosen, and 6.09 is the measurement.**
-               "OpenChapter" set in this face at this weight and tracking is
-               6.09em wide, so a font-size of (measure ÷ 6.09) fills the column
-               exactly at every width — which is the whole point of the thing,
-               and something a `clamp` of guessed steps cannot do: it overflowed
-               by 124px at 1280 and would have underfilled a wider screen. The
-               `3rem` is this container's own `px-6`, and `min()` caps it where
-               the container stops growing at `max-w-6xl`. Re-measure if the
-               face, the weight or the tracking changes. */
-            style={{ fontSize: "min(calc((100vw - 3rem) / 6.09), 11.3rem)" }}
-            className="oc-display font-serif leading-[0.78] font-semibold tracking-[-0.045em] text-lp-soft select-none"
-          >
-            OpenChapter
-          </p>
-        </div>
-      </div>
-
-      {/* ---- The bottom bar ------------------------------------------ */}
-      <div className="border-t border-lp-line">
-        <div className="mx-auto max-w-6xl px-6 py-5">
-          <p className="font-code text-[0.6875rem] tracking-wider text-lp-faint uppercase">
-            © {new Date().getFullYear()} {TRADING_NAME}. All rights reserved.
-          </p>
         </div>
       </div>
     </footer>

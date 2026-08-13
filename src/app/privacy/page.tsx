@@ -134,11 +134,11 @@ export default function PrivacyPage() {
               Sent to Anthropic, who process it to answer and do not train on
               it.
             </>,
-            <>
-              <Term>Narration (audiobook export)</Term> — the text of the
-              chapters you choose to narrate, a chunk at a time, sent to a
-              speech provider through the Vercel AI Gateway.
-            </>,
+            /* Narration (text → speech) was listed here and came off with the
+               feature on 2026-08-14. The route is still in the tree but nothing
+               can reach it, so nothing is sent — and a privacy page naming a
+               transfer that cannot happen is as wrong as one that misses a
+               transfer that can. Put both back together. */
             <>
               <Term>Transcription (audiobook import)</Term> — the audio file you
               choose, sent to a transcription provider through the same gateway.

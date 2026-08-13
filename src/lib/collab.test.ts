@@ -175,7 +175,13 @@ describe("the role somebody actually holds", () => {
 describe("invitations waiting for an address", () => {
   it("finds a pending invite by email, whatever the case", () => {
     const invite = member({ status: "pending", userId: null });
-    expect(invitesFor([invite], "  ANN@Example.com ")).toHaveLength(1);
+    /* `NOW` is passed for the same reason every other test here passes it, and
+       this one is the proof: without it `invitesFor` fell back to the real
+       clock while the fixture's `expiresAt` stayed pinned at `NOW + 7 days`.
+       That is 2026-08-13T12:00Z, so the test passed for a week and then began
+       failing forever, mid-afternoon, with nothing changed. A fixture built on
+       a fixed date has to be read against that date. */
+    expect(invitesFor([invite], "  ANN@Example.com ", NOW)).toHaveLength(1);
   });
 
   it("leaves out accepted, revoked and expired ones", () => {

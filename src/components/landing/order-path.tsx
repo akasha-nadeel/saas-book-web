@@ -88,7 +88,11 @@ export interface Station {
   /** `01`, `02` — the phase's number. */
   n: string;
   title: string;
-  note: string;
+  /** A node rather than a string so a station can carry `<Em>` on the phrase
+   *  that is its point — see `SECTION_LEAD` in `type.ts` for the treatment.
+   *  Built in `landing-page.tsx`, which is a Server Component; passing a
+   *  rendered element into this client one as a prop is fine. */
+  note: ReactNode;
   /** Which side of the road the words sit on, from `md` up. */
   side: "left" | "right";
   /** Where the station sits across the width, 0 to 1, from `md` up. Below that
@@ -397,10 +401,26 @@ export function OrderPath({ stations }: { stations: Station[] }) {
                 <p className="font-code text-[0.875rem] font-semibold tracking-[0.18em] text-lp-faint uppercase">
                   Phase {station.n}
                 </p>
-                <h3 className="oc-heading mt-3.5 font-serif text-[2.25rem] leading-[1.08] font-semibold text-lp-ink sm:text-[3rem]">
+                {/* **Bigger and one weight heavier than the page's section
+                    titles, which is allowed here and nowhere else.** A section
+                    title is read once at the top of a block; these are read
+                    five times on the way down a road, each against a drawn
+                    screen on the other side of the lane, so they have to hold
+                    their half of a row rather than announce a section. The
+                    *measure* could not grow with them: the side column is
+                    426px at `max-w-6xl` against the 26rem cap on
+                    `.oc-road-words`, and anything wider puts the words under
+                    the lane the road is drawn through. */}
+                <h3 className="oc-heading mt-3.5 font-serif text-[3.25rem] leading-[1.03] font-bold text-lp-ink sm:text-[4.5rem]">
                   {station.title}
                 </h3>
-                <p className="mt-5 text-[1.25rem] leading-relaxed sm:text-[1.375rem]">
+                {/* The deck treatment — grey sentence, the phase's point in
+                    near-black. **`lp-body` rather than `lp-deck`**: these sit
+                    on the road's green field, where the deck grey measures
+                    4.16:1 and misses AA. Same call as the FAQ cards and the
+                    ask panel; the deck grey is only legal on the page's own
+                    white. */}
+                <p className="mt-5 text-[1.375rem] leading-[1.45] font-semibold text-lp-body sm:text-[1.5rem]">
                   {station.note}
                 </p>
                 {station.callout && (

@@ -2,11 +2,19 @@ import { beforeEach, expect, it } from "vitest";
 import {
   createBook,
   createChapter,
+  createMatterPage,
   findBook,
   getShelf,
   saveBody,
+  setBookAuthor,
 } from "@/lib/library-store";
-import { buildMarkdownFile, fileSize, loadChapters, slugify } from "@/lib/export";
+import {
+  buildMarkdownFile,
+  checkStoreReadiness,
+  fileSize,
+  loadChapters,
+  slugify,
+} from "@/lib/export";
 
 beforeEach(() => {
   localStorage.clear();
@@ -108,4 +116,70 @@ it("omits the book title when exporting a single chapter", () => {
   expect(buildMarkdownFile(book, chapters, { single: true })).toBe(
     "# Chapter One\n\nIt began.",
   );
+});
+
+/**
+ * A copyright page naming somebody else.
+ *
+ * The finding itself is the old part; what is asserted here is that it **comes
+ * with the way to the page**. It is raised on the last screen of the export
+ * wizard, about one of up to sixteen front-matter pages, and a writer told
+ * "your copyright page is wrong" with no link is a writer left to go and find
+ * it. Only the code that found the page knows which one it is, so if this
+ * stops carrying a link nothing downstream can put one back.
+ */
+it("points at the copyright page it is complaining about", () => {
+  const { bookId } = createBook("The Salt Road");
+  setBookAuthor(bookId, "Mara Okonkwo");
+  const pageId = createMatterPage(bookId, "front", "Copyright page")!;
+  saveBody(
+    bookId,
+    pageId,
+    {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Copyright © 2026 A. N. Author" }],
+        },
+      ],
+    },
+    4,
+  );
+
+  const book = findBook(getShelf(), bookId)!;
+  const issue = checkStoreReadiness(book, null).find(
+    (i) => i.field === "copyright-name",
+  );
+
+  expect(issue?.message).toContain("Mara Okonkwo");
+  expect(issue?.link).toEqual({
+    href: `/book/${bookId}/chapter/${pageId}`,
+    label: "Open the copyright page",
+  });
+});
+
+it("says nothing about a copyright page that names the author", () => {
+  const { bookId } = createBook("The Salt Road");
+  setBookAuthor(bookId, "Mara Okonkwo");
+  const pageId = createMatterPage(bookId, "front", "Copyright page")!;
+  saveBody(
+    bookId,
+    pageId,
+    {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Copyright © 2026 Mara Okonkwo" }],
+        },
+      ],
+    },
+    4,
+  );
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(
+    checkStoreReadiness(book, null).some((i) => i.field === "copyright-name"),
+  ).toBe(false);
 });

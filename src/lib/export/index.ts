@@ -183,10 +183,10 @@ function copyrightNames(
   const author = book.author?.trim();
   if (!author) return [];
 
-  const page = chapters.find(
-    (c) =>
-      c.matter === "front" && c.title.trim().toLowerCase() === "copyright page",
-  );
+  const isCopyright = (title: string, matter: string | undefined) =>
+    matter === "front" && title.trim().toLowerCase() === "copyright page";
+
+  const page = chapters.find((c) => isCopyright(c.title, c.matter));
   // No page, or one the export is leaving out anyway — `loadChapters` has
   // already dropped the untouched ones, so anything here is real prose.
   if (!page) return [];
@@ -196,11 +196,27 @@ function copyrightNames(
     .join(" ");
   if (text.toLowerCase().includes(author.toLowerCase())) return [];
 
+  /* The page's own id, so the finding can carry the way to it.
+     `LoadedChapter` has no id — it is what a *renderer* needs — so the meta is
+     matched again on the same rule. It is the shelf that holds ids, and this
+     is the one place that needs both halves. */
+  const meta = book.chapters.find((c) =>
+    isCopyright(c.title, chapterMatterOf(c)),
+  );
+
   return [
     {
       level: "advisory",
       field: "copyright-name",
       message: `Your copyright page does not mention ${author}. A shop compares the name on the page with the name on the listing.`,
+      ...(meta
+        ? {
+            link: {
+              href: `/book/${book.id}/chapter/${meta.id}`,
+              label: "Open the copyright page",
+            },
+          }
+        : {}),
     },
   ];
 }

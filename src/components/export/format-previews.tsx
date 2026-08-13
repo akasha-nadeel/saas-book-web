@@ -18,6 +18,15 @@
  * landing-figures.tsx gives: a screenshot is an asset that goes stale silently
  * while the app keeps moving.
  *
+ * **They are drawn on `sheet`, and every one of them used to be drawn on
+ * `#ededed`.** That is a dark-set near-white typed in at forty call sites, and
+ * `--color-panel` is #ffffff in daylight — so for every writer on a light
+ * machine this whole file rendered white on white, and the cards a format is
+ * chosen from were empty boxes. The tokens are stated in both theme blocks and
+ * do not move between them, because a page of a set book is a picture of an
+ * object: what comes out of this app is black ink on white paper whatever the
+ * screen reading about it is wearing. See the note beside them in globals.css.
+ *
  * Everything is a `<span>`. A button's content model is phrasing content, and
  * these live inside one — `<div>`s would be invalid markup that happens to
  * render.
@@ -35,6 +44,19 @@ export const OPENING =
   "The road ran west, and the salt began before she had counted a mile of it.";
 export const SECOND =
   "She did not look back, and afterwards could never say whether that had been courage or the simple want of a reason to.";
+
+/**
+ * Two more paragraphs, for the one preview that shows a whole page.
+ *
+ * The page sheet on the formatting steps is a *page*, so it has to run past the
+ * chapter opening: an indent, a leading and a justified measure are all things
+ * you cannot judge from two sentences, and a sheet that ran out after them
+ * would show a page with a hole in it.
+ */
+export const THIRD =
+  "By the second afternoon the wind had taken the last of the trees, and there was nothing to walk towards but the white of it and the thin dark line where the white stopped.";
+export const FOURTH =
+  "She had been told the crossing took four days. Nobody had said what a person was supposed to think about for four days.";
 
 /**
  * The measure every preview sets its text to.
@@ -67,15 +89,15 @@ interface PreviewProps {
 /** A trimmed page: chapter number, title, justified body — as `typeset.ts` sets it. */
 function PdfPreview({ book }: PreviewProps) {
   return (
-    <span className={`block h-full w-full ${MEASURE} px-6 pt-5 text-[#ededed]`}>
-      <span className="block text-center font-serif text-[8px] text-[#ededed]/45">
+    <span className={`block h-full w-full ${MEASURE} px-6 pt-5 text-sheet-ink`}>
+      <span className="block text-center font-serif text-[8px] text-sheet-ink/45">
         1
       </span>
-      <span className="mt-1.5 block text-center font-serif text-[10px] tracking-[0.08em] text-[#ededed]/80 uppercase">
+      <span className="mt-1.5 block text-center font-serif text-[10px] tracking-[0.08em] text-sheet-ink/85 uppercase">
         {book.chapter}
       </span>
       <span
-        className="mt-3 block text-justify font-serif text-[7.5px] leading-[1.85] text-[#ededed]/60"
+        className="mt-3 block text-justify font-serif text-[7.5px] leading-[1.85] text-sheet-ink/70"
         style={{ hyphens: "auto" }}
       >
         {OPENING} {SECOND}
@@ -96,11 +118,11 @@ function PdfPreview({ book }: PreviewProps) {
 function EpubPreview({ book, wide }: PreviewProps) {
   const page = (folio: string, prose: string) => (
     <span className="flex min-w-0 flex-1 flex-col">
-      <span className="flex items-baseline justify-between font-serif text-[6.5px] tracking-[0.1em] text-[#ededed]/35 uppercase">
+      <span className="flex items-baseline justify-between font-serif text-[6.5px] tracking-[0.1em] text-sheet-ink/40 uppercase">
         <span className="truncate">{book.title}</span>
         <span className="shrink-0 pl-3">{folio}</span>
       </span>
-      <span className="mt-3 block text-justify font-serif text-[7.5px] leading-[1.9] text-[#ededed]/60">
+      <span className="mt-3 block text-justify font-serif text-[7.5px] leading-[1.9] text-sheet-ink/70">
         {prose}
       </span>
     </span>
@@ -108,7 +130,7 @@ function EpubPreview({ book, wide }: PreviewProps) {
 
   return (
     <span
-      className={`flex h-full w-full ${wide ? "" : MEASURE} flex-col px-6 pt-4 text-[#ededed]`}
+      className={`flex h-full w-full ${wide ? "" : MEASURE} flex-col px-6 pt-4 text-sheet-ink`}
     >
       {/* The gutter is wider than the outer margins, as it is in a bound book. */}
       <span className="flex gap-10">
@@ -117,10 +139,10 @@ function EpubPreview({ book, wide }: PreviewProps) {
       </span>
 
       <span className="mt-auto mb-3 flex items-center gap-2">
-        <span className="block h-[3px] flex-1 rounded-full bg-[#ededed]/10">
-          <span className="block h-full w-1/3 rounded-full bg-[#ededed]/35" />
+        <span className="block h-[3px] flex-1 rounded-full bg-sheet-ink/10">
+          <span className="block h-full w-1/3 rounded-full bg-sheet-ink/40" />
         </span>
-        <span className="shrink-0 font-sans text-[6px] text-[#ededed]/40">
+        <span className="shrink-0 font-sans text-[6px] text-sheet-ink/45">
           32%
         </span>
       </span>
@@ -132,19 +154,19 @@ function EpubPreview({ book, wide }: PreviewProps) {
 function WordPreview({ book }: PreviewProps) {
   const surname = (book.author ?? "").trim().split(/\s+/).pop() || "Author";
   return (
-    <span className={`block h-full w-full ${MEASURE} px-6 pt-4 text-[#ededed]`}>
-      <span className="flex items-start justify-between font-mono text-[6.5px] leading-[1.6] text-[#ededed]/45">
+    <span className={`block h-full w-full ${MEASURE} px-6 pt-4 text-sheet-ink`}>
+      <span className="flex items-start justify-between font-mono text-[6.5px] leading-[1.6] text-sheet-ink/50">
         <span className="block min-w-0">
           <span className="block truncate">{surname}</span>
           <span className="block truncate">{book.title.toUpperCase()}</span>
         </span>
         <span className="block shrink-0 pl-3">1</span>
       </span>
-      <span className="mt-4 block truncate text-center font-mono text-[7px] tracking-wide text-[#ededed]/70 uppercase">
+      <span className="mt-4 block truncate text-center font-mono text-[7px] tracking-wide text-sheet-ink/80 uppercase">
         {book.chapter}
       </span>
       {/* Double-spaced, which is the whole point of the format. */}
-      <span className="mt-3 block font-mono text-[7px] leading-[2.1] text-[#ededed]/55">
+      <span className="mt-3 block font-mono text-[7px] leading-[2.1] text-sheet-ink/65">
         &nbsp;&nbsp;&nbsp;&nbsp;{OPENING}
       </span>
     </span>
@@ -155,29 +177,39 @@ function WordPreview({ book }: PreviewProps) {
 function MarkdownPreview({ book }: PreviewProps) {
   return (
     <span
-      className={`block h-full w-full ${MEASURE} px-6 pt-4 font-mono text-[7.5px] leading-[1.85] text-[#ededed]/55`}
+      className={`block h-full w-full ${MEASURE} px-6 pt-4 font-mono text-[7.5px] leading-[1.85] text-sheet-ink/70`}
     >
       <span className="block truncate">
-        <span className="text-[#a3a3a3]"># </span>
+        <span className="text-sheet-ink/40"># </span>
         {book.title}
       </span>
       <span className="mt-1 block truncate">
-        <span className="text-[#a3a3a3]">## </span>
+        <span className="text-sheet-ink/40">## </span>
         {book.chapter}
       </span>
       <span className="mt-2 block">The road ran west, and the salt began</span>
       <span className="block">
-        <span className="text-[#a3a3a3]">*before*</span> she had counted a mile
+        <span className="text-sheet-ink/40">*before*</span> she had counted a
+        mile
       </span>
       <span className="block">of it. She did not look back.</span>
-      <span className="mt-2 block text-[#ededed]/35">
+      <span className="mt-2 block text-sheet-ink/45">
         &gt; and afterwards could never say
       </span>
     </span>
   );
 }
 
-/** A player, a waveform, and the chapters it was cut into. */
+/**
+ * A player, a waveform, and the chapters it was cut into.
+ *
+ * **Nothing renders this at the moment, and it stays.** The audiobook export
+ * came off the format step on 2026-08-14 to be put back later; the machinery
+ * behind it is whole and tested, and this is the picture that card carried.
+ * Same standing as `templates-dialog.tsx` and `ambience.ts` — kept, callerless,
+ * not to be tidied away. It is still in `PREVIEWS` and `BADGES` below, which
+ * costs nothing and is what makes the return one line of data.
+ */
 function AudiobookPreview({ book }: PreviewProps) {
   // Fixed rather than random: a preview that redraws differently on every
   // render reads as a loading state.
@@ -187,29 +219,29 @@ function AudiobookPreview({ book }: PreviewProps) {
   ];
   return (
     <span
-      className={`flex h-full w-full ${MEASURE} flex-col px-6 pt-4 text-[#ededed]`}
+      className={`flex h-full w-full ${MEASURE} flex-col px-6 pt-4 text-sheet-ink`}
     >
       <span className="flex items-center gap-2">
-        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-[#ededed]">
+        <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-sheet-ink">
           <span
             className="block h-0 w-0"
             style={{
               borderTop: "3px solid transparent",
               borderBottom: "3px solid transparent",
-              borderLeft: "5px solid white",
+              borderLeft: "5px solid var(--color-sheet)",
               marginLeft: "1px",
             }}
           />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-sans text-[7px] font-semibold text-[#ededed]/70">
+          <span className="block truncate font-sans text-[7px] font-semibold text-sheet-ink/80">
             {book.chapter}
           </span>
-          <span className="block truncate font-sans text-[6px] text-[#ededed]/40">
+          <span className="block truncate font-sans text-[6px] text-sheet-ink/50">
             {book.title}
           </span>
         </span>
-        <span className="shrink-0 font-mono text-[6.5px] text-[#ededed]/40">
+        <span className="shrink-0 font-mono text-[6.5px] text-sheet-ink/50">
           04:12 / 12:38
         </span>
       </span>
@@ -218,17 +250,15 @@ function AudiobookPreview({ book }: PreviewProps) {
         {bars.map((h, i) => (
           <span
             key={i}
-            className="block w-[3px] rounded-full"
-            style={{
-              height: `${h}%`,
-              background: i < 10 ? "#ededed" : "rgba(237,237,237,0.18)",
-              opacity: i < 10 ? 0.7 : 1,
-            }}
+            className={`block w-[3px] rounded-full ${
+              i < 10 ? "bg-sheet-ink/70" : "bg-sheet-ink/20"
+            }`}
+            style={{ height: `${h}%` }}
           />
         ))}
       </span>
 
-      <span className="mt-2.5 block font-mono text-[6.5px] leading-[1.9] text-[#ededed]/40">
+      <span className="mt-2.5 block font-mono text-[6.5px] leading-[1.9] text-sheet-ink/50">
         <span className="flex justify-between">
           <span className="truncate">01 &nbsp;{book.chapter}</span>
           <span className="shrink-0 pl-2">12:38</span>
@@ -264,45 +294,46 @@ function AudiobookPreview({ book }: PreviewProps) {
  *
  * **They were coloured and now are not.** PDF red and Word blue were the two
  * the world already reads those formats by, with EPUB green and audio amber
- * invented to match; the app is greyscale, so all five are white and the glyph
- * plus the format's own name beside it carry the recognition. Nothing is lost
- * that was doing real work here — the marks were never brand marks, which is
- * the whole of the paragraph above.
+ * invented to match; the app is greyscale, so the glyph plus the format's own
+ * name beside it carry the recognition. Nothing is lost that was doing real
+ * work here — the marks were never brand marks, which is the whole of the
+ * paragraph above.
+ *
+ * **They take `currentColor` and used to be filled `#ffffff`.** White is right
+ * in the dark set and is the card's own ground in daylight, so on a light
+ * machine every one of these was an invisible mark beside a format name. The
+ * caller says what colour a mark is, which is also what lets a chosen card ink
+ * its mark in the accent.
  *
  * Paths: file glyphs from Font Awesome Free 6 (CC BY 4.0,
  * https://fontawesome.com); Markdown from Simple Icons (CC0).
  */
 const BADGES: Record<
   keyof typeof PREVIEWS,
-  { viewBox: string; path: string; color: string; label: string }
+  { viewBox: string; path: string; label: string }
 > = {
   pdf: {
     viewBox: "0 0 576 512",
-    color: "#ffffff",
     label: "PDF file",
     path: "M96 0C60.7 0 32 28.7 32 64l0 384c0 35.3 28.7 64 64 64l80 0 0-112c0-35.3 28.7-64 64-64l176 0 0-165.5c0-17-6.7-33.3-18.7-45.3L290.7 18.7C278.7 6.7 262.5 0 245.5 0L96 0zM357.5 176L264 176c-13.3 0-24-10.7-24-24L240 58.5 357.5 176zM240 380c-11 0-20 9-20 20l0 128c0 11 9 20 20 20s20-9 20-20l0-28 12 0c33.1 0 60-26.9 60-60s-26.9-60-60-60l-32 0zm32 80l-12 0 0-40 12 0c11 0 20 9 20 20s-9 20-20 20zm96-80c-11 0-20 9-20 20l0 128c0 11 9 20 20 20l32 0c28.7 0 52-23.3 52-52l0-64c0-28.7-23.3-52-52-52l-32 0zm20 128l0-88 12 0c6.6 0 12 5.4 12 12l0 64c0 6.6-5.4 12-12 12l-12 0zm88-108l0 128c0 11 9 20 20 20s20-9 20-20l0-44 28 0c11 0 20-9 20-20s-9-20-20-20l-28 0 0-24 28 0c11 0 20-9 20-20s-9-20-20-20l-48 0c-11 0-20 9-20 20z",
   },
   docx: {
     viewBox: "0 0 384 512",
-    color: "#ffffff",
     label: "Word file",
     path: "M0 64C0 28.7 28.7 0 64 0L213.5 0c17 0 33.3 6.7 45.3 18.7L365.3 125.3c12 12 18.7 28.3 18.7 45.3L384 448c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zm208-5.5l0 93.5c0 13.3 10.7 24 24 24L325.5 176 208 58.5zM135.4 274.8c-2.9-12.9-15.7-21.1-28.6-18.2s-21.1 15.7-18.2 28.6l32 144c2.3 10.5 11.4 18.2 22.2 18.8s20.6-6.1 24-16.4l25.2-75.7 25.2 75.7c3.4 10.2 13.2 16.9 24 16.4s19.9-8.2 22.2-18.8l32-144c2.9-12.9-5.3-25.8-18.2-28.6s-25.8 5.3-28.6 18.2l-13.2 59.4-20.6-61.8c-3.3-9.8-12.4-16.4-22.8-16.4s-19.5 6.6-22.8 16.4l-20.6 61.8-13.2-59.4z",
   },
   epub: {
     viewBox: "0 0 512 512",
-    color: "#ffffff",
     label: "EPUB file",
     path: "M256 141.3l0 309.3 .5-.2C311.1 427.7 369.7 416 428.8 416l19.2 0 0-320-19.2 0c-42.2 0-84.1 8.4-123.1 24.6-16.8 7-33.4 13.9-49.7 20.7zM230.9 61.5L256 72 281.1 61.5C327.9 42 378.1 32 428.8 32L464 32c26.5 0 48 21.5 48 48l0 352c0 26.5-21.5 48-48 48l-35.2 0c-50.7 0-100.9 10-147.7 29.5l-12.8 5.3c-7.9 3.3-16.7 3.3-24.6 0l-12.8-5.3C184.1 490 133.9 480 83.2 480L48 480c-26.5 0-48-21.5-48-48L0 80C0 53.5 21.5 32 48 32l35.2 0c50.7 0 100.9 10 147.7 29.5z",
   },
   markdown: {
     viewBox: "0 0 24 24",
-    color: "#ffffff",
     label: "Markdown",
     path: "M22.27 19.385H1.73A1.73 1.73 0 010 17.655V6.345a1.73 1.73 0 011.73-1.73h20.54A1.73 1.73 0 0124 6.345v11.308a1.73 1.73 0 01-1.73 1.731zM5.769 15.923v-4.5l2.308 2.885 2.307-2.885v4.5h2.308V8.078h-2.308l-2.307 2.885-2.308-2.885H3.46v7.847zM21.232 12h-2.309V8.077h-2.307V12h-2.308l3.461 4.039z",
   },
   audiobook: {
     viewBox: "0 0 384 512",
-    color: "#ffffff",
     label: "Audio file",
     path: "M0 64C0 28.7 28.7 0 64 0L213.5 0c17 0 33.3 6.7 45.3 18.7L365.3 125.3c12 12 18.7 28.3 18.7 45.3L384 448c0 35.3-28.7 64-64 64L64 512c-35.3 0-64-28.7-64-64L0 64zm208-5.5l0 93.5c0 13.3 10.7 24 24 24L325.5 176 208 58.5zm53.8 185.2c-9.1-6.3-21.5-4.1-27.8 5s-4.1 21.5 5 27.8c23.9 16.7 39.4 44.3 39.4 75.5s-15.6 58.9-39.4 75.5c-9.1 6.3-11.3 18.8-5 27.8s18.8 11.3 27.8 5c34.1-23.8 56.6-63.5 56.6-108.3S296 267.5 261.8 243.7zM80 312c-8.8 0-16 7.2-16 16l0 48c0 8.8 7.2 16 16 16l24 0 27.2 34c3 3.8 7.6 6 12.5 6l.3 0c8.8 0 16-7.2 16-16l0-128c0-8.8-7.2-16-16-16l-.3 0c-4.9 0-9.5 2.2-12.5 6l-27.2 34-24 0zm128 72.2c0 10.7 10.5 18.2 18.9 11.6 12.9-10.3 21.1-26.1 21.1-43.8s-8.2-33.5-21.1-43.8c-8.4-6.7-18.9 .9-18.9 11.6l0 64.5z",
   },
@@ -314,7 +345,7 @@ const BADGES: Record<
  * It sits at the head of the card beside the format's name, which is where a
  * reader looks to find out what a thing is. On the artwork it was a second
  * object competing with the preview it was pinned to; here it is simply the
- * name's own mark, and each keeps its real colour.
+ * name's own mark, inked by whatever it is sitting in.
  */
 export function FormatMark({
   format,
@@ -329,7 +360,7 @@ export function FormatMark({
       role="img"
       aria-label={badge.label}
       viewBox={badge.viewBox}
-      fill={badge.color}
+      fill="currentColor"
       className={`shrink-0 ${className}`}
     >
       <path d={badge.path} />

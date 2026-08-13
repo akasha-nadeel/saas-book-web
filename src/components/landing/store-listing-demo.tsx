@@ -585,7 +585,16 @@ export function StoreListingDemo() {
     // out as a list of stray words. `screenRef` still wraps the same box the
     // pointer's measurements are taken relative to, so adding a title bar
     // above it moves the whole figure and changes nothing about the maths.
+    //
+    // **The bezel since 2026-08-14**, at the owner's request, where this
+    // carried the pale ring. Its section is plain white now, and the test
+    // `app-window.tsx` sets out is exactly that one: a pale hairline on a pale
+    // ground has nothing to hold, and the frame is what has to say "this is a
+    // screen" when the window is the loudest thing in its half of the page. It
+    // also puts this in step with the check demo two sections up and with the
+    // drawn tablet in the order rows — three windows, one frame.
     <AppWindow
+      bezel
       label="A store-listing form filling itself in — ISBN, language, publisher, publication date, series and number in series — and then being submitted."
       hostRef={hostRef}
       screenRef={screenRef}

@@ -106,6 +106,14 @@ function Line({ w }: { w: number }) {
    01 — writing
    -------------------------------------------------------------------------- */
 
+/**
+ * **Callerless since 2026-08-13, and kept on purpose.** The writing phase's
+ * figure is a photograph of a laptop now (`WriteShot` in `landing-page.tsx`),
+ * swapped in at the owner's request. This is the drawn version, and it is the
+ * one that cannot go stale — if the picture ever starts lying about the
+ * editor's chrome, putting this back is a one-line change in `ORDER_SCREENS`.
+ * Do not tidy it away; see TODO.md under "Taken out on purpose".
+ */
 export function WriteScreen() {
   return (
     <AppWindow
@@ -221,6 +229,14 @@ const ASKED_FOR = [
   ["Blurb", "todo"],
 ] as const;
 
+/**
+ * **Callerless since 2026-08-13, and kept for the same reason `WriteScreen`
+ * is.** The prepare phase's figure is a photograph of a tablet now
+ * (`PrepareShot` in `landing-page.tsx`). This is the drawn version, and it is
+ * the one that cannot go stale — it is rendered from the app's own strings, so
+ * putting it back is a one-line change in `ORDER_SCREENS` if the picture ever
+ * starts quoting a version of Prepare that no longer exists.
+ */
 export function PrepareScreen() {
   const left = ASKED_FOR.filter(([, state]) => state === "todo").length;
 
@@ -275,6 +291,17 @@ export function PrepareScreen() {
 /* --------------------------------------------------------------------------
    04 — before you publish
    -------------------------------------------------------------------------- */
+
+/**
+ * **Callerless since 2026-08-13, and the costliest of the three to lose.**
+ * `ArcShot` in `landing-page.tsx` — a photograph of a laptop — draws this
+ * phase now, at the owner's request. Where `WriteScreen` and `PrepareScreen`
+ * were merely drawn, this one was *computed*: the badges below are `STATUSES`
+ * and the six weeks is `LEAD_DAYS`, so it could not go stale in either
+ * respect and the photograph can go stale in both. Putting it back is a
+ * one-line change in `ORDER_SCREENS`. Do not tidy it away; see TODO.md under
+ * "Taken out on purpose".
+ */
 
 /** Who has the advance copy, drawn against the tool's own five states. The
  *  names are invented; the *states* are not, and neither is the lead time. */
@@ -336,6 +363,17 @@ export function ArcScreen() {
  *  the export does not reach. */
 const EPUB_OPENS = DESTINATIONS.filter((d) => d.format === "EPUB");
 
+/**
+ * **Nothing renders this since 2026-08-14**, and it stays — the publishing row
+ * carries a photograph of the real export screen now (`PublishShot` in
+ * `landing-page.tsx`), at the owner's request and on the same terms as the
+ * three rows that went that way before it.
+ *
+ * Keep it. The thing it does that a bitmap cannot is the `EPUB_OPENS` filter
+ * above: those three shop names are `DESTINATIONS` read through the export's
+ * own rule, so this drawing could never name a shop the export does not reach.
+ * Putting it back is one line in `ORDER_SCREENS`.
+ */
 export function PublishScreen() {
   return (
     <AppWindow label="The finished export: an EPUB at zero EPUBCheck errors, with the shops it opens in.">

@@ -95,6 +95,14 @@ describe("parseArc", () => {
   });
 });
 
+/*
+ * **Kept although nothing calls `isOverdue` any more.** The chasing half of
+ * this tool came out on 2026-08-13 to be rebuilt, and these are the decisions
+ * it was built on — that a reviewed or declined reader is never late, and that
+ * silence is. Deleting them would mean the rebuild re-deciding both from
+ * scratch, which is how a feature comes back subtly different from the one
+ * that was taken out. See TODO.md under "Taken out on purpose".
+ */
 describe("isOverdue", () => {
   it("is late once the date has passed and nobody has answered", () => {
     expect(isOverdue(reader({ dueAt: NOW - DAY }), NOW)).toBe(true);
@@ -120,16 +128,18 @@ describe("isOverdue", () => {
 
 describe("summarise", () => {
   it("counts nothing without falling over", () => {
-    expect(summarise([], NOW)).toEqual({
+    expect(summarise([])).toEqual({
       total: 0,
       out: 0,
       reviewed: 0,
-      overdue: 0,
       reviewRate: null,
     });
   });
 
-  it("counts copies still out, reviews in, and what is late", () => {
+  // No `overdue` field and no clock to work one out from — see the note above
+  // `isOverdue`. A summary that still counted what nothing draws would be the
+  // first place the removed feature grew back by accident.
+  it("counts copies still out and reviews in", () => {
     const readers = [
       reader({ id: "1", status: "sent" }),
       reader({ id: "2", status: "reading" }),
@@ -137,11 +147,31 @@ describe("summarise", () => {
       reader({ id: "4", status: "declined" }),
       reader({ id: "5", status: "silent", dueAt: NOW - DAY }),
     ];
-    const s = summarise(readers, NOW);
+    const s = summarise(readers);
     expect(s.total).toBe(5);
-    expect(s.out).toBe(2);
+    // Three: sent, reading, *and* the silent one. Somebody who was chased and
+    // said nothing still has the copy, and this used to answer 2 — so a writer
+    // counting five rows against the boxes could not find the fifth anywhere.
+    expect(s.out).toBe(3);
     expect(s.reviewed).toBe(1);
-    expect(s.overdue).toBe(1);
+    expect(s).not.toHaveProperty("overdue");
+  });
+
+  // The one to keep: out, reviewed and declined are the whole list between
+  // them, so the row of figures can always be reconciled against the rows
+  // under it.
+  it("accounts for every reader between out, reviewed and declined", () => {
+    const readers = [
+      reader({ id: "1", status: "sent" }),
+      reader({ id: "2", status: "reading", dueAt: NOW - DAY }),
+      reader({ id: "3", status: "reviewed" }),
+      reader({ id: "4", status: "reviewed" }),
+      reader({ id: "5", status: "declined" }),
+      reader({ id: "6", status: "silent", dueAt: NOW - DAY }),
+    ];
+    const s = summarise(readers);
+    const declined = readers.filter((r) => r.status === "declined").length;
+    expect(s.out + s.reviewed + declined).toBe(s.total);
   });
 
   it("rates reviews against those who answered, not against everyone", () => {
@@ -155,46 +185,53 @@ describe("summarise", () => {
         reader({ id: `s${n}`, status: "silent" }),
       ),
     ];
-    expect(summarise(readers, NOW).reviewRate).toBe(75);
+    expect(summarise(readers).reviewRate).toBe(75);
   });
 
   it("has no rate at all until somebody answers", () => {
     // Not zero — zero reads as "everyone refused you", which is a claim about
     // a campaign that has simply not resolved yet.
     const readers = [reader({ status: "sent" }), reader({ status: "silent" })];
-    expect(summarise(readers, NOW).reviewRate).toBeNull();
+    expect(summarise(readers).reviewRate).toBeNull();
   });
 });
 
 describe("sortReaders", () => {
-  it("puts the late ones first, then whoever is due soonest", () => {
+  it("puts whoever is due soonest first, and no date last", () => {
+    // A date that has gone is simply the earliest date, so the one that used
+    // to be picked out as "late" still arrives at the top — without anything
+    // here knowing what late means.
     const readers = [
       reader({ id: "a", name: "No date" }),
       reader({ id: "b", name: "Due later", dueAt: NOW + 10 * DAY }),
-      reader({ id: "c", name: "Late", dueAt: NOW - DAY }),
+      reader({ id: "c", name: "Gone by", dueAt: NOW - DAY }),
       reader({ id: "d", name: "Due soon", dueAt: NOW + DAY }),
     ];
-    expect(sortReaders(readers, NOW).map((r) => r.name)).toEqual([
-      "Late",
+    expect(sortReaders(readers).map((r) => r.name)).toEqual([
+      "Gone by",
       "Due soon",
       "Due later",
       "No date",
     ]);
   });
 
-  it("sorts a finished reader by date rather than by lateness", () => {
-    // Someone who reviewed a month after their deadline is not a chase, so
-    // they sit with the dated readers rather than jumping the queue.
+  it("sorts a finished reader by its date like any other", () => {
+    // It used to drop somebody who had already reviewed below a genuinely
+    // overdue reader. With no overdue there is one rule, and the badge on the
+    // row is what says which of the two is finished.
     const readers = [
-      reader({ id: "a", name: "Reviewed late", status: "reviewed", dueAt: NOW - 5 * DAY }),
-      reader({ id: "b", name: "Actually late", dueAt: NOW - DAY }),
+      reader({ id: "a", name: "Reviewed", status: "reviewed", dueAt: NOW - 5 * DAY }),
+      reader({ id: "b", name: "Waiting", dueAt: NOW - DAY }),
     ];
-    expect(sortReaders(readers, NOW)[0].name).toBe("Actually late");
+    expect(sortReaders(readers).map((r) => r.name)).toEqual([
+      "Reviewed",
+      "Waiting",
+    ]);
   });
 
   it("does not disturb the caller's list", () => {
     const readers = [reader({ id: "b", name: "B" }), reader({ id: "a", name: "A" })];
-    sortReaders(readers, NOW);
+    sortReaders(readers);
     expect(readers.map((r) => r.name)).toEqual(["B", "A"]);
   });
 });

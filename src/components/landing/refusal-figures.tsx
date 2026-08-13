@@ -146,7 +146,10 @@ const COVER_PROBLEMS = COVER_REPORT.filter(
  */
 export function CoverCheckFigure() {
   return (
-    <AppWindow label="The covers screen, checking a 500 × 800 PNG: two things a shop would refuse, listed above the checks that passed.">
+    <AppWindow
+      fill
+      label="The covers screen, checking a 500 × 800 PNG: two things a shop would refuse, listed above the checks that passed."
+    >
       <div className="p-4 sm:p-5">
         {/* The file, as the screen draws it: the picture, its name, and the
             measurements as a labelled list rather than a run of numbers. */}
@@ -302,6 +305,7 @@ function FormField({
 export function ListingFigure() {
   return (
     <AppWindow
+      fill
       label="The listing form, with the ISBN box outlined in red and the words: that check digit doesn’t add up."
     >
       <div className="p-4 sm:p-5">
@@ -355,6 +359,7 @@ const EPUB_OPENS = DESTINATIONS.filter(
 export function ExportDoneFigure() {
   return (
     <AppWindow
+      fill
       label="The dialog after an export: your EPUB is ready, with the file’s name and size and the shops it opens in."
     >
       <div className="p-5 sm:p-6">

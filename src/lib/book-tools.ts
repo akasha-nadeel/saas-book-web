@@ -209,7 +209,7 @@ export const TOOL_GROUPS: ToolGroup[] = [
         path: "arc",
         icon: "send",
         name: "Advance copies",
-        what: "Who holds one, who reviewed, and who is late. One list instead of six sites.",
+        what: "Who holds one, who reviewed, and when each review is wanted. One list instead of six sites.",
       },
     ],
   },

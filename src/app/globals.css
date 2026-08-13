@@ -162,6 +162,31 @@
   --color-guide: #2f7d32;
   --color-guide-hover: #276b2a; /* deepens, since a mid-tone cannot brighten */
 
+  /* ------------------------------------------------------------------------
+     Paper — the sheet every export preview is drawn on.
+
+     **A documented exception, stated identically in both blocks**, and it joins
+     the landing page's rule rather than the chrome's: *drawn artwork of an
+     object stays literal.* A book cover is a picture of a cover in either
+     theme, and a page of a set book is a picture of a page — what leaves this
+     app is black ink on white paper for every reader, so a preview that turned
+     charcoal after sunset would be showing a file nobody will ever open.
+
+     It was learned the expensive way. The format cards and the specimen were
+     written against the dark set with `#ededed` typed in at every call site,
+     which is near-white — so in daylight the whole preview system rendered
+     white-on-white and the cards a writer chooses a *format* from were blank
+     rectangles. Tokens are what stop that being written again.
+
+     Paper is a shade off white rather than #ffffff, and that is load-bearing
+     in exactly one place: `--color-panel` is #ffffff in daylight, so a pure
+     white sheet on a white card is a sheet you cannot see. Two percent of warm
+     is enough to read as paper against it and still read as paper on #000.
+     The ink is not pure black either — printed type never is. */
+  --color-sheet: #fcfbf7;
+  --color-sheet-ink: #1f1d1a;
+  --color-sheet-edge: #d9d7d0; /* the sheet's own hairline, on either ground */
+
   /* The pricing table's value badges — a tinted ground, a hairline of the same
      hue, and ink of that hue rather than white.
      ------------------------------------------------------------------------
@@ -374,6 +399,7 @@
   --color-lp-soft: #c6c6d0; /* strong secondary text */
   --color-lp-body: #a2a2ad; /* body copy */
   --color-lp-faint: #85858f; /* eyebrows, format tags, captions */
+  --color-lp-deck: #8e8e99; /* section decks — see the light value */
   --color-lp-accent: #5f5bd0; /* the fill: buttons, the closing banner */
   --color-lp-accent-ink: #ffffff; /* what rides on that fill */
 
@@ -400,6 +426,75 @@
   --color-lp-card-1: #14141c;
   --color-lp-card-2: #1a1512;
   --color-lp-card-3: #17131c;
+
+  /* Each card's own ink, and its own fill.
+
+     **This is the exception widening, knowingly.** The three grounds above
+     were grounds only — never ink, never a control — and they now dress a
+     whole card: the badge, the second line of the heading and the button all
+     take the card's hue. It was asked for twice, and the risk it was guarded
+     against is real but narrower than the rule made it sound. On this page a
+     status colour is always a *small mark attached to a finding* — a tick, a
+     cross, a pill reading "would be refused" — and one of those appears inside
+     every one of these cards, on the drawn screen, still meaning exactly what
+     it means everywhere else. A card's brand hue is a different register and
+     is not read as a verdict about the card.
+
+     Two rules keep it from becoming one. **No green, at any strength** — it is
+     the `ok` end of the family and a green card would tell somebody their
+     problem had passed. And the warm one is a red-brown rather than the amber
+     `note` colour it sits nearest (#9c3d17 against #b45309), because amber on
+     this page means *this costs you readers*.
+
+     Contrast, measured rather than judged: ink on its own tint clears 9.7,
+     5.8 and 7.4 to one; white on each fill clears 11.4, 6.8 and 8.7; and the
+     page's body grey holds 5.7 on all three tints, so the description under a
+     coloured heading needs no special value. */
+  /* The paper the check stands on.
+
+     **This section used to be the one that went dark**, on the argument that a
+     black panel is what a keynote uses when it stops talking and starts
+     demonstrating. It reads warm now, which is the same argument made the
+     other way: the *figure* is a white drawn app, and a white app is a screen
+     when it has a dark frame round it and a floating card when it does not.
+     Turning the panel light and putting the black on the frame instead puts
+     the contrast where the product is rather than around the whole section.
+
+     Warm rather than the page's cool tints, which is a reversal of a note that
+     used to sit beside them: a warm ground under a cool indigo card was called
+     two colour systems in one viewport. That was true while the page had one
+     hue; it now has three by design, one of them terracotta, so warm paper is
+     part of the set rather than an intruder in it.
+
+     Measured against it: `lp-ink` 16.7:1, `lp-body` 5.9:1, the accent 10.0:1.
+     `lp-faint` is only 2.4 and is the one token that may not be used here —
+     the small print on this panel takes `lp-body`. */
+  --color-lp-paper: #14130f;
+
+  /* The teal this panel answers in, and it is **two values for one colour** —
+     the same split `lp-accent` and `lp-accent-text` make, for the same reason.
+     The heading is 60px semibold, which is large text, so it can take the
+     brighter teal at 3.9:1 and be correct; the eyebrow is 11px, needs 4.5, and
+     gets the deeper one at 5.2. One value for both would either wash out the
+     heading or fail the eyebrow.
+
+     **Why a fourth hue is allowed at all.** Indigo is the page's *way
+     forward* — it is on every button and every link, and this panel's own
+     control has to stay indigo for that reason. The heading here is not a way
+     forward, it is the panel's voice, and giving it indigo made the section
+     read as one more link. Teal is far enough from the status family to carry
+     no verdict: it is not the amber that means *this costs you readers* and,
+     crucially, not the green that means *passed*. Keep it to this panel — a
+     fourth hue that travels becomes a second brand colour. */
+  --color-lp-paper-accent: #4ec7de;
+  --color-lp-paper-accent-text: #7ad8e9;
+
+  --color-lp-card-1-ink: #a9a4ee;
+  --color-lp-card-1-fill: #4a46b5;
+  --color-lp-card-2-ink: #e8a07a;
+  --color-lp-card-2-fill: #b04a1e;
+  --color-lp-card-3-ink: #c9a2ee;
+  --color-lp-card-3-fill: #7c2fbc;
 
   /* The field the order road is drawn on, and the fourth member of the set
      above — same rules, same saturation, one extra thing to be careful about.
@@ -433,32 +528,6 @@
   --color-lp-wordmark: #8c88ff; /* "Chapter" — the accent, lightness lifted */
   --color-lp-accent-pale: #eae9ff; /* dimmed text *on* the accent fill */
   --color-lp-device: #2a2a33; /* the drawn tablet's shell */
-
-  /* ------------------------------------------------------------------------
-     The closing banner's sky — two stops that fall to `lp-ground`.
-
-     The section that makes the page's last ask is a vertical gradient with the
-     product cropped by its bottom edge, and the whole reason it reads as one
-     closing movement rather than as a coloured slab with a footer stuck under
-     it is that the gradient *ends on the ground the footer is painted with*.
-     So there is no third token: the last stop is `--color-lp-ground` itself,
-     in both themes, and the seam between banner and footer cannot drift.
-
-     **They are a second value at night rather than the same one twice**, which
-     is the opposite of what `--color-upgrade-*` does and for a reason that
-     does not apply there. That fill is a small block on a page; this one has
-     to *arrive* at the page's own ground, which is #ffffff by day and #0b0b0e
-     at night — a pair of daylight indigos falling into black would leave a
-     muddy band across the bottom third where the two systems meet.
-
-     `top` holds the upper 42% flat, so every word on the banner sits on one
-     even ground: white clears 12.9:1 on the light value and 11.4:1 on the dark
-     one, and `lp-accent-pale` clears 7.4:1 and 6.9:1. Only the drawing sits
-     below that, which is why the fade is allowed to happen at all. Move the
-     first stop down the section and the deck lands in the fade, where neither
-     of those numbers holds. */
-  --color-lp-cta-top: #1c1a4d;
-  --color-lp-cta-mid: #131228;
 
   /* ------------------------------------------------------------------------
      The marker — a highlighter pen behind one clause of the hero headline.
@@ -618,6 +687,15 @@
   --color-guide: #2f7d32;
   --color-guide-hover: #276b2a;
 
+  /* Paper, in daylight: the same three values as the dark block. See the note
+     there — a page of a set book is a picture of an object, and the object is
+     white paper whatever the machine reading about it is wearing. Stated here
+     anyway, because a token in one block and not the other is the bug this
+     file's own rule warns about. */
+  --color-sheet: #fcfbf7;
+  --color-sheet-ink: #1f1d1a;
+  --color-sheet-edge: #d9d7d0;
+
   /* The badges in daylight — the same three hues the other way up. Unlike the
      upgrade fill above, these *do* change between blocks: a tint is a ground,
      and a ground belongs to its theme. See the note in the dark block.
@@ -733,6 +811,35 @@
   --color-lp-soft: #45454d;
   --color-lp-body: #5b5b63;
   --color-lp-faint: #9a9aa2;
+
+  /* **The deck grey, and it is a fourth step for one reason: the gap.** A
+     section deck is set the way the reference sets its product copy — a grey
+     sentence with the claim inside it in near-black — and the whole mechanism
+     is the *distance* between those two inks. `lp-body` was tried and is too
+     close: at 8.0:1 against this white it sits only a step off the ink's 19:1,
+     so the emphasis read as a slightly darker word rather than as the thing to
+     take away. This is 4.6:1, which roughly doubles the gap.
+
+     **It is as light as it is allowed to get, and the limit is the small end
+     of the scale rather than the large one.** The deck tops out at 26px, where
+     WCAG's large-text rule would permit 3:1 and a much paler grey — but its
+     smallest step is 21px at semibold, which is under the 24px large-text
+     threshold and not reliably "bold", so the whole ramp has to clear the full
+     4.5:1. 4.56:1 is that bar with the margin a rounding error needs. Going as
+     pale as the reference means raising the deck's smallest step to 24px
+     first; do that before touching this, not after.
+
+     Not an `opacity` on the paragraph, which was the other way to get here:
+     opacity fades the `<strong>` inside it by the same amount, which is the
+     one thing in the deck that must not move.
+
+     **It is legal on this page's own white and nowhere else**, which is worth
+     knowing before reaching for it. It is tuned to 4.56:1 against #ffffff and
+     that is nearly all the margin there is, so every tinted or off-white ground
+     on the page takes it under the bar — measured: `lp-well` 4.38:1, the road's
+     green field 4.16:1, `lp-card-1` 3.88:1. All three use `lp-body` instead,
+     which is the fallback to reach for rather than inventing a fourth grey. */
+  --color-lp-deck: #75757e;
   --color-lp-accent: #312e81;
   --color-lp-accent-ink: #ffffff;
 
@@ -741,9 +848,30 @@
      one of them and `lp-body` clears 6.4:1, so the same type reads the same on
      all three. These are the values the section is actually seen in; the dark
      set exists only because every token in this file is stated twice. */
-  --color-lp-card-1: #eef1fb;
-  --color-lp-card-2: #fdf3ec;
-  --color-lp-card-3: #f6f0fb;
+  /* Deepened from about 4% saturation to about 10%. At 4% the three were told
+     apart only by standing next to each other, and a card on its own read as
+     off-white; at 10% each is plainly its own colour and the page's body grey
+     still holds 5.7:1 on every one of them. See the long note in the dark
+     block for the ink and fill that go with them, and for the two hues this
+     set may never take. */
+  --color-lp-card-1: #e9ecfb;
+  --color-lp-card-2: #fbe9df;
+  --color-lp-card-3: #f3e9fb;
+
+  /* The check panel's paper and its teal — see the long note in the dark
+     block. Measured on this ground: the heading's teal is 3.9:1, which is
+     correct for text at 60px semibold, and the eyebrow's is 5.2:1, which it
+     needs at 11px. */
+  --color-lp-paper: #f2efe9;
+  --color-lp-paper-accent: #0d8299;
+  --color-lp-paper-accent-text: #0a6e7f;
+
+  --color-lp-card-1-ink: #312e81;
+  --color-lp-card-1-fill: #312e81;
+  --color-lp-card-2-ink: #9c3d17;
+  --color-lp-card-2-fill: #9c3d17;
+  --color-lp-card-3-ink: #6b21a8;
+  --color-lp-card-3-fill: #6b21a8;
 
   /* The order road's field in daylight — see the long note in the dark block,
      and especially the part about green already meaning "passed" here. This is
@@ -756,13 +884,6 @@
   --color-lp-wordmark: #423ead;
   --color-lp-accent-pale: #c7d2fe;
   --color-lp-device: #e2e2e8;
-
-  /* The closing banner's sky in daylight — see the note in the dark block.
-     `top` is the accent itself, so the last section of the page is the brand
-     colour at full strength; `mid` is the same hue lifted, and the gradient
-     then falls to white, which is what the footer is. */
-  --color-lp-cta-top: #312e81;
-  --color-lp-cta-mid: #7b78c8;
 
   /* The marker in daylight — see the note in the dark block. This is the
      highlighter-pen yellow itself; the dark block deepens it so it does not
@@ -1666,6 +1787,178 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The closing landscape — one picture under the last ask *and* the footer.
+
+   The page used to end on two separate movements: an indigo banner with a
+   drawn app window cropped by its bottom edge, and under it a white footer
+   with a landscape band inside it. They are one section now, on one
+   photograph, with the footer riding up onto the lower half of it as a card.
+   The shape is borrowed from the reference that does this best; what could
+   not be borrowed is below.
+
+   **No word sits on this picture, and that is a finding rather than a
+   preference.** Two landscapes were tried with the ask centred on the sky and
+   both were measured against the page's near-black ink (#0f0f10). This one is
+   the better of the two by a distance — its sky holds **13.6:1 to 15.7:1
+   through the top 36% of the frame** — but the dark hills begin at exactly
+   that 36% line, and below it the ridge and its reflection run **1.9:1 to
+   4.5:1**. White ink is hopeless on all of it: it peaks at 3.4:1 down in the
+   shadows and sits at 1.2:1 against the sky.
+
+   A short safe zone is not the problem. The problem is that the ask is a
+   *fixed number of pixels* — a heading, two lines, a caveat — while the frame
+   scales with the width, so the fraction of the picture the words cover grows
+   as the window narrows. Probed in an iframe at four widths, the caveat line
+   finished at 41% at 1280, 45% at 1024, and **58% at 390**, which is out over
+   the open water. Padding cannot fix that: every lever available is a
+   proportion of the width, and the text is not.
+
+   So the words moved off the picture and onto the page's own ground above it,
+   which is what the reference does too — and this image is the one that makes
+   it invisible, because its sky is pale enough (L 0.77) that the join needs
+   only a short veil rather than a gradient pretending to be haze. The band
+   below carries **nothing**: it is scenery, and the footer card is the next
+   thing on it.
+
+   The rule that follows is simple and worth keeping if anyone puts something
+   here later. **Anything on this band brings its own ground** — the card does,
+   a filled button would. Bare type does not go back on it without redoing the
+   probe above, at 390 first.
+
+   The band is `cover` anchored `top`, so the sky is what survives at every
+   width and the water is what gets cropped — anchoring it `bottom` inverts
+   exactly that and loses the sky the composition opens on.
+   -------------------------------------------------------------------------- */
+
+/* **The picture is the footer's own background, and that is the whole trick.**
+   It was a fixed-height band above the footer with the card lifted onto it by
+   a negative margin, which put landscape down either side of the card for
+   exactly the height of that lift and plain page ground under the rest — so a
+   tall card ran off the bottom of its own picture. The reference does not do
+   that: its artwork is behind the *entire* footer, and the texture runs down
+   both edges all the way to the last line of small print.
+   Painting it here rather than above solves that by construction. The footer
+   is as tall as the footer is; `cover` fills whatever that turns out to be, so
+   the strips beside the card cannot run out.
+
+   **`cover` cannot do this job and the arithmetic says why.** This footer is
+   about 1120px tall against a 3:1 panorama. Under `cover` the scale is
+   height-driven, so the frame's whole height maps onto the footer's — which
+   put the ridge at 36% of 1120, exactly level with the top of the card, and
+   left the reveal showing nothing but empty sky. Buying the scene back means
+   a reveal of roughly 1000px, and covering a box that tall means upscaling a
+   2172px-wide image 2.4× and showing the middle quarter of it. That is not a
+   panorama any more.
+
+   So the picture is laid at its **natural aspect** (`100% auto`) and its
+   bottom row is *extended* downward by a horizontal gradient sampled from that
+   row — thirteen stops across the width, which is why the join is invisible
+   rather than merely close: the gradient starts at the exact colours the last
+   scanline ends on. The scene therefore always renders un-upscaled in the top
+   third-of-the-width, and the strips beside the card go on to the bottom of
+   the document whatever the card's height turns out to be. Re-sample
+   `--lp-closing-floor` if the image is ever swapped; a stale floor shows as a
+   coloured line across both strips.
+
+   `padding-top` is the reveal — the picture with nothing on it before the card
+   starts. At 30% of the width the card's top edge lands just under the
+   monolith, so the whole composition is above it and only the near water is
+   covered. */
+.oc-closing {
+  /* Phones take `cover` instead. At 390px the natural-aspect scene is a 130px
+     ribbon — technically correct and far too small to be a picture of
+     anything. Height-driven scaling there crops to the centre column, which is
+     where the monolith and the ridge are, so a phone gets a tall portrait
+     crop of the same scene rather than a letterbox of it. */
+  padding-top: clamp(11rem, 46vw, 15rem);
+  background:
+    var(--lp-closing-veil),
+    url("/closing-field.webp") center top / cover no-repeat;
+}
+
+@media (min-width: 48rem) {
+  .oc-closing {
+    padding-top: 30%;
+    background:
+      var(--lp-closing-veil),
+      url("/closing-field.webp") center top / 100% auto no-repeat,
+      var(--lp-closing-floor);
+  }
+}
+
+/* The fade has to be stated per theme rather than reading `--color-lp-ground`
+   at both ends, and the reason is how gradients interpolate: from opaque white
+   to a *transparent black* the middle of the ramp is translucent grey, which
+   paints a dirty band across the top of the sky. Both stops must be the same
+   colour and only the alpha may move.
+
+   It has one job and it is a small one, which is the point: the ask sits on
+   the page's own ground and the picture starts under it, so all this has to do
+   is stop the step from white to a pale sky reading as an edge. It is short
+   for that reason — the two are close in value (#ffffff against L 0.77), and a
+   longer ramp would be washing out a picture that needs no protecting.
+
+   **The stop is a length, not a percentage**, which matters now that this
+   paints over a whole footer rather than a fixed band: at 20% it would grow
+   with the footer, so adding a link column would deepen the haze over the sky.
+   160px is 160px whatever is underneath it.
+
+   Dark is the default here, as everywhere in this file; the light value is in
+   the `[data-theme="light"]` block, which is what the landing page pins itself
+   to. The landscape itself is left alone in both — it is a photograph of a
+   place rather than a drawing of this app, and the same rule that keeps the
+   book covers and the brand marks literal keeps this literal too. */
+:root {
+  --lp-closing-veil: linear-gradient(
+    to bottom,
+    #0b0b0e 0px,
+    rgba(11, 11, 14, 0) 160px
+  );
+}
+
+/* **The floor — the photograph's last scanline, extended downward.** Thirteen
+   stops sampled across the bottom six rows of `closing-field.webp`, which is
+   what makes the join invisible instead of approximately right: the gradient
+   begins on the exact colours the image ends on, so the eye reads the bank and
+   the water carrying on rather than a picture sitting on a coloured block.
+   Only the strips down either side of the card ever show it.
+
+   **Stated once, not per theme, and that is deliberate.** Every other token in
+   this file is declared in both blocks; this one is not a colour choice at all
+   but a continuation of a photograph, and the same rule that keeps the
+   landscape, the book covers and the brand marks literal in both themes keeps
+   this literal too. A dark-mode variant of it would be a different picture.
+
+   Re-sample it whenever the image is swapped — a stale floor shows up as a
+   coloured line ruled across both strips at the point the picture ends. */
+:root {
+  --lp-closing-floor: linear-gradient(
+    to right,
+    #4a7161 0%,
+    #66907d 8%,
+    #8cc1e3 17%,
+    #80bbe1 25%,
+    #7dbae1 33%,
+    #80bbe2 42%,
+    #498186 50%,
+    #2b616c 58%,
+    #285c6f 67%,
+    #225063 75%,
+    #2c6170 83%,
+    #355f7f 92%,
+    #426789 100%
+  );
+}
+
+[data-theme="light"] {
+  --lp-closing-veil: linear-gradient(
+    to bottom,
+    #ffffff 0px,
+    rgba(255, 255, 255, 0) 160px
+  );
+}
+
+/* --------------------------------------------------------------------------
    The order road — the winding path in "The whole point".
 
    Everything here is the *choreography*; the words and the road itself are
@@ -1737,8 +2030,21 @@ body {
     display: grid;
     /* The lane. A proportion rather than a fixed width, so the swing stays in
        step with how far apart the stations look — a fixed 8rem lane on a wide
-       screen is a straight line with a wobble in it. */
-    grid-template-columns: minmax(0, 1fr) 26% minmax(0, 1fr);
+       screen is a straight line with a wobble in it.
+
+       **It was 26% and narrowed to 16% on 2026-08-13**, which is the one lever
+       that gives the stations a longer measure. The lane and the side columns
+       are the same pixels twice: at 26% each side was 37% of the row, and the
+       words were capped at 26rem against 426px of it with about ten pixels
+       spare — so the headings could not grow without being drawn through. At
+       16% each side is 42%, or 484px at the page's `max-w-6xl`, which is what
+       pays for the 30rem cap below.
+
+       **Three things move together and must stay in step**: this number, the
+       cap on `.oc-road-words`, and the `at` values in `landing-page.tsx`. The
+       lane now runs 0.42 to 0.58, so the stations sit at 0.45 and 0.55; put
+       one outside those and the road is drawn across somebody's sentence. */
+    grid-template-columns: minmax(0, 1fr) 16% minmax(0, 1fr);
     align-items: center;
     /* **The pacing lives here.** The marker's vertical position *is* the
        reading line, so how fast it feels is entirely how much scrolling
@@ -1750,14 +2056,22 @@ body {
     padding: 0;
   }
 
-  /* The cap that makes the description set as two lines, and it moves with the
-     type size: at the station scale a sentence of about seventy-five
-     characters wants a little over four hundred pixels to break in half. One
-     line is a caption and four is a paragraph; two is what reads as a label on
-     a station at the speed somebody scrolls past it. Re-check the break if
-     either the size or this number changes — they are a pair. */
+  /* The cap the description breaks against, and it is a pair with the type
+     size — re-check the break if either changes. At the station scale a line
+     holds about thirty-eight characters here, so the four-line bound the leads
+     are written to is roughly a hundred and fifty characters with the step
+     count in. Four is what reads as a label on a station at the speed somebody
+     scrolls past it; one is a caption and six is a paragraph.
+
+     **30rem is not a round number, it is the ceiling**, and it moved only
+     because the lane did. Each side column is 42% of the row — 484px at the
+     page's `max-w-6xl` — and this cap is 480px of it. There is about four
+     pixels of slack. Widening it further does not give the words more room, it
+     slides them under the lane the road is drawn through and the road comes
+     out as a strike-through; the lane has to narrow first, and the `at` values
+     have to follow it in. */
   .oc-road-words {
-    max-width: 26rem;
+    max-width: 30rem;
   }
 
   /* `grid-column` rather than a re-order, so what a screen reader hears is the

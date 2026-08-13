@@ -951,6 +951,23 @@ dynamically imported so a writer who never exports never downloads them.
   reader; `typeset.ts` controls the look of the outputs that are ours;
   `front-matter.ts` generates the title/copyright/contents pages.
 
+  **The wizard that drives it is `export-page.tsx`, and four things in it are
+  load-bearing.** *The action bar stands still* — Back and the primary sit at
+  the foot of the window on every step including the last, where the primary
+  *is* the export; Continue used to sit at the end of the form, which put the
+  only way forward below the fold on the two steps that carry a page of
+  typesetting. *A switch looks like a switch* — these were `role="switch"` on
+  cards whose only state was a tinted border, the same tint the format cards
+  use for *chosen*, so the front-matter step was three identical white boxes
+  for three settings that were all on. *The sheet is measured in the page's own
+  width*: `Sheet` sets everything on it in `cqw` against a container query, so
+  at its natural width (72px to the inch) one point is one pixel and the type
+  is the size the template really sets, and a narrow window scales the whole
+  setting rather than reflowing a page that is not the page. Its margins come
+  from **`trimMargins`**, which `typesetCss` also asks — a preview computing
+  its own would drift from the file. And *the fifth format is gone but not
+  deleted*: see the audio note above and TODO.md.
+
   **A finished export says so, and PDF is the one that cannot.** `runExport`
   answers with an `ExportResult` — the filename and the blob — and
   `ExportDoneDialog` (`components/export/export-done.tsx`) is what a writer sees
@@ -1118,12 +1135,18 @@ the two paid ones need `AI_GATEWAY_API_KEY` (not the Anthropic one) and check
 auth themselves, because the proxy skips `/api` and a minute of speech is
 somebody else's invoice.
 - **Text → audio** (`/api/narrate` + `src/lib/export/narrate.ts`,
-  `export/audiobook.ts`): the export page's Audiobook card, one MP3 per chapter
-  in a zip. The route does *one chunk per request* and is stateless; the loop is
-  driven from the client so a 40-chapter book is 40 visible steps rather than one
-  request that fails having produced nothing. The tested part is `speechChunks()`
-  — cut at the largest boundary that fits (paragraph, then sentence, then word,
-  never mid-word), because a break mid-clause is audible.
+  `export/audiobook.ts`) — **and it has no way in as of 2026-08-14.** The
+  export page's Audiobook card came off at the owner's request, to be switched
+  back on later; all of this is whole, still tested, and callerless, the
+  standing `templates-dialog.tsx` and `ambience.ts` have. Do not tidy it away,
+  and read TODO.md under "Taken out on purpose" before putting it back — four
+  pages had claims about it reworded and the privacy page lost its Narration
+  entry, which has to return in the same commit. What it does: one MP3 per
+  chapter in a zip, the route doing *one chunk per request* and stateless, with
+  the loop driven from the client so a 40-chapter book is 40 visible steps
+  rather than one request that fails having produced nothing. The tested part
+  is `speechChunks()` — cut at the largest boundary that fits (paragraph, then
+  sentence, then word, never mid-word), because a break mid-clause is audible.
 - **Audio → text** (`/api/transcribe` + `src/lib/import/transcript.ts`):
   importing an audiobook. Only the transcript is made server-side; chaptering and
   book creation go through the same `parseText → splitIntoChapters →
@@ -1971,31 +1994,86 @@ Three things in it are load-bearing:
   fixed set of measurements while the export one filters `DESTINATIONS` the way
   the real dialog does — so every row, label and count in them is the app's own
   answer and there is nothing left to drift. Prefer that shape for any new
-  figure whose subject is a pure module. **The order road
-  (`order-path.tsx`, over the tested `landing-path.ts`) is the one figure that
-  is not a picture at all** — the five phases are stations on a curve and a
-  marker rides it as the reader scrolls, the station reached at full strength
-  and the rest at a floor. Three things in it are worth not re-deriving: the
-  curve is drawn **through measured station positions** rather than from a
-  hand-written `d`, which is what lets one code path serve the phone and the
-  desktop; the marker's vertical position *is* the reading line, so pacing is
-  controlled by the row height and nothing else; and its whole layout lives in
-  `globals.css` because three arbitrary-value Tailwind utilities were silently
-  dropped and collapsed the row to one column, drawing the road straight
-  through the prose. Each station carries a drawn screen
-  (`phase-screens.tsx`) in the column its words are not in, and three of the
-  five are computed — `proseReport()` over a fixed passage for the writing and
-  revising ones, `STATUSES`/`LEAD_DAYS` for advance copies, `DESTINATIONS` for
-  the export. The hero is the exception and goes
-  further still: it carries the **real check**, not a drawing of one — see
-  `book-check.tsx`. The one bitmap
-  on the page is the hero *backdrop* (`public/hero-{dark,light}.webp`, per
-  theme, behind `--lp-hero`), which is abstract artwork rather than a picture
-  of the product, so it cannot go stale. Its framing is *measured*, not
-  eyeballed: the long comment above it in `globals.css` records the contrast
-  ratio each anchor and size buys against the headline, and there is a separate
-  phone framing because the text block ends higher there. Re-measure before
-  swapping either image — the numbers are fitted to these two pictures.
+  figure whose subject is a pure module. **"The whole point" is five
+  alternating rows** (`order-rows.tsx`): a drawn screen on one side, the phase
+  on the other, sides swapping down the page, each screen captioned with the
+  name of the screen it draws. It has no `"use client"` and ships no script.
+
+  It **replaced an order road on 2026-08-13** — the five phases as stations on
+  a measured curve with a marker riding it as the reader scrolled. That road is
+  still in the tree, imported by nothing, along with the pure and still-tested
+  `landing-path.ts`; TODO.md records why it went and what the rows owe it. The
+  short version is the part to keep: the road's argument was that a writer is
+  short of the *sequence* rather than of five names, so the rows carry the
+  phase numbers, the per-phase step counts and the ARC callout. Strip those and
+  this is the boxed list the road existed to replace. Each row carries a screen
+  in the column its words are not in — and **every one of them is now a
+  photograph of the real app, which is this section's standing exception to the
+  rule above.** They were drawn by `phase-screens.tsx` and computed:
+  `proseReport()` over a fixed passage for the writing and revising ones,
+  `STATUSES`/`LEAD_DAYS` for advance copies, `DESTINATIONS` for the export.
+  Three were swapped for bitmaps on 2026-08-13 and the fourth on 2026-08-14, at
+  the owner's request — `WriteShot`, `PrepareShot`, `ArcShot`, `PublishShot` in
+  `landing-page.tsx`, each with the cost written above it. The cost is the same
+  one every time and worth restating: **when the screen it photographs moves,
+  nothing fails and nothing warns; the picture simply starts lying.** Re-shoot
+  them when the editor's chrome, the Prepare check's wording, the ARC statuses
+  or the export's last step change. The drawn components are all still there and
+  callerless, so putting one back is a line in `ORDER_SCREENS`. The hero is the
+  other exception and goes further still: it carries the **real check**, not a
+  drawing of one — see `book-check.tsx`. Two more bitmaps are *scenery* rather
+  than pictures of the product, so neither can go stale: the hero *backdrop*
+  (`public/hero-{dark,light}.webp`, per theme, behind `--lp-hero`) and the
+  **closing landscape** (`public/closing-field.webp`, behind
+  `.oc-closing-field`). **Both framings
+  are *measured*, not eyeballed**, and the long comments above them in
+  `globals.css` record the numbers: the hero's records the contrast ratio each
+  anchor and size buys against the headline, with a separate phone framing
+  because the text block ends higher there.
+
+  **The closing landscape is one picture under the last ask *and* the footer**,
+  and it replaced two separate endings — an indigo CTA gradient with a drawn app
+  window cropped by its bottom edge, and a paler landscape band
+  (`footer-field.webp`) inside a white footer under it. The ask sits on the
+  page's own ground and **the picture is the `<footer>`'s own background**
+  (`.oc-closing`), with its `padding-top` as the reveal — the scene with nothing
+  on it before the card starts. That placement is the load-bearing part. It was
+  a fixed-height band above the footer with the card lifted onto it by a
+  negative margin, and landscape then ran down either side of the card for
+  exactly the height of that lift and stopped, leaving the lower two thirds of
+  a tall card on plain white. Painted here it covers however tall the footer
+  turns out to be, so the strips reach the last line of small print whatever
+  gets added.
+
+  **`cover` cannot do it and the arithmetic is why.** The footer is ~1120px tall
+  against a 3:1 panorama, so height-driven scaling put the ridge level with the
+  card's top edge and left the reveal as bare sky; buying the scene back needs a
+  ~1000px reveal, which means upscaling a 2172px image 2.4× and showing its
+  middle quarter. So from `48rem` up the picture is laid at its **natural
+  aspect** (`100% auto`) and its last scanline is extended downward by
+  `--lp-closing-floor`, a thirteen-stop horizontal gradient *sampled from that
+  scanline* — which is why the join is invisible rather than close. Re-sample it
+  whenever the image changes. Below `48rem` it falls back to `cover`, because at
+  390px the natural-aspect scene is a 130px ribbon and a centre crop is the
+  better picture. The reveal is a percentage of the width, so it holds at **89%
+  of the scene at every width from 1024 to 2560** — and therefore at any browser
+  zoom.
+
+  **Nothing is written on this picture, and that is the finding worth not
+  re-deriving.** Two landscapes were tried with the ask centred on the sky.
+  Both were measured band by band against `lp-ink`, and the second is genuinely
+  good — **13.6:1 to 15.7:1 through the top 36%** — but its dark ridge starts at
+  that 36% line and runs 1.9:1 to 4.5:1 below it, and white type fails on all of
+  it (1.2:1 on the sky). The killer is not the short safe zone: the ask is a
+  *fixed stack of pixels* while the frame scales with the width, so probing four
+  widths in an iframe put the caveat line at 41% of the frame at 1280 and **58%
+  at 390**, out over open water. No padding lever fixes that — they are all
+  proportions of the width and the text is not. So the words went onto the white
+  above, which is what the reference does, and the band below carries nothing.
+  **Anything placed on it must bring its own ground**; bare type does not go back
+  without re-running that probe, at 390 first. The frame is `cover` anchored
+  `top` so the sky survives at every width. Re-measure before swapping any of the
+  three images.
 - **Everything countable is imported and counted**: `STEPS`, `PHASES`,
   `ALL_TOOLS`, `TOOL_GROUPS`, the price from `plans.ts`. The ARC step's title,
   its number and its phase are all derived, because the page quotes them.
@@ -2003,7 +2081,7 @@ Three things in it are load-bearing:
   `SECTION_TITLE` in `components/landing/type.ts`, paired with `oc-display`.
   Most headings go through `Head`, but three are hand-written (the FAQ's
   column carries a marker dot and a description, the check's is centred over a
-  window, the closing banner's sits on a coloured ground), so the size has to
+  window, the closing banner's is centred on the landscape), so the size has to
   live somewhere all four can read it — `type.ts` has no `"use client"` for
   the same reason `sections.ts` does not, and it avoids a cycle with
   `cta-banner.tsx`. The scale tops out a little **above** the hero's own 56px:
@@ -2020,14 +2098,36 @@ Three things in it are load-bearing:
   of their own ask a reader to be impressed by an arithmetic nobody has given
   them a reason to care about. All four figures are still on the page, each
   where it means something — the steps in "The order", the tool count in the
-  tools heading, the formats in the strip and the footer, the zero in "The
-  export is verified, not asserted".
-- **The testimonial slot holds the research, not customers** (`VOICES` in
-  `landing-page.tsx`): things writers said about the *problem*, quoted from the
-  module each one caused, with nobody named and nothing invented, under a
-  heading that says outright they are not our customers. Same rule as above,
-  answered rather than dodged. Replace it with real quotes — names, and their
-  permission — when there are any.
+  tools heading, the formats in the mosaic under the hero and in the footer,
+  the zero in "The export is verified, not asserted".
+- **There is no testimonial slot on the page, and the empty space is owed a
+  replacement.** It held the *research* rather than customers — things writers
+  said about the *problem*, quoted from the module each one caused, nobody
+  named, nothing invented, under a heading saying outright they were not our
+  customers — and it was **removed on 2026-08-13** to be rebuilt. `VOICES` went
+  with it. Read TODO.md under "Taken out on purpose" before rebuilding it: the
+  four rules that kept it honest are recorded there, and they are what stop the
+  replacement becoming the invented quotes this page refuses. Until it returns
+  the slot stays empty, which claims nothing.
+- **A refusal card's title is two lines and only the second takes a hue** —
+  the problem in ink, the answer in the page's own indigo. That is what a
+  reader gets at skimming speed, and it is why the accent is indigo rather
+  than the card's tint: indigo means *this is the way forward* everywhere on
+  this page, the card grounds mean nothing at all, and peach on a problem
+  would read as amber, which means *this costs you readers*. Its badge is the
+  status family for the same reason, and the line above its button carries the
+  rule's **provenance** where the reference puts a customer's logo and result.
+- **The "trusted by" slot under the hero holds `TILES`**, and it is the third
+  answer to the same problem. A panel lifted over the hero, one sentence
+  across it, then a bento of small tiles — the arrangement every reader has
+  been trained to read as proof — filled with the only proof this page can
+  honestly offer: the **seven programs a finished file opens in**, each with
+  the format that opens it, read from `DESTINATIONS` so it cannot name one the
+  export does not reach, and **three facts a reader can settle today** (zero
+  EPUBCheck errors, four formats, nothing uploaded). No company logo appears
+  under any claim of endorsement, because none of them endorse us. The grid
+  has **no edge fade**: the reference crops its own to say there is more than
+  fits, and all seven destinations are shown, so a fade would imply an eighth.
 
 **Every claim on it has to be true of the code, in both directions.** Nothing
 claims what the app cannot do — the print PDF is the browser's print engine and
@@ -2272,6 +2372,20 @@ Three more things follow from the palette, and each has bitten already:
   `--color-accent`, for the reason the upgrade fill does not. And the radius is
   `rounded-lg` rather than a capsule — a full pill is a *control* in this app,
   and a value you cannot press should not borrow the shape of one.
+
+- **`--color-sheet` / `-ink` / `-edge` are paper, and they are the fifth
+  exception.** Every picture of an exported page — the format cards' previews
+  and the page sheet on the two formatting steps — is drawn on them, and they
+  are **stated identically in both theme blocks**, like `--color-upgrade-*`.
+  The rule they follow is the landing page's, not the chrome's: *drawn artwork
+  of an object stays literal.* What leaves this app is black ink on white paper
+  for every reader, so a preview that turned charcoal after sunset would be a
+  picture of a file nobody will open. It was learned expensively — those
+  previews had `#ededed` typed in at forty call sites, which is a dark-set
+  near-white, so in daylight the whole system rendered white-on-white and the
+  cards a *format* is chosen from were blank rectangles. Paper is a shade off
+  #ffffff on purpose: `--color-panel` is white in daylight, and a pure white
+  sheet on a white card is a sheet nobody can see.
 
 The writer-facing looks stored in `prefs` are each applied their own way:
 `theme` as `[data-theme]` on `<html>` (above), `paper` as `[data-paper]` on the

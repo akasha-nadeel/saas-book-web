@@ -188,6 +188,24 @@ export interface ReadinessIssue {
   field: string;
   /** What is wrong, in the writer's terms rather than the validator's. */
   message: string;
+  /**
+   * Where it is put right, when that is a *page in this book* rather than a
+   * field on a form.
+   *
+   * Every issue this module raises is about a field, and the screens that show
+   * them already sit next to those fields — so nothing here sets it. It exists
+   * for `checkStoreReadiness`, the half in `export/index.ts` that has read the
+   * manuscript: a copyright page naming the wrong person is fixed by opening
+   * that page in the editor, and only the code that found the page knows which
+   * one it is. Without this the writer is told, on the last screen of the
+   * wizard, that a page is wrong and left to go and find it.
+   *
+   * Deliberately a plain href rather than the dashboard's typed `Fix` union
+   * (`checkup.ts`): that one exists because three of its destinations are
+   * *dialogs the shelf owns* and cannot be addressed by URL. A chapter is a
+   * URL, and none of these issues reaches the dashboard anyway.
+   */
+  link?: { href: string; label: string };
 }
 
 export interface ReadinessInput {

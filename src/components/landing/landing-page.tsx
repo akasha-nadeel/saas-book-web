@@ -1,22 +1,22 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { BookCheck } from "@/components/landing/book-check";
 import { CheckDemo } from "@/components/landing/check-demo";
+import { ListingQuestions } from "@/components/landing/listing-questions";
 import { CtaBanner } from "@/components/landing/cta-banner";
 import { HeroWall } from "@/components/landing/hero-wall";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
-import { OrderPath, type Station } from "@/components/landing/order-path";
-import { SECTION_TITLE } from "@/components/landing/type";
+import { OrderRows, type Station } from "@/components/landing/order-rows";
 import {
-  ArcScreen,
-  PrepareScreen,
-  PublishScreen,
-  ReviseScreen,
-  WriteScreen,
-} from "@/components/landing/phase-screens";
+  LEAD_EM,
+  SECTION_LEAD,
+  SECTION_TITLE,
+} from "@/components/landing/type";
+import { ReviseScreen } from "@/components/landing/phase-screens";
 import {
   CoverCheckFigure,
   ExportDoneFigure,
@@ -27,6 +27,7 @@ import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
 import { SEATS_PER_BOOK } from "@/lib/free-limits";
+import { copiesToLevel, totals, type Entry } from "@/lib/ledger";
 import {
   IDEAL_RATIO,
   MAX_EDGE,
@@ -62,11 +63,13 @@ import { CONTACT_EMAIL, REFUND_DAYS, REPLY_DAYS } from "@/lib/legal";
  * The layout this was built to wants "trusted by 5,000 brands" and we have
  * nobody, so: no user count, no rating and no testimonial anywhere on this
  * page until there is a real one. Two slots that would ordinarily carry them
- * answer the problem instead rather than dodging it — `VOICES`, which quotes
- * the research and says plainly that it is not customers, and a band of four
- * counted figures which stood under the refusals until it was removed (see the
- * note where it was: the rule survived it, and all four figures are still on
- * the page in places that give them a meaning).
+ * have both been emptied rather than filled with something invented — a band
+ * of four counted figures which stood under the refusals until it was removed
+ * (the rule survived it, and all four figures are still on the page in places
+ * that give them a meaning), and the testimonial row, which for a while
+ * carried the *research* instead of customers and came out on 2026-08-13 to be
+ * rebuilt. `TODO.md` holds what that row was and the rules its replacement
+ * owes. An empty slot claims nothing, which is the safe direction here.
  *
  * **It is always light, and it is the one screen in the product that is.** It
  * followed `data-theme` for a while, on the argument that a reader whose
@@ -291,14 +294,20 @@ function Icon({
  * The step that carries the whole argument, read out of the roadmap itself.
  *
  * Derived rather than typed, because the page quotes the step's own title and
- * states where it sits — "step 13 of 18, phase four" — and those are three
- * facts about a list that lives somewhere else. Written by hand they would be
- * right today and quietly wrong the first time a step is added, on the one page
- * whose entire pitch is being checkable.
+ * states where it sits — "step 13 of 19" — and those are facts about a list
+ * that lives somewhere else. Written by hand they would be right today and
+ * quietly wrong the first time a step is added, on the one page whose entire
+ * pitch is being checkable.
+ *
+ * **The phase number went with the Revise row on 2026-08-13.** The callout used
+ * to say "here in phase 4", counted off `PHASES` — and once this section stopped
+ * drawing all five and renumbered what was left, that four disagreed with the
+ * "PHASE 03" printed on the very row it sat in. The step's position in the whole
+ * list says the same thing and cannot drift: thirteenth of nineteen is before
+ * the end however the phases are grouped.
  */
 const ARC_INDEX = STEPS.findIndex((step) => step.id === "arc");
 const ARC_STEP = STEPS[ARC_INDEX]!;
-const ARC_PHASE = PHASES.findIndex((phase) => phase.id === ARC_STEP.phase) + 1;
 
 /**
  * The five phases as stations on the road.
@@ -328,18 +337,120 @@ const ARC_PHASE = PHASES.findIndex((phase) => phase.id === ARC_STEP.phase) + 1;
  * running would put a bulge in the curve where there is no room for one.
  */
 /*
- * Two lines each, and that is a length rather than a style: at the capped
- * width these set as two, which is what reads as a label on a station. One is
- * a caption and four is a paragraph, and a reader takes these at scrolling
- * speed. Keep a replacement inside roughly seventy-five characters, count
- * included.
+ * The station headings, longer than the phase's own label.
+ *
+ * **A landing-page override rather than a rename**, and the distinction is the
+ * whole reason this exists. `PHASES[].label` is product vocabulary: the
+ * roadmap screen, the dashboard's five dials and `checkup` all say "Prepare",
+ * so changing it in `roadmap.ts` to suit a heading here would rename the phase
+ * everywhere a writer meets it. These are five headings on one page.
+ *
+ * Two rules keep the override honest. **The phase's own word comes first** in
+ * every one of them, so a reader who arrives in the app finds the same
+ * vocabulary rather than wondering which of two names is the real one. And it
+ * falls back to `phase.label`, so a phase added to `roadmap.ts` and forgotten
+ * here still draws its station with the right name rather than nothing.
+ *
+ * `launch` is absent on purpose: "Before you publish" is already the longest
+ * of the five and needs no help.
  */
-const ORDER_LEADS: Record<string, string> = {
-  write: "Get the words down. The only phase most writing software covers.",
-  revise: "Make them the right words. The last phase that is about the book.",
-  prepare: "Everything a shop asks for that is not the book. The longest phase.",
-  launch: "The part almost everybody finds out about too late to act on.",
-  publish: "Send it, then check what you actually sent, as a reader sees it.",
+const ORDER_TITLES: Record<string, string> = {
+  write: "Write the first draft",
+  revise: "Revise it into shape",
+  /* "Prepare what shops ask for" was the first try and set as three lines
+     where the other four set as two. The size has come down since (40px from
+     `sm`), so the ceiling is nearer thirty characters — but the rule is
+     unchanged: every one of these sets to the same number of lines, or the
+     rows read as different sizes of thing. */
+  prepare: "Prepare for the shops",
+  publish: "Publish, then check it",
+};
+
+/*
+ * **Three lines each, and that is a length rather than a style.** These were
+ * held to two — roughly seventy-five characters with the step count — on the
+ * reasoning that a reader takes them at scrolling speed and one line is a
+ * caption while four is a paragraph. That ceiling was raised deliberately on
+ * 2026-08-13: each phase now names *what is actually in it* before it makes
+ * its point, because "the longest phase" tells a reader nothing they can
+ * picture and "the cover, the blurb, the categories, the keywords, the ISBN"
+ * tells them exactly what they are in for.
+ *
+ * The bound that replaced it is still a bound, and it is measured rather than
+ * guessed: the column is about 29rem and these set at 22px, so a line holds
+ * roughly forty characters and **eight lines is about three hundred and
+ * twenty characters with the count included**. That ceiling has now been
+ * raised five times at the owner's request — 75 characters, then 105, 150,
+ * 190, 215, now 320 — so treat the *number* as current rather than settled and
+ * the *rule* as the fixed part: every station sets to the same number of lines,
+ * because five stations of different heights read as five sizes of thing
+ * rather than as one road. The five below run 317–325 characters, which is one
+ * line of slack across the set; keep any rewrite inside that.
+ *
+ * **The extra room went on what each phase actually does**, not on adjectives:
+ * the writing one now says the page is a real page and saves as you type, the
+ * revising one says the report has no score and no rewrite button, the
+ * preparing one says what happens when a shop asks for something you have not
+ * got, and the publishing one names EPUBCheck. Every one of those is a claim
+ * the code backs — the same rule as everywhere else on this page.
+ *
+ * Four drafts overran whatever the bound was at the time — one set "Prepare"
+ * as five lines when the rest were two, one left "3" at the end of a line with
+ * "steps." alone under it, one ran two stations long while three sat short.
+ * Measure the wrap, not the character count; they disagree about where the
+ * spaces fall.
+ *
+ * They are nodes rather than strings so each can carry `<Em>` on its point —
+ * the deck treatment, so a reader skimming the road takes five claims and
+ * nothing else. The step count is appended in `ORDER_STATIONS` and stays
+ * plain: it is a counted figure, not the claim.
+ */
+const ORDER_LEADS: Record<string, ReactNode> = {
+  write: (
+    <>
+      Get the words down, with your notes, your bookmarks, your story bible and
+      the idea parking lot in the same rail — leaving the chapter is the
+      interruption. The page is a real page at your trim size, it saves as you
+      type, and it keeps working with the connection off.{" "}
+      <Em>The only phase most writing software covers.</Em>
+    </>
+  ),
+  revise: (
+    <>
+      Make them the right words — the echoes, the crutch words, the sentences
+      that all begin the same way, the adverbs. The report counts them and shows
+      you where every one of them is, and it changes nothing: no score, no
+      grade, and no button that rewrites your prose for you.{" "}
+      <Em>The last phase about the book itself.</Em>
+    </>
+  ),
+  prepare: (
+    <>
+      The cover, the blurb, the categories, the keywords, the ISBN, the
+      paperback setup. None of it is writing, and most people meet it in the
+      wrong order — or meet it at the upload, when a shop asks for something
+      they have never heard of and the file comes back refused.{" "}
+      <Em>Everything a shop asks for that is not the book.</Em>
+    </>
+  ),
+  launch: (
+    <>
+      Line up advance readers, and the rest of what only works before the book
+      is out — reviews on the page the day it goes up, not three months late.
+      The list holds who has a copy, who is reading and who came back, so who is
+      left is a glance rather than a hunt through the mail.{" "}
+      <Em>Almost everybody finds this out too late.</Em>
+    </>
+  ),
+  publish: (
+    <>
+      Send it, then <Em>check what you actually sent, as a reader sees it</Em> —
+      in the reading view, at the book&rsquo;s real trim size, with the front
+      matter and the contents where the file really puts them. The file is built
+      to pass EPUBCheck, the validator the shops run, and the last screen names
+      anything a shop would refuse.
+    </>
+  ),
 };
 
 /*
@@ -349,133 +460,276 @@ const ORDER_LEADS: Record<string, string> = {
  * cannot quietly put the advance-copy tracker beside "Write". Three of the
  * five are computed out of the app's own modules — see `phase-screens.tsx`.
  */
+/**
+ * The writing phase's figure, and the first of this section's three bitmaps.
+ *
+ * The drawn figures elsewhere on this page are a rule rather than a habit: a
+ * drawing of a pure module cannot go stale, because it is rendered from the
+ * module. This one can. It was swapped in on 2026-08-13 at the owner's
+ * request, and the cost is worth writing down where somebody will find it —
+ * **if the editor's chrome changes, nothing fails and nothing warns; this
+ * picture simply starts lying.** The rail down the left, the front/body/back
+ * matter panel, the chapter list and the right-hand tool rail are all things
+ * the app really has today. Re-shoot it when they move.
+ *
+ * **Re-shot on 2026-08-14, and the new file has a new name.** The first
+ * version was a hand holding the machine, and the hand reached further left
+ * than the laptop did — so the frame had to be cropped *into* it to stop the
+ * laptop floating in the middle of its own figure, and the hand ran off the
+ * left edge. This one is the whole machine on white, which needs no such
+ * trick: the crop is the content bbox plus 10px, the same as the other two.
+ * The name changed from `editor-laptop.webp` because `next/image` caches its
+ * optimised copy by URL — replacing a file under the same name looks like it
+ * has not worked, however many times you replace it. Same rule as the upgrade
+ * dialog's artwork.
+ *
+ * `priority` is deliberately absent — it sits several screens down the page,
+ * so eager-loading it would cost the hero its bandwidth. The `sizes` hint says
+ * what the layout actually does: the wide column of a `7xl` grid from `lg`,
+ * full width below it.
+ *
+ * **`mix-blend-multiply` stays on the three photographs even though the
+ * section is white again.** On white it is arithmetically a no-op — multiplying
+ * by 1 is identity, so not a pixel of these moves — and it is what let the
+ * section be tinted for an afternoon without three white rectangles appearing
+ * around three machines. These were shot on pure white; multiplying renders
+ * that white as whatever ground is behind it, with no cut-out and no halo
+ * along the machine's edge, which a transparency matte on an anti-aliased
+ * photograph does not manage. Keep it, and the ground stays free to change.
+ * The one thing it rules out is a *dark* ground: multiply would take the app's
+ * own white screen down with it, and the pictures would have to be re-cut.
+ */
+function WriteShot() {
+  return (
+    <Image
+      src="/write-laptop.webp"
+      alt="A laptop showing the OpenChapter editor: the book's front matter, body matter and back matter down the left with a list of twelve chapters, the manuscript open at Chapter 1 in the middle, and the writing tools down the right."
+      width={1361}
+      height={994}
+      sizes="(min-width: 1024px) 44rem, 100vw"
+      className="mix-blend-multiply block h-auto w-full"
+    />
+  );
+}
+
+/*
+ * **The prepare row is the moving demo, not a photograph, since 2026-08-14.**
+ *
+ * `PrepareShot` — a tablet photograph of the real Prepare area, at
+ * `/prepare-ipad.webp` — is gone from this file at the owner's request and
+ * `CheckDemo` stands in its place (see `ORDER_SCREENS`). The file is still in
+ * `public/`, so putting the picture back is one `<Image>`; what is *not*
+ * recoverable from the file is the alt text, so here it is: "A tablet showing
+ * OpenChapter's Prepare area: a book with one thing to fix and four more,
+ * listed as what a shop would refuse — nothing in the book to publish yet, no
+ * ISBN, no blurb, no categories, no publisher — each with the control that
+ * fixes it."
+ *
+ * The demo is a better fit for this row than it looks: it draws the same
+ * screen the photograph did and then *works* it — Overview, Prepare, a book's
+ * findings opening with the fix beside each one — which is the phase's whole
+ * claim rather than a still of it. It carries its own dark frame (`AppWindow`
+ * with `bezel`), so the row keeps a device, and it scales its 760px design to
+ * whatever width the column gives it, so it lands at the size the photograph
+ * had.
+ *
+ * **The cost, stated where it will be found: the same figure now appears twice
+ * on the page** — here, and in the "Before you upload" panel it was drawn for.
+ * Nothing breaks, and each instance animates only while it is on screen, but
+ * two identical drawn dashboards a few sections apart is a repetition rather
+ * than a rhyme. If one of them is to go, it is a one-line change either way.
+ */
+
+/**
+ * The launch phase's figure — the third bitmap, on the same terms as the two
+ * above, and the one that gave up the most to become one.
+ *
+ * `ArcScreen` did not merely draw this list, it **read `STATUSES` and
+ * `LEAD_DAYS` out of `arc.ts`**: the states in it were the states the tool
+ * has, and "six weeks" was `LEAD_DAYS` divided by seven. Neither could go
+ * stale. This picture can, and in two ways rather than one — if a status is
+ * renamed, and if the lead time changes. Swapped in on 2026-08-13 at the
+ * owner's request.
+ *
+ * What is in it is the real screen as it stands today: the five badges, their
+ * colours, the ordering line under the count and the panel's own control. Note
+ * it is a shot of the list *since the chasing came out* — nothing in it says
+ * late, which is the truthful state of the tool. Re-shoot it when that half is
+ * built again, or the page will be advertising a screen the app no longer has.
+ *
+ * 1296×977, cropped to the machine plus its shadow with 10px of air — measured
+ * from the dark-pixel bbox, which is the lesson from `WriteShot`.
+ */
+function ArcShot() {
+  return (
+    <Image
+      src="/arc-laptop.webp"
+      alt="A laptop showing OpenChapter's advance-copy list: five readers ordered by whose review is wanted soonest, each with a coloured badge for where they have got to — no answer, sent, reading, reviewed, declined — beside the genre they read, where they were found, and the date their review is wanted."
+      width={1296}
+      height={977}
+      sizes="(min-width: 1024px) 44rem, 100vw"
+      className="mix-blend-multiply block h-auto w-full"
+    />
+  );
+}
+
+/**
+ * The publishing phase's figure — the fourth bitmap, and the last drawn screen
+ * this section gave up.
+ *
+ * `PublishScreen` did not merely draw a finished file, it **filtered
+ * `DESTINATIONS` the way the export dialog filters it**, so it could not name a
+ * shop the export does not reach. This picture can go stale in the ordinary
+ * way; swapped in on 2026-08-14 at the owner's request, on the same terms as
+ * the three above. The component is kept, whole and callerless, in
+ * `phase-screens.tsx`.
+ *
+ * What is in it is the real last step of the export flow as it stands after
+ * that screen's rebuild: the file's own name, what it will contain, and the
+ * pre-upload check answering green. Two things date it — the row of summary
+ * labels, and the wizard's five steps down the left — so re-shoot it if either
+ * moves.
+ *
+ * **It is a tablet rather than a laptop**, which keeps this row from reading as
+ * a third photograph of the same machine, and the frame is *drawn* rather than
+ * photographed: a bezel around the app at 1904×1246, with the desk extended
+ * above the pinned action bar — which is exactly what a taller window renders,
+ * since the layout is a fixed-height column with the bar at the bottom and the
+ * content top-aligned above it. Cropped to the device plus 10px, and it carries
+ * **no drop shadow**: the other three are photographs and bring their own, but
+ * a drawn one under a drawn frame reads as a grey band under the picture rather
+ * than as depth.
+ */
+function PublishShot() {
+  return (
+    <Image
+      src="/export-tablet.webp"
+      alt="A tablet showing the last step of OpenChapter's export: the file breathe-again.epub with what it will contain — three chapters, four pages of front and back matter, the Classic template — and a green panel saying the book is ready for the shops, with the Export EPUB button below."
+      width={1984}
+      height={1326}
+      sizes="(min-width: 1024px) 44rem, 100vw"
+      /* No `mix-blend-multiply` here, unlike the three photographs: this one
+         was drawn on a transparent canvas, so it has no white to blend away
+         and multiplying would only dim the screen inside it. */
+      className="block h-auto w-full"
+    />
+  );
+}
+
 const ORDER_SCREENS: Record<string, ReactNode> = {
-  write: <WriteScreen />,
+  write: <WriteShot />,
   revise: <ReviseScreen />,
-  prepare: <PrepareScreen />,
-  launch: <ArcScreen />,
-  publish: <PublishScreen />,
+  prepare: <CheckDemo />,
+  launch: <ArcShot />,
+  publish: <PublishShot />,
 };
 
-const ORDER_STATIONS: Station[] = PHASES.map((phase, i) => {
+/*
+ * The line under each drawn screen, naming what it is.
+ *
+ * Every one names a screen that exists in the app, which is the same rule the
+ * screens themselves are held to — three of the five are computed out of the
+ * app's own modules. A caption that named something aspirational would be the
+ * one place on this page a drawing turned into a promise.
+ */
+const ORDER_CAPTIONS: Record<string, string> = {
+  write: "The editor",
+  revise: "The prose report",
+  prepare: "The pre-upload check",
+  launch: "The advance-reader list",
+  publish: "The export",
+};
+
+/**
+ * The phases this section draws — **four of the road's five, since
+ * 2026-08-13.**
+ *
+ * Revising came out at the owner's request. Everything about it is *kept*
+ * rather than deleted: `ORDER_TITLES`, `ORDER_LEADS`, `ORDER_SCREENS` and
+ * `ORDER_CAPTIONS` all still carry a `revise` entry, and `ReviseScreen` is
+ * still its screen — so putting the row back is deleting one id from the set
+ * below, and nothing else in this file has to be found and undone.
+ *
+ * **The rows are numbered off this list, not off `PHASES`,** which is what
+ * makes them read 01–04 with no gap. The cost is worth knowing: the app's own
+ * roadmap still has five phases and still calls this last one phase five, so a
+ * writer who signs up meets different numbers from the ones on the page. Two
+ * things follow from that and are handled where they live — the deck no longer
+ * prints a phase count, and the ARC callout no longer names a phase.
+ */
+const ORDER_HIDDEN = new Set(["revise"]);
+
+const ORDER_STATIONS: Station[] = PHASES.filter(
+  (phase) => !ORDER_HIDDEN.has(phase.id),
+).map((phase, i) => {
   const steps = STEPS.filter((step) => step.phase === phase.id).length;
-  const place = [
-    { at: 0.4, side: "left" as const },
-    { at: 0.6, side: "right" as const },
-    { at: 0.4, side: "left" as const },
-    { at: 0.6, side: "right" as const },
-    { at: 0.4, side: "left" as const },
-  ][i]!;
 
   return {
     n: String(i + 1).padStart(2, "0"),
-    title: phase.label,
-    note: `${ORDER_LEADS[phase.id] ?? phase.note} ${steps} step${steps === 1 ? "" : "s"}.`,
+    title: ORDER_TITLES[phase.id] ?? phase.label,
+    /* The count is joined by a non-breaking space, which is not a nicety: at
+       this measure "3" landed at the end of a line with "steps." alone on the
+       next, so the station ended on an orphan that read as a fourth line of
+       nothing. Tie the number to its noun and the pair wraps together. */
+    note: (
+      <>
+        {ORDER_LEADS[phase.id] ?? phase.note} {steps}
+        &nbsp;step{steps === 1 ? "" : "s"}.
+      </>
+    ),
     screen: ORDER_SCREENS[phase.id],
-    ...place,
+    caption: ORDER_CAPTIONS[phase.id] ?? phase.label,
     ...(phase.id === ARC_STEP.phase
       ? {
-          callout: `“${ARC_STEP.title}” is step ${ARC_INDEX + 1}, here in phase ${ARC_PHASE} — before you publish, not after.`,
+          callout: `“${ARC_STEP.title}” is step ${ARC_INDEX + 1} of ${STEPS.length} — before you publish, not after.`,
         }
       : {}),
   };
 });
 
-const WRITE = [
-  [
-    "Where you left off",
-    "Open the book and the last paragraph you wrote is there, with the note you left yourself. For the seventeen free minutes, not the two clear hours.",
-  ],
-  [
-    "An idea parking lot",
-    "Catch the shiny new idea without leaving the chapter you are in. Leaving is the interruption.",
-  ],
-  [
-    "The shape most novels share",
-    "Your word count placed on it, in plain words, for when the middle has run out of road. A convention, not a rule.",
-  ],
-  [
-    "Versions, and how many sittings",
-    "A version kept every ten minutes or so, and a count of how often you have been round this chapter. A bad afternoon is not permanent.",
-  ],
-  [
-    "A distraction-light editor",
-    "Chapters, focus mode, typewriter scrolling, and free dictation for the days when typing is the thing draining you.",
-  ],
-  [
-    "Proof of the work, if you are ever accused",
-    "A day-by-day record of the book accumulating, the drafts saved along the way, and a fingerprint of the text — in a document you can send. Evidence, not proof, and it says which it is in its own words.",
-  ],
-] as const;
+/* **`WRITE` and `PREPARE` lived here and went on 2026-08-14**, with the
+   "Three phases. Writing is one." section that was the only thing counting
+   them. Each was six named claims with a sentence apiece — the six things the
+   writing side does, the six the preparing side does — and every claim they
+   made is still on the page, in the tools section, which lists all sixteen
+   tools out of `book-tools.ts` rather than restating six by hand. `TRACK`
+   stays: the Track section below still draws four of its five. See TODO.md
+   under "Taken out on purpose". */
+
+
+/* `PREPARE_MARKS` used to live here — one glyph per point, drawn beside the
+   four Prepare claims on the stage. Those four restated four of the sixteen
+   tools, which `book-tools.ts` already lists in full, so they went when that
+   section took the reference's two-column header. `PREPARE` itself stays: the
+   phases section above counts it. */
+
 
 /*
- * The first four are the ones the Prepare section prints, and they are written
- * short on purpose.
- *
- * They ran to three and four lines each, which stacked to a wall of grey beside
- * a figure that is the actual argument — a reader skims that and takes none of
- * it. What went in every case was the *qualifying* clause, not a claim: the
- * checks are still named, the comps are still found by reading the blurb, the
- * blurb is still counted and still not written for you. Same rule the hero deck
- * was cut under. Anything that would have removed a claim stayed.
+ * The first four are cards now rather than a column, so the notes are cut to
+ * card length — two or three lines each. Nothing factual went: "nobody keeps
+ * this" moved up into the section's own deck, where it is the point rather
+ * than an aside on one card, and the panel beside them carries the sentence
+ * about a figure not appearing when the rows cannot support it. The clauses
+ * that did go were the ones a reader does not need to feel it ("whatever the
+ * shop renames next year"). The fifth is never drawn — it is here for the
+ * count the phases section quotes.
  */
-const PREPARE = [
-  [
-    "A pre-upload check",
-    "Missing cover, malformed ISBN, blurb over the limit — and which of them would actually stop the upload. It never blocks your export.",
-  ],
-  [
-    "The books yours sits beside",
-    "Real comps, found by reading your blurb — and from them your categories, the length those books run, and the covers yours has to sit against.",
-  ],
-  [
-    "Your blurb, counted against real ones",
-    "The shops' limit, five real blurbs from books like yours, and how long they run. We do not write it.",
-  ],
-  [
-    "Is the title taken, will the cover be refused",
-    "Whether another book turns up first when a reader searches yours, and whether your artwork is the right size, shape and weight.",
-  ],
-  [
-    "Paperback numbers, worked out",
-    "Spine width, inside margin and the full cover wrap, from your page count and trim size.",
-  ],
-  [
-    "Four files out",
-    "EPUB, DOCX, PDF at your trim size, and Markdown. No watermark, no export cap, and the EPUB is checked against EPUBCheck 5.3 with no errors and no warnings.",
-  ],
-] as const;
-
-/**
- * A mark for each of the four Prepare points the page shows, positionally.
- *
- * **They are all one colour, and that colour is `INK`.** The temptation with
- * four icons is to give each a hue, and on this page that would be a lie by
- * decoration: red and amber are *verdicts* here — would be refused, costs you
- * readers — and they are spent, twice, inside the figure beside these points
- * where they carry real findings. A red mark on "A pre-upload check" would say
- * the check itself is the problem. So the marks take the way-forward indigo,
- * the colour every other "here is the answer" on this page is set in, and the
- * status hues keep meaning what they mean everywhere else.
- */
-const PREPARE_MARKS = ["prepare", "shelf", "blurb", "search"] as const;
-
 const TRACK = [
   [
     "Cost against earnings, per book",
-    "Cover, editing, ads and proof copies on one side. Royalties on the other. Nobody keeps this, which is why the total is always a shock.",
+    "Cover, editing, ads and proof copies on one side. Royalties on the other.",
   ],
   [
     "Import your sales report",
-    "Amazon has no public API, so nothing is fetched — but it will let you download your sales. Hand the file over and you say which column is which, so it works whatever the shop renames next year.",
+    "Amazon has no public API, so nothing is fetched. Hand the file over and you say which column is which.",
   ],
   [
     "How many more copies get you level",
-    "Worked from what a copy has actually earned you, never from a royalty rate we invented. If your rows do not say, neither do we.",
+    "Worked from what a copy has actually earned you, never from a royalty rate we invented.",
   ],
   [
-    "Who has an advance copy, and who is late",
-    "One list instead of six sites and a spreadsheet, with the dates attached — and a send-by date worked back from your publication date.",
+    "Who has an advance copy, and who read it",
+    "One list instead of six sites and a spreadsheet, with a send-by date worked back from publication.",
   ],
   [
     "What it usually costs, and what to check first",
@@ -581,39 +835,72 @@ const REFUSALS = [
  * exported EPUB that clears EPUBCheck at zero errors is a direct answer to it.
  * No competitor can respond with a nicer illustration.
  */
-/**
- * Which destinations the strip under the hero shows, and why it is not all of
- * them.
- *
- * `DESTINATIONS` is the true and complete list — every program one of our four
- * exports opens in — and it stays that way, because it is also what the footer
- * reads and what any future claim about the pipeline should be checked
- * against. What this is, is an *edit* of it for one row: five names on one
- * line, ordered as a writer would meet them, one word processor and the four
- * shops.
- *
- * Two go: LibreOffice Writer, because Microsoft Word already makes the DOCX
- * claim and three word processors in a row of seven made the strip look like a
- * compatibility matrix, and Obsidian, because a Markdown notes app beside four
- * bookshops answers a question nobody at this point in the page is asking.
- * Neither is a retraction — both still open the exports, and both are still in
- * `DESTINATIONS` for anything that needs the whole answer.
- *
- * Filtered by name rather than sliced by index, so reordering that module
- * cannot silently change what this row claims. A name that stops matching
- * drops out of the strip instead of breaking the page.
- */
-const STRIP_NAMES = [
-  "Microsoft Word",
-  "Google Docs",
-  "Apple Books",
-  "Amazon Kindle",
-  "Google Play Books",
-];
+/* `STRIP_NAMES` and `STRIP` used to live here: an *edit* of `DESTINATIONS`
+   down to five names for a single-line logo row, leaving out LibreOffice
+   Writer and Obsidian because three word processors on one line read as a
+   compatibility matrix and a Markdown notes app beside four bookshops
+   answered a question nobody was asking at that point in the page. The mosaic
+   below shows all seven as tiles, where neither problem arises, so the filter
+   went with the row it was written for. Nothing was retracted — both were
+   always in `DESTINATIONS`, which is still the complete and only list. */
 
-const STRIP = STRIP_NAMES.map((name) =>
-  DESTINATIONS.find((destination) => destination.name === name),
-).filter((destination) => destination !== undefined);
+/**
+ * The mosaic under the hero: every program a finished file opens in, with
+ * three checkable facts set among them.
+ *
+ * **The marks are read from `DESTINATIONS` rather than listed here**, so this
+ * cannot name a program the export does not reach — the same rule the footer
+ * and the export dialog follow. All seven are shown, which is why the grid has
+ * no fade at its edges: there is no eighth to imply.
+ *
+ * The three facts are placed *between* the marks rather than gathered at one
+ * end. The reference alternates its stat tiles with its logos, and the
+ * alternation is what stops a row like this reading as a table of
+ * specifications with a summary bolted on. Their positions are the only
+ * arbitrary thing in the list.
+ *
+ * Each fact is settleable by the reader today, without an account: the zero by
+ * running the free validator on the file they get, the four by pressing
+ * export, and the "nothing" by opening devtools while the check above reads
+ * their book. That is the bar for anything that joins them — a fact that has
+ * to be taken on trust belongs in the prose, not on a tile that looks like
+ * evidence.
+ */
+type Tile =
+  | { kind: "mark"; destination: (typeof DESTINATIONS)[number] }
+  | { kind: "fact"; figure: string; label: string; tone?: string };
+
+const TILE_FACTS: Record<number, Tile> = {
+  1: {
+    kind: "fact",
+    figure: "0",
+    label: "EPUBCheck errors, and zero warnings",
+    tone: PASS,
+  },
+  4: { kind: "fact", figure: "4", label: "export formats, free forever" },
+  6: {
+    kind: "fact",
+    figure: "None",
+    label: "of your book is uploaded anywhere",
+  },
+};
+
+const TILES: Tile[] = (() => {
+  const marks = DESTINATIONS.map(
+    (destination): Tile => ({ kind: "mark", destination }),
+  );
+  /* Counted once, up front. Written as `marks.length + …` inside the
+     condition it was a moving target — `shift()` empties the array as the
+     loop runs, so the loop stopped four tiles short and three destinations
+     silently never rendered. */
+  const total = marks.length + Object.keys(TILE_FACTS).length;
+  const out: Tile[] = [];
+  for (let i = 0; out.length < total; i++) {
+    const fact = TILE_FACTS[i];
+    out.push(fact ?? marks.shift()!);
+  }
+  return out;
+})();
 
 /*
  * Each row carries the screen that catches it, because a claim on this page
@@ -632,35 +919,82 @@ const STRIP = STRIP_NAMES.map((name) =>
  * ships no rule at all. Indexed with a modulo at the call site so a fourth
  * refusal wraps to the first ground rather than rendering with none.
  */
-const CARD_TINTS = ["bg-lp-card-1", "bg-lp-card-2", "bg-lp-card-3"];
+/*
+ * A ground, an ink and a fill per card, in order down the page.
+ *
+ * Whole class names and whole `var()` strings, because Tailwind reads class
+ * names as literals — `bg-lp-card-${i}` ships no rule at all — and because the
+ * two colours are set through `style`, where a token name has to be complete
+ * to resolve. Indexed with a modulo at the call site so a fourth refusal wraps
+ * to the first set rather than rendering with none.
+ */
+const CARD_TINTS = [
+  {
+    ground: "bg-lp-card-1",
+    ink: "var(--color-lp-card-1-ink)",
+    fill: "var(--color-lp-card-1-fill)",
+  },
+  {
+    ground: "bg-lp-card-2",
+    ink: "var(--color-lp-card-2-ink)",
+    fill: "var(--color-lp-card-2-fill)",
+  },
+  {
+    ground: "bg-lp-card-3",
+    ink: "var(--color-lp-card-3-ink)",
+    fill: "var(--color-lp-card-3-fill)",
+  },
+];
 
+/*
+ * **The title is two lines, and the split is the argument.** The reference
+ * this section is drawn from sets the first line in ink and the second in the
+ * card's own colour — setup, then payoff. That shape is worth having here for
+ * a reason beyond looking like it: a reader skimming three cards reads six
+ * lines instead of three, and the second of each pair is the only place the
+ * *answer* appears at skimming speed. It used to be buried mid-paragraph.
+ *
+ * **`fix` is the one that takes the accent**, and it takes the page's own
+ * indigo rather than the card's tint. On this page indigo means *this is the
+ * way forward* and the card grounds mean nothing at all — they are documented
+ * as grounds only, never ink and never a control (see `--color-lp-card-*`).
+ * Colouring "The cover is the wrong size" in peach would put a hue on a
+ * problem, and amber on this page means *this costs you readers*; colouring
+ * the answer in indigo says exactly what indigo says everywhere else.
+ *
+ * `source` is what the reference fills with a customer's logo and result. We
+ * have neither, so it carries the *provenance* of the rule instead — which is
+ * this page's own standing habit, and the thing this audience actually wants:
+ * not who else believes it, but where the number came from.
+ */
 const REJECTIONS = [
   {
-    mark: "shelf",
     title: "The cover is the wrong size",
+    fix: "Measured before you send it",
     /* The figures are interpolated rather than typed, like everything
        countable on this page: `MIN_HEIGHT`, `MIN_WIDTH`, `MAX_EDGE` and
        `IDEAL_RATIO` are the constants the checker itself measures against, so
        the sentence and the screen beside it cannot end up quoting different
        numbers at the same reader. */
-    note: `The commonest refusal there is. Amazon wants at least ${MIN_HEIGHT.toLocaleString()}px tall and ${MIN_WIDTH} wide, no more than ${MAX_EDGE.toLocaleString()} on a side, at least ${IDEAL_RATIO}:1, and a JPEG or TIFF. We measure the file you picked — not the copy we resized to fit your browser — against those figures before you send it.`,
+    note: `The commonest refusal there is. Amazon wants at least ${MIN_HEIGHT.toLocaleString()}px tall and ${MIN_WIDTH} wide, no more than ${MAX_EDGE.toLocaleString()} on a side, at least ${IDEAL_RATIO}:1, and a JPEG or TIFF.`,
+    source:
+      "Checked against the file you picked, not the copy we resized to fit your browser.",
     figure: <CoverCheckFigure />,
   },
   {
-    mark: "search",
     title: "The details do not match",
-    note: "Title, author and ISBN inside the file have to match your listing down to the punctuation, and a check digit one out is a rejection with no explanation attached. Here one set of details fills both, and the arithmetic is ours.",
+    fix: "One set of details fills both",
+    note: "Title, author and ISBN inside the file have to match your listing down to the punctuation, and a check digit one out is a rejection with no explanation attached.",
+    source:
+      "The ISBN's check digit is arithmetic on the number itself. We do it as you type.",
     figure: <ListingFigure />,
   },
   {
-    /* A file, not a tick. This row's mark used to be `check`, drawn in `STOP`
-       like the other two — and once the answer moved into the same column it
-       sat directly above the green tick on the solution badge: one glyph, two
-       colours, two opposite meanings, four lines apart. The others draw the
-       noun in their heading (a shelf, a magnifier); this one draws the file. */
-    mark: "formats",
     title: "The file is broken in a way Amazon hides",
-    note: "Amazon's converter quietly repairs structural faults that Apple, Kobo and IngramSpark refuse outright, so the book sells for weeks before anyone finds out. The EPUB is built here rather than converted, at zero EPUBCheck errors and zero warnings.",
+    fix: "Built here, not converted",
+    note: "Amazon's converter quietly repairs structural faults that Apple, Kobo and IngramSpark refuse outright, so the book sells for weeks before anyone finds out.",
+    source:
+      "Verified against EPUBCheck 5.3 at zero errors and zero warnings — run it yourself.",
     figure: <ExportDoneFigure />,
   },
 ] as const;
@@ -681,66 +1015,6 @@ const REJECTIONS = [
  * any". The last row is the one most pages would never print, and it is the
  * reason the others get believed.
  */
-/**
- * What writers said, and what each one turned into.
- *
- * **This is the testimonial slot, and it holds no testimonials.** The page has
- * the same problem in this row that it has in the stat band: a landing page
- * puts customer quotes here and there are no customers, so the only ways to
- * fill it are to invent people or to put something true in it. Inventing is
- * out — on a page whose whole argument is that every claim can be checked, and
- * to a reader who has already been sold to by a course that taught nothing.
- *
- * So it carries the *research* instead: things writers said about the problem,
- * to somebody else, before this existed. Four rules keep that honest.
- *
- * - **Nobody is named and nobody is described.** Real quotes, anonymous
- *   sources, no invented "Sarah M., fantasy author" under any of them —
- *   attaching a face is the part that would make it a lie.
- * - **The section says what they are, above the quotes rather than under
- *   them.** A reader who takes only the heading has still been told these are
- *   not customers.
- * - **They are quoted, not paraphrased**, and each is recorded in the module
- *   it caused — the file named beside each one below. That is what makes this
- *   checkable in the same way as everything else here: the quote and the
- *   feature it produced sit in the same file.
- * - **Each carries what was built about it**, which is the whole reason the
- *   slot earns its place. A quote about a problem with nothing under it is
- *   decoration; a quote with the answer beneath it is the shortest version of
- *   this product's argument.
- *
- * When there are real writers using this and willing to be quoted, they
- * replace this — with names, and with their permission.
- */
-const VOICES = [
-  {
-    /* roadmap.ts — the quote the whole ordering argument came from. */
-    quote:
-      "I’ve realized how absolutely essential ARCs are… Now I’m trying to get reviews for a book that has been published for a few months.",
-    answer: `Why “${ARC_STEP.title}” is step ${ARC_INDEX + 1} of ${STEPS.length}, before publication rather than after it.`,
-  },
-  {
-    /* money.ts — one of four in that file, and the least angry of them. */
-    quote:
-      "I look at the massive amount of money I wasted, especially on the first book.",
-    answer:
-      "Why the money tool works out what a book will cost before it is spent, names no company, and sells nothing.",
-  },
-  {
-    /* cover-check.ts */
-    quote: "$1000 covers are a non-starter.",
-    answer:
-      "Why the covers tool measures your file against a shop's published rules instead of selling you artwork.",
-  },
-  {
-    /* ideas.ts — the shiny-idea problem, which is why the parking lot is in
-       the editor's rail rather than on a screen of its own. */
-    quote: "I get new shiny ideas when I’m trying to write.",
-    answer:
-      "Why the parking lot is in the editor's own rail: leaving the book to write the idea down is the interruption.",
-  },
-] as const;
-
 const PROOFS = [
   [
     "shelf",
@@ -764,10 +1038,30 @@ const PROOFS = [
   ],
 ] as const;
 
-const FAQ = [
+/**
+ * The questions, and the answers set the way the decks are.
+ *
+ * **The answers are nodes rather than strings**, so each can carry `<Em>` on
+ * the one or two phrases that are its actual answer. That is what makes a
+ * column of open cards skimmable: a reader taking only the dark words gets
+ * "Straight in", "You do", "No", and the rest is the qualification that makes
+ * each of those true. Two emphases an answer is the ceiling — a third and the
+ * eye stops treating any of them as the point.
+ *
+ * Note the ink: these sit on `lp-well`, where the deck grey measures **4.38:1**
+ * and misses AA, so the answers take `lp-body`. Same call as the panel beside
+ * them, and the same rule — `lp-deck` is calibrated against the page's pure
+ * white and anything on an off-white or tinted ground steps up.
+ */
+const FAQ: [question: string, answer: React.ReactNode][] = [
   [
     "I have a finished manuscript. Where does it go?",
-    "Straight in. Import a .docx, .epub, .md, .txt or .html file and it is split into chapters for you. Then the first screen tells you what stands between it and a shop — usually four or five things, most of them ten minutes each.",
+    <>
+      <Em>Straight in.</Em> Import a .docx, .epub, .md, .txt or .html file and
+      it is split into chapters for you. Then the first screen tells you what
+      stands between it and a shop —{" "}
+      <Em>usually four or five things, most of them ten minutes each.</Em>
+    </>,
   ],
   /*
    * **The question the new section invites, answered before it is asked.**
@@ -782,29 +1076,63 @@ const FAQ = [
    */
   [
     "Can two of us write the same book?",
-    "Yes. Put somebody on a book and choose whether they can edit it or only read it — free covers you and one other, and Pro raises that. Whoever owns the book pays for the seats, so the person you invite needs an account and nothing else. What it is not is Google Docs: you will not see each other type. Changes travel when they are saved, and if you both write the same chapter at once the second save is refused rather than quietly replacing the first. Working in different chapters, which is what usually happens, needs no thought at all.",
+    <>
+      <Em>Yes.</Em> Put somebody on a book and choose whether they can edit it
+      or only read it — free covers you and one other, and Pro raises that.
+      Whoever owns the book pays for the seats, so the person you invite needs
+      an account and nothing else.{" "}
+      <Em>
+        What it is not is Google Docs: you will not see each other type.
+      </Em>{" "}
+      Changes travel when they are saved, and if you both write the same chapter
+      at once the second save is refused rather than quietly replacing the
+      first. Working in different chapters, which is what usually happens, needs
+      no thought at all.
+    </>,
   ],
   [
     "What doesn’t it do?",
-    "A fair amount. It does not design covers, edit your prose, write your blurb, market your book, buy ads, upload to any store, or introduce you to other writers. It will tell you what a cover needs to be and show you the shelf yours has to sit on; it will not draw one. It will count what is in your prose; it will not change a word.",
+    <>
+      <Em>A fair amount.</Em> It does not design covers, edit your prose, write
+      your blurb, market your book, buy ads, upload to any store, or introduce
+      you to other writers. It will tell you what a cover needs to be and show
+      you the shelf yours has to sit on; it will not draw one. It will count
+      what is in your prose; <Em>it will not change a word.</Em>
+    </>,
   ],
   [
     "Who owns what I write?",
-    "You do. We claim no rights over your manuscript and take no cut of anything you sell.",
+    <>
+      <Em>You do.</Em> We claim no rights over your manuscript and{" "}
+      <Em>take no cut of anything you sell.</Em>
+    </>,
   ],
   [
     "Do you train AI on my manuscript?",
-    "No. The assistant receives only the single chapter you hand it, at the moment you ask, and it is not used to train a model afterwards.",
+    <>
+      <Em>No.</Em> The assistant receives only the single chapter you hand it,
+      at the moment you ask, and{" "}
+      <Em>it is not used to train a model afterwards.</Em>
+    </>,
   ],
   [
     "Can I get my work out if I stop using it?",
-    "Yes, without asking us. EPUB, DOCX, PDF and Markdown, whenever you want. Markdown is plain text — it opens in any editor, including one written thirty years ago.",
+    <>
+      <Em>Yes, without asking us.</Em> EPUB, DOCX, PDF and Markdown, whenever
+      you want. <Em>Markdown is plain text</Em> — it opens in any editor,
+      including one written thirty years ago.
+    </>,
   ],
   [
     "I’ve paid for tools that did none of this. Why is this different?",
-    "You can test the whole claim in an afternoon without paying: import a draft, run the check, export all four files, open them in Word and an e-reader. If any of it does not work, you have lost an afternoon rather than a thousand pounds.",
+    <>
+      <Em>You can test the whole claim in an afternoon without paying</Em>:
+      import a draft, run the check, export all four files, open them in Word
+      and an e-reader. If any of it does not work,{" "}
+      <Em>you have lost an afternoon rather than a thousand pounds.</Em>
+    </>,
   ],
-] as const;
+];
 
 export function LandingPage() {
   return (
@@ -1130,65 +1458,104 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ---- The logo strip -------------------------------------------
+        {/* ---- Where the book comes back out ----------------------------
 
-            The row a landing page fills with customer logos, and we have none
-            to put there — a wall of publishers' marks would be inventing them.
-            So it names the places a finished manuscript *goes*, which is both
-            true of the export pipeline and the thing a writer is actually
-            nervous about: not who else is here, but whether the book comes out
-            again.
+            The slot every landing page fills with customer logos under the
+            words "trusted by", and **this one has no customers and will not
+            invent any** — the same rule that removed the stat band and, later,
+            the testimonial row further down. What it has instead is better
+            suited to the moment:
+            a visitor who has just dropped a manuscript into the check above is
+            asking one question, *does my book come back out*, and every tile
+            here answers it with something they can verify without an account.
 
-            **It sits directly under the hero now, which is a reversal.** It
-            used to come after the three refusals, on the argument that a
-            reassurance before the fear has been named answers a question
-            nobody asked — put second, it became the fear's first reply. That
-            reading is still true and was traded away deliberately: this is the
-            slot every reader has been trained to find a logo strip in, and a
-            visitor who has just dropped their manuscript into the check above
-            is asking one question — *does my book come back out* — which is
-            the one this row answers. If it moves back, move this note with it.
+            **The mosaic is the shape, borrowed deliberately.** A panel lifted
+            over the hero, one sentence across the top, then a bento of small
+            tiles — it is the arrangement a reader has been trained to read as
+            proof, and the argument of this section is that our version of that
+            proof is checkable where the usual one is not. Two kinds of tile:
+            the programs a finished file opens in, each with the format that
+            opens it, and three facts about what leaves this browser and in
+            what shape.
 
-            **Set as one plain row, no format tags.** Seven names with a
-            monospace format code beside each wrapped to two lines and read as
-            a table of specifications. Five real ones on a single line, under a
-            quiet caption, reads as what it is. The formats are not lost — the
-            counted band below says four, and the footer names one per badge —
-            and each row still carries its own in a `title`.
-
-            Real marks in their real colours, which is the documented exception
-            to this page's greyscale: a strip like this works on instant
+            **Real marks in their real colours**, which is the page's other
+            documented exception to greyscale: a row like this works on instant
             recognition, and Microsoft's four squares flattened to one grey is
             the *monochrome* mark, a different one from the mark people know.
-            Sourcing and licences are recorded in `works-with.tsx`. Nominative
-            use: these are programs that open our exports, not partners or
-            customers. */}
-        <section className="border-b border-lp-line px-6 py-10 sm:py-12">
-          <div className="mx-auto max-w-6xl">
-            <p className="text-center text-[0.8125rem] text-lp-faint">
-              Your book comes back out — and opens in
+            Sourcing and licences are in `works-with.tsx`. Nominative use —
+            these are programs that open our exports, not partners, and nothing
+            here says otherwise.
+
+            **No edge fade.** The reference crops its grid at both sides so it
+            bleeds, which says *there is more of this than the page has room
+            for*. There are exactly seven destinations and all seven are here,
+            so a fade would be implying a count we do not have. */}
+        <section className="border-b border-lp-line px-6 pb-14 sm:pb-20">
+          {/* Lifted over the hero, which is what makes it a panel rather than
+              the next band down. The hero keeps its own bottom rule, so the
+              overlap reads as one surface laid on another. */}
+          <div className="relative mx-auto -mt-8 max-w-6xl rounded-3xl bg-lp-ground p-6 shadow-[0_-1px_0_var(--color-lp-line),0_24px_60px_-40px_rgba(15,15,16,0.35)] sm:-mt-12 sm:p-10">
+            {/* Wider than the decks under a heading (`3xl`, not `2xl`): this
+                one has no title over it to set its measure, and at the deck
+                size a `2xl` column turns it into five short lines. */}
+            <p
+              className={`mx-auto max-w-3xl text-center ${SECTION_LEAD}`}
+            >
+              Your manuscript <Em>never leaves this browser</Em>, and it comes
+              back out in four formats. The EPUB is{" "}
+              <Em>verified against EPUBCheck 5.3</Em>, not asserted.
             </p>
-            <ul className="mt-7 flex flex-wrap items-center justify-center gap-x-10 gap-y-6 sm:mt-8 sm:gap-x-12">
-              {STRIP.map((destination) => (
-                <li
-                  key={destination.name}
-                  className="flex items-center gap-2.5"
-                  title={`${destination.name} — opens the ${destination.format} export`}
-                >
-                  <svg
-                    viewBox={destination.mark.viewBox}
-                    aria-hidden="true"
-                    className="h-[22px] w-[22px] shrink-0"
+
+            <ul className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:grid-cols-3 lg:grid-cols-5">
+              {/* The three facts, spread through the marks rather than
+                  gathered at one end — the reference alternates its stat tiles
+                  with its logos, and the alternation is what stops the row
+                  reading as a table of specifications with a summary stuck on
+                  it. Each is checkable by the reader today: the first with
+                  devtools, the second with a free validator, the third by
+                  pressing export. */}
+              {TILES.map((tile) =>
+                tile.kind === "fact" ? (
+                  <li
+                    key={tile.label}
+                    className="rounded-2xl bg-lp-tint-soft p-4 sm:p-5"
                   >
-                    {destination.mark.paths.map((path) => (
-                      <path key={path.d} d={path.d} fill={path.fill} />
-                    ))}
-                  </svg>
-                  <span className="text-[0.9375rem] font-semibold tracking-tight text-lp-soft">
-                    {destination.name}
-                  </span>
-                </li>
-              ))}
+                    <p
+                      className="oc-display font-serif text-[1.75rem] leading-none font-semibold sm:text-[2rem]"
+                      style={tile.tone ? { color: tile.tone } : undefined}
+                    >
+                      {tile.figure}
+                    </p>
+                    <p className="mt-2 text-[0.8125rem] leading-snug text-lp-faint">
+                      {tile.label}
+                    </p>
+                  </li>
+                ) : (
+                  <li
+                    key={tile.destination.name}
+                    title={`Opens the ${tile.destination.format} export`}
+                    className="flex flex-col justify-between rounded-2xl border border-lp-line p-4 sm:p-5"
+                  >
+                    <svg
+                      viewBox={tile.destination.mark.viewBox}
+                      aria-hidden="true"
+                      className="h-6 w-6 shrink-0"
+                    >
+                      {tile.destination.mark.paths.map((path) => (
+                        <path key={path.d} d={path.d} fill={path.fill} />
+                      ))}
+                    </svg>
+                    <span className="mt-4 block">
+                      <span className="block text-[0.875rem] leading-snug font-semibold tracking-tight text-lp-ink">
+                        {tile.destination.name}
+                      </span>
+                      <span className="mt-1 block font-code text-[0.625rem] tracking-[0.12em] text-lp-faint uppercase">
+                        {tile.destination.format}
+                      </span>
+                    </span>
+                  </li>
+                ),
+              )}
             </ul>
           </div>
         </section>
@@ -1282,10 +1649,10 @@ export function LandingPage() {
             says what "wrong" means — three documented refusals, in the order
             of how often they happen, each with the thing on our side of it.
 
-            It sits *above* the logo strip on purpose. The strip is a
-            reassurance ("your book comes back out"), and a reassurance before
-            the fear has been named is an answer to a question nobody asked.
-            Named first, the strip becomes its first reply.
+            It sits *above* the mosaic under the hero on purpose. That mosaic
+            is a reassurance ("your book comes back out"), and a reassurance
+            before the fear has been named is an answer to a question nobody
+            asked. Named first, the mosaic becomes its first reply.
 
             **Three cards in one section, rather than a band each.** They were
             full-bleed bands with alternating grounds and the figure changing
@@ -1311,7 +1678,17 @@ export function LandingPage() {
               center
               eyebrow="Before you upload"
               title="Three ways a finished book gets turned away"
-              lead="None of them is about the writing. All are knowable while the file is still on your machine."
+              lead={
+                <>
+                  None of them is about the writing. Each one is a rule a shop
+                  publishes and then enforces quietly, so the first you hear of
+                  it is a listing that never appears.{" "}
+                  <Em>
+                    All three are knowable while the file is still on your
+                    machine.
+                  </Em>
+                </>
+              }
             />
 
             <ul className="mt-12 space-y-5 sm:mt-14 sm:space-y-6">
@@ -1319,9 +1696,10 @@ export function LandingPage() {
                 <Rejection
                   key={rejection.title}
                   n={String(i + 1).padStart(2, "0")}
-                  mark={rejection.mark}
                   title={rejection.title}
+                  fix={rejection.fix}
                   note={rejection.note}
+                  source={rejection.source}
                   figure={rejection.figure}
                   tint={CARD_TINTS[i % CARD_TINTS.length]!}
                 />
@@ -1342,7 +1720,7 @@ export function LandingPage() {
             Every one of those four figures is still on the page, in the place
             that gives it a meaning: the step count and the phases in "The
             order", the tool count in the heading of the tools section, the
-            four formats in the strip under the hero and in the footer, and the
+            four formats in the mosaic under the hero and in the footer, and the
             zero in "The export is verified, not asserted". Four numerals on a
             band of their own asked a reader to be impressed by an arithmetic
             they had not been given a reason to care about yet.
@@ -1354,229 +1732,130 @@ export function LandingPage() {
             and the coming-soon dialog, which are whole features waiting on a
             way in. */}
 
-        {/* ---- Three up, one lit ---------------------------------------- */}
-        <section
-          id="does"
-          className="border-b border-lp-line px-6 py-14 sm:py-20"
-        >
-          <div className="mx-auto max-w-6xl">
-            <Head
-              center
-              eyebrow="What it does"
-              title="Three phases. Writing is one."
-              lead="Most tools stop when the draft does. The expensive part starts there."
-            />
-            <div className="mt-12 grid gap-5 md:grid-cols-3">
-              <Phase
-                lit
-                n="01"
-                icon="write"
-                title="Write"
-                note="Seventeen free minutes a day, and not losing your place between them."
-                items={WRITE.length}
-              />
-              <Phase
-                n="02"
-                icon="prepare"
-                title="Prepare"
-                note="Everything a shop asks for that is not the book, checked before you upload."
-                items={PREPARE.length}
-              />
-              <Phase
-                n="03"
-                icon="track"
-                title="Track"
-                note="What the book cost against what it earned, and who still owes you a review."
-                items={TRACK.length}
-              />
-            </div>
-          </div>
-        </section>
+        {/* **"Three phases. Writing is one." is gone, removed 2026-08-14** at
+            the owner's request, with the "Before you upload" panel below it.
+            It was three cards — Write, Prepare, Track — each counting its own
+            group out of `book-tools.ts`, over the claim that most software
+            stops when the draft does.
+
+            Nothing on the page depended on it and one thing is owed by it: the
+            nav lost its `#does` entry in the same commit, because a link to an
+            id that is not on the page scrolls nowhere and says nothing. The
+            arrays it counted (`WRITE`, `PREPARE`, `TRACK`) are still read by
+            the tools section, which lists them in full. */}
 
         {/* ---- The order, as a road you travel down ----------------------
 
-            **The one section on this page whose figure is the argument.** It
-            was a two-column split — a paragraph beside a boxed list of five
-            phases — and a boxed list is a picture of the very thing the page
-            says nobody's problem is. What a writer is short of is not five
-            names, it is the road between them and where on it they are
-            standing. So the phases are stations on one line, and a marker
-            rides it as the reader scrolls: the station being read is at full
-            strength and the rest sit at a floor.
+            **Five alternating rows: the screen on one side, the phase on the
+            other, sides swapping down the page.** Rebuilt on 2026-08-13 to the
+            reference's layout, replacing a drawn road with a marker that rode
+            it as the reader scrolled.
 
-            `OrderPath` carries the whole of how that works, including why the
-            dimming is allowed here and nowhere else on the page. The two
-            sentences under it are the ones the old column carried that the
-            stations do not say for themselves. */}
+            The road's argument has to survive the change, and it is the reason
+            this is not just a list: a writer is short of the *sequence*, not
+            of five names. Three things carry it — the phases are numbered, each
+            says how many steps it holds, and the ARC callout names its step's
+            real number and phase. A reader taking only the numbers still gets
+            an order.
+
+            `OrderRows` has no `"use client"` and ships no script, which the
+            road could not manage: the dimming needed measurement, a scroll
+            handler and a reduced-motion path. `order-path.tsx` and the tested
+            `landing-path.ts` are left in the tree unused — see TODO.md. */}
         <section
           id="order"
-          className="scroll-mt-20 border-b border-lp-line px-6 py-14 sm:py-20"
+          /* **More side padding than the rest of the page, and it is the one
+             section that needs it.** Everything else caps at `6xl`, so on a
+             1280 window the max-width itself leaves about 64px of margin and
+             `px-6` never comes into play. This section caps at `7xl` — wider
+             than that window — so the padding *is* the margin, and at 24px the
+             words ran to within an inch of the browser's edge while the row
+             beside them had room to spare. 40px from `lg` puts the text back
+             on a margin without giving the screens the width back.
+
+             **It was a tinted field for part of 2026-08-14 and is white
+             again.** Worth keeping the measurement that came out of it: on
+             `lp-tint`, `lp-deck` — the deck grey every section lead is set in
+             — falls to **3.95:1** and misses AA, where `lp-body` clears
+             **5.8:1**. The tint carried `[--color-lp-deck:var(--color-lp-body)]`
+             for exactly that reason, re-pointing the token for the subtree
+             rather than hunting every deck in it. Put the tint back and that
+             line has to come with it. On white the deck grey is legal (4.56:1)
+             and the token stands as the palette states it. */
+          className="scroll-mt-20 border-b border-lp-line px-6 py-14 sm:px-8 sm:py-20 lg:px-10"
         >
-          <div className="mx-auto max-w-6xl">
+          {/* **`7xl` here where the rest of the page is `6xl`**, and it is for
+              the screens rather than for the words: this is the one section
+              built around five large pictures, and at `6xl` with two equal
+              columns each of them had about 34rem to live in — a laptop
+              rendered at that width puts the app's own type below the size it
+              can be read at. The header and the closing line under it cap
+              themselves (`Head` at `3xl` when centred), so nothing but the
+              rows takes the extra width. */}
+          <div className="mx-auto max-w-7xl">
             <Head
               center
               eyebrow="The whole point"
               title="The order"
-              lead={`${STEPS.length} steps, ${PHASES.length} phases. The software is the least of it; the sequence is the thing nobody hands you.`}
+              /* **No phase count here since 2026-08-13.** It read
+                 "{STEPS.length} steps, {PHASES.length} phases" — counted off
+                 the roadmap, which is the shape everything on this page
+                 follows. Then this section stopped drawing the revising phase,
+                 so the page said five and showed four, and a reader who counts
+                 is exactly the reader this page is written for. The step count
+                 stays because it is still true of the road and is the stronger
+                 number; the rows themselves say how many phases are here. */
+              lead={
+                <>
+                  {STEPS.length} steps, in the order they have to happen. The
+                  software is the least of it;{" "}
+                  <Em>the sequence is the thing nobody hands you</Em> — and the
+                  steps people miss are the ones that cannot be done late.
+                </>
+              }
             />
 
-            {/* The road is drawn on a field of its own, and the section around
-                it is left as plain ground so that field reads as one object.
-                It was the other way about — a tinted section with the road
-                loose on it — which made the road part of the page's furniture
-                rather than a thing the page had put down in front of you. */}
-            <div className="mt-14 sm:mt-16">
-              <OrderPath stations={ORDER_STATIONS} />
+            {/* The rows sit on the section's tint — see the note on the
+                `<section>` above for the ground and the ink that came with
+                it. */}
+            <div className="mt-16 sm:mt-20">
+              <OrderRows stations={ORDER_STATIONS} />
             </div>
 
-            <p className="mx-auto mt-16 max-w-prose text-center leading-relaxed sm:mt-20">
-              <strong className="text-lp-ink">
+            <p
+              className={`mx-auto mt-16 max-w-3xl text-center sm:mt-20 ${SECTION_LEAD}`}
+            >
+              <Em>
                 {SELF_TICKING} of the {SELF_TICKING + YOURS_TO_TICK} steps tick
                 themselves
-              </strong>{" "}
+              </Em>{" "}
               from what is already in your book — no checklist to maintain, and
               nothing that can be lied to by accident. There is a test in the
-              codebase asserting that the advance-copy step stays where it is.
-              If it ever moves, the build fails.
+              codebase asserting that the advance-copy step stays where it is.{" "}
+              <Em>If it ever moves, the build fails.</Em>
             </p>
           </div>
         </section>
 
-        {/* ---- Prepare --------------------------------------------------
+        {/* **The "Before you upload" panel is gone, removed 2026-08-14** at
+            the owner's request, together with "Three phases. Writing is one."
+            above it. It was a warm-paper panel — a two-column header over
+            `CheckDemo` at full width — and its parts were not deleted so much
+            as *distributed*, which is why the page loses nothing by it:
 
-            **Stacked, not split, and the figure decides it.** This was words
-            left and the product right, with the figure pinned while the claims
-            scrolled past. It was a good arrangement for reading and a bad one
-            for the thing being read: `CheckDemo` is a whole dashboard drawn at
-            760 design px whose *content is 11px labels* — a finding, and the
-            button that fixes it — and a column can never be wide enough for
-            them. On the larger half of `max-w-6xl` it scaled to about 0.8 and
-            the labels went to texture, which is the difference between a
-            picture of a product and a picture of a product you can read. It
-            also ran off the right edge of the viewport, which is what a fixed
-            aspect ratio does when the column it is in is narrower than the
-            picture wants.
+            - the **demo itself** is the figure for phase 02 in "The order"
+              now, where it draws the same screens and works them;
+            - the **header shape** — eyebrow and heading left, lead right — is
+              what the listing section below uses;
+            - the **claim** it made, that a shop's refusal is slow and silent
+              and never says which of a dozen things was wrong, is made by the
+              three refusal cards further up, which name the three.
 
-            So the section centres: header, then the figure at its own full
-            width, then the claims underneath in two columns. The figure now
-            scales *up* rather than down, and the one thing this section exists
-            to show — the fix sitting on the problem — is legible at a glance
-            instead of needing to be leant into.
-
-            **It is set on a black panel, inset from the page.** Everywhere
-            else the page alternates two tints and keeps one voice; here it
-            stops arguing and demonstrates, and going dark is how a keynote
-            marks that change of mode. It earns it twice over. The figure is a
-            *drawn light interface* — by day a white app on black, which is the
-            strongest contrast available on the page and puts every one of
-            those 11px labels on its own ground. And the panel is inset with
-            the page showing down both sides and around the corners, so it
-            reads as a stage the product is standing on rather than as another
-            full-bleed band in the stack.
-
-            The ink inside it is a palette of its own (`lp-stage-*`) that does
-            *not* invert with the theme, because the surface does not either —
-            see the note in globals.css.
-
-            The figure replaced a drawn still of the export screen's readiness
-            list. The still could show that the app lists problems; only the
-            moving one shows the fix sitting *on* the problem, which is the
-            claim this section is actually making. */}
-        {/* Near full-bleed, with a thin gutter rather than a container width.
-            Capped at `max-w-7xl` the panel left a hand's width of page down
-            both sides on any wide screen, which made it read as a very large
-            card sitting *in* the layout. The reference this is built to runs
-            the dark almost to the glass and keeps only enough page to show the
-            rounded corner — so the stage is the width of the window and the
-            gutter is a detail, not a margin. The content inside keeps its own
-            measures, so nothing stretches with the viewport. */}
-        <section className="px-2 py-10 sm:px-4 sm:py-12">
-          <div className="rounded-[1.25rem] bg-lp-stage px-4 py-14 sm:rounded-[1.5rem] sm:px-8 sm:py-16">
-            <Head
-              center
-              stage
-              eyebrow="Before you upload"
-              title="Find out from us, not from a rejection"
-              lead="A shop refusing your upload is a slow, silent thing. This names what would stop it, and what merely costs you readers."
-            />
-
-            {/* The figure, centred, and deliberately smaller than the panel it
-              sits on: about three fifths of it, so there is a full hand's
-              width of black down either side. A screen that fills its stage is
-              a section with a picture in it; one with room around it is a
-              thing being *presented*, which is the whole reason this section
-              went dark.
-
-              **760px is the floor and it is a hard one.** The stage is a fixed
-              design exactly that wide, so anything under it drops the scale
-              below 1, shrinks the 11px labels under native size, and the
-              findings stop being readable — which is the one thing this figure
-              exists to show. `max-w-4xl` (896) puts it at 1.18, comfortably
-              clear of that and still well short of about 1100, past which it
-              stops reading as a screen and starts reading as the page. */}
-            <div className="mx-auto mt-10 max-w-4xl sm:mt-14">
-              <WideFigure>
-                <CheckDemo />
-              </WideFigure>
-            </div>
-
-            {/* **The four headings are the list; the notes are the footnotes.**
-              Set a step apart on the page's own scale — 24px serif against 14px
-              sans — they can be read on their own, in order, without a word of
-              the small text, which is how a reader who has just watched the
-              screen above them actually arrives. Closing that gap made four
-              paragraphs with bold first lines, and the eye had nowhere to land.
-
-              Two columns rather than four: three of these headings run to five
-              or six words, and in a quarter of the container they break to four
-              lines each and the row reads as a wall. Two gives every heading at
-              most two lines.
-
-              **The marks carry no tile.** A boxed icon is a *control* — the
-              same shape as the chips inside the figure above — and four of them
-              promised four buttons. Naked, they are what they are: a mark on
-              the ground, in the way-forward indigo. Bigger and heavier to earn
-              that (28px at weight 2), because stroke width is in user units and
-              a glyph scaled up keeps its hairline and quietly reads lighter.
-              On the black it takes the stage's own lightness of that indigo —
-              the page's #312e81 is a smudge down here. */}
-            <ul className="mx-auto mt-14 grid max-w-4xl gap-x-12 gap-y-9 sm:mt-16 sm:grid-cols-2">
-              {PREPARE.slice(0, 4).map(([name, note], i) => (
-                <li key={name} className="flex gap-4">
-                  <span className="mt-1 shrink-0 text-lp-stage-accent">
-                    <Icon
-                      name={PREPARE_MARKS[i]!}
-                      className="h-7 w-7"
-                      weight={2}
-                    />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="oc-heading font-serif text-xl leading-snug text-lp-stage-ink sm:text-2xl">
-                      {name}
-                    </p>
-                    <p className="mt-1.5 text-sm leading-relaxed text-lp-stage-body">
-                      {note}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            {/* Outlined rather than filled, which is the opposite of every
-                other instance of this box on the page. A white card here would
-                be a second lit rectangle competing with the screen above it —
-                on black, a hairline is enough to make a box, and the caveat
-                should be quieter than the thing it qualifies. Centred and
-                narrow, or a caveat at the full width of the claims above reads
-                as a fifth claim. */}
-            <p className="mx-auto mt-12 max-w-2xl rounded-xl border border-lp-stage-line p-4 text-center text-sm leading-relaxed text-lp-stage-body">
-              <strong className="text-lp-stage-ink">About the PDF.</strong> A
-              clean interior file at your trim size with fonts embedded — not a
-              pre-press file. No bleed, no crop marks, no CMYK, because it comes
-              from your browser’s print engine.
-            </p>
-          </div>
-        </section>
+            What went with it and is not owed: `--color-lp-paper` and the
+            `lp-paper-accent*` pair are now unused by this file. They are left
+            in `globals.css` — a token stated in one theme block and not the
+            other is the bug that file warns about, and these are stated in
+            both — but nothing on the page is warm paper any more. */}
 
         {/* ---- The metadata, which is where people actually give up ------
 
@@ -1586,55 +1865,155 @@ export function LandingPage() {
             never had to know. It is the most-skipped work in publishing and the
             cheapest to get right, so showing the form is showing the product
             doing its least glamorous and most useful thing. */}
-        <Split
-          eyebrow="The tedious part"
-          title="Every field a shop asks for, and why"
-          figure={
-            <WideFigure>
-              <StoreListingDemo />
-            </WideFigure>
-          }
-          flip
-        >
-          <p className="oc-lead font-serif text-xl leading-relaxed">
-            An ISBN, a publisher, a language, a series. Fields with names you
-            have never needed until the moment a shop refuses to go on without
-            them.
-          </p>
-          <p className="mt-5 leading-relaxed">
-            Every one carries a line saying what it is for and who actually
-            wants it — Amazon assigns its own ISBN, Apple and Kobo want yours,
-            and nobody tells you that until you have hunted for the answer.
-          </p>
-          <p className="mt-4 leading-relaxed">
-            Answered once and saved to the book, not re-asked on every export.
-            And every one of them is skippable: the export runs on a blank form,
-            because a file you want for your own reader is nobody else&rsquo;s
-            business.
-          </p>
-        </Split>
+        {/* **Set to the check panel's own shape since 2026-08-14**, at the
+            owner's request: a two-column header — the eyebrow and the heading
+            on the left, the lead on the right — and the figure on a row of its
+            own beneath, rather than the `Split` this used to be.
 
-        {/* ---- Track ---------------------------------------------------- */}
-        <Split
-          eyebrow="Once it is out"
-          title="What it cost against what it earned"
-          tint
-          figure={<MoneyFigure />}
-        >
-          <p className="oc-lead font-serif text-xl leading-relaxed">
-            Nobody keeps this, which is why the total is always a shock.
-          </p>
-          <ul className="mt-6 flex flex-col gap-3">
-            {TRACK.slice(0, 4).map(([name, note]) => (
-              <li key={name}>
-                <p className="oc-heading font-serif text-lg text-lp-ink">
-                  {name}
+            It buys the same thing it bought there. As a `Split` the heading,
+            the lead and both paragraphs stacked in one half while the form sat
+            in the other, so the words were a narrow column of four different
+            sizes and the demo was read before any of them. Split across two
+            rows, the header is taken in one pass at the width of the page and
+            the demo gets a half rather than a column.
+
+            The figure is on the **right** now (the `Split` carried `flip`,
+            which put it left). Nothing in the section's argument depended on
+            the side; what does depend on it is the two sections either side of
+            this one, which both lead with words. */}
+        {/* `bg-lp-ground` is written out rather than inherited: the sections
+            either side of this one are tinted, and a white band between two
+            tints is a decision. Stating it means a later change to the page's
+            own ground cannot quietly take it. */}
+        <section className="border-b border-lp-line bg-lp-ground px-6 py-14 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="grid gap-8 lg:grid-cols-2 lg:gap-16">
+              <div>
+                {/* The dotted eyebrow the check panel uses, in this section's
+                    own grey — that one is on warm paper and takes the paper
+                    accent, which would be a second hue out here. */}
+                <p className="flex items-center gap-2.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-faint"
+                  />
+                  The tedious part
                 </p>
-                <p className="text-sm leading-relaxed">{note}</p>
-              </li>
-            ))}
-          </ul>
-        </Split>
+                <h2
+                  className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}
+                >
+                  Every field a shop asks for, and why
+                </h2>
+              </div>
+
+              {/* Top-aligned against the heading rather than centred on it,
+                  which is what makes the two columns read as one row. */}
+              <div className="lg:pt-1">
+                <p className={`oc-lead font-serif ${SECTION_LEAD}`}>
+                  An ISBN, a publisher, a language, a series.{" "}
+                  <Em>Fields with names you have never needed</Em> until the
+                  moment a shop refuses to go on without them.
+                </p>
+              </div>
+            </div>
+
+            {/* **Three questions beside the form, rather than two
+                paragraphs.** Same two facts as the prose it replaced — every
+                field says who wants it, every answer is saved, and none of it
+                is required — but a reader arriving at a form full of words
+                they have never had to know does not have a *paragraph*
+                question, they have three specific ones. Asked as questions
+                they can be scanned and only one has to be opened.
+
+                Three, and no more: this is a column beside a figure, not the
+                FAQ. The page has one of those already, further down, and a
+                second long list here would be answering questions the section
+                has not raised. */}
+            <div className="mt-12 grid items-center gap-10 lg:mt-14 lg:grid-cols-2 lg:gap-16">
+              <ListingQuestions />
+
+              <WideFigure>
+                <StoreListingDemo />
+              </WideFigure>
+            </div>
+          </div>
+        </section>
+
+        {/* ---- Track ----------------------------------------------------
+
+            **Four cards and a panel, rather than a column beside a figure.**
+            It was a `Split`: the four points stacked as a list on the left and
+            the money drawn on the right. That put the section's four claims in
+            the shape a footnote takes — a run of small headings down a column
+            — while the one *invented* thing on it, a demonstration ledger, had
+            the whole other half and all the visual weight.
+
+            As cards the four read as four things the tool does, which is what
+            they are, and the panel becomes the last of five rather than the
+            argument. It also lets the panel run the full height beside them,
+            which is the only way to show the two figures at a size where the
+            gap between them lands before the words explaining it.
+
+            **The heading and its deck share the top row**, heading left and
+            deck right — the one place on the page that happens, because this
+            deck is a single line that would otherwise sit alone above a
+            five-card grid with nothing under it for half the width. */}
+        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
+          <div className="mx-auto max-w-6xl">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
+              <div>
+                <p className="flex items-center gap-2.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-faint"
+                  />
+                  Once it is out
+                </p>
+                <h2
+                  className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}
+                >
+                  What it cost against
+                  <br className="hidden sm:block" /> what it earned
+                </h2>
+              </div>
+              <p
+                className={`oc-lead font-serif lg:max-w-md lg:text-right ${SECTION_LEAD}`}
+              >
+                Editing, the cover, the ISBN, the ads.{" "}
+                <Em>Nobody keeps a running total</Em>, which is why the number
+                is always a shock — and every figure here carries where it came
+                from.
+              </p>
+            </div>
+
+            {/* Three columns to two: the cards take three fifths and the panel
+                two, which is the reference's proportion and, more usefully,
+                the point at which the two money figures still sit side by side
+                rather than stacking. Plain span classes rather than an
+                arbitrary track — see the note on the road's layout for what
+                happens to those. */}
+            <div className="mt-12 grid gap-5 lg:grid-cols-5 sm:mt-14">
+              <ul className="grid gap-5 sm:grid-cols-2 lg:col-span-3">
+                {TRACK.slice(0, 4).map(([name, note]) => (
+                  <li
+                    key={name}
+                    className="rounded-2xl bg-lp-ground p-6 sm:p-7"
+                  >
+                    <p className="oc-heading font-serif text-[1.25rem] leading-snug font-semibold text-lp-ink">
+                      {name}
+                    </p>
+                    <p className="mt-3 text-[0.9375rem] leading-relaxed">
+                      {note}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <div className="lg:col-span-2">
+                <MoneyFigure />
+              </div>
+            </div>
+          </div>
+        </section>
 
         {/* ---- The bento ------------------------------------------------
 
@@ -1651,7 +2030,13 @@ export function LandingPage() {
               center
               eyebrow="All of it included"
               title={`${ALL_TOOLS.length} tools, nothing held back`}
-              lead="Every one works on a real book, and none is behind the paid plan."
+              lead={
+                <>
+                  Grouped by the job they do rather than by what they cost, and
+                  every one of them works on a real book rather than a sample.{" "}
+                  <Em>None is behind the paid plan.</Em>
+                </>
+              }
             />
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {TOOL_GROUPS.map((group, i) => (
@@ -1755,7 +2140,14 @@ export function LandingPage() {
               center
               eyebrow="Straight answer"
               title="What we will not do, and what we do instead"
-              lead="We say no in public so you can plan around it, and each no carries the work we did instead."
+              lead={
+                <>
+                  AI covers, AI editing, a marketplace.{" "}
+                  <Em>We say no in public</Em> so you can plan around it rather
+                  than discover it six months in, and each no carries the work
+                  we did instead.
+                </>
+              }
             />
             <table className="mt-12 w-full border-separate border-spacing-0 text-left max-md:block">
               <thead className="max-md:hidden">
@@ -1920,12 +2312,17 @@ export function LandingPage() {
                     </span>
                   </h2>
 
-                  <p className="oc-lead mt-6 max-w-md font-serif text-lg leading-relaxed">
-                    <strong className="text-lp-ink">
-                      Nothing here will make you finish it.
-                    </strong>{" "}
-                    Nothing can. What you can stop doing is writing into a void:
-                    put one person on the book — a co-writer, an editor, whoever
+                  {/* The one deck on the page that does not take the full
+                      scale, and the column is why: this sits in half a card at
+                      about 500px, where the top step would set nine lines of
+                      twenty characters. It keeps the weight, the grey and the
+                      emphasis — the part that makes a deck a deck — and stops
+                      one step down. A measure this narrow is a reason to hold
+                      the size, not a reason to drop the treatment. */}
+                  <p className="oc-lead mt-6 max-w-md font-serif text-[1.1875rem] leading-[1.45] font-semibold text-lp-deck sm:text-[1.3125rem]">
+                    <Em>Nothing here will make you finish it.</Em> Nothing can.
+                    What you can stop doing is <Em>writing into a void</Em>: put
+                    one person on the book — a co-writer, an editor, whoever
                     keeps asking how it is going — and they can read what you
                     wrote this week, or write the next chapter themselves.
                   </p>
@@ -2089,7 +2486,13 @@ export function LandingPage() {
               center
               eyebrow="Not built yet"
               title="What comes after that"
-              lead="Listed so you can hold us to the difference between a plan and a product. No dates: a date is a promise with a number on it."
+              lead={
+                <>
+                  Listed so you can hold us to{" "}
+                  <Em>the difference between a plan and a product.</Em> No
+                  dates: a date is a promise with a number on it.
+                </>
+              }
             />
             <div className="mt-12 grid gap-4 md:grid-cols-3">
               {LATER.map(([name, note]) => (
@@ -2127,10 +2530,25 @@ export function LandingPage() {
 
             The rows are `<details>` — the browser's own disclosure, so it
             works with no JavaScript, is announced correctly, and the page can
-            be searched with the browser's own find. The circle on the right is
-            drawn rather than the default marker, and it is one glyph with its
-            upright stroke turned off when open, which is the whole of the plus
-            becoming a minus. */}
+            be searched with the browser's own find.
+
+            **The rows are cards and the ask is a panel**, which is the
+            reference's arrangement rather than the hairline list this used to
+            be. Three things follow from copying it, and each is a rule this
+            page already had rather than a new one:
+
+            - The panel takes `lp-card-1`, the page's own decorative indigo
+              ground. That token is *grounds only* — never ink, never a control
+              and never a badge — so the eyebrow above it stays neutral
+              (`lp-well`) even though the reference tints its own. A badge in a
+              decorative hue is the one use the palette note rules out by name.
+            - The question cards take `lp-well` with a hairline, so the tinted
+              panel is the only colour on the row and the eye goes to the ask
+              rather than to the list. Two tinted columns would compete.
+            - The mark on the right became a chevron in a ring, because a card
+              *is* a surface you press and the ring now reads as the control the
+              whole card is. The bare plus was right when these were rows on the
+              page and would read as punctuation floating on a card. */}
         <section className="border-b border-lp-line px-6 py-16 sm:py-24">
           <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-20">
             {/* **The left column is written out rather than using `Head`**, and
@@ -2143,11 +2561,11 @@ export function LandingPage() {
                 on the page's one heading component is how eleven headings end
                 up at nine sizes. */}
             <div>
-              {/* The dot is what turns a line of small caps into a *label*.
-                  It costs one span and it is the difference between an
-                  eyebrow that reads as a heading somebody forgot to size and
-                  one that reads as a marker on the section. */}
-              <p className="flex items-center gap-2.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
+              {/* The dot is what turns a line of small caps into a *label*, and
+                  the pill is what the reference puts around it. Neutral ground
+                  on purpose: see the palette note above — the decorative tints
+                  are grounds, and a badge is the use they are ruled out for. */}
+              <p className="inline-flex items-center gap-2.5 rounded-full border border-lp-edge bg-lp-well px-3.5 py-1.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
                 <span
                   aria-hidden="true"
                   className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-faint"
@@ -2158,73 +2576,100 @@ export function LandingPage() {
               {/* The same scale every other section title takes — see
                   `SECTION_TITLE`. The column is hand-written; the type is not. */}
               <h2 className={`oc-display mt-6 font-serif text-lp-ink ${SECTION_TITLE}`}>
-                Reasonable suspicion, answered
+                {/* No hard break. This column is a fixed 24rem, so at the
+                    section-title size the line turns after "Frequently" on its
+                    own and a `<br>` changes nothing about the shape — while
+                    joining "Asked" and "Questions" into one word in
+                    `textContent`, which is what a screen reader announces. */}
+                Frequently Asked Questions
               </h2>
 
-              <p className="mt-6 max-w-sm leading-relaxed">
-                Every one of these is a question this audience actually asks
-                before paying for anything. Still have one? One person answers,
-                usually within {REPLY_DAYS} days.
-              </p>
-
-              <Link
-                href="/contact"
-                style={{ backgroundColor: INK }}
-                className="mt-8 inline-block rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
-              >
-                Contact us
-              </Link>
+              {/* **The ask, as a panel.** It is the half most FAQ sections
+                  leave out: a reader whose question is not on the list has
+                  just been told, by omission, that there is nowhere to put it.
+                  Boxed rather than loose because the right column is now a
+                  column of boxes, and one loose paragraph beside them reads as
+                  the section's leftovers. The address and the reply time come
+                  from `legal.ts`, so what this promises is what the contact
+                  page promises. */}
+              <div className="mt-8 rounded-2xl bg-lp-card-1 p-6 sm:mt-10 sm:p-7">
+                <h3 className="oc-heading font-serif text-xl text-lp-ink">
+                  Still have a question?
+                </h3>
+                {/* The deck treatment — grey sentence, claim in near-black —
+                    but **`lp-body` rather than `lp-deck`, because this one is
+                    on a tint.** The deck grey is measured against the page's
+                    white, where it clears 4.56:1; on `lp-card-1` the same ink
+                    drops to **3.88:1** and fails. The exact match for this
+                    ground would be #696973 at 4.62:1, which is a hair lighter
+                    than `lp-body` and not worth a second token for one
+                    paragraph — so this takes the token that already exists and
+                    clears 5.7:1 here. Anything moved onto a tinted ground needs
+                    this check; the ink that was legal on white may not be. */}
+                <p className="mt-3 text-[1.0625rem] leading-[1.5] font-semibold text-lp-body">
+                  Every one of these is a question this audience actually asks
+                  before paying for anything. If yours is not here,{" "}
+                  <Em>one person answers — usually within {REPLY_DAYS} days.</Em>
+                </p>
+                <Link
+                  href="/contact"
+                  style={{ backgroundColor: INK }}
+                  className="mt-6 inline-block rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
+                >
+                  Contact us
+                </Link>
+              </div>
             </div>
 
-            {/* The rows carry a rule *above* each rather than below, so the
-                list opens with a line at the top edge of the first question
-                and closes with one under the last — the shape the reference
-                has, and the one that reads as a table of contents rather than
-                as a stack of cards that lost their borders. */}
-            <div className="flex flex-col border-b border-lp-line lg:pt-1">
+            {/* Separate cards with a gap, the way the reference stacks them —
+                rather than one list divided by hairlines. A card can be
+                pressed anywhere and looks it, which is the whole reason the
+                mark on the right could become a ring. */}
+            <div className="flex flex-col gap-2.5">
               {FAQ.map(([q, a], i) => (
                 <details
                   key={q}
                   open={i === 0}
-                  className="group border-t border-lp-line"
+                  className="group rounded-xl border border-lp-line bg-lp-well px-4 transition-colors hover:border-lp-edge sm:px-5"
                 >
                   {/* `list-none` and the WebKit rule together: Safari draws its
                       triangle through a pseudo-element the standard property
                       does not reach, so one without the other leaves a marker
                       in exactly one browser. */}
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-8 py-6 [&::-webkit-details-marker]:hidden sm:py-7">
-                    <span className="oc-heading font-serif text-[1.125rem] leading-snug text-lp-ink transition-opacity group-hover:opacity-70 sm:text-xl">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-3.5 [&::-webkit-details-marker]:hidden">
+                    <span className="oc-heading font-serif text-[0.9375rem] leading-snug text-lp-ink sm:text-base">
                       {q}
                     </span>
-                    {/* **A bare plus, not a circled one.** The ring was doing
-                        the work of a button, and this is not one — pressing
-                        anywhere on the row opens it. Without the ring the mark
-                        reads as punctuation on the line, which is what it is,
-                        and the row stops looking like a control with a label
-                        beside it. */}
-                    <svg
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={1.5}
-                      strokeLinecap="round"
-                      className="h-5 w-5 shrink-0 text-lp-faint transition-colors group-hover:text-lp-ink"
-                    >
-                      <path d="M4 12h16" />
-                      {/* The upright half of the plus. It fades rather than
-                          unmounting, so the plus turns into a minus in place
-                          instead of the row flickering. */}
-                      <path
-                        d="M12 4v16"
-                        className="origin-center transition-opacity duration-150 group-open:opacity-0"
-                      />
-                    </svg>
+                    {/* **A chevron in a ring, and the ring is the point.** On a
+                        hairline row a circled mark read as a button sitting
+                        next to a label, so it was stripped back to a bare
+                        plus. On a card the opposite is true: the card is the
+                        control, and a mark with no ring floats on it looking
+                        like punctuation nobody can press. The ring takes the
+                        card's own ground so it reads as lifted off it. */}
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-lp-edge bg-lp-ground text-lp-body transition-colors group-hover:text-lp-ink">
+                      <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        /* One glyph turned over rather than two swapped: the
+                           arrow travels, so the row does not flicker at the
+                           moment it opens. */
+                        className="h-3.5 w-3.5 transition-transform duration-200 group-open:-rotate-180"
+                      >
+                        <path d="m6 9 6 6 6-6" />
+                      </svg>
+                    </span>
                   </summary>
                   {/* Stopped short of the mark on the right, so the answer
                       reads as belonging to the line above it rather than as
-                      the next row. */}
-                  <p className="max-w-prose pr-12 pb-7 text-[1.0625rem] leading-relaxed">
+                      the next row. `lp-body` rather than `lp-deck` — see the
+                      note on `FAQ` for the measurement. */}
+                  <p className="max-w-prose pr-8 pb-4 text-[0.9375rem] leading-[1.55] font-semibold text-lp-body">
                     {a}
                   </p>
                 </details>
@@ -2262,7 +2707,13 @@ export function LandingPage() {
               center
               eyebrow="Before you trust us"
               title="Four things you can check without believing a word"
-              lead="Every claim on this page can be settled by you, today, without an account."
+              lead={
+                <>
+                  <Em>Every claim on this page can be settled by you, today,</Em>{" "}
+                  without an account and without taking our word for any of it —
+                  with devtools, a free validator, and the export button.
+                </>
+              }
             />
 
             <ul className="mt-12 grid gap-5 md:grid-cols-2">
@@ -2288,56 +2739,25 @@ export function LandingPage() {
               ))}
             </ul>
 
-            {/* ---- What writers said ---------------------------------
-                See the note on `VOICES`. This is the slot a landing page
-                fills with testimonials and it does not contain any, because
-                there is nobody to quote yet. */}
-            <div className="mt-14 border-t border-lp-line pt-12">
-              <div className="mx-auto max-w-3xl text-center">
-                <p className="font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
-                  What writers said
-                </p>
-                <h3 className="oc-heading mt-3 font-serif text-[1.5rem] leading-tight text-lp-ink sm:text-3xl">
-                  Not testimonials. The research this was built from
-                </h3>
-                <p className="mt-3 leading-relaxed">
-                  Every one is something a writer said about the problem, not
-                  about us — we have no customers to quote yet, and we are not
-                  going to invent any. Each is in the codebase, beside the
-                  thing it caused.
-                </p>
-              </div>
+            {/* **The testimonial slot was here and is coming back.** It held
+                the *research* rather than customers — real things writers said
+                about the problem, nobody named, each with the module it caused
+                underneath. It came out on **2026-08-13** to be rebuilt, and
+                `TODO.md` records the four rules it kept so the replacement does
+                not quietly become the invented quotes this page refuses. Until
+                then there is no testimonial row at all, which is the safe
+                direction: an empty slot claims nothing.
 
-              <ul className="mt-10 grid gap-5 sm:grid-cols-2">
-                {VOICES.map(({ quote, answer }) => (
-                  <li
-                    key={quote}
-                    className="flex flex-col rounded-2xl border border-lp-edge bg-lp-ground p-6 sm:p-7"
-                  >
-                    {/* The quote in the page's own display face and a size up
-                        from the body, because it is the thing being shown;
-                        the answer below is set small and quiet, since it is
-                        our voice rather than theirs and must not compete with
-                        the words it is answering. */}
-                    <blockquote className="oc-lead flex-1 font-serif text-lg leading-relaxed text-lp-ink sm:text-xl">
-                      “{quote}”
-                    </blockquote>
-                    <p className="mt-5 border-t border-lp-line pt-4 text-[0.875rem] leading-relaxed text-lp-faint">
-                      {answer}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-
-              {/* What the risk-reversal panel that used to sit here was
-                  carrying, kept as one line rather than dropped: the free
-                  plan, the refund window and a reachable human. The first is
-                  made twice more on this page and the address is in the
-                  footer, but the refund window is said nowhere else, and it
-                  is the one a reader is owed before they are asked for a
+                What stays is the risk reversal, which was always the last thing
+                in this block rather than part of the row above it. */}
+            <div className="mt-14 border-t border-lp-line pt-10">
+              {/* The free plan, the refund window and a reachable human. The
+                  first is made twice more on this page and the address is in
+                  the footer, but the refund window is said nowhere else, and
+                  it is the one a reader is owed before they are asked for a
                   card. The address is the same module `/contact` prints
                   from. */}
-              <p className="mt-8 text-center text-[0.875rem] leading-relaxed text-lp-faint">
+              <p className="text-center text-[0.875rem] leading-relaxed text-lp-faint">
                 No card to start, {REFUND_DAYS} days to change your mind, and
                 one person answers —{" "}
                 <a
@@ -2353,13 +2773,18 @@ export function LandingPage() {
 
         {/* ---- Close ----------------------------------------------------
 
-            The last ask, and the one section on the page whose *shape* is
-            borrowed wholesale: a lit sky holding the sentence and the two ways
-            in on the left, the product oversized and cropped by the bottom
-            edge on the right, and the gradient landing on the footer's own
-            ground so the two read as one closing movement. `CtaBanner` carries
-            the whole of the reasoning, including what could not be copied from
-            the reference and why. */}
+            The last ask, and the top half of one closing composition: a
+            landscape running full-bleed under both this and the footer, with
+            the ask centred on its sky and the footer riding up onto its foot
+            as a card. The two are separate elements — this one closes `<main>`
+            and the footer follows it — but they are one picture, joined by a
+            negative margin rather than by a wrapper, so `<main>` keeps the
+            content that belongs in it.
+
+            Read `cta-banner.tsx` for what the picture cost (the drawn app
+            window, and why nothing it said was lost) and `globals.css` beside
+            `.oc-closing-field` for the contrast measurement that decides what
+            may sit on the sky at all. */}
         <CtaBanner />
       </main>
 
@@ -2377,16 +2802,29 @@ export function LandingPage() {
 
 /* ---- The furniture ------------------------------------------------------- */
 
+/**
+ * The claim inside a deck, in near-black on the deck's grey.
+ *
+ * One component rather than `<strong className={LEAD_EM}>` at thirteen call
+ * sites: the emphasis is a *rule* about how a deck is read, and thirteen copies
+ * of a class string is how eleven of them end up right and two drift.
+ */
+function Em({ children }: { children: React.ReactNode }) {
+  return <strong className={LEAD_EM}>{children}</strong>;
+}
+
 function Head({
   eyebrow,
   title,
   lead,
   center = false,
-  stage = false,
 }: {
   eyebrow: string;
   title: string;
-  lead?: string;
+  /* A `ReactNode` rather than a string so a deck can carry `<Em>` on the words
+     that are its claim — see `SECTION_LEAD`. Plain strings still work and most
+     of the shorter decks are still strings. */
+  lead?: React.ReactNode;
   /**
    * Centred, which every **stacked** section header now is.
    *
@@ -2400,35 +2838,26 @@ function Head({
    * centred; in a column, not.
    */
   center?: boolean;
-  /** On the black panel, where every ink is a different token — see the stage
-   *  note in globals.css. The type scale is identical; only the colours move,
-   *  which is exactly why this is a flag here rather than a second Head. */
-  stage?: boolean;
+  /* A `stage` flag used to sit here, swapping every ink for the `lp-stage-*`
+     set so this could be used on the black check panel. That panel is warm
+     paper now and writes its own two-tone heading, so the flag lost its only
+     caller. The stage tokens themselves stay: `AppWindow`'s bezel is drawn
+     with them, and it is what frames the check's own screen. */
 }) {
   return (
     <div className={center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}>
       <p
-        className={`font-code text-[0.6875rem] tracking-[0.18em] uppercase ${
-          stage ? "text-lp-stage-faint" : "text-lp-faint"
-        }`}
+        className="font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase"
       >
         {eyebrow}
       </p>
       <h2
-        className={`oc-display mt-5 font-serif ${SECTION_TITLE} ${
-          stage ? "text-lp-stage-ink" : "text-lp-ink"
-        }`}
+        className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}
       >
         {title}
       </h2>
       {lead && (
-        <p
-          className={`oc-lead mt-4 font-serif text-xl leading-relaxed ${
-            stage ? "text-lp-stage-body" : ""
-          }`}
-        >
-          {lead}
-        </p>
+        <p className={`oc-lead mt-5 font-serif ${SECTION_LEAD}`}>{lead}</p>
       )}
     </div>
   );
@@ -2478,43 +2907,147 @@ function Head({
  */
 function Rejection({
   n,
-  mark,
   title,
+  fix,
   note,
+  source,
   figure,
   tint,
 }: {
   n: string;
-  mark: keyof typeof icons;
   title: string;
+  fix: string;
   note: string;
+  source: string;
   figure: ReactNode;
-  tint: string;
+  tint: (typeof CARD_TINTS)[number];
 }) {
   return (
-    <li className={`rounded-3xl p-6 sm:p-8 lg:p-10 ${tint}`}>
-      {/* `items-center` rather than `start`: the words are shorter than the
-          screen in two of the three, and a short column pinned to the top of a
-          tall figure leaves a hole under it that reads as a missing
-          paragraph. */}
-      <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
-        <div>
-          {/* The page's own ground, so the pill lifts off the tint. */}
-          <span className="font-code inline-flex items-center gap-2 rounded-full bg-lp-ground px-3 py-1.5 text-[0.6875rem] font-semibold tracking-[0.12em] text-lp-soft uppercase">
-            <span style={{ color: STOP }} className="flex">
-              <Icon name={mark} className="h-3.5 w-3.5" weight={2.1} />
+    /* `overflow-hidden`, because the figure runs to the card's own edge and
+       has to be cut by its rounding rather than sitting inside it. */
+    <li className={`rounded-3xl p-6 sm:p-8 lg:p-10 ${tint.ground}`}>
+      {/* **Even margin all round the figure, and the two columns are one
+          height.** The figure ran to the card's own right edge for a while —
+          the reference's own trick — and at these proportions it was wrong
+          twice: the drawn screen is wider than it is tall, so bleeding it
+          right made it collide with the card's corner instead of settling
+          into it, and the card lost the band of colour that tells the three
+          apart at a glance.
+
+          Padded evenly and stretched, the tint frames the screen on all four
+          sides and the figure is as tall as the words beside it — which is
+          what makes the row read as *a page beside a screen* rather than as
+          two objects of unrelated height that happen to be adjacent.
+
+          `items-stretch` is what does the second half, with `fill` on the
+          window inside. The drawn screen keeps its own size and sits at the
+          top of the glass; the space under it is not a gap to be closed, it
+          is what a real application window looks like. */}
+      <div className="grid items-stretch gap-8 lg:grid-cols-2 lg:gap-10">
+        {/* `items-start` is not optional. A flex column stretches its children
+            across the cross axis by default, which took the badge and the
+            button — both `inline-flex`, both meant to hug their own words —
+            and ran them the full width of the column as two coloured bars. */}
+        <div className="flex flex-col items-start justify-center">
+          {/* **A solid pill in the card's own hue, with three fading echoes
+              behind it**, as the reference draws it. They are the same pill
+              shifted left and dimmed, so the badge reads as something that has
+              *arrived* rather than as a static label — motion implied by
+              repetition, which is the one way to suggest it without anything
+              actually moving on a page a reader may leave open.
+
+              Absolutely positioned rather than laid out, so they take no width
+              and the solid pill keeps the left edge the heading and the
+              paragraph below it use. They extend into the card's own padding,
+              which is 40px at `lg` against 24px of trail, so nothing is
+              clipped — the card carries no `overflow-hidden`, and must not
+              grow one without this being re-checked.
+
+              The mark went with the change, and that is the reference's shape
+              rather than an accident: it was a white glyph on a coloured pill
+              beside three words in caps, at 14px, where the word is doing all
+              the work. The nouns it drew — a shelf, a magnifier, a file — are
+              still on the drawn screen beside it. */}
+          <span className="relative inline-flex items-center">
+            {[
+              { at: 8, opacity: 0.42 },
+              { at: 16, opacity: 0.24 },
+              { at: 24, opacity: 0.12 },
+            ].map(({ at, opacity }) => (
+              <span
+                key={at}
+                aria-hidden="true"
+                className="absolute inset-y-0 left-0 w-full rounded-full"
+                style={{
+                  backgroundColor: tint.fill,
+                  opacity,
+                  transform: `translateX(-${at}px)`,
+                }}
+              />
+            ))}
+            <span
+              style={{ backgroundColor: tint.fill }}
+              className="font-code relative rounded-full px-4 py-1.5 text-[0.6875rem] font-semibold tracking-[0.14em] text-white uppercase"
+            >
+              Refusal {n}
             </span>
-            Refusal {n}
           </span>
 
-          <h3 className="oc-heading mt-5 font-serif text-[1.75rem] leading-[1.15] font-semibold text-lp-ink sm:text-[2rem]">
-            {title}
+          {/* Two lines: the problem in ink, the answer in the card's own hue.
+              `block` on both, so the break is the layout's rather than a
+              `<br>` that has to be re-guessed at every width.
+
+              **Set to the order rows' own scale since 2026-08-14** — 32px into
+              40px, bold, at `leading-[1.08]` — so the two sections a reader
+              meets one after the other are plainly one typography rather than
+              two sizes of the same idea. The pattern is the whole of what was
+              copied: eyebrow, big bold title, one heavy grey paragraph. The
+              badge and the button keep their own sizes, because those are
+              controls and a control that grows with the prose stops looking
+              like a control. */}
+          <h3 className="oc-heading mt-5 font-serif text-[2rem] leading-[1.08] font-bold sm:text-[2.5rem]">
+            <span className="block text-lp-ink">{title}</span>
+            <span className="block" style={{ color: tint.ink }}>
+              {fix}
+            </span>
           </h3>
-          <p className="mt-4 max-w-prose text-[0.9375rem] leading-relaxed">
+
+          {/* The rows' note, to the letter, with one change forced by the
+              ground: `lp-body` rather than `lp-deck`. The deck grey is
+              calibrated against pure white and these cards are tinted panels,
+              where it lands under 4.5:1 — the same step-up the FAQ makes on
+              `lp-well` and the order section now makes by re-pointing the
+              token. `max-w-prose` came off with the size: at 22px it capped
+              nothing the column was not already capping. */}
+          <p className="mt-5 text-[1.25rem] leading-[1.5] font-semibold text-lp-body sm:text-[1.375rem]">
             {note}
           </p>
 
-          {/* A plain anchor, not `<Link>`, and that is the same choice the
+          {/* Where the reference puts a customer's logo and their result. We
+              have neither and will not invent them, so the slot carries the
+              provenance of the rule — which is what this audience is actually
+              short of, and what the rest of the page already does with every
+              figure it prints.
+
+              No rule above it any more: on a coloured ground a hairline is a
+              third line of chrome in a column that already has a pill and a
+              button, and the reference separates this with space alone. */}
+          {/* Up from 13px with the rest of the card. It has no counterpart in
+              the order rows — nothing there carries a provenance line — so it
+              keeps its job as the quiet one and simply stops being tiny beside
+              a 22px paragraph. */}
+          <p className="mt-8 text-[0.9375rem] leading-relaxed text-lp-faint">
+            {source}
+          </p>
+
+          {/* **One button, where the reference has two.** Its second is a
+              link into a marketplace; the honest second here would be the tool
+              that mends this, and every one of those needs an account, so it
+              would be a button that goes to a sign-up wall wearing the label
+              of a feature. One control that works beats two where one is a
+              door.
+
+              A plain anchor, not `<Link>`, and that is the same choice the
               header's three in-page links make. The page's scroll container is
               the `lp-type` div rather than the window, so the fragment has to
               be handled by the browser — which walks up to the nearest
@@ -2522,10 +3055,11 @@ function Rejection({
               restoration, which is written for the document. */}
           <a
             href="#check"
-            style={{ backgroundColor: INK }}
-            className="mt-7 inline-block rounded-full px-5 py-2.5 text-[0.875rem] font-semibold text-lp-accent-ink hover:opacity-90"
+            style={{ backgroundColor: tint.fill }}
+            className="mt-4 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[0.875rem] font-semibold text-white hover:opacity-90"
           >
             Check your book
+            <span aria-hidden="true">→</span>
           </a>
         </div>
 
@@ -2535,48 +3069,16 @@ function Rejection({
   );
 }
 
-/**
- * A section with the words on one side and a picture of the thing on the other.
- *
- * `flip` swaps the sides. Alternating them down the page is what stops six
- * sections reading as one long column — the reference does it for the same
- * reason, and the order-reversal classes are on the *figure* so the words stay
- * first in the DOM and a screen reader is never handed the picture first.
- */
-function Split({
-  id,
-  eyebrow,
-  title,
-  children,
-  figure,
-  flip,
-  tint,
-}: {
-  id?: string;
-  eyebrow: string;
-  title: string;
-  children: ReactNode;
-  figure: ReactNode;
-  flip?: boolean;
-  tint?: boolean;
-}) {
-  return (
-    <section
-      {...(id ? { id } : {})}
-      className={`border-b border-lp-line px-6 py-14 sm:py-20 ${
-        tint ? "bg-lp-tint-soft" : ""
-      }`}
-    >
-      <div className="mx-auto grid max-w-6xl items-center gap-12 md:grid-cols-2">
-        <div>
-          <Head eyebrow={eyebrow} title={title} />
-          <div className="mt-6">{children}</div>
-        </div>
-        <div className={flip ? "md:order-first" : ""}>{figure}</div>
-      </div>
-    </section>
-  );
-}
+/* `Split` — a section with the words on one side and a picture on the other,
+   with `flip` to swap them — stood here until 2026-08-14 and is gone rather
+   than kept, because it had run down to one caller and that caller now writes
+   its own two rows. It is the case CLAUDE.md distinguishes from
+   `templates-dialog.tsx`: thirty lines of layout, no logic, nothing tested,
+   and keeping it callerless would have bought nothing but a standing lint
+   warning. The one thing worth carrying forward is why the flip classes sat on
+   the *figure* rather than on the words — so the words stay first in the DOM
+   and a screen reader is never handed the picture first. `OrderRows` does the
+   same thing for the same reason. */
 
 /**
  * One marked point: mark, title, small description.
@@ -2656,90 +3158,15 @@ function WideFigure({ children }: { children: ReactNode }) {
   );
 }
 
-function Phase({
-  n,
-  icon,
-  title,
-  note,
-  items,
-  lit,
-}: {
-  n: string;
-  icon: keyof typeof icons;
-  title: string;
-  note: string;
-  items: number;
-  lit?: boolean;
-}) {
-  return (
-    <div
-      className="rounded-2xl border p-7"
-      style={
-        lit
-          ? {
-              borderColor: INK,
-              backgroundColor: INK,
-              color: "var(--color-lp-accent-pale)",
-            }
-          : {
-              borderColor: "var(--color-lp-edge)",
-              backgroundColor: "var(--color-lp-ground)",
-            }
-      }
-    >
-      {/* The lit card is the brand indigo rather than black: it is the phase
-          most readers are standing in, and indigo says "you are here" where
-          black said "this one is heavier than the others".
+/* `Phase` — the three cards of "Three phases. Writing is one." — went with
+   that section on 2026-08-14. It is the `Counted` case again: presentation
+   with no logic, no test and no second caller, where keeping it callerless
+   buys a standing lint warning and nothing else. The one detail in it worth
+   carrying: its glyph tile was a `color-mix` wash of whatever it sat on rather
+   than an eight-digit hex, because a token cannot carry its own alpha —
+   `var(--x)1f` is a string, not a colour, and CSS drops the declaration
+   without a word. */
 
-          The tile behind the glyph is a wash of whatever it sits on — the ink
-          on the lit card, the accent on the unlit one — through `color-mix`
-          rather than an eight-digit hex. A hex carries its own alpha and a
-          token cannot: `var(--x)1f` is not a colour, it is a string with two
-          characters stuck on the end, and CSS drops the whole declaration
-          without saying so. */}
-      <span
-        className="flex h-10 w-10 items-center justify-center rounded-xl"
-        style={
-          lit
-            ? {
-                backgroundColor:
-                  "color-mix(in srgb, var(--color-lp-accent-ink) 12%, transparent)",
-                color: "var(--color-lp-accent-ink)",
-              }
-            : {
-                backgroundColor:
-                  "color-mix(in srgb, var(--color-lp-accent) 7%, transparent)",
-                color: INK_TEXT,
-              }
-        }
-      >
-        <Icon name={icon} className="h-5 w-5" />
-      </span>
-      <p
-        className={`mt-5 font-code text-xs tracking-[0.18em] uppercase ${
-          lit ? "text-lp-accent-ink/60" : "text-lp-faint"
-        }`}
-      >
-        {n}
-      </p>
-      <p
-        className={`oc-heading mt-4 font-serif text-2xl ${
-          lit ? "text-lp-accent-ink" : "text-lp-ink"
-        }`}
-      >
-        {title}
-      </p>
-      <p className="oc-lead mt-2 font-serif text-lg leading-relaxed">{note}</p>
-      <p
-        className={`mt-5 font-code text-xs tracking-wider uppercase ${
-          lit ? "text-lp-accent-ink/60" : "text-lp-faint"
-        }`}
-      >
-        {items} things it does
-      </p>
-    </div>
-  );
-}
 
 /* ---- The figures ---------------------------------------------------------
  *
@@ -2760,47 +3187,105 @@ function Phase({
    verdict, on the real screen, with the fix beside each problem. */
 
 /** Cost against earnings, the way the Track screen puts it. */
+/**
+ * A book's money, and **every figure on it is computed** rather than typed.
+ *
+ * The rows below are the invented part — somebody's cover, editing, ads and
+ * proofs against two sales reports — and that is the only invented part. What
+ * was spent, what was earned, how far under the book is and how many more
+ * copies clear it all come out of `totals()` and `copiesToLevel()`, the same
+ * two functions the Track screen uses. Change how the ledger adds up and this
+ * picture changes with it; there is nothing here left to drift.
+ *
+ * It matters more here than on most figures, because the claim beside it is
+ * that the break-even count is worked from what a copy has *actually* earned
+ * rather than from a royalty rate we invented. A hand-typed "412" under that
+ * sentence would be exactly the thing the sentence promises not to do.
+ */
+const MONEY_ROWS: Entry[] = [
+  ["cost", 650, "Cover"],
+  ["cost", 420, "Editing"],
+  ["cost", 120, "Ads"],
+  ["cost", 50, "Proof copies"],
+  ["income", 260, "Amazon KDP", 128],
+  ["income", 150, "Apple Books", 76],
+].map(([kind, amount, what, units]) => ({
+  id: what as string,
+  bookId: "demo",
+  kind: kind as Entry["kind"],
+  amount: amount as number,
+  what: what as string,
+  at: 0,
+  ...(units ? { units: units as number } : {}),
+}));
+
+const MONEY = totals(MONEY_ROWS);
+const MONEY_COPIES = copiesToLevel(MONEY);
+
 function MoneyFigure() {
+  /* How far the earnings have got towards the outlay. Capped, because a book
+     that has made more than it cost is not a bar that overflows its track —
+     though this one has not, and the cap is here for whoever changes the rows
+     rather than for this drawing. */
+  const covered = MONEY.spent > 0 ? Math.min(1, MONEY.earned / MONEY.spent) : 0;
+
   return (
     <div
-      className="rounded-2xl border border-lp-edge bg-lp-ground p-7"
+      className="flex h-full flex-col rounded-3xl bg-lp-card-2 p-7 sm:p-8"
       aria-hidden="true"
     >
-      <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-xl bg-lp-tint-soft p-4">
-          <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
+      <div className="flex flex-wrap gap-x-10 gap-y-6">
+        <div>
+          <p className="font-code text-[0.6875rem] font-semibold tracking-[0.16em] text-lp-faint uppercase">
             Spent
           </p>
           <p
-            className="oc-heading mt-2 font-serif text-2xl"
+            className="oc-display mt-2 font-serif text-[2.25rem] leading-none font-semibold sm:text-[2.75rem]"
             style={{ color: STOP }}
           >
-            £1,240
+            £{MONEY.spent.toLocaleString()}
           </p>
-          <p className="mt-1 text-xs">Cover · editing · ads · proofs</p>
+          <p className="mt-2 text-[0.8125rem]">Cover · editing · ads · proofs</p>
         </div>
-        <div className="rounded-xl bg-lp-tint-soft p-4">
-          <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
+        <div>
+          <p className="font-code text-[0.6875rem] font-semibold tracking-[0.16em] text-lp-faint uppercase">
             Earned
           </p>
           <p
-            className="oc-heading mt-2 font-serif text-2xl"
+            className="oc-display mt-2 font-serif text-[2.25rem] leading-none font-semibold sm:text-[2.75rem]"
             style={{ color: PASS }}
           >
-            £410
+            £{MONEY.earned.toLocaleString()}
           </p>
-          <p className="mt-1 text-xs">From your own sales report</p>
+          <p className="mt-2 text-[0.8125rem]">From your own sales report</p>
         </div>
       </div>
-      <div className="mt-4 rounded-xl border border-lp-edge p-4">
-        <p className="text-sm text-lp-ink">
-          <strong>412 more copies</strong> gets you level.
-        </p>
-        <p className="mt-1 text-xs leading-relaxed">
-          Worked from what a copy has actually earned you. With no rows saying
-          so, the figure does not appear at all.
-        </p>
+
+      {/* The one bar on the page, and it is a proportion of two real numbers
+          rather than a mood: earnings against outlay, so its width says the
+          same thing the two figures above it do. Squared off at the ends
+          rather than capsuled — a full pill is a control in this app. */}
+      <div className="mt-8 h-2 w-full overflow-hidden rounded-full bg-lp-edge">
+        <div
+          className="h-full rounded-full"
+          style={{
+            width: `${Math.round(covered * 100)}%`,
+            backgroundColor: PASS,
+          }}
+        />
       </div>
+
+      {MONEY_COPIES !== null && (
+        <div className="mt-6">
+          <p className="oc-heading font-serif text-[1.375rem] leading-snug font-semibold text-lp-ink sm:text-2xl">
+            {MONEY_COPIES.toLocaleString()} more copies gets you level.
+          </p>
+          <p className="mt-2.5 text-[0.9375rem] leading-relaxed">
+            Worked from what a copy has actually earned you. With no rows
+            saying so, the figure does not appear at all.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

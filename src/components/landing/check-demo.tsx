@@ -1435,7 +1435,15 @@ export function CheckDemo() {
     // the whole figure and nothing about the measurement inside — `screenRef`
     // still measures the glass, and every rect the pointer aims at is taken
     // relative to it.
+    /* **The bezel, not the pale ring**, and it is the section around it that
+       decides. This figure used to sit on a black stage, where the black shell
+       would have disappeared into the ground and the pale ring was what
+       separated the drawn app from it. The section is warm paper now, so the
+       ring has nothing to do — a pale hairline on a pale ground — and the
+       bezel does the whole job: a dark frame is what makes a white drawn app
+       read as a *screen* rather than as a card the page happens to contain. */
     <AppWindow
+      bezel
       label={LABEL}
       hostRef={hostRef}
       screenRef={screenRef}

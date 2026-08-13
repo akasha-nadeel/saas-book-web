@@ -86,6 +86,24 @@ export function trimById(id: string): Trim {
   return TRIMS.find((t) => t.id === id) ?? TRIMS[0];
 }
 
+/**
+ * The white a page keeps around its text, in inches.
+ *
+ * Margins scale with the trim: a 5-inch page cannot carry the same inch of
+ * white as a letter page and still hold a line of text.
+ *
+ * Exported because the export wizard's preview draws the same page, and a
+ * preview computed from its own arithmetic is a preview that drifts. This is
+ * the one place the numbers live; `typesetCss` and the sheet on screen both
+ * ask it, so the page a writer approves is the page that prints.
+ */
+export function trimMargins(trim: Trim): { side: number; ends: number } {
+  return {
+    side: Math.max(0.5, Math.min(1, trim.width * 0.14)),
+    ends: Math.max(0.5, Math.min(1, trim.height * 0.09)),
+  };
+}
+
 export interface TypesetOptions {
   template: TemplateId;
   trim: string;
@@ -136,10 +154,7 @@ export function typesetCss(
   const t = templateById(options.template);
   const trim = trimById(options.trim);
 
-  // Margins scale with the trim: a 5-inch page cannot carry the same inch of
-  // white as a letter page and still hold a line of text.
-  const side = Math.max(0.5, Math.min(1, trim.width * 0.14));
-  const ends = Math.max(0.5, Math.min(1, trim.height * 0.09));
+  const { side, ends } = trimMargins(trim);
 
   return `
 ${forPrint ? `@page { size: ${trim.width}in ${trim.height}in; margin: ${ends}in ${side}in; }` : ""}

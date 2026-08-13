@@ -58,7 +58,7 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
           <Result
             tone="good"
             title="You're on Pro"
-            body="The assistant, the bookmarks and the audiobook are switched on. PayHere has emailed your receipt."
+            body="The assistant, the bookmarks and the research tools are switched on. PayHere has emailed your receipt."
             action={{ href: "/", label: "Back to writing" }}
           />
         ) : refused ? (

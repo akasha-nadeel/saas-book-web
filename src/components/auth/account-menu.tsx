@@ -194,7 +194,7 @@ export function AccountMenu({
                 The plan sits under the name, as it did in the header chip —
                 and it is the one thing on this row a writer might want at a
                 glance rather than a click, since it is what decides whether
-                the assistant and the audiobook will answer. Null until known:
+                the assistant and the research tools will answer. Null until known:
                 a paying writer seeing "Free plan" flash under their own name
                 on every load is worse than a line that arrives a moment late. */}
             <Avatar url={account?.avatarUrl ?? null} name={name} size={30} />

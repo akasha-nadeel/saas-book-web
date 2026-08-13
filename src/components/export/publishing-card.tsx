@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { checkStoreReadiness } from "@/lib/export";
 import { setPublishing, type Book } from "@/lib/library-store";
 import {
@@ -371,6 +372,16 @@ export function StoreReadiness({
  * are the difference between listed and found. Neither disables the export
  * button — a writer is allowed to want the file for their own reader, and a
  * greyed-out button with no way to reach it is worse than a plain warning.
+ *
+ * **It is drawn in the status family, and it used to be drawn in neither.** The
+ * blocking panel was `danger` at five percent with a red heading, and the
+ * advisory one was a plain grey box — so on the last screen before the export
+ * the two levels were told apart by the *weight of a heading*, and the amber
+ * rung of the dashboard's own ladder (red is blocked, amber is worth doing,
+ * green has passed) went unspent on the one screen where that ladder decides
+ * whether to upload. `ok`/`note`/`stop` are the three tokens for exactly this,
+ * they invert with the theme, and every other verdict in the app already wears
+ * them.
  */
 export function ReadinessPanel({ issues }: { issues: readonly ReadinessIssue[] }) {
   const blocking = issues.filter((i) => i.level === "blocking");
@@ -378,51 +389,146 @@ export function ReadinessPanel({ issues }: { issues: readonly ReadinessIssue[] }
 
   if (issues.length === 0) {
     return (
-      <div className="mt-4 rounded-md border border-line bg-surface px-3 py-2.5">
-        <p className="font-sans text-sm font-medium text-fg">
-          Ready for the shops.
-        </p>
-        <p className="mt-0.5 font-sans text-xs text-muted">
-          Cover, metadata and images are all in order.
-        </p>
+      <div className="flex items-start gap-3 rounded-xl border border-ok-line bg-ok-bg px-4 py-3.5">
+        <Mark className="text-ok-fg">
+          <path d="M4.5 10.5l3.5 3.5 7-7.5" />
+        </Mark>
+        <span>
+          <span className="block font-sans text-sm font-semibold text-ok-fg">
+            Ready for the shops.
+          </span>
+          <span className="mt-0.5 block font-sans text-xs text-muted">
+            Cover, metadata and images are all in order.
+          </span>
+        </span>
       </div>
     );
   }
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className="space-y-3">
       {blocking.length > 0 && (
-        <div className="rounded-md border border-danger/40 bg-danger/5 px-3 py-2.5">
-          <p className="font-sans text-xs font-semibold text-danger">
-            {blocking.length === 1
+        <Verdict
+          tone="stop"
+          title={
+            blocking.length === 1
               ? "One thing will stop a shop taking this"
-              : `${blocking.length} things will stop a shop taking this`}
-          </p>
-          <ul className="mt-1.5 flex flex-col gap-1.5">
-            {blocking.map((issue) => (
-              <li key={issue.field} className="font-sans text-xs text-fg">
-                {issue.message}
-              </li>
-            ))}
-          </ul>
-        </div>
+              : `${blocking.length} things will stop a shop taking this`
+          }
+          issues={blocking}
+        />
       )}
 
       {advisory.length > 0 && (
-        <div className="rounded-md border border-line bg-surface px-3 py-2.5">
-          <p className="font-sans text-xs font-semibold text-fg">
-            Worth fixing first
-          </p>
-          <ul className="mt-1.5 flex flex-col gap-1.5">
-            {advisory.map((issue) => (
-              <li key={issue.field} className="font-sans text-xs text-muted">
-                {issue.message}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <Verdict tone="note" title="Worth fixing first" issues={advisory} />
       )}
     </div>
+  );
+}
+
+/** One level of the check, in its own rung of the ladder. */
+function Verdict({
+  tone,
+  title,
+  issues,
+}: {
+  tone: "stop" | "note";
+  title: string;
+  issues: readonly ReadinessIssue[];
+}) {
+  const skin =
+    tone === "stop"
+      ? { box: "border-stop-line bg-stop-bg", ink: "text-stop-fg" }
+      : { box: "border-note-line bg-note-bg", ink: "text-note-fg" };
+
+  return (
+    <div className={`rounded-xl border px-4 py-3.5 ${skin.box}`}>
+      <p className={`flex items-center gap-2 font-sans text-sm font-semibold ${skin.ink}`}>
+        <Mark className={skin.ink}>
+          {tone === "stop" ? (
+            <>
+              <circle cx="10" cy="10" r="7.25" />
+              <path d="M10 6.4v4.4M10 13.3v.1" />
+            </>
+          ) : (
+            <>
+              <path d="M10 3.4l7 12.2H3z" />
+              <path d="M10 8v3.2M10 13.6v.1" />
+            </>
+          )}
+        </Mark>
+        {title}
+      </p>
+      {/* The problems themselves stay in the page's own ink rather than the
+          banner's: the heading is the verdict and these are the facts under it,
+          and a whole list set in a status colour is a list nobody reads to the
+          end of. */}
+      <ul className="mt-2 flex flex-col gap-2.5 pl-7">
+        {issues.map((issue) => (
+          <li
+            key={issue.field}
+            className="font-sans text-sm leading-relaxed text-fg/85"
+          >
+            {issue.message}
+            {/* **The way to it, where the problem is named.** An issue about a
+                *page* used to end at the sentence: a writer was told on the
+                last screen of the wizard that their copyright page names
+                somebody else, and left to work out which of sixteen front
+                pages that was and how to reach it from here. The finding
+                carries its own destination now — see `ReadinessIssue.link` —
+                so only the code that found the page decides where the link
+                goes, and a finding with nowhere to send anybody simply has no
+                link rather than a guess. */}
+            {issue.link && (
+              <Link
+                href={issue.link.href}
+                className="mt-1 flex w-fit items-center gap-1.5 rounded-sm
+                           font-medium text-accent underline-offset-4
+                           outline-none transition-colors hover:underline
+                           focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                {issue.link.label}
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-3.5 w-3.5"
+                >
+                  <path d="M4 10h11M11 6l4 4-4 4" />
+                </svg>
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Mark({
+  className = "",
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`h-5 w-5 shrink-0 ${className}`}
+    >
+      {children}
+    </svg>
   );
 }
 

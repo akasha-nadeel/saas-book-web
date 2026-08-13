@@ -55,7 +55,6 @@ import {
 } from "@/lib/use-library";
 import { pace, streak } from "@/lib/activity";
 import {
-  isOverdue,
   parseArc,
   summarise as summariseArc,
   type ArcSummary,
@@ -798,41 +797,16 @@ function Overview({
   // A book that is already readable is drawn at once.
   const settled = useLibrarySettled();
 
-  /**
-   * Advance readers whose date has gone, across every book.
+  /*
+   * **Advance readers past their date are not counted here any more.**
    *
-   * The one thing on this screen that is *urgent* rather than merely true. A
-   * date that has passed is unambiguous — no judgement, no threshold, nothing
-   * inferred — which is what makes it safe to raise here. Readiness problems
-   * are deliberately not raised: a writer on chapter three has no ISBN and
-   * that is not a problem, and a dashboard that says so every morning is the
-   * scold the research warned about.
-   *
-   * Read straight from the store rather than through `useArc`, because a hook
-   * cannot be called in a loop and there is one list per book. They are names
-   * and dates, so this is nothing like reading covers.
+   * Every book's list was read at this point, filtered through `isOverdue`,
+   * and drawn as the amber panel below — the one thing on this screen that was
+   * *urgent* rather than merely true. The whole of it came out on 2026-08-13
+   * with the rest of the chasing, so the read, the frozen clock it needed and
+   * the panel are all gone rather than left computing something nothing draws.
+   * The rule survives in `arc.ts`; see TODO.md under "Taken out on purpose".
    */
-  // Read once when the screen opens, not in the memo: `Date.now()` during
-  // render is a different answer every pass, so whether a reader is late would
-  // depend on which unrelated state change last re-rendered the dashboard.
-  // Once per visit is also the right cadence — lateness turns over at midnight.
-  const [now] = useState(() => Date.now());
-
-  /** Advance readers per book. One read, used by the checkup and by `late`. */
-  const readers = useMemo(
-    () => new Map(all.map((b) => [b.id, parseArc(getArcRaw(b.id))])),
-    [all],
-  );
-
-  const late = useMemo(() => {
-    return all
-      .map((b) => ({
-        book: b,
-        count: (readers.get(b.id) ?? []).filter((r) => isOverdue(r, now))
-          .length,
-      }))
-      .filter((row) => row.count > 0);
-  }, [all, readers, now]);
 
   /**
    * Momentum, not totals.
@@ -1550,34 +1524,11 @@ function Overview({
         />
       )}
 
-      {/* Nothing when nothing is late, which is most days. A panel that has
-          to explain that it is empty is a panel earning its place by being
-          there rather than by saying anything. */}
-      {late.length > 0 && (
-        <section className="rounded-2xl border border-note-line bg-note-bg p-5">
-          <p className="font-bold text-fg">
-            {late.reduce((n, row) => n + row.count, 0)} advance{" "}
-            {late.reduce((n, row) => n + row.count, 0) === 1
-              ? "reader is"
-              : "readers are"}{" "}
-            past their date
-          </p>
-          <ul className="mt-2.5 flex flex-col gap-1.5">
-            {late.map(({ book, count }) => (
-              <li key={book.id}>
-                <Link
-                  href={`/book/${book.id}/arc`}
-                  className="flex flex-wrap items-center gap-x-2 text-sm"
-                >
-                  <span className="font-semibold text-fg">{book.title}</span>
-                  <span className="text-muted">{count} to chase</span>
-                  <span className="text-accent">→</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* An amber panel counting advance readers past their date stood here
+          until 2026-08-13 — the one *urgent* thing this screen ever raised —
+          and it came out with the rest of the chasing, to be rebuilt with it.
+          `isOverdue` in `arc.ts` is the rule it was computed from and is kept
+          for that; see TODO.md under "Taken out on purpose". */}
 
       {/* ---- Am I moving -------------------------------------------------
 
@@ -2762,7 +2713,7 @@ function Track({ books }: { books: Book[] }) {
 
   const library = useMemo(() => totals(ledger), [ledger]);
   const out = rows.reduce((n, r) => n + r.readers.out, 0);
-  const late = rows.reduce((n, r) => n + r.readers.overdue, 0);
+  const reviewed = rows.reduce((n, r) => n + r.readers.reviewed, 0);
   const anyMoney = ledger.length > 0;
 
   return (
@@ -2811,11 +2762,18 @@ function Track({ books }: { books: Book[] }) {
             </div>
           )}
 
+          {/* The note counted what was past its date and now counts what came
+              back, which is the other half of the same sentence and the half
+              this app can still answer. */}
           <Stat
             icon={shelfIcons.calendar}
             value={String(out)}
             label="advance copies out"
-            note={late > 0 ? `${late} past their date` : "none late"}
+            note={
+              reviewed > 0
+                ? `${reviewed} reviewed so far`
+                : "none reviewed yet"
+            }
           />
         </section>
       )}
@@ -3025,7 +2983,10 @@ function TrackRow({
         <span className="min-w-0 flex-1 truncate font-semibold text-fg">
           {book.title}
         </span>
-        {readers.overdue > 0 && <Flag tone="stop">{readers.overdue} late</Flag>}
+        {/* A red "N late" flag sat here and went with the chasing on
+            2026-08-13. Nothing replaces it: the row's own Advance copies cell
+            below already says how many are out and how many reviewed, and a
+            second badge repeating one of those would be decoration. */}
       </div>
 
       <div className="grid grid-cols-2 border-t border-line">

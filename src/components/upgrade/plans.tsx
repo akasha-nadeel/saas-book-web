@@ -39,8 +39,8 @@ import { FREE_LIMITS, SEATS_PER_BOOK } from "@/lib/free-limits";
  * are free and unbounded, which is the promise the product rests on.
  *
  * The rows differ in *how* they are enforced, and it is worth knowing which is
- * which. The four metered ones — assistant, ranked comps, audiobook, audio
- * import — are checked server-side by `requirePro()`, which is the only check a
+ * which. The three metered ones — assistant, ranked comps, audio import — are
+ * checked server-side by `requirePro()`, which is the only check a
  * reader with devtools cannot edit. The rest are computed in the browser and
  * are therefore gated in the browser: the prose report, the money screens, the
  * advance-copy list, the writing record and the series bible. That is normal
@@ -339,8 +339,14 @@ const ROWS: {
   },
   { group: "Getting it ready", label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
   {
+    // **Import only, since 2026-08-14.** This row read "Audiobook & audio
+    // import" while the export step could also read a book aloud; that half was
+    // taken off to be put back later, and a pricing row is the last place a
+    // feature is allowed to outlive its way in. Half a row is still a true row:
+    // `/api/transcribe` is there, gated and paid for.
     group: "Getting it ready",
-    label: "Audiobook & audio import",
+    label: "Audiobook import",
+    detail: "An audiobook becomes a manuscript, chaptered.",
     starter: NOT_INCLUDED,
     pro: "Included",
   },
@@ -503,7 +509,7 @@ export function Plans({
             badge="Ideal once the book is going out"
             mark={<StackIcon className="h-6 w-6" />}
             name="Pro"
-            blurb="For the assistant, the money, the readers and the book read aloud."
+            blurb="For the assistant, the money, the readers and the research."
             price={headline}
             note={note}
             rows={ROWS.map((r) => ({
@@ -575,9 +581,9 @@ export function Plans({
         <ComingSoonDialog title="Pro" onClose={() => setSoon(false)}>
           There is no payment gateway configured on this copy of OpenChapter, so
           there is nothing to buy — and nothing is held back either. The
-          assistant, the bookmarks and the audiobook all work here for anyone
-          running their own API keys; Pro is those same three without a key to
-          keep.
+          assistant, the research tools and the audiobook import all work here
+          for anyone running their own API keys; Pro is those same three without
+          a key to keep.
         </ComingSoonDialog>
       )}
     </main>

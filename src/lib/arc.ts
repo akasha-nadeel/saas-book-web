@@ -1,5 +1,5 @@
 /**
- * Advance copies: who has one, who read it, and what is late.
+ * Advance copies: who has one, and who read it.
  *
  * From the research, and the pain is specific: one launch used NetGalley,
  * Booksprout, BookSirens, Reddit, Facebook, Threads and Instagram — *"six sites
@@ -16,8 +16,14 @@
  *
  * **A due date is the point of the whole thing.** Advance copies exist so the
  * reviews are there on the day the book goes on sale; a copy sent with no date
- * is a copy nobody chases, and a writer who does not know what is late finds
- * out on launch day.
+ * is a copy nobody chases, and a writer who does not know when the reviews are
+ * wanted finds out on launch day.
+ *
+ * **Nothing here works out what is *overdue*, as of 2026-08-13.** The dates
+ * are recorded and the list is ordered by them, but no screen counts what has
+ * passed, marks a row, or says "late" — that half was taken out to be built
+ * again properly. `isOverdue` below is kept, whole and tested, because it is
+ * what that rebuild starts from. See TODO.md under "Taken out on purpose".
  */
 
 export type ArcStatus = "sent" | "reading" | "reviewed" | "declined" | "silent";
@@ -89,6 +95,13 @@ export function parseArc(raw: string | null): ArcReader[] {
 /**
  * Whether this one is late.
  *
+ * **Nothing calls this, on purpose, and it is not to be tidied away.** The
+ * chasing half of the tool came out on 2026-08-13 to be rebuilt — the counts,
+ * the marked rows and the dashboard's own late panel with it — and this is the
+ * rule all of them were computed from, kept whole and kept tested so the
+ * rebuild starts from the decision that was already made rather than from a
+ * fresh guess. Same standing as `templates-dialog.tsx` and `ambience.ts`.
+ *
  * Only a reader who still might review counts as overdue. Somebody who declined
  * is not late, and somebody who has already reviewed is certainly not — a list
  * that called those overdue would train the writer to ignore the whole column.
@@ -100,9 +113,9 @@ export function isOverdue(reader: ArcReader, now: number = Date.now()): boolean 
 
 export interface ArcSummary {
   total: number;
+  /** Copies that are out and have produced no answer either way. */
   out: number;
   reviewed: number;
-  overdue: number;
   /** Of those who took a copy and answered either way, the share who reviewed. */
   reviewRate: number | null;
 }
@@ -114,40 +127,49 @@ export interface ArcSummary {
  * silent ones as failures would be a guess, and counting them as pending
  * forever flatters the number — leaving them out of both sides is the only
  * honest denominator, and the screen shows how many are still open beside it.
+ *
+ * **"Out" is everyone who has not answered, silence included**, and it counted
+ * only `sent` and `reading` until 2026-08-13. That was wrong twice over. A
+ * writer with five readers read "2 still out, 1 reviewed" and could not find
+ * the fifth in any box, because a chased-and-silent reader appeared in none of
+ * them — while still having the book. And it was inconsistent with itself: an
+ * overdue *sent* reader was counted as out, an overdue *silent* one was not,
+ * though nothing about the copy differs. Now the figures account for every row
+ * — out plus reviewed plus declined is the whole list.
+ *
+ * **There is no `overdue` here any more**, and no `now` to compute one from.
+ * See the note at the top of the file: nothing in this app counts what has
+ * passed until the chasing half is rebuilt.
  */
-export function summarise(
-  readers: readonly ArcReader[],
-  now: number = Date.now(),
-): ArcSummary {
+export function summarise(readers: readonly ArcReader[]): ArcSummary {
   const reviewed = readers.filter((r) => r.status === "reviewed").length;
   const declined = readers.filter((r) => r.status === "declined").length;
   const resolved = reviewed + declined;
 
   return {
     total: readers.length,
-    out: readers.filter((r) => r.status === "sent" || r.status === "reading")
-      .length,
+    out: readers.length - resolved,
     reviewed,
-    overdue: readers.filter((r) => isOverdue(r, now)).length,
     reviewRate: resolved > 0 ? Math.round((reviewed / resolved) * 100) : null,
   };
 }
 
 /**
- * Overdue first, then whoever is due soonest, then everyone with no date.
+ * Whoever is due soonest, then everyone with no date.
  *
- * The order is the feature: a writer opening this wants the two people to chase
+ * The order is the feature: a writer opening this wants the two people to email
  * this morning, not an alphabetical list of thirty.
+ *
+ * **It used to put the overdue ones first and no longer needs to.** A date that
+ * has passed is the earliest date there is, so it sorts to the top of a plain
+ * ascending order anyway — the branch was only ever there to lift a *late*
+ * reader above one due sooner today, which is a distinction nothing draws now.
+ * What it costs is that a reviewed or declined reader with an old date floats
+ * up too, where `isOverdue` would have excluded them; the badge on the row says
+ * which they are.
  */
-export function sortReaders(
-  readers: readonly ArcReader[],
-  now: number = Date.now(),
-): ArcReader[] {
+export function sortReaders(readers: readonly ArcReader[]): ArcReader[] {
   return [...readers].sort((a, b) => {
-    const lateA = isOverdue(a, now);
-    const lateB = isOverdue(b, now);
-    if (lateA !== lateB) return lateA ? -1 : 1;
-
     const dueA = a.dueAt ?? Infinity;
     const dueB = b.dueAt ?? Infinity;
     if (dueA !== dueB) return dueA - dueB;

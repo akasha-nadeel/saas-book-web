@@ -193,11 +193,18 @@ export function LandingHeader({ ink }: { ink: string }) {
             navigation and the pair at the end is the offer, and a row where
             all six things are the same size has no offer in it. */}
         <nav className="hidden items-center gap-8 font-sans text-[0.9375rem] font-medium text-lp-body md:flex">
+          {/* **Two anchors, not three, since 2026-08-14.** "What it does"
+              pointed at `#does`, the three-phase section, and that section came
+              off the page — so the link went with it in the same commit. A nav
+              entry whose target is not on the page is worse than a missing
+              one: it scrolls nowhere, says nothing, and is the one kind of
+              broken a visitor blames on the product rather than on the page.
+
+              The order left standing is the order of the page itself, which is
+              what these are for: the road first, then the sixteen tools, then
+              what it costs. */}
           <a href="#order" className="hover:text-lp-ink">
             The order
-          </a>
-          <a href="#does" className="hover:text-lp-ink">
-            What it does
           </a>
           <a href="#tools" className="hover:text-lp-ink">
             Tools
@@ -234,7 +241,7 @@ export function LandingHeader({ ink }: { ink: string }) {
             a `<label>` bound to the hero's own file input, which is a genuinely
             nice trick and cost nothing to keep; what it cost to *lose* is the
             only route from this bar to the check, which now lives in a band of
-            its own below the logo strip and has to be scrolled to. What it
+            its own below the mosaic under the hero and has to be scrolled to. What it
             buys is the pairing every visitor already knows how to read: the
             way in for somebody who has an account, beside the way in for
             somebody who does not. A returning writer had no way back to their

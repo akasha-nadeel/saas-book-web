@@ -1522,6 +1522,159 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **Two landing sections — "Three phases. Writing is one." and the "Before you
+  upload" panel** — removed **2026-08-14** at the owner's request. Settled
+  rather than owed: nothing in either is missing from the page.
+
+  **"Three phases" (`id="does"`)** was three cards — Write, Prepare, Track —
+  each counting its own group of tools, over the claim that most software stops
+  when the draft does. That claim is now made by the order rows, whose writing
+  phase carries it in as many words. Gone with it: the `Phase` component and
+  the `WRITE` and `PREPARE` copy arrays, which nothing else counted (`TRACK`
+  stays — the Track section draws four of its five). The **nav lost its "What
+  it does" entry in the same commit**, because a link to an id that is not on
+  the page scrolls nowhere.
+
+  **The "Before you upload" panel** was a warm-paper band holding `CheckDemo`
+  at full width under a two-column header. Its three parts were distributed
+  rather than deleted: the **demo** is the figure for phase 02 in "The order";
+  the **header shape** (eyebrow and heading left, lead right) is what the
+  listing section uses; and the **claim** — that a refusal is slow, silent and
+  never says which of a dozen things was wrong — is what the three refusal
+  cards say, by naming the three. `CheckDemo` itself is untouched and is now
+  rendered once rather than twice.
+
+  What is now unused and left alone: `--color-lp-paper` and the
+  `lp-paper-accent*` pair in `globals.css`. Nothing on the page is warm paper
+  any more, but a token stated in one theme block and not the other is the bug
+  that file warns about, and these are stated in both.
+
+- **The audiobook export — text read aloud,** removed **2026-08-14** at the
+  owner's request, **to be switched back on later.** The owner asked to be
+  reminded of it in a future session, so it is here and in the assistant's
+  memory both. Nothing was deleted: this is a removal of the *way in*, the
+  standing `templates-dialog.tsx` and `ambience.ts` already have.
+
+  **What is kept, whole and callerless.** `/api/narrate/route.ts` (still
+  `requirePro()`, still chunked), `src/lib/export/narrate.ts` **with its tests
+  still running** — `speechChunks` is the expensive part and cuts at the largest
+  boundary that fits, because a break mid-clause is audible — `export/
+  audiobook.ts` (the per-chapter zip, the progress callback, `NarrationError`),
+  `AudiobookPreview` and its badge in `format-previews.tsx`, and the
+  `"audiobook"` arm of `DoneFormat` in `export-done.tsx`. Do not tidy any of it
+  away.
+
+  **What came off.** The Audiobook row in `FORMATS`; the `Output = Format |
+  "audiobook"` union and every branch that read it (the export step's title and
+  deck, the "Read by a speech model" note, the narration state and the
+  `narrate()` handler, the footer's Read-aloud primary, the progress line and
+  its error); and the `.zip` arm of `exportFilename`.
+
+  **Four claims elsewhere were reworded in the same commit**, because a feature
+  with no way in that a page still advertises is the failure the house rules
+  will not have: the pricing table's row (now **"Audiobook import"**, which is
+  the transcription half and is still true), the Pro card's blurb, the PayHere
+  success message, and the Help dialog's Plans entry. The privacy page's
+  **Narration** disclosure came off with it — nothing can reach the route, so
+  nothing is sent, and naming a transfer that cannot happen is as wrong as
+  missing one that can. Putting the feature back means putting that entry back
+  in the same commit.
+
+  **Note the import half is untouched.** Audio → text (`/api/transcribe`, the
+  shelf's Audiobook import) is a different feature and still shipped.
+
+- **Everything in Advance copies that worked out what was *late*,** removed
+  **2026-08-13** at the owner's request, **to be built again later.** This one
+  is *owed a rebuild* rather than settled — the owner asked to be reminded of
+  it in a future session, so it is here and in the assistant's memory both.
+
+  **What went, all five of it.** The `late` count from the tool's stat row
+  (four boxes down to three); the row treatment — an accent border on an
+  overdue card, plus the "N days late" beside its date; the dashboard's amber
+  **"N advance readers are past their date"** panel, with the per-book read and
+  frozen clock that fed it; the red `N late` flag on each row of the Track
+  area's book list; and `ArcSummary.overdue`, which every one of those was
+  computed from. `sortReaders` lost its late-first branch with them.
+
+  **What was kept, and must not be tidied away.** `isOverdue` in `src/lib/arc.ts`
+  is whole, exported, **called by nothing**, and still covered by its three
+  tests — the same standing as `templates-dialog.tsx` and `ambience.ts`. It
+  holds two decisions the rebuild would otherwise have to make again and could
+  easily make differently: a reader who **reviewed or declined is never late**
+  however old the date, and **silence is** — because silence is the one state
+  left that chasing can still change. Start there.
+
+  **Three consequences worth knowing before rebuilding.** The list still sorts
+  by date, so a reader whose date has gone still arrives at the top — a passed
+  date is simply the earliest date — and the only thing lost is that a
+  *reviewed* reader with an old date now floats up with them. The Track area's
+  "advance copies out" note counts what came back (`N reviewed so far`) where
+  it used to count what was overdue. And three places that *described* the tool
+  as tracking lateness were reworded in the same commit, because a claim the
+  code cannot back is the one thing the house rules will not have: the tool's
+  own line in `book-tools.ts`, the Help dialog's entry, and the landing page's
+  tools list. Whatever comes back has to put those three right again.
+
+- **The landing page's order road,** replaced **2026-08-13** at the owner's
+  request with alternating feature rows (`order-rows.tsx`), to the layout of
+  the reference they supplied. `order-path.tsx` and the pure, tested
+  `landing-path.ts` behind it are **left in the tree and imported by nothing**,
+  the way the previous landing design was — `landing-path.test.ts` still runs
+  and still passes, and the curve arithmetic is the expensive part to rebuild.
+
+  **What the road was, and what the rows owe it.** Five phases as stations on
+  one drawn curve, with a marker riding it as the reader scrolled: the station
+  being read at full strength, the rest at a floor. Its argument was that a
+  writer is short of the *sequence* rather than of five names, which a boxed
+  list of phases cannot say. The rows have to keep making that argument by
+  other means, and three things do: the phases are numbered in the eyebrow,
+  each says how many steps it holds, and the ARC callout still quotes its
+  step's real number and phase. Take those away and this is the boxed list the
+  road was built to replace.
+
+  **What the change bought.** `OrderRows` has no `"use client"` and ships no
+  JavaScript. The road needed measurement on mount, a scroll handler, a
+  `ResizeObserver`, a `document.fonts.ready` re-measure and a reduced-motion
+  path, and its `d` came out empty if any of that did not run — which cost real
+  time to diagnose more than once. It also freed the notes: the road sat on a
+  tinted green field where `lp-deck` measured 4.16:1 and had to fall back to
+  `lp-body`, and the rows are on white where the deck grey is legal.
+
+  If the road ever comes back, the three numbers that were one calculation are
+  the lane width in `.oc-road-row`, the cap on `.oc-road-words`, and the `at`
+  values — git history has them in step at 16% / 30rem / 0.45–0.55.
+
+- **The landing page's "What writers said" row,** removed **2026-08-13** at the
+  owner's request, **to be added back later**. Unlike the counted band below,
+  this one is *owed a replacement* rather than settled — record it here so the
+  rebuild does not start from a blank slot and quietly become the thing the row
+  was built to avoid.
+
+  What it was: the slot a landing page fills with customer testimonials,
+  holding the **research** instead — four real things writers said about the
+  *problem*, said to somebody else before this existed, each with the module it
+  caused underneath it (`roadmap.ts`, `money.ts`, `cover-check.ts`,
+  `ideas.ts`). The `VOICES` const and its long note went with it; git history
+  has both, and the quotes themselves are still in the modules they caused.
+
+  **The four rules it kept, which any replacement owes.** Nobody is named and
+  nobody is described — real quotes, anonymous sources, no invented "Sarah M.,
+  fantasy author", because attaching a face is the part that makes it a lie.
+  The section says what they are *above* the quotes, so a reader who takes only
+  the heading has still been told these are not customers. They are quoted
+  rather than paraphrased, and each is recorded in the module it caused, which
+  is what made it checkable like everything else on that page. And each carries
+  what was built about it — a quote about a problem with nothing under it is
+  decoration.
+
+  When there are real writers using this and willing to be quoted, they replace
+  it, with names and with their permission. Until then the slot stays empty:
+  the page's standing rule is that no user count, rating or testimonial appears
+  until there is a real one, and an empty slot claims nothing. The risk
+  reversal that sat under the row (no card, the refund window, a reachable
+  human) stayed on the page — it was never part of the row, and the refund
+  window is stated nowhere else.
+
 - **The landing page's counted band,** removed **2026-08-12** at the owner's
   request. Four figures on a row of their own under the refusals — 19 steps,
   16 tools, 4 export formats, 0 EPUBCheck errors — each imported and counted
