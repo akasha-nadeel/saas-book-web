@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
+import {
+  LegalPage,
+  List,
+  Note,
+  Section,
+  Term,
+} from "@/components/legal/legal-shell";
 import { CONTACT_EMAIL, COUNTRY, OPERATOR, TRADING_NAME } from "@/lib/legal";
 
 /**
@@ -199,6 +205,20 @@ export default function PrivacyPage() {
             <>
               <Term>Sync</Term> — if you are signed in, your library as
               described above, to our database.
+            </>,
+            /* Added with invitation email on 2026-08-14. This is the first
+               transfer here about somebody who is *not* the writer, so it names
+               whose address it is and what the recipient can do about it. The
+               manuscript is deliberately absent from the list, and stays
+               absent. */
+            <>
+              <Term>Inviting a co-writer</Term> — when you invite someone to a
+              book, their email address, the book&rsquo;s title, your name and
+              email address, and any message you add are sent to our email
+              provider so the invitation can be delivered. No part of the
+              manuscript goes. Replies go to your address rather than ours. If
+              they do nothing, the invitation expires and no account is created
+              for them.
             </>,
             <>
               <Term>Payment</Term> — when you subscribe, you are handed to our

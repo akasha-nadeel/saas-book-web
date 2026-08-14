@@ -17,7 +17,12 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Focus, Placeholder } from "@tiptap/extensions";
 import { ToolRail, useEditorState } from "@/components/editor/editor-toolbar";
-import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
+import {
+  Rail,
+  RailButton,
+  RailDivider,
+  icons,
+} from "@/components/editor/icon-rail";
 import { WorkspaceRail, selectPanel } from "@/components/editor/workspace-rail";
 import { SelectionToolbar } from "@/components/editor/selection-toolbar";
 import { ImageToolbar } from "@/components/editor/image-toolbar";
@@ -44,6 +49,8 @@ import {
 import { BookGuide } from "@/components/editor/book-guide";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
+import { ShareDialog } from "@/components/collab/share-dialog";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 import {
   bookWordCount,
   canWriteBook,
@@ -52,6 +59,7 @@ import {
   chapterNumberOf,
   findBook,
   isGenericChapterTitle,
+  isSharedBook,
   pageSetupOf,
   renameChapter,
   saveBody,
@@ -141,6 +149,7 @@ export function ChapterEditor({
   const cover = useCover(bookId);
 
   const [editingCover, setEditingCover] = useState(false);
+  const [sharing, setSharing] = useState(false);
   // Lifted out of the surface so the toolbar and the assistant can both reach
   // it — they are siblings of the manuscript, not children of it.
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -222,6 +231,28 @@ export function ChapterEditor({
   // between chapters, so flipping chapter to chapter never replays it.
   //
   const book = findBook(shelf, bookId);
+
+  /*
+   * **Whether this writer may share this book at all**, checked before the
+   * button is drawn rather than after it is pressed.
+   *
+   * Two conditions, and both are refusals the *server* would make anyway — the
+   * point of testing them here is that the house forbids dead UI, and a Share
+   * button that opens a dialog which can only say no is exactly that.
+   *
+   * - **Accounts have to exist.** With no Supabase configured the app runs
+   *   local-only and there is nobody to share with; `useMembers` already
+   *   answers empty in that case, so the dialog would open onto a form whose
+   *   Invite can never succeed.
+   * - **Only the owner.** `book_members` is written by Server Actions that
+   *   check ownership, and the seat count is taken under a row lock in SQL —
+   *   an editor or a viewer pressing this gets a refusal from Postgres. A book
+   *   carries `role` only when somebody else owns it, which is what
+   *   `isSharedBook` reads, so this is the ownership test stated in the terms
+   *   the store already has.
+   */
+  const canShare =
+    isSupabaseConfigured() && book !== null && !isSharedBook(book);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
   // The part the open page belongs to, and the part the *panel* says is
@@ -423,7 +454,7 @@ export function ChapterEditor({
                write · view · leave. */
             footer={
               <>
-                <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+                <RailDivider />
                 {/* Reachable from the manuscript's own rail as well as the
                     left one, the way dictation already has two controls — the
                     rule for a second press is shared (`selectPanel`), so both
@@ -441,6 +472,29 @@ export function ChapterEditor({
                 >
                   {icons.assistant}
                 </RailButton>
+                {/* **Share, beside Export, and the group is the argument.**
+
+                    Every product that does this well puts the control on the
+                    thing being shared while you are looking at it — Google
+                    Docs, Notion and Figma all carry it in the document's own
+                    chrome, and none of them make you go to a management page
+                    to add somebody. `ShareDialog`'s own note says the same
+                    thing and has said it since it was written; what was
+                    missing is that the only way to open it was the dashboard's
+                    Collaborators area, which is exactly the separate screen
+                    that argument rules out. A writer in chapter nine who wants
+                    their editor on the book had to leave the book to do it.
+
+                    It sits in the "leave" group rather than beside the writing
+                    tools because it does not act on the page: like Export, it
+                    is about handing the manuscript to somebody else. Export
+                    stays last — it is the end of the road, and Share is a
+                    thing you do while still on it. */}
+                {canShare && (
+                  <RailButton label="Share" onClick={() => setSharing(true)}>
+                    {icons.share}
+                  </RailButton>
+                )}
                 <RailButton label="Export" href={`/book/${bookId}/export`}>
                   {icons.export}
                 </RailButton>
@@ -472,7 +526,7 @@ export function ChapterEditor({
               />
             </button>
 
-            <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+            <RailDivider />
 
             <ToolRail
               editor={liveEditor}
@@ -481,7 +535,7 @@ export function ChapterEditor({
               dictation={dictation}
             />
 
-            <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />
+            <RailDivider />
 
             <RailButton
               label="Typewriter scrolling"
@@ -503,6 +557,18 @@ export function ChapterEditor({
           </Rail>
         )}
       </div>
+
+      {/* Rendered on the press and never from an effect, like every other
+          dialog here. `ShareDialog` opens itself with `showModal`, so it sits
+          in the browser's top layer and clears both rails and the tool panel
+          without a z-index to keep in step with any of them. */}
+      {sharing && (
+        <ShareDialog
+          bookId={bookId}
+          bookTitle={book.title}
+          onClose={() => setSharing(false)}
+        />
+      )}
 
       {editingCover && (
         <CoverDialog book={book} onClose={() => setEditingCover(false)} />

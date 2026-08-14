@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
@@ -393,61 +401,65 @@ export function Bookshelf({
   const meta = AREAS.find((a) => a.id === area)!;
 
   return (
-    <div className="flex h-dvh bg-surface">
-      {/* ---- The six areas ------------------------------------------- */}
-      {/* The rail is three groups rather than one list with everything else
+    /* Every cover under here can open "Edit book details" — see
+       `EditCoverContext`. The value is `setCovering` itself, so the dialog a
+       cover opens is the same one the ⋯ menu opens; two ways in, one dialog. */
+    <EditCoverContext.Provider value={setCovering}>
+      <div className="flex h-dvh bg-surface">
+        {/* ---- The six areas ------------------------------------------- */}
+        {/* The rail is three groups rather than one list with everything else
           shoved to the bottom by `mt-auto`. That arrangement left a hand's
           width of empty panel between Tools and Help on any normal screen,
           which reads as an unfinished sidebar; and it filed Templates and
           Background sound — two extras — beside Help and Pricing, which are
           chrome. Grouping says which is which and closes the hole. */}
-      {/* pb-3, not the pb-14 this used to carry. That padding existed to keep
+        {/* pb-3, not the pb-14 this used to carry. That padding existed to keep
           the last item clear of Next's dev-tools badge, which sits in this
           exact corner — and it left a hand's width of empty rail at the bottom
           of the shipped product to dodge something only a developer ever sees.
           The badge is moved to bottom-right in next.config.ts instead. */}
-      <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-3 md:flex">
-        <Link
-          href="/"
-          className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
-        >
-          Open<span className="text-wordmark">Chapter</span>
-        </Link>
+        <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-3 md:flex">
+          <Link
+            href="/"
+            className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
+          >
+            Open<span className="text-wordmark">Chapter</span>
+          </Link>
 
-        {/* Two groups, because there are two kinds of item here and the flat
+          {/* Two groups, because there are two kinds of item here and the flat
             list said so nowhere. Overview, Write, Prepare and Track are the
             arc of a book's life, in the order it happens. Tools is not a
             stage — you open it at any point — so a rule separates it rather
             than letting the eye read five equal steps and expect Tools to come
             after Track. */}
-        <nav className="flex flex-col gap-0.5">
-          {AREAS.filter((a) => a.stage).map((a) => (
-            <SideItem
-              key={a.id}
-              icon={a.icon}
-              active={area === a.id}
-              onClick={() => setArea(a.id)}
-            >
-              {a.label}
-            </SideItem>
-          ))}
-        </nav>
+          <nav className="flex flex-col gap-0.5">
+            {AREAS.filter((a) => a.stage).map((a) => (
+              <SideItem
+                key={a.id}
+                icon={a.icon}
+                active={area === a.id}
+                onClick={() => setArea(a.id)}
+              >
+                {a.label}
+              </SideItem>
+            ))}
+          </nav>
 
-        <div className="my-3 h-px bg-line" />
+          <div className="my-3 h-px bg-line" />
 
-        <nav className="flex flex-col gap-0.5">
-          {AREAS.filter((a) => !a.stage).map((a) => (
-            <SideItem
-              key={a.id}
-              icon={a.icon}
-              active={area === a.id}
-              onClick={() => setArea(a.id)}
-            >
-              {a.label}
-            </SideItem>
-          ))}
+          <nav className="flex flex-col gap-0.5">
+            {AREAS.filter((a) => !a.stage).map((a) => (
+              <SideItem
+                key={a.id}
+                icon={a.icon}
+                active={area === a.id}
+                onClick={() => setArea(a.id)}
+              >
+                {a.label}
+              </SideItem>
+            ))}
 
-          {/* Not built, and sitting where it will be built.
+            {/* Not built, and sitting where it will be built.
 
               It goes beside Tools rather than among the four stages because
               that is what it is — somewhere you go at any point, not a step in
@@ -458,40 +470,40 @@ export function Bookshelf({
               works or plainly says it is not built. Pressing it explains
               itself rather than doing nothing, which is the difference between
               a promise and a dead button. */}
-          <SideItem
-            icon={shelfIcons.community}
-            badge={<Badge>Soon</Badge>}
-            onClick={() => setDialog("community")}
-          >
-            Community
-          </SideItem>
-        </nav>
+            <SideItem
+              icon={shelfIcons.community}
+              badge={<Badge>Soon</Badge>}
+              onClick={() => setDialog("community")}
+            >
+              Community
+            </SideItem>
+          </nav>
 
-        {/* Getting help, then giving it back, then the account. Help before
+          {/* Getting help, then giving it back, then the account. Help before
             Support because Support's own first line points at the guide, and
             Feedback after both because it is the other direction: nothing
             comes back, and a writer reaching for it is not stuck. */}
-        <div className="mt-auto flex flex-col gap-0.5 pt-6">
-          <SideItem icon={shelfIcons.help} onClick={() => setDialog("help")}>
-            Help
-          </SideItem>
-          <SideItem
-            icon={shelfIcons.support}
-            onClick={() => setDialog("support")}
-          >
-            Support
-          </SideItem>
-          <SideItem
-            icon={shelfIcons.feedback}
-            onClick={() => setDialog("feedback")}
-          >
-            Send feedback
-          </SideItem>
-          <SideItem icon={shelfIcons.pricing} href="/upgrade">
-            Pricing
-          </SideItem>
+          <div className="mt-auto flex flex-col gap-0.5 pt-6">
+            <SideItem icon={shelfIcons.help} onClick={() => setDialog("help")}>
+              Help
+            </SideItem>
+            <SideItem
+              icon={shelfIcons.support}
+              onClick={() => setDialog("support")}
+            >
+              Support
+            </SideItem>
+            <SideItem
+              icon={shelfIcons.feedback}
+              onClick={() => setDialog("feedback")}
+            >
+              Send feedback
+            </SideItem>
+            <SideItem icon={shelfIcons.pricing} href="/upgrade">
+              Pricing
+            </SideItem>
 
-          {/* Below the rule: who you are, and everything that is a setting
+            {/* Below the rule: who you are, and everything that is a setting
               rather than a place.
 
               The four above go somewhere; this one opens the menu that holds
@@ -503,242 +515,243 @@ export function Bookshelf({
               One row rather than two. Theme had a row of its own here and has
               moved inside the menu, because it is a setting about the app and
               that menu is now where the app's settings are. */}
-          <div className="mt-2 border-t border-line pt-2">
-            <AccountMenu account={account} variant="bar" />
+            <div className="mt-2 border-t border-line pt-2">
+              <AccountMenu account={account} variant="bar" />
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* ---- The area ------------------------------------------------ */}
-      <div className="flex-1 overflow-y-auto">
-        {/* The bar keeps its full-width background and border — a sticky
+        {/* ---- The area ------------------------------------------------ */}
+        <div className="flex-1 overflow-y-auto">
+          {/* The bar keeps its full-width background and border — a sticky
             header that stopped short of the edges would tear as the page
             scrolled under it — but its *contents* sit in the same max-w-6xl
             column as the page, so the search lines up with the heading below
             and the account chip lines up with the right edge of the cards. */}
-        <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
-            {/* The area picker again, for the widths where the rail is hidden. */}
-            <select
-              value={area}
-              onChange={(e) => setArea(e.target.value as Area)}
-              className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg md:hidden"
-            >
-              {AREAS.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                  {a.live ? "" : " (planned)"}
-                </option>
-              ))}
-            </select>
+          <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur">
+            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
+              {/* The area picker again, for the widths where the rail is hidden. */}
+              <select
+                value={area}
+                onChange={(e) => setArea(e.target.value as Area)}
+                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg md:hidden"
+              >
+                {AREAS.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                    {a.live ? "" : " (planned)"}
+                  </option>
+                ))}
+              </select>
 
-            {/* Capped rather than `flex-1`. At full width it was the loudest
+              {/* Capped rather than `flex-1`. At full width it was the loudest
               thing on the screen, and it is a filter for one list, not the
               product's main verb. */}
-            <div className="relative min-w-[8rem] max-w-sm flex-1">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-                {shelfIcons.search}
-              </span>
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  // The results live in Write. Searching from Overview used to
-                  // filter a list nobody could see, so the box appeared broken.
-                  if (e.target.value.trim()) setArea("write");
-                }}
-                placeholder="Search your books"
-                aria-label="Search your books"
-                className="w-full rounded-lg border border-line bg-surface py-2 pr-12 pl-9
+              <div className="relative min-w-[8rem] max-w-sm flex-1">
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
+                  {shelfIcons.search}
+                </span>
+                <input
+                  ref={searchRef}
+                  value={query}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    // The results live in Write. Searching from Overview used to
+                    // filter a list nobody could see, so the box appeared broken.
+                    if (e.target.value.trim()) setArea("write");
+                  }}
+                  placeholder="Search your books"
+                  aria-label="Search your books"
+                  className="w-full rounded-lg border border-line bg-surface py-2 pr-12 pl-9
                          text-sm text-fg outline-none focus-visible:ring-2
                          focus-visible:ring-accent/50"
-              />
-              <kbd
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-y-0 right-2.5 my-auto flex h-5
+                />
+                <kbd
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-2.5 my-auto flex h-5
                          items-center rounded border border-line bg-raised px-1.5
                          text-[11px] font-medium text-muted"
-              >
-                /
-              </kbd>
-            </div>
+                >
+                  /
+                </kbd>
+              </div>
 
-            {/* A split button. New book is the verb; import and templates are
+              {/* A split button. New book is the verb; import and templates are
               two other ways to arrive at the same place, and three peer
               buttons in a header made none of them read as the main one. */}
-            <div className="ml-auto flex items-center gap-3">
-              <div className="flex items-stretch">
-                <Link
-                  href="/book/new"
-                  className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
+              <div className="ml-auto flex items-center gap-3">
+                <div className="flex items-stretch">
+                  <Link
+                    href="/book/new"
+                    className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
                          text-sm font-semibold text-accent-ink"
-                >
-                  {shelfIcons.plus}
-                  New book
-                </Link>
-                {/* The ink, not white: this divider sits *on* the accent fill,
+                  >
+                    {shelfIcons.plus}
+                    New book
+                  </Link>
+                  {/* The ink, not white: this divider sits *on* the accent fill,
                     and the fill is white at night — a fixed white hairline is
                     invisible in exactly the theme nobody checks. Same rule as
                     `text-accent-ink`. */}
-                <span aria-hidden="true" className="w-px bg-accent-ink/25" />
-                <Menu
-                  label="Other ways to start a book"
-                  align="end"
-                  width={248}
-                  triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-accent-ink"
-                  trigger={shelfIcons.chevron}
-                >
-                  {(close) => (
-                    <>
-                      <MenuLabel>Start a book</MenuLabel>
-                      <MenuLink
-                        href="/book/new"
-                        icon={shelfIcons.plus}
-                        onNavigate={close}
-                      >
-                        Blank book
-                      </MenuLink>
-                      <MenuButton
-                        icon={shelfIcons.upload}
-                        onClick={() => {
-                          setDialog("import");
-                          close();
-                        }}
-                      >
-                        Import a file…
-                      </MenuButton>
-                    </>
-                  )}
-                </Menu>
-              </div>
+                  <span aria-hidden="true" className="w-px bg-accent-ink/25" />
+                  <Menu
+                    label="Other ways to start a book"
+                    align="end"
+                    width={248}
+                    triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-accent-ink"
+                    trigger={shelfIcons.chevron}
+                  >
+                    {(close) => (
+                      <>
+                        <MenuLabel>Start a book</MenuLabel>
+                        <MenuLink
+                          href="/book/new"
+                          icon={shelfIcons.plus}
+                          onNavigate={close}
+                        >
+                          Blank book
+                        </MenuLink>
+                        <MenuButton
+                          icon={shelfIcons.upload}
+                          onClick={() => {
+                            setDialog("import");
+                            close();
+                          }}
+                        >
+                          Import a file…
+                        </MenuButton>
+                      </>
+                    )}
+                  </Menu>
+                </div>
 
-              {/* Only where there is no sidebar to hold it. The account moved
+                {/* Only where there is no sidebar to hold it. The account moved
                   to the foot of the rail, and the rail is `hidden md:flex` —
                   so on a phone this is the one way to reach sign-out, and
                   removing it outright would have stranded exactly the writers
                   least able to work around it. */}
-              <div className="md:hidden">
-                <AccountMenu account={account} />
+                <div className="md:hidden">
+                  <AccountMenu account={account} />
+                </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        {/* Capped, so the cards do not stretch to a metre wide on a desktop
+          {/* Capped, so the cards do not stretch to a metre wide on a desktop
             monitor and leave the eye travelling between a number and its
             label. */}
-        <main className="mx-auto max-w-6xl px-6 pb-16">
-          {/* One block. The heading and its line used to be two siblings with
+          <main className="mx-auto max-w-6xl px-6 pb-16">
+            {/* One block. The heading and its line used to be two siblings with
               `mb-8` and `-mt-6` cancelling each other out — a spacing bug
               waiting to be inherited by the next area added. */}
-          <div className="mt-8 mb-7">
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-extrabold text-fg">{meta.label}</h1>
-              {!meta.live && <Badge>Not built yet</Badge>}
+            <div className="mt-8 mb-7">
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-extrabold text-fg">
+                  {meta.label}
+                </h1>
+                {!meta.live && <Badge>Not built yet</Badge>}
+              </div>
+              <p className="mt-1.5 text-muted">{meta.blurb}</p>
             </div>
-            <p className="mt-1.5 text-muted">{meta.blurb}</p>
-          </div>
 
-          {area === "overview" && (
-            <Overview
-              current={current}
-              all={active}
-              books={active.length}
-              words={totals.words}
-              chapters={totals.chapters}
-              onDetails={setEditing}
-              onCover={setCovering}
-              onPrepare={showInPrepare}
-            />
-          )}
+            {area === "overview" && (
+              <Overview
+                current={current}
+                all={active}
+                books={active.length}
+                words={totals.words}
+                chapters={totals.chapters}
+                onDetails={setEditing}
+                onCover={setCovering}
+                onPrepare={showInPrepare}
+              />
+            )}
 
-          {area === "write" && (
-            <Write
-              visible={visible}
-              view={view}
-              counts={counts}
-              sort={sort}
-              searching={query.trim().length > 0}
-              onView={setView}
-              onSort={setSort}
-              onClearSearch={() => setQuery("")}
-              onDetails={setEditing}
-              onCover={setCovering}
-              onTrash={handleTrash}
-              onDeleteForever={handleDeleteForever}
-              onTools={setTooling}
-            />
-          )}
+            {area === "write" && (
+              <Write
+                visible={visible}
+                view={view}
+                counts={counts}
+                sort={sort}
+                searching={query.trim().length > 0}
+                onView={setView}
+                onSort={setSort}
+                onClearSearch={() => setQuery("")}
+                onDetails={setEditing}
+                onCover={setCovering}
+                onTrash={handleTrash}
+                onDeleteForever={handleDeleteForever}
+                onTools={setTooling}
+              />
+            )}
 
-          {area === "prepare" && (
-            <Prepare
-              books={active}
-              onCover={setCovering}
-              focus={focus}
-            />
-          )}
+            {area === "prepare" && (
+              <Prepare books={active} onCover={setCovering} focus={focus} />
+            )}
 
-          {area === "tools" && <Tools books={active} current={current} />}
+            {area === "tools" && <Tools books={active} current={current} />}
 
-          {area === "track" && <Track books={active} />}
+            {area === "track" && <Track books={active} />}
 
-          {/* Mounted only when the area is open, so the member-list request is
+            {/* Mounted only when the area is open, so the member-list request is
               never made by a writer who does not share books. */}
-          {/* The signed-in writer's own face is already here — resolved on the
+            {/* The signed-in writer's own face is already here — resolved on the
               server and handed down with the page — so the disc that leads
               every pile paints with the first frame instead of waiting on a
               round trip for something we were already holding. */}
-          {area === "collab" && <CollabArea account={account} />}
+            {area === "collab" && <CollabArea account={account} />}
 
-          {/* **The one collaboration request the dashboard always makes**, and it
-              earns its place: this app sends no email, so an invitation whose link
-              went astray would otherwise be found only by somebody who thought to
-              open Collaborators — which is the one screen a writer who has never
+            {/* **The one collaboration request the dashboard always makes**, and it
+              earns its place: an invitation whose email was filtered or sent to a
+              mistyped address would otherwise be found only by somebody who
+              thought to open Collaborators — the one screen a writer who has never
               collaborated has no reason to visit. It interrupts once per browser
               session and never again; see the dialog's own note. */}
-          <InviteWatch onSee={() => setArea("collab")} />
-        </main>
-      </div>
+            <InviteWatch onSee={() => setArea("collab")} />
+          </main>
+        </div>
 
-      {editing && (
-        <BookDetailsDialog
-          book={editing}
-          onClose={() => setEditing(null)}
-          onEditCover={() => {
-            setCovering(editing);
-            setEditing(null);
-          }}
-        />
-      )}
-      {covering && (
-        <CoverDialog book={covering} onClose={() => setCovering(null)} />
-      )}
-      {tooling && (
-        <BookToolsDialog book={tooling} onClose={() => setTooling(null)} />
-      )}
-      {dialog === "import" && <ImportDialog onClose={() => setDialog(null)} />}
-      {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
-      {dialog === "support" && (
-        <SupportDialog onClose={() => setDialog(null)} />
-      )}
-      {dialog === "feedback" && (
-        <FeedbackDialog onClose={() => setDialog(null)} />
-      )}
-      {/* What it will be, in the writer's terms — and no date. A date is a
+        {editing && (
+          <BookDetailsDialog
+            book={editing}
+            onClose={() => setEditing(null)}
+            onEditCover={() => {
+              setCovering(editing);
+              setEditing(null);
+            }}
+          />
+        )}
+        {covering && (
+          <CoverDialog book={covering} onClose={() => setCovering(null)} />
+        )}
+        {tooling && (
+          <BookToolsDialog book={tooling} onClose={() => setTooling(null)} />
+        )}
+        {dialog === "import" && (
+          <ImportDialog onClose={() => setDialog(null)} />
+        )}
+        {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
+        {dialog === "support" && (
+          <SupportDialog onClose={() => setDialog(null)} />
+        )}
+        {dialog === "feedback" && (
+          <FeedbackDialog onClose={() => setDialog(null)} />
+        )}
+        {/* What it will be, in the writer's terms — and no date. A date is a
           promise with a number on it, which is the thing the landing page
           refuses to make about unbuilt work, and this screen is held to the
           same rule. */}
-      {dialog === "community" && (
-        <ComingSoonDialog title="Community" onClose={() => setDialog(null)}>
-          Somewhere to ask the writers who have already been through this — what
-          a cover cost them, which aggregator paid, whether the third book is
-          really where it turns. Not built yet, and it is not here as a preview:
-          this button exists so you know it is coming rather than wondering
-          whether you missed it.
-        </ComingSoonDialog>
-      )}
-    </div>
+        {dialog === "community" && (
+          <ComingSoonDialog title="Community" onClose={() => setDialog(null)}>
+            Somewhere to ask the writers who have already been through this —
+            what a cover cost them, which aggregator paid, whether the third
+            book is really where it turns. Not built yet, and it is not here as
+            a preview: this button exists so you know it is coming rather than
+            wondering whether you missed it.
+          </ComingSoonDialog>
+        )}
+      </div>
+    </EditCoverContext.Provider>
   );
 }
 
@@ -958,19 +971,25 @@ function Overview({
     () => steps.filter((s) => !s.automatic && s.done),
     [steps],
   );
-  const undoable = handTicked.length > 0 ? handTicked[handTicked.length - 1] : null;
+  const undoable =
+    handTicked.length > 0 ? handTicked[handTicked.length - 1] : null;
 
   return (
     <div className="flex flex-col gap-5">
       {book ? (
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
           <div className="flex flex-wrap items-start gap-5 p-5">
-            <Link
-              href={`/book/${book.id}`}
-              className="w-[92px] shrink-0 transition-transform hover:-translate-y-0.5"
-            >
-              <CoverOf book={book} />
-            </Link>
+            {/* **The cover edits the book, it no longer opens it.** It was a
+                `<Link>` to `/book/<id>`, and the two cannot both live on one
+                picture. Nothing is stranded by the change: "Open book" and
+                "Read" are the two buttons directly under this card, and the
+                title beside it is still a link — where the cover was the
+                *only* way to something, it kept its link. What it buys is the
+                thing a writer reaches for when they look at a cover and find
+                their title printed twice, or the wrong name under it. */}
+            <span className="w-[92px] shrink-0">
+              <CoverOf book={book} editable />
+            </span>
 
             <div className="min-w-[16rem] flex-1">
               <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -1090,8 +1109,8 @@ function Overview({
                   to print one. Two counts and a way to the detail say more and
                   claim less. */}
               {!waved.includes(`${book.id}:${counts.fix}:${counts.note}`) && (
-              <div
-                className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
+                <div
+                  className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
                             border px-3.5 py-3 ${
                               counts.fix > 0
                                 ? "border-stop-line bg-stop-bg"
@@ -1099,109 +1118,111 @@ function Overview({
                                   ? "border-note-line bg-note-bg"
                                   : "border-ok-line bg-ok-bg"
                             }`}
-              >
-                {counts.fix + counts.note > 0 ? (
-                  <AlertMark level={counts.fix > 0 ? "fix" : "note"} />
-                ) : (
-                  <span aria-hidden="true" className="shrink-0 text-ok-fg">
-                    {shelfIcons.check}
-                  </span>
-                )}
+                >
+                  {counts.fix + counts.note > 0 ? (
+                    <AlertMark level={counts.fix > 0 ? "fix" : "note"} />
+                  ) : (
+                    <span aria-hidden="true" className="shrink-0 text-ok-fg">
+                      {shelfIcons.check}
+                    </span>
+                  )}
 
-                <p className="min-w-[12rem] flex-1 text-sm">
-                  {counts.fix > 0 ? (
-                    <>
-                      <strong className="text-stop-fg">
-                        {plural(counts.fix, "thing")}
-                      </strong>{" "}
-                      <span className="text-stop-fg/80">
-                        would stop a shop taking this
-                      </span>
-                    </>
-                  ) : counts.note > 0 ? (
-                    /* True and incomplete on purpose: nothing is *blocking*,
+                  <p className="min-w-[12rem] flex-1 text-sm">
+                    {counts.fix > 0 ? (
+                      <>
+                        <strong className="text-stop-fg">
+                          {plural(counts.fix, "thing")}
+                        </strong>{" "}
+                        <span className="text-stop-fg/80">
+                          would stop a shop taking this
+                        </span>
+                      </>
+                    ) : counts.note > 0 ? (
+                      /* True and incomplete on purpose: nothing is *blocking*,
                        and there is still work. Saying only the first half is
                        how this card came to claim a book was in order while
                        Prepare listed two things for it. */
-                    <span className="text-note-fg">
-                      <strong>Nothing would stop a shop</strong> taking it, but
-                      there is more to do.
-                    </span>
-                  ) : (
-                    /* The one verdict on this screen worth colouring, and it is
+                      <span className="text-note-fg">
+                        <strong>Nothing would stop a shop</strong> taking it,
+                        but there is more to do.
+                      </span>
+                    ) : (
+                      /* The one verdict on this screen worth colouring, and it is
                        the *good* one. A clear book used to get the same neutral
                        sentence a blocked one got, so the best news the screen
                        can carry looked like no news. */
-                    <span className="text-ok-fg">
-                      <strong>Nothing here would stop a shop</strong> taking it.
-                      The listing details are in order.
-                    </span>
-                  )}
-                  {counts.note > 0 && (
-                    <span
-                      className={
-                        counts.fix > 0 ? "text-stop-fg/80" : "text-note-fg"
-                      }
-                    >
-                      {counts.fix > 0 ? " · " : " "}
-                      {counts.note} worth doing
-                    </span>
-                  )}
-                </p>
+                      <span className="text-ok-fg">
+                        <strong>Nothing here would stop a shop</strong> taking
+                        it. The listing details are in order.
+                      </span>
+                    )}
+                    {counts.note > 0 && (
+                      <span
+                        className={
+                          counts.fix > 0 ? "text-stop-fg/80" : "text-note-fg"
+                        }
+                      >
+                        {counts.fix > 0 ? " · " : " "}
+                        {counts.note} worth doing
+                      </span>
+                    )}
+                  </p>
 
-                {/* Prepare rather than a tool, because what a writer wants
+                  {/* Prepare rather than a tool, because what a writer wants
                     after reading a count is the *list*, and that is the screen
                     that holds it. An area change rather than a link: both are
                     the dashboard, and a navigation here would throw away the
                     scroll position and the book they had chosen. */}
-                {counts.fix + counts.note > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onPrepare(book.id)}
-                    className={`shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold
+                  {counts.fix + counts.note > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onPrepare(book.id)}
+                      className={`shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold
                                 text-white transition-opacity hover:opacity-90 ${
                                   counts.fix > 0
                                     ? "bg-stop-solid"
                                     : "bg-note-solid"
                                 }`}
-                  >
-                    See them in Prepare →
-                  </button>
-                )}
+                    >
+                      See them in Prepare →
+                    </button>
+                  )}
 
-                {/* Waving it away, and only here.
+                  {/* Waving it away, and only here.
                 
                     The Prepare rows keep theirs: that screen *is* the list, and
                     a dismissable row on it would be a way to lose work rather
                     than a way to stop being told. This one is a summary on a
                     dashboard, and a writer who has read it should be able to
                     put it down. */}
-                <button
-                  type="button"
-                  onClick={() => dismissBanner(book.id, counts.fix, counts.note)}
-                  aria-label="Dismiss until this changes"
-                  title="Dismiss until this changes"
-                  className={`shrink-0 rounded-md p-1 transition-opacity hover:opacity-70 ${
-                    counts.fix > 0
-                      ? "text-stop-fg"
-                      : counts.note > 0
-                        ? "text-note-fg"
-                        : "text-ok-fg"
-                  }`}
-                >
-                  <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    className="h-[15px] w-[15px]"
+                  <button
+                    type="button"
+                    onClick={() =>
+                      dismissBanner(book.id, counts.fix, counts.note)
+                    }
+                    aria-label="Dismiss until this changes"
+                    title="Dismiss until this changes"
+                    className={`shrink-0 rounded-md p-1 transition-opacity hover:opacity-70 ${
+                      counts.fix > 0
+                        ? "text-stop-fg"
+                        : counts.note > 0
+                          ? "text-note-fg"
+                          : "text-ok-fg"
+                    }`}
                   >
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
-              </div>
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      className="h-[15px] w-[15px]"
+                    >
+                      <path d="M6 6l12 12M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
               )}
 
               {/* The three verbs for a book, then ⋯.
@@ -1314,9 +1335,7 @@ function Overview({
               >
                 <div className="flex">
                   {PHASES.map((phase, i) => {
-                    const inPhase = steps.filter(
-                      (st) => st.phase === phase.id,
-                    );
+                    const inPhase = steps.filter((st) => st.phase === phase.id);
                     const done = inPhase.filter((st) => st.done).length;
                     return (
                       <div
@@ -1499,7 +1518,11 @@ function Overview({
           )}
         </section>
       ) : settled ? (
-        <EmptyState title="Nothing on the shelf yet" primary={START} secondary={IMPORT}>
+        <EmptyState
+          title="Nothing on the shelf yet"
+          primary={START}
+          secondary={IMPORT}
+        >
           Start one and name it later, or bring in a manuscript you already have
           — .docx, .epub, .md, .txt or .html. Then this screen tells you what
           stands between it and a shop.
@@ -1597,8 +1620,7 @@ function Overview({
 
 /** Somewhere to go, or something to do. Empty states take one of each. */
 type EmptyAction =
-  | { label: string; href: string }
-  | { label: string; onClick: () => void };
+  { label: string; href: string } | { label: string; onClick: () => void };
 
 function ActionButton({
   action,
@@ -1666,9 +1688,7 @@ function EmptyState({
       }
     >
       <p className="text-lg font-bold text-fg">{title}</p>
-      <p
-        className={`mt-2 max-w-md text-muted ${bare ? "" : "mx-auto"}`}
-      >
+      <p className={`mt-2 max-w-md text-muted ${bare ? "" : "mx-auto"}`}>
         {children}
       </p>
       {(primary || secondary) && (
@@ -1988,7 +2008,10 @@ function Write({
            than "you have no books", and this screen used to announce the
            second. A search that found nothing is exempt — that answer is about
            the query and is already true of whatever is loaded. */
-        <ul aria-hidden="true" className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul
+          aria-hidden="true"
+          className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
           {[0, 1, 2].map((card) => (
             <li
               key={card}
@@ -2047,9 +2070,12 @@ function Write({
               className="rounded-xl border border-line bg-panel p-4"
             >
               <div className="flex gap-4">
-                <Link href={`/book/${book.id}`} className="w-[64px] shrink-0">
-                  <CoverOf book={book} />
-                </Link>
+                {/* Edits rather than opens, as on the Overview card. The
+                    title beside it is still a link to the book, and the two
+                    buttons under the card are Write and Read. */}
+                <span className="w-[64px] shrink-0">
+                  <CoverOf book={book} editable />
+                </span>
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/book/${book.id}`}
@@ -2307,7 +2333,12 @@ function Prepare({
           // Import leads here — the person on this screen with an empty shelf
           // has a manuscript somewhere, or they would not be reading about
           // what a shop refuses.
-          <EmptyState bare title="No book to check yet" primary={IMPORT} secondary={START}>
+          <EmptyState
+            bare
+            title="No book to check yet"
+            primary={IMPORT}
+            secondary={START}
+          >
             Bring one in and this names what a shop would refuse before you find
             out from a rejection.
           </EmptyState>
@@ -2319,9 +2350,7 @@ function Prepare({
                  even if the writer had closed it. Every other row keeps a
                  stable key and its own open/shut. */
               <PrepareRow
-                key={
-                  focus?.id === book.id ? `${book.id}:${focus.n}` : book.id
-                }
+                key={focus?.id === book.id ? `${book.id}:${focus.n}` : book.id}
                 book={book}
                 issues={issues}
                 onCover={onCover}
@@ -2596,8 +2625,10 @@ function Tools({
         className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl
                           border border-line bg-panel px-5 py-4"
       >
+        {/* The "Working on" chip. Free to take the dialog — this cover was
+            never wrapped in anything. */}
         <span className="w-10 shrink-0">
-          <CoverOf book={book} />
+          <CoverOf book={book} editable />
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold tracking-widest text-muted uppercase">
@@ -2770,9 +2801,7 @@ function Track({ books }: { books: Book[] }) {
             value={String(out)}
             label="advance copies out"
             note={
-              reviewed > 0
-                ? `${reviewed} reviewed so far`
-                : "none reviewed yet"
+              reviewed > 0 ? `${reviewed} reviewed so far` : "none reviewed yet"
             }
           />
         </section>
@@ -2789,7 +2818,12 @@ function Track({ books }: { books: Book[] }) {
         </p>
 
         {books.length === 0 ? (
-          <EmptyState bare title="Nothing to track yet" primary={IMPORT} secondary={START}>
+          <EmptyState
+            bare
+            title="Nothing to track yet"
+            primary={IMPORT}
+            secondary={START}
+          >
             Costs, royalties and advance readers all hang off a book. Bring one
             in and this starts keeping the account.
           </EmptyState>
@@ -2920,7 +2954,9 @@ function BookCurve({ books, ledger }: { books: Book[]; ledger: Entry[] }) {
               <span className="mt-1 block h-1.5 overflow-hidden rounded-full bg-raised">
                 <span
                   className="block h-full rounded-full bg-accent"
-                  style={{ width: `${Math.max((entry.earned / most) * 100, 1)}%` }}
+                  style={{
+                    width: `${Math.max((entry.earned / most) * 100, 1)}%`,
+                  }}
                 />
               </span>
               <span className="mt-1 block text-xs text-muted">
@@ -2948,7 +2984,10 @@ function BookCurve({ books, ledger }: { books: Book[]; ledger: Entry[] }) {
       {curve.left.length > 0 && (
         <p className="mt-3 text-xs text-muted">
           Not on this:{" "}
-          {curve.left.map(({ title, why }) => `${title} (${missing[why]})`).join(", ")}.
+          {curve.left
+            .map(({ title, why }) => `${title} (${missing[why]})`)
+            .join(", ")}
+          .
         </p>
       )}
     </section>
@@ -2978,7 +3017,7 @@ function TrackRow({
     <li className="overflow-hidden rounded-xl border border-line bg-surface">
       <div className="flex items-center gap-3 px-4 py-3">
         <span className="w-8 shrink-0">
-          <CoverOf book={book} />
+          <CoverOf book={book} editable />
         </span>
         <span className="min-w-0 flex-1 truncate font-semibold text-fg">
           {book.title}
@@ -2993,11 +3032,7 @@ function TrackRow({
         <Cell href={`/book/${book.id}/track`} label="Money" divider>
           {recorded ? (
             <>
-              <span
-                className={
-                  money.net >= 0 ? "text-ok-fg" : "text-fg"
-                }
-              >
+              <span className={money.net >= 0 ? "text-ok-fg" : "text-fg"}>
                 {money.net >= 0 ? "+" : "\u2212"}
                 {Math.abs(money.net).toLocaleString()}
               </span>{" "}
@@ -3185,11 +3220,41 @@ function SideItem({
 // `SideGroup` is gone with the Extras group it labelled. The rail is one list
 // and a footer again, so nothing needs naming.
 
-function CoverOf({ book }: { book: Book }) {
+/**
+ * The way a cover anywhere on the dashboard reaches "Edit book details".
+ *
+ * A context rather than a prop threaded through five components, and the
+ * reason is the shape of this file rather than a preference: `CoverOf` is
+ * called from `Overview`, `Write`, `PrepareRow`, `Tools` and `TrackRow`, and
+ * only the first three are handed `onCover` today. Threading it into the other
+ * two — and through `Track`, which merely renders rows — would put a prop
+ * about a *dialog* into components that have nothing else to do with one.
+ *
+ * The provider is `Bookshelf` itself, which owns `covering`, so every consumer
+ * is inside it by construction. Null is the honest default for a `CoverOf`
+ * rendered outside that tree: it draws a plain cover rather than a control
+ * that would do nothing.
+ */
+const EditCoverContext = createContext<((book: Book) => void) | null>(null);
+
+/**
+ * A book's cover, and — where it is asked for — the control that edits it.
+ *
+ * **`editable` is opt-in, and it has to be.** Three of the five callers draw
+ * this *inside* something that is already interactive: Overview and Write wrap
+ * it in a `<Link>` to the book, and `PrepareRow` puts it inside a row-wide
+ * `<button>`. A `<button>` nested in either is invalid HTML that browsers
+ * silently unnest, which shows up as the outer control losing its own click
+ * rather than as anything visible. So a caller that wants the dialog says so,
+ * and takes responsibility for what it removed to make room.
+ */
+function CoverOf({ book, editable }: { book: Book; editable?: boolean }) {
   // `useCover` returns the artwork itself, or null. Whether to draw the title
   // over it is the *book's* setting, not the image's — see `bareCover`.
   const cover = useCover(book.id);
-  return (
+  const openEdit = useContext(EditCoverContext);
+
+  const face = (
     <BookCover
       title={book.title}
       subtitle={book.subtitle}
@@ -3199,5 +3264,23 @@ function CoverOf({ book }: { book: Book }) {
       bare={book.bareCover}
       seed={book.id}
     />
+  );
+
+  if (!editable || !openEdit) return face;
+
+  return (
+    <button
+      type="button"
+      onClick={() => openEdit(book)}
+      /* The cover is the picture of the book, so the label has to say what
+         pressing it *does* — "The Shadow" alone would announce a link to the
+         book, which is what this used to be. */
+      aria-label={`Edit title, author and cover for ${book.title}`}
+      className="block w-full cursor-pointer rounded-sm outline-none
+                 transition-transform hover:-translate-y-0.5
+                 focus-visible:ring-2 focus-visible:ring-accent/60"
+    >
+      {face}
+    </button>
   );
 }

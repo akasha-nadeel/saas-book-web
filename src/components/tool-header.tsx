@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
+import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { areaLabel } from "@/lib/areas";
 import {
   bookChapterCount,
@@ -122,6 +124,10 @@ export function ToolHeader({
   children?: React.ReactNode;
 }) {
   const cover = useCover(book.id);
+  /* The details dialog, mounted here rather than on each of the fifteen tool
+     screens: this component is the only thing all of them share, and it is
+     already the one place that draws the book. */
+  const [editing, setEditing] = useState(false);
 
   /*
    * Where the writer came from, if whoever linked here said so.
@@ -198,14 +204,25 @@ export function ToolHeader({
             the heading floating at whatever height the description happened to
             make. The top edges agree instead. */}
           <div className="mt-4 flex items-start gap-4">
-            {/* Linked, because the cover is what a writer reaches for the moment
-              they see it is the wrong book. Shadowed rather than bordered so it
-              reads as an object on the page instead of a framed thumbnail. */}
-            <Link
-              href={`/book/${book.id}`}
-              aria-label={`Open ${book.title}`}
-              className="w-11 shrink-0 overflow-hidden rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.18),0_6px_12px_-6px_rgba(0,0,0,0.35)]
-                       transition-transform hover:-translate-y-0.5 sm:w-12"
+            {/* **It opens "Edit book details" now, and it used to open the
+              book.** The old note is worth keeping because the need it named
+              is real: the cover is what a writer reaches for the moment they
+              see it is the wrong book. That escape survives — the title beside
+              it is a link to `/book/<id>`, and the breadcrumb above it is
+              another — so what the picture gives up is a third copy of the
+              same route, and what it gains is the one control a writer wants
+              while *looking at a cover*: the title, the byline, the artwork,
+              and whether our words go over theirs.
+
+              Shadowed rather than bordered so it reads as an object on the
+              page instead of a framed thumbnail. */}
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label={`Edit title, author and cover for ${book.title}`}
+              className="w-11 shrink-0 cursor-pointer overflow-hidden rounded-sm shadow-[0_1px_2px_rgba(0,0,0,0.18),0_6px_12px_-6px_rgba(0,0,0,0.35)]
+                       outline-none transition-transform hover:-translate-y-0.5
+                       focus-visible:ring-2 focus-visible:ring-accent/60 sm:w-12"
             >
               <BookCover
                 title={book.title}
@@ -216,7 +233,7 @@ export function ToolHeader({
                 {...(book.author ? { author: book.author } : {})}
                 {...(book.bareCover ? { bare: true } : {})}
               />
-            </Link>
+            </button>
 
             <div className="min-w-0 flex-1">
               {/* Whose book, small and above — the eyebrow the heading needed.
@@ -279,6 +296,12 @@ export function ToolHeader({
           </div>
         </div>
       </div>
+
+      {/* A `<dialog>` opened with `showModal` sits in the browser's top layer,
+          so it clears the roadmap's sheet and any tool's own chrome without a
+          z-index to keep in step with either — the same reason the export
+          screen mounts its done dialog where it does. */}
+      {editing && <CoverDialog book={book} onClose={() => setEditing(false)} />}
     </header>
   );
 }

@@ -1324,14 +1324,54 @@ rather than lifts, so `spentLine` drops the word "free" for a paying owner and
 the one false cell on the pricing page. A lapsed plan **evicts nobody**; it only
 refuses new invitations.
 
-**No email is sent, and nothing may say one was.** The owner copies a link; the
-invitation also appears in the invitee's own Collaborators area. The link is a
-*pointer, not a credential* — `/invite/[token]` sits behind the sign-in wall, and
-`acceptInvite` refuses anyone whose **confirmed** address is not the invited one,
-checked with `auth.admin.getUserById` because Supabase puts `email` in the access
-token whether or not it has been confirmed. Invitations expire after
-`INVITE_DAYS` (14), derived from the stamp rather than stored — nothing sweeps
-the table — and cancelling is silent.
+**An invitation is emailed *and* a link is offered, and nothing may claim a
+send that did not happen.** For most of this feature's life no mail existed:
+the owner copied a link and the invitation also appeared in the invitee's own
+Collaborators area. That second half never worked for the person it was aimed
+at — somebody without an account has no dashboard to find it in — so the owner
+was the delivery mechanism. Mail arrived on **2026-08-14** (`src/lib/email/`),
+and the honesty rule survived the change intact rather than being dropped with
+it.
+
+Five things hold it:
+
+- **The mail is best-effort; the row is the feature.** `inviteMember` sends
+  *after* the `invite_book_member` RPC and nothing the send does can change its
+  outcome. A provider having a bad minute must not turn a successful invitation
+  into a reported failure — the co-writer would be on the book, the seat spent,
+  and the owner told it had not worked.
+- **`emailed` comes back from the server**, and `InviteSentDialog` says "sent"
+  only when it is true. All three failures — no key, refused, unreachable —
+  read the same to the writer, because the only useful next step is the same
+  one. It is `note`'s amber rather than `stop`'s red: nothing failed that costs
+  anybody access.
+- **The link is offered either way.** Every product this is measured against
+  does both, because the two fail in different places: mail is filtered and
+  delayed, a link needs a channel to travel down.
+- **`send.ts` never throws and `invite.ts` never sends.** The composing half is
+  pure and tested — 17 tests, including that every interpolation is escaped,
+  since the book title, the owner's `user_metadata` display name and the
+  owner's note are all free text arriving in a stranger's inbox under our own
+  DKIM signature.
+- **We send from our verified domain, never as the owner.** Their name rides in
+  the display name (`Ada Vance (via OpenChapter)`) and their address in
+  `Reply-To`; a `From:` of somebody's gmail fails DKIM and DMARC and is how a
+  sending domain gets flagged for spoofing. `RESEND_API_KEY` and `RESEND_FROM`
+  are optional like every other key here — unset, the feature degrades exactly
+  to what it was before mail existed.
+
+Resend is the provider because Vercel's marketplace lists exactly one messaging
+integration; it is reached over its REST API rather than its SDK, for the reason
+`ai.ts` writes Gemini out by hand.
+
+Emailing the link is only safe because the link is a *pointer, not a credential*
+— `/invite/[token]` sits behind the sign-in wall, and `acceptInvite` refuses
+anyone whose **confirmed** address is not the invited one, checked with
+`auth.admin.getUserById` because Supabase puts `email` in the access token
+whether or not it has been confirmed. Were it a bearer token this feature could
+not exist in an inbox at all. Invitations expire after `INVITE_DAYS` (14),
+derived from the stamp rather than stored — nothing sweeps the table — and
+cancelling is silent.
 
 **Every push in `sync.ts` is owner-aware, and two filters are load-bearing.**
 `pushBook` skips the `books` upsert for a book somebody else owns and sends only
@@ -2007,19 +2047,36 @@ Three things in it are load-bearing:
   short of the *sequence* rather than of five names, so the rows carry the
   phase numbers, the per-phase step counts and the ARC callout. Strip those and
   this is the boxed list the road existed to replace. Each row carries a screen
-  in the column its words are not in — and **every one of them is now a
-  photograph of the real app, which is this section's standing exception to the
-  rule above.** They were drawn by `phase-screens.tsx` and computed:
-  `proseReport()` over a fixed passage for the writing and revising ones,
-  `STATUSES`/`LEAD_DAYS` for advance copies, `DESTINATIONS` for the export.
-  Three were swapped for bitmaps on 2026-08-13 and the fourth on 2026-08-14, at
-  the owner's request — `WriteShot`, `PrepareShot`, `ArcShot`, `PublishShot` in
-  `landing-page.tsx`, each with the cost written above it. The cost is the same
-  one every time and worth restating: **when the screen it photographs moves,
-  nothing fails and nothing warns; the picture simply starts lying.** Re-shoot
-  them when the editor's chrome, the Prepare check's wording, the ARC statuses
-  or the export's last step change. The drawn components are all still there and
-  callerless, so putting one back is a line in `ORDER_SCREENS`. The hero is the
+  in the column its words are not in — and **two of the four are photographs of
+  the real app, which is this section's standing exception to the rule above.**
+  They were all drawn by `phase-screens.tsx` and computed: `proseReport()` over
+  a fixed passage for the writing and revising ones, `STATUSES`/`LEAD_DAYS` for
+  advance copies, `DESTINATIONS` for the export. Three were swapped for bitmaps
+  on 2026-08-13 and the fourth on 2026-08-14, at the owner's request. The cost
+  is the same one every time and worth restating: **when the screen it
+  photographs moves, nothing fails and nothing warns; the picture simply starts
+  lying.** `WriteShot` and `ArcShot` in `landing-page.tsx` still carry it, each
+  with the cost written above it — re-shoot them when the editor's chrome or
+  the ARC statuses change. The drawn components are all still there and
+  callerless, so putting one back is a line in `ORDER_SCREENS`.
+
+  **Two rows have come back off bitmaps, and the publishing one is the case to
+  learn from.** Prepare took `CheckDemo` on 2026-08-14, which draws the screen
+  and then works it. Publishing took a new drawing the same day —
+  `ExportScreen` in `export-screen.tsx`, a full-width recreation of the export
+  wizard's last step, replacing `/export-tablet.webp`. That picture was the one
+  of the four that **could not be fixed by re-encoding**: composed by a script
+  from a screenshot no longer on disk, so there was nothing to re-encode
+  *from*, and at 1984×1326 in 49KB — about 0.15 bits a pixel, on flat grounds
+  and small type — webp's ringing sat on the letters. Its own note said the
+  real fix was to render it again. Two of the new drawing's values are read out
+  of the app (the export's own `FormatMark`, and "Classic" from
+  `templateById(DEFAULT_TYPESET.template)`); the rest is quoted by hand,
+  because the strings live in `export-page.tsx`, which is `"use client"` — a
+  Server Component importing a *value* from a client module gets a client
+  reference, which is the `sections.ts` lesson. It sizes itself in `cqw`
+  against a container query on `AppWindow`'s glass, so it needs no script and
+  holds its proportions at any column width. The hero is the
   other exception and goes further still: it carries the **real check**, not a
   drawing of one — see `book-check.tsx`. Two more bitmaps are *scenery* rather
   than pictures of the product, so neither can go stale: the hero *backdrop*
@@ -2129,15 +2186,23 @@ Three things in it are load-bearing:
   has **no edge fade**: the reference crops its own to say there is more than
   fits, and all seven destinations are shown, so a fade would imply an eighth.
 
-**Every claim on it has to be true of the code, in both directions.** Nothing
-claims what the app cannot do — the print PDF is the browser's print engine and
-says so — and **nothing stays under the "Not built yet" badge once it ships.**
-That second half fails in the safe direction and so fails silently: Track
-carried "none of it exists today" for a while after Track shipped, which is
-still a page saying something untrue. Walk the badges whenever a feature lands.
-The page reads `SELF_TICKING` / `YOURS_TO_TICK` out of `roadmap.ts` and prices
-out of `billing/plans.ts` rather than restating either, which is the shape to
-prefer for any new figure on it.
+**Every claim on it has to be true of the code.** Nothing claims what the app
+cannot do — the print PDF is the browser's print engine and says so. The page
+reads `SELF_TICKING` / `YOURS_TO_TICK` out of `roadmap.ts` and prices out of
+`billing/plans.ts` rather than restating either, which is the shape to prefer
+for any new figure on it.
+
+**There is no "Not built yet" section any more, and the rule it carried is
+worth knowing anyway.** "What comes after that" — three dashed cards naming
+what is genuinely unbuilt — was **removed on 2026-08-14** at the owner's
+request; TODO.md keeps its three entries verbatim. Its rule was that *nothing
+stays under that badge once it ships*, which failed in the safe direction and
+so failed silently: Track carried "none of it exists today" for a while after
+Track shipped, which is still a page saying something untrue. Nothing needs
+walking now — but the mirror of that rule binds harder than it did, because
+**an unbuilt feature named anywhere on this page is now a promise with no
+section admitting it is one.** Do not name one; if the page ever has to, the
+section comes back.
 
 **`works-with.tsx` is half-live, and the half that lives is the data.** The
 current page imports `DESTINATIONS` from it — the shops and readers our exports

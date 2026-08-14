@@ -285,7 +285,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Sending an invitation",
-        desc: "You get a link to pass on however you like — we send no email. The link only works for the address you invited, so forwarding it gives nobody access, and it lasts 14 days. It also appears under Collaborators when they next sign in, so a lost link is not the end of it. Cancelling an invitation tells them nothing.",
+        desc: "We email them an invitation, and you also get a link to pass on however you like — the screen tells you whether the email actually went. The link only works for the address you invited, so forwarding it gives nobody access, and it lasts 14 days. It also appears under Collaborators when they next sign in, so a lost email is not the end of it. Cancelling an invitation tells them nothing.",
       },
       {
         name: "Two people in one chapter",

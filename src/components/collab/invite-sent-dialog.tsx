@@ -6,18 +6,31 @@ import { INVITE_DAYS, ROLE_LABELS, type CollabRole } from "@/lib/collab";
 /**
  * What happens the moment an invitation exists.
  *
- * **It does not say "sent", because nothing was sent.** This app has no
- * transactional email — Supabase Auth mails its own links and nothing else does
- * — so the writer is the delivery mechanism, and a green tick reading "Invitation
- * sent" would be the app taking credit for a job it has just handed back. The
- * headline says *ready*, and the next line says who has to carry it.
+ * **It says "sent" only when something was sent**, which is the whole of the
+ * discipline here. For most of this feature's life nothing was: the writer was
+ * the delivery mechanism, and a green tick reading "Invitation sent" would have
+ * been the app taking credit for a job it had just handed back. Mail exists now
+ * — see `email/invite.ts` — but it is best-effort by design, so the headline is
+ * decided by `emailed`, a fact the server established, rather than by the
+ * feature having been switched on somewhere.
+ *
+ * The failure case is the one that matters, and it is not an error: the
+ * invitation is real, the seat is spent, and the co-writer can still get in.
+ * Only the notification failed. So a mail that did not go is reported in
+ * `note`'s amber — worth doing something about — never in `stop`'s red, and the
+ * something is right there: the link, already selected.
+ *
+ * **The link is offered either way, and that is not belt-and-braces.** Every
+ * product this is measured against does both, because the two fail in different
+ * places: mail is filtered, delayed and mistyped; a link needs a channel to
+ * travel down. What changes with `emailed` is the *emphasis* — a heading and a
+ * sentence — never whether the link is there.
  *
  * That is also why this is a dialog rather than a toast. A toast is right when
- * the work is finished and the message is a receipt; here the work is *not*
- * finished until the link is somewhere the other person can reach, and a
- * notification that slides away after four seconds taking the only copy of that
- * link with it is a quietly broken feature. The link is the point, so it gets the
- * interruption.
+ * the work is finished and the message is a receipt; when the mail did not go
+ * the work is *not* finished until the link is somewhere the other person can
+ * reach, and a notification that slides away after four seconds taking the only
+ * copy of that link with it is a quietly broken feature.
  *
  * It is still cheap to leave: Escape, the backdrop, the ×, and a Done button. And
  * nothing is lost by leaving — the row in the share dialog keeps its own Copy
@@ -29,12 +42,20 @@ export function InviteSentDialog({
   email,
   role,
   link,
+  emailed,
   onClose,
 }: {
   email: string;
   role: CollabRole;
   /** Path only — the origin is added here, where `window` exists. */
   link: string;
+  /**
+   * Whether the invitation email actually left. Established by the server and
+   * passed down rather than inferred from configuration: "a provider is set
+   * up" and "this message went" are different claims, and only the second one
+   * earns the word *sent*.
+   */
+  emailed: boolean;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -83,10 +104,15 @@ export function InviteSentDialog({
             with nothing to distinguish it from the form it came from reads as
             another step. `ok` is the status family's all-clear — the one place
             in this palette a hue means something without being taught. */}
+        {/* The status family carries the difference, which is what it is for:
+            green where everything happened, amber where something is left for
+            the owner to do. Never red — nothing failed that costs anybody
+            access. */}
         <span
           aria-hidden="true"
-          className="mb-3.5 flex h-10 w-10 items-center justify-center rounded-full
-                     bg-ok-bg text-ok-fg"
+          className={`mb-3.5 flex h-10 w-10 items-center justify-center rounded-full ${
+            emailed ? "bg-ok-bg text-ok-fg" : "bg-note-bg text-note-fg"
+          }`}
         >
           <svg
             viewBox="0 0 20 20"
@@ -102,19 +128,21 @@ export function InviteSentDialog({
         </span>
 
         <h2 id="invite-sent-title" className="text-lg font-bold text-fg">
-          Their invitation is ready
+          {emailed ? "Invitation sent" : "Their invitation is ready"}
         </h2>
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          <strong className="font-semibold text-fg">{email}</strong> will be able
-          to {ROLE_LABELS[role].label.replace(/^Can /, "")} this book once they
-          accept.
+          <strong className="font-semibold text-fg">{email}</strong> will be
+          able to {ROLE_LABELS[role].label.replace(/^Can /, "")} this book once
+          they accept.
         </p>
 
-        {/* The link, and the sentence that explains why the writer is holding it.
-            Stated plainly rather than apologised for: it is a deliberate design,
-            and it is also why a forwarded link grants nobody anything. */}
+        {/* The link, and the sentence that explains why the writer is holding
+            it. Two readings of the same control: a spare when the mail went, and
+            the way through when it did not. */}
         <p className="mt-4 text-sm font-semibold text-fg">
-          We don&rsquo;t send email — pass this on yourself
+          {emailed
+            ? "Or send them the link yourself"
+            : "We couldn’t email them — send this link instead"}
         </p>
         <div className="mt-1.5 flex gap-2">
           <input
@@ -152,9 +180,9 @@ export function InviteSentDialog({
           <li>It lasts {INVITE_DAYS} days.</li>
           {/* The line that makes closing this safe rather than a gamble. */}
           <li>
-            If the link goes astray, it also appears under Collaborators when they
-            next sign in — and you can copy it again from this book&rsquo;s share
-            list.
+            {emailed ? "If the email goes astray, it" : "It"} also appears under
+            Collaborators when they next sign in — and you can copy the link
+            again from this book&rsquo;s share list.
           </li>
         </ul>
       </div>

@@ -9,9 +9,10 @@ import { timeUntil } from "@/lib/relative-time";
  *
  * Without this, an invitation is only found by a writer who thinks to open
  * Collaborators, which is the one screen somebody who has never collaborated has
- * no reason to visit. And this app sends no email, so if the link went astray
- * there is nothing else to reach them with. That is what earns an interruption:
- * it is news the reader cannot get any other way, and it has a deadline.
+ * no reason to visit. An email goes out too, but mail is filtered, delayed and
+ * sent to mistyped addresses — and this reader is, by definition, already signed
+ * in and looking at the product. That is what earns an interruption: it is news
+ * with a deadline that the other channel may never have delivered.
  *
  * **Once per browser session, and that rule is the whole of its manners.** An
  * invitation is not urgent enough to meet on every navigation, and a dialog that

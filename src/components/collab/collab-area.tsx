@@ -289,9 +289,10 @@ function BookRow({
  * on each.
  *
  * The invitations list is what makes this area worth having rather than leaving
- * sharing entirely to the per-book dialog: this app sends no email, so without a
- * place in the product that says "somebody has invited you", an invitation whose
- * link went astray would be invisible forever.
+ * sharing entirely to the per-book dialog. Invitations are emailed now, which
+ * makes this the *second* way in rather than the only one — and it is still the
+ * one that cannot be filtered, delayed or sent to a mistyped address, so an
+ * invitation whose email went astray is found here.
  *
  * Each of your books carries a **face pile** rather than only a Share button, and
  * that is the whole reason this screen is worth having as well as the per-book
@@ -423,7 +424,9 @@ export function CollabArea({ account = null }: { account?: Account | null }) {
                                        bg-danger px-3 py-1.5 text-xs font-semibold
                                        text-accent-ink disabled:opacity-60"
                           >
-                            {busy === book.id && <Spinner className="h-3 w-3" />}
+                            {busy === book.id && (
+                              <Spinner className="h-3 w-3" />
+                            )}
                             Leave
                           </button>
                           <button
@@ -467,8 +470,8 @@ export function CollabArea({ account = null }: { account?: Account | null }) {
           {leaving !== null && (
             <p className="mt-2.5 text-xs leading-relaxed text-muted">
               Leaving takes the book off your shelf and gives the owner their
-              place back. Nothing you wrote in it is removed, and nobody is
-              told — but you would need a fresh invitation to come back.
+              place back. Nothing you wrote in it is removed, and nobody is told
+              — but you would need a fresh invitation to come back.
             </p>
           )}
 

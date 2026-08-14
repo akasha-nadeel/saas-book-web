@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppWindow } from "@/components/landing/app-window";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { coverReport, type CoverFacts } from "@/lib/cover-check";
+import { STEPS } from "@/lib/roadmap";
 
 /**
  * A picture of the screen that catches each refusal, one per band.
@@ -27,9 +28,10 @@ import { coverReport, type CoverFacts } from "@/lib/cover-check";
  *   picture changes with it; it cannot drift, because there is nothing here to
  *   drift. The one thing written by hand is that the file is a PNG at 500 × 800
  *   — the picture's premise, like the book's title.
- * - The export figure **reads `DESTINATIONS`**, so the row of shops is the same
- *   list the footer and the real dialog use, filtered by the format the same
- *   way `export-done.tsx` filters it.
+ * - The export figure **reads `DESTINATIONS` and `STEPS`**, so the row of shops
+ *   is the same list the footer and the real dialog use, filtered by the format
+ *   the same way `export-done.tsx` filters it, and the roadmap step it names as
+ *   next is the road's own — title, note and position all.
  *
  * The listing figure quotes its strings, since the form's copy lives inside
  * `publishing-card.tsx` rather than in a module either side can import. Its
@@ -129,7 +131,14 @@ const COVER_PROBLEMS = COVER_REPORT.filter(
 ).length;
 
 /**
- * All three take the **pale ring** rather than the bezel, and they take it
+ * **Callerless since 2026-08-14, and kept on purpose.** Refusal 01 shows a
+ * photograph of the covers screen now — `CoverCheckShot` in `landing-page.tsx`
+ * — swapped in at the owner's request. This is the version that could not go
+ * stale, since every row below is `coverReport()`'s own answer rather than a
+ * transcription of one, so it is left whole: putting it back is one word at the
+ * call site. Read the note above `CoverCheckShot` for what the swap costs.
+ *
+ * All three took the **pale ring** rather than the bezel, and they took it
  * together.
  *
  * They wore the bezel while the refusals were full-bleed bands on white, where
@@ -356,13 +365,63 @@ const EPUB_OPENS = DESTINATIONS.filter(
   (destination) => destination.format === "EPUB",
 );
 
+/**
+ * What the dialog says comes next, **read out of `roadmap.ts` rather than
+ * typed here.**
+ *
+ * The real dialog searches from *after* the export step for the first thing
+ * not yet done, because the export step is hand-ticked and is un-ticked by
+ * definition at the moment it opens. On a book that has just exported, the
+ * step immediately after it has no detector and so cannot be done — which is
+ * why taking the next one outright gives the same answer the dialog gives,
+ * without needing a `Book` to run `roadmapFor` against.
+ *
+ * The point of doing it this way is the same as `EPUB_OPENS` above: rename
+ * that step or move it and this figure follows, instead of quoting a title the
+ * road no longer has. `?? null` because a step could be reordered to the end,
+ * and a picture is not worth crashing a page over.
+ */
+const AFTER_EXPORT =
+  STEPS[STEPS.findIndex((step) => step.id === "export") + 1] ?? null;
+
 export function ExportDoneFigure() {
   return (
     <AppWindow
       fill
-      label="The dialog after an export: your EPUB is ready, with the file’s name and size and the shops it opens in."
+      label="The dialog after an export: your EPUB is ready, with the file’s name and size, the shops it opens in, what is next on the roadmap, and the control that ticks the step just finished."
     >
-      <div className="p-5 sm:p-6">
+      {/* **Every part the real dialog has, in its order** — the tick, the
+          headline, the file with a second copy on request, where it opens,
+          what is next on the road, and the two controls at the foot. It drew
+          only the first four for a while, and the half it left out is the half
+          that makes the point of the section: a reader saw a download
+          confirmation, which every tool has, rather than the export *knowing
+          where this sits in the job*. It also left the card half empty beside
+          a full column of words.
+
+          What is still deliberately absent is the red line about listing
+          problems a shop would refuse. That one is conditional in the real
+          dialog — it appears only when the book has some — and a figure that
+          draws a warning as though it were furniture would be claiming
+          something about a book nobody has. */}
+      <div className="relative p-5 sm:p-6">
+        {/* The close, drawn because the real dialog has one at this corner and
+            a modal with no way out is the one detail a reader would notice
+            missing. `aria-hidden` is inherited from the window's `role="img"`,
+            so it announces nothing. */}
+        <span className="absolute top-4 right-4 flex h-6 w-6 items-center justify-center rounded-full text-lp-faint">
+          <svg
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            className="h-3 w-3"
+          >
+            <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
+          </svg>
+        </span>
+
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-ok-bg text-ok-fg">
           <svg
             viewBox="0 0 24 24"
@@ -401,6 +460,10 @@ export function ExportDoneFigure() {
 
         <div className="mt-4">
           <Eyebrow>It opens in</Eyebrow>
+          {/* Names rather than the brand marks `works-with.tsx` draws beside
+              them, which is the real dialog's own decision and worth keeping:
+              those marks are each in the brand's own hex — Apple's is #000000
+              — and a trademark is not ours to re-tint to suit a panel. */}
           <ul className="mt-2 flex flex-wrap gap-1.5">
             {EPUB_OPENS.map((destination) => (
               <li
@@ -411,6 +474,40 @@ export function ExportDoneFigure() {
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* **The road, which is the part that is actually about this
+            section.** Every tool that writes a file can say "your file is
+            ready"; what this one adds is the next thing to do, so the export
+            is a step in a job rather than the end of one. Its title and note
+            are `roadmap.ts`'s own — see `AFTER_EXPORT`. */}
+        {AFTER_EXPORT && (
+          <div className="mt-4 rounded-lg border border-lp-edge px-3 py-2.5">
+            <Eyebrow>Next on your roadmap</Eyebrow>
+            <p className="mt-1.5 text-[0.75rem] font-semibold text-lp-ink">
+              {AFTER_EXPORT.title}
+            </p>
+            <p className="mt-1 text-[0.625rem] leading-relaxed text-lp-faint">
+              {AFTER_EXPORT.note}
+            </p>
+          </div>
+        )}
+
+        {/* The two controls the dialog closes on. The left one is
+            `ToolStepDone`, which the export step needs because nothing in a
+            library records that a writer exported — it is one of the four
+            steps with no detector, so it is a press. Drawn un-ticked, since
+            that is its state at the moment this dialog opens. */}
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <span className="rounded-md border border-lp-edge px-2.5 py-1.5 text-[0.625rem] font-semibold text-lp-ink">
+            <span aria-hidden="true" className="mr-1 text-lp-faint">
+              ✓
+            </span>
+            Mark step done
+          </span>
+          <span className="rounded-md bg-lp-accent px-3.5 py-1.5 text-[0.625rem] font-semibold text-lp-accent-ink">
+            Done
+          </span>
         </div>
       </div>
     </AppWindow>

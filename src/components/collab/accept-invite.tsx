@@ -250,8 +250,9 @@ export function AcceptInvite({
                 )}
               </h1>
               <p className="mt-3 text-sm text-fg">
-                As <strong>{ROLE_LABELS[offer.role].label.toLowerCase()}</strong>{" "}
-                — {ROLE_LABELS[offer.role].what.toLowerCase()}
+                As{" "}
+                <strong>{ROLE_LABELS[offer.role].label.toLowerCase()}</strong> —{" "}
+                {ROLE_LABELS[offer.role].what.toLowerCase()}
               </p>
 
               {/* ---- already a member: the link has done its job ---- */}
@@ -332,8 +333,15 @@ export function AcceptInvite({
                       name="next"
                       value={`/invite/${token}?via=link`}
                     />
-                    <input type="hidden" name="email" value={offer.invitedEmail} />
-                    <button type="submit" className={`w-full sm:w-auto ${PRIMARY}`}>
+                    <input
+                      type="hidden"
+                      name="email"
+                      value={offer.invitedEmail}
+                    />
+                    <button
+                      type="submit"
+                      className={`w-full sm:w-auto ${PRIMARY}`}
+                    >
                       Sign in
                     </button>
                   </form>
@@ -393,9 +401,10 @@ export function AcceptInvite({
                   branches it describes a decision nobody is being asked to make. */}
               {offer.forMe && !offer.problem && !offer.alreadyMember && (
                 <p className="mt-6 border-t border-line pt-4 text-xs leading-relaxed text-muted">
-                  Accepting puts the book on your shelf and keeps it in step with
-                  the owner’s copy. Their story bible, advance readers, ledger and
-                  writing record do not travel — none of those sync, for anybody.
+                  Accepting puts the book on your shelf and keeps it in step
+                  with the owner’s copy. Their story bible, advance readers,
+                  ledger and writing record do not travel — none of those sync,
+                  for anybody.
                 </p>
               )}
             </>

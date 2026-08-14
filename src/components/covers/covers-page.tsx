@@ -362,7 +362,6 @@ function CoverChecker({ bookId }: { bookId: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
-  const [dragging, setDragging] = useState(false);
   /** Which reshape is being previewed, or null when no dialog is open. */
   /** Which fix is being previewed. `draw` is the artwork's rendered size in
       output pixels — equal to its natural size for crop and pad, larger for an
@@ -378,6 +377,28 @@ function CoverChecker({ bookId }: { bookId: string }) {
   } | null>(null);
   /** What was just put right, shown in green until the next file or fix. */
   const [done, setDone] = useState<string | null>(null);
+
+  /**
+   * Throw away the checked file and everything said about it.
+   *
+   * Named rather than written at each button because there are two of them
+   * now — one beside the artwork, one under the drop zone that stands where
+   * the artwork would be — and a screen with two ways to clear a thing must
+   * clear exactly the same things both times.
+   *
+   * The stored measurement goes with it: the dashboard reads `coverfacts:` for
+   * its own findings, and it must not go on reporting a cover nobody is
+   * checking any more.
+   */
+  function clearChecked() {
+    setFacts(null);
+    setPreview(null);
+    setName(null);
+    setError(null);
+    setDone(null);
+    setFromStored(false);
+    setCoverFacts(bookId, null);
+  }
 
   /**
    * Measure a file and report on it.
@@ -856,76 +877,13 @@ function CoverChecker({ bookId }: { bookId: string }) {
           things look. Clicking still opens the picker, because the label wraps
           the input rather than replacing it. */}
       {!shown && (
-        <label
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
+        <DropZone
+          className="mt-5 max-w-xl"
+          onFile={(file) => {
+            setName(file.name);
+            void read(file);
           }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            const file = e.dataTransfer.files?.[0];
-            if (file) {
-              setName(file.name);
-              void read(file);
-            }
-          }}
-          className={`mt-5 flex max-w-xl cursor-pointer flex-col items-center justify-center
-                      gap-2 rounded-xl border-2 border-dashed px-6 py-12 text-center
-                      transition-colors ${
-                        dragging
-                          ? "border-accent bg-accent/8"
-                          : "border-line bg-surface hover:border-accent/50 hover:bg-raised"
-                      }`}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) {
-                setName(file.name);
-                void read(file);
-              }
-            }}
-            className="sr-only"
-          />
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-7 w-7 text-muted"
-          >
-            <path d="M12 16V4m0 0L8 8m4-4 4 4" />
-            <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
-          </svg>
-          <span className="text-sm font-semibold text-fg">
-            Drop your cover here, or choose a file
-          </span>
-          {/* **Not "JPEG or PNG", which is what this said for about an hour
-              and is the exact advice that gets a cover rejected.** Amazon takes
-              JPEG and TIFF for an ebook cover; PNG is what every design tool
-              exports by default, so naming it here would have been this screen
-              causing the refusal it exists to prevent. The `accept` attribute
-              deliberately stays wider than the rule — a writer who picks a PNG
-              anyway must be *told* it is a PNG, not have the file quietly
-              hidden by a picker with no explanation. */}
-          {/* **What this page can check, which is not the same list.** Amazon
-              takes JPEG and TIFF; browsers cannot open a TIFF at all, so
-              naming both here promised a check that fails on one of them. The
-              `accept` attribute deliberately stays wider than either list — a
-              writer who picks a PNG must be *told* it is a PNG, not have the
-              file quietly hidden by a picker that explains nothing. */}
-          <span className="max-w-xs text-xs text-muted">
-            The file you are about to upload — not the copy stored here. JPEG is
-            what Amazon wants and what this page can measure.
-          </span>
-        </label>
+        />
       )}
 
       {error && (
@@ -963,136 +921,191 @@ function CoverChecker({ bookId }: { bookId: string }) {
               preview is a preview at every width; it is the report beside it
               that wants the room. */}
           <div className="min-w-0 max-w-[20rem]">
-            {/* The picture at a size a decision can be made from. Framed
-                rather than bare: a cover with a white ground and no border
-                bleeds into the panel and stops looking like a file. */}
-            {preview ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={preview}
-                alt=""
-                className="w-full rounded-lg border border-line bg-surface object-contain shadow-sm"
-              />
-            ) : (
-              /* **The numbers outlived the picture, and the box says so —
-                 briefly.** Arriving from a dashboard finding, the
-                 measurements are read back from `coverfacts:` and the artwork
-                 itself is not kept.
+            {/* **Two states, and the one with no artwork is a drop zone
+                rather than a description of one.**
 
-                 It was drawn at the aspect ratio those numbers describe, on
-                 the reasoning that the shape *is* one of the findings. In
-                 practice that made an empty 320 × 512 rectangle holding one
-                 line of grey text — the largest thing on the screen, saying
-                 the least, and towering over the report it was supposed to
-                 support. Absence is not worth an illustration. Two lines and
-                 a rule under them, with the shape stated properly in the list
-                 below where every other measurement is. */
-              <div
-                className="rounded-lg border border-dashed border-line bg-surface
-                           px-3.5 py-3 text-xs text-muted"
-              >
-                The artwork itself is not kept here — only what was measured.
-                Drop the file again to see it.
-              </div>
+                Arriving from a dashboard finding, the measurements are read
+                back from `coverfacts:` and the file itself is not — it is the
+                one thing this app refuses to keep. What stood here then was a
+                dashed box explaining that, above the file's name, the two
+                buttons and the full measurement list: an inspector panel for a
+                file that is not there, whose *only* useful sentence was "drop
+                the file again". Every number in it is already in the report
+                beside it, word for word and with the rule it broke — "735×1117
+                will be accepted", "This is 1.52:1" — so the column was
+                repeating the answer while withholding the thing that would
+                make it current.
+
+                A drop target says the same sentence as a control instead of as
+                a caption, and it is the *same* control the empty screen uses,
+                so dropping a file works identically wherever the writer
+                happens to be looking. The report stays where it is: they came
+                here because of it. */}
+            {preview ? (
+              <>
+                {/* The picture at a size a decision can be made from. Framed
+                    rather than bare: a cover with a white ground and no border
+                    bleeds into the panel and stops looking like a file. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={preview}
+                  alt=""
+                  className="w-full rounded-lg border border-line bg-surface object-contain shadow-sm"
+                />
+
+                {/* The file's identity and the two things you can do to it.
+                    Named, because "the file you checked" is otherwise a
+                    picture and a writer with three exports in a folder cannot
+                    tell which. Two states here rather than the old three: the
+                    file just handed over, and the cover already on the book.
+                    The third — a set of numbers with no picture — has its own
+                    half of this branch now. */}
+                <p className="mt-3 truncate text-sm font-medium text-fg">
+                  {name ??
+                    (fromStored ? "The cover on this book" : "Checked file")}
+                </p>
+
+                {/* **Replace is a first-class control now, not small print.**
+                    It was a line inside the drop zone reading "drop another to
+                    check it instead", which is an instruction rather than a
+                    control — and once the drop zone went there was no way to
+                    check a second file except Remove, then drop. The Image
+                    Upload pattern names four things this has to allow: select,
+                    preview, validate, *replace*. This is the fourth. */}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  {/* **Filled, and filled with `bg-fg`/`text-surface` rather
+                      than a literal black.** It is the pair the pricing page's
+                      paid card and the checkout's own button already use: the
+                      two tokens invert *with* the palette, so this is
+                      near-black carrying white by day and near-white carrying
+                      black at night — where a typed `bg-black text-white`
+                      would be a black hole in a black screen after sunset,
+                      which is the one way to get a filled control wrong here.
+                      It is not `bg-accent`, because the accent means "the way
+                      forward" and this is the way *back* — a second run at the
+                      same step. */}
+                  <label
+                    className="cursor-pointer rounded-md bg-fg px-2.5 py-1 text-xs
+                               font-semibold text-surface transition-opacity
+                               hover:opacity-90"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setName(file.name);
+                          void read(file);
+                        }
+                      }}
+                      className="sr-only"
+                    />
+                    Check another
+                  </label>
+                  <button
+                    type="button"
+                    onClick={clearChecked}
+                    /* Quiet until hovered. It throws the checked file away, so
+                       it carries the danger colour — but sitting permanently
+                       red beside a neutral control it read as the primary
+                       action of the pair, which it is not. */
+                    className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted
+                               transition-colors hover:bg-stop-bg hover:text-danger
+                               focus-visible:ring-2 focus-visible:ring-accent/50
+                               focus-visible:outline-none"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                {/* **The measurements as a labelled list, not a run of
+                    numbers.** They were one grey line — `679 × 960 pixels ·
+                    69KB · 1.41:1` — which is three different kinds of fact
+                    separated by dots, none of them named. A definition list is
+                    what every inspector panel uses, and the labels are what
+                    make "1.41:1" mean anything to somebody who has not read
+                    the checks below yet. */}
+                <dl className="mt-4 border-t border-line pt-3 text-sm">
+                  {[
+                    [
+                      "Pixels",
+                      `${shown.width.toLocaleString()} × ${shown.height.toLocaleString()}`,
+                    ],
+                    ["Shape", `${(shown.height / shown.width).toFixed(2)}:1`],
+                    /* No weight for the stored copy: its size on disk is an
+                       artefact of this app's own compression, not a fact about
+                       the writer's artwork, and printing it beside a shop's
+                       50MB limit would invite exactly the wrong conclusion. */
+                    ...(shown.bytes > 0
+                      ? ([["File", fileSize(shown.bytes)]] as const)
+                      : []),
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      className="flex justify-between gap-4 py-1"
+                    >
+                      <dt className="text-muted">{label}</dt>
+                      <dd className="font-medium text-fg tabular-nums">
+                        {value}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </>
+            ) : (
+              <>
+                <DropZone
+                  onFile={(file) => {
+                    setName(file.name);
+                    void read(file);
+                  }}
+                />
+                {/* Why there is a drop zone here rather than the file, said
+                    once and quietly. The rule and the small type are what keep
+                    it a footnote to the control rather than a second heading
+                    above it. */}
+                <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
+                  The report beside this is from the last file you checked. The
+                  artwork itself is never kept here, so drop the same file again
+                  to see it and to put anything right.
+                </p>
+                {/* The measurements outlive the picture, so there has to be a
+                    way to throw them out — otherwise the dashboard goes on
+                    reporting a cover nobody is checking, and this screen goes
+                    on drawing a report with no file behind it. */}
+                <button
+                  type="button"
+                  onClick={clearChecked}
+                  className="mt-2 rounded-md px-2.5 py-1 text-xs font-semibold text-muted
+                             transition-colors hover:bg-stop-bg hover:text-danger
+                             focus-visible:ring-2 focus-visible:ring-accent/50
+                             focus-visible:outline-none"
+                >
+                  Forget these measurements
+                </button>
+              </>
             )}
 
-            {/* The file's identity and the two things you can do to it. Named,
-                because "the file you checked" is otherwise a picture and a
-                writer with three exports in a folder cannot tell which.
+            {/* **The caveats, against the measurements rather than under the
+                report.** They were the last thing on the right-hand column,
+                which put them below the fix buttons — so the small print
+                qualifying the numbers sat under the *remedies*, four hundred
+                pixels from anything it was about, and on a long report it was
+                off the bottom of the window entirely.
 
-                Three states, because there are three: a file handed over now,
-                the cover already on the book, and a set of numbers left from a
-                check that happened on some earlier visit. Calling that third
-                one "Checked file" implied a file was present. */}
-            <p className="mt-3 truncate text-sm font-medium text-fg">
-              {name ??
-                (fromStored
-                  ? "The cover on this book"
-                  : facts
-                    ? "Checked file"
-                    : "Last checked file")}
+                Here it is a footnote to the thing it footnotes: what was
+                measured, and the two things this screen cannot measure at all.
+                The column is narrow, so the sentences wrap into a block rather
+                than running the width of the page — which is the shape small
+                print should have been all along. */}
+            <p className="mt-3 border-t border-line pt-3 text-xs text-muted">
+              Measured in your browser; the file is never uploaded. These are
+              Amazon KDP&rsquo;s published figures and do not replace the
+              shop&rsquo;s own check. Two things decide a cover and neither can
+              be measured: whether the title is readable at 60px, and whether it
+              looks like its genre. Both are on the shelf.
             </p>
-
-            {/* **Replace is a first-class control now, not small print.** It
-                was a line inside the drop zone reading "drop another to check
-                it instead", which is an instruction rather than a control —
-                and once the drop zone went there was no way to check a second
-                file except Remove, then drop. The Image Upload pattern names
-                four things this has to allow: select, preview, validate,
-                *replace*. This is the fourth. */}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <label
-                className="cursor-pointer rounded-md border border-line px-2.5 py-1
-                           text-xs font-semibold text-fg transition-colors hover:bg-raised"
-              >
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setName(file.name);
-                      void read(file);
-                    }
-                  }}
-                  className="sr-only"
-                />
-                Check another
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setFacts(null);
-                  setPreview(null);
-                  setName(null);
-                  setError(null);
-                  setDone(null);
-                  setFromStored(false);
-                  // The measurement goes with the file it measured; the
-                  // dashboard must not keep reporting a cover nobody is
-                  // checking any more.
-                  setCoverFacts(bookId, null);
-                }}
-                /* Quiet until hovered. It throws the checked file away, so it
-                   carries the danger colour — but sitting permanently red
-                   beside a neutral control it read as the primary action of
-                   the pair, which it is not. */
-                className="rounded-md px-2.5 py-1 text-xs font-semibold text-muted
-                           transition-colors hover:bg-stop-bg hover:text-danger
-                           focus-visible:ring-2 focus-visible:ring-accent/50
-                           focus-visible:outline-none"
-              >
-                Remove
-              </button>
-            </div>
-
-            {/* **The measurements as a labelled list, not a run of numbers.**
-                They were one grey line — `679 × 960 pixels · 69KB · 1.41:1` —
-                which is three different kinds of fact separated by dots, none
-                of them named. A definition list is what every inspector panel
-                uses, and the labels are what make "1.41:1" mean anything to
-                somebody who has not read the checks below yet. */}
-            <dl className="mt-4 border-t border-line pt-3 text-sm">
-              {[
-                [
-                  "Pixels",
-                  `${shown.width.toLocaleString()} × ${shown.height.toLocaleString()}`,
-                ],
-                ["Shape", `${(shown.height / shown.width).toFixed(2)}:1`],
-                /* No weight for the stored copy: its size on disk is an
-                   artefact of this app's own compression, not a fact about the
-                   writer's artwork, and printing it beside a shop's 50MB limit
-                   would invite exactly the wrong conclusion. */
-                ...(shown.bytes > 0
-                  ? ([["File", fileSize(shown.bytes)]] as const)
-                  : []),
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-4 py-1">
-                  <dt className="text-muted">{label}</dt>
-                  <dd className="font-medium text-fg tabular-nums">{value}</dd>
-                </div>
-              ))}
-            </dl>
           </div>
 
           <div className="min-w-0">
@@ -1234,9 +1247,24 @@ function CoverChecker({ bookId }: { bookId: string }) {
                 ahead of the diagnosis. The order is what the report is for:
                 here is the file, here is what each rule says, here is what can
                 be done about the two that failed. */}
+            {/* **Blue, and the blue is the badge family rather than a new
+                hue.** `--color-badge-blue-*` is the app's one *state* colour —
+                a tinted ground, a hairline of the same hue, ink of that hue,
+                correct in both themes — where the status family means a
+                verdict and the accent means "the way forward". This panel is
+                neither: it is the workshop under the diagnosis, so it wants to
+                be told apart from the report above it without claiming
+                anything about the file. Grey said nothing at all, and amber or
+                green would have read as a fourth finding.
+
+                The buttons inside stay `panel` on it, which is the shape the
+                panel already had: white cards on a ground, one blue ground
+                rather than three blue boxes. */}
             {facts && (shapeOff || smallerThanIdeal || wrongFormat) && (
-              <div className="mt-5 rounded-lg border border-line bg-surface p-4">
-                <p className="text-sm font-bold text-fg">Fix the file</p>
+              <div className="mt-5 rounded-lg border border-badge-blue-line bg-badge-blue-bg p-4">
+                <p className="text-sm font-bold text-badge-blue-ink">
+                  Fix the file
+                </p>
                 <p className="mt-1 max-w-prose text-sm text-muted">
                   You choose what shows before anything is written. Nothing is
                   uploaded and this file is not changed — you get a copy.
@@ -1275,16 +1303,12 @@ function CoverChecker({ bookId }: { bookId: string }) {
                         { x: 0, y: 0 },
                       )
                     }
-                    className="mt-3 flex w-full flex-wrap items-center justify-between gap-x-4
-                               gap-y-1 rounded-lg border border-line bg-panel px-4 py-3
-                               text-left transition-colors hover:border-accent/40
-                               hover:bg-raised focus-visible:ring-2
-                               focus-visible:ring-accent/50 focus-visible:outline-none"
+                    className={`mt-3 ${FIX_BUTTON}`}
                   >
-                    <span className="text-sm font-semibold text-fg">
+                    <span className="text-sm font-semibold">
                       Save it as a JPEG
                     </span>
-                    <span className="text-xs text-muted tabular-nums">
+                    <span className="text-xs text-badge-blue-ink/70 tabular-nums">
                       {facts.width} × {facts.height} · same pixels, a format
                       Amazon takes
                     </span>
@@ -1323,16 +1347,12 @@ function CoverChecker({ bookId }: { bookId: string }) {
                               tooSmall: out.tooSmall,
                             })
                           }
-                          className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1
-                                     rounded-lg border border-line bg-panel px-4 py-3 text-left
-                                     transition-colors hover:border-accent/40 hover:bg-raised
-                                     focus-visible:ring-2 focus-visible:ring-accent/50
-                                     focus-visible:outline-none"
+                          className={FIX_BUTTON}
                         >
-                          <span className="text-sm font-semibold text-fg">
+                          <span className="text-sm font-semibold">
                             {mode === "crop" ? "Crop to fit" : "Pad with bars"}
                           </span>
-                          <span className="text-xs text-muted tabular-nums">
+                          <span className="text-xs text-badge-blue-ink/70 tabular-nums">
                             {out.width} × {out.height} ·{" "}
                             {mode === "crop"
                               ? `${out.changed}px trimmed`
@@ -1372,16 +1392,12 @@ function CoverChecker({ bookId }: { bookId: string }) {
                               },
                             )
                           }
-                          className="flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1
-                                     rounded-lg border border-line bg-panel px-4 py-3 text-left
-                                     transition-colors hover:border-accent/40 hover:bg-raised
-                                     focus-visible:ring-2 focus-visible:ring-accent/50
-                                     focus-visible:outline-none"
+                          className={FIX_BUTTON}
                         >
-                          <span className="text-sm font-semibold text-fg">
+                          <span className="text-sm font-semibold">
                             Enlarge to {big.width} × {big.height}
                           </span>
-                          <span className="text-xs text-muted tabular-nums">
+                          <span className="text-xs text-badge-blue-ink/70 tabular-nums">
                             scaled up {big.factor.toFixed(1)}× · adds no detail
                           </span>
                         </button>
@@ -1391,29 +1407,17 @@ function CoverChecker({ bookId }: { bookId: string }) {
               </div>
             )}
 
-            {!facts && (shapeOff || smallerThanIdeal) && (
-              /* Arrived from the dashboard: the numbers survived, the picture
-                 did not. Saying which is better than either hiding the
-                 findings — the writer came here *because* of them — or showing
-                 fix buttons that have nothing to work on.
+            {/* **Where the "these were measured earlier" box used to be.**
+                It stood here — under the report, where the fix panel would
+                have been — to answer "so what do I do about it" for a writer
+                who arrived from a dashboard finding with the numbers but no
+                artwork. It said to drop the file again.
 
-                 It stands where the fix panel would have been, which is what
-                 makes it read as the answer to "so what do I do about it" — the
-                 question the report directly above has just raised. */
-              <p className="mt-5 max-w-prose rounded-lg border border-line bg-surface p-4 text-sm text-muted">
-                These were measured when you last checked this file. The artwork
-                itself is never kept here, so drop the same file again to put
-                any of it right.
-              </p>
-            )}
-
-            <p className="mt-4 max-w-prose text-xs text-muted">
-              Measured in your browser; the file is never uploaded. These are
-              Amazon KDP&rsquo;s published figures and do not replace the
-              shop&rsquo;s own check. Two things decide a cover and neither can
-              be measured: whether the title is readable at 60px, and whether it
-              looks like its genre. Both are on the shelf.
-            </p>
+                The column on the left now *is* a drop zone in exactly that
+                case, carrying the same sentence with the control attached to
+                it, so this had become the second of two boxes on one screen
+                asking for the same file — and the one with nothing to press.
+                A sentence beats a box; a control beats both. */}
           </div>
         </div>
       )}
@@ -1450,6 +1454,135 @@ function CoverChecker({ bookId }: { bookId: string }) {
 }
 
 /**
+ * The one drop target, in the two places a cover can be handed over.
+ *
+ * It was written out at the empty state and nowhere else, and the second place
+ * needing it is what made this a component rather than a copy: the column
+ * beside the report, when the measurements outlived the artwork. Two hand-kept
+ * copies of a file input is how one of them ends up accepting a format the
+ * other refuses, or losing its drag handling — and a writer who has learned
+ * that dropping works on this screen must not find a spot where it silently
+ * does not.
+ *
+ * **A real drop target, because the sentence promises one.** This was a bare
+ * `<input type="file">`, which the browser draws as "Choose File | No file
+ * chosen" — the one undesigned control on a screen about how things look.
+ * Clicking still opens the picker, because the label wraps the input rather
+ * than replacing it, and `dragging` is the component's own state: two of these
+ * on one screen sharing a flag would light up together.
+ *
+ * The caller sizes it (`className`) and nothing else varies. The empty screen
+ * caps it at `max-w-xl` — a drop area wider than about a card stops reading as
+ * an object you can aim at — and in the report's rail it simply fills the
+ * 20rem column.
+ */
+function DropZone({
+  onFile,
+  className = "",
+}: {
+  onFile: (file: File) => void;
+  className?: string;
+}) {
+  const [dragging, setDragging] = useState(false);
+
+  return (
+    <label
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragging(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) onFile(file);
+      }}
+      className={`flex cursor-pointer flex-col items-center justify-center gap-2
+                  rounded-xl border-2 border-dashed px-6 py-12 text-center
+                  transition-colors ${className} ${
+                    dragging
+                      ? "border-accent bg-accent/8"
+                      : "border-line bg-surface hover:border-accent/50 hover:bg-raised"
+                  }`}
+    >
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onFile(file);
+        }}
+        className="sr-only"
+      />
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-7 w-7 text-muted"
+      >
+        <path d="M12 16V4m0 0L8 8m4-4 4 4" />
+        <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+      </svg>
+      <span className="text-sm font-semibold text-fg">
+        Drop your cover here, or choose a file
+      </span>
+      {/* **What this page can check, which is not the same list as what Amazon
+          takes.** Amazon takes JPEG and TIFF for an ebook cover; browsers
+          cannot open a TIFF at all, so naming both here would promise a check
+          that fails on one of them. It also does not say "JPEG or PNG", which
+          is what it said for about an hour and is the exact advice that gets a
+          cover rejected — PNG is what every design tool exports by default, so
+          naming it would have been this screen causing the refusal it exists
+          to prevent. The `accept` attribute deliberately stays wider than
+          either list: a writer who picks a PNG must be *told* it is a PNG, not
+          have the file quietly hidden by a picker that explains nothing. */}
+      <span className="max-w-xs text-xs text-muted">
+        The file you are about to upload — not the copy stored here. JPEG is
+        what Amazon wants and what this page can measure.
+      </span>
+    </label>
+  );
+}
+
+/**
+ * One of the fix panel's buttons — the shape and the fill, in one place.
+ *
+ * **Blue on the panel's blue tint**, which is what the ground forced. They
+ * were white cards with a hairline, which is the shape they take *anywhere
+ * else*: a card on a grey desk is told from it by its own edge. On a blue tint
+ * that edge does the job the ground already does, so three white slabs read as
+ * the panel's furniture rather than as the three things to press — and this
+ * panel is nothing but its buttons.
+ *
+ * All three parts come from the badge family: `-soft` for the ground, one step
+ * deeper into the hue than the panel it sits on, `-ink` for the words, `-line`
+ * for the edge. A saturated fill was tried first and is the wrong volume — it
+ * makes three offers to *change somebody's file* the loudest thing on a screen
+ * whose whole argument is that the report above them is the point. A tinted
+ * control is still unmistakably a control and does not shout down the
+ * diagnosis.
+ *
+ * The measurement beside each label goes to `-ink/70`: `text-muted` is the
+ * chrome's grey and reads as switched off on a coloured ground, but the cost
+ * of a fix is still the quieter half of its line.
+ *
+ * Hover deepens to `-line`, the direction daylight moves in this palette, and
+ * the focus ring is offset against the panel — a ring drawn *on* a fill of
+ * nearly its own hue is a ring nobody can see.
+ */
+const FIX_BUTTON = `flex w-full flex-wrap items-center justify-between gap-x-4
+  gap-y-1 rounded-lg border border-badge-blue-line bg-badge-blue-soft px-4 py-3
+  text-left text-badge-blue-ink transition-colors hover:bg-badge-blue-line
+  focus-visible:ring-2 focus-visible:ring-badge-blue-ink
+  focus-visible:ring-offset-2 focus-visible:ring-offset-badge-blue-bg
+  focus-visible:outline-none`;
+
+/**
  * A file size in the unit a person would use for it.
  *
  * It was always KB, which is right for a 69KB thumbnail and reads as noise the
@@ -1477,28 +1610,30 @@ function fileSize(bytes: number): string {
  * themes without a second palette. `aria-hidden`, because the row's own words
  * already say which it is; a screen reader hearing "problem" and then reading
  * "Too small to upload" has been told the same thing twice.
+ *
+ * **It is a filled disc rather than a tinted one**, and that is the `-solid`
+ * half of the family rather than a new colour: `-bg` is a ground for a *banner*
+ * of the hue, a few percent off the surface, so a 20px circle of it beside a
+ * hairline read as a faint outline with a pale glyph in it — the mark carrying
+ * the row's whole verdict was the quietest thing in the row. `-solid` is the
+ * value tuned to carry white ink in both themes (see the note beside it in
+ * `globals.css`), which is why the glyph is a literal `text-white`: those three
+ * do not invert, so an ink token that crossed over would put black on them at
+ * night. No border — a hairline of `-line` around a saturated fill is a second
+ * edge saying nothing.
  */
 function CheckMark({ status }: { status: CoverCheck["status"] }) {
   const look =
     status === "problem"
-      ? {
-          ring: "border-stop-line bg-stop-bg text-stop-fg",
-          d: "M6 6l8 8M14 6l-8 8",
-        }
+      ? { ring: "bg-stop-solid", d: "M6 6l8 8M14 6l-8 8" }
       : status === "note"
-        ? {
-            ring: "border-note-line bg-note-bg text-note-fg",
-            d: "M10 5v6M10 14v.5",
-          }
-        : {
-            ring: "border-ok-line bg-ok-bg text-ok-fg",
-            d: "M5 10.5l3.5 3.5L15 7",
-          };
+        ? { ring: "bg-note-solid", d: "M10 5v6M10 14v.5" }
+        : { ring: "bg-ok-solid", d: "M5 10.5l3.5 3.5L15 7" };
 
   return (
     <span
       aria-hidden="true"
-      className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${look.ring}`}
+      className={`mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white ${look.ring}`}
     >
       <svg
         viewBox="0 0 20 20"
@@ -1507,7 +1642,7 @@ function CheckMark({ status }: { status: CoverCheck["status"] }) {
         strokeWidth={2.2}
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="h-3 w-3"
+        className="h-4 w-4"
       >
         <path d={look.d} />
       </svg>

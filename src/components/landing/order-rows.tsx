@@ -70,12 +70,28 @@ export function OrderRows({ stations }: { stations: Station[] }) {
              sends the figure to the second column. Hence one template per
              side.
 
-             **1.5fr since 2026-08-14, up from 1.3.** Same argument one step
-             further, and the words lose nothing by it: at `7xl` the text
-             column is still about 29rem, which is a *better* measure for a
-             two-line note than the 32rem it had. What it buys is roughly 40px
-             on every screen in the section, which is 40px of the app's own
-             type at a size somebody can read.
+             **1.85fr since 2026-08-14, by way of 1.3, 1.5 and 1.7.** Same
+             argument several steps on. The early takes bought their width
+             *from* the words, and that has a price with a history: the phase
+             heading came down from 72px to 52 and then to 40 as this column
+             narrowed, and a heading setting to as many lines as its own
+             paragraph has stopped being a heading.
+
+             So the last take was made with two other levers rather than on its
+             own — a wider container (`100rem`, up from `7xl`; see the note
+             there) and a tighter gap below. That matters because the ratio is
+             the *only* one of the three that costs the words anything, and on
+             a wide window the container now does most of the work: at 1600 the
+             figure lands near 955px against 730 before, with the text column
+             ending up *wider* than it started. On a 1280 window, where the
+             section's padding binds and the container cannot grow, the ratio
+             and the gap between them still move about 66px across and the text
+             holds at ~404px.
+
+             That last figure is the constraint to check before touching this
+             number again: the four titles are held to the same line count as
+             each other, and the ceiling at 40px is somewhere near thirty
+             characters. 404px still sets a 21-character title as two lines.
 
              **`minmax(0, …)` rather than a bare `1.3fr`, and it is not
              optional.** A grid item's automatic minimum size is its
@@ -85,10 +101,16 @@ export function OrderRows({ stations }: { stations: Station[] }) {
              1500px. Tailwind's own `grid-cols-2` is `repeat(2, minmax(0,
              1fr))` for exactly this reason; writing the template by hand is
              what dropped the floor. */
-          className={`grid items-center gap-10 lg:gap-16 ${
+          /* The gap is the third lever on the screens' width and the cheapest
+             of the three — 16px off it at `lg` is 16px onto the picture, taken
+             from air rather than from the words. It does not go below 3rem:
+             the alternation means the words' hard edge faces the screen, and
+             a column of type set right up against a framed picture reads as
+             one crowded object rather than as a spread. */
+          className={`grid items-center gap-10 lg:gap-12 ${
             i % 2 === 1
-              ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]"
-              : "lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]"
+              ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.85fr)]"
+              : "lg:grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)]"
           }`}
         >
           {/* ---- The screen -------------------------------------------

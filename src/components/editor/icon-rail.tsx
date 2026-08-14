@@ -95,6 +95,27 @@ export function RailButton({
   );
 }
 
+/**
+ * The hairline between two groups of rail buttons.
+ *
+ * **It carries no margin of its own, and that is the whole of it.** This was
+ * `my-1` in four places across the two rails, which *added* to the `gap-2` the
+ * rail already puts between its children: 8px of gap plus 4px of margin on
+ * each side, so a rule that separates two groups sat in 24px of air where
+ * every other gap in the column is 8. Three different spacings in one narrow
+ * strip — 8 within a group, 24 around a rule, and `mt-auto` before the footer
+ * — read as a rail that had been assembled rather than spaced.
+ *
+ * With the margin gone the rule takes an ordinary slot in the flex column, so
+ * a group boundary is 8 + 1 + 8 against a within-group 8: still plainly a
+ * bigger gap, still obviously a division, and now a multiple of the one number
+ * the rail is built on. Change the spacing here and both rails move together,
+ * which is why this is a component rather than a string copied twice more.
+ */
+export function RailDivider() {
+  return <span aria-hidden="true" className="h-px w-6 bg-line" />;
+}
+
 export function Rail({
   side,
   children,
@@ -239,6 +260,28 @@ export const icons = {
       <path d="M10 2.9v8.7" />
       <path d="m6.4 8.2 3.6 3.6 3.6-3.6" />
       <path d="M3.4 13.6v1.9a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-1.9" />
+    </>
+  ),
+  /**
+   * Two people, for sharing the book with a co-writer.
+   *
+   * **Not the three-nodes-and-two-lines "share" glyph**, which every product
+   * that uses it means *send this somewhere else* by — a tweet, a link, a
+   * system share sheet. Nothing is sent here: the owner adds somebody to the
+   * book and the two of them work on it. Google Docs, Notion and Figma all put
+   * a person on this control for that reason, and the second figure is what
+   * separates "share with someone" from "my account".
+   *
+   * Drawn to the same 20-unit system as the rest — the shapes sit between 2.5
+   * and 17.5 — with the second figure behind and to the right, so it reads as
+   * two people rather than one person with a smudge.
+   */
+  share: (
+    <>
+      <path d="M8 9.4a2.9 2.9 0 1 0 0-5.8 2.9 2.9 0 0 0 0 5.8Z" />
+      <path d="M2.9 16.4a5.1 5.1 0 0 1 10.2 0" />
+      <path d="M13.4 4.1a2.7 2.7 0 0 1 0 5.2" />
+      <path d="M15.2 11.4a4.6 4.6 0 0 1 2 3.7" />
     </>
   ),
   panel: (

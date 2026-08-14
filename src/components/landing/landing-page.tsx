@@ -5,6 +5,7 @@ import { signInWithGoogle } from "@/app/auth/actions";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { BookCheck } from "@/components/landing/book-check";
 import { CheckDemo } from "@/components/landing/check-demo";
+import { ExportScreen } from "@/components/landing/export-screen";
 import { ListingQuestions } from "@/components/landing/listing-questions";
 import { CtaBanner } from "@/components/landing/cta-banner";
 import { HeroWall } from "@/components/landing/hero-wall";
@@ -17,8 +18,8 @@ import {
   SECTION_TITLE,
 } from "@/components/landing/type";
 import { ReviseScreen } from "@/components/landing/phase-screens";
+import { AppWindow } from "@/components/landing/app-window";
 import {
-  CoverCheckFigure,
   ExportDoneFigure,
   ListingFigure,
 } from "@/components/landing/refusal-figures";
@@ -105,12 +106,19 @@ import { CONTACT_EMAIL, REFUND_DAYS, REPLY_DAYS } from "@/lib/legal";
  * never simply start further out; a bleed reads as deliberate and a wider
  * container reads as a mistake.
  *
- * **Every claim has to be true of the code, in both directions** — nothing
- * claims what the app cannot do, and nothing stays under the "Not built yet"
- * badge once it ships. That second half fails silently and has been wrong once
- * already, so walk the badges whenever a feature lands. The phases, the step
- * counts and the tool list are all imported rather than restated,
- * which is the shape to prefer for any new figure here.
+ * **Every claim has to be true of the code**, and nothing here may claim what
+ * the app cannot do — the print PDF is the browser's print engine and says so
+ * wherever it appears. The phases, the step counts and the tool list are all
+ * imported rather than restated, which is the shape to prefer for any new
+ * figure here.
+ *
+ * That rule used to have a second half — *nothing stays under the "Not built
+ * yet" badge once it ships* — and the section that badge belonged to was
+ * **removed on 2026-08-14** at the owner's request. There is no longer a place
+ * on this page where an unbuilt thing is listed, so there is nothing to walk
+ * when a feature lands. What the page must not do is grow one by accident: an
+ * unbuilt feature named anywhere here is a promise with no section admitting
+ * it is one. See the note where that section stood, and TODO.md.
  */
 
 /**
@@ -484,9 +492,35 @@ const ORDER_LEADS: Record<string, ReactNode> = {
  * dialog's artwork.
  *
  * `priority` is deliberately absent — it sits several screens down the page,
- * so eager-loading it would cost the hero its bandwidth. The `sizes` hint says
- * what the layout actually does: the wide column of a `7xl` grid from `lg`,
- * full width below it.
+ * so eager-loading it would cost the hero its bandwidth.
+ *
+ * **`sizes` has to be re-checked whenever that grid moves, and it is the part
+ * that fails quietly.** It says what the layout actually does — the wide
+ * column of the order grid from `lg`, full width below it — and `next/image`
+ * picks which generated variant to download from it, not from the box the
+ * picture lands in. Set too small and the browser confidently fetches a
+ * narrower file and scales it *up*: nothing errors, nothing warns, the
+ * photograph just goes soft, on a page whose whole argument is that you can
+ * read the app's own type in it. It was 44rem while the column was one; the
+ * column reaches about 60rem now (`100rem` container, 1.85fr), so this is
+ * 62rem — rounded up, because over-declaring costs a slightly larger download
+ * and under-declaring costs the sharpness the picture is there for.
+ *
+ * **`quality` is the other half of that, and it is the half that had actually
+ * gone wrong.** These three went soft when the section widened, and widening
+ * only exposed it: the shipped files had been encoded at about q82 and
+ * `next/image` then re-encoded them at its **default 75** on the way out, so
+ * what a reader saw was two lossy passes over a picture of *type*, which is
+ * the content webp's default tuning handles worst. Both ends are fixed —
+ * re-encoded at q95 from the originals (`write-laptop.webp` went 73KB → 128KB,
+ * `arc-laptop.webp` 45KB → 86KB) and served at 95, so there is no second
+ * generation worth the name.
+ *
+ * The ceiling left is the source: these are 1448px originals cropped to about
+ * 1350, so a 2× screen showing them near 955px CSS is above what the file
+ * holds. That cannot be encoded away — it needs the mockups rendering larger,
+ * which is a re-shoot rather than a setting. Do not answer it by raising
+ * `quality` further; past about 95 webp buys size and nothing a reader sees.
  *
  * **`mix-blend-multiply` stays on the three photographs even though the
  * section is white again.** On white it is arithmetically a no-op — multiplying
@@ -504,9 +538,10 @@ function WriteShot() {
     <Image
       src="/write-laptop.webp"
       alt="A laptop showing the OpenChapter editor: the book's front matter, body matter and back matter down the left with a list of twelve chapters, the manuscript open at Chapter 1 in the middle, and the writing tools down the right."
-      width={1361}
-      height={994}
-      sizes="(min-width: 1024px) 44rem, 100vw"
+      width={1353}
+      height={991}
+      sizes="(min-width: 1024px) 62rem, 100vw"
+      quality={95}
       className="mix-blend-multiply block h-auto w-full"
     />
   );
@@ -565,63 +600,49 @@ function ArcShot() {
     <Image
       src="/arc-laptop.webp"
       alt="A laptop showing OpenChapter's advance-copy list: five readers ordered by whose review is wanted soonest, each with a coloured badge for where they have got to — no answer, sent, reading, reviewed, declined — beside the genre they read, where they were found, and the date their review is wanted."
-      width={1296}
-      height={977}
-      sizes="(min-width: 1024px) 44rem, 100vw"
+      width={1292}
+      height={976}
+      sizes="(min-width: 1024px) 62rem, 100vw"
+      quality={95}
       className="mix-blend-multiply block h-auto w-full"
     />
   );
 }
 
-/**
- * The publishing phase's figure — the fourth bitmap, and the last drawn screen
- * this section gave up.
+/*
+ * **The publishing row is a drawn screen again since 2026-08-14**, and it is
+ * the one row that went to a bitmap and came back.
  *
- * `PublishScreen` did not merely draw a finished file, it **filtered
- * `DESTINATIONS` the way the export dialog filters it**, so it could not name a
- * shop the export does not reach. This picture can go stale in the ordinary
- * way; swapped in on 2026-08-14 at the owner's request, on the same terms as
- * the three above. The component is kept, whole and callerless, in
- * `phase-screens.tsx`.
+ * `PublishShot` — a tablet at `/export-tablet.webp`, swapped in on 2026-08-14
+ * on the same terms as the three photographs — is gone from this file and
+ * `ExportScreen` (`export-screen.tsx`) stands in its place. Not a change of
+ * mind about the trade: that picture was the one of the four that could not be
+ * fixed by re-encoding. It was composed by a script from a screenshot no
+ * longer on disk, so there was nothing to re-encode *from*, and at 1984×1326
+ * in 49KB — about 0.15 bits a pixel, on flat grounds and small type — webp's
+ * ringing sat on the letters. Its own note said the real fix was to render it
+ * again; that is what the drawing is. The file stays in `public/` and
+ * `export-screen.tsx` carries the alt text, so the photograph is one `<Image>`
+ * away if it is ever wanted back.
  *
- * What is in it is the real last step of the export flow as it stands after
- * that screen's rebuild: the file's own name, what it will contain, and the
- * pre-upload check answering green. Two things date it — the row of summary
- * labels, and the wizard's five steps down the left — so re-shoot it if either
- * moves.
+ * The other three rows keep their bitmaps and keep the cost that comes with
+ * them. This one now costs nothing to keep true: two of its values are read
+ * out of the app, and the rest is markup that a browser sets at whatever size
+ * the column gives it rather than pixels that were sized once.
  *
- * **It is a tablet rather than a laptop**, which keeps this row from reading as
- * a third photograph of the same machine, and the frame is *drawn* rather than
- * photographed: a bezel around the app at 1904×1246, with the desk extended
- * above the pinned action bar — which is exactly what a taller window renders,
- * since the layout is a fixed-height column with the bar at the bottom and the
- * content top-aligned above it. Cropped to the device plus 10px, and it carries
- * **no drop shadow**: the other three are photographs and bring their own, but
- * a drawn one under a drawn frame reads as a grey band under the picture rather
- * than as depth.
+ * `PublishScreen` in `phase-screens.tsx` — the small card-sized drawing that
+ * filtered `DESTINATIONS` — is still there and still callerless. It is a
+ * different figure rather than this one at another size: it draws the finished
+ * file and the shops it opens in, where this draws the screen the writer is
+ * standing on.
  */
-function PublishShot() {
-  return (
-    <Image
-      src="/export-tablet.webp"
-      alt="A tablet showing the last step of OpenChapter's export: the file breathe-again.epub with what it will contain — three chapters, four pages of front and back matter, the Classic template — and a green panel saying the book is ready for the shops, with the Export EPUB button below."
-      width={1984}
-      height={1326}
-      sizes="(min-width: 1024px) 44rem, 100vw"
-      /* No `mix-blend-multiply` here, unlike the three photographs: this one
-         was drawn on a transparent canvas, so it has no white to blend away
-         and multiplying would only dim the screen inside it. */
-      className="block h-auto w-full"
-    />
-  );
-}
 
 const ORDER_SCREENS: Record<string, ReactNode> = {
   write: <WriteShot />,
   revise: <ReviseScreen />,
   prepare: <CheckDemo />,
   launch: <ArcShot />,
-  publish: <PublishShot />,
+  publish: <ExportScreen />,
 };
 
 /*
@@ -737,32 +758,16 @@ const TRACK = [
   ],
 ] as const;
 
-/**
- * What is genuinely not built, and nothing that is.
- *
- * This list had the series bible, ranked comps and the book-three curve on it
- * until all three shipped, and the rule that matters here is the one that
- * fails quietly: **nothing stays under this badge once it exists.** A page
- * still promising a shipped feature is a page saying something untrue, in the
- * one section whose whole job is being trustworthy about the difference
- * between a plan and a product. Walk it whenever a feature lands — and when
- * something comes off, put something real in its place rather than shortening
- * the list, because three honest absences buy more than two do.
- */
-const LATER = [
-  [
-    "A real print-ready PDF",
-    "Today's PDF is the browser's print engine, which we say wherever it appears: no bleed, no crop marks, no CMYK. A printer's file needs a real PDF library and is a project of its own.",
-  ],
-  [
-    "Sales reports without a detour",
-    "Track reads CSV, and KDP downloads .xlsx — so today you open it and save it again. Reading the spreadsheet directly is the whole of the difference.",
-  ],
-  [
-    "Your tools on your second machine",
-    "Your books and chapters sync. The ledger, the story bible and the advance-copy list do not yet, so a writer on a laptop and a desktop keeps two of each. Every screen with one says so on it.",
-  ],
-] as const;
+/* **`LATER` stood here and went on 2026-08-14** with the "Not built yet"
+   section it filled — see the note where that section was, and TODO.md under
+   "Taken out on purpose", which keeps its three entries verbatim so rebuilding
+   it is a paste rather than a rewrite.
+
+   Deleted rather than kept callerless, which is the split CLAUDE.md draws:
+   `templates-dialog.tsx` and `ambience.ts` are whole features waiting on a way
+   in, and this was three strings and a `.map`. An unused const buys nothing
+   but a standing lint warning, and TODO.md holds the part that was actually
+   worth keeping. */
 
 /**
  * Every refusal, with the work that sits on our side of it.
@@ -979,7 +984,7 @@ const REJECTIONS = [
     note: `The commonest refusal there is. Amazon wants at least ${MIN_HEIGHT.toLocaleString()}px tall and ${MIN_WIDTH} wide, no more than ${MAX_EDGE.toLocaleString()} on a side, at least ${IDEAL_RATIO}:1, and a JPEG or TIFF.`,
     source:
       "Checked against the file you picked, not the copy we resized to fit your browser.",
-    figure: <CoverCheckFigure />,
+    figure: <CoverCheckShot />,
   },
   {
     title: "The details do not match",
@@ -998,6 +1003,84 @@ const REJECTIONS = [
     figure: <ExportDoneFigure />,
   },
 ] as const;
+
+/**
+ * Refusal 01's figure — a **photograph of the covers screen**, and the fifth
+ * bitmap on this page.
+ *
+ * Swapped in on 2026-08-14 at the owner's request, and it is the most expensive
+ * of the five, because `CoverCheckFigure` was not a drawing of that screen — it
+ * **ran `coverReport()`** over a fixed set of measurements, so every row, every
+ * label and the count in the summary line were the checker's own answers about
+ * a made-up 500 × 800 PNG. Change a rule in `cover-check.ts` and the picture
+ * changed with it. It could not drift, because there was nothing in it to
+ * drift.
+ *
+ * **This can, and the cost is the usual one: when the covers screen moves,
+ * nothing fails and nothing warns — the picture simply starts lying.** What is
+ * in it is the real screen as it stands today: the two tabs, the report with
+ * its seven checks, the measurements under the artwork, and the blue fix panel
+ * with the three repairs. Re-shoot it when any of those change, and especially
+ * when a rule is added to `cover-check.ts` — the caption under it counts seven.
+ * `CoverCheckFigure` is still in `refusal-figures.tsx`, callerless and whole,
+ * so putting the computed version back is one word here.
+ *
+ * **It keeps the black bezel**, which is the one part that is not simply
+ * inherited. The three refusal figures gave the bezel up when they moved onto
+ * tinted cards — a dark frame inside a panel is two frames around one screen —
+ * and a *photograph* is the case that argument does not cover: this one already
+ * carries the app's own white card in its pixels, so on a tinted card with only
+ * a pale ring it reads as a rectangle of the wrong background rather than as a
+ * screen. The bezel is what says "this is a display". The other two stay as
+ * they are; if they are ever photographed too, they take the bezel with them
+ * and the rule becomes "drawn figures ring, photographs bezel".
+ *
+ * **`fill`, like the other two, and the crop is chosen to suit it.** The
+ * window has to be the row's height or the three refusal cards hold three
+ * different-sized screens, which reads as three products rather than three
+ * views of one. A wide crop was tried and is what rules the shape: at 1.65:1
+ * against a column of words half again as tall, the frame held the picture at
+ * the top with three hundred pixels of glass beneath it — space a *drawn*
+ * window carries happily and a photograph does not, because on a photograph it
+ * reads as a screenshot that failed to load rather than as a window with room
+ * in it. This crop is 1.29:1, near enough the listing figure's own proportions
+ * that it nearly fills the glass; what is left under it is a strip of
+ * `lp-ground`, which on this page is #ffffff — the same white the screenshot's
+ * own card is drawn on, so the seam does not read as one.
+ *
+ * **Nothing here re-encodes the picture, which is the point of it.** The file
+ * is lossless WebP and `unoptimized` hands those exact bytes over:
+ * `next/image` would otherwise downscale it to a 640px variant at quality 75,
+ * and 75 is tuned for photographs — on a screenshot of *type* it is visible
+ * immediately as fringing round every letter, on the one figure whose whole
+ * job is that a reader can read the checks in it. The cost is ~190KB with no
+ * responsive variants, paid by a picture below the fold. Do not "optimise"
+ * this back without looking at the result at 100%.
+ *
+ * No `mix-blend-multiply` either, unlike the three laptops: those were shot on
+ * pure white so that multiplying dissolves the ground into whatever is behind
+ * them. This is a rectangular screenshot inside a frame — it has no ground to
+ * dissolve, and multiplying it against the card's tint would drag the whole
+ * picture towards indigo.
+ */
+function CoverCheckShot() {
+  return (
+    <AppWindow
+      bezel
+      fill
+      label="The covers screen, checking a 736 × 1,308 JPEG: seven checks, with nothing a shop would refuse and two worth knowing — smaller than recommended, and taller than a shop's thumbnail — each naming the figure it measured and the rule it measured against."
+    >
+      <Image
+        src="/cover-check-screen.webp"
+        alt=""
+        width={739}
+        height={572}
+        unoptimized
+        className="block h-auto w-full"
+      />
+    </AppWindow>
+  );
+}
 
 /**
  * What is checkable about this page, for a reader who has been sold to.
@@ -1784,15 +1867,33 @@ export function LandingPage() {
              and the token stands as the palette states it. */
           className="scroll-mt-20 border-b border-lp-line px-6 py-14 sm:px-8 sm:py-20 lg:px-10"
         >
-          {/* **`7xl` here where the rest of the page is `6xl`**, and it is for
-              the screens rather than for the words: this is the one section
-              built around five large pictures, and at `6xl` with two equal
+          {/* **`100rem` here where the rest of the page is `6xl`**, and it is
+              for the screens rather than for the words: this is the one
+              section built around large pictures, and at `6xl` with two equal
               columns each of them had about 34rem to live in — a laptop
               rendered at that width puts the app's own type below the size it
               can be read at. The header and the closing line under it cap
               themselves (`Head` at `3xl` when centred), so nothing but the
-              rows takes the extra width. */}
-          <div className="mx-auto max-w-7xl">
+              rows takes the extra width.
+
+              **Widened from `7xl` on 2026-08-14**, and it is the part of that
+              change that costs the words nothing. Going at the grid's *ratio*
+              alone buys the screens width by taking it from the column beside
+              them, which is the move that has already had to be paid for
+              twice — the phase heading came down from 72px to 52 and then to
+              40 as that column narrowed. Container width is new rather than
+              borrowed, so on a wide window it does most of the work and the
+              text column ends up wider than it began.
+
+              **The catch, and the reason `7xl` looked like it had done
+              nothing: below about 1440 this cap is not what binds.** The
+              section's own `lg:px-10` takes 80px off the viewport first, so
+              anything above `viewport - 80` is a ceiling nothing reaches, and
+              the row is exactly as wide at `100rem` as it was at `7xl`. Growth
+              at those widths has to come from the grid ratio and the gap —
+              which is why all three moved together, and why changing this
+              number alone will read as no change at all on a 1280 window. */}
+          <div className="mx-auto max-w-[100rem]">
             <Head
               center
               eyebrow="The whole point"
@@ -2480,38 +2581,31 @@ export function LandingPage() {
           </div>
         </section>
 
-        <section className="border-b border-lp-line px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-6xl">
-            <Head
-              center
-              eyebrow="Not built yet"
-              title="What comes after that"
-              lead={
-                <>
-                  Listed so you can hold us to{" "}
-                  <Em>the difference between a plan and a product.</Em> No
-                  dates: a date is a promise with a number on it.
-                </>
-              }
-            />
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
-              {LATER.map(([name, note]) => (
-                <div
-                  key={name}
-                  className="rounded-2xl border border-dashed border-lp-edge p-6"
-                >
-                  <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-faint uppercase">
-                    Not built
-                  </p>
-                  <p className="oc-heading mt-3 font-serif text-lg text-lp-ink">
-                    {name}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed">{note}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        {/* ---- Where "What comes after that" was -------------------------
+
+            The **"Not built yet"** section — three dashed cards, each headed
+            "Not built", under the promise that you could hold us to the
+            difference between a plan and a product — was **removed on
+            2026-08-14** at the owner's request. `LATER`, the array behind it,
+            went with it: the three entries are recorded verbatim in TODO.md
+            under "Taken out on purpose", which is where to look before
+            rebuilding it.
+
+            **The rule it enforced does not go with it, and it now has nowhere
+            of its own to live, which is the cost.** It was this: nothing stays
+            under that badge once it ships. The list had carried the series
+            bible, ranked comps and the book-three curve until each one landed,
+            and a page still promising a shipped feature says something untrue
+            in the one section whose whole job was being trustworthy about that
+            distinction. What survives the removal is the *other* half of the
+            same rule, and it is the half that still binds every line on this
+            page: nothing here may claim what the app cannot do. The three
+            absences the section listed are all still stated where they
+            actually bite — the PDF's limits wherever the PDF is named, and the
+            tool stores' not syncing on every screen that has one.
+
+            Nothing linked to it: it carried no `id` and the nav never had an
+            entry for it, so this is a deletion with no dangling anchor. */}
 
         {/* ---- FAQ ------------------------------------------------------
 

@@ -1,6 +1,9 @@
 "use server";
 
+import { headers } from "next/headers";
 import { accountFromClaims } from "@/lib/account";
+import { inviteEmail } from "@/lib/email/invite";
+import { isEmailConfigured, sendEmail } from "@/lib/email/send";
 import { billingConfigured } from "@/lib/billing/provider";
 import { subscriptionFor } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
@@ -38,7 +41,24 @@ import { createClient } from "@/lib/supabase/server";
  * see the other's absence and both get in.
  */
 
-export type CollabResult = { error: string } | { ok: true; link?: string };
+export type CollabResult =
+  | { error: string }
+  | {
+      ok: true;
+      link?: string;
+      /**
+       * Whether an invitation email actually left the building.
+       *
+       * Carried back rather than assumed, because the dialog says so out loud
+       * and this app does not let a screen claim something the code cannot
+       * back. Undefined where the question does not arise — every action here
+       * but `inviteMember` — and `false` covers all three ways it can fail to
+       * go: no provider configured, the provider refusing, the provider
+       * unreachable. The writer is told the same thing in each case, since the
+       * only useful next step is the same one: send them the link.
+       */
+      emailed?: boolean;
+    };
 
 /**
  * Said in one place because two screens and three actions say it, and a reader
@@ -215,6 +235,25 @@ function linkFor(token: string): string {
   return `/invite/${token}`;
 }
 
+/**
+ * The app's own public address, for a link that has to survive leaving here.
+ *
+ * A relative path is right everywhere else in this file — the dialog turns it
+ * into a URL against the page it is already on — and useless in an inbox. The
+ * request's own `origin` is preferred because it is what the owner is actually
+ * looking at, which keeps a preview deployment's invitations pointed at that
+ * preview rather than at production; `NEXT_PUBLIC_SITE_URL` is the fallback,
+ * the same variable PayHere's return_url is built from.
+ *
+ * Empty rather than a guess when neither is known: `absolute()` then declines
+ * to send at all, because a mail carrying `/invite/abc` is worse than no mail.
+ */
+async function siteOrigin(): Promise<string> {
+  const fromRequest = (await headers()).get("origin");
+  if (fromRequest) return fromRequest.replace(/\/+$/, "");
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "").replace(/\/+$/, "");
+}
+
 // ---------------------------------------------------------------------------
 // Inviting
 // ---------------------------------------------------------------------------
@@ -223,6 +262,15 @@ export async function inviteMember(
   bookId: string,
   email: string,
   role: CollabRole,
+  /**
+   * The owner's optional note, quoted in the email.
+   *
+   * Optional in the signature as well as on the screen, so the two callers
+   * that do not offer one need no change. Cut server-side rather than trusted
+   * from the client: a Server Action is a public endpoint, and the length the
+   * textarea enforces is a courtesy rather than a limit.
+   */
+  message?: string,
 ): Promise<CollabResult> {
   const owner = await asOwner(bookId);
   if ("error" in owner) return owner;
@@ -243,7 +291,9 @@ export async function inviteMember(
    */
   const { data: members } = await db
     .from("book_members")
-    .select("id, book_id, invited_email, user_id, role, status, expires_at, accepted_at")
+    .select(
+      "id, book_id, invited_email, user_id, role, status, expires_at, accepted_at",
+    )
     .eq("book_id", bookId);
 
   const problem = inviteProblem(address, {
@@ -274,7 +324,117 @@ export async function inviteMember(
   });
 
   if (error) return { error: inviteError(error) };
-  return { ok: true, link: linkFor(token) };
+
+  /*
+   * **The invitation exists; the email is what happens next.**
+   *
+   * Deliberately after the RPC and deliberately unable to change its outcome.
+   * The row in `book_members` is what grants access — the message only saves
+   * the owner a paste — so a mail provider having a bad minute must not turn a
+   * successful invitation into a reported failure. That would be the worst of
+   * both: the co-writer is on the book, the seat is spent, and the owner has
+   * been told it did not work.
+   *
+   * So the send is awaited (the dialog has to say what really happened) but
+   * every failure is folded into one boolean, and the link comes back either
+   * way. `sendEmail` resolves rather than throwing, so there is nothing here
+   * to catch.
+   */
+  const emailed = await sendInvite({
+    to: address,
+    bookId,
+    ownerId: owner.userId,
+    role,
+    token,
+    message,
+  });
+
+  return { ok: true, link: linkFor(token), emailed };
+}
+
+/**
+ * Compose and send one invitation, and answer only whether it went.
+ *
+ * Split out so `inviteMember` reads as the thing it is — check, insert, tell
+ * them — and because everything in here is best-effort while everything above
+ * it is not. Nothing it returns can fail the invitation.
+ */
+async function sendInvite(details: {
+  to: string;
+  bookId: string;
+  ownerId: string;
+  role: CollabRole;
+  token: string;
+  message?: string;
+}): Promise<boolean> {
+  if (!isEmailConfigured()) return false;
+
+  const origin = await siteOrigin();
+  // A link that is not absolute is a dead link in an inbox. Better to send
+  // nothing and let the owner pass the link on than to send a broken one.
+  if (!origin) {
+    console.error("[collab] no origin for the invite link; email not sent");
+    return false;
+  }
+
+  const db = createAdminClient();
+  if (!db) return false;
+
+  /* The book's title and the owner's own details, both read here rather than
+     passed in from the client: a Server Action's arguments are whatever the
+     caller chose to send, and the title of somebody else's book is not a thing
+     to take on trust when it is about to be printed in an email. */
+  const [{ data: book }, { data: account }] = await Promise.all([
+    db.from("books").select("title").eq("id", details.bookId).maybeSingle(),
+    db.auth.admin.getUserById(details.ownerId),
+  ]);
+
+  const meta = (account?.user?.user_metadata ?? {}) as Record<string, unknown>;
+  const inviterName =
+    typeof meta.full_name === "string"
+      ? meta.full_name
+      : typeof meta.name === "string"
+        ? meta.name
+        : null;
+  const inviterEmail = account?.user?.email ?? "";
+
+  const mail = inviteEmail({
+    bookTitle: book?.title?.trim() || "Untitled Book",
+    inviterName,
+    inviterEmail,
+    role: details.role,
+    link: `${origin}${linkFor(details.token)}`,
+    // Cut here rather than on the client, and at a length that is a paragraph
+    // rather than an essay — this is a note, not a letter.
+    ...(details.message ? { message: details.message.slice(0, 500) } : {}),
+  });
+
+  const sent = await sendEmail({
+    to: details.to,
+    subject: mail.subject,
+    html: mail.html,
+    text: mail.text,
+    /* Keyed on the invitation itself, so a double-clicked button or a retried
+       Server Action cannot post the same invitation into somebody's inbox
+       twice. A *genuine* second invitation carries a new token, so it is
+       correctly sent. See `Message.idempotencyKey`. */
+    idempotencyKey: `book-invite/${details.token}`,
+    /* Replies go to the owner; the message is *from* our verified domain. See
+       `send.ts` — sending as the owner's own address fails DKIM and DMARC and
+       is how a sending domain gets flagged for spoofing. */
+    ...(inviterEmail ? { replyTo: inviterEmail } : {}),
+    ...(inviterName ? { fromName: inviterName } : {}),
+  });
+
+  if (!sent.sent) {
+    // Logged, never surfaced: the writer is told the mail did not go and given
+    // the link, which is the only thing they can act on. The reason is for
+    // whoever is reading the server's output.
+    console.error(
+      `[collab] invitation email not sent (${sent.reason}): ${sent.detail ?? ""}`,
+    );
+  }
+  return sent.sent;
 }
 
 /**
@@ -816,7 +976,9 @@ export async function leaveBook(bookId: string): Promise<CollabResult> {
 }
 
 /** Declining from the dashboard, where the row's id is all the browser has. */
-export async function declineOwnInvite(memberId: string): Promise<CollabResult> {
+export async function declineOwnInvite(
+  memberId: string,
+): Promise<CollabResult> {
   if (!isAdminConfigured()) {
     return { error: "Sharing isn't available on this server." };
   }

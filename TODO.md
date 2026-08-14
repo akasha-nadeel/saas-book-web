@@ -1522,6 +1522,75 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **The landing page's "Not built yet" section — "What comes after that"** —
+  removed **2026-08-14** at the owner's request. The owner asked to be reminded
+  of it in future sessions, so it is here and in the assistant's memory both.
+
+  It was three dashed cards under a centred header, each headed **Not built**,
+  over the lead: *"Listed so you can hold us to the difference between a plan
+  and a product. No dates: a date is a promise with a number on it."* `LATER`,
+  the array behind it, was deleted with it rather than kept callerless — three
+  strings and a `.map` is the case CLAUDE.md distinguishes from
+  `templates-dialog.tsx`, and an unused const buys nothing but a lint warning.
+  So the entries are kept **verbatim here**, which makes rebuilding it a paste:
+
+  1. **A real print-ready PDF** — "Today's PDF is the browser's print engine,
+     which we say wherever it appears: no bleed, no crop marks, no CMYK. A
+     printer's file needs a real PDF library and is a project of its own."
+  2. **Sales reports without a detour** — "Track reads CSV, and KDP downloads
+     .xlsx — so today you open it and save it again. Reading the spreadsheet
+     directly is the whole of the difference."
+  3. **Your tools on your second machine** — "Your books and chapters sync. The
+     ledger, the story bible and the advance-copy list do not yet, so a writer
+     on a laptop and a desktop keeps two of each. Every screen with one says so
+     on it."
+
+  **What went with it, and it is the part worth not re-deriving.** The section
+  enforced a rule that fails quietly: *nothing stays under that badge once it
+  ships.* The list had carried the series bible, ranked comps and the
+  book-three curve until each landed, and a page still promising a shipped
+  feature says something untrue in the one section whose whole job was being
+  trustworthy about the difference. It also had a companion rule — when
+  something comes off, put something real in its place rather than shortening
+  the list, because three honest absences buy more than two.
+
+  With the section gone there is nothing to walk when a feature ships, which is
+  a maintenance burden lifted. The exposure it leaves is the mirror image:
+  **an unbuilt feature named anywhere on that page is now a promise with no
+  section admitting it is one.** All three absences above are still stated
+  where they actually bite — the PDF's limits wherever the PDF is named, and
+  the tool stores' not syncing on every screen that has one — so the page is
+  honest as it stands. Rebuilding the section is the answer if that ever stops
+  being true.
+
+- **Refusal 01's computed figure — `CoverCheckFigure`** — replaced by a
+  photograph of the covers screen on **2026-08-14** at the owner's request.
+  Settled rather than owed, but it is the most expensive of the page's five
+  bitmaps and the cost belongs here as well as beside the code.
+
+  It was not a *drawing* of that screen. It **ran `coverReport()`** over a
+  fixed 500 × 800 PNG, so every row, every label and the count in its summary
+  line were the checker's own answers — change a rule in `cover-check.ts` and
+  the picture changed with it. It could not go stale because there was nothing
+  in it to drift. `CoverCheckShot` in `landing-page.tsx` can, in the usual way:
+  **when the covers screen moves, nothing fails and nothing warns — the picture
+  starts lying.** Re-shoot `public/cover-check-screen.webp` when the deck, the
+  check rows or their wording change, and especially when a rule is added to
+  `cover-check.ts`, since the shot's own caption counts seven checks. Shoot it
+  at about **1.3:1** — the window is `fill`ed to the row's height like the
+  other two, and a wider crop leaves a band of white glass under it that reads
+  as a screenshot which failed to load.
+
+  The component is kept whole and callerless in `refusal-figures.tsx`, so
+  putting the computed version back is one word at the call site. Two details
+  in the replacement are deliberate and easy to undo by accident: it is the
+  only figure in that section with the **black bezel** (a photograph already
+  carries the app's own white card in its pixels, so a pale ring on a tinted
+  card reads as a rectangle of the wrong background), and it is **lossless
+  WebP served `unoptimized`** — `next/image` at its default quality 75 fringes
+  every letter of a screenshot of type, on the one figure whose job is that
+  the checks in it can be read.
+
 - **Two landing sections — "Three phases. Writing is one." and the "Before you
   upload" panel** — removed **2026-08-14** at the owner's request. Settled
   rather than owed: nothing in either is missing from the page.

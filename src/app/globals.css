@@ -231,6 +231,19 @@
   --color-badge-blue-line: #24365f;
   --color-badge-blue-ink: #93c5fd; /* 10.0:1 */
 
+  /* A fourth part, and the only one in the family that is a *ground for a
+     control* rather than for a label. It exists because the covers screen's
+     fix panel is itself `-bg`, and a button on that ground cannot be told from
+     it by a hairline of `-line`: one step deeper into the same hue is what
+     separates them, with `-ink` still carrying the words (5.2:1 by day,
+     7.7:1 at night).
+
+     Unlike `--color-upgrade-*`, this belongs to its theme and is stated
+     differently in each block — it is a tint, and a tint is a ground. A pale
+     blue slab on #000 is a hole in the page, the same reasoning that governs
+     the three above it. */
+  --color-badge-blue-soft: #1c2c4d;
+
   --color-badge-pro-bg: #1a1130;
   --color-badge-pro-line: #3b1f6b;
   --color-badge-pro-ink: #d8b4fe; /* 9.1:1 */
@@ -712,6 +725,10 @@
   --color-badge-blue-bg: #eff6ff;
   --color-badge-blue-line: #bfdbfe;
   --color-badge-blue-ink: #1d4ed8; /* 6.4:1 */
+  /* The control ground — see the note in the dark block. A step deeper than
+     `-bg` so a button reads as a button on a panel of `-bg`, and light enough
+     that `-ink` still clears 5.2:1 on it. */
+  --color-badge-blue-soft: #bfdbfe;
 
   --color-badge-pro-bg: #faf5ff;
   --color-badge-pro-line: #e9d5ff;

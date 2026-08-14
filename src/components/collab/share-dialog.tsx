@@ -22,7 +22,11 @@ import { seatAllowance, spentLine } from "@/lib/free-limits";
 import { relativeTime, timeUntil } from "@/lib/relative-time";
 import { useMembers } from "@/lib/use-collab";
 import { usePlan } from "@/lib/use-plan";
-import { LeftPill, LimitBanner, LimitDialog } from "@/components/upgrade/free-limit";
+import {
+  LeftPill,
+  LimitBanner,
+  LimitDialog,
+} from "@/components/upgrade/free-limit";
 import { Spinner } from "@/components/ui/spinner";
 import { Menu, MenuButton, MenuSeparator } from "@/components/ui/menu";
 import { InviteSentDialog } from "./invite-sent-dialog";
@@ -45,12 +49,20 @@ import { InviteSentDialog } from "./invite-sent-dialog";
  * is enforced in SQL under a row lock, so the answer to "did that work" genuinely
  * is the server's to give.
  *
- * **The link is copied, never emailed.** This app sends no transactional mail —
- * Supabase Auth sends its own and nothing else does — so the owner gets a link to
- * pass on however they like, and the invitation also appears in the invitee's own
- * dashboard. Nowhere may this say an email was sent. The link is a *pointer, not a
- * credential*: accepting requires being signed in as the invited address with it
- * confirmed, so a forwarded link grants nothing.
+ * **The invitation is emailed *and* the link is offered, and the rule about
+ * what may be claimed is unchanged.** For most of this feature's life nothing
+ * was sent: the owner copied a link, and an invited writer with no account had
+ * no dashboard to find the invitation in, so the second half of that promise
+ * never worked for the person it was aimed at. Mail is sent now — see
+ * `email/invite.ts` — but it is **best-effort**, so this dialog may still never
+ * say an email went out unless the server said it did. `emailed` comes back
+ * from `inviteMember` for exactly that reason, and the link is offered either
+ * way, because the two fail in different places: mail is filtered and delayed,
+ * a link needs a channel to travel down.
+ *
+ * The link is a *pointer, not a credential*, which is what makes it safe to put
+ * in an inbox at all: accepting requires being signed in as the invited address
+ * with it confirmed, so a forwarded message grants nothing.
  *
  * **It says what a co-writer will not get.** The tool stores do not sync, so a
  * collaborator sees none of the owner's story bible, advance readers, ledger or
@@ -95,15 +107,30 @@ export function ShareDialog({
    * The invitation that has just been made, held so its link can be handed over.
    *
    * It used to be copied to the clipboard silently and confirmed with a green
-   * line, which is a receipt for a job that is not finished: no email is sent, so
-   * until that link reaches somebody the invitation has gone nowhere. The dialog
-   * is what makes the handover the visible last step rather than a side effect.
+   * line, which is a receipt for a job that may not be finished: if the email did
+   * not go, the invitation has gone nowhere until that link reaches somebody. The
+   * dialog is what makes the handover a visible step rather than a side effect,
+   * and `emailed` is what decides which of the two things it is reporting.
    */
   const [sent, setSent] = useState<{
     email: string;
     role: CollabRole;
     link: string;
+    /** Whether the invitation email actually went — see `CollabResult`. */
+    emailed: boolean;
   } | null>(null);
+
+  /*
+   * The owner's optional note, quoted in the email above the button.
+   *
+   * Google Docs, Figma and Dropbox all offer one, and it earns its place for a
+   * reason that is not politeness: an unexpected email from a product the
+   * recipient has never heard of, with a link in it, is indistinguishable from
+   * phishing. One line in the sender's own voice is the cheapest thing that
+   * makes it plainly real. Cleared with the address on a successful invite, so
+   * the next person does not silently inherit the last one's note.
+   */
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -148,7 +175,7 @@ export function ShareDialog({
 
     setBusy(true);
     setProblem(null);
-    const result = await inviteMember(bookId, email, role);
+    const result = await inviteMember(bookId, email, role, message);
     setBusy(false);
 
     if ("error" in result) {
@@ -156,7 +183,17 @@ export function ShareDialog({
       return;
     }
     setEmail("");
-    if (result.link) setSent({ email: normalizeEmail(email), role, link: result.link });
+    setMessage("");
+    if (result.link) {
+      setSent({
+        email: normalizeEmail(email),
+        role,
+        link: result.link,
+        // `emailed` is absent on any result that is not an invitation, and
+        // absent is not "sent" — the dialog may only claim what came back true.
+        emailed: result.emailed === true,
+      });
+    }
     refresh();
   }
 
@@ -168,7 +205,9 @@ export function ShareDialog({
     } catch {
       // A browser that refuses the clipboard is not a failure worth a banner;
       // the row still offers the button and the writer can try again.
-      setProblem("Could not reach the clipboard. Try the Copy link button again.");
+      setProblem(
+        "Could not reach the clipboard. Try the Copy link button again.",
+      );
     }
   }
 
@@ -215,11 +254,13 @@ export function ShareDialog({
         <div className="px-6 py-8">
           <p className="font-bold text-fg">Sharing isn&rsquo;t set up yet.</p>
           <p className="mt-2 text-sm text-muted">
-            The <code>book_members</code> table could not be read. If this is your
-            own server, apply{" "}
+            The <code>book_members</code> table could not be read. If this is
+            your own server, apply{" "}
             <code>supabase/migrations/20260806000000_collaboration.sql</code>.
           </p>
-          <p className="mt-3 font-mono text-xs break-words text-muted">{error}</p>
+          <p className="mt-3 font-mono text-xs break-words text-muted">
+            {error}
+          </p>
         </div>
       ) : (
         /*
@@ -247,7 +288,10 @@ export function ShareDialog({
             }}
           >
             <div className="flex items-end justify-between gap-3">
-              <label htmlFor="share-email" className="text-sm font-bold text-fg">
+              <label
+                htmlFor="share-email"
+                className="text-sm font-bold text-fg"
+              >
                 Invite someone
               </label>
               {/* Silent while there is room to spare — see WARN_WHEN_LEFT. */}
@@ -296,11 +340,59 @@ export function ShareDialog({
                 changed under the reader's eyes as they used the dropdown and ran
                 to three lines. What the role does now lives beside the role, in
                 the dropdown's own options; what is left here is the one fact the
-                dropdown cannot carry — that no email is sent. */}
+                dropdown cannot carry — what actually happens on the press.
+
+                **It used to say no email was sent, because none was.** That is
+                the sentence this feature changed; see `email/invite.ts` for
+                why. It still promises only what the press guarantees: the
+                invitation and the link are certain, the mail is not, and
+                whether it went is reported afterwards rather than assumed
+                here. */}
             <p className="mt-2 text-xs text-muted">
-              You&rsquo;ll get a link to send them yourself. It works only for
-              that address and lasts {INVITE_DAYS} days.
+              We&rsquo;ll email them an invitation, and you&rsquo;ll get a link
+              to send on as well. It works only for that address and lasts{" "}
+              {INVITE_DAYS} days.
             </p>
+
+            {/* **The note, optional and collapsed until wanted.**
+                A `<details>` rather than a permanent textarea: the field is
+                genuinely optional, and a second empty box under the address is
+                a form that looks twice as long as the job. Google Docs, Figma
+                and Dropbox all put it behind the same one-click reveal.
+
+                It is not merely a nicety. An unexpected email from a product
+                the recipient has never heard of, carrying a link, reads
+                exactly like phishing — a line in the sender's own voice is the
+                cheapest thing that makes it plainly real. */}
+            <details className="mt-2.5 group">
+              <summary
+                className="cursor-pointer list-none text-xs font-semibold text-muted
+                           outline-none transition-colors hover:text-fg
+                           focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                Add a message
+                <span
+                  aria-hidden="true"
+                  className="ml-1 inline-block transition-transform group-open:rotate-90"
+                >
+                  ›
+                </span>
+              </summary>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={2}
+                /* Matched to the cut in `inviteMember`, which is the one that
+                   binds — a Server Action's arguments are whatever the caller
+                   chose to send, so this is a courtesy rather than a limit. */
+                maxLength={500}
+                placeholder="Chapter nine is the one I'd like your eye on."
+                aria-label="A message to send with the invitation"
+                className="mt-2 w-full resize-y rounded-lg border border-line bg-surface
+                           px-3 py-2 text-sm text-fg outline-none placeholder:text-muted
+                           focus-visible:ring-2 focus-visible:ring-accent/50"
+              />
+            </details>
 
             {problem && (
               <p role="alert" className="mt-2.5 text-sm text-stop-fg">
@@ -414,8 +506,8 @@ export function ShareDialog({
               already do the separating that hairline was doing. */}
           <div className="px-1 pt-1">
             <p className="text-xs text-muted">
-              Chapters and their notes sync. Your story bible, ledger and writing
-              record do not.
+              Chapters and their notes sync. Your story bible, ledger and
+              writing record do not.
             </p>
             <details className="group mt-1.5">
               <summary
@@ -440,9 +532,9 @@ export function ShareDialog({
               <div className="mt-2 space-y-2 text-xs leading-relaxed text-muted">
                 <p>
                   Your story bible, advance readers, the ledger, your writing
-                  record and your roadmap ticks stay on your own machine. None of
-                  those sync between machines for anybody, so a co-writer sees
-                  none of yours.
+                  record and your roadmap ticks stay on your own machine. None
+                  of those sync between machines for anybody, so a co-writer
+                  sees none of yours.
                 </p>
                 <p>
                   Full-size cover artwork does not travel either, so if they
@@ -460,7 +552,10 @@ export function ShareDialog({
       )}
 
       {showLimit && (
-        <LimitDialog action="collaborators" onClose={() => setShowLimit(false)} />
+        <LimitDialog
+          action="collaborators"
+          onClose={() => setShowLimit(false)}
+        />
       )}
 
       {/* Over the share dialog, which browsers stack in the top layer — the same
@@ -470,6 +565,7 @@ export function ShareDialog({
           email={sent.email}
           role={sent.role}
           link={sent.link}
+          emailed={sent.emailed}
           onClose={() => setSent(null)}
         />
       )}
@@ -519,10 +615,11 @@ function Disc({
  * `Menu` is the app's own primitive, so this inherits its keyboard and dismissal
  * behaviour rather than reimplementing it.
  *
- * Copy link stays visible for a pending invitation rather than joining the menu:
- * we send no email, so that link is the *only* way the invitation reaches
- * anybody. Hiding the one thing that makes the feature work behind a chevron
- * would be tidiness bought at the cost of the thing itself.
+ * Copy link stays visible for a pending invitation rather than joining the menu.
+ * The email is best-effort — it can be refused, filtered or never configured at
+ * all — so this link is what the owner reaches for when it did not arrive.
+ * Hiding the fallback for the one thing that can silently fail behind a chevron
+ * would be tidiness bought at the cost of the feature.
  */
 function MemberRow({
   member,
@@ -551,7 +648,9 @@ function MemberRow({
       </Disc>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-fg">{member.name ?? member.email}</p>
+        <p className="truncate text-sm text-fg">
+          {member.name ?? member.email}
+        </p>
         {pending ? (
           <p className="text-xs text-muted">
             Invited · expires {timeUntil(member.expiresAt)}

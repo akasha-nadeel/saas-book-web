@@ -10,6 +10,7 @@ import {
 } from "@/lib/image-import";
 import {
   bookWordCount,
+  setBareCover,
   setBookDetails,
   type Book,
 } from "@/lib/library-store";
@@ -51,6 +52,10 @@ export function CoverDialog({
      chosen, or cancelling would leave artwork behind for a cover that was
      never set. See `saveCover`. */
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  /* Whether the artwork is left alone — see `setBareCover`. In the draft like
+     everything else here, so the preview beside the fields answers before the
+     writer commits to it. */
+  const [bare, setBare] = useState(Boolean(book.bareCover));
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,6 +68,11 @@ export function CoverDialog({
     e.preventDefault();
 
     setBookDetails(book.id, { title, subtitle, author, genre });
+
+    /* Only when it moved. `setBareCover` is a commit of its own — a second
+       shelf write, a second fan-out and a second push — and saving a retyped
+       subtitle should not spend one on a field nobody touched. */
+    if (bare !== Boolean(book.bareCover)) setBareCover(book.id, bare);
 
     if (coverFile) {
       // One call sets all three: the thumbnail, the full-size artwork the
@@ -102,6 +112,7 @@ export function CoverDialog({
               author={author.trim() || undefined}
               words={bookWordCount(book)}
               image={preview}
+              bare={bare}
               seed={book.id}
             />
           </div>
@@ -177,13 +188,23 @@ export function CoverDialog({
               </span>
             </label>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              {/* **Filled with `bg-fg`/`text-surface`, never a literal black.**
+                  The same pair the covers tool's "Check another" uses, and for
+                  the same reason: the two tokens invert *with* the palette, so
+                  this is near-black carrying white by day and near-white
+                  carrying black at night — where a typed `bg-black text-white`
+                  is a black hole in a black screen after sunset, which is the
+                  one way to get a filled control wrong here.
+
+                  It is not `bg-accent`: the accent means "the way forward",
+                  and the way forward on this dialog is Save. */}
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
-                className="rounded-md border border-line px-3 py-2 font-sans
-                           text-sm text-fg outline-none transition-colors
-                           hover:border-accent/60 hover:bg-raised
+                className="rounded-md bg-fg px-3 py-2 font-sans text-sm
+                           font-medium text-surface outline-none
+                           transition-opacity hover:opacity-90
                            focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 {preview ? "Replace image" : "Choose image"}
@@ -194,17 +215,76 @@ export function CoverDialog({
                   onClick={() => {
                     setNextCover(null);
                     setCoverFile(null);
+                    /* The words come back with the artwork's departure. A
+                       typeset face *is* the title, so a book left "bare" with
+                       no picture would be a blank cloth cover with nothing on
+                       it — and the flag would then lie in wait for the next
+                       image, hiding the title on artwork nobody had said that
+                       about. */
+                    setBare(false);
                     setError(null);
                   }}
+                  /* Quiet until hovered, then the status family's red. It
+                     throws the artwork away, so it carries the danger colour —
+                     but sitting permanently red beside a filled control it
+                     would read as the primary action of the pair, which it is
+                     the opposite of. Same treatment as the covers tool's own
+                     Remove. */
                   className="rounded-md px-3 py-2 font-sans text-sm text-muted
-                             outline-none transition-colors hover:bg-raised
-                             hover:text-fg focus-visible:ring-2
+                             outline-none transition-colors hover:bg-stop-bg
+                             hover:text-danger focus-visible:ring-2
                              focus-visible:ring-accent/60"
                 >
                   Remove image
                 </button>
               )}
             </div>
+
+            {/* **Whose words go on the front.**
+
+                A designed jacket already carries the title, the subtitle and
+                the byline, set by somebody who chose where they sit — and the
+                shelf printed ours over the top of theirs, which is worse than
+                showing nothing. `bareCover` and every reader of it have been
+                in the store since the field was added; what was missing was
+                anywhere to say so. This is that control, and it is here rather
+                than on the covers tool because the question is about the
+                *relationship* between the three fields above and the picture
+                beside them — both are on this screen and nowhere else at once.
+
+                Only with artwork, because `BookCover` ignores it without: a
+                typeset face is the title, so hiding the words there would
+                leave a blank cloth cover.
+
+                The hint is not a nicety. The fields stay in the book and go on
+                driving the EPUB's metadata, the title page and the shop
+                listing — this changes the picture and nothing else — and a
+                writer who reads "hide the title" without that has every reason
+                to think they are deleting it. */}
+            {preview && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={bare}
+                onClick={() => setBare(!bare)}
+                className="mt-4 flex w-full items-start gap-3 rounded-md border
+                           border-line px-3 py-3 text-left outline-none
+                           transition-colors hover:bg-raised
+                           focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                <SwitchTrack on={bare} />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-sans text-sm font-medium text-fg">
+                    The artwork already has the words on it
+                  </span>
+                  <span className="mt-0.5 block font-sans text-xs text-muted">
+                    Show the picture as it is, with no title, subtitle or author
+                    printed over it. The fields above are still used for the
+                    shops and the exported book.
+                  </span>
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -273,5 +353,36 @@ export function CoverDialog({
         </div>
       </form>
     </dialog>
+  );
+}
+
+/**
+ * The track and thumb behind the one switch on this dialog.
+ *
+ * Drawn here rather than pulled into `ui/`, which is deliberately two files
+ * wide and takes a primitive on the third copy rather than the second: the
+ * export wizard has the only other one. If a third screen wants a switch, that
+ * is the moment to extract this and `SwitchTrack` in `export-page.tsx`
+ * together — not before.
+ *
+ * `bg-accent` with an `accent-ink` thumb, because the fill is white at night
+ * and near-black by day; a fixed `bg-white` thumb is invisible in exactly one
+ * theme, which is the half nobody tests.
+ */
+function SwitchTrack({ on }: { on: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5
+                  transition-colors ${
+                    on ? "bg-accent" : "bg-raised ring-1 ring-line ring-inset"
+                  }`}
+    >
+      <span
+        className={`h-4 w-4 rounded-full transition-transform ${
+          on ? "translate-x-4 bg-accent-ink" : "bg-muted"
+        }`}
+      />
+    </span>
   );
 }

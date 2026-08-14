@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { useMyInvites } from "@/lib/use-collab";
-import {
-  InviteWaitingDialog,
-  shouldAnnounce,
-} from "./invite-waiting-dialog";
+import { InviteWaitingDialog, shouldAnnounce } from "./invite-waiting-dialog";
 
 /**
  * The dashboard's one standing question: has anybody invited me?

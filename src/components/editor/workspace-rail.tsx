@@ -1,6 +1,11 @@
 "use client";
 
-import { Rail, RailButton, icons } from "@/components/editor/icon-rail";
+import {
+  Rail,
+  RailButton,
+  RailDivider,
+  icons,
+} from "@/components/editor/icon-rail";
 import { PANEL_TITLES, type PanelTab } from "@/components/editor/left-panel";
 
 /**
@@ -73,10 +78,6 @@ const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
   trash: icons.trash,
 };
 
-function Divider() {
-  return <span aria-hidden="true" className="my-1 h-px w-6 bg-line" />;
-}
-
 /**
  * The left rail shared by the chapter editor and the book overview.
  *
@@ -142,7 +143,7 @@ export function WorkspaceRail({
       side="left"
       footer={
         <>
-          <Divider />
+          <RailDivider />
           {FOOTER.filter(allowed).map(tabButton)}
         </>
       }
@@ -168,7 +169,7 @@ export function WorkspaceRail({
           <RailButton label="Show panel" onClick={() => onPanel(true)}>
             {icons.panel}
           </RailButton>
-          <Divider />
+          <RailDivider />
         </>
       )}
 
@@ -184,7 +185,7 @@ export function WorkspaceRail({
 
       {groups.map((group, i) => (
         <div key={i} className="flex flex-col items-center gap-2">
-          <Divider />
+          <RailDivider />
           {group.map(tabButton)}
         </div>
       ))}

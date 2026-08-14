@@ -364,15 +364,18 @@ export function ArcScreen() {
 const EPUB_OPENS = DESTINATIONS.filter((d) => d.format === "EPUB");
 
 /**
- * **Nothing renders this since 2026-08-14**, and it stays — the publishing row
- * carries a photograph of the real export screen now (`PublishShot` in
- * `landing-page.tsx`), at the owner's request and on the same terms as the
- * three rows that went that way before it.
+ * **Nothing renders this since 2026-08-14**, and it stays. The publishing row
+ * went to a photograph of the export screen that day and came off it the same
+ * day — `ExportScreen` in `export-screen.tsx` draws that screen now, at the
+ * row's full width.
  *
- * Keep it. The thing it does that a bitmap cannot is the `EPUB_OPENS` filter
- * above: those three shop names are `DESTINATIONS` read through the export's
- * own rule, so this drawing could never name a shop the export does not reach.
- * Putting it back is one line in `ORDER_SCREENS`.
+ * Keep this anyway, and note it is a *different figure* rather than the same
+ * one smaller: it draws the finished file and the shops it opens in, where the
+ * other draws the step the writer is standing on. The thing it does that
+ * neither a bitmap nor that drawing does is the `EPUB_OPENS` filter above —
+ * those shop names are `DESTINATIONS` read through the export's own rule, so
+ * this can never name a shop the export does not reach. Putting it back is one
+ * line in `ORDER_SCREENS`.
  */
 export function PublishScreen() {
   return (
