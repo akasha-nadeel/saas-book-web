@@ -20,7 +20,7 @@ import {
 } from "@/lib/collab";
 import { seatAllowance, spentLine } from "@/lib/free-limits";
 import { relativeTime, timeUntil } from "@/lib/relative-time";
-import { useMembers } from "@/lib/use-collab";
+import { useMemberFaces, useMembers } from "@/lib/use-collab";
 import { usePlan } from "@/lib/use-plan";
 import {
   LeftPill,
@@ -80,6 +80,11 @@ export function ShareDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const { members, loading, error, refresh } = useMembers(bookId);
+  /* Names and photos for the people on this book. Already fetched for the
+     dashboard's face pile and cached at module scope, so asking here costs
+     nothing extra — the dialog simply never asked, and showed an initial for
+     somebody whose photo was already on screen one panel away. */
+  const faces = useMemberFaces();
   const plan = usePlan();
 
   const [email, setEmail] = useState("");
@@ -477,6 +482,7 @@ export function ShareDialog({
                   }}
                   onRole={(next) => void act(() => changeRole(m.id, next))}
                   onRemove={() => void act(() => removeMember(m.id))}
+                  face={m.userId ? faces[m.userId] : undefined}
                 />
               ))}
             </ul>
@@ -593,8 +599,11 @@ function Disc({
   return (
     <span
       aria-hidden="true"
-      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full
-                  text-[11px] font-semibold ${look}`}
+      /* `relative` and `overflow-hidden` so a photo can be laid over the
+         initial and clipped to the circle — the initial stays underneath as
+         the fallback for an image that never loads. */
+      className={`relative flex h-7 w-7 shrink-0 items-center justify-center
+                  overflow-hidden rounded-full text-[11px] font-semibold ${look}`}
     >
       {children}
     </span>
@@ -628,6 +637,7 @@ function MemberRow({
   onCopy,
   onRole,
   onRemove,
+  face,
 }: {
   member: Member;
   busy: boolean;
@@ -635,22 +645,46 @@ function MemberRow({
   onCopy: () => void;
   onRole: (role: CollabRole) => void;
   onRemove: () => void;
+  /** Their name and photo, once they have an account to take one from. */
+  face?: { name: string | null; avatarUrl: string | null };
 }) {
   const state = memberState(member);
   const pending = state === "pending";
   const expired = state === "expired";
-  const initial = (member.name ?? member.email).trim().charAt(0).toUpperCase();
+  const shownName = face?.name ?? member.name ?? null;
+  const initial = (shownName ?? member.email).trim().charAt(0).toUpperCase();
+  /* No photo for somebody who has not accepted yet: a pending invitation is an
+     *address*, not a person, and putting a face on it says they are on the
+     book when they have not answered. The face pile makes the same call. */
+  const photo = pending || expired ? null : (face?.avatarUrl ?? null);
 
   return (
     <li className="flex items-center gap-3 py-2.5">
       <Disc tone={pending || expired ? "pending" : "member"}>
         {initial || "?"}
+        {photo && (
+          /* A plain <img> rather than next/image: these are arbitrary provider
+             hosts (googleusercontent today, whatever comes next tomorrow) and
+             every one would need adding to the image config. Drawn *over* the
+             initial rather than instead of it, so a photo that fails to load
+             falls back to a letter rather than a hole. */
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photo}
+            alt=""
+            className="absolute inset-0 h-full w-full rounded-full object-cover"
+          />
+        )}
       </Disc>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-fg">
-          {member.name ?? member.email}
-        </p>
+        <p className="truncate text-sm text-fg">{shownName ?? member.email}</p>
+        {/* The address under the name, where a name is known: two people can
+            share a display name and only the address tells them apart — which
+            is the whole question this list answers. */}
+        {shownName && (
+          <p className="truncate text-xs text-muted">{member.email}</p>
+        )}
         {pending ? (
           <p className="text-xs text-muted">
             Invited · expires {timeUntil(member.expiresAt)}

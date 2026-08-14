@@ -259,7 +259,7 @@ ${
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
           <tr>
             <td style="background:#312e81;border-radius:8px;">
-              <a href="${escapeHtml(details.link)}" style="display:inline-block;padding:15px 30px;font-size:16px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;">Open ${escapeHtml(details.bookTitle)}</a>
+              <a href="${escapeHtml(details.link)}" style="display:inline-block;padding:15px 30px;font-size:16px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;">Open the book</a>
             </td>
           </tr>
         </table>

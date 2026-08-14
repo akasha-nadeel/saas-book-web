@@ -76,6 +76,12 @@ export function Menu({
     left: number;
     maxHeight: number;
   } | null>(null);
+  /* Where the open menu is portalled to, decided when it opens rather than
+     during render — see `portalHost`. Reading a ref while rendering is both a
+     lint error and a real hazard: the value is not tracked, so a menu opened
+     before the ref settled would portal to the wrong place and never correct
+     itself. Chosen in the click handler, where refs are safe to read. */
+  const [host, setHost] = useState<HTMLElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -202,7 +208,10 @@ export function Menu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        onClick={() => setOpen((was) => !was)}
+        onClick={() => {
+          if (!open) setHost(portalHost(triggerRef.current));
+          setOpen((was) => !was);
+        }}
         className={triggerClassName}
       >
         {trigger}
@@ -240,10 +249,41 @@ export function Menu({
           >
             {children(close)}
           </div>,
-          document.body,
+          host ?? document.body,
         )}
     </>
   );
+}
+
+/**
+ * Where the menu is portalled to — and why it is not always `document.body`.
+ *
+ * **A `<dialog>` opened with `showModal()` lives in the browser's *top
+ * layer*.** That is the property the app relies on elsewhere: it is what lets
+ * the export's done dialog clear the roadmap's sheet and the export rail
+ * without any z-index keeping in step with them. The top layer is above the
+ * whole normal stacking context, and `z-index` cannot reach it — 50, 9999 or a
+ * million all lose.
+ *
+ * So a menu portalled to `document.body` from *inside* a modal dialog opens
+ * correctly, is positioned correctly, and is painted **behind the dialog's
+ * backdrop** — invisible and unclickable. It reads as a dropdown that does not
+ * work. That was the share dialog's role control, which is also where Remove
+ * lives, so one stacking mistake made a member impossible to remove *and* made
+ * their role impossible to change.
+ *
+ * The fix is to join the dialog in the top layer rather than fight it: portal
+ * into the open `<dialog>` ancestor when there is one, and to `document.body`
+ * otherwise. `position: fixed` still resolves against the viewport inside a
+ * top-layer element, so the measured coordinates need no adjustment.
+ *
+ * `open` is checked rather than assumed: a `<dialog>` rendered but not shown
+ * is an ordinary element, and portalling into a hidden one would hide the
+ * menu just as thoroughly.
+ */
+function portalHost(trigger: Element | null): HTMLElement {
+  const dialog = trigger?.closest("dialog");
+  return dialog?.open ? dialog : document.body;
 }
 
 const ITEM =
