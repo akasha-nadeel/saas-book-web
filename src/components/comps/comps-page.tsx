@@ -695,10 +695,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
             from={summary.pagesFrom}
             words={bookWordCount(book)}
             target={book.targetWords}
-            folklore={suggestTarget(
-              book.kind ?? "novel",
-              book.genre ?? "Other",
-            )}
+            folklore={suggestTarget(book.genre ?? "Other")}
             onUseTarget={(words) => setTargetWords(book.id, words)}
           />
         )}

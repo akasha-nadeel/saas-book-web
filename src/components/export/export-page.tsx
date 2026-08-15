@@ -42,15 +42,8 @@ import {
   trimMargins,
   type TypesetOptions,
 } from "@/lib/export/typeset";
-import {
-  bookChapterCount,
-  bookWordCount,
-  chapterMatterOf,
-  findBook,
-  type Book,
-} from "@/lib/library-store";
+import { chapterMatterOf, findBook, type Book } from "@/lib/library-store";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
-import { BookCover } from "@/components/shelf/book-cover";
 import { storeReadiness } from "@/lib/publishing";
 import { type ToolPageProps } from "@/lib/tool-page";
 import { areaLabel } from "@/lib/areas";
@@ -193,7 +186,9 @@ function stepsFor(output: Format | null): Step[] {
         group: "Formatting",
         label: "Page and chapters",
         title:
-          output === "epub" ? "How a chapter opens" : "The page and the chapters",
+          output === "epub"
+            ? "How a chapter opens"
+            : "The page and the chapters",
         blurb:
           // An e-reader picks its own page, so there is no page size to set —
           // and a deck promising one on a step that cannot offer it is the
@@ -419,6 +414,14 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   // it is a question waiting for an answer.
   const last = output !== null && index === steps.length - 1;
 
+  /* **Which steps put a page beside their controls.** These two are the ones
+     whose every control lands on the sheet, and they are also the only ones
+     the sheet can honestly illustrate: a format card is a picture of its own,
+     and the front-matter step draws the pages it makes. Named here rather
+     than asked inside the two components because the layout above it — one
+     column or two — is a decision about the whole screen. */
+  const showSheet = step.id === "template" || step.id === "layout";
+
   const go = (next: number) => {
     setStepId(steps[Math.min(steps.length - 1, Math.max(0, next))].id);
     // A step change is a new screen; the old one's scroll position is not it.
@@ -438,7 +441,12 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     setBusy(true);
     setError(null);
     try {
-      const file = await runExport({ book, format: output, manuscript, typeset });
+      const file = await runExport({
+        book,
+        format: output,
+        manuscript,
+        typeset,
+      });
       // Null is the PDF, which went to the browser's print dialog rather than
       // to a file we made.
       if (file) setDone({ format: output, ...file });
@@ -470,31 +478,49 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     // the desk the same card is an object with an edge, in both themes and by
     // the palette's own elevation logic rather than by adding a shadow.
     //
-    // The export screen keeps its own rail in the panel rather than taking the
-    // `toolShell` helper: this one is already a two-pane layout and the rail is
-    // the step list, not chrome. Only the height claim changes.
+    // The export screen does not take the `toolShell` helper: it is a wizard
+    // with a band of its own rather than a page with a heading. Only the
+    // height claim changes.
     <main
-      className={`flex ${embedded ? "h-full" : "h-dvh"} overflow-hidden bg-surface`}
+      className={`flex ${embedded ? "h-full" : "h-dvh"} flex-col overflow-hidden bg-surface`}
     >
-      {/* No rail in the panel.
+      {/* **The rail is gone and this band replaces it.**
 
-          The rail is this screen's table of contents, and it earns its 18rem
-          when the screen owns the window. Inside the roadmap's panel it is a
-          sidebar within a sidebar: the roadmap is already the navigation on
-          the left, the panel is already half the width, and the rail took most
-          of what was left — the format cards ended up in a column narrow
-          enough to break "How do you want it?" over three lines.
+          It was an 18rem column down the left carrying the step list, the
+          book, the readiness count and the two escapes — and it cost the
+          width that the thing being set up needs. These steps *set a page*,
+          and the page they set is four hundred pixels wide: with a rail taking
+          18rem, the sheet had nowhere to go but underneath the controls, so a
+          writer flipping a switch scrolled to see what it did. Laid along the
+          top instead, the same information takes a band and hands back a
+          column, and the controls and the preview sit side by side where a
+          switch and its lamp belong.
 
-          Nothing is lost that the writer needs there. The rail's job is
-          *where am I and what is left*, and the header below answers both in a
-          line; its steps are reachable with Previous and Continue, which is
-          how a wizard is walked anyway. The book chip and "All tools" are
-          chrome the panel already provides. */}
-      {!embedded && (
-        <Rail
-          book={book}
-          bookId={bookId}
-          cover={cover}
+          It renders in the panel too, unlike the rail, which was hidden there
+          for the reason a sidebar inside a sidebar is: a band is not competing
+          for the panel's width, and it scrolls sideways where it has to. What
+          it drops there is only the chrome the panel already provides. */}
+      {/* **Everything scrolls except the action bar.**
+
+          The band used to be pinned above the scroller, so the window was
+          three fixed strips with a small scrolling middle — on a laptop the
+          steps that carry a sheet had about half the height to move in. The
+          band is *context*: once a writer is working down a step they have
+          read it, and holding it on screen spends height on something already
+          answered. So it scrolls with the page and the whole window becomes
+          the scroll area.
+
+          The action bar stays pinned, and it is the one thing that should be:
+          it is where both directions live, and a wizard's next step is the one
+          control that must never have to be hunted for. `min-h-0` on the
+          scroller is what lets it shrink below its content — a flex item
+          defaults to `min-height: auto`, which is what pushed the bar off the
+          bottom of the window when this box first became a column item. */}
+      <div
+        id="export-scroll"
+        className="scroll-slim min-h-0 min-w-0 flex-1 overflow-y-auto"
+      >
+        <TopBar
           blocking={blocking}
           groups={groups}
           currentId={step.id}
@@ -502,157 +528,152 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           steps={steps}
           onGo={(id) => go(steps.findIndex((s) => s.id === id))}
           from={from}
+          embedded={Boolean(embedded)}
         />
-      )}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* Above this screen's own Back/step header rather than inside it: the
-            step name belongs to the whole export flow, and the header below
-            changes with every step of it. */}
-        {heading && (
-          <div className="shrink-0 px-5 pt-5 md:px-12 md:pt-7">{heading}</div>
-        )}
-        {/* The top row is context, and nothing else acts on the step.
-            Previous used to live here, opposite "Mark step done" — one control
-            that moves you through the wizard and one that does not, sharing a
-            row, with the step's own Continue five hundred pixels below at the
-            end of the form. Walking the flow therefore meant the pointer
-            crossing the screen every step and the two directions never being
-            in the same place at once. Both directions are on the action bar at
-            the foot now; what is left up here is where you are, the way out of
-            the tool, and the road's own tick. */}
-        <header className="flex shrink-0 items-center gap-4 px-5 pt-5 md:px-12 md:pt-7">
-          {/* "Where am I", which the rail carries when there is a rail.
-              Below `lg` there never is one; in the panel there is no longer one
-              either, and a wizard that cannot say which step you are on is a
-              wizard you cannot tell you are near the end of. */}
-          <span
-            className={`font-sans text-xs font-semibold tracking-[0.14em] text-muted uppercase ${
-              embedded ? "" : "lg:hidden"
-            }`}
+        {/* The step name belongs to the whole export flow rather than to the
+            question below it, so it sits between the band and the body. */}
+        {heading && <div className="px-5 pt-5 md:px-12 md:pt-4">{heading}</div>}
+
+        {/* The body's own padding. It is here rather than on the scroller so
+            the band above can run full-bleed to the window's edges — its
+            warning strip is a full-width bar and would otherwise be inset by
+            the body's margin. */}
+        <div className="px-5 py-8 md:px-12 md:py-10">
+          {/* **Two columns on the steps that set a page, one on the rest.**
+
+              `showSheet` is the whole condition, and it is what the band above
+              was widened to pay for: the template and the page-and-chapters
+              steps are a handful of controls whose entire result is the sheet
+              beside them. Stacked, every switch was a switch with the lamp in
+              the next room — the preview sat below a four-hundred-pixel fold,
+              so seeing what "Drop caps" did meant scrolling away from the
+              control that set it.
+
+              The other steps get the measure they always had. A column of
+              format cards or front-matter switches has nothing to sit beside,
+              and a two-column grid with an empty right half is a page with a
+              hole in it. */}
+          <div
+            className={
+              showSheet
+                ? /* 28rem, and the number is measured rather than picked. The
+                     sheet renders at its trim's natural 72px to the inch and
+                     caps there — 432px for a 6in page — and its figure spends
+                     2rem on padding, so a 28rem column hands it 416px and the
+                     preview sits within a few per cent of true size. Narrower
+                     and the whole setting scales down, which is honest but
+                     shows a typeface at a size nobody can judge. `items-start`
+                     is load-bearing for the sticky column: a stretched grid
+                     item is already full height, so sticky never engages. */
+                  "mx-auto grid w-full max-w-6xl gap-8 lg:grid-cols-[minmax(0,1fr)_28rem] lg:items-start lg:gap-10"
+                : "mx-auto w-full max-w-2xl"
+            }
           >
-            {steps.length > 1
-              ? `Step ${index + 1} of ${steps.length}`
-              : "Pick a format"}
-          </span>
-
-          {/* The rail carries this where the rail exists. */}
-          <Link
-            href={`/book/${bookId}`}
-            className="shrink-0 rounded-sm font-sans text-sm text-muted
-                       outline-none transition-colors hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/60 lg:hidden"
-          >
-            Back to writing
-          </Link>
-
-          {/* This screen never took `ToolHeader` — it is a two-pane wizard
-              rather than a page with a heading — so the control the other
-              tools get from that component is placed by hand, on the one row
-              present in every frame and on every step.
-
-              The margin moved off the link and on to this: the link is
-              `lg:hidden`, and an auto margin on a `display:none` element
-              pushes nothing, so above `lg` the button would have sat next to
-              the step count. Two auto margins in one row is the other wrong
-              answer — the free space splits between them and neither lands
-              where it was aimed. */}
-          <ToolStepDone state={save} className="ml-auto" />
-        </header>
-
-        <div
-          id="export-scroll"
-          className="scroll-slim min-h-0 flex-1 overflow-y-auto px-5 py-8 md:px-12 md:py-10"
-        >
-          <div className="mx-auto w-full max-w-2xl">
-            <h1 className="font-serif text-2xl text-fg md:text-[1.75rem]">
-              {step.title}
-            </h1>
-            {/* The same lift the shared `ToolHeader` took, so the one tool
+            <div className="min-w-0">
+              <h1 className="font-serif text-2xl text-fg md:text-[1.75rem]">
+                {step.title}
+              </h1>
+              {/* The same lift the shared `ToolHeader` took, so the one tool
                 that never adopted that header does not read as a quieter
                 product. Not `text-muted`, which this app spends on metadata:
                 on a wizard step this line is the only thing saying what the
                 step is for. The serif heading above is left alone — at 28px it
                 is already a size up, and it is a deliberately different type
                 treatment rather than a smaller version of the others. */}
-            <p className="mt-2 font-sans text-base leading-relaxed font-medium text-fg/75">
-              {step.blurb}
-            </p>
+              <p className="mt-2 font-sans text-base leading-relaxed font-medium text-fg/75">
+                {step.blurb}
+              </p>
 
-            <div className="mt-8">
-              {step.id === "format" && (
-                <FormatStep
-                  output={output}
-                  // The previews are set with this book's own title and first
-                  // chapter rather than a stand-in. It costs nothing and it is
-                  // the difference between a picture of a format and a picture
-                  // of *your book* in that format. Same body chapter the
-                  // specimen uses — these pages carry a chapter number too.
-                  book={{
-                    title: book.title,
-                    chapter: sampleTitle,
-                    author: book.author,
-                  }}
-                  onPick={pick}
-                  manuscript={manuscript}
-                  onManuscript={setManuscript}
-                />
-              )}
+              <div className="mt-8">
+                {step.id === "format" && (
+                  <FormatStep
+                    output={output}
+                    // The previews are set with this book's own title and first
+                    // chapter rather than a stand-in. It costs nothing and it is
+                    // the difference between a picture of a format and a picture
+                    // of *your book* in that format. Same body chapter the
+                    // specimen uses — these pages carry a chapter number too.
+                    book={{
+                      title: book.title,
+                      chapter: sampleTitle,
+                      author: book.author,
+                    }}
+                    onPick={pick}
+                    manuscript={manuscript}
+                    onManuscript={setManuscript}
+                  />
+                )}
 
-              {step.id === "template" && (
-                <TemplateStep
-                  typeset={typeset}
-                  output={output}
-                  onPick={(id) => set("template", id)}
-                  sampleTitle={sampleTitle}
-                  bookTitle={book.title}
-                />
-              )}
+                {step.id === "template" && (
+                  <TemplateStep
+                    typeset={typeset}
+                    onPick={(id) => set("template", id)}
+                  />
+                )}
 
-              {step.id === "layout" && (
-                <LayoutStep
-                  typeset={typeset}
-                  output={output}
-                  sampleTitle={sampleTitle}
-                  bookTitle={book.title}
-                  onSet={set}
-                />
-              )}
+                {step.id === "layout" && (
+                  <LayoutStep typeset={typeset} output={output} onSet={set} />
+                )}
 
-              {step.id === "frontmatter" && (
-                <FrontMatterStep
-                  book={book}
-                  typeset={typeset}
-                  written={written}
-                  skipped={skipped}
-                  onSet={set}
-                />
-              )}
+                {step.id === "frontmatter" && (
+                  <FrontMatterStep
+                    book={book}
+                    typeset={typeset}
+                    written={written}
+                    skipped={skipped}
+                    onSet={set}
+                  />
+                )}
 
-              {step.id === "listing" && <ListingDetails book={book} />}
-              {step.id === "blurb" && <ListingBlurb book={book} />}
+                {step.id === "listing" && <ListingDetails book={book} />}
+                {step.id === "blurb" && <ListingBlurb book={book} />}
 
-              {/* Only reachable once a format is chosen, which is what builds
+                {/* Only reachable once a format is chosen, which is what builds
                   this step in the first place. */}
-              {step.id === "export" && output !== null && (
-                <ExportStep
-                  book={book}
-                  cover={cover}
-                  output={output}
-                  label={active?.label ?? ""}
-                  typeset={typeset}
-                  manuscript={manuscript}
-                  busy={busy}
-                  error={error}
-                  skipped={skipped.length}
-                  written={written}
-                />
-              )}
+                {step.id === "export" && output !== null && (
+                  <ExportStep
+                    book={book}
+                    cover={cover}
+                    output={output}
+                    label={active?.label ?? ""}
+                    typeset={typeset}
+                    manuscript={manuscript}
+                    busy={busy}
+                    error={error}
+                    skipped={skipped.length}
+                    written={written}
+                  />
+                )}
+              </div>
             </div>
+
+            {/* **The page these steps set, beside the controls that set it.**
+
+                Lifted out of `TemplateStep` and `LayoutStep`, which each drew
+                their own: rendered here it is one sheet for both steps, so
+                walking from the template to the page settings leaves the
+                preview standing where it is instead of unmounting and
+                remounting a near-identical copy one row further down.
+
+                Sticky, so it stays put while the controls scroll. `top-0`
+                against this scroll container rather than the window — the
+                body is the scrolling element here, not `<main>`. */}
+            {showSheet && (
+              <aside className="min-w-0 lg:sticky lg:top-0">
+                <Sheet
+                  typeset={typeset}
+                  output={output}
+                  sampleTitle={sampleTitle}
+                  bookTitle={book.title}
+                />
+              </aside>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* **The action bar, and it stands still.**
+      {/* **The action bar, and it stands still.**
 
             Continue used to sit at the end of the form, which is fine on a
             step that is four fields long and wrong on the two that carry a
@@ -668,61 +689,69 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
             is what "one button per screen, always in the same place" was
             reaching for; the form's own end is not a place, because it moves
             with the form. */}
-        <footer className="shrink-0 border-t border-line bg-nav px-5 py-4 md:px-12">
-          <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
-            {/* Absent on the first step rather than disabled — there is
+      {/* `bg-surface`, matching the band above — see the note there. */}
+      <footer className="shrink-0 border-t border-line bg-surface px-5 py-4 md:px-12">
+        <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
+          {/* **The roadmap's tick, moved down here from the band.** It was
+                top right, opposite nothing, on a band that is now only
+                context — and it is an *action*, which is what this row is
+                for. It is not a step of the wizard, so it sits with Back
+                rather than near the primary: nothing about it moves the
+                writer through the flow. */}
+          <ToolStepDone state={save} />
+
+          {/* Absent on the first step rather than disabled — there is
                 nothing behind it. */}
-            {index > 0 && (
-              <button
-                type="button"
-                onClick={() => go(index - 1)}
-                className="flex items-center gap-2 rounded-lg border border-line
+          {index > 0 && (
+            <button
+              type="button"
+              onClick={() => go(index - 1)}
+              className="flex items-center gap-2 rounded-lg border border-line
                            bg-panel px-4 py-2.5 font-sans text-sm font-medium
                            text-fg outline-none transition-colors
                            hover:bg-raised focus-visible:ring-2
                            focus-visible:ring-accent/60"
-              >
-                <Arrow className="rotate-180" />
-                Back
-              </button>
-            )}
+            >
+              <Arrow className="rotate-180" />
+              Back
+            </button>
+          )}
 
-            {/* Only where it is true. The listing steps are genuinely optional
+          {/* Only where it is true. The listing steps are genuinely optional
                 — the export runs without any of it — so saying so is honest.
                 Offering it on the format step would be a lie, since something
                 has to be chosen. */}
-            {(step.id === "listing" || step.id === "blurb") && (
-              <button
-                type="button"
-                onClick={() => go(steps.length - 1)}
-                className="rounded-sm px-1 font-sans text-sm font-medium
+          {(step.id === "listing" || step.id === "blurb") && (
+            <button
+              type="button"
+              onClick={() => go(steps.length - 1)}
+              className="rounded-sm px-1 font-sans text-sm font-medium
                            text-muted underline-offset-4 outline-none
                            transition-colors hover:text-fg hover:underline
                            focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                Skip for now
-              </button>
-            )}
+            >
+              Skip for now
+            </button>
+          )}
 
-            {last ? (
-              <PrimaryAction
-                busy={busy}
-                label={`Export ${active?.label ?? ""}`}
-                onClick={run}
-              />
-            ) : (
-              <PrimaryAction
-                // The one place in this wizard where a control is genuinely
-                // unavailable: there is no next step until a format is picked,
-                // because which steps exist is what the pick decides.
-                disabled={output === null}
-                label={output === null ? "Choose a format" : "Continue"}
-                onClick={() => go(index + 1)}
-              />
-            )}
-          </div>
-        </footer>
-      </div>
+          {last ? (
+            <PrimaryAction
+              busy={busy}
+              label={`Export ${active?.label ?? ""}`}
+              onClick={run}
+            />
+          ) : (
+            <PrimaryAction
+              // The one place in this wizard where a control is genuinely
+              // unavailable: there is no next step until a format is picked,
+              // because which steps exist is what the pick decides.
+              disabled={output === null}
+              label={output === null ? "Choose a format" : "Continue"}
+              onClick={() => go(index + 1)}
+            />
+          )}
+        </div>
+      </footer>
 
       {/* The one thing this screen does that leaves no trace on it. A `<dialog>`
           opened with `showModal` sits in the browser's top layer, so it clears
@@ -742,25 +771,49 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 }
 
 // ---------------------------------------------------------------------------
-// The rail
+// The step band
 // ---------------------------------------------------------------------------
 
 /**
- * The stepper, and the book it is about.
+ * Where you are in the export, laid along the top.
+ *
+ * **This is the `/book/new` band, and that is the point.** Both screens are
+ * short wizards a writer walks once per book, and until now they were two
+ * different products to look at: this one had an 18rem rail down the left
+ * carrying the steps, the book, the readiness count and two escapes, while the
+ * setup flow had a centred title with a row of numbered steps under it and one
+ * red Cancel in the corner. Same shape of task, same app, two vocabularies.
+ * So this takes that one — centred stack, numbered row, red Cancel — and the
+ * writer learns the pattern once.
+ *
+ * What the rail carried and this does not:
+ *
+ * - **The book, as a box.** The safeguard it existed for is real — the Tools
+ *   area lets a writer pick a book *before* opening a tool, and on this screen
+ *   landing on the wrong manuscript is a way to publish the wrong book — so it
+ *   is not simply dropped. It is the line under the heading now, which answers
+ *   the same question in a quarter of the height and does not compete with the
+ *   steps for the top of the screen.
+ * - **"All tools" and "Back to writing".** One red Cancel replaces both, for
+ *   the reason `/book/new` has one: two quiet escapes at opposite ends of a
+ *   band read as chrome, and a wizard needs exactly one obvious way out. It
+ *   goes where the writer came from (`?from=`), falling back to the tools
+ *   wall.
+ * - **"Mark step done".** Moved to the action bar at the foot, beside Back and
+ *   the primary. It is an action on the roadmap rather than a piece of context,
+ *   and this band is now only context.
  *
  * Every step is clickable, including ones ahead: nothing here is required, so
  * refusing to let a writer skip forward would be inventing a gate to guard an
  * empty room. "Done" therefore means *behind you*, not *answered*.
  *
- * The accent throughout rather than the usual green tick. There is no green in
- * this palette to reach for, and the accent is what every other "done" in the
- * app is drawn with, so a second treatment here would be a thing to learn for
- * no gain.
+ * The accent throughout rather than a green tick. There is no green in this
+ * palette to reach for, and the accent is what every other "done" in the app is
+ * drawn with, so a second treatment here would be a thing to learn for no gain.
  */
-function Rail({
-  book,
-  bookId,
-  cover,
+/* No `book` prop any more — the line naming it came off with the step count,
+   and nothing else here reads the manuscript. */
+function TopBar({
   blocking,
   groups,
   steps,
@@ -768,13 +821,10 @@ function Rail({
   currentIndex,
   onGo,
   from,
+  embedded,
 }: {
-  book: Book;
-  bookId: string;
   /** The dashboard area this was opened from, if the link said so. */
   from: string | null;
-  /** The stored cover, or null. Passed down so the rail fetches nothing. */
-  cover: string | null;
   /** How many listing problems a shop would refuse today. */
   blocking: number;
   groups: { name: string; steps: Step[] }[];
@@ -782,174 +832,175 @@ function Rail({
   currentId: StepId;
   currentIndex: number;
   onGo: (id: StepId) => void;
+  /** In the roadmap's panel, where the frame supplies its own chrome. */
+  embedded: boolean;
 }) {
+  const group = groups.find((g) => g.steps.some((s) => s.id === currentId));
+
   return (
-    <aside className="hidden w-72 shrink-0 flex-col border-r border-line bg-nav lg:flex">
-      <div className="shrink-0 px-8 pt-7">
-        {/* The way back out, first.
+    /* **One ground for the whole screen, not three.** The band and the action
+       bar were `bg-nav` — which is `#ffffff` by day against a `#f4f4f5`
+       body — so the wizard read as a white strip, a grey middle and a white
+       strip, and the cards in the middle were the same white as the chrome
+       above them. `/book/new` puts everything on `surface` and lets the cards
+       be the only white, which is the app's own elevation logic; this now
+       does the same. The hairlines stay: the middle scrolls between two fixed
+       bands, and without an edge the content slides under them with nothing
+       marking where the page stops. */
+    <header className="shrink-0 border-b border-line bg-surface">
+      {/* `pt-14` below `sm` is the room the absolute Cancel needs, the same
+          arithmetic `/book/new` uses: the stack is centred and the button is
+          out of the flow, so on a phone the two would otherwise share a line.
+          Padding rather than a margin on the heading, which would collapse
+          through this box and take the button with it. */}
+      <div
+        className={`relative px-5 pb-4 md:px-12 ${
+          embedded ? "pt-5" : "pt-14 sm:pt-5"
+        }`}
+      >
+        {/* The one way out, in the corner, in red — `/book/new`'s control and
+            its reasoning: this is the only thing on the screen that abandons
+            what the writer is doing, so it should not look like the greys
+            around it, and the `stop` tint carries its own ink in both themes
+            where a solid red slab would read as *confirm a deletion*.
 
-            Every other tool screen carries a breadcrumb and an "All tools"
-            escape; this one never took the shared header, so a writer who
-            opened it from the wall of tools had no way back except the browser
-            button. A wizard is the *worst* screen to strand somebody on,
-            because the whole shape of it implies there is no exit until the
-            end. */}
-        <Link
-          href={areaLabel(from) ? `/?area=${from}` : "/?area=tools"}
-          className="font-sans text-xs font-semibold text-muted
-                     underline-offset-4 hover:text-fg hover:underline"
-        >
-          ← {areaLabel(from) ? `Back to ${areaLabel(from)}` : "All tools"}
-        </Link>
+            Absent in the panel, which has a Close of its own two rows up. */}
+        {!embedded && (
+          <Link
+            href={areaLabel(from) ? `/?area=${from}` : "/?area=tools"}
+            className="absolute top-5 right-5 z-10 rounded-md border border-stop-line
+                       bg-stop-bg px-4 py-2 font-sans text-sm font-medium text-stop-fg
+                       outline-none transition-colors hover:border-stop-fg
+                       focus-visible:ring-2 focus-visible:ring-stop-fg/60 md:right-12"
+          >
+            Cancel
+          </Link>
+        )}
 
-        {/* The book, with its cover.
+        <h1 className="text-center font-serif text-2xl text-fg md:text-[1.75rem]">
+          Export your book
+        </h1>
 
-            The other fourteen tools put this in `ToolHeader` for one reason:
-            the Tools area lets a writer pick a book *before* opening a tool, so
-            landing on the wrong manuscript is a real way to lose ten minutes —
-            and on this screen it is a way to publish the wrong book. A writer
-            knows their own covers on sight and has to read a title. */}
-        <div className="mt-4 flex items-start gap-3">
-          <span className="w-9 shrink-0">
-            <BookCover
-              title={book.title}
-              words={bookWordCount(book)}
-              seed={book.id}
-              image={cover}
-              {...(book.subtitle ? { subtitle: book.subtitle } : {})}
-              {...(book.author ? { author: book.author } : {})}
-              {...(book.bareCover ? { bare: true } : {})}
-            />
-          </span>
-          <span className="min-w-0">
-            <span className="block truncate font-sans text-sm font-semibold text-fg">
-              {book.title}
-            </span>
-            {/* `bookChapterCount`, not `chapters.length`: the second counts the
-                front- and back-matter pages too, so a two-chapter novel with
-                the standard matter read "18 chapters" here while the panel it
-                came from said two. One question, one answer — the store owns
-                it. */}
-            <span className="mt-0.5 block font-sans text-xs text-muted">
-              {bookChapterCount(book)}{" "}
-              {bookChapterCount(book) === 1 ? "chapter" : "chapters"} ·{" "}
-              {bookWordCount(book).toLocaleString()} words
-            </span>
-          </span>
-        </div>
+        {/* **The book line and the "Step 3 of 7" line were both here.**
 
-        {/* Where you are in the road, as a number.
+            The book — title, chapter count, word count — was what survived of
+            the rail's cover-and-title box, and the count line was the rail's
+            own. Both came off at the owner's request, and what they were doing
+            is worth recording rather than re-deriving:
 
-            The rail drew five circles and lit one, which says *which* step but
-            not *how far*. "Step 2 of 5" is the thing a person actually wants
-            when deciding whether to start something now or after lunch, and it
-            costs one line. */}
-        {/* Only once the road is known.
+            The count line answered *how far*, which five circles in a column
+            could not. That argument is much weaker now the stepper is a row —
+            every step is on screen at once, numbered, with the current one
+            filled — so the row answers it by being looked at.
 
-            Before a format is chosen `steps` is genuinely one long, and "Step 1
-            of 1" reads as *finished* — the exact opposite of the truth, on the
-            screen where the writer has not yet answered anything. The honest
-            line there is that the length depends on the answer, which is also
-            the reason the first question is the first question. */}
-        <p className="mt-5 font-sans text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
-          {steps.length > 1
-            ? `Step ${currentIndex + 1} of ${steps.length}`
-            : "Pick a format to see the steps"}
-        </p>
-      </div>
+            The book line answered *which manuscript*, and nothing on this
+            screen answers it now. The Tools area lets a writer pick a book
+            before opening a tool, so arriving on the wrong one is possible;
+            the cost is a wrong export rather than lost work, and the file
+            names itself after the book. If it needs saying again, the heading
+            is where it goes — not a third line under it. */}
 
-      {/* Scrolls rather than clips. On a short laptop the steps are taller than
-          the rail, and the thing that must never be cut off is the
-          navigation. */}
-      <nav className="scroll-slim mt-9 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-8 pb-6">
-        {groups.map((group, i) => {
-          const indices = group.steps.map((s) => steps.indexOf(s));
-          const isCurrent = group.steps.some((s) => s.id === currentId);
-          const isDone = Math.max(...indices) < currentIndex;
-          const isLast = i === groups.length - 1;
+        {/* Scrolls sideways rather than wrapping. Five groups with their names
+            do not fit a phone or the roadmap's panel, and a stepper that wraps
+            to two lines stops reading as one line of travel. `justify-center`
+            with `w-max mx-auto` inside, so it centres when it fits and scrolls
+            from the left when it does not — a centred flex row that overflows
+            clips its first item unreachably. */}
+        <nav className="scroll-none mt-2.5 overflow-x-auto">
+          <div className="mx-auto flex w-max items-center gap-1">
+            {groups.map((g, i) => {
+              const indices = g.steps.map((s) => steps.indexOf(s));
+              const isCurrent = g.steps.some((s) => s.id === currentId);
+              const isDone = Math.max(...indices) < currentIndex;
 
-          return (
-            <div key={group.name} className="relative">
-              {/* The thread through the steps. Absolutely positioned from under
-                  this circle into the gap below, so it reaches the next circle
-                  whatever height this row grew to — a group showing its
-                  sub-steps is twice as tall as one that is not. */}
-              {!isLast && (
-                <span
-                  aria-hidden="true"
-                  className={`absolute top-7 -bottom-6 left-[11px] w-0.5 rounded-full ${
-                    isDone ? "bg-accent" : "bg-line"
-                  }`}
-                />
-              )}
+              return (
+                <div key={g.name} className="flex shrink-0 items-center gap-1">
+                  {/* The thread between the circles, taking the accent only
+                      where it is behind you. */}
+                  {i > 0 && (
+                    <span
+                      aria-hidden="true"
+                      className={`h-px w-5 md:w-8 ${
+                        isDone || isCurrent ? "bg-accent" : "bg-line"
+                      }`}
+                    />
+                  )}
 
-              <button
-                type="button"
-                onClick={() => onGo(group.steps[0].id)}
-                className="relative flex w-full items-center gap-3.5 rounded-sm
-                           text-left outline-none focus-visible:ring-2
-                           focus-visible:ring-accent/60"
-              >
-                {/* Filled for both done and current, outlined only for what is
-                    still ahead: the circle answers "have I been here", and
-                    where you are standing is somewhere you have been. */}
-                <span
-                  aria-hidden="true"
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center
-                              rounded-full font-sans text-[11px] font-semibold
-                              transition-colors ${
-                                isDone || isCurrent
-                                  ? "bg-accent text-accent-ink"
-                                  : "border border-line bg-panel text-muted"
+                  <button
+                    type="button"
+                    onClick={() => onGo(g.steps[0].id)}
+                    aria-current={isCurrent ? "step" : undefined}
+                    className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1
+                               outline-none transition-colors hover:bg-raised
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    {/* Filled for where you are, outlined for everywhere else.
+                        A step behind you keeps the accent on its edge, so the
+                        row reads as a line you have walked part of. */}
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center
+                                  rounded-full font-sans text-[11px] font-semibold
+                                  transition-colors ${
+                                    isCurrent
+                                      ? "bg-accent text-accent-ink"
+                                      : isDone
+                                        ? "border border-accent text-fg"
+                                        : "border border-line bg-panel text-muted"
+                                  }`}
+                    >
+                      {isDone ? <Check /> : i + 1}
+                    </span>
+                    {/* The name of the step you are *on* survives at every
+                        width; the others are the first thing to go, since
+                        their circles still number them. */}
+                    <span
+                      className={`font-sans text-sm whitespace-nowrap ${
+                        isCurrent
+                          ? "font-medium text-fg"
+                          : "hidden text-muted md:block"
+                      }`}
+                    >
+                      {g.name}
+                    </span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Sub-steps only for the group you are standing in — listing them all
+            would make this a table of contents for a book nobody asked to
+            read. A centred row of pills, since they now hang under a
+            horizontal stepper and the rail's indent points at nothing here. */}
+        {group && group.steps.length > 1 && (
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
+            {group.steps.map((sub) => {
+              const here = sub.id === currentId;
+              return (
+                <button
+                  key={sub.id}
+                  type="button"
+                  onClick={() => onGo(sub.id)}
+                  aria-current={here ? "step" : undefined}
+                  className={`rounded-md border px-2.5 py-1 font-sans text-xs
+                              outline-none transition-colors focus-visible:ring-2
+                              focus-visible:ring-accent/60 ${
+                                here
+                                  ? "border-accent bg-accent/10 font-semibold text-fg"
+                                  : "border-line bg-panel text-muted hover:bg-raised hover:text-fg"
                               }`}
                 >
-                  {isDone ? <Check /> : i + 1}
-                </span>
-                <span
-                  className={`font-sans text-sm ${
-                    isCurrent
-                      ? "font-semibold text-fg"
-                      : "text-muted hover:text-fg"
-                  }`}
-                >
-                  {group.name}
-                </span>
-              </button>
+                  {sub.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-              {/* Sub-steps only for the group you are standing in — listing them
-                  everywhere would make the rail a table of contents for a book
-                  nobody asked to read. */}
-              {isCurrent && group.steps.length > 1 && (
-                <div className="mt-3 ml-[2.4rem] flex flex-col gap-2.5">
-                  {group.steps.map((sub) => {
-                    const here = sub.id === currentId;
-                    return (
-                      <button
-                        key={sub.id}
-                        type="button"
-                        onClick={() => onGo(sub.id)}
-                        className={`flex items-center gap-2 rounded-sm text-left
-                                    font-sans text-sm outline-none
-                                    transition-colors focus-visible:ring-2
-                                    focus-visible:ring-accent/60 ${
-                                      here
-                                        ? "font-medium text-fg"
-                                        : "text-muted hover:text-fg"
-                                    }`}
-                      >
-                        {sub.label}
-                        {here && <Arrow className="ml-auto text-muted" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      {/* What a shop would refuse, from step one rather than step five.
+      {/* **What a shop would refuse, from step one rather than step five.**
 
           This is the product's whole argument and it was invisible until the
           last screen of the wizard — a writer answered four steps' worth of
@@ -958,40 +1009,31 @@ function Rail({
           only; `hasCover` tests for a key rather than fetching a data URL), so
           there is no reason to withhold it.
 
-          It never blocks: the sentence under it says the export runs anyway,
-          which is the standing promise of this screen — the file is yours
-          whether or not a shop would take it. */}
+          A full-width strip rather than the rail's card, which is the shape
+          that matches a horizontal band. It keeps the `stop` tint it always
+          had and it still never blocks — the second sentence says the export
+          runs anyway, which is the standing promise of this screen: the file
+          is yours whether or not a shop would take it. */}
       {blocking > 0 && (
         <button
           type="button"
           onClick={() => onGo("export")}
-          className="mx-6 mb-4 shrink-0 rounded-xl border border-stop-line
-                     bg-stop-bg px-4 py-3 text-left outline-none
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="flex w-full items-center gap-3 border-t border-stop-line
+                     bg-stop-bg px-5 py-2.5 text-left outline-none
+                     transition-colors hover:bg-stop-bg/70
+                     focus-visible:ring-2 focus-visible:ring-inset
+                     focus-visible:ring-accent/60 md:px-12"
         >
-          <span className="block font-sans text-sm font-semibold text-stop-fg">
+          <span className="font-sans text-sm font-semibold text-stop-fg">
             {blocking} {blocking === 1 ? "thing" : "things"} a shop would refuse
           </span>
-          <span className="mt-0.5 block font-sans text-xs text-muted">
+          <span className="hidden font-sans text-xs text-muted sm:block">
             The export still runs. Fixing them first saves the upload.
           </span>
+          <Arrow className="ml-auto shrink-0 text-stop-fg" />
         </button>
       )}
-
-      {/* The way out, where the reference puts Log out: bottom of the rail,
-          quiet, and never mistakable for a step. */}
-      <div className="shrink-0 px-8 pb-8">
-        <Link
-          href={`/book/${bookId}`}
-          className="rounded-sm font-sans text-sm text-muted underline
-                     underline-offset-4 outline-none transition-colors
-                     hover:text-fg focus-visible:ring-2
-                     focus-visible:ring-accent/60"
-        >
-          Back to writing
-        </Link>
-      </div>
-    </aside>
+    </header>
   );
 }
 
@@ -1191,18 +1233,14 @@ function FormatCard({
  * to see the difference between Georgia and Palatino, and the page below shows
  * the chosen one whole.
  */
+/* The sheet's four props went with the sheet — `ExportPage` renders it in the
+   column beside this one now, and it already holds every one of them. */
 function TemplateStep({
   typeset,
-  output,
   onPick,
-  sampleTitle,
-  bookTitle,
 }: {
   typeset: TypesetOptions;
-  output: Format | null;
   onPick: (id: TypesetOptions["template"]) => void;
-  sampleTitle: string;
-  bookTitle: string;
 }) {
   return (
     <div className="space-y-4">
@@ -1267,13 +1305,8 @@ function TemplateStep({
       <p className="font-sans text-sm leading-relaxed text-muted">
         {templateById(typeset.template).description}
       </p>
-
-      <Sheet
-        typeset={typeset}
-        output={output}
-        sampleTitle={sampleTitle}
-        bookTitle={bookTitle}
-      />
+      {/* The sheet used to close this step and is now the column beside it —
+          see `showSheet` in `ExportPage`. */}
     </div>
   );
 }
@@ -1442,19 +1475,17 @@ function Sheet({
   );
 }
 
+/* `sampleTitle` and `bookTitle` went with the sheet — see `TemplateStep`.
+   `output` stays: this step still asks it whether to draw a trim row. */
 function LayoutStep({
   typeset,
   output,
-  sampleTitle,
-  bookTitle,
   onSet,
 }: {
   typeset: TypesetOptions;
   // Only ever pdf or epub in practice — this step does not exist otherwise —
   // but typed as the caller has it rather than asserted at the call site.
   output: Format | null;
-  sampleTitle: string;
-  bookTitle: string;
   onSet: <K extends keyof TypesetOptions>(
     key: K,
     value: TypesetOptions[K],
@@ -1505,14 +1536,9 @@ function LayoutStep({
         </Note>
       )}
 
-      {/* Both switches change this and nothing else on the screen. Without it
-          they are switches with the lamp in the next room. */}
-      <Sheet
-        typeset={typeset}
-        output={output}
-        sampleTitle={sampleTitle}
-        bookTitle={bookTitle}
-      />
+      {/* Both switches change the sheet and nothing else on the screen, which
+          is why it is now the column *beside* them rather than the thing
+          under them — see `showSheet` in `ExportPage`. */}
 
       {output === "pdf" && (
         <Note>

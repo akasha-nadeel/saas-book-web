@@ -6,6 +6,7 @@ import { GoogleButton } from "@/components/auth/auth-shell";
 import { BookCheck } from "@/components/landing/book-check";
 import { CheckDemo } from "@/components/landing/check-demo";
 import { ExportScreen } from "@/components/landing/export-screen";
+import { FeatureShots } from "@/components/landing/feature-shots";
 import { ListingQuestions } from "@/components/landing/listing-questions";
 import { CtaBanner } from "@/components/landing/cta-banner";
 import { HeroWall } from "@/components/landing/hero-wall";
@@ -28,8 +29,6 @@ import { StoreListingDemo } from "@/components/landing/store-listing-demo";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { ALL_TOOLS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
-import { SEATS_PER_BOOK } from "@/lib/free-limits";
-import { copiesToLevel, totals, type Entry } from "@/lib/ledger";
 import {
   IDEAL_RATIO,
   MAX_EDGE,
@@ -727,38 +726,21 @@ const ORDER_STATIONS: Station[] = PHASES.filter(
    section took the reference's two-column header. `PREPARE` itself stays: the
    phases section above counts it. */
 
-/*
- * The first four are cards now rather than a column, so the notes are cut to
- * card length — two or three lines each. Nothing factual went: "nobody keeps
- * this" moved up into the section's own deck, where it is the point rather
- * than an aside on one card, and the panel beside them carries the sentence
- * about a figure not appearing when the rows cannot support it. The clauses
- * that did go were the ones a reader does not need to feel it ("whatever the
- * shop renames next year"). The fifth is never drawn — it is here for the
- * count the phases section quotes.
- */
-const TRACK = [
-  [
-    "Cost against earnings, per book",
-    "Cover, editing, ads and proof copies on one side. Royalties on the other.",
-  ],
-  [
-    "Import your sales report",
-    "Amazon has no public API, so nothing is fetched. Hand the file over and you say which column is which.",
-  ],
-  [
-    "How many more copies get you level",
-    "Worked from what a copy has actually earned you, never from a royalty rate we invented.",
-  ],
-  [
-    "Who has an advance copy, and who read it",
-    "One list instead of six sites and a spreadsheet, with a send-by date worked back from publication.",
-  ],
-  [
-    "What it usually costs, and what to check first",
-    "What a book typically earns, what covers and editing and promotion run to, and what to establish before the money moves. Every figure says where it came from.",
-  ],
-] as const;
+/* **`TRACK` and `MoneyFigure` stood here and went on 2026-08-15** with the
+   "What it cost against what it earned" section they filled, at the owner's
+   request. The sibling "Two writers" section went in the same edit.
+
+   Deleted rather than kept callerless, which is the split CLAUDE.md draws and
+   the one `LATER` was held to below: `templates-dialog.tsx` and `ambience.ts`
+   are whole features waiting on a way in, and these were a string table and a
+   figure. What is worth not re-deriving is why the figure was built the way it
+   was — every number on it came out of `totals()` and `copiesToLevel()`, the
+   same two functions the Track screen uses, because the claim beside it was
+   that the break-even count is worked from what a copy has actually earned
+   rather than from a royalty rate we invented, and a hand-typed figure under
+   that sentence would have been exactly the thing the sentence promised not to
+   do. Rebuild it that way or not at all. The Track tool itself is untouched;
+   only the landing page's account of it has gone. */
 
 /* **`LATER` stood here and went on 2026-08-14** with the "Not built yet"
    section it filled — see the note where that section was, and TODO.md under
@@ -2113,81 +2095,18 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ---- Track ----------------------------------------------------
+        {/* ---- Inside the app -------------------------------------------
 
-            **Four cards and a panel, rather than a column beside a figure.**
-            It was a `Split`: the four points stacked as a list on the left and
-            the money drawn on the right. That put the section's four claims in
-            the shape a footnote takes — a run of small headings down a column
-            — while the one *invented* thing on it, a demonstration ledger, had
-            the whole other half and all the visual weight.
+            Three captures of the real screens, each beside what it is for.
+            It sits here because everything above it argues about the *job* —
+            the order, the refusals, the fields a shop asks for — and a reader
+            who has been persuaded there wants to see the thing.
 
-            As cards the four read as four things the tool does, which is what
-            they are, and the panel becomes the last of five rather than the
-            argument. It also lets the panel run the full height beside them,
-            which is the only way to show the two figures at a size where the
-            gap between them lands before the words explaining it.
-
-            **The heading and its deck share the top row**, heading left and
-            deck right — the one place on the page that happens, because this
-            deck is a single line that would otherwise sit alone above a
-            five-card grid with nothing under it for half the width. */}
-        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-[88rem]">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
-              <div>
-                <p className="flex items-center gap-2.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
-                  <span
-                    aria-hidden="true"
-                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-faint"
-                  />
-                  Once it is out
-                </p>
-                <h2
-                  className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}
-                >
-                  What it cost against
-                  <br className="hidden sm:block" /> what it earned
-                </h2>
-              </div>
-              <p
-                className={`oc-lead font-serif lg:max-w-md lg:text-right ${SECTION_LEAD}`}
-              >
-                Editing, the cover, the ISBN, the ads.{" "}
-                <Em>Nobody keeps a running total</Em>, which is why the number
-                is always a shock — and every figure here carries where it came
-                from.
-              </p>
-            </div>
-
-            {/* Three columns to two: the cards take three fifths and the panel
-                two, which is the reference's proportion and, more usefully,
-                the point at which the two money figures still sit side by side
-                rather than stacking. Plain span classes rather than an
-                arbitrary track — see the note on the road's layout for what
-                happens to those. */}
-            <div className="mt-12 grid gap-5 lg:grid-cols-5 sm:mt-14">
-              <ul className="grid gap-5 sm:grid-cols-2 lg:col-span-3">
-                {TRACK.slice(0, 4).map(([name, note]) => (
-                  <li
-                    key={name}
-                    className="rounded-2xl bg-lp-ground p-6 sm:p-7"
-                  >
-                    <p className="oc-heading font-serif text-[1.25rem] leading-snug font-semibold text-lp-ink">
-                      {name}
-                    </p>
-                    <p className="mt-3 text-[0.9375rem] leading-relaxed">
-                      {note}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-              <div className="lg:col-span-2">
-                <MoneyFigure />
-              </div>
-            </div>
-          </div>
-        </section>
+            The one section on this page whose figures are photographs by
+            design rather than by exception, and the standing cost comes with
+            it: when one of those screens moves, nothing fails and nothing
+            warns. `scripts/feature-shots.cjs` regenerates them. */}
+        <FeatureShots />
 
         {/* ---- The tool cloud --------------------------------------------
 
@@ -2341,250 +2260,6 @@ export function LandingPage() {
                 ))}
               </tbody>
             </table>
-          </div>
-        </section>
-
-        {/* ---- Still to come -------------------------------------------- */}
-        {/* ---- Two writers ---------------------------------------------- */}
-        {/*
-          **Placed after the tools and before the refusals, not in the hero.**
-
-          The page's argument is "nobody tells you the order", and that is the one
-          claim a competitor cannot answer by shipping a feature. Co-writing is a
-          different axis — genuinely attractive, and not what this page is about —
-          so it earns a section rather than the headline. Putting it higher would
-          trade the sharpest thing on the page for a feature several other tools
-          also have.
-
-          Everything countable here is imported: the seat numbers come from
-          `SEATS_PER_BOOK`, which is also what the database enforces and what the
-          pricing page prints. Nothing on this page may restate a figure.
-
-          The competitive line is checkable and that is why it is here at all.
-          Dabble's own documentation says "the invitee's access depends on their
-          own subscription level, not the project owner's" — so on the tool
-          closest to this one, both people pay. Ours is the owner's plan, and a
-          reader can verify that by being invited.
-        */}
-        {/* **The pain named honestly, which is the whole difficulty with this
-            section.** Writers do not finish, and the research says so loudly —
-            but *why* they do not finish is motivation, time and self-doubt,
-            and this app's own build list files all three under "no tool fixes
-            these". A share feature is not an accountability system, and a
-            heading promising it would make you finish is the exact claim this
-            page refuses everywhere else, aimed at the audience that checks.
-
-            So the headline names the situation — nobody is waiting for the
-            next chapter — and offers the action rather than the outcome. The
-            first line of the body says outright that finishing is not
-            something software can give you. On a reader who has been sold to
-            by four other tools, that line is doing more work than any promise
-            would.
-
-            **One section, in a card, on a tinted ground.** It replaced a plain
-            three-bullets-and-a-figure band: the layout is contained now, so
-            the copy and the drawn panel read as one object rather than as two
-            columns of a page. The three checkable claims survive as a strip
-            along the foot of the card — quieter than they were, and still
-            there, because they are the half of this section a competitor
-            cannot copy.
-
-            The competitive line is checkable and that is why it is here at
-            all. Dabble's own documentation says "the invitee's access depends
-            on their own subscription level, not the project owner's" — so on
-            the tool closest to this one, both people pay. Ours is the owner's
-            plan, and a reader can verify that by being invited.
-
-            Every figure is imported: the seat numbers come from
-            `SEATS_PER_BOOK`, which is what the database enforces and what the
-            pricing page prints. Nothing on this page may restate a number. */}
-        <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-[88rem]">
-            <div className="rounded-[1.75rem] border border-lp-edge bg-lp-ground p-6 sm:p-10 lg:p-12">
-              <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-14">
-                {/* ---- The ask ----------------------------------------- */}
-                <div>
-                  <p className="font-code text-[0.6875rem] font-semibold tracking-[0.18em] text-lp-faint uppercase">
-                    Two writers
-                  </p>
-                  {/* Two lines, the second in the accent — the reference's own
-                      headline shape. Line one is the reader's situation, line
-                      two is the thing they can do about it. Deliberately not
-                      "and you will finish it": the section is allowed to name
-                      a pain it does not claim to cure. */}
-                  <h2 className={`oc-display mt-4 font-serif ${SECTION_TITLE}`}>
-                    No one is waiting for chapter twelve.
-                    <br />
-                    <span style={{ color: INK_TEXT }}>
-                      Put somebody in the book.
-                    </span>
-                  </h2>
-
-                  {/* The one deck on the page that does not take the full
-                      scale, and the column is why: this sits in half a card at
-                      about 500px, where the top step would set nine lines of
-                      twenty characters. It keeps the weight, the grey and the
-                      emphasis — the part that makes a deck a deck — and stops
-                      one step down. A measure this narrow is a reason to hold
-                      the size, not a reason to drop the treatment. */}
-                  <p className="oc-lead mt-6 max-w-md font-serif text-[1.1875rem] leading-[1.45] font-semibold text-lp-deck sm:text-[1.3125rem]">
-                    <Em>Nothing here will make you finish it.</Em> Nothing can.
-                    What you can stop doing is <Em>writing into a void</Em>: put
-                    one person on the book — a co-writer, an editor, whoever
-                    keeps asking how it is going — and they can read what you
-                    wrote this week, or write the next chapter themselves.
-                  </p>
-
-                  <p className="mt-4 max-w-md text-[0.9375rem] leading-relaxed text-lp-faint">
-                    It is not Google Docs. You will not see each other type —
-                    changes travel when they are saved.
-                  </p>
-
-                  <Link
-                    href="/signup"
-                    style={{ backgroundColor: INK }}
-                    className="mt-8 inline-flex items-center gap-2 rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
-                  >
-                    Share a book, free
-                    <svg
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="h-4 w-4"
-                    >
-                      <path d="M5 12h13m-5.5-5.5L18.5 12l-6 5.5" />
-                    </svg>
-                  </Link>
-                </div>
-
-                {/* ---- The panel ---------------------------------------
-
-                    Filled with the brand accent rather than the reference's
-                    lime. This page spends exactly one hue and this is it —
-                    a second colour invented for one panel is how a palette
-                    starts lying, and the accent is already what the closing
-                    banner is filled with, so the two read as the same
-                    product.
-
-                    Drawn in markup, never screenshotted: a picture of this
-                    app goes stale silently while the app moves, on the one
-                    page whose whole pitch is being checkable. It quotes the
-                    product's own role labels, so it can only be wrong if the
-                    product is. */}
-                <div
-                  role="img"
-                  aria-label={`The collaborators panel for a book shared with one other writer: the owner, and somebody who can edit. A free book holds ${SEATS_PER_BOOK.free} people including you; Pro holds ${SEATS_PER_BOOK.pro}.`}
-                  style={{ backgroundColor: INK }}
-                  className="rounded-2xl p-6 sm:p-8"
-                >
-                  <p className="font-code text-[0.625rem] tracking-[0.16em] text-lp-accent-pale uppercase">
-                    On this book
-                  </p>
-
-                  <div aria-hidden="true" className="mt-5 space-y-2.5">
-                    <div className="flex items-center gap-3 rounded-xl bg-lp-accent-ink/10 px-3.5 py-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-lp-accent-ink text-[11px] font-bold text-lp-accent">
-                        You
-                      </span>
-                      <span className="oc-heading flex-1 font-serif text-lp-accent-ink">
-                        You
-                      </span>
-                      <span className="font-code text-[0.625rem] tracking-[0.12em] text-lp-accent-pale uppercase">
-                        Owner
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3 rounded-xl bg-lp-accent-ink/10 px-3.5 py-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-lp-accent-ink/40 text-[11px] font-bold text-lp-accent-ink">
-                        A
-                      </span>
-                      <span className="oc-heading flex-1 truncate font-serif text-lp-accent-ink">
-                        your co-writer
-                      </span>
-                      <span className="rounded-md border border-lp-accent-ink/30 px-2 py-1 font-code text-[0.625rem] tracking-[0.12em] text-lp-accent-ink uppercase">
-                        Can edit
-                      </span>
-                    </div>
-
-                    {/* The empty seat. A wall of filled rows says "this is what
-                        a shared book looks like"; one empty row says "there is
-                        room for somebody", which is the actual invitation. */}
-                    <div className="flex items-center gap-3 rounded-xl border border-dashed border-lp-accent-ink/30 px-3.5 py-3">
-                      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-dashed border-lp-accent-ink/40 text-lp-accent-pale">
-                        <svg
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={1.8}
-                          strokeLinecap="round"
-                          className="h-4 w-4"
-                        >
-                          <path d="M12 6v12M6 12h12" />
-                        </svg>
-                      </span>
-                      <span className="flex-1 text-[0.9375rem] text-lp-accent-pale">
-                        Invite by email
-                      </span>
-                    </div>
-                  </div>
-
-                  <p className="mt-6 border-t border-lp-accent-ink/20 pt-5 text-[0.9375rem] leading-relaxed text-lp-accent-pale">
-                    <strong className="font-semibold text-lp-accent-ink">
-                      {SEATS_PER_BOOK.free} people
-                    </strong>{" "}
-                    on a book, free — including you.{" "}
-                    <strong className="font-semibold text-lp-accent-ink">
-                      {SEATS_PER_BOOK.pro}
-                    </strong>{" "}
-                    on Pro.
-                  </p>
-                </div>
-              </div>
-
-              {/* The three checkable claims. Quieter than the bullet list they
-                  replaced and still here, because they are the half of this
-                  section a funded competitor cannot copy — each one is a
-                  thing a reader can verify by being invited. */}
-              <ul className="mt-10 grid gap-7 border-t border-lp-line pt-8 sm:grid-cols-3 sm:gap-8">
-                {[
-                  [
-                    "Two levels, both enforced",
-                    "Can edit writes the chapters. Can view reads and exports, and changes nothing — refused by the database, not just hidden on screen.",
-                  ],
-                  [
-                    "The owner pays, not the guest",
-                    "Whoever owns the book covers its seats. The person you invite needs an account and nothing else.",
-                  ],
-                  [
-                    "Their half stays theirs",
-                    "Chapters and notes travel. Your story bible, ledger and writing record do not — and the app says so before you share, not after.",
-                  ],
-                ].map(([name, note]) => (
-                  <li key={name}>
-                    <div className="flex items-center gap-2.5">
-                      <span style={{ color: PASS }} className="shrink-0">
-                        <Icon
-                          name="check"
-                          className="h-[17px] w-[17px]"
-                          weight={2.4}
-                        />
-                      </span>
-                      <p className="oc-heading font-serif text-[1.0625rem] text-lp-ink">
-                        {name}
-                      </p>
-                    </div>
-                    <p className="mt-2 text-[0.9375rem] leading-relaxed">
-                      {note}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </div>
           </div>
         </section>
 
@@ -3287,107 +2962,3 @@ function WideFigure({ children }: { children: ReactNode }) {
    verdict, on the real screen, with the fix beside each problem. */
 
 /** Cost against earnings, the way the Track screen puts it. */
-/**
- * A book's money, and **every figure on it is computed** rather than typed.
- *
- * The rows below are the invented part — somebody's cover, editing, ads and
- * proofs against two sales reports — and that is the only invented part. What
- * was spent, what was earned, how far under the book is and how many more
- * copies clear it all come out of `totals()` and `copiesToLevel()`, the same
- * two functions the Track screen uses. Change how the ledger adds up and this
- * picture changes with it; there is nothing here left to drift.
- *
- * It matters more here than on most figures, because the claim beside it is
- * that the break-even count is worked from what a copy has *actually* earned
- * rather than from a royalty rate we invented. A hand-typed "412" under that
- * sentence would be exactly the thing the sentence promises not to do.
- */
-const MONEY_ROWS: Entry[] = [
-  ["cost", 650, "Cover"],
-  ["cost", 420, "Editing"],
-  ["cost", 120, "Ads"],
-  ["cost", 50, "Proof copies"],
-  ["income", 260, "Amazon KDP", 128],
-  ["income", 150, "Apple Books", 76],
-].map(([kind, amount, what, units]) => ({
-  id: what as string,
-  bookId: "demo",
-  kind: kind as Entry["kind"],
-  amount: amount as number,
-  what: what as string,
-  at: 0,
-  ...(units ? { units: units as number } : {}),
-}));
-
-const MONEY = totals(MONEY_ROWS);
-const MONEY_COPIES = copiesToLevel(MONEY);
-
-function MoneyFigure() {
-  /* How far the earnings have got towards the outlay. Capped, because a book
-     that has made more than it cost is not a bar that overflows its track —
-     though this one has not, and the cap is here for whoever changes the rows
-     rather than for this drawing. */
-  const covered = MONEY.spent > 0 ? Math.min(1, MONEY.earned / MONEY.spent) : 0;
-
-  return (
-    <div
-      className="flex h-full flex-col rounded-3xl bg-lp-card-2 p-7 sm:p-8"
-      aria-hidden="true"
-    >
-      <div className="flex flex-wrap gap-x-10 gap-y-6">
-        <div>
-          <p className="font-code text-[0.6875rem] font-semibold tracking-[0.16em] text-lp-faint uppercase">
-            Spent
-          </p>
-          <p
-            className="oc-display mt-2 font-serif text-[2.25rem] leading-none font-semibold sm:text-[2.75rem]"
-            style={{ color: STOP }}
-          >
-            £{MONEY.spent.toLocaleString()}
-          </p>
-          <p className="mt-2 text-[0.8125rem]">
-            Cover · editing · ads · proofs
-          </p>
-        </div>
-        <div>
-          <p className="font-code text-[0.6875rem] font-semibold tracking-[0.16em] text-lp-faint uppercase">
-            Earned
-          </p>
-          <p
-            className="oc-display mt-2 font-serif text-[2.25rem] leading-none font-semibold sm:text-[2.75rem]"
-            style={{ color: PASS }}
-          >
-            £{MONEY.earned.toLocaleString()}
-          </p>
-          <p className="mt-2 text-[0.8125rem]">From your own sales report</p>
-        </div>
-      </div>
-
-      {/* The one bar on the page, and it is a proportion of two real numbers
-          rather than a mood: earnings against outlay, so its width says the
-          same thing the two figures above it do. Squared off at the ends
-          rather than capsuled — a full pill is a control in this app. */}
-      <div className="mt-8 h-2 w-full overflow-hidden rounded-full bg-lp-edge">
-        <div
-          className="h-full rounded-full"
-          style={{
-            width: `${Math.round(covered * 100)}%`,
-            backgroundColor: PASS,
-          }}
-        />
-      </div>
-
-      {MONEY_COPIES !== null && (
-        <div className="mt-6">
-          <p className="oc-heading font-serif text-[1.375rem] leading-snug font-semibold text-lp-ink sm:text-2xl">
-            {MONEY_COPIES.toLocaleString()} more copies gets you level.
-          </p>
-          <p className="mt-2.5 text-[0.9375rem] leading-relaxed">
-            Worked from what a copy has actually earned you. With no rows saying
-            so, the figure does not appear at all.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}

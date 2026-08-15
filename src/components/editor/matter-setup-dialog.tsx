@@ -1,11 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  MATTER_SECTIONS,
-  type MatterPart,
-  type MatterSection,
-} from "@/lib/matter";
+import { MatterPartRows } from "@/components/editor/matter-rows";
+import { defaultPicked, pagesLabel, picksFrom } from "@/lib/matter-picks";
 import type { MatterPick } from "@/lib/library-store";
 
 /**
@@ -42,23 +39,17 @@ import type { MatterPick } from "@/lib/library-store";
  * are on the list because a writer may want to set their own, and unticked
  * because most will not; the export leaves its generated page out when a
  * written one exists, so ticking them is a choice rather than a duplicate.
+ *
+ * **This is now the second screen to ask, not the only one.** `/book/new` puts
+ * the same question as two steps of its own, so a book made in the app has
+ * answered before it is created and `shouldAskMatter` is already false by the
+ * time the editor mounts. What is left for this dialog is every book that
+ * arrived some other way — an import, or one made before the wizard existed —
+ * which is why it stays rather than being folded into the wizard. The ticks,
+ * the ordering and the rows themselves come from `matter-picks.ts` and
+ * `matter-rows.tsx` so the two screens cannot come to different views about
+ * what a first novel usually has.
  */
-
-/** Ticked when the dialog opens. */
-const SUGGESTED: Record<MatterPart, readonly string[]> = {
-  /*
-   * A dedication and nothing else.
-   *
-   * The temptation is to pre-tick everything that looks standard, which is how
-   * a setup dialog turns into the Start button it was written to replace. What
-   * is ticked here is what a first novel almost always has *and* what nothing
-   * else in the app will make for you: the title, copyright and contents pages
-   * are generated at export, the epigraph and the preface are genuine choices,
-   * and a prologue is a decision about the story rather than about the book.
-   */
-  front: ["Dedication"],
-  back: ["Acknowledgements", "About the author"],
-};
 
 export function MatterSetupDialog({
   onCreate,
@@ -70,15 +61,7 @@ export function MatterSetupDialog({
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
-  // Keyed "part:title" so the two parts cannot collide — both could hold a page
-  // called "Glossary", and a set of bare titles would tick both at once.
-  const [picked, setPicked] = useState<Set<string>>(
-    () =>
-      new Set([
-        ...SUGGESTED.front.map((t) => `front:${t}`),
-        ...SUGGESTED.back.map((t) => `back:${t}`),
-      ]),
-  );
+  const [picked, setPicked] = useState<Set<string>>(defaultPicked);
 
   useEffect(() => {
     dialogRef.current?.showModal();
@@ -92,13 +75,7 @@ export function MatterSetupDialog({
       return next;
     });
 
-  // Built by walking MATTER_SECTIONS rather than the picked set, so the pages
-  // are created in the order a book is bound whatever order they were ticked in.
-  const picks: MatterPick[] = (["front", "back"] as const).flatMap((part) =>
-    MATTER_SECTIONS[part]
-      .filter((section) => picked.has(`${part}:${section.title}`))
-      .map((section) => ({ part, title: section.title })),
-  );
+  const picks: MatterPick[] = picksFrom(picked);
 
   return (
     <dialog
@@ -174,15 +151,12 @@ export function MatterSetupDialog({
                     column a hundred and thirty pixels below the back one, so
                     two lists that should scan as a pair were visibly out of
                     step. Information belongs on the row it is about. */}
-                <div className="mt-2 flex flex-col gap-0.5">
-                  {MATTER_SECTIONS[part].map((section) => (
-                    <SectionRow
-                      key={section.title}
-                      section={section}
-                      on={picked.has(`${part}:${section.title}`)}
-                      onToggle={() => toggle(`${part}:${section.title}`)}
-                    />
-                  ))}
+                <div className="mt-2">
+                  <MatterPartRows
+                    part={part}
+                    picked={picked}
+                    onToggle={toggle}
+                  />
                 </div>
               </fieldset>
             ))}
@@ -228,84 +202,10 @@ export function MatterSetupDialog({
                 reading "Add 0 pages" is a button that looks broken. */}
             {picks.length === 0
               ? "No pages, thanks"
-              : `Add ${picks.length} ${picks.length === 1 ? "page" : "pages"}`}
+              : `Add ${pagesLabel(picks.length)}`}
           </button>
         </div>
       </div>
     </dialog>
-  );
-}
-
-/**
- * One offered page.
- *
- * **The "Usually" marker rather than two groups behind a disclosure.** The
- * problem with the flat list was never its length — eight rows a column is
- * nothing to scan — it was that sixteen identical rows read as a checklist to
- * complete. Splitting them into "Usually included" and an "Optional" section
- * folded away would have fixed that by *hiding* thirteen real choices behind a
- * click, which is the wrong trade: a writer who wants a prologue should not
- * have to go looking for it, and progressive disclosure earns its keep on long
- * lists rather than on short ones with an uneven distribution.
- *
- * So the rows stay where they are and three of them are marked. The eye lands
- * on the few most books have, everything else is one glance away, and nothing
- * is hidden.
- */
-function SectionRow({
-  section,
-  on,
-  onToggle,
-}: {
-  section: MatterSection;
-  on: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    /* Tighter than it was: `py-2` and a `text-xs` hint on relaxed leading made
-       each row about 70px, so sixteen of them ran to 1,100px and the list was
-       mostly scrollbar on a laptop. The hint is the same size on tighter
-       leading and the padding is down a step, which fits four more rows in the
-       same window without making anything harder to read or to hit — the row
-       is still a comfortable target because the whole label is one. */
-    <label
-      className={`flex cursor-pointer gap-2.5 rounded-lg border px-2.5 py-1.5
-                  transition-colors ${
-                    on
-                      ? "border-accent/60 bg-raised"
-                      : "border-transparent hover:bg-raised"
-                  }`}
-    >
-      {/* A real checkbox, not a styled div: it is what a keyboard and a screen
-          reader already know how to work, and there are sixteen of them. */}
-      <input
-        type="checkbox"
-        checked={on}
-        onChange={onToggle}
-        className="mt-[3px] h-4 w-4 shrink-0 accent-accent"
-      />
-      <span className="min-w-0">
-        <span className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-sans text-sm font-medium text-fg">
-            {section.title}
-          </span>
-          {/* Quiet on purpose. It is a note about convention, not a
-              recommendation the app is making — and it sits beside the title
-              rather than replacing the hint, because "what is this page" is
-              still the question a first novelist is asking. */}
-          {section.usual && (
-            <span className="font-sans text-[10px] tracking-wide text-muted uppercase">
-              Usually
-            </span>
-          )}
-        </span>
-        {/* The whole reason this is a dialog and not two buttons: "Epigraph"
-            means nothing to a first novelist, and a list of sixteen of those
-            is sixteen guesses. */}
-        <span className="block font-sans text-xs leading-tight text-muted">
-          {section.hint}
-        </span>
-      </span>
-    </label>
   );
 }

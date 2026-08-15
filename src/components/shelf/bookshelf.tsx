@@ -2099,10 +2099,22 @@ function Write({
               <div className="mt-3.5 flex flex-wrap items-center gap-2">
                 {view === "active" ? (
                   <>
+                    {/* **Outlined, like Read beside it**, at the owner's
+                        request. It was the filled accent — the card's one
+                        primary — and the argument for that was that writing is
+                        what a writer came for. Against a wall of cards the
+                        cost showed: twelve books put twelve filled blue
+                        buttons on one screen, which is a grid of primaries,
+                        and a colour that means "the way forward" everywhere
+                        else stops meaning anything when it is the wallpaper.
+                        Matched to Read, the pair reads as two ways into the
+                        same book and the accent goes back to being spent on
+                        New book, which is the one action on this screen that
+                        is not per-card. */}
                     <Link
                       href={`/book/${book.id}`}
-                      className="flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-1.5
-                                 text-sm font-semibold text-accent-ink"
+                      className="flex items-center gap-1.5 rounded-lg border border-line
+                                 bg-surface px-3.5 py-1.5 text-sm font-semibold text-fg"
                     >
                       {shelfIcons.write}
                       Write

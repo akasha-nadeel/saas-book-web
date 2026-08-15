@@ -1,5 +1,4 @@
 import type { Book } from "./library-store";
-import { formShortfall } from "./book-kinds";
 import { checkCover, type CoverFacts } from "./cover-check";
 
 /**
@@ -392,27 +391,17 @@ export function storeReadiness({
   }
 
   /*
-   * **The form the book is sold as, against its actual length.**
-   *
-   * A shop may refuse a listing whose description misrepresents what a reader
-   * is buying, and "A Novel" on four thousand words is exactly that — the
-   * word appears on the generated title page, and most writers put it in the
-   * subtitle too. The book's own setup already carries the answer.
-   *
-   * Advisory, and a fact rather than a verdict: it does not say the book is
-   * too short, because that is not knowable. It says what the book was set up
-   * as and what it currently runs to, and lets the writer decide which of the
-   * two is wrong. `formShortfall` only fires well below the boundary — see
-   * there for why.
+   * **The `kind` advisory was here** — "Set up as a Novel, and 4,200 words so
+   * far" — and it went with the form picker on 2026-08-15. It read
+   * `book.kind`, which `/book/new` was the only screen that ever set; with the
+   * picker gone every book would have fallen to the `"novel"` default, so the
+   * check would have fired on every novella and short story in the library and
+   * there would have been no field anywhere to correct it with. A verdict
+   * computed from a question the app no longer asks is exactly the invented
+   * number the house rules refuse. Removing the check meant removing its
+   * `DESTINATIONS` entry in `checkup.ts` in the same commit — the test at
+   * `checkup.test.ts` walks every field this function can emit.
    */
-  const words = book.chapters.reduce((sum, c) => sum + (c.words ?? 0), 0);
-  const shortfall = formShortfall(book.kind ?? "novel", words);
-  if (shortfall) {
-    advisory(
-      "kind",
-      `Set up as a ${shortfall.label}, and ${words.toLocaleString()} words so far. A ${shortfall.label.toLowerCase()} is usually ${shortfall.floor.toLocaleString()} or more.`,
-    );
-  }
 
   return issues;
 }

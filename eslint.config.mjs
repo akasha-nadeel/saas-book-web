@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build-time Node tools, not application code. They are CommonJS and run
+    // by hand with `node`, so the app's ES-module and React rules do not apply
+    // — `no-require-imports` in particular would be asking a `.cjs` file not to
+    // be one.
+    "scripts/**",
   ]),
 ]);
 

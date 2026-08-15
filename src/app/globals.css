@@ -1252,6 +1252,28 @@ body {
   scrollbar-color: rgb(127 139 153 / 0.45) transparent;
 }
 
+/* --------------------------------------------------------------------------
+   A scroller with no bar at all.
+
+   For a strip that *may* overflow but usually does not — the export wizard's
+   step row is the case it was written for. `overflow-x: auto` is what keeps a
+   five-step row reachable on a phone, and the cost is a scrollbar gutter
+   sitting under the steps at every width on the platforms that reserve one,
+   which reads as a stray rule under a row of numbers.
+
+   Not `overflow: hidden`, which would make the far steps unreachable rather
+   than merely unlabelled. The content stays scrollable by wheel, trackpad,
+   touch and keyboard; only the bar goes.
+   -------------------------------------------------------------------------- */
+.scroll-none {
+  scrollbar-width: none;
+}
+
+.scroll-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .scroll-slim::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -3529,6 +3551,69 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .oc-done-in,
   .oc-done-pop {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   The three steps of `/book/new`, changing places.
+
+   **The panel slides in from the side it is arriving from** — Next brings the
+   next question in from the right, Back brings the previous one from the left
+   — which is the one thing an animation can say here that a static swap
+   cannot: the steps are a line, and you have just moved along it. Getting the
+   direction *wrong* is worse than having none, so the two are separate
+   classes chosen by which control was pressed rather than one class doing
+   double duty.
+
+   Opacity and one axis of translate, 220ms, on the same decelerating curve as
+   the toast: the writer pressed a button and is waiting for the answer, so
+   this is the panel arriving rather than a thing to watch. Only the panel
+   moves. The heading, the step indicator, the cover and the action bar all
+   stand still, because they are the parts that did *not* change — animating
+   the whole page would say the writer had been navigated somewhere, which is
+   the opposite of what three steps in one place are for.
+
+   No exit animation. The outgoing panel is unmounted the moment the step
+   changes, and holding it on screen to fade it out would mean two panels in
+   one column and a page that jumps as the taller one leaves.
+   -------------------------------------------------------------------------- */
+@keyframes oc-step-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes oc-step-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oc-step-in-next {
+  animation: oc-step-in-next 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.oc-step-in-back {
+  animation: oc-step-in-back 220ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* The movement goes and the panel still arrives — a step change is the whole
+   content of the screen, so it may never be the thing an accessibility setting
+   hides. Same rule the toast follows. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-step-in-next,
+  .oc-step-in-back {
     animation: none;
   }
 }

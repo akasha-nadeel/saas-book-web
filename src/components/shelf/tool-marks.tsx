@@ -318,13 +318,35 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
  * 26px glyph on a grid this size reads as a bullet rather than a logo.
  */
 export function ToolMark({ name }: { name: string }) {
-  // A tile one step up from the card it sits on, plus a hairline. A shadow does
-  // nothing on black, so the lift has to come from value.
+  /*
+   * **The tile is tinted from the mark, the way the landing page's is.**
+   *
+   * It was `bg-raised` with a `line` hairline — one neutral plate for all
+   * sixteen, on the reasoning that a shadow does nothing on black so the lift
+   * had to come from value. That is still true of the *lift*, and it is why
+   * this is a value step rather than a drop shadow. What changed is that the
+   * step is now taken in the mark's own hue, so a writer scanning the Tools
+   * grid gets colour at tile size rather than only inside a 32px glyph.
+   *
+   * `color-mix` against the app's own `--color-raised` rather than white: this
+   * grid is chrome and follows the theme, so mixing toward a literal would
+   * have made sixteen pale plates that are correct in daylight and glowing
+   * holes at night. Mixed against the token, the tint rides whatever `raised`
+   * currently is and the percentages hold in both.
+   *
+   * Low percentages on purpose. The mark has to stay the most saturated thing
+   * on its own tile — past about 20% the plate starts competing with the logo
+   * it is holding, which is the failure the landing page's version documents.
+   */
+  const hue = TOOL_MARK_HUES[name] ?? "var(--color-accent)";
   return (
     <span
       className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl
-                 border border-line bg-raised transition-colors
-                 group-hover:border-fg/25"
+                 border transition-colors group-hover:border-fg/25"
+      style={{
+        backgroundColor: `color-mix(in srgb, ${hue} 14%, var(--color-raised))`,
+        borderColor: `color-mix(in srgb, ${hue} 32%, var(--color-line))`,
+      }}
     >
       <svg viewBox="0 0 24 24" aria-hidden="true" className="h-8 w-8">
         {TOOL_MARKS[name]}

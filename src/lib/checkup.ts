@@ -221,14 +221,6 @@ const DESTINATIONS: Record<string, Fix> = {
    * manuscript, which only happens once a format is chosen and the export runs
    * — there is no earlier screen holding the answer to jump to.
    */
-  /*
-   * The form the book is sold as — set in the shelf's own book dialog, which
-   * is where the kind, the genre and the target were chosen in the first
-   * place. `identity` opens that dialog rather than routing anywhere, which is
-   * the same answer the title and the author give for the same reason: the
-   * three commonest fixes are all in one sheet the shelf owns.
-   */
-  kind: { kind: "identity", action: "Check the form" },
   /* Found by reading the manuscript, like the two image rows below, so there
      is no earlier screen holding the answer — but unlike those it names a page
      the writer can open. The editor is where that page is. */

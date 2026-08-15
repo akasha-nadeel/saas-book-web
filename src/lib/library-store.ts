@@ -20,7 +20,6 @@
  * the chapters they describe.
  */
 
-import type { BookKind } from "./book-kinds";
 import type { CollabRole } from "./collab";
 import type { CoverFacts } from "./cover-check";
 import {
@@ -263,8 +262,11 @@ export interface Book {
   bareCover?: true;
   /** Optional. Used for the DOCX byline and EPUB's dc:creator. */
   author?: string;
-  /** What the writer set out to make. Absent on books made before setup. */
-  kind?: BookKind;
+  /* **`kind` was here** — novel, novella or short story. The picker that set
+     it came off `/book/new` on 2026-08-15 and nothing reads it now; the
+     `books.kind` column is left in Postgres unused rather than migrated away,
+     since dropping a column earns nothing and an older build still writing one
+     is harmless. See the note at the top of `book-kinds.ts`. */
   /** A plain string, not a union: the list can grow without a migration. */
   genre?: string;
   /** Words aimed at. Absent means no goal, and no progress is shown. */
@@ -827,13 +829,21 @@ function commitBook(bookId: string, update: (book: Book) => Book) {
  */
 /** What the setup dialog collects. Every field is optional — see createBook. */
 export interface BookSetup {
-  kind?: BookKind;
   genre?: string;
   targetWords?: number;
   subtitle?: string;
   author?: string;
   /** A data URL. Stored at its own key, not in the shelf — see COVER_PREFIX. */
   cover?: string;
+  /**
+   * Leave the artwork bare — see `bareCover` on `Book`.
+   *
+   * Answerable at creation because that is where the cover is first chosen: a
+   * writer bringing a designed jacket already knows it carries its own title,
+   * and making them save the book, find it on the shelf and open a dialog to
+   * say so is asking them to fix something we let them create wrong.
+   */
+  bareCover?: boolean;
   /**
    * Listing details a file arrived with. Only import fills this in: a book made
    * at `/book/new` has nothing to say about ISBNs yet, and asking would be four
@@ -866,7 +876,9 @@ export function createBook(
     // shows up in object comparisons, and the store's tests check exact shape.
     ...(setup?.subtitle ? { subtitle: setup.subtitle } : {}),
     ...(setup?.author ? { author: setup.author } : {}),
-    ...(setup?.kind ? { kind: setup.kind } : {}),
+    // Absent rather than `false`, so only books deliberately set this way
+    // carry the field — the same rule `setBareCover` follows.
+    ...(setup?.bareCover ? { bareCover: true as const } : {}),
     ...(setup?.genre ? { genre: setup.genre } : {}),
     ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
     ...(setup?.publishing ? { publishing: setup.publishing } : {}),
@@ -1230,7 +1242,6 @@ export function createBookFromImport(
     title: title.trim() || "Untitled Book",
     ...(setup?.subtitle ? { subtitle: setup.subtitle } : {}),
     ...(setup?.author ? { author: setup.author } : {}),
-    ...(setup?.kind ? { kind: setup.kind } : {}),
     ...(setup?.genre ? { genre: setup.genre } : {}),
     ...(setup?.targetWords ? { targetWords: setup.targetWords } : {}),
     ...(setup?.publishing ? { publishing: setup.publishing } : {}),

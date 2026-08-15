@@ -38,7 +38,10 @@ interface BookRow {
   title: string;
   subtitle: string | null;
   author: string | null;
-  kind: string | null;
+  /* No `kind`. The column is still on the table and is simply never written —
+     see the note on `Book` in `library-store.ts`. Leaving it out of the upsert
+     is safe: it is nullable, and PostgREST only refuses columns that do *not*
+     exist. */
   genre: string | null;
   target_words: number | null;
   bare_cover: boolean | null;
@@ -152,7 +155,6 @@ function bookToRow(book: Book, owner: string, position: number): BookRow {
     title: text(book.title, "Untitled book"),
     subtitle: book.subtitle ?? null,
     author: book.author ?? null,
-    kind: book.kind ?? null,
     genre: book.genre ?? null,
     target_words:
       typeof book.targetWords === "number" && Number.isFinite(book.targetWords)
@@ -276,7 +278,6 @@ function rowsToBook(
 
   if (row.subtitle) book.subtitle = row.subtitle;
   if (row.author) book.author = row.author;
-  if (row.kind) book.kind = row.kind as Book["kind"];
   if (row.genre) book.genre = row.genre;
   if (row.target_words !== null) book.targetWords = row.target_words;
   if (row.bare_cover) book.bareCover = true;

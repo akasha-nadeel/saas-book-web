@@ -8,6 +8,7 @@ import {
   type CSSProperties,
 } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   EditorContent,
   useEditor,
@@ -206,8 +207,28 @@ export function ChapterEditor({
    * with — arriving at a chapter is not opening the section — and set true by
    * the one control that changes the face, then cleared once the longest of
    * them has finished.
+   *
+   * **Creating a book is the one arrival that does earn it.** `/book/new`
+   * lands here with `?new=1`, and at that moment the three matter cards are
+   * being seen for the first time with the pages the setup just made in them —
+   * which is exactly the "the face changed" case above, reached by a different
+   * route. Read with `useSearchParams` rather than `window.location`, the rule
+   * the rest of the app follows: a lazy initialiser reading the location sees
+   * the *previous* URL during a client navigation, and this arrives on a
+   * `router.push`.
    */
-  const [entering, setEntering] = useState(false);
+  const isNewBook = useSearchParams().get("new") === "1";
+  const [entering, setEntering] = useState(isNewBook);
+  /* The flag is spent once. Dropped with `replaceState` rather than
+     `router.replace` because nothing needs re-fetching — the point is only
+     that a reload does not replay the entrance, and that a URL somebody keeps
+     does not carry a setup flag around with it. */
+  useEffect(() => {
+    if (!isNewBook) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("new");
+    window.history.replaceState(null, "", url.pathname + url.search);
+  }, [isNewBook]);
   const changePanelMode = (mode: BookPanelMode) => {
     setEntering(true);
     setPref("bookPanel", mode);

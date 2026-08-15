@@ -94,14 +94,14 @@ export function BookDetailsDialog({
                 <dt className="text-xs text-muted">Last opened</dt>
                 <dd className="text-fg">{relativeTime(book.lastOpenedAt)}</dd>
               </div>
-              {book.genre || book.kind ? (
+              {/* Genre alone since 2026-08-15. This row read "Form" and joined
+                  the genre to the book's `kind` — novel, novella or short
+                  story — and the picker that set that came off `/book/new`.
+                  See the note at the top of `book-kinds.ts`. */}
+              {book.genre ? (
                 <div className="col-span-2">
-                  <dt className="text-xs text-muted">Form</dt>
-                  <dd className="text-fg">
-                    {[book.genre, book.kind === "short-story" ? "short story" : book.kind]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </dd>
+                  <dt className="text-xs text-muted">Genre</dt>
+                  <dd className="text-fg">{book.genre}</dd>
                 </div>
               ) : null}
             </dl>

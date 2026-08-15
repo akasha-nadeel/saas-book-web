@@ -55,7 +55,7 @@ export function StructurePage({ bookId }: { bookId: string }) {
   const placements = placeBeats(words, book.targetWords);
   const line = whereYouAre(placements, words);
   const note = book.genre ? GENRE_NOTES[book.genre] : undefined;
-  const suggested = suggestTarget(book.kind ?? "novel", book.genre ?? "Other");
+  const suggested = suggestTarget(book.genre ?? "Other");
 
   return (
     <div className="h-dvh overflow-y-auto bg-surface">

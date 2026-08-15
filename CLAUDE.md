@@ -1098,7 +1098,9 @@ exports the first one's picture.
 
 **The small pure modules** are where the conventions of the trade live, kept out
 of components so they can be tested and changed in one place: `book-kinds.ts`
-(novel/novella/short story, genre word-count targets), `book-templates.ts`
+(genre word-count targets — it asked novel/novella/short story too until
+2026-08-15, and the note at the top of the file says why the picker went),
+`book-templates.ts`
 (chapter skeletons only — never boilerplate prose), `search.ts` (walks plain text
 out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
 `relative-time.ts`, `use-typewriter.ts`.
