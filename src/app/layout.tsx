@@ -7,7 +7,6 @@ import {
   Poppins,
 } from "next/font/google";
 import "./globals.css";
-import { AppLoader } from "@/components/app-loader";
 import { LibrarySync } from "@/components/library-sync";
 import { ThemeSync } from "@/components/theme/theme-sync";
 
@@ -136,7 +135,12 @@ export default function RootLayout({
       <body className="h-full overflow-hidden bg-surface text-fg">
         <ThemeSync />
         <LibrarySync />
-        <AppLoader />
+        {/* `AppLoader` stood here and is gone, at the owner's request. It held
+            the loading screen up for a second on every route but `/` so the
+            logo's fill animation had time to play — a delay the product
+            invented and a writer paid for. `LoadingScreen` still renders
+            wherever a screen genuinely has nothing yet; it is a spinner now
+            rather than a mark, so there is nothing left that needs holding. */}
         {children}
       </body>
     </html>

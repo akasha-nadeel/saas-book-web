@@ -6,12 +6,12 @@ import type { ToolPageProps } from "@/lib/tool-page";
 /**
  * What a tool shows while its chunk arrives: nothing.
  *
- * It was `LoadingScreen`, which is the *app's* splash — a full-height book mark
- * and the word "Loading…" — and in a panel that is wildly out of scale: pick a
- * different step and the whole right of the window is taken over by a logo,
- * for a chunk that is already cached and arrives in a frame or two. A
- * placeholder louder than the thing it stands in for is worse than no
- * placeholder.
+ * It was `LoadingScreen`, which claims the full height of whatever holds it —
+ * at the time a book mark and the word "Loading…", a spinner since — and
+ * either is out of scale here: pick a different step and the whole right of
+ * the window becomes a placeholder, for a chunk that is already cached and
+ * arrives in a frame or two. A placeholder louder than the thing it stands in
+ * for is worse than no placeholder, and that stays true now the mark is gone.
  *
  * An empty box of the right size, so nothing jumps when the tool lands, and
  * `aria-busy` so the wait is announced to anyone who cannot see that it is
@@ -42,30 +42,48 @@ const Pending = () => <div className="h-full" aria-busy="true" />;
  * roadmap knows to draw an ordinary link.
  */
 const TOOLS: Record<string, React.ComponentType<ToolPageProps>> = {
-  comps: dynamic(() => import("@/components/comps/comps-page").then((m) => m.CompsPage), {
-    ssr: false,
-    loading: Pending,
-  }),
+  comps: dynamic(
+    () => import("@/components/comps/comps-page").then((m) => m.CompsPage),
+    {
+      ssr: false,
+      loading: Pending,
+    },
+  ),
   "title-check": dynamic(
-    () => import("@/components/title-check/title-check-page").then((m) => m.TitleCheckPage),
+    () =>
+      import("@/components/title-check/title-check-page").then(
+        (m) => m.TitleCheckPage,
+      ),
     { ssr: false, loading: Pending },
   ),
-  blurb: dynamic(() => import("@/components/blurb/blurb-page").then((m) => m.BlurbPage), {
-    ssr: false,
-    loading: Pending,
-  }),
+  blurb: dynamic(
+    () => import("@/components/blurb/blurb-page").then((m) => m.BlurbPage),
+    {
+      ssr: false,
+      loading: Pending,
+    },
+  ),
   categories: dynamic(
-    () => import("@/components/categories/categories-page").then((m) => m.CategoriesPage),
+    () =>
+      import("@/components/categories/categories-page").then(
+        (m) => m.CategoriesPage,
+      ),
     { ssr: false, loading: Pending },
   ),
-  covers: dynamic(() => import("@/components/covers/covers-page").then((m) => m.CoversPage), {
-    ssr: false,
-    loading: Pending,
-  }),
-  export: dynamic(() => import("@/components/export/export-page").then((m) => m.ExportPage), {
-    ssr: false,
-    loading: Pending,
-  }),
+  covers: dynamic(
+    () => import("@/components/covers/covers-page").then((m) => m.CoversPage),
+    {
+      ssr: false,
+      loading: Pending,
+    },
+  ),
+  export: dynamic(
+    () => import("@/components/export/export-page").then((m) => m.ExportPage),
+    {
+      ssr: false,
+      loading: Pending,
+    },
+  ),
 };
 
 /**

@@ -1266,87 +1266,15 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Loading screen.
+   The loading screen's CSS stood here and is gone.
 
-   The book mark fills from the foot up on a loop — a dim outline underneath, a
-   bright copy on top revealed by a clip rectangle that scales up from its base.
-   All CSS, so it runs with no JavaScript and animates inside a server-rendered
-   fallback. Themed, so it shares the app's ground and never flashes.
+   `.oc-loader` and friends drew the book mark filling from the foot up on a
+   loop, with a dim outline underneath and a clip rectangle scaling from its
+   base. It went with `AppLoader` at the owner's request: the animation needed
+   a second to play, so the splash had to be *held* for a second, which is a
+   delay the product invented. `LoadingScreen` is the shared `Spinner` now and
+   needs no CSS of its own.
    -------------------------------------------------------------------------- */
-.oc-loader {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1.4rem;
-  background: var(--color-surface);
-}
-
-.oc-loader-mark {
-  position: relative;
-  width: 16rem;
-  height: 16rem;
-  /* The real logo isolates the shape; the layers below show only through it.
-     Sized past 100% to crop the square's padding so the mark reads large. The
-     query busts the browser cache when the file is re-exported. */
-  -webkit-mask: url("/logo.png?v=2") center / 135% no-repeat;
-  mask: url("/logo.png?v=2") center / 135% no-repeat;
-}
-
-/* The unfilled logo: a faint wash of the accent. */
-.oc-loader-base {
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--color-accent) 26%, transparent);
-}
-
-/* The fill that rises through it, from the foot up. */
-.oc-loader-fill {
-  position: absolute;
-  inset: 0;
-  background: var(--color-accent);
-  transform-origin: bottom;
-  animation: oc-loader-rise 1.9s ease-in-out infinite;
-}
-
-@keyframes oc-loader-rise {
-  0%,
-  100% {
-    transform: scaleY(0);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-.oc-loader-text {
-  font-family: var(--font-serif);
-  font-size: 2.25rem;
-  letter-spacing: 0.01em;
-  color: var(--color-muted);
-}
-
-/* Fades out when the splash lets go, so it lifts rather than cuts. */
-.oc-loader-leaving {
-  animation: oc-loader-fade 340ms ease forwards;
-}
-
-@keyframes oc-loader-fade {
-  to {
-    opacity: 0;
-  }
-}
-
-/* A steady, filled mark for anyone who would rather not watch it pulse. */
-@media (prefers-reduced-motion: reduce) {
-  .oc-loader-fill {
-    animation: none;
-    transform: scaleY(1);
-  }
-}
 
 /* --------------------------------------------------------------------------
    The manuscript's own scrollbar.
