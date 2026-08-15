@@ -216,13 +216,13 @@ export function inviteEmail(details: InviteDetails): InviteEmail {
            by default on first open, and this is the line that says who the
            mail is from. -->
       <div style="padding:24px 32px 0;">
-        <span style="font-size:15px;font-weight:700;letter-spacing:-0.01em;color:#17171a;">Open<span style="color:#423ead;">Chapter</span></span>
+        <span style="font-size:15px;font-weight:700;letter-spacing:-0.01em;color:#17171a;">Open<span style="color:#146ef5;">Chapter</span></span>
       </div>
 
       <div style="padding:20px 32px 32px;">
 
         <div style="margin:0 0 20px;">
-          <span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:18px;background:#eeeefb;color:#312e81;font-size:15px;font-weight:700;text-align:center;vertical-align:middle;">${initial}</span>
+          <span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:18px;background:#e8f1fe;color:#0b57d0;font-size:15px;font-weight:700;text-align:center;vertical-align:middle;">${initial}</span>
           <span style="display:inline-block;vertical-align:middle;padding-left:12px;font-size:15px;color:#62626b;">
             <strong style="color:#17171a;font-weight:600;">${escapeHtml(who)}</strong><br />
             <span style="font-size:13px;">${escapeHtml(details.inviterEmail)}</span>
@@ -247,7 +247,7 @@ export function inviteEmail(details: InviteDetails): InviteEmail {
 ${
   note
     ? `
-        <blockquote style="margin:0 0 24px;padding:14px 18px;border-left:3px solid #d8d8f4;background:#f7f7fb;font-size:16px;line-height:1.6;color:#17171a;">
+        <blockquote style="margin:0 0 24px;padding:14px 18px;border-left:3px solid #c3dcfd;background:#f7f7fb;font-size:16px;line-height:1.6;color:#17171a;">
           ${escapeHtml(note).replace(/\n/g, "<br />")}
           <span style="display:block;margin-top:10px;font-size:13px;color:#62626b;">— ${escapeHtml(who)}</span>
         </blockquote>`
@@ -258,7 +258,7 @@ ${
              reader does not announce a one-cell table around the button. -->
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;">
           <tr>
-            <td style="background:#312e81;border-radius:8px;">
+            <td style="background:#146ef5;border-radius:8px;">
               <a href="${escapeHtml(details.link)}" style="display:inline-block;padding:15px 30px;font-size:16px;font-weight:600;line-height:1;color:#ffffff;text-decoration:none;">Open the book</a>
             </td>
           </tr>

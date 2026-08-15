@@ -413,7 +413,7 @@
   --color-lp-body: #a2a2ad; /* body copy */
   --color-lp-faint: #85858f; /* eyebrows, format tags, captions */
   --color-lp-deck: #8e8e99; /* section decks — see the light value */
-  --color-lp-accent: #5f5bd0; /* the fill: buttons, the closing banner */
+  --color-lp-accent: #146ef5; /* the fill: buttons, the closing banner */
   --color-lp-accent-ink: #ffffff; /* what rides on that fill */
 
   /* ------------------------------------------------------------------------
@@ -526,7 +526,7 @@
      sit on near-black (over ~0.19), and those two windows do not overlap. In
      daylight they are the same indigo, because a white ground gives both
      directions all the room they need. */
-  --color-lp-accent-text: #9b98f5;
+  --color-lp-accent-text: #74a9ff;
   /* The first line of the hero headline, and the one token in this set whose
      two values are not the same colour at two brightnesses.
 
@@ -538,7 +538,7 @@
      lead nor dark enough to recede), and white against the accent below it
      draws the same two-volume sentence with the volumes swapped. */
   --color-lp-accent-soft: #ffffff;
-  --color-lp-wordmark: #8c88ff; /* "Chapter" — the accent, lightness lifted */
+  --color-lp-wordmark: #74a9ff; /* "Chapter" — the accent, lightness lifted */
   --color-lp-accent-pale: #eae9ff; /* dimmed text *on* the accent fill */
   --color-lp-device: #2a2a33; /* the drawn tablet's shell */
 
@@ -588,7 +588,7 @@
   --color-lp-stage-ink: #f5f5f7; /* 16.8:1 */
   --color-lp-stage-body: #a8a8b4; /* 7.8:1 */
   --color-lp-stage-faint: #8a8a99; /* 5.4:1 — eyebrows and captions */
-  --color-lp-stage-accent: #9b98f5; /* the accent, at a lightness black allows */
+  --color-lp-stage-accent: #74a9ff; /* the accent, at a lightness black allows */
   --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #14141a; /* and its lower edge */
 
@@ -666,10 +666,21 @@
      before the words are, and reserving exactly one for "this is the way
      forward" is what lets the rest of the app stay grey and quiet.
 
-     Why indigo and not the SaaS blue: it is ink. This audience buys books and
-     writes them, and the colour of a fountain pen reads as craft and
-     institution where a bright azure reads as a startup that will be gone in
-     a year — which is the exact suspicion this product is built against.
+     **It was #312e81, a near-black indigo, and the note here argued for it at
+     length: ink rather than "the SaaS blue", the colour of a fountain pen, on
+     the reasoning that a bright azure reads as a startup that will be gone in
+     a year.** The brand is blue now at the owner's decision, and the argument
+     is recorded rather than deleted because it names a real risk for this
+     audience — one the rest of the palette still answers, since everything
+     around this hue stays grey and quiet.
+
+     What the change costs is measurable and is the thing to keep an eye on.
+     White on #312e81 was **11.4:1**; on #146ef5 it is **4.59:1** — over AA's
+     4.5 by nine hundredths. It is a floor rather than a cushion: darkening
+     this value is safe, lightening it by even a percent is not, and any new
+     pairing with it needs measuring rather than eyeballing. That is also why
+     the ink on tinted grounds below is #0b57d0 (6.4:1) rather than this
+     value: on a pale blue ground the fill colour has nothing left to give.
 
      **Daylight only.** The dark set keeps white, because on black there is no
      ground for a hue to sit on: any indigo dark enough to take white text
@@ -677,9 +688,9 @@
      brand. See the note in that block.
 
      Near-black is still what `fg` is, so nothing about the *text* moved. */
-  --color-accent: #312e81;
-  --color-accent-strong: #252362; /* its hover — deepens, since it cannot dim */
-  --color-accent-deep: #423ead;
+  --color-accent: #146ef5;
+  --color-accent-strong: #0b57d0; /* its hover — deepens, since it cannot dim */
+  --color-accent-deep: #3b86f7;
   --color-accent-ink: #ffffff;
 
   /* The upgrade banner, in daylight: **the same three values as the dark
@@ -739,20 +750,20 @@
      value — the shop front and the app are the same product, and the mark a
      visitor read on the way in should be the mark they see once inside.
 
-     The lift is deliberate, and it is a lift of *lightness only*. The banner's
-     own #312e81 is a fill colour, chosen to carry white text across a whole
-     section; set as type beside a near-black "Open" it reads as another
-     near-black and the two halves stop telling themselves apart. So the hue
-     and the saturation are the banner's exactly — this is the same colour,
-     turned up — rather than a brighter indigo off the shelf, which would be a
-     second brand colour pretending to be the first.
+     **The lift is gone with the indigo, and its reason went with it.** While
+     the brand was #312e81 this had to be lifted to #423ead: a near-black fill
+     set as type beside a near-black "Open" read as more near-black, and the
+     two halves stopped telling themselves apart. #146ef5 has no such problem —
+     it is already a mid-tone, plainly blue against the ink beside it, and it
+     clears 4.59:1 on white. So the mark is simply the brand colour, which is
+     the arrangement the lift was always approximating.
 
      It is a second token rather than a share of the landing page's
      `--color-lp-wordmark`, because the two marks part company at night: this
      one sits in a black sidebar with nothing near it and goes plain white,
      while the landing page is pinned to daylight and keeps the indigo always.
      The two are kept in step by hand: change one, change the other. */
-  --color-wordmark: #423ead;
+  --color-wordmark: #146ef5;
 
   /* Chosen to sit on white; the dark set's #f87171 goes pale and sugary here. */
   --color-danger: #c0362c;
@@ -760,8 +771,9 @@
   /* 10% where the near-black wanted 8%: a saturated hue at low alpha reads
      fainter than a neutral at the same figure, so keeping the number would
      have quietly weakened "you are here". */
-  --color-selected: color-mix(in srgb, #312e81 10%, transparent);
-  --color-selected-fg: #312e81;
+  --color-selected: color-mix(in srgb, #146ef5 10%, transparent);
+  /* The deeper shade, not the fill: this is ink on a tint of itself. */
+  --color-selected-fg: #0b57d0;
 
   --color-nav: #ffffff;
 
@@ -803,9 +815,11 @@
   /* The road, in daylight — see the note in the dark block. Pale ground, mid
      hairline, and the accent itself as the ink, so the strip and the button
      sitting on it are plainly the same colour saying the same thing. */
-  --color-step-bg: #eeeefb;
-  --color-step-line: #d8d8f4;
-  --color-step-fg: #312e81;
+  --color-step-bg: #e8f1fe;
+  --color-step-line: #c3dcfd;
+  /* #0b57d0 rather than the accent itself: on this pale blue the fill measures
+     under 4.5, where the deeper shade holds 5.9:1. */
+  --color-step-fg: #0b57d0;
 
   /* The landing page in daylight — see the long note in the dark block.
 
@@ -857,7 +871,7 @@
      green field 4.16:1, `lp-card-1` 3.88:1. All three use `lp-body` instead,
      which is the fallback to reach for rather than inventing a fourth grey. */
   --color-lp-deck: #75757e;
-  --color-lp-accent: #312e81;
+  --color-lp-accent: #146ef5;
   --color-lp-accent-ink: #ffffff;
 
   /* The three refusal cards in daylight — see the long note in the dark block.
@@ -871,7 +885,7 @@
      still holds 5.7:1 on every one of them. See the long note in the dark
      block for the ink and fill that go with them, and for the two hues this
      set may never take. */
-  --color-lp-card-1: #e9ecfb;
+  --color-lp-card-1: #e4eefe;
   --color-lp-card-2: #fbe9df;
   --color-lp-card-3: #f3e9fb;
 
@@ -883,8 +897,9 @@
   --color-lp-paper-accent: #0d8299;
   --color-lp-paper-accent-text: #0a6e7f;
 
-  --color-lp-card-1-ink: #312e81;
-  --color-lp-card-1-fill: #312e81;
+  /* Ink on a tinted card takes the deeper shade; the fill is the brand. */
+  --color-lp-card-1-ink: #0b57d0;
+  --color-lp-card-1-fill: #146ef5;
   --color-lp-card-2-ink: #9c3d17;
   --color-lp-card-2-fill: #9c3d17;
   --color-lp-card-3-ink: #6b21a8;
@@ -896,10 +911,10 @@
      deliberately *not* `--color-ok-bg` (#ecfdf5), which is a mint carrying a
      verdict. `lp-ink` clears 16:1 on it and `lp-body` 6.2:1. */
   --color-lp-road: #eff6f1;
-  --color-lp-accent-text: #312e81;
-  --color-lp-accent-soft: #6e6c96;
-  --color-lp-wordmark: #423ead;
-  --color-lp-accent-pale: #c7d2fe;
+  --color-lp-accent-text: #146ef5;
+  --color-lp-accent-soft: #5d6b86;
+  --color-lp-wordmark: #146ef5;
+  --color-lp-accent-pale: #bfdbfe;
   --color-lp-device: #e2e2e8;
 
   /* The marker in daylight — see the note in the dark block. This is the
@@ -916,7 +931,7 @@
   --color-lp-stage-ink: #f5f5f7; /* 18.0:1 */
   --color-lp-stage-body: #a8a8b4; /* 8.4:1 */
   --color-lp-stage-faint: #8a8a99; /* 5.8:1 */
-  --color-lp-stage-accent: #9b98f5;
+  --color-lp-stage-accent: #74a9ff;
   --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #b9b9c4;
 }
