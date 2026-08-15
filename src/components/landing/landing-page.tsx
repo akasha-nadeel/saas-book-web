@@ -36,7 +36,10 @@ import {
   MIN_HEIGHT,
   MIN_WIDTH,
 } from "@/lib/cover-check";
-import { CONTACT_EMAIL, REFUND_DAYS, REPLY_DAYS } from "@/lib/legal";
+/* `REPLY_DAYS` was imported here for the FAQ's "Still have a question?"
+   panel, which came off on 2026-08-15. Nothing else on this page promises a
+   reply time, which is worth knowing rather than only noticing later. */
+import { CONTACT_EMAIL, REFUND_DAYS } from "@/lib/legal";
 
 /**
  * The landing page.
@@ -2605,21 +2608,27 @@ export function LandingPage() {
               whole card is. The bare plus was right when these were rows on the
               page and would read as punctuation floating on a card. */}
         <section className="border-b border-lp-line px-6 py-16 sm:py-24">
-          <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] lg:gap-20">
-            {/* **The left column is written out rather than using `Head`**, and
-                it is the one section on the page where that is right. Every
-                other heading is a title over the thing it names; this one is
-                half the composition — it stands beside a column of rows and
-                has to hold that whole side on its own, which means a display
-                size, a three-line stack and a description under it. Pushing
-                `Head` to do that would have meant a size prop, and a size prop
-                on the page's one heading component is how eleven headings end
-                up at nine sizes. */}
-            <div>
+          {/* **One centred column, not two.** It was a 24rem heading column
+              beside the rows — the arrangement the rest of this page uses —
+              and it is the owner's reference that changed it: the heading sits
+              over the list now, centred, with the rows running the full
+              measure under it.
+
+              What that buys is line length. Beside a heading column the rows
+              had about two thirds of the page; centred they have all of it, so
+              a question and its answer stop turning at awkward places on a
+              laptop. What it costs is the heading's job — it was holding one
+              side of a two-column composition and is now a title over a list,
+              which is what every other section heading here already is. That
+              is the trade, and it makes this section less special rather than
+              more, which is the right direction for the one section a reader
+              arrives at with a specific question. */}
+          <div className="mx-auto max-w-3xl">
+            <div className="text-center">
               {/* The dot is what turns a line of small caps into a *label*, and
                   the pill is what the reference puts around it. Neutral ground
-                  on purpose: see the palette note above — the decorative tints
-                  are grounds, and a badge is the use they are ruled out for. */}
+                  on purpose: the decorative tints are grounds, and a badge is
+                  the use they are ruled out for. */}
               <p className="inline-flex items-center gap-2.5 rounded-full border border-lp-edge bg-lp-well px-3.5 py-1.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
                 <span
                   aria-hidden="true"
@@ -2628,107 +2637,82 @@ export function LandingPage() {
                 Questions
               </p>
 
-              {/* The same scale every other section title takes — see
-                  `SECTION_TITLE`. The column is hand-written; the type is not. */}
               <h2
                 className={`oc-display mt-6 font-serif text-lp-ink ${SECTION_TITLE}`}
               >
-                {/* No hard break. This column is a fixed 24rem, so at the
-                    section-title size the line turns after "Frequently" on its
-                    own and a `<br>` changes nothing about the shape — while
-                    joining "Asked" and "Questions" into one word in
-                    `textContent`, which is what a screen reader announces. */}
                 Frequently Asked Questions
               </h2>
-
-              {/* **The ask, as a panel.** It is the half most FAQ sections
-                  leave out: a reader whose question is not on the list has
-                  just been told, by omission, that there is nowhere to put it.
-                  Boxed rather than loose because the right column is now a
-                  column of boxes, and one loose paragraph beside them reads as
-                  the section's leftovers. The address and the reply time come
-                  from `legal.ts`, so what this promises is what the contact
-                  page promises. */}
-              <div className="mt-8 rounded-2xl bg-lp-card-1 p-6 sm:mt-10 sm:p-7">
-                <h3 className="oc-heading font-serif text-xl text-lp-ink">
-                  Still have a question?
-                </h3>
-                {/* The deck treatment — grey sentence, claim in near-black —
-                    but **`lp-body` rather than `lp-deck`, because this one is
-                    on a tint.** The deck grey is measured against the page's
-                    white, where it clears 4.56:1; on `lp-card-1` the same ink
-                    drops to **3.88:1** and fails. The exact match for this
-                    ground would be #696973 at 4.62:1, which is a hair lighter
-                    than `lp-body` and not worth a second token for one
-                    paragraph — so this takes the token that already exists and
-                    clears 5.7:1 here. Anything moved onto a tinted ground needs
-                    this check; the ink that was legal on white may not be. */}
-                <p className="mt-3 text-[1.0625rem] leading-[1.5] font-semibold text-lp-body">
-                  Every one of these is a question this audience actually asks
-                  before paying for anything. If yours is not here,{" "}
-                  <Em>
-                    one person answers — usually within {REPLY_DAYS} days.
-                  </Em>
-                </p>
-                <Link
-                  href="/contact"
-                  style={{ backgroundColor: INK }}
-                  className="mt-6 inline-block rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
-                >
-                  Contact us
-                </Link>
-              </div>
             </div>
 
-            {/* Separate cards with a gap, the way the reference stacks them —
-                rather than one list divided by hairlines. A card can be
-                pressed anywhere and looks it, which is the whole reason the
-                mark on the right could become a ring. */}
-            <div className="flex flex-col gap-2.5">
+            {/* **The "Still have a question?" panel was here and is gone**, at
+                the owner's request. It carried the contact address and the
+                reply time out of `legal.ts`, and the reason it existed is
+                worth leaving on the record: a reader whose question is not on
+                the list has just been told, by omission, that there is nowhere
+                to put it. Nothing else in this section says otherwise now —
+                the footer's Contact link is the only remaining route, and it
+                does not promise a person or a reply time. Put it back here if
+                that ever reads as a gap. */}
+            {/* **Hairline rows, not cards**, at the owner's request — the
+                same treatment `listing-questions.tsx` uses further up the
+                page, so the two question lists finally look like one idea
+                rather than two components that happen to both open.
+
+                The card version put a border, a ground and a ring around every
+                row, which is a lot of furniture for a list whose whole job is
+                to be scanned. A rule between rows is the least a list can be
+                divided by, and it lets the question take the size it wants:
+                the heading is now the FAQ's own type rather than a label
+                inside a box.
+
+                It stays `<details>` rather than borrowing that component
+                outright. `ListingQuestions` keeps one open at a time in React
+                state, which is right beside a figure — the column has a fixed
+                height to respect. Here there is nothing to push out of place,
+                so a reader may open as many as they like and the section needs
+                no JavaScript at all. */}
+            <div className="mt-10 border-t border-lp-line sm:mt-12">
               {FAQ.map(([q, a], i) => (
                 <details
                   key={q}
                   open={i === 0}
-                  className="group rounded-xl border border-lp-line bg-lp-well px-4 transition-colors hover:border-lp-edge sm:px-5"
+                  className="group border-b border-lp-line"
                 >
                   {/* `list-none` and the WebKit rule together: Safari draws its
                       triangle through a pseudo-element the standard property
                       does not reach, so one without the other leaves a marker
                       in exactly one browser. */}
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-3.5 [&::-webkit-details-marker]:hidden">
-                    <span className="oc-heading font-serif text-[0.9375rem] leading-snug text-lp-ink sm:text-base">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-6 py-5 [&::-webkit-details-marker]:hidden">
+                    <span className="oc-heading font-serif text-[1.375rem] leading-snug font-semibold text-lp-ink sm:text-[1.5rem]">
                       {q}
                     </span>
-                    {/* **A chevron in a ring, and the ring is the point.** On a
-                        hairline row a circled mark read as a button sitting
-                        next to a label, so it was stripped back to a bare
-                        plus. On a card the opposite is true: the card is the
-                        control, and a mark with no ring floats on it looking
-                        like punctuation nobody can press. The ring takes the
-                        card's own ground so it reads as lifted off it. */}
-                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-lp-edge bg-lp-ground text-lp-body transition-colors group-hover:text-lp-ink">
-                      <svg
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={1.75}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        /* One glyph turned over rather than two swapped: the
-                           arrow travels, so the row does not flicker at the
-                           moment it opens. */
-                        className="h-3.5 w-3.5 transition-transform duration-200 group-open:-rotate-180"
-                      >
-                        <path d="m6 9 6 6 6-6" />
-                      </svg>
-                    </span>
+                    {/* **The ring is gone with the card.** A circled mark reads
+                        as a button sitting beside a label when the row is a
+                        rule rather than a surface — it was stripped back for
+                        exactly this reason the last time these were rows, and
+                        the ring only earned its place while the whole card was
+                        the control. One glyph turned over rather than two
+                        swapped, so the row does not flicker as it opens. */}
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="h-5 w-5 shrink-0 text-lp-faint transition-transform duration-200 group-hover:text-lp-body group-open:-rotate-180 group-open:text-lp-body"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
                   </summary>
-                  {/* Stopped short of the mark on the right, so the answer
-                      reads as belonging to the line above it rather than as
-                      the next row. `lp-body` rather than `lp-deck` — see the
-                      note on `FAQ` for the measurement. */}
-                  <p className="max-w-prose pr-8 pb-4 text-[0.9375rem] leading-[1.55] font-semibold text-lp-body">
+                  {/* Stopped short of the chevron, so the answer reads as
+                      belonging to the line above it rather than as the next
+                      row. `lp-soft` at regular weight, which is the same
+                      answer type the listing questions take — the emphasis
+                      inside stays semibold ink, so the two-tone reading the
+                      copy is written for survives the lighter base. */}
+                  <p className="pr-10 pb-6 text-[1.0625rem] leading-[1.6] text-lp-soft">
                     {a}
                   </p>
                 </details>
