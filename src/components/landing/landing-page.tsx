@@ -99,7 +99,7 @@ import { CONTACT_EMAIL, REFUND_DAYS } from "@/lib/legal";
  * covers in the figures, because a cover is a picture of an object, and the
  * marks in `works-with.tsx`, because a trademark is a trademark.
  *
- * **One measure down the whole page: `max-w-6xl px-6`.** The header, every
+ * **One measure down the whole page: `max-w-[88rem] px-6`.** The header, every
  * section, the closing banner and the footer all use it, so every heading,
  * every card edge and the wordmark itself start on the same vertical line. It
  * was not always: the header was `6xl` while the sections were `5xl`, which
@@ -1279,7 +1279,7 @@ export function LandingPage() {
             it by half. Hence `pt-36`/`sm:pt-40` (+2rem each) against
             `lg:pt-32` (+4rem, for the same +2rem on screen). The wall is
             absolutely positioned and does not move with any of it. */}
-        <section className="relative -mt-16 flex items-center overflow-hidden border-b border-lp-line bg-lp-tint px-6 pt-36 pb-16 sm:pt-40 sm:pb-20 lg:min-h-dvh lg:pt-32 lg:pb-16">
+        <section className="relative -mt-16 flex items-center overflow-hidden border-b border-lp-line bg-lp-tint pt-36 pb-16 sm:pt-40 sm:pb-20 lg:min-h-dvh lg:pt-32 lg:pb-16">
           {/* ---- No backdrop -------------------------------------------
 
               The hero carried a photographic gradient — `public/hero-{dark,
@@ -1305,7 +1305,7 @@ export function LandingPage() {
           {/* ---- The wall ----------------------------------------------
 
               **Outside the content container, on purpose.** Every section on
-              this page holds its content in the same `max-w-6xl` measure, and
+              this page holds its content in the same `max-w-[88rem]` measure, and
               the headline has to start on that margin like every heading below
               it — a hero whose first line begins further left than the rest of
               the page is the commonest way a site looks like two designs. But
@@ -1351,7 +1351,7 @@ export function LandingPage() {
             <HeroWall />
           </div>
 
-          <div className="relative mx-auto w-full max-w-6xl">
+          <div className="relative mx-auto w-full max-w-[88rem] px-6 sm:px-8 lg:px-10">
             {/* The text stops at half the measure from `lg` up, where the wall
                 begins. Without the cap the headline would run under the first
                 column of cards — and `overflow-hidden` on the section means it
@@ -1628,7 +1628,7 @@ export function LandingPage() {
           {/* Lifted over the hero, which is what makes it a panel rather than
               the next band down. The hero keeps its own bottom rule, so the
               overlap reads as one surface laid on another. */}
-          <div className="relative mx-auto -mt-8 max-w-6xl rounded-3xl bg-lp-ground p-6 shadow-[0_-1px_0_var(--color-lp-line),0_24px_60px_-40px_rgba(15,15,16,0.35)] sm:-mt-12 sm:p-10">
+          <div className="relative mx-auto -mt-8 max-w-[88rem] rounded-3xl bg-lp-ground p-6 shadow-[0_-1px_0_var(--color-lp-line),0_24px_60px_-40px_rgba(15,15,16,0.35)] sm:-mt-12 sm:p-10">
             {/* Wider than the decks under a heading (`3xl`, not `2xl`): this
                 one has no title over it to set its measure, and at the deck
                 size a `2xl` column turns it into five short lines. */}
@@ -1764,7 +1764,7 @@ export function LandingPage() {
           id="check"
           className="scroll-mt-20 border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20"
         >
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <div className="text-center">
               <span
                 style={{
@@ -1829,7 +1829,7 @@ export function LandingPage() {
             costs depends on the shop, the queue and the writer, and the one
             number this page could honestly print there is nought. */}
         <section className="border-b border-lp-line px-6 pt-14 pb-16 sm:pt-20 sm:pb-20">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <Head
               center
               eyebrow="Before you upload"
@@ -2060,7 +2060,7 @@ export function LandingPage() {
             tints is a decision. Stating it means a later change to the page's
             own ground cannot quietly take it. */}
         <section className="border-b border-lp-line bg-lp-ground px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <div className="grid gap-8 lg:grid-cols-2 lg:gap-16">
               <div>
                 {/* The dotted eyebrow the check panel uses, in this section's
@@ -2133,7 +2133,7 @@ export function LandingPage() {
             deck is a single line that would otherwise sit alone above a
             five-card grid with nothing under it for half the width. */}
         <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between lg:gap-16">
               <div>
                 <p className="flex items-center gap-2.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
@@ -2209,7 +2209,7 @@ export function LandingPage() {
           id="tools"
           className="overflow-hidden border-b border-lp-line px-6 py-14 sm:py-20"
         >
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <ToolCloud>
               <p className="font-code text-[0.8125rem] font-semibold tracking-[0.18em] text-lp-faint uppercase">
                 All of it included
@@ -2272,7 +2272,7 @@ export function LandingPage() {
             per row. The alternative — a horizontally scrolling table on a
             phone — is the one thing on this page that would need explaining. */}
         <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             {/* The lead was two sentences and is now one, which cost nothing:
                 the second half — that a no with nothing behind it is a feature
                 we are missing — is *demonstrated* by the table's right-hand
@@ -2399,7 +2399,7 @@ export function LandingPage() {
             `SEATS_PER_BOOK`, which is what the database enforces and what the
             pricing page prints. Nothing on this page may restate a number. */}
         <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <div className="rounded-[1.75rem] border border-lp-edge bg-lp-ground p-6 sm:p-10 lg:p-12">
               <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center lg:gap-14">
                 {/* ---- The ask ----------------------------------------- */}
@@ -2788,7 +2788,7 @@ export function LandingPage() {
             The three facts are read from the same modules the pricing page and
             the refunds page read, so they cannot drift into being untrue. */}
         <section className="border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20">
-          <div className="mx-auto max-w-6xl">
+          <div className="mx-auto max-w-[88rem]">
             <Head
               center
               eyebrow="Before you trust us"

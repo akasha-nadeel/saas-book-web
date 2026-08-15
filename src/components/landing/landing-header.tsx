@@ -148,7 +148,7 @@ export function LandingHeader({ ink }: { ink: string }) {
             : "border-transparent opacity-0"
         }`}
       />
-      {/* `max-w-6xl px-6`, which is the page's one measure — the wordmark has
+      {/* `max-w-[88rem] px-6`, which is the page's one measure — the wordmark has
           to start on the same line as every heading below it. It was `px-4` up
           to `sm`, which put the bar's left edge 8px inside every section's on
           a phone: small, and exactly the kind of small that reads as the
@@ -159,7 +159,7 @@ export function LandingHeader({ ink }: { ink: string }) {
           it: the hero is pulled up by a fixed `-mt-16` and its wall of cards
           is pushed down by the same `top-16`, which lands the wall on the
           header's bottom edge whatever height the header settles at. */}
-      <div className="relative mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-1.5 sm:gap-6 sm:py-2">
+      <div className="relative mx-auto flex max-w-[88rem] items-center justify-between gap-3 px-6 py-1.5 sm:gap-6 sm:px-8 sm:py-2 lg:px-10">
         {/* The same wordmark the dashboard sidebar carries, at the same size:
             a visitor who signs up should not have to learn a second mark on
             the other side of the door.
