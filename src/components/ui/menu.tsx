@@ -314,12 +314,23 @@ export function MenuButton({
   icon,
   danger,
   hint,
+  badge,
   children,
 }: {
   onClick: () => void;
   icon?: ReactNode;
   /** Destructive, so it reads differently before it is pressed. */
   danger?: boolean;
+  /**
+   * A marker at the right end — "Soon" so far.
+   *
+   * The rail's own items have carried one since Community was announced there;
+   * a menu item announcing an unbuilt feature needs to say so *before* it is
+   * pressed for the same reason. A row that looks exactly like the working
+   * rows above it and then explains itself in a dialog has already spent the
+   * writer's press.
+   */
+  badge?: ReactNode;
   /**
    * A second line saying what the item is.
    *
@@ -354,8 +365,9 @@ export function MenuButton({
           </span>
         </span>
       ) : (
-        children
+        <span className="min-w-0 flex-1 text-left">{children}</span>
       )}
+      {badge}
     </button>
   );
 }

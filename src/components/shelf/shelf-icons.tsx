@@ -103,6 +103,22 @@ export const shelfIcons = {
       <path d="M12 3v13M7.5 7.5 12 3l4.5 4.5" />
     </Svg>
   ),
+  /** Pasted prose: a clipboard with lines of text on it. */
+  paste: (
+    <Svg>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" />
+      <path d="M8.5 10h7M8.5 13.5h7M8.5 17h4" />
+    </Svg>
+  ),
+  /** A recording, for the audiobook route in. */
+  audio: (
+    <Svg>
+      <rect x="9" y="2.5" width="6" height="11" rx="3" />
+      <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
+      <path d="M12 17.5V21" />
+    </Svg>
+  ),
   compass: (
     <Svg>
       <circle cx="12" cy="12" r="9" />

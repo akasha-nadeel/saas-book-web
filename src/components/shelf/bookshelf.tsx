@@ -23,7 +23,6 @@ import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
-import { ImportDialog } from "@/components/shelf/import-dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import { type Account } from "@/lib/account";
 import {
@@ -323,7 +322,7 @@ export function Bookshelf({
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<BookView>("active");
   const [dialog, setDialog] = useState<
-    "help" | "support" | "feedback" | "import" | "community" | null
+    "help" | "support" | "feedback" | "community" | "audiobook" | null
   >(null);
 
   /**
@@ -632,6 +631,17 @@ export function Bookshelf({
                     triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-accent-ink"
                     trigger={shelfIcons.chevron}
                   >
+                    {/* **Four ways in, and all four are the same road.**
+                        "Import a file…" used to open a dialog that parsed the
+                        manuscript, asked for a title and made the book there
+                        and then — a second, shorter creation path, so an
+                        imported book arrived with no author, no genre and no
+                        word-count goal while a blank one was asked for all
+                        three. The three tabs that were inside that dialog are
+                        named here instead, because a writer with a recording
+                        cannot discover that this app takes recordings from a
+                        menu item that says "file", and each carries the writer
+                        into `/book/new` with the source it names. */}
                     {(close) => (
                       <>
                         <MenuLabel>Start a book</MenuLabel>
@@ -642,14 +652,38 @@ export function Bookshelf({
                         >
                           Blank book
                         </MenuLink>
-                        <MenuButton
+                        <MenuLink
+                          href="/book/new?source=file"
                           icon={shelfIcons.upload}
+                          onNavigate={close}
+                        >
+                          Local file
+                        </MenuLink>
+                        <MenuLink
+                          href="/book/new?source=paste"
+                          icon={shelfIcons.paste}
+                          onNavigate={close}
+                        >
+                          Paste text
+                        </MenuLink>
+                        {/* **Announced, not offered.** The transcriber works
+                            and the chaptering after it works, but the route in
+                            has never been finished to the standard of the
+                            other two — so it says "Soon" *before* it is
+                            pressed and explains itself when it is, rather than
+                            sitting in the list looking identical to the two
+                            that do work. `/book/import` has said the same
+                            thing about it in the same words for a while; this
+                            is the menu catching up with the page. */}
+                        <MenuButton
+                          icon={shelfIcons.audio}
+                          badge={<Badge>Soon</Badge>}
                           onClick={() => {
-                            setDialog("import");
+                            setDialog("audiobook");
                             close();
                           }}
                         >
-                          Import a file…
+                          Audiobook
                         </MenuButton>
                       </>
                     )}
@@ -758,9 +792,6 @@ export function Bookshelf({
         {tooling && (
           <BookToolsDialog book={tooling} onClose={() => setTooling(null)} />
         )}
-        {dialog === "import" && (
-          <ImportDialog onClose={() => setDialog(null)} />
-        )}
         {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
         {dialog === "support" && (
           <SupportDialog onClose={() => setDialog(null)} />
@@ -779,6 +810,23 @@ export function Bookshelf({
             book is really where it turns. Not built yet, and it is not here as
             a preview: this button exists so you know it is coming rather than
             wondering whether you missed it.
+          </ComingSoonDialog>
+        )}
+        {/* Says what it will do and what is honestly true of it now. The
+            transcription itself is written and tested — what is not finished
+            is the way in, and claiming otherwise would be the "no claim the
+            code can't back" rule broken on the one screen where a writer is
+            deciding whether to trust the rest of it. */}
+        {dialog === "audiobook" && (
+          <ComingSoonDialog
+            title="Audiobook to text"
+            onClose={() => setDialog(null)}
+          >
+            Hand over a recording of your book being read and get the words
+            back, split into chapters at the pauses a narrator leaves. The
+            transcription behind it works; the way into it is not finished, so
+            it is named here rather than offered — you are not missing a button
+            somewhere.
           </ComingSoonDialog>
         )}
       </div>
@@ -1744,9 +1792,13 @@ function EmptyState({
  * likely to have a manuscript in a file than to be about to type one.
  */
 const START: EmptyAction = { label: "Start a book", href: "/book/new" };
+/* Into the same wizard the menu's three sources use, rather than the older
+   `/book/import` page — an imported book should be asked the same questions a
+   blank one is, and there is no reason for the empty state to be the one door
+   that skips them. */
 const IMPORT: EmptyAction = {
   label: "Import a manuscript",
-  href: "/book/import",
+  href: "/book/new?source=file",
 };
 
 /**

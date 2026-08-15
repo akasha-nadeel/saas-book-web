@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   DEFAULT_GENRE,
   GENRES,
@@ -17,9 +17,17 @@ import {
 import { saveCover } from "@/lib/cover-save";
 import {
   createBook,
+  createBookFromImport,
   createMatterPages,
   rememberMatterAsked,
 } from "@/lib/library-store";
+import { setupFromImport } from "@/lib/import";
+import type { ImportedBook } from "@/lib/import/split";
+import {
+  SourceStep,
+  isSourceKind,
+  type SourceKind,
+} from "@/components/shelf/source-step";
 import type { MatterPart } from "@/lib/matter";
 import {
   countPicked,
@@ -90,16 +98,37 @@ const SECONDARY_ACTION =
   "focus-visible:ring-2 focus-visible:ring-accent/60";
 
 /** Which question the screen is on. */
-type Step = "details" | "front" | "back";
-
-const STEPS: readonly Step[] = ["details", "front", "back"];
+type Step = "source" | "details" | "front" | "back";
 
 /** The name of each step, for the indicator under the heading. */
 const STEP_NAMES: Record<Step, string> = {
+  source: "Your manuscript",
   details: "Your book",
   front: "Before the story",
   back: "After the story",
 };
+
+/**
+ * The road this particular book takes, which is not the same for all four ways
+ * in.
+ *
+ * **`source` only when one was asked for.** A blank book has no manuscript to
+ * bring in, and a step that exists to be skipped is a step.
+ *
+ * **The two matter steps drop out when the file already answered them.** Only
+ * an EPUB says which of its pages are front and back matter, and `importFile`
+ * keeps what it said. Asking a writer to tick a dedication for a book that
+ * already contains one would either duplicate the page or quietly overwrite the
+ * answer the file gave — so the questions are put to the formats that cannot
+ * answer them (.txt, .md, .docx) and not to the one that can.
+ */
+function stepsFor(source: SourceKind | null, declaresMatter: boolean): Step[] {
+  return [
+    ...(source ? (["source"] as const) : []),
+    "details" as const,
+    ...(declaresMatter ? [] : (["front", "back"] as const)),
+  ];
+}
 
 /**
  * The question at the top of a matter step.
@@ -115,6 +144,24 @@ const MATTER_HEADINGS: Record<MatterPart, string> = {
 
 export function NewBookForm() {
   const router = useRouter();
+
+  /* Which door the writer came through, from `?source=`. Read with
+     `useSearchParams` for the reason the dashboard's `?area=` is: a lazy
+     initialiser reading `window.location` sees the previous URL during a client
+     navigation, and every one of these arrives by client navigation from the
+     shelf's menu. Anything that is not one of the three is treated as a blank
+     book rather than trusted — the same lookup-against-a-fixed-set that
+     `areaLabel` and `safeNext` make. */
+  const params = useSearchParams();
+  const source: SourceKind | null = isSourceKind(params.get("source"))
+    ? (params.get("source") as SourceKind)
+    : null;
+  const [kind, setKind] = useState<SourceKind>(source ?? "file");
+
+  /** The parsed manuscript, once a source step has read one. */
+  const [imported, setImported] = useState<ImportedBook | null>(null);
+  /** A refused write at the very last press — storage full, most likely. */
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
   const [subtitle, setSubtitle] = useState("");
@@ -141,7 +188,12 @@ export function NewBookForm() {
   const suggested = suggestTarget(genre);
   const target = ownTarget ?? String(suggested);
 
-  const [step, setStep] = useState<Step>("details");
+  const [step, setStep] = useState<Step>(source ? "source" : "details");
+
+  /* Whether the file said which pages are its front and back matter. Only an
+     EPUB does; everything else leaves this false and keeps both steps. */
+  const declaresMatter = (imported?.chapters ?? []).some((c) => c.matter);
+  const STEPS = stepsFor(source, declaresMatter);
   /* **Which way the writer just travelled**, so the incoming panel can slide
      in from the side it is arriving from. It is state rather than something
      derived from the old and new step because the *stepper* can also move the
@@ -186,7 +238,16 @@ export function NewBookForm() {
 
   const create = () => {
     const words = Number.parseInt(target.replace(/[^0-9]/g, ""), 10);
-    const { bookId, chapterId } = createBook(title.trim() || "Untitled Book", {
+
+    /* **One set of answers, whichever door was used.** What the writer typed on
+       the details step wins over what the file said — they have just been shown
+       both and edited one — but everything the file knew and this form never
+       asks for (the ISBN, the language, the description an EPUB carries) rides
+       in underneath from `setupFromImport`. That is the whole point of routing
+       imports through this screen: an imported book used to arrive with a title
+       and nothing else, because the dialog that made it asked nothing else. */
+    const setup = {
+      ...(imported ? setupFromImport(imported) : {}),
       subtitle: subtitle.trim() || undefined,
       author: author.trim() || undefined,
       cover: cover ?? undefined,
@@ -194,12 +255,35 @@ export function NewBookForm() {
       genre,
       // A cleared or nonsense field means no goal rather than a goal of zero.
       targetWords: Number.isFinite(words) && words > 0 ? words : undefined,
-    });
+    };
+
+    const made = imported
+      ? createBookFromImport(
+          title.trim() || imported.title || "Untitled Book",
+          imported.chapters,
+          setup,
+        )
+      : createBook(title.trim() || "Untitled Book", setup);
+
+    if (!made) {
+      setSaveError(
+        "That book could not be saved — it may be too large for this browser's storage.",
+      );
+      return;
+    }
+    const { bookId, chapterId } = made;
 
     /* **The pages the last two steps asked for, in one commit.** Binding order
        comes from `picksFrom` rather than from the order they were ticked in,
-       so a dedication ticked after a prologue still lands in front of it. */
-    const picks = picksFrom(picked);
+       so a dedication ticked after a prologue still lands in front of it.
+
+       **Only when those steps were actually shown.** `picked` starts at
+       `defaultPicked()`, so a book whose matter steps were skipped — an EPUB,
+       which already carries its own — would otherwise be given a dedication and
+       two back pages nobody ticked, on top of the ones the file brought. Caught
+       on a real import: seven pages came out of a file that had four. A
+       question that was not asked has no answer to act on. */
+    const picks = declaresMatter ? [] : picksFrom(picked);
     if (picks.length > 0) createMatterPages(bookId, picks);
 
     /* **Whatever they answered, the question has been put.** Without this the
@@ -235,15 +319,24 @@ export function NewBookForm() {
   };
 
   /* One handler for the form's submit, so Return does what the primary button
-     does at every step rather than creating the book from step one. */
+     does at every step rather than creating the book from step one.
+
+     Driven off `STEPS` rather than a chain of named steps, because the road is
+     no longer the same for every book: a blank one has three steps, an EPUB
+     import has two, and a pasted manuscript has four. The last step creates,
+     whichever step that turns out to be. */
+  const at = STEPS.indexOf(step);
+  const isLast = at === STEPS.length - 1;
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (step === "details") goTo("front");
-    else if (step === "front") goTo("back");
-    else create();
+    // The source step is left by reading a manuscript, not by pressing on.
+    if (step === "source") return;
+    if (isLast) create();
+    else goTo(STEPS[at + 1]);
   };
 
-  const back = () => goTo(step === "back" ? "front" : "details");
+  const back = () => goTo(STEPS[Math.max(0, at - 1)]);
 
   return (
     <main
@@ -294,8 +387,31 @@ export function NewBookForm() {
           Create a new book
         </h1>
 
-        <Stepper step={step} onGo={goTo} />
+        <Stepper step={step} steps={STEPS} onGo={goTo} />
 
+        {/* **The source step stands alone, outside the two-column layout.**
+            Everything after it is a question *about* a book, drawn beside the
+            cover being built; this one is the step where there is not a book
+            yet. Reading a manuscript moves the writer on by itself — there is
+            nothing to press once a file has been chosen, and a Next button
+            under a drop zone would be a second way to do the thing the drop
+            already did. The title comes from the file and is editable on the
+            very next step. */}
+        {step === "source" ? (
+          <div className="mt-8">
+            <SourceStep
+              kind={kind}
+              onKind={setKind}
+              onBook={(book) => {
+                setImported(book);
+                if (!title.trim()) setTitle(book.title);
+                if (book.author && !author.trim()) setAuthor(book.author);
+                if (book.cover && !cover) setCover(book.cover);
+                goTo("details");
+              }}
+            />
+          </div>
+        ) : (
         <form onSubmit={submit} className="mt-8">
           {/* **Two boxes rather than one column**, at the owner's request: the
               cover on the left, everything a shop or a shelf reads on the
@@ -622,7 +738,7 @@ export function NewBookForm() {
                 has an edge now, and a caption tucked against it reads as part
                 of the button. */}
             <div className="flex min-w-0 items-center gap-3">
-              {step !== "details" && (
+              {at > 0 && (
                 <button
                   type="button"
                   onClick={back}
@@ -636,10 +752,19 @@ export function NewBookForm() {
                   says "Next" at both steps and a control that changes width as
                   you tick is a control that moves under the pointer. Hidden on
                   a narrow screen, where the two controls need the room. */}
-              {step !== "details" && (
+              {(step === "front" || step === "back") && (
                 <p className="hidden font-sans text-xs text-muted sm:block">
                   {pagesLabel(countPicked(picked, step))} selected. You can add
                   or delete any of these later.
+                </p>
+              )}
+              {saveError && (
+                <p
+                  role="alert"
+                  className="font-sans text-xs"
+                  style={{ color: "var(--color-danger)" }}
+                >
+                  {saveError}
                 </p>
               )}
             </div>
@@ -651,10 +776,11 @@ export function NewBookForm() {
                          transition-colors hover:bg-accent-strong
                          focus-visible:ring-2 focus-visible:ring-accent/60"
             >
-              {step === "back" ? "Create book" : "Next"}
+              {isLast ? "Create book" : "Next"}
             </button>
           </div>
         </form>
+        )}
       </div>
     </main>
   );
@@ -665,9 +791,15 @@ export function NewBookForm() {
  *
  * **A wizard with no indicator is a wizard with no end**, which is the whole
  * job here: pressing "Next" on a screen that gave no sign it was the first of
- * three is how a two-minute setup starts feeling open-ended. Three is few
- * enough to name each one rather than counting them, and the names are the
- * questions — "Before the story" says what is coming in a way "Step 2" cannot.
+ * three is how a two-minute setup starts feeling open-ended. Few enough to name
+ * each one rather than counting them, and the names are the questions —
+ * "Before the story" says what is coming in a way "Step 2" cannot.
+ *
+ * **The list is passed in, because it is no longer always the same three.** A
+ * blank book answers three questions, a pasted manuscript four, and an EPUB two
+ * — the file having already said which of its pages are front and back matter.
+ * Numbering off a fixed array would have drawn a fourth step nobody was going
+ * to be shown.
  *
  * **A step already answered is a button; one not reached yet is not.** Going
  * back to change the title should not mean pressing Back twice, and the
@@ -676,12 +808,20 @@ export function NewBookForm() {
  * forbid. Nothing is validated, so there is nothing to jump *over* — Next is
  * the only way forward and the numbers are a map rather than a shortcut.
  */
-function Stepper({ step, onGo }: { step: Step; onGo: (step: Step) => void }) {
-  const at = STEPS.indexOf(step);
+function Stepper({
+  step,
+  steps,
+  onGo,
+}: {
+  step: Step;
+  steps: readonly Step[];
+  onGo: (step: Step) => void;
+}) {
+  const at = steps.indexOf(step);
 
   return (
     <ol className="mt-5 flex items-center justify-center gap-2 sm:gap-3">
-      {STEPS.map((name, i) => {
+      {steps.map((name, i) => {
         const done = i < at;
         const here = i === at;
 
