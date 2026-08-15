@@ -29,6 +29,39 @@
  *
  */
 
+/**
+ * The one colour each mark is *mostly* made of.
+ *
+ * **Beside the marks rather than beside the thing that uses them**, so that
+ * changing a mark's fill and forgetting its hue is a one-file mistake rather
+ * than a two-file one. Nothing here is decorative on its own: the landing
+ * page's tool cloud tints each tile's ground, border and shadow from this, so
+ * a wrong entry shows up as a tile whose plate does not match the logo on it.
+ *
+ * Where a mark carries two or three fills this is the *body* of the shape, not
+ * the brightest part — `trend` and `send` both open on a pale highlight, and
+ * taking the first fill in the file would have tinted their tiles from a
+ * colour the eye reads as an accent rather than as the mark's own.
+ */
+export const TOOL_MARK_HUES: Record<string, string> = {
+  package: "#2563eb",
+  compass: "#059669",
+  ruler: "#f59e0b",
+  shelf: "#7c3aed",
+  quote: "#8b5cf6",
+  tag: "#0891b2",
+  form: "#0d9488",
+  image: "#f472b6",
+  search: "#3b82f6",
+  arc: "#10b981",
+  lines: "#6366f1",
+  trend: "#3b82f6",
+  shield: "#0ea5e9",
+  wallet: "#f59e0b",
+  coins: "#047857",
+  send: "#2563eb",
+};
+
 export const TOOL_MARKS: Record<string, React.ReactNode> = {
   // ---- Get it out ---------------------------------------------------------
 
@@ -78,17 +111,33 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
   /** A quotation, which is all a blurb is. */
   quote: (
     <>
-      <rect x="2.4" y="3.6" width="19.2" height="13.6" rx="3.6" fill="#8b5cf6" />
+      <rect
+        x="2.4"
+        y="3.6"
+        width="19.2"
+        height="13.6"
+        rx="3.6"
+        fill="#8b5cf6"
+      />
       <path d="M6.6 17.2h5.2l-5.2 4.2Z" fill="#8b5cf6" />
-      <path d="M10.6 7.9c-2.2.5-3.5 2-3.5 3.9v2.3h3.7v-3.4H9c.1-.8.6-1.3 1.6-1.5Z" fill="#ffffff" />
-      <path d="M17.6 7.9c-2.2.5-3.5 2-3.5 3.9v2.3h3.7v-3.4H16c.1-.8.6-1.3 1.6-1.5Z" fill="#ffffff" />
+      <path
+        d="M10.6 7.9c-2.2.5-3.5 2-3.5 3.9v2.3h3.7v-3.4H9c.1-.8.6-1.3 1.6-1.5Z"
+        fill="#ffffff"
+      />
+      <path
+        d="M17.6 7.9c-2.2.5-3.5 2-3.5 3.9v2.3h3.7v-3.4H16c.1-.8.6-1.3 1.6-1.5Z"
+        fill="#ffffff"
+      />
     </>
   ),
 
   /** The shelf label a shop files you under. */
   tag: (
     <>
-      <path d="M12.6 2.6H20a1.4 1.4 0 0 1 1.4 1.4v7.4a2.2 2.2 0 0 1-.65 1.56l-7.8 7.8a2.2 2.2 0 0 1-3.1 0l-6.6-6.6a2.2 2.2 0 0 1 0-3.1l7.8-7.8a2.2 2.2 0 0 1 1.55-.66Z" fill="#0891b2" />
+      <path
+        d="M12.6 2.6H20a1.4 1.4 0 0 1 1.4 1.4v7.4a2.2 2.2 0 0 1-.65 1.56l-7.8 7.8a2.2 2.2 0 0 1-3.1 0l-6.6-6.6a2.2 2.2 0 0 1 0-3.1l7.8-7.8a2.2 2.2 0 0 1 1.55-.66Z"
+        fill="#0891b2"
+      />
       <circle cx="16.9" cy="7.1" r="1.9" fill="#ffffff" />
     </>
   ),
@@ -103,9 +152,30 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
    */
   form: (
     <>
-      <rect x="3.8" y="2.6" width="16.4" height="18.8" rx="2.6" fill="#0d9488" />
-      <rect x="6.8" y="6.4" width="10.4" height="1.9" rx="0.95" fill="#ffffff" />
-      <rect x="6.8" y="10.2" width="10.4" height="1.9" rx="0.95" fill="#5eead4" />
+      <rect
+        x="3.8"
+        y="2.6"
+        width="16.4"
+        height="18.8"
+        rx="2.6"
+        fill="#0d9488"
+      />
+      <rect
+        x="6.8"
+        y="6.4"
+        width="10.4"
+        height="1.9"
+        rx="0.95"
+        fill="#ffffff"
+      />
+      <rect
+        x="6.8"
+        y="10.2"
+        width="10.4"
+        height="1.9"
+        rx="0.95"
+        fill="#5eead4"
+      />
       <rect x="6.8" y="14" width="6.2" height="1.9" rx="0.95" fill="#5eead4" />
     </>
   ),
@@ -115,7 +185,10 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
     <>
       <rect x="2.4" y="4" width="19.2" height="16" rx="3.4" fill="#f472b6" />
       <circle cx="8.4" cy="9.6" r="2.1" fill="#fde68a" />
-      <path d="M21.6 14.6V16.6a3.4 3.4 0 0 1-3.4 3.4H5.8a3.4 3.4 0 0 1-3.4-3.4v-.4l4.8-4.8 3.6 3.6 4.2-4.2Z" fill="#be185d" />
+      <path
+        d="M21.6 14.6V16.6a3.4 3.4 0 0 1-3.4 3.4H5.8a3.4 3.4 0 0 1-3.4-3.4v-.4l4.8-4.8 3.6 3.6 4.2-4.2Z"
+        fill="#be185d"
+      />
     </>
   ),
 
@@ -138,7 +211,10 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
   /** The rise and fall a novel is shaped on, with its peak marked. */
   arc: (
     <>
-      <path d="M1.8 20.4c2.8-9.6 6.2-14.4 10.2-14.4s7.4 4.8 10.2 14.4Z" fill="#10b981" />
+      <path
+        d="M1.8 20.4c2.8-9.6 6.2-14.4 10.2-14.4s7.4 4.8 10.2 14.4Z"
+        fill="#10b981"
+      />
       <circle cx="12" cy="5.4" r="3" fill="#f59e0b" />
     </>
   ),
@@ -146,7 +222,10 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
   /** A page, counted rather than corrected. */
   lines: (
     <>
-      <path d="M4.8 2.4h8.4L19.6 8.8V19a2.6 2.6 0 0 1-2.6 2.6H4.8A2.6 2.6 0 0 1 2.2 19V5A2.6 2.6 0 0 1 4.8 2.4Z" fill="#6366f1" />
+      <path
+        d="M4.8 2.4h8.4L19.6 8.8V19a2.6 2.6 0 0 1-2.6 2.6H4.8A2.6 2.6 0 0 1 2.2 19V5A2.6 2.6 0 0 1 4.8 2.4Z"
+        fill="#6366f1"
+      />
       <path d="M13.2 2.4 19.6 8.8h-6.4Z" fill="#c7d2fe" />
       <path
         d="M6.4 12.4h8M6.4 15.6h8M6.4 18.8h5"
@@ -169,7 +248,10 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
   /** A shield, for the one tool that exists to defend you. */
   shield: (
     <>
-      <path d="M12 2 3.8 5.1v6.6c0 5.1 3.4 9.2 8.2 10.7 4.8-1.5 8.2-5.6 8.2-10.7V5.1Z" fill="#0ea5e9" />
+      <path
+        d="M12 2 3.8 5.1v6.6c0 5.1 3.4 9.2 8.2 10.7 4.8-1.5 8.2-5.6 8.2-10.7V5.1Z"
+        fill="#0ea5e9"
+      />
       <path
         d="m8.3 11.9 2.6 2.6 4.8-5.2"
         stroke="#ffffff"
@@ -185,7 +267,14 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
   /** A wallet, closed — the point being what to check before it opens. */
   wallet: (
     <>
-      <rect x="2.4" y="4.8" width="19.2" height="14.4" rx="3.4" fill="#f59e0b" />
+      <rect
+        x="2.4"
+        y="4.8"
+        width="19.2"
+        height="14.4"
+        rx="3.4"
+        fill="#f59e0b"
+      />
       <path d="M2.4 8.4h19.2v3H6.2a1.5 1.5 0 0 1 0-3Z" fill="#fcd34d" />
       <rect x="13.2" y="9.6" width="9.2" height="5" rx="2.5" fill="#b45309" />
       <circle cx="16.6" cy="12.1" r="1.4" fill="#ffffff" />
@@ -196,7 +285,10 @@ export const TOOL_MARKS: Record<string, React.ReactNode> = {
   coins: (
     <>
       <path d="M4 11.4v4c0 1.9 3.6 3.4 8 3.4s8-1.5 8-3.4v-4Z" fill="#047857" />
-      <path d="M4 7.2v4.2c0 1.9 3.6 3.4 8 3.4s8-1.5 8-3.4V7.2Z" fill="#10b981" />
+      <path
+        d="M4 7.2v4.2c0 1.9 3.6 3.4 8 3.4s8-1.5 8-3.4V7.2Z"
+        fill="#10b981"
+      />
       <ellipse cx="12" cy="7.2" rx="8" ry="3.4" fill="#6ee7b7" />
     </>
   ),
