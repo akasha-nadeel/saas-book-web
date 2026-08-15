@@ -2276,88 +2276,55 @@ export function LandingPage() {
                 </>
               }
             />
-            <table className="mt-12 w-full border-separate border-spacing-0 text-left max-md:block">
-              <thead className="max-md:hidden">
+            {/*
+              **Separated cards, and still a `<table>`.**
+
+              It was one unbroken grid: cells butted together with shared
+              hairlines, a ✕/✓ beside every line, and two column headings
+              carrying the same two marks at the top. The style is the owner's
+              — cards with air between them, a small label on each, no icons —
+              and the markup underneath is deliberately unchanged.
+
+              A refusal and the work we do instead are a *pair*; that is the
+              whole argument of the section, and a pair is what a table row is.
+              Rebuilt as two `<div>` columns it would read to a screen reader as
+              four unrelated refusals followed by four unrelated promises, with
+              nothing saying which answers which. So the cells simply became
+              cards: `border-spacing` puts the air in, each cell takes its own
+              border and radius, and the row still binds the two.
+
+              The headings stay for the same reason and go `sr-only`: they are
+              the accessible names for the columns, and the cards carry the
+              same two words visibly. Printing both would say it twice.
+            */}
+            <table className="mt-12 w-full border-separate border-spacing-x-0 border-spacing-y-4 text-left md:border-spacing-x-4">
+              <thead className="sr-only">
                 <tr>
-                  <th
-                    scope="col"
-                    className="w-1/2 rounded-tl-2xl border-x border-t border-stop-line bg-stop-bg px-7 pt-6 pb-4 align-bottom"
-                  >
-                    <span
-                      className="font-code flex items-center gap-3 text-[0.9375rem] font-semibold tracking-[0.12em] uppercase"
-                      style={{ color: STOP }}
-                    >
-                      <Icon
-                        name="cross"
-                        className="h-[23px] w-[23px]"
-                        weight={2.3}
-                      />
-                      What we will not do
-                    </span>
-                  </th>
-                  <th
-                    scope="col"
-                    className="rounded-tr-2xl border-x border-t border-ok-line bg-ok-bg px-7 pt-6 pb-4 align-bottom"
-                  >
-                    <span
-                      className="font-code flex items-center gap-3 text-[0.9375rem] font-semibold tracking-[0.12em] uppercase"
-                      style={{ color: PASS }}
-                    >
-                      <Icon
-                        name="check"
-                        className="h-[23px] w-[23px]"
-                        weight={2.3}
-                      />
-                      What we do instead
-                    </span>
-                  </th>
+                  <th scope="col">What we will not do</th>
+                  <th scope="col">What we do instead</th>
                 </tr>
               </thead>
               <tbody className="max-md:block">
-                {REFUSALS.map(([name, why, doTitle, doNote], i) => {
-                  const last = i === REFUSALS.length - 1;
-                  return (
-                    <tr key={name} className="max-md:block max-md:pt-4">
-                      <td
-                        className={`bg-stop-bg px-7 py-7 align-top max-md:block max-md:rounded-2xl max-md:border max-md:border-stop-line md:border-x md:border-t md:border-x-stop-line md:border-t-stop-line ${
-                          last
-                            ? "md:rounded-bl-2xl md:border-b md:border-b-stop-line"
-                            : ""
-                        }`}
-                      >
-                        <Point
-                          mark="cross"
-                          tone={STOP}
-                          title={name}
-                          note={why}
-                        />
-                      </td>
-                      <td
-                        className={`bg-ok-bg px-7 py-7 align-top max-md:mt-4 max-md:block max-md:rounded-2xl max-md:border max-md:border-ok-line md:border-x md:border-t md:border-x-ok-line md:border-t-ok-line ${
-                          last
-                            ? "md:rounded-br-2xl md:border-b md:border-b-ok-line"
-                            : ""
-                        }`}
-                      >
-                        {/* The column header is hidden on a phone, so the
-                            label comes back per row. Its mark does not — the
-                            point below is already carrying one. */}
-                        <span
-                          className="font-code mb-3 block text-[0.9375rem] font-semibold tracking-[0.12em] uppercase md:hidden"
-                          style={{ color: PASS }}
-                        >
-                          What we do instead
-                        </span>
-                        <Point
-                          mark="check"
-                          tone={PASS}
-                          title={doTitle}
-                          note={doNote}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
+                {REFUSALS.map(([name, why, doTitle, doNote]) => (
+                  <tr key={name} className="max-md:block">
+                    <td className="rounded-2xl border-2 border-stop-line bg-stop-bg px-7 py-7 align-top max-md:block md:w-1/2">
+                      <Point
+                        eyebrow="Will not"
+                        tone={STOP}
+                        title={name}
+                        note={why}
+                      />
+                    </td>
+                    <td className="rounded-2xl border-2 border-ok-line bg-ok-bg px-7 py-7 align-top max-md:mt-4 max-md:block md:w-1/2">
+                      <Point
+                        eyebrow="Instead"
+                        tone={PASS}
+                        title={doTitle}
+                        note={doNote}
+                      />
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -3220,27 +3187,44 @@ function Rejection({
  * at a hairline it was the quietest thing in a row it should lead.
  */
 function Point({
-  mark,
+  eyebrow,
   tone,
   title,
   note,
 }: {
-  mark: "cross" | "check";
+  /** The card's own label, since the column headings are `sr-only` now. */
+  eyebrow: string;
   tone: string;
   title: string;
   note: string;
 }) {
   return (
-    <div className="flex items-start gap-3.5">
-      <span className="mt-0.5 shrink-0" style={{ color: tone }}>
-        <Icon name={mark} className="h-[28px] w-[28px]" weight={2.3} />
-      </span>
-      <div>
-        <p className="oc-heading font-serif text-xl leading-snug text-lp-ink">
-          {title}
-        </p>
-        <p className="mt-2 text-sm leading-relaxed">{note}</p>
-      </div>
+    <div>
+      {/* The one thing on the card that carries the hue. The title stays in
+          `lp-ink` and the note in the section's body grey: a card tinted red
+          with red type on it is a warning, and half of these are the opposite
+          of one. */}
+      <p
+        className="font-code text-[0.8125rem] font-semibold tracking-[0.14em] uppercase"
+        style={{ color: tone }}
+      >
+        {eyebrow}
+      </p>
+      {/* **The FAQ's question and answer, verbatim.** Those two lines are the
+          page's existing treatment for a short claim followed by the paragraph
+          that qualifies it, which is exactly the job these cards do — so they
+          take the same face, size, weight and leading rather than a fourth
+          scale invented for one section.
+
+          `lp-soft` for the body, and it is the one value that had to be
+          checked rather than copied: the FAQ sits on white and these cards sit
+          on a tint. It measures 8.7:1 on `stop-bg` and 9.0:1 on `ok-bg`, so it
+          carries over comfortably — unlike `lp-deck`, which is tuned to white
+          and fails on both. */}
+      <p className="oc-heading mt-3 font-serif text-[1.375rem] leading-snug font-semibold text-lp-ink sm:text-[1.5rem]">
+        {title}
+      </p>
+      <p className="mt-3 text-[1.0625rem] leading-[1.6] text-lp-soft">{note}</p>
     </div>
   );
 }
