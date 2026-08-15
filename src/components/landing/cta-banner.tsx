@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ToolMarquee } from "@/components/landing/tool-marquee";
 import { SECTION_TITLE } from "@/components/landing/type";
 
 /**
@@ -113,6 +114,14 @@ export function CtaBanner() {
         </div>
       </div>
 
+      {/* The sixteen tools going past, under the ask and above the footer —
+          see `tool-marquee.tsx`. It sits outside the `max-w-6xl` column on
+          purpose: a marquee that stops at the page's measure reads as a
+          widget in a box, where one running the full width reads as the row
+          carrying on past the screen, which is what it is. */}
+      <div className="pb-14 sm:pb-16">
+        <ToolMarquee />
+      </div>
     </section>
   );
 }

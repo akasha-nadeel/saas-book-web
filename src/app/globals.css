@@ -1325,6 +1325,54 @@ body {
 }
 
 /* --------------------------------------------------------------------------
+   The closing marquee.
+
+   Each row holds its list twice and travels exactly half its own width, so at
+   the end of the cycle the second copy sits precisely where the first began
+   and the loop is seamless. That is why the duplicate in `tool-marquee.tsx` is
+   not optional — with one copy the row would run out and snap back.
+
+   The duration is set per row as an inline `animation-duration`, so the three
+   rows drift apart instead of marching in step. Direction is the only thing
+   these two classes differ by.
+   -------------------------------------------------------------------------- */
+.oc-marquee-left {
+  animation: oc-marquee-left linear infinite;
+}
+
+.oc-marquee-right {
+  animation: oc-marquee-right linear infinite;
+}
+
+@keyframes oc-marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes oc-marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Stopped, not slowed. A row that crawls is still a row somebody asked not to
+   have moving, and stopping it leaves a legible line of tools rather than
+   nothing — the content is the same either way. */
+@media (prefers-reduced-motion: reduce) {
+  .oc-marquee-left,
+  .oc-marquee-right {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
    The manuscript's own scrollbar.
 
    .scroll-slim leaves the track transparent, which lets the browser fill the
