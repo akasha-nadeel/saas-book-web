@@ -5,6 +5,9 @@ import {
   extractDraft,
   MAX_WORKSHOP_OPENING,
   replyWithoutDraft,
+  shortDraftNote,
+  TARGET_WORDS,
+  wordCount,
   WORKSHOP_SYSTEM,
   type WorkshopMessage,
 } from "./blurb-workshop";
@@ -166,5 +169,94 @@ describe("the bubble the reader sees", () => {
 
   it("leaves an ordinary question alone", () => {
     expect(replyWithoutDraft("What does she want?")).toBe("What does she want?");
+  });
+});
+
+describe("shortDraftNote", () => {
+  const say = (words: number) => "word ".repeat(words).trim();
+
+  /*
+   * The case from the screenshot that prompted this: three short facts in, a
+   * 34-word blurb out, and nothing on screen explaining why. A writer
+   * reasonably reads that as the feature being broken.
+   */
+  it("explains a draft that came out well under the target", () => {
+    const note = shortDraftNote(say(34));
+    expect(note).toContain("34 words");
+    expect(note).toContain(String(TARGET_WORDS));
+  });
+
+  /*
+   * **It points at what the writer said, never at the manuscript**, and that is
+   * the finding rather than a preference. Measured: the same model, with no
+   * manuscript either way, gave nothing usable from three short facts and 118
+   * words from one detailed answer. A note blaming empty chapters would send
+   * somebody off to write prose when the fix is another sentence in the box.
+   */
+  it("does not blame the manuscript", () => {
+    const note = shortDraftNote(say(30))!;
+    expect(note).not.toMatch(/manuscript|chapter|write your book/i);
+  });
+
+  /* A fact and a next step. Never a verdict on the writing. */
+  it("passes no judgement on the blurb", () => {
+    const note = shortDraftNote(say(30))!;
+    expect(note).not.toMatch(/\b(bad|poor|weak|too short|improve|better)\b/i);
+  });
+
+  it("says nothing about a full-length draft", () => {
+    expect(shortDraftNote(say(TARGET_WORDS))).toBeNull();
+    expect(shortDraftNote(say(TARGET_WORDS * 2))).toBeNull();
+  });
+
+  /*
+   * A good short blurb is a good blurb. The threshold is loose so the note is
+   * rare — one that fires on every draft is furniture nobody reads.
+   */
+  it("leaves a respectable short draft alone", () => {
+    expect(shortDraftNote(say(120))).toBeNull();
+    expect(shortDraftNote(say(100))).toBeNull();
+  });
+
+  it("has nothing to say about an empty draft", () => {
+    expect(shortDraftNote("")).toBeNull();
+    expect(shortDraftNote("   ")).toBeNull();
+  });
+});
+
+describe("wordCount", () => {
+  it("counts words rather than spaces", () => {
+    expect(wordCount("one two three")).toBe(3);
+    expect(wordCount("  padded   out  ")).toBe(2);
+    expect(wordCount("line\nbreak")).toBe(2);
+    expect(wordCount("")).toBe(0);
+  });
+});
+
+describe("the target is stated once", () => {
+  /*
+   * The prompt used to carry "around 150 words" as prose, with the screen
+   * saying nothing. Now both read `TARGET_WORDS`, so the figure a writer is
+   * shown is the figure the model was actually asked for.
+   */
+  it("is the figure the prompt asks for", () => {
+    expect(WORKSHOP_SYSTEM).toContain(`around ${TARGET_WORDS} words`);
+  });
+});
+
+describe("the note claims nothing it cannot back", () => {
+  /*
+   * **It says what this tool aims for, never what books average**, and that
+   * wording was arrived at the hard way — see the note on `TARGET_WORDS`.
+   * "Most blurbs run about 150" was checked and could not be backed: named
+   * bestsellers carry 236–304 words, while Google Books' description field
+   * across 416 records has a median of 57. The second is a fact about
+   * catalogue metadata rather than about blurbs, so neither number can be
+   * printed as though it described the world.
+   */
+  it("does not claim to know what published blurbs average", () => {
+    const note = shortDraftNote("word ".repeat(30))!;
+    expect(note).not.toMatch(/most blurbs|average|typical(ly)?|published books/i);
+    expect(note).toContain(`aims for about ${TARGET_WORDS}`);
   });
 });

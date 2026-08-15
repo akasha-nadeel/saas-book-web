@@ -387,11 +387,14 @@ while nothing has been checked the covers are the page, and the field is the
 thing you use on them. The paragraph explaining what the button would do is
 gone: it described the button to somebody looking at the button. And the
 verdict — the coloured card with the count, the reason and the provenance — is
-a **toast** (`TitleToast` + `Verdict`), top right, dismissible, *never* on a
-timer: it is the answer rather than a save confirmation, it takes longer to
-read than any timeout, and the shelves it describes stay on the page, so
-closing it loses the summary and none of the evidence. Dismissal is remembered
-against the title it was about, so the next check brings its own.
+a **banner** (`VerdictBanner` + `VerdictActions`), full width, directly under
+the field, carrying *Try another* and *Keep it*. It is *never* on a timer: it
+is the answer rather than a save confirmation, it takes longer to read than any
+timeout, and the shelves it describes stay on the page, so dismissing it loses
+the summary and none of the evidence. (This passage described a top-right toast
+called `TitleToast` until 2026-08-15; there has never been a component by that
+name in `src`, so anyone looking for one was hunting something that does not
+exist.)
 
 **The comps screen is one box: shelves, then the search, then the covers.**
 The three were loose on the page with nothing saying where the controls ended
@@ -512,6 +515,15 @@ clean parse is tried before any bracket scan, since scanning a bare array for
 `{` finds the first *element's* brace and silently parses one pick as the whole
 reply.
 
+**Ranking is the second of three routes that send prose** — the assistant, this,
+and the blurb workshop — and the opening of the manuscript goes, because
+whether a book *sounds* like another is what a keyword search cannot answer.
+Capped at a couple of pages by `openingFrom()`, cut at a paragraph
+(a severed clause is a false signal about how the writer ends sentences),
+images dropped, sent only on a press — and the card lists exactly what leaves
+*before* the button, the same shape the feedback dialog uses. Add a field to
+what is sent and add it to that list, and to `/privacy`.
+
 **A third route answers the shop’s form rather than the librarian’s.**
 `/api/comps/categories` (POST, `requirePro()`, a model via `ai.ts`) over the pure
 `src/lib/comps/shelves.ts` translates the librarian subjects `subjects.ts`
@@ -530,10 +542,38 @@ way to ask: `ANTHROPIC_API_KEY` makes it Claude, `GOOGLE_GENERATIVE_AI_API_KEY`
 makes it Gemini, both set and Claude wins, `OPENCHAPTER_MODEL` overrides the
 model name without a deploy. `modelProvider()` returning null is how a route
 answers 501 with a message saying so, the same shape as everything else here.
-Three things about it are deliberate. **The assistant is not routed through
-it** — `/api/chat` streams, caches the chapter in a system block across turns,
-and stays on the Anthropic SDK directly; this is for short, bounded, one-shot
-calls. **Nor is the gateway used**, though narration and transcription go
+Three things about it are deliberate. **The assistant now goes through it too,
+as of 2026-08-15, and `streamModel` is the second half of the file.** It did
+not: `/api/chat` streams, caches the chapter across turns and reasons about
+prose, so it stayed on the Anthropic SDK and this note said `ai.ts` was for
+short, bounded, one-shot calls — while naming, correctly, where streaming
+belonged if it were ever wanted for both providers. It was: a deployment with
+only a Google key had every other model route working and a dead assistant
+telling it to go and fetch an Anthropic key. `askModel` is untouched; the two
+paths share only the provider choice, which is the point — an installation has
+one answer to "is there a model" rather than two. Three things inside it are
+load-bearing:
+
+- **`splitSse` is pure and tested because a network chunk is not a message.**
+  One `read()` can carry half an event, and a splitter that parsed whatever it
+  was handed would drop that half silently — the JSON fails, the piece is
+  skipped, and a long reply loses about a token in ten in a way that reads as
+  the model writing badly. CRLF gets the same treatment for a louder reason: a
+  stray `\r` makes every payload a parse error, so the reply arrives empty.
+- **The first chunk is pulled before the response is returned.** That is what
+  keeps a rejected key a 401 instead of a 200 with an apology in the prose. Once
+  the first byte is out the status is spent, so a failure after that can only be
+  a note in the stream — the two paths are the two halves of one failure, told
+  apart by whether the writer has seen anything yet.
+- **There are two model tiers now** (`DEFAULTS.task` / `.chat`, and
+  `OPENCHAPTER_CHAT_MODEL` beside `OPENCHAPTER_MODEL`). Not tidiness: the route
+  named `claude-opus-4-8` itself and `ai.ts` defaulted to `claude-sonnet-5`, so
+  folding one into the other would have quietly downgraded the assistant.
+  Google is the same id in both tiers on purpose — a wrong model name fails as a
+  404 behind a screen that says the assistant is unavailable, so it stays on the
+  id the six working routes already prove.
+
+**Nor is the gateway used**, though narration and transcription go
 through it on `AI_GATEWAY_API_KEY` and it would have been the tidier home: it
 was tried, and the gateway refuses every request without a card on file. And
 **Gemini is written out over its REST API** rather than pulled in via
@@ -590,13 +630,36 @@ Four things hold it, and the first is the interesting one:
   description to describe the same book — a suggested trope the book lacks is a
   rule broken rather than bad advice.
 
-**This is the second of three routes that send prose** — the assistant, this,
-and the blurb workshop — and the opening of the manuscript goes, because
-whether a book *sounds* like another is what a keyword search cannot answer. Capped at a couple of pages, cut at a paragraph
-(a severed clause is a false signal about how the writer ends sentences),
-images dropped, sent only on a press — and the card lists exactly what leaves
-*before* the button, the same shape the feedback dialog uses. Add a field to
-what is sent and add it to that list.
+**A seventh route is the conversation about those same boxes**, and it is a
+sibling of the press rather than a replacement for it.
+`/api/comps/keywords/chat` (POST, `requirePro()`, a model via `ai.ts`) over the
+pure `src/lib/keywords/workshop.ts` answers "which seven, and why" where the
+press answers "give me seven from the blurb"; the two sit under one parent so
+the whole feature is found in one place, and they **share `keepUsable`**, so
+neither can offer a phrase the other's checker would flag. It is the blurb
+workshop's four rules pointed at a different form field — candidates are
+**tagged** (`<keywords>`, so a turn that answers a question has no button under
+it), the **checker is still the filter**, nothing reaches the book without a
+press (empty slots only, into the draft), and **no prose leaves**: the
+conversation, blurb, genre, categories, listing names and the seven boxes as
+they stand, all form fields. Two things are its own. The **rules are given, not
+recalled** — the system prompt states the shop's own numbers and prohibitions,
+including that seven boxes of fifty characters is Amazon's shape and not a
+standard, so an answer about Kobo or IngramSpark does not quietly assume KDP.
+And the refusal of a search volume is repeated *to the model* as a hard rule,
+because a plausible number beside a real keyword would be the most believable
+invented thing in the app.
+
+**`src/lib/keywords/guide.ts` is the same knowledge with no model behind it,
+and that is the point.** A self-hosted copy has no key, a free account runs out
+of conversations, a gateway has a bad afternoon — and in every one of those the
+writer still has seven empty boxes and a book to publish. So the whole of what
+the chat knows is also written down, free, offline and readable signed out
+(`keyword-guide.tsx`, dynamically imported by the categories screen). Every
+fact in it was checked against the shop's own help pages rather than the
+folklore, `SOURCES` records which, and a test asserts it offers no invented
+number — a guide is exactly where one would be most believable, because it
+reads as documentation rather than as a guess.
 
 **The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. The surface
 is keyed on `${chapterId}:${storedText}` so a save from another tab reloads it
@@ -870,6 +933,20 @@ And `createMatterPages` takes the whole list in **one commit** — a dozen pages
 through a single-page function would be a dozen shelf writes, fan-outs and
 pushes for one gesture.
 
+**Two screens ask it now, and `src/lib/matter-picks.ts` is what keeps them
+saying the same thing.** `/book/new` grew the same question as two steps of its
+own on 2026-08-15 (`new-book-form.tsx`: details → front → back), so the dialog
+is for a book that arrived some other way — an import, or one made before the
+wizard existed. The three things the two must agree about live in that module
+rather than in either of them: what is ticked to begin with (`SUGGESTED` — a
+dedication at the front, two pages at the back, and *not* everything that looks
+standard, which is how a setup screen turns back into the Start button it
+replaced), how a tick is keyed (`matterKey`, `"part:title"`, because both parts
+could hold a Glossary and a set of bare titles would tick both), and the order
+the pages come out in (`picksFrom`). Two copies of `SUGGESTED` would be two
+answers to "what does a first novel usually have", which is the drift `usual`
+in `matter.ts` exists to avoid.
+
 **Where the generated pages and the written ones meet.** Three of the front
 sections — title, copyright, contents — can now come from either side, and a
 book carrying both got two title pages on consecutive sheets. `writtenPages()`
@@ -1126,10 +1203,16 @@ type-checked. `auth-redirect.ts` is `safeNext()`, the open-redirect guard on the
 (protocol-relative, and reads as a path if you only check the leading slash) and
 anything with a backslash. Anyone can put anything in that query string.
 
-**The assistant** is `src/app/api/chat/route.ts` — Anthropic streaming. Needs
-`ANTHROPIC_API_KEY` in `.env.local`; without it the route returns 501 with a
-message saying so. Chapter text is sent only when the writer opens the panel and
-asks, and rides in the (cached) system prompt.
+**The assistant** is `src/app/api/chat/route.ts`, streaming through
+`streamModel` in `ai.ts` — so it runs on **either** `ANTHROPIC_API_KEY` or
+`GOOGLE_GENERATIVE_AI_API_KEY`, whichever is set, with Anthropic winning when
+both are. Without either the route returns 501 with a message naming both, the
+same shape every other model route uses. Chapter text is sent only when the
+writer opens the panel and asks, and rides in the system prompt as `context` —
+its own cached block on Anthropic, joined to the instruction on Gemini, which
+caches a repeated prefix implicitly and has nothing to declare. The Help and
+support dialogs name both keys; they said only Anthropic for a while after this
+changed, which is the documentation-goes-stale rule catching the app itself.
 
 **Audio is three separate things, and they are not interchangeable.** All three
 degrade the way the assistant does — no key, 501 with a message saying so — and
@@ -1254,8 +1337,16 @@ behind it, pushes those books up under their own account.
 
 The SQL behind all that is checked in: `supabase/migrations/` (library,
 book publishing, billing, feedback, collaboration, Paddle). Schema changes
-belong there, not only in the dashboard. **All six are applied to the live
-project** — the first five as of 2026-08-07 and `20260808000000_paddle.sql` on
+belong there, not only in the dashboard. **Five of the six are applied to the
+live project, and `20260801000000_feedback.sql` is not** — verified in the
+browser on 2026-08-15, when pressing Send in the feedback dialog came back
+`404 PGRST205, "Could not find the table 'public.feedback' in the schema
+cache"`. That is the whole of the feedback feature failing silently for every
+writer, and it went unnoticed because the dialog's own "the migration has not
+been applied" branch tested for `42P01`, which PostgREST never returns for a
+table it cannot find at all. The branch is fixed; the migration still has to be
+applied by hand. Read the rest of this paragraph as a description of the other
+five — the first four as of 2026-08-07 and `20260808000000_paddle.sql` on
 2026-08-09, proved by the sandbox checkout writing `provider`,
 `paddle_subscription_id` and a period end into real rows rather than by the SQL
 editor saying "Success". `20260730000000_book_publishing.sql` had been outstanding for a
@@ -1485,7 +1576,8 @@ reads empty strings, so `isPaddleConfigured()` answers false rather than leaking
 a secret. `server.ts` is `requirePro()`, the
 gate in front of `/api/chat`, `/api/narrate`, `/api/transcribe`,
 `/api/comps/query`, `/api/comps/rank`, `/api/comps/categories`,
-`/api/comps/keywords`, `/api/blurb/critique` and `/api/blurb/workshop` — 401 when
+`/api/comps/keywords`, `/api/comps/keywords/chat`, `/api/blurb/critique` and
+`/api/blurb/workshop` — 401 when
 signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
@@ -1584,12 +1676,14 @@ Five things hold it, and the first is the interesting one:
   overwritten silently.
 - **Nothing is persisted**, exactly as the assistant's chat is not — a
   conversation about a draft is scaffolding.
-- **It is not streamed, and that is a deployment decision.** The assistant can
-  afford to be Anthropic-only; this has to run on whichever provider is
-  configured, and `ai.ts` is the only path that does both. Streaming would mean
-  an SSE reader for Gemini's REST API, which is the complication `ai.ts` was
-  scoped to avoid. If it is ever worth streaming, it belongs in `ai.ts` for
-  both providers rather than as a second Anthropic-only route.
+- **It is not streamed, and that is now a choice rather than a constraint.**
+  The reasoning was that this has to run on whichever provider is configured
+  while the assistant could afford to be Anthropic-only, and that an SSE reader
+  for Gemini was the complication `ai.ts` was scoped to avoid. Both halves have
+  since gone: the assistant cannot afford it either, and `streamModel` is that
+  SSE reader, written and tested. So switching this to stream is now swapping
+  `askModel` for `streamModel` and reading the pieces — worth doing if a draft
+  arriving all at once ever feels slow, and deliberately not done on spec.
 
 Send a chapter from the *critique* route and it needs a line on the privacy
 page and a sentence above the button, as the prose report and the workshop
@@ -1608,7 +1702,7 @@ of manuscripts. Four shapes replaced it:
 | **Per day** | comps, covers, title check | 2 / 3 / 2 a day |
 | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
 | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
-| **In total, for good** | keyword suggestions, blurb chat | 5 / 3 ever |
+| **In total, for good** | keyword suggestions, blurb chat, keyword chat | 5 / 3 / 3 ever |
 
 **The fourth shape follows the cost, not the work, and it is the only one that
 never comes back.** The three daily limits guard things that are free to us —
@@ -1620,16 +1714,20 @@ five, ever. Five is what it takes to do one book properly (two or three runs
 before the seven boxes look right), which covers the listing somebody came here
 for and does not cover a backlist.
 
-**The two members of that shape carry different numbers, and the ratio is the
-bill.** A keyword press is one short model call; a blurb conversation is five
-to fifteen, so one of those costs roughly fifty times one of these — hence
-three rather than five. **A blurb conversation is the unit, not a message**:
-counting messages would stop a writer mid-brainstorm, and the interview asks
-four questions before it offers anything. It is spent on the *first message*
-of a chat, so opening the panel and reading it costs nothing, and a reload with
-nothing said costs nothing either. `WORDS.blurbChat` says "conversations" for
-that reason — "3 chats left" beside a chat box would otherwise be read as three
-messages, which is a different and much smaller promise.
+**The members of that shape carry different numbers, and the ratio is the
+bill.** A keyword press is one short model call; a conversation — about a blurb
+or about the seven boxes — is five to fifteen, so one of those costs roughly
+fifty times one of these, hence three rather than five. The two chats are
+counted **separately** (`blurbChat` and `keywordChat`, three each) rather than
+out of one pot, because they belong to different screens and a writer who used
+their allowance on the blurb should not find the keyword box already shut. **A
+conversation is the unit, not a message**: counting messages would stop a
+writer mid-brainstorm, and the blurb interview asks four questions before it
+offers anything. It is spent on the *first message* of a chat, so opening the
+panel and reading it costs nothing, and a reload with nothing said costs
+nothing either. `WORDS` says "conversations" for both for that reason — "3
+chats left" beside a chat box would otherwise be read as three messages, which
+is a different and much smaller promise.
 
 **Its sentences may not borrow the daily vocabulary**, and a test enforces that:
 no "today", no "tomorrow", no "a day", because all three would be untrue of a
@@ -2324,13 +2422,13 @@ grouped there the way `book-tools.ts` groups them.
 
 **API routes:** `/api/chat` (assistant) · `/api/narrate` · `/api/transcribe` ·
 `/api/comps` · `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
-`/api/comps/categories` · `/api/comps/keywords` · `/api/blurb/critique` ·
-`/api/blurb/workshop` ·
+`/api/comps/categories` · `/api/comps/keywords` · `/api/comps/keywords/chat` ·
+`/api/blurb/critique` · `/api/blurb/workshop` ·
 `/api/billing/*`. All of those except
 `/api/comps` and `/api/comps/subjects` are metered and gated by `requirePro()`;
 those two are free, keyless and stay that way — which is the whole reason the
-four model steps around the comps search (query, rank, categories, keywords)
-are routes of their own rather than flags on it.
+model steps around the comps search (query, rank, categories, keywords and the
+keyword chat) are routes of their own rather than flags on it.
 
 ## Styling
 
@@ -2345,14 +2443,55 @@ properties on the manuscript container, which the editor and the reading view
 both read — so one setting styles the writing surface and the read-through alike.
 
 **`src/components/ui/` is the shared-primitive shelf, and it is deliberately
-two files wide** — `menu.tsx` and `spinner.tsx`. Things land there on the third
-copy, not the first: `Spinner` was extracted once a tool screen needed the ring
-the checkout result already drew, because that is how one product ends up with
-two loading states spinning at different weights. Both take `currentColor` and
-inherit whatever they sit on; a fixed colour is invisible in exactly one theme.
-The spinner also carries the standing Tailwind v4 warning in miniature — its
-first draft used `border-current/25`, which v4 silently drops, so it would have
-shipped as a plain circle. Check the built CSS, per the build note above.
+narrow** — `menu.tsx`, `spinner.tsx`, `book-cover.tsx`, `copy-button.tsx`,
+`tool-save.tsx` and `assistant-reply.tsx`. Things land there on the third copy,
+not the first: `Spinner` was extracted once a tool screen needed the ring the
+checkout result already drew, because that is how one product ends up with two
+loading states spinning at different weights. Both it and `Menu` take
+`currentColor` and inherit whatever they sit on; a fixed colour is invisible in
+exactly one theme. The spinner also carries the standing Tailwind v4 warning in
+miniature — its first draft used `border-current/25`, which v4 silently drops,
+so it would have shipped as a plain circle. Check the built CSS, per the build
+note above.
+
+**`assistant-reply.tsx` over the pure `markdown.ts` is what the three assistant
+panels print with**, and it arrived on 2026-08-15 by the third-copy rule
+exactly. The editor's assistant, the blurb workshop and the keyword workshop
+each rendered the model's answer with `whitespace-pre-wrap` — so all three put
+`* **Tightening:** Cut fluff` on screen with the asterisks in it. Every model
+answers in Markdown unprompted; nobody was parsing it. Four things hold it:
+
+- **The parser is written, not installed**, for the reason `ai.ts` writes Gemini
+  out by hand. A CommonMark library is mostly syntax no model emits into a chat
+  panel — reference links, HTML blocks, tables nobody can read in a 300px rail.
+  What is there is the subset that turns up, tested.
+- **Generated text is hostile input, so the output is data and never HTML.**
+  `markdown.ts` returns blocks and runs of plain strings; the component makes
+  React elements. Nothing downstream may reach for `dangerouslySetInnerHTML`.
+  Raw HTML in the source renders as characters, and **a link keeps its words and
+  loses its destination** — a model-supplied URL is attacker-shaped, and the
+  assistant has no reason to send a writer off-site.
+- **Underscores do not emphasise inside a word.** `snake_case_name` had its
+  middle set in italic until a test caught it; CommonMark forbids intraword `_`
+  for this reason, and these replies are full of `ANTHROPIC_API_KEY`. Asterisks
+  are deliberately left loose, because `**Label:**text` is commoner than
+  intraword `*`.
+- **An unclosed code fence renders anyway.** A streaming reply has one on almost
+  every frame, and waiting for the closing fence would make offered prose appear
+  only once the model had finished — the moment a reader is watching hardest.
+
+**What is copyable is what is *offered*, not everything.** `isOffered` says a
+fenced block and a blockquote are where a model puts prose it is handing over;
+those get a button, a paragraph explaining a suggestion does not, or every reply
+becomes a column of buttons and the one that matters stops standing out. The
+editor's assistant adds one for the whole reply, which appears only once the
+reply has finished. And **the clipboard gets the words without the notation** —
+`blockText` drops the marks, because the destination is somebody's novel and
+pasting `**bold**` into a manuscript puts asterisks in a book. The two workshops
+pass `copyable={false}` on the conversation itself: what is worth taking there
+is the draft or the candidate list, which already have their own controls, and a
+second button beside them would be two ways to take the same words, one of which
+does less.
 
 **One greyscale palette in two values.** No hue anywhere except the status
 family below. The dark set is the `@theme` block and the default — `surface`

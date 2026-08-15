@@ -1,6 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import {
+  AssistantReply,
+  replyText,
+} from "@/components/ui/assistant-reply";
+import { CopyButton } from "@/components/ui/copy-button";
 import { useChatScroll } from "@/lib/use-chat-scroll";
 
 /**
@@ -122,21 +127,51 @@ export function ChatPanel({
           </div>
         ) : (
           <ol className="flex flex-col gap-4">
-            {messages.map((message, i) => (
-              <li
-                key={i}
-                className={
-                  message.role === "user"
-                    ? "rounded-md bg-raised px-3 py-2 font-sans text-sm text-fg"
-                    : "px-1 font-sans text-sm leading-relaxed whitespace-pre-wrap text-fg"
-                }
-              >
-                {message.content ||
-                  (busy && i === messages.length - 1 ? (
-                    <span className="text-muted">Thinking…</span>
-                  ) : null)}
-              </li>
-            ))}
+            {messages.map((message, i) =>
+              message.role === "user" ? (
+                <li
+                  key={i}
+                  className="rounded-md bg-raised px-3 py-2 font-sans text-sm text-fg"
+                >
+                  {message.content}
+                </li>
+              ) : (
+                /* **The reply is parsed rather than printed.** It arrives in
+                   Markdown — every model answers that way unprompted — so
+                   printing it put `* **Tightening:**` on screen with the
+                   asterisks in it. `group` is what reveals the copy control
+                   below. */
+                <li key={i} className="group px-1 font-sans">
+                  {message.content ? (
+                    <>
+                      <AssistantReply text={message.content} />
+                      {/* **Copy the whole reply**, beside the per-block
+                          buttons `AssistantReply` draws on offered prose. The
+                          two answer different questions — take this passage,
+                          or take all of it — and this one only appears once
+                          the reply has finished, since copying a half-written
+                          answer is a paste somebody has to redo.
+
+                          Held open on hover, focus *within* (so it can be
+                          reached by keyboard), and while it is saying
+                          "Copied" — which is why `focus-within` is on the row
+                          rather than `focus` on the button. */}
+                      {!(busy && i === messages.length - 1) && (
+                        <div className="mt-1 flex justify-end opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+                          <CopyButton
+                            value={replyText(message.content)}
+                            label="Copy the whole reply"
+                            className="text-muted hover:bg-raised hover:text-fg"
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : busy && i === messages.length - 1 ? (
+                    <span className="text-sm text-muted">Thinking…</span>
+                  ) : null}
+                </li>
+              ),
+            )}
           </ol>
         )}
 

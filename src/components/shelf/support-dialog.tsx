@@ -52,7 +52,8 @@ export function SupportDialog({ onClose }: { onClose: () => void }) {
           </li>
           <li>
             <span className="font-medium text-fg">Assistant silent?</span> It
-            needs an ANTHROPIC_API_KEY set on the server; without one it says so.
+            needs a model key on the server — either an ANTHROPIC_API_KEY or a
+            GOOGLE_GENERATIVE_AI_API_KEY; without one it says so.
           </li>
         </ul>
 

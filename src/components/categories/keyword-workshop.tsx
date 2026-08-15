@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AssistantReply } from "@/components/ui/assistant-reply";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Spinner } from "@/components/ui/spinner";
 import {
   LeftPill,
@@ -269,15 +271,20 @@ export function KeywordWorkshop({
                   </span>
                 </div>
 
-                <p
-                  className={
-                    turn.role === "user"
-                      ? "mt-1.5 ml-auto w-fit max-w-[92%] rounded-xl rounded-tr-sm bg-accent px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-accent-ink"
-                      : "mt-1.5 w-fit max-w-[92%] rounded-xl rounded-tl-sm border border-line bg-surface px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-fg"
-                  }
-                >
-                  {turn.content}
-                </p>
+                {turn.role === "user" ? (
+                  <p className="mt-1.5 ml-auto w-fit max-w-[92%] rounded-xl rounded-tr-sm bg-accent px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap text-accent-ink">
+                    {turn.content}
+                  </p>
+                ) : (
+                  /* **Parsed, not printed** — the reply arrives in Markdown,
+                     so a bulleted answer showed its asterisks. `copyable` is
+                     off for the reason the blurb workshop gives: what is worth
+                     taking from this turn is the candidate list below, which
+                     has its own controls. */
+                  <div className="mt-1.5 w-fit max-w-[92%] rounded-xl rounded-tl-sm border border-line bg-surface px-3 py-2">
+                    <AssistantReply text={turn.content} copyable={false} />
+                  </div>
+                )}
 
                 {/* **The candidates, with the only control that touches the
                     boxes.** Never applied on their own: a model quietly
@@ -292,8 +299,22 @@ export function KeywordWorkshop({
                           className="flex items-baseline justify-between gap-2 text-sm text-fg"
                         >
                           <span>{phrase}</span>
-                          <span className="shrink-0 text-xs text-muted tabular-nums">
-                            {phrase.length}
+                          <span className="flex shrink-0 items-center gap-1">
+                            <span className="text-xs text-muted tabular-nums">
+                              {phrase.length}
+                            </span>
+                            {/* **One phrase per press**, which is the rule
+                                `CopyButton` was written for: a shop gives seven
+                                separate boxes, and a writer taking one of these
+                                candidates by hand is retyping fifty characters
+                                into a fifty-character field. "Use these" fills
+                                the empty boxes here; this is for the one being
+                                pasted somewhere else. */}
+                            <CopyButton
+                              value={phrase}
+                              label={`Copy “${phrase}”`}
+                              className="text-muted hover:bg-raised hover:text-fg"
+                            />
                           </span>
                         </li>
                       ))}

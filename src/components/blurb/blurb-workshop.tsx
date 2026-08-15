@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ReaderMark } from "@/components/blurb/reader-mark";
+import { AssistantReply } from "@/components/ui/assistant-reply";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Spinner } from "@/components/ui/spinner";
 import { displayName, firstNameOf, initialOf } from "@/lib/account";
 import { useAccount } from "@/lib/use-account";
@@ -12,7 +14,11 @@ import {
   LimitNote,
   useLimitGate,
 } from "@/components/upgrade/free-limit";
-import { STARTERS, type WorkshopMessage } from "@/lib/blurb-workshop";
+import {
+  shortDraftNote,
+  STARTERS,
+  type WorkshopMessage,
+} from "@/lib/blurb-workshop";
 import { spendTotalUse } from "@/lib/library-store";
 import { useChatScroll } from "@/lib/use-chat-scroll";
 import { usePrefs } from "@/lib/use-library";
@@ -260,15 +266,21 @@ export function BlurbWorkshop({
                   </span>
                 </div>
 
-                <p
-                  className={
-                    turn.role === "user"
-                      ? "mt-1.5 ml-auto w-fit max-w-[92%] rounded-xl rounded-tr-sm bg-accent px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-accent-ink"
-                      : "mt-1.5 w-fit max-w-[92%] rounded-xl rounded-tl-sm border border-line bg-surface px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-fg"
-                  }
-                >
-                  {turn.content}
-                </p>
+                {turn.role === "user" ? (
+                  <p className="mt-1.5 ml-auto w-fit max-w-[92%] rounded-xl rounded-tr-sm bg-accent px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap text-accent-ink">
+                    {turn.content}
+                  </p>
+                ) : (
+                  /* **Parsed, not printed** — the reply arrives in Markdown,
+                     so a bulleted answer showed its asterisks. `copyable` is
+                     off because this turn's offered prose *is* the draft
+                     below, which has its own controls; a copy button on the
+                     conversation as well would be two ways to take the same
+                     words, one of which does less. */
+                  <div className="mt-1.5 w-fit max-w-[92%] rounded-xl rounded-tl-sm border border-line bg-surface px-3.5 py-2.5">
+                    <AssistantReply text={turn.content} copyable={false} />
+                  </div>
+                )}
 
                 {/* **The draft, with the only control that touches the box.**
                     It is never applied on its own: a model quietly replacing
@@ -287,11 +299,40 @@ export function BlurbWorkshop({
                       >
                         Put this in the box
                       </button>
+                      {/* **Beside the primary, not instead of it.** The button
+                          above is what a writer wants nine times out of ten;
+                          this is for the tenth — comparing two drafts in
+                          another window, or keeping one before asking for a
+                          rewrite. The draft is plain prose already, so it goes
+                          to the clipboard exactly as written. */}
+                      <CopyButton
+                        value={turn.draft}
+                        label="Copy this draft"
+                        className="text-muted hover:bg-raised hover:text-fg"
+                      />
                       <span className="text-xs text-muted">
                         {turn.draft.length} characters · nothing is saved until
                         you press Save
                       </span>
                     </div>
+
+                    {/* **Why it came out short, when it did.**
+                        The commonest disappointment with this feature is not a
+                        bug: a writer answers in a dozen words, gets thirty back,
+                        and concludes the thing is broken. It is the hard rule
+                        working — it may not state a fact they did not give it,
+                        so a short answer can only make a short blurb.
+
+                        It sits under the controls rather than over them: the
+                        draft and the button are what the writer came for, and
+                        an explanation above them would be read as a warning
+                        about the draft itself. `note` amber rather than `stop`
+                        red — nothing has failed. */}
+                    {shortDraftNote(turn.draft) && (
+                      <p className="mt-3 rounded-lg border border-note-line bg-note-bg px-3 py-2 text-xs leading-relaxed text-note-fg">
+                        {shortDraftNote(turn.draft)}
+                      </p>
+                    )}
                   </div>
                 )}
               </li>

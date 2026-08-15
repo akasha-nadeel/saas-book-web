@@ -68,6 +68,78 @@ export const MAX_TOKENS = 1200;
 export const MIN_TO_START = 2;
 
 /**
+ * The length a draft aims at, in words.
+ *
+ * **One constant, read by the prompt *and* by the screen**, so the figure the
+ * writer is shown is the figure the model was actually asked for. It was typed
+ * into the prompt as prose ("around 150 words") and nowhere else, which is how
+ * a screen ends up quoting a target that was quietly changed underneath it.
+ *
+ * **It is described to the writer as what this tool aims for, never as what
+ * books average — and that wording was arrived at the hard way.** The note
+ * below first read "most blurbs run about 150", which sounded safe and could
+ * not be backed. Checking it produced two answers that do not agree:
+ *
+ * - Named bestsellers, fetched directly, carry full jacket copy: Gone Girl 236
+ *   words, The Silent Patient 236, Project Hail Mary 304.
+ * - Google Books' `description` across 416 records from subject searches has a
+ *   median of 57 words — 47 for fiction — and filtering to titles with ratings
+ *   pushed it *down*, to 35.
+ *
+ * The second figure is not a finding about blurbs; it is a finding about
+ * catalogue metadata, which carries a one-line stub as often as the jacket
+ * copy and varies by edition. So the honest position is that we do not know
+ * what books average, and a screen printing either number as though we did
+ * would be the invented figure this product refuses everywhere else. What we
+ * *do* know exactly is what we asked the model for, so that is what is said.
+ *
+ * 150 sits at the low end of the trade's own advice (150–250 for fiction), and
+ * nothing enforces it — `shortDraftNote` reports the gap and never blocks.
+ */
+export const TARGET_WORDS = 150;
+
+/**
+ * How far under the target a draft may fall before the screen explains itself.
+ *
+ * A threshold for *whether to speak*, not a figure anybody is shown — the two
+ * numbers in the sentence are the real word count and the real target. Two
+ * thirds is loose on purpose: a 120-word blurb is a good blurb and does not
+ * need a note under it, and a note that fires on every draft is furniture.
+ */
+const SPEAK_BELOW = 2 / 3;
+
+export function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Why a draft came out short, said to the writer — or null when it did not.
+ *
+ * **This exists because the commonest disappointment with this feature is not a
+ * bug.** A writer answers the four questions in a dozen words, gets a
+ * thirty-word blurb back, and reasonably concludes the thing is broken. It is
+ * not: the hard rule above forbids stating any fact they did not give it, so a
+ * short answer *can only* produce a short blurb. The alternative — padding it
+ * out — is the invented detail this whole feature refuses.
+ *
+ * Measured before it was written, and the measurement is what shaped the
+ * sentence: the same model, on the same prompt with **no manuscript either
+ * way**, returned nothing usable from three short facts and 118 words from one
+ * detailed answer. So the note points at *what the writer said*, not at the
+ * missing chapters. Blaming an empty manuscript would send somebody off to
+ * write prose when the fix is one more sentence in the box — and it would be
+ * false, which matters more.
+ *
+ * A fact and a next step, no verdict: it never says the blurb is bad.
+ */
+export function shortDraftNote(draft: string): string | null {
+  const words = wordCount(draft);
+  if (words === 0 || words >= TARGET_WORDS * SPEAK_BELOW) return null;
+
+  return `That is ${words} words, where this aims for about ${TARGET_WORDS}. It stays short when it has little to go on — it will not invent anything you have not told it. Tell it more about who the story is about, what they want and what it costs them if they fail, then ask for a longer draft.`;
+}
+
+/**
  * The instructions.
  *
  * Two rules carry the design and both are stated as prohibitions, because the
@@ -87,7 +159,7 @@ How to work:
 Hard rules:
 - NEVER state a fact about this book that the writer has not told you or that is not in the opening you were given. No invented names, places, twists, or stakes. If you need something, ask for it.
 - NEVER reveal or hint at the ending. A blurb stops around the moment the story properly begins. You may have been given the opening chapters; they are for voice and setup only.
-- Keep a draft under ${BLURB_MAX} characters, and around 150 words unless asked otherwise.
+- Keep a draft under ${BLURB_MAX} characters, and around ${TARGET_WORDS} words unless asked otherwise.
 - No praise for the book, no review language, no "a gripping tale of". Write the book's own specifics.
 - You are writing the description, never the book. Do not offer to write chapters.
 

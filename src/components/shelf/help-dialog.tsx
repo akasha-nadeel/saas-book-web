@@ -227,7 +227,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Assistant",
-        desc: "An AI writing partner for the chapter you have open. Needs an ANTHROPIC_API_KEY set on the server.",
+        desc: "An AI writing partner for the chapter you have open. Needs either an ANTHROPIC_API_KEY or a GOOGLE_GENERATIVE_AI_API_KEY set on the server.",
       },
     ],
   },
