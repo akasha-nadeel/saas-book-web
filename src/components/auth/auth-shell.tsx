@@ -139,9 +139,18 @@ export function AuthShell({
 }
 
 /**
- * The open-book mark, shown through a mask so it takes the panel's text colour
+ * The brand mark, shown through a mask so it takes the panel's text colour
  * rather than staying the white it is on disk — the same trick the shelf uses
  * for its supplied icons, and what keeps it right in both themes.
+ *
+ * **`/logo.png` is a silhouette, not a picture**, and that is what makes the
+ * mask work: the file is white throughout and carries its whole shape in the
+ * alpha channel, so the counters — the holes in the O and the C, the bubble's
+ * interior — stay open and the ground shows through them. Replacing it with a
+ * flat coloured export would fill those and the mark would render as a solid
+ * blob. It was an open book until 2026-08-15 and is the OC speech bubble now;
+ * nothing here had to change, which is the point of masking rather than
+ * colouring.
  */
 function Mark() {
   return (
@@ -175,17 +184,13 @@ function Wordmark() {
 }
 
 /** The heading and lede above a form, centred the way the reference sets them. */
-export function AuthHeading({
-  title,
-  lede,
-}: {
-  title: string;
-  lede: string;
-}) {
+export function AuthHeading({ title, lede }: { title: string; lede: string }) {
   return (
     <div className="text-center">
       <h1 className="font-serif text-2xl text-fg">{title}</h1>
-      <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">{lede}</p>
+      <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
+        {lede}
+      </p>
     </div>
   );
 }
@@ -314,10 +319,7 @@ export function PasswordField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={id}
-        className="flex items-baseline justify-between gap-3"
-      >
+      <label htmlFor={id} className="flex items-baseline justify-between gap-3">
         <FieldLabel>{label}</FieldLabel>
         {trailing}
       </label>
