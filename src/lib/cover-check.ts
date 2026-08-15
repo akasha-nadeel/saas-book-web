@@ -115,6 +115,21 @@ export const IDEAL_RATIO = 1.6;
 export const MAX_BYTES = 50 * 1024 * 1024;
 
 /**
+ * A file's weight, in the unit that says something about it.
+ *
+ * Fixed at one decimal of a megabyte, every small file read "0.0MB" — so the
+ * line meant to reassure a writer that their cover is under the limit printed
+ * a zero at them instead of a size. Anything under a megabyte is quoted in KB,
+ * which is the unit those files are actually discussed in, and is what the
+ * "very little detail" finding below already used.
+ */
+export function fileSize(bytes: number): string {
+  return bytes < 1024 * 1024
+    ? `${Math.round(bytes / 1024)}KB`
+    : `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
+/**
  * The two Amazon takes, and the reason this check had to exist.
  *
  * "Save your cover as a TIFF or JPEG file." PNG is not on that list — and PNG
@@ -355,7 +370,7 @@ export function checkCover(facts: CoverFacts): CoverFinding[] {
       id: "too-heavy",
       level: "problem",
       label: "Too large a file",
-      detail: `${(bytes / 1024 / 1024).toFixed(1)}MB. It has to be under 50MB — save it again at a lower JPEG quality rather than shrinking the picture.`,
+      detail: `${fileSize(bytes)}. It has to be under 50MB — save it again at a lower JPEG quality rather than shrinking the picture.`,
     });
   }
 
@@ -602,7 +617,7 @@ export function coverReport(facts: CoverFacts): CoverCheck[] {
     checks.push(
       rule("weight", ["too-heavy"], {
         label: "Under the size limit",
-        detail: `${(bytes / 1024 / 1024).toFixed(1)}MB. It has to be under ${MAX_BYTES / 1024 / 1024}MB.`,
+        detail: `${fileSize(bytes)}. It has to be under ${MAX_BYTES / 1024 / 1024}MB.`,
       }),
     );
   }

@@ -11,6 +11,7 @@ import {
 } from "@/lib/import";
 import type { ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
 import { keepImportedCover } from "@/lib/cover-save";
 
 /**
@@ -440,7 +441,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
                   {proposal.chapters.length === 1 ? "chapter" : "chapters"}
                 </p>
                 <p className="font-sans text-sm tabular-nums text-muted">
-                  {totalWords.toLocaleString()} words
+                  {plural(totalWords, "word")}
                 </p>
               </div>
 

@@ -17,6 +17,11 @@ const eslintConfig = defineConfig([
     // — `no-require-imports` in particular would be asking a `.cjs` file not to
     // be one.
     "scripts/**",
+    // A scratch copy of the app, carrying its own `.next/` build output. It is
+    // gitignored, but a flat config does not read `.gitignore`, and without
+    // this `npm run lint` reports seven thousand problems from bundled
+    // vendor code — which is how the three real ones in `src/` went unread.
+    ".shot-app/**",
   ]),
 ]);
 

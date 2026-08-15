@@ -169,20 +169,26 @@ export function PagePreview({
   const frameStyle = { width: PREVIEW_W, height: trueH * scale } as const;
 
   // Which way the leaf turns: forward when the page went up, back when it went
-  // down. Compared against the last committed index, updated after paint — so on
-  // the render where the page changes, this still holds the old value and the
-  // direction reads true. The keyed frame below remounts each change, replaying
-  // the CSS page-turn.
-  const prevIndexRef = useRef(index);
-  const turn =
-    index > prevIndexRef.current
-      ? "oc-page-turn-next"
-      : index < prevIndexRef.current
-        ? "oc-page-turn-prev"
-        : "";
-  useEffect(() => {
-    prevIndexRef.current = index;
-  }, [index]);
+  // down. The keyed frame below remounts on each change, replaying the CSS
+  // page-turn, so the class has to be right on the very render the page
+  // changes — not a frame later.
+  //
+  // **Derived by adjusting state during render, not by reading a ref.** The
+  // previous version kept the last index in a ref and updated it in an effect,
+  // which is the pattern React's own lint rule forbids: a ref read during
+  // render is not tracked, so nothing guarantees the component re-renders when
+  // it matters. It also decayed — once the effect had run, any later render at
+  // the same index recomputed `turn` as "" and stripped the class off an
+  // element that was still mid-animation. Setting state during render re-runs
+  // this component immediately, before paint, so the keyed frame still mounts
+  // with its class on the same commit, and the value now *keeps* until the
+  // page actually changes again.
+  const [prev, setPrev] = useState({ index, turn: "" });
+  let turn = prev.turn;
+  if (prev.index !== index) {
+    turn = index > prev.index ? "oc-page-turn-next" : "oc-page-turn-prev";
+    setPrev({ index, turn });
+  }
 
   // The cover, page 0 — drawn on a sheet the size of a page so the frame holds.
   if (index <= 0) {

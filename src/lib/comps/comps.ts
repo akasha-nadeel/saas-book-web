@@ -69,40 +69,82 @@ export interface CompSeed {
   extra?: string;
 }
 
-/** Words too common to narrow anything, plus the ones every blurb contains. */
+/**
+ * Words too common to narrow anything, plus the ones every blurb contains.
+ *
+ * **There is no stemmer behind this, so the inflections have to be listed.**
+ * The first version held `can`, `not`, `will`, `would` and `must` but not
+ * `cannot`; `be` and `been` but not `being`. Measured over four blurbs,
+ * "cannot" came out as one of the six most distinctive words in *all four* —
+ * it is six letters long, it is in almost every blurb ever written, and
+ * nothing here was stopping it. The second and third groups below are the
+ * auxiliaries and the colourless verbs that were walking through with it.
+ */
 const STOP = new Set([
+  // Articles, pronouns, prepositions, conjunctions.
   "the","a","an","and","or","but","of","in","on","at","to","for","with","from",
   "by","as","is","are","was","were","be","been","it","its","this","that","these",
   "those","he","she","they","her","his","their","them","when","where","what",
   "who","how","why","all","one","two","new","book","novel","story","stories",
   "first","after","before","into","out","up","down","over","about","against",
   "than","then","there","here","not","no","yes","can","will","would","must",
+  "you","your","him","our","ours","hers","which","whose","whom","itself",
+  "himself","herself","themselves","other","others","another","both","each",
+  "such","some","any","every","only","just","still","even","more","most",
+  "much","many","never","always","own","very","too","back","away","off",
+  "onto","upon","under","through","again","without","within","around",
+  "between","because","since","while","until","though","although","whether",
+  // Auxiliaries and modals, including the compounds the first list missed.
+  "cannot","could","should","might","may","shall","being","having","has",
+  "had","have","does","did","done","doing",
+  // Verbs that carry no subject: every book has somebody coming and going.
+  "come","comes","coming","came","goes","going","went","gone","get","gets",
+  "getting","got","make","makes","making","made","take","takes","taking",
+  "took","hold","holds","holding","held","carry","carries","carrying",
+  "carried","call","calls","calling","called","say","says","said","tell",
+  "tells","told","know","knows","knew","find","finds","finding","found",
+  "leave","leaves","leaving","give","gives","giving","gave",
 ]);
 
 /**
- * The most distinctive words in a piece of prose, longest first.
+ * The most distinctive words in a piece of prose, in the order they were
+ * written.
  *
  * A blurb is the best short description of a book that exists, so it is the
  * best thing to search with — but handed over whole it matches nothing, because
  * these services search titles and subjects rather than doing anything
  * semantic. So it is reduced to the words that carry meaning.
  *
- * Longest-first rather than most-frequent: in a paragraph this short, frequency
- * is noise, and the long words are the nouns that name what the book is about.
+ * **This used to rank by word length, on the reasoning that "the long words are
+ * the nouns that name what the book is about". Measured, that is false**, and
+ * it was doing real damage: this seed runs by itself when the comps and covers
+ * screens open, so its results are the first thing a writer sees on both, and
+ * what it produced was
+ *
+ *     ["inherits","coming","cannot","ledger","father","called"]
+ *
+ * — a query that returns nothing. Length selects *for* Latinate function words
+ * (`cannot`, `because`, `carrying`) and *against* exactly the short concrete
+ * nouns a book is usually about: `salt`, `tide`, `war`, `spy`, `dog`. Two
+ * changes follow from that. The sort is gone, leaving the writer's own order,
+ * which front-loads the subject because that is how anybody writes a first
+ * sentence. And the length floor drops to three, because `spy` and `war` are
+ * the whole subject of the books they appear in; the words that floor was
+ * really aimed at are in `STOP`, which is where they belong.
  */
 export function keywords(text: string, limit = 6): string[] {
   const seen = new Set<string>();
-  const words = text
+  return text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s'-]/gu, " ")
     .split(/\s+/)
-    .filter((w) => w.length > 3 && !STOP.has(w))
+    .filter((w) => w.length > 2 && !STOP.has(w))
     .filter((w) => {
       if (seen.has(w)) return false;
       seen.add(w);
       return true;
-    });
-  return words.sort((a, b) => b.length - a.length).slice(0, limit);
+    })
+    .slice(0, limit);
 }
 
 /**

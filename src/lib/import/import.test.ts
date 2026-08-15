@@ -206,6 +206,57 @@ it("drops headings that have nothing under them", () => {
   expect(book.chapters[0].title).toBe("Three");
 });
 
+/**
+ * `declared` — one document the file itself marked out, which only an EPUB can
+ * say. These three are the round-trip bug: exporting a one-chapter book and
+ * importing it back gave a chapter named after the *book*, with the chapter's
+ * own heading still sitting in its prose. Re-exporting then printed both.
+ */
+it("reads a lone heading in a declared document as that document's name", () => {
+  const book = splitIntoChapters(
+    [head("Chapter One", 1), para("The tide went out.")],
+    "The Salt Ledger",
+    true,
+  );
+
+  expect(book.chapters).toHaveLength(1);
+  // Its own name, not the book's.
+  expect(book.chapters[0].title).toBe("Chapter One");
+});
+
+it("takes the heading out of the prose when it names the document", () => {
+  const book = splitIntoChapters(
+    [head("Chapter One", 1), para("The tide went out.")],
+    "The Salt Ledger",
+    true,
+  );
+
+  // Left in, the exporter prints it under the chapter title it duplicates.
+  const nodes = (book.chapters[0].doc.content ?? []) as { type?: string }[];
+  expect(nodes.map((n) => n.type)).not.toContain("heading");
+});
+
+it("still splits a declared document that holds several chapters", () => {
+  // A spine file carrying the whole book: one H1 title over H2 chapters. The
+  // lone H1 must not win here, or the book comes back as a single chapter.
+  const book = splitIntoChapters(
+    [
+      head("The Salt Road", 1),
+      head("Chapter One", 2),
+      para("She left at dawn."),
+      head("Chapter Two", 2),
+      para("The road turned."),
+    ],
+    "fallback",
+    true,
+  );
+
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "Chapter One",
+    "Chapter Two",
+  ]);
+});
+
 // --- document building -----------------------------------------------------
 
 it("counts words the way the editor does", () => {

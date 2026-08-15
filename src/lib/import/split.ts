@@ -98,15 +98,36 @@ function makeChapter(title: string, blocks: Block[]): ImportedChapter | null {
  * so the level that appears more than once wins. Returns null when headings
  * cannot be the answer.
  */
-function chapterHeadingLevel(blocks: readonly Block[]): 1 | 2 | 3 | null {
+function chapterHeadingLevel(
+  blocks: readonly Block[],
+  /** See `declared` on `splitIntoChapters`. */
+  declared = false,
+): 1 | 2 | 3 | null {
+  const countAt = (level: number) =>
+    blocks.filter((b) => b.type === "heading" && (b.level ?? 2) === level)
+      .length;
+
   for (const level of [1, 2, 3] as const) {
-    const count = blocks.filter(
-      (b) => b.type === "heading" && (b.level ?? 2) === level,
-    ).length;
-    if (count >= 2) return level;
+    if (countAt(level) >= 2) return level;
   }
-  // One heading of a level is a title, not a divider — there is nothing for it
-  // to divide.
+
+  /*
+   * One heading of a level is a title, not a divider — there is nothing for it
+   * to divide. That holds for a file handed over whole, and is wrong for one
+   * document out of an EPUB spine, where the file has *already* said this is
+   * one chapter: its single heading is the chapter's name, not the book's.
+   *
+   * Tried second, never first. A spine document holding the whole book — one
+   * H1 for the title above a run of H2 chapters — has to keep splitting on the
+   * H2s, and checking `>= 1` from the top would have seized on the lone H1 and
+   * returned the entire book as a single chapter.
+   */
+  if (declared) {
+    for (const level of [1, 2, 3] as const) {
+      if (countAt(level) >= 1) return level;
+    }
+  }
+
   return null;
 }
 
@@ -163,8 +184,19 @@ function splitAt(
 export function splitIntoChapters(
   blocks: readonly Block[],
   fallbackTitle: string,
+  /**
+   * Whether these blocks are one document the *file* declared, rather than a
+   * whole manuscript to be carved up.
+   *
+   * Only an EPUB can say this, because only an EPUB ships one document per
+   * spine entry. It changes exactly one thing — a lone heading is read as this
+   * document's own name instead of being left in the text — and that is what
+   * stops a one-chapter book coming back named after itself. See
+   * `chapterHeadingLevel`.
+   */
+  declared = false,
 ): ImportedBook {
-  const level = chapterHeadingLevel(blocks);
+  const level = chapterHeadingLevel(blocks, declared);
 
   // A lone H1 above a document chaptered in H2 is the book's own title. It then
   // leaves the text, or it opens the book as a stray chapter containing nothing

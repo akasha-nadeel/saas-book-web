@@ -354,7 +354,7 @@ it("writes mimetype as the first entry, uncompressed", async () => {
       lastOpenedId: "c1",
       lastOpenedAt: 0,
     },
-    [{ title: "Chapter One", doc: { type: "doc", content: [] } }],
+    [{ title: "Chapter One", number: 1, doc: { type: "doc", content: [] } }],
   );
 
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -405,7 +405,10 @@ describe("structural semantics", () => {
     // No images, so the text-only summary is the one written.
     const opf = contentOpf(
       { title: "T", author: "A" },
-      [{ id: "chapter-01", title: "One" }],
+      // `contentOpf` names the files positionally (`chapterId(i)`) and reads
+      // neither the body nor any id off these, so the xhtml can be empty. It
+      // used to pass an `id` field, which `EpubChapter` has never had.
+      [{ title: "One", xhtml: "" }],
       "urn:uuid:x",
     );
     expect(opf).not.toMatch(/any order of presentation/i);

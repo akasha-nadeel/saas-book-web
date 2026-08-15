@@ -176,17 +176,34 @@ export async function importFile(file: File): Promise<ImportedBook> {
    * body chapter called "Chapter 1 – Dedication", because apparatus pages
    * print no heading to split on and a dedication does.
    *
-   * The body is still split exactly as before. Only the pages the file
-   * *declared* as front or back matter are lifted out, so an EPUB that says
-   * nothing about itself — and every other format — takes the same path it
-   * always did.
+   * **The body is split per declared document, not as one pile.** It used to
+   * be flattened here too, and that threw away the same information twice: a
+   * book of one chapter has one heading, `chapterHeadingLevel` needs two of a
+   * level before it will divide on them, so the whole thing fell through to
+   * "one chapter named after the file" — and the chapter's own `<h1>` stayed
+   * sitting in the prose. Exporting a one-chapter book and reading it back
+   * gave a chapter called *The Salt Ledger* whose body opened with a heading
+   * saying *Chapter One*; export that again and both print, one under the
+   * other. Splitting each spine document on its own believes what the file
+   * already said, and `splitAt` consumes the heading it divides on, so the
+   * duplicate goes with it.
+   *
+   * Every other format — and an EPUB that says nothing about itself — has no
+   * sections and takes the same path it always did.
    */
   const matter = sections.filter((s) => s.matter && s.blocks.length);
-  const bodyBlocks = matter.length
-    ? sections.filter((s) => !s.matter).flatMap((s) => s.blocks)
-    : blocks;
+  const bodySections = sections.filter((s) => !s.matter && s.blocks.length);
 
-  const book = splitIntoChapters(bodyBlocks, title);
+  const book = bodySections.length
+    ? {
+        title,
+        chapters: bodySections.flatMap(
+          (section) =>
+            splitIntoChapters(section.blocks, section.title || title, true)
+              .chapters,
+        ),
+      }
+    : splitIntoChapters(blocks, title);
   const pages: ImportedChapter[] = matter.map((section, i) => ({
     title: section.title || `Page ${i + 1}`,
     doc: toDoc(section.blocks),

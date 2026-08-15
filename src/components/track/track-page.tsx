@@ -21,6 +21,7 @@ import {
   type Entry,
 } from "@/lib/ledger";
 import { findBook, saveLedgerRaw } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
 import { relativeTime } from "@/lib/relative-time";
 import { useHydrated, useLedger, useShelf } from "@/lib/use-library";
 
@@ -190,7 +191,10 @@ export function TrackPage({ bookId }: { bookId: string }) {
             "Nothing recorded yet. Start with what you have already spent — it is the number that matters most and the one nobody writes down."
           ) : toLevel !== null ? (
             <>
-              <strong>{toLevel.toLocaleString()} more copies</strong> at the{" "}
+              <strong>
+                {plural(toLevel, "more copy", "more copies")}
+              </strong>{" "}
+              at the{" "}
               {sums.perCopy} a copy you have actually been earning, and this
               book is level.
             </>
@@ -385,7 +389,9 @@ export function TrackPage({ bookId }: { bookId: string }) {
                   >
                     {entry.kind === "cost" ? "−" : "+"}
                     {entry.amount.toLocaleString()}
-                    {entry.units ? ` · ${entry.units} copies` : ""}
+                    {entry.units
+                      ? ` · ${plural(entry.units, "copy", "copies")}`
+                      : ""}
                   </span>
                   <button
                     type="button"

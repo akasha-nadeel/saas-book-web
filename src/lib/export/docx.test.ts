@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import { buildDocx } from "@/lib/export/docx";
+import type { LoadedChapter } from "@/lib/export/blocks";
 import type { Book } from "@/lib/library-store";
 
 /**
@@ -18,9 +19,13 @@ const book: Book = {
   lastOpenedAt: 0,
 };
 
-const chapters = [
+/* Typed, so the fixture cannot drift away from the shape the exporters take.
+   It had: `number` became required on `LoadedChapter` and these were never
+   updated, which typechecked nowhere because vitest does not typecheck. */
+const chapters: LoadedChapter[] = [
   {
     title: "Chapter One",
+    number: 1,
     doc: {
       type: "doc",
       content: [
@@ -92,7 +97,7 @@ it("survives a book with no author", async () => {
 it("survives an empty chapter", async () => {
   const blob = await buildDocx(
     book,
-    [{ title: "Empty", doc: { type: "doc", content: [] } }],
+    [{ title: "Empty", number: 1, doc: { type: "doc", content: [] } }],
     { manuscript: true },
   );
   expect(await textOf(blob)).toContain("Empty");

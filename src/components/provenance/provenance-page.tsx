@@ -12,6 +12,7 @@ import {
   getHistoryRaw,
   orderedChapters,
 } from "@/lib/library-store";
+import { nounFor } from "@/lib/plural";
 import { download } from "@/lib/export";
 import { toBlocks } from "@/lib/export/blocks";
 import {
@@ -215,11 +216,17 @@ export function ProvenancePage({ bookId }: { bookId: string }) {
           ) : (
             <>
               <div className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-                <Stat value={String(record.daysWritten)} label="days written" />
-                <Stat value={String(record.spanDays)} label="days spanned" />
+                <Stat
+                  value={String(record.daysWritten)}
+                  label={`${nounFor(record.daysWritten, "day")} written`}
+                />
+                <Stat
+                  value={String(record.spanDays)}
+                  label={`${nounFor(record.spanDays, "day")} spanned`}
+                />
                 <Stat
                   value={record.netWords.toLocaleString()}
-                  label="net words"
+                  label={`net ${nounFor(record.netWords, "word")}`}
                 />
               </div>
               <p className="border-t border-line px-5 py-3 text-xs text-muted">

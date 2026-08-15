@@ -130,13 +130,20 @@ export function ReaderFlipbook({
   // the pages beneath still read as the old spread — the leaf, not a content
   // swap, is what changes them.
   const [committed, setCommitted] = useState(0);
+
+  // Closing back onto the cover is a plain reveal, not a turn, so it settles at
+  // once. Done during render rather than in the effect below: setting state
+  // synchronously in an effect body schedules a second render *after* paint,
+  // which is a wasted frame and what React's lint rule calls a cascading
+  // render. Adjusting it here re-runs this component before anything is
+  // painted, so the cover reveal lands on the same commit.
+  if (target === 0 && committed !== 0) setCommitted(0);
+
+  // Every other turn lags `target` for one turn's length, so during a turn the
+  // pages beneath still read as the old spread — the leaf, not a content swap,
+  // is what changes them.
   useEffect(() => {
-    if (committed === target) return;
-    // Closing back onto the cover is a plain reveal; only forward turns animate.
-    if (target === 0) {
-      setCommitted(0);
-      return;
-    }
+    if (committed === target || target === 0) return;
     const t = setTimeout(() => setCommitted(target), TURN_MS);
     return () => clearTimeout(t);
   }, [target, committed]);

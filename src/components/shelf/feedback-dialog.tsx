@@ -68,10 +68,21 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
 
       if (error) {
         setProblem(
-          // 42P01 is "relation does not exist" — the migration has not been
-          // run on this project. Worth naming, because the fix is a file in
-          // this repo rather than anything the writer can do.
-          error.code === "42P01"
+          // The migration has not been run on this project. Worth naming,
+          // because the fix is a file in this repo rather than anything the
+          // writer can do.
+          //
+          // **Two codes, and PGRST205 is the one that actually fires.**
+          // 42P01 is Postgres' "relation does not exist", which only comes
+          // back for a table PostgREST still has in its schema cache and
+          // finds gone underneath it. A table that was *never created* never
+          // reaches Postgres at all: PostgREST refuses it up front with
+          // PGRST205. Matching 42P01 alone meant this branch could not fire
+          // in the situation it was written for, and a live project missing
+          // the migration reported the generic "that did not send" instead —
+          // which is exactly how it went unnoticed. `sync.ts` and
+          // `use-collab.ts` both already name PGRST205 for this.
+          error.code === "42P01" || error.code === "PGRST205"
             ? "The feedback table is not on this project yet — supabase/migrations/20260801000000_feedback.sql has not been applied."
             : "That did not send. Your note is still here, so you can try again.",
         );

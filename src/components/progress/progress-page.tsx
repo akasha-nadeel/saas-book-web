@@ -15,6 +15,7 @@ import {
   type HeatLevel,
 } from "@/lib/activity";
 import { bookWordCount, findBook } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
 import { useActivity, useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -117,7 +118,7 @@ export function ProgressPage({ bookId }: { bookId: string }) {
         <section className="mt-6 rounded-xl border border-line bg-panel p-5">
           <h2 className="text-sm font-bold text-fg">{book.title}</h2>
           <p className="mt-1.5 text-fg">
-            {words.toLocaleString()} words
+            {plural(words, "word")}
             {book.targetWords
               ? ` of ${book.targetWords.toLocaleString()}`
               : ", with no target set"}
@@ -307,8 +308,8 @@ function Month({ days, netWords }: { days: Day[]; netWords: number }) {
             ) : (
               <span className="text-muted">
                 {netWords >= 0
-                  ? `${netWords.toLocaleString()} words net across the month.`
-                  : `${Math.abs(netWords).toLocaleString()} words shorter than a month ago — which is what revising looks like.`}
+                  ? `${plural(netWords, "word")} net across the month.`
+                  : `${plural(Math.abs(netWords), "word")} shorter than a month ago — which is what revising looks like.`}
               </span>
             )}
           </p>
@@ -407,8 +408,8 @@ function longDay(key: string): string {
 /** What a day's figure says, in the page's own voice. */
 function said(words: number): string {
   if (words === 0) return "nothing written";
-  if (words > 0) return `${words.toLocaleString()} words`;
-  return `${Math.abs(words).toLocaleString()} words cut`;
+  if (words > 0) return plural(words, "word");
+  return `${plural(Math.abs(words), "word")} cut`;
 }
 
 /**

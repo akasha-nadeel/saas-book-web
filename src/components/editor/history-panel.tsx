@@ -2,6 +2,7 @@
 
 import { MAX_SNAPSHOTS, passesOf } from "@/lib/history";
 import { saveBody } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
 import { relativeTime } from "@/lib/relative-time";
 import { useHistory } from "@/lib/use-library";
 
@@ -84,7 +85,7 @@ export function HistoryPanel({
                     {relativeTime(version.at)}
                   </span>
                   <span className="font-sans text-[11px] text-muted">
-                    {version.words.toLocaleString()} words
+                    {plural(version.words, "word")}
                     {/* The change against the version before it, which is the
                         only number that tells a writer which of eight
                         near-identical timestamps is the one they want. */}

@@ -47,6 +47,42 @@ describe("keywords", () => {
   it("does not repeat a word that appears twice", () => {
     expect(keywords("shadow shadow shadow")).toEqual(["shadow"]);
   });
+
+  /**
+   * These three are the seed bug, written down so it cannot come back.
+   *
+   * The seed runs on its own when the comps and covers screens open, so
+   * whatever it produces is the first result a writer ever sees on either. It
+   * used to rank by word *length*, which selected for long function words and
+   * against short concrete ones — "cannot" was a top-six "most distinctive
+   * word" in every blurb tried, and both screens opened on "nothing came back".
+   */
+  it("does not offer a function word as a subject", () => {
+    const words = keywords(
+      "When the tide stops coming in, Mira inherits a salt works that cannot make salt.",
+    );
+    expect(words).not.toContain("cannot");
+    expect(words).not.toContain("coming");
+  });
+
+  // Three letters is a whole subject: a spy novel, a war novel, a dog.
+  it("keeps a short concrete noun", () => {
+    expect(keywords("A retired spy is pulled back for one last job.")).toContain(
+      "spy",
+    );
+    expect(keywords("War comes to a small farm, and a boy and his dog.")).toEqual(
+      expect.arrayContaining(["war", "boy", "dog"]),
+    );
+  });
+
+  // The writer's own order, because a first sentence names its subject.
+  it("keeps the order the words were written in", () => {
+    expect(keywords("lighthouse cartographer drowned", 3)).toEqual([
+      "lighthouse",
+      "cartographer",
+      "drowned",
+    ]);
+  });
 });
 
 describe("buildQuery", () => {

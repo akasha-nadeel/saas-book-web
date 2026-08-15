@@ -49,3 +49,21 @@ next-env.d.ts
 .dev.log
 
 .env*
+
+# Per-machine Claude Code permissions. `settings.local.json` is local by name
+# and by content — it accumulates absolute paths into this machine's temp
+# directories, which mean nothing to anybody else.
+.claude/settings.local.json
+
+# A scratch copy of the app, with its own .next/ build output in it. Untracked
+# and never meant to ship: without this a `git add .` commits thousands of
+# bundled files, and it is what made `npm run lint` report 7303 problems
+# against the three that are actually in src/.
+/.shot-app/
+
+# Vendored third-party skill documentation, fetched by tooling and pinned by
+# `skills-lock.json` — which is committed, so the set is reproducible without
+# carrying ~120 files of somebody else's docs in an app repo. The two
+# directories are copies of each other.
+/.agents/
+/.claude/

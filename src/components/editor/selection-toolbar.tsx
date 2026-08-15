@@ -177,6 +177,23 @@ export function SelectionToolbar({ editor }: { editor: Editor | null }) {
     ({ state, from, to }: { state: EditorState; from: number; to: number }) => {
       if (!editor?.isEditable) return false;
       if (pointerOnBar.current || menuOpen.current) return true;
+      /*
+       * **Gone once the writer is working somewhere else.**
+       *
+       * ProseMirror keeps its selection when focus leaves the editor, so
+       * `from !== to` stays true indefinitely — and this bar went on floating
+       * over the manuscript, covering two lines of it, while somebody typed in
+       * the Search panel. Observed surviving three panel switches.
+       *
+       * Tiptap's own default `shouldShow` tests `view.hasFocus()` for exactly
+       * this reason; passing a custom one replaces that default outright,
+       * which is how the check went missing. It has to sit *below* the two
+       * refs above, because pressing a control on this bar legitimately blurs
+       * the editor for a moment and those are what hold the bar open through
+       * it — the font list especially, which stays up waiting to be chosen
+       * from.
+       */
+      if (!editor.isFocused) return false;
       if (from === to) return false;
       if (!(state.selection instanceof TextSelection)) return false;
       return state.doc.textBetween(from, to).trim().length > 0;

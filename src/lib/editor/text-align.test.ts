@@ -1,5 +1,5 @@
 import { afterEach, expect, it } from "vitest";
-import { Editor } from "@tiptap/core";
+import { Editor, type Content } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { TextAlign } from "@/lib/editor/text-align";
 
@@ -10,7 +10,9 @@ afterEach(() => {
   editor = null;
 });
 
-function makeEditor(content: unknown): Editor {
+// Tiptap's own `Content`, rather than `unknown`: it already covers both an
+// HTML string and a JSON doc, which is everything these tests pass.
+function makeEditor(content: Content): Editor {
   editor = new Editor({
     element: document.createElement("div"),
     extensions: [StarterKit, TextAlign],

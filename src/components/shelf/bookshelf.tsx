@@ -50,6 +50,7 @@ import {
   type Fix,
 } from "@/lib/checkup";
 import { relativeTime } from "@/lib/relative-time";
+import { nounFor, plural } from "@/lib/plural";
 import { withReturn, type AreaId } from "@/lib/areas";
 import {
   useActivity,
@@ -142,6 +143,15 @@ import {
  */
 
 type Area = "overview" | "write" | "prepare" | "track" | "tools" | "collab";
+
+/**
+ * The one element the six areas scroll inside, by id.
+ *
+ * An id rather than a ref because the thing that needs to reach it is a click
+ * handler declared above the markup — the same reason the export wizard names
+ * its own scroller. See `goToArea`.
+ */
+const AREA_SCROLLER = "shelf-area-scroll";
 
 const AREAS: {
   id: Area;
@@ -269,6 +279,26 @@ export function Bookshelf({
     picked ??
     (AREAS.some((a) => a.id === asked) ? (asked as Area) : "overview");
   const setArea = setPicked;
+
+  /**
+   * Switch area *and* go back to the top of it.
+   *
+   * The areas share one scroll container, so walking from a scrolled Track to
+   * Tools landed the writer part-way down Tools — past the first group of the
+   * page they had just asked for. `<body>` is `overflow-hidden` here, so this
+   * is a div's `scrollTop` rather than the window's, and nothing resets it.
+   *
+   * Imperative, in the handler, rather than an effect keyed on `area` — the
+   * same shape the export wizard uses when it changes step. An effect would
+   * also fire for `showInPrepare`, whose whole job is to scroll a particular
+   * book's card *into view* (see `startOpen` further down); child effects run
+   * before parent ones, so the reset would land after the card had scrolled
+   * and quietly undo it. Only the navigation controls call this.
+   */
+  const goToArea = (next: Area) => {
+    setArea(next);
+    document.getElementById(AREA_SCROLLER)?.scrollTo({ top: 0 });
+  };
   /**
    * Which book Prepare should open, and how many times it has been asked.
    *
@@ -438,7 +468,7 @@ export function Bookshelf({
                 key={a.id}
                 icon={a.icon}
                 active={area === a.id}
-                onClick={() => setArea(a.id)}
+                onClick={() => goToArea(a.id)}
               >
                 {a.label}
               </SideItem>
@@ -453,7 +483,7 @@ export function Bookshelf({
                 key={a.id}
                 icon={a.icon}
                 active={area === a.id}
-                onClick={() => setArea(a.id)}
+                onClick={() => goToArea(a.id)}
               >
                 {a.label}
               </SideItem>
@@ -522,7 +552,8 @@ export function Bookshelf({
         </aside>
 
         {/* ---- The area ------------------------------------------------ */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Named so `goToArea` can put it back to the top on a switch. */}
+        <div id={AREA_SCROLLER} className="flex-1 overflow-y-auto">
           {/* The bar keeps its full-width background and border — a sticky
             header that stopped short of the edges would tear as the page
             scrolled under it — but its *contents* sit in the same max-w-6xl
@@ -533,7 +564,7 @@ export function Bookshelf({
               {/* The area picker again, for the widths where the rail is hidden. */}
               <select
                 value={area}
-                onChange={(e) => setArea(e.target.value as Area)}
+                onChange={(e) => goToArea(e.target.value as Area)}
                 className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg md:hidden"
               >
                 {AREAS.map((a) => (
@@ -1017,7 +1048,7 @@ function Overview({
                   </p>
                   <p className="mt-1 text-sm text-muted">
                     {plural(bookChapterCount(book), "chapter")} ·{" "}
-                    {bookWordCount(book).toLocaleString()} words · opened{" "}
+                    {plural(bookWordCount(book), "word")} · opened{" "}
                     {relativeTime(book.lastOpenedAt)}
                   </p>
                 </div>
@@ -1576,7 +1607,7 @@ function Overview({
           <Stat
             icon={shelfIcons.write}
             value={week.words.toLocaleString()}
-            label="words this week"
+            label={`${nounFor(week.words, "word")} this week`}
             note={
               week.daysWritten > 0
                 ? // The streak, folded in rather than given a tile of its own.
@@ -1611,7 +1642,7 @@ function Overview({
           icon={shelfIcons.overview}
           value={String(books)}
           label={books === 1 ? "book" : "books"}
-          note={`${words.toLocaleString()} words · ${chapters} chapters`}
+          note={`${plural(words, "word")} · ${plural(chapters, "chapter")}`}
         />
       </div>
     </div>
@@ -2085,7 +2116,7 @@ function Write({
                   </Link>
                   <p className="mt-1 text-xs text-muted">
                     {plural(bookChapterCount(book), "chapter")} ·{" "}
-                    {bookWordCount(book).toLocaleString()} words
+                    {plural(bookWordCount(book), "word")}
                   </p>
                   <p className="text-xs text-muted">
                     Opened {relativeTime(book.lastOpenedAt)}
@@ -3158,13 +3189,9 @@ function Stat({
 // one named action or a described card, so a generic "link that looks like a
 // button" had nothing left to be.
 
-/**
- * "1 chapters" was on the shelf for as long as the shelf has existed. Only ever
- * an -s, because every count this is used for takes one.
- */
-function plural(count: number, noun: string): string {
-  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
-}
+// `plural` used to live here, privately. It moved to `src/lib/plural.ts` once
+// it turned out that everywhere it could not reach was printing "1 words",
+// "1 days written" and "1 copies".
 
 // `Chip` and `ChipButton` are gone. They existed for the book card's row of
 // twenty-one identical pills, and that row is now two buttons and a menu.

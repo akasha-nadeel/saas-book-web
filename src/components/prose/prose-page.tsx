@@ -20,6 +20,7 @@ import {
   type Passage,
   type ProseReport,
 } from "@/lib/prose";
+import { plural } from "@/lib/plural";
 import { chapterText } from "@/lib/search";
 import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 
@@ -127,7 +128,15 @@ export function ProsePage({ bookId }: { bookId: string }) {
     if (!chosen) return null;
     const chapter = chapters.find((c) => c.id === chosen);
     if (!chapter) return null;
-    return proseReport(chapterText(chapter.title, getBody(chosen)));
+    /* The empty title is the load-bearing argument. `chapterText` prepends
+       whatever it is given, because it was written for *search*, where a
+       chapter has to be findable by its name. Here the answer is a
+       measurement, so a title counted as prose is simply a wrong number: a
+       74-word chapter reported 76, and the average sentence length carried
+       the error with it — while the picker directly above said 74. The other
+       two callers that want prose rather than a search index pass "" for the
+       same reason (`resume-card.tsx`, `bible-panel.tsx`). */
+    return proseReport(chapterText("", getBody(chosen)));
   }, [chosen, chapters]);
 
   /*
@@ -140,7 +149,8 @@ export function ProsePage({ bookId }: { bookId: string }) {
   const bookRates = useMemo(() => {
     if (!showing || chapters.length < 2) return {};
     return combinedRates(
-      chapters.map((c) => proseReport(chapterText(c.title, getBody(c.id)))),
+      // "" for the title, as above: these are measurements, not a search index.
+      chapters.map((c) => proseReport(chapterText("", getBody(c.id)))),
     );
   }, [showing, chapters]);
 
@@ -204,7 +214,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
               >
                 {chapters.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.title} — {c.words.toLocaleString()} words
+                    {c.title} — {plural(c.words, "word")}
                   </option>
                 ))}
               </select>
@@ -426,14 +436,16 @@ function Rhythm({ report }: { report: ProseReport }) {
       <p className="mt-4 min-h-[3.25rem] text-sm" aria-live="polite">
         {at ? (
           <>
-            <span className="font-semibold text-fg">{at.words} words</span>
+            <span className="font-semibold text-fg">
+              {plural(at.words, "word")}
+            </span>
             <span className="text-muted"> · sentence {cursor! + 1}</span>
             <br />
             <span className="text-muted">{at.text}</span>
           </>
         ) : (
           <span className="text-muted">
-            {report.sentences.toLocaleString()} sentences, averaging{" "}
+            {plural(report.sentences, "sentence")}, averaging{" "}
             {report.averageSentence} words. The longest is {longestSentence}.
             {report.rhythm.some((s) => s.words > LONG_SENTENCE)
               ? " The ones over " + LONG_SENTENCE + " are picked out."
@@ -791,7 +803,9 @@ function Disclosure({
 function PassageBlock({ passage }: { passage: Passage }) {
   return (
     <li className="rounded-lg border border-line bg-surface p-3">
-      <p className="text-xs font-semibold text-muted">{passage.words} words</p>
+      <p className="text-xs font-semibold text-muted">
+        {plural(passage.words, "word")}
+      </p>
       <p className="mt-1 text-sm leading-relaxed text-fg">
         {passage.mark ? marked(passage.text, passage.mark) : passage.text}
       </p>

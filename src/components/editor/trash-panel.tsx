@@ -8,6 +8,7 @@ import {
   trashedChapters,
 } from "@/lib/library-store";
 import { useShelf } from "@/lib/use-library";
+import { plural } from "@/lib/plural";
 import { relativeTime } from "@/lib/relative-time";
 
 /**
@@ -64,7 +65,7 @@ export function TrashPanel({ bookId }: { bookId: string }) {
                 <span className="mt-0.5 block font-sans text-xs text-muted">
                   deleted {relativeTime(item.trashedAt)}
                   {item.words > 0
-                    ? ` · ${item.words.toLocaleString()} words`
+                    ? ` · ${plural(item.words, "word")}`
                     : ""}
                 </span>
               </span>

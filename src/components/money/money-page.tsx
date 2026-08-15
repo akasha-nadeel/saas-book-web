@@ -6,6 +6,7 @@ import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { findBook } from "@/lib/library-store";
 import { copiesToBreakEven, REALITIES, SPENDS } from "@/lib/money";
+import { plural } from "@/lib/plural";
 import { useHydrated, useShelf } from "@/lib/use-library";
 
 /**
@@ -121,7 +122,7 @@ export function MoneyPage({ bookId }: { bookId: string }) {
               "Put a spend and a royalty in and this will tell you."
             ) : (
               <>
-                <strong>{copies.toLocaleString()} copies</strong> to get back to
+                <strong>{plural(copies, "copy", "copies")}</strong> to get back to
                 nothing.
               </>
             )}

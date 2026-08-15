@@ -9,6 +9,7 @@ import {
 } from "@/lib/beats";
 import { suggestTarget } from "@/lib/book-kinds";
 import { bookWordCount, findBook, setTargetWords } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { useHydrated, useShelf } from "@/lib/use-library";
@@ -209,7 +210,7 @@ function Arc({
       <div className="flex items-baseline justify-between gap-4">
         <p className="text-sm text-fg">{line}</p>
         <p className="shrink-0 text-xs text-muted tabular-nums">
-          {total.toLocaleString()} words
+          {plural(total, "word")}
         </p>
       </div>
     </section>

@@ -31,6 +31,7 @@ import {
   restOf,
   type RankedComp,
 } from "@/lib/comps/rank";
+import { plural } from "@/lib/plural";
 import { toBlocks } from "@/lib/export/blocks";
 import {
   bookWordCount,
@@ -1333,7 +1334,8 @@ function LengthPanel({
         <strong>
           {range.low.toLocaleString()}–{range.high.toLocaleString()} words
         </strong>
-        , from a median of {range.medianPages} pages across {range.from} books.
+        , from a median of {plural(range.medianPages, "page")} across{" "}
+        {plural(range.from, "book")}.
       </p>
       <p className="mt-1.5 text-xs text-muted">
         Pages, not words — catalogues record pages, and a trade paperback runs
@@ -1390,7 +1392,7 @@ function Figure({
       <p className="text-2xl font-extrabold text-fg">{value}</p>
       <p className="text-sm text-muted">{label}</p>
       <p className="mt-1 text-xs text-muted">
-        from {from} of {total} books
+        from {from} of {plural(total, "book")}
       </p>
     </div>
   );
