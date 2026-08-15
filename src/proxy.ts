@@ -40,6 +40,9 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
  *
  * "/upgrade" is public because a price is read before an account is made. It
  * holds no manuscript and no account detail — only what each plan costs.
+ * "/tools" is public for the same reason and a stronger one: it is the page
+ * that describes the product, read by somebody deciding whether to sign up, and
+ * a description of the software behind the sign-in wall describes it to nobody.
  *
  * The four policy pages are public for a harder reason than convenience: a
  * payment provider reviews this site before it will let anybody take a card,
@@ -48,7 +51,12 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
  * as far as a customer looking for the refund terms is concerned too. They are
  * read from `LEGAL_PAGES` so adding a fifth page cannot forget this list.
  */
-const PUBLIC_EXACT = ["/", "/upgrade", ...LEGAL_PAGES.map((page) => page.href)];
+const PUBLIC_EXACT = [
+  "/",
+  "/upgrade",
+  "/tools",
+  ...LEGAL_PAGES.map((page) => page.href),
+];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_EXACT.includes(pathname)) return true;

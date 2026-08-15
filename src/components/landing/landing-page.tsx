@@ -2122,11 +2122,18 @@ export function LandingPage() {
             dashboard's own, so a reader meets the same sixteen objects on this
             page that they will meet inside the product.
 
+            **The names came back on 2026-08-15, one page along.** The loss
+            above was real and `/tools` is where it is made good: the four
+            groups, the sixteen names, and room to say what each one does rather
+            than a pill's worth of space. The button below is the only way in
+            from here, which is the trade this section is making — the cloud
+            says how much there is, and the page says what it is.
+
             The count in the heading and the marks in the cloud both come from
             `ALL_TOOLS`, so neither can claim a tool that does not exist. */}
         <section
           id="tools"
-          className="overflow-hidden border-b border-lp-line px-6 py-14 sm:py-20"
+          className="scroll-mt-20 overflow-hidden border-b border-lp-line px-6 py-14 sm:py-20"
         >
           <div className="mx-auto max-w-[88rem]">
             <ToolCloud>
@@ -2137,9 +2144,27 @@ export function LandingPage() {
                 {ALL_TOOLS.length} tools, nothing held back
               </h2>
               <p className={`mt-5 ${SECTION_LEAD}`}>
-                Every one of them works on a real book rather than a sample.{" "}
-                <Em>None is behind the paid plan.</Em>
+                Every one of them works on a real book rather than a sample.
               </p>
+              {/* The way into the guide, and the one control in this section.
+                  It is filled rather than a text link because it is the only
+                  thing here to press — the marks around it are hover cards
+                  rather than destinations, and a section whose sole action is
+                  set as a sentence has no action as far as a skimming reader is
+                  concerned.
+
+                  `mt-8` matches the hero's gap under its own deck, so the two
+                  centred stacks on this page put their buttons the same
+                  distance below the words. */}
+              <div className="mt-8 flex justify-center">
+                <Link
+                  href="/tools"
+                  style={{ backgroundColor: INK }}
+                  className="rounded-full px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink hover:opacity-90"
+                >
+                  See what each tool does
+                </Link>
+              </div>
             </ToolCloud>
           </div>
         </section>
@@ -2325,7 +2350,12 @@ export function LandingPage() {
               *is* a surface you press and the ring now reads as the control the
               whole card is. The bare plus was right when these were rows on the
               page and would read as punctuation floating on a card. */}
-        <section className="border-b border-lp-line px-6 py-16 sm:py-24">
+        {/* `id="faq"` is the bar's own entry. `scroll-mt-20` clears the sticky
+            header, as every other anchored section here does. */}
+        <section
+          id="faq"
+          className="scroll-mt-20 border-b border-lp-line px-6 py-16 sm:py-24"
+        >
           {/* **One centred column, not two.** It was a 24rem heading column
               beside the rows — the arrangement the rest of this page uses —
               and it is the owner's reference that changed it: the heading sits

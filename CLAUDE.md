@@ -1908,6 +1908,75 @@ paints and is taken away, which is the flash it exists to prevent.
 `/` — **plus four client pieces it cannot hold itself**: `landing-header.tsx`,
 and the three things that go in a window (below).
 
+**There is a second marketing page, and it exists to buy back what the tool
+cloud gave up.** `/tools` (`tools-page.tsx` over the pure `tool-guide.ts`) is
+every tool explained one at a time, grouped the way `book-tools.ts` groups them.
+The cloud that replaced the four cards of pills says *how many* tools there are
+and nothing about what any of them does — its own note calls that a real loss —
+so the names, the grouping and the explanations live here, one page along, with
+a button under the cloud as the way in. Four things hold it:
+
+- **`book-tools.ts` still declares a tool; this only describes one.** The path,
+  name, mark and one-liner stay there and are read by the two screens *inside*
+  the app; `tool-guide.ts` holds the headline, the claim and the three folded
+  points a *visitor* needs. **A test walks `ALL_TOOLS` and fails if either side
+  lacks the other**, so a seventeenth tool cannot ship as a heading over an
+  empty column — the same shape as the `DESTINATIONS` check behind the
+  dashboard's findings.
+- **The row is `feature-row.tsx`, shared rather than copied.** It came out of
+  `feature-shots.tsx` when this page needed the same layout sixteen more times.
+  Every measurement in it is an argument (the uneven columns, the alternation,
+  the `<details>` disclosures that keep both sections free of JavaScript), and
+  two copies is how two sections meant to look identical end up a step apart.
+- **The screenshots are not in yet and the space is reserved, not collapsed.**
+  `ToolShot` draws the tool's mark on a stage at `aspect-[2/1]` — the
+  proportion the existing captures take — so filling `guide.shot` in later
+  moves nothing on the page. The stand-in claims nothing about the screen it
+  stands for, because a mocked-up interface is the one thing this site refuses.
+- **No plan claims in `tool-guide.ts`, and a test enforces that too.** What is
+  metered is `free-limits.ts`'s answer and it moves; a sentence here repeating
+  it goes quietly wrong on the page a reader uses to decide. The line *"None is
+  behind the paid plan"* came off the cloud in the same commit for that reason.
+
+`LandingHeader` and `LandingFooter` both take a `home` flag because of this
+page: three footer columns and the nav's anchors are in-page links, which scroll
+nowhere off `/`, so away from home they are rooted to `/#order`. It is a prop
+rather than `usePathname()` so neither has to become a client component.
+
+**The bar's Tools entry is a menu, and it is the only nav item that earns the
+machinery.** `tools-menu.tsx`: four columns from `TOOL_GROUPS`, a small grey
+label over a column of names, each name linking to **that tool's own row** —
+`/tools#comps`, matched by an `id` on every `FeatureRow` there. The section it
+used to point at is a cloud of marks around a count, which is right as a section
+and useless as a destination since it names none of the sixteen. Five things
+hold it:
+
+- **Hover opens it; hover is not the only thing that does.** A menu that exists
+  only under a pointer does not exist on a touchscreen, under a keyboard, or by
+  voice — and this one holds the only links to two thirds of the product. The
+  trigger is a real `<button>` with `aria-expanded`: pointer, press, and focus
+  all open it, Escape closes it and returns focus to the trigger.
+- **`CLOSE_MS` is a grace period on the way out**, because the panel hangs below
+  the bar with a gap, and a menu that closes the instant the pointer leaves the
+  word closes while the pointer is crossing to the thing it was aimed at. A
+  delay rather than an invisible bridging element, which would swallow clicks on
+  whatever is under it.
+- **The bar must not slide away while it is open.** The header hides on a
+  downward scroll and is this panel's ancestor, so it would take the open menu
+  off the top of the screen mid-read. The menu reports upward through
+  `onOpenChange` and `hidden && !menuOpen` is where that is spent — the scroll
+  listener goes on recording direction either way, so the bar is correct the
+  moment the menu closes rather than needing another scroll to catch up.
+- **The panel stays mounted and hides with `invisible`.** An unmounted panel
+  cannot animate out, and — the one that bites — the `onBlur` that closes it
+  needs the element focus is leaving to still exist when the event fires.
+- **Every nav entry points at something that exists**, and that rule has already
+  cost one: "What it does" pointed at `#does`, whose section came off the page on
+  2026-08-14. The header's copy went in the same commit and **the footer's did
+  not**, so it offered a scroll to nowhere until 2026-08-15. Both are `#inside`
+  now. Anchored sections carry `scroll-mt-20` and linked rows `scroll-mt-28`, or
+  the jump lands with the heading under the bar.
+
 **There is one window, and `app-window.tsx` is it.** The page had a tablet slab
 under the check demo, another under the listing form and a bare card in the
 hero; three frames on one page read as three products. So one frame takes all
@@ -2233,6 +2302,8 @@ writer (six areas, `?area=`), decided on the server off `getClaims()` so
 neither sees the other's screen first; with no Supabase configured everyone gets
 the dashboard · `/signin` · `/signup` · `/forgot-password` ·
 `/reset-password` · `/auth/confirm` (the far end of any emailed link) ·
+`/tools` the tool guide (public, and public is the point — it is what a visitor
+reads to decide whether to sign up) ·
 `/upgrade` plans (public — a price is read before an account exists; Paddle's
 overlay opens from here) ·
 `/upgrade/checkout/[orderId]` billing details, then a form POST straight to

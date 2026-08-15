@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ToolsMenu } from "@/components/landing/tools-menu";
 
 /**
  * The landing page's header: invisible over the hero, and it gets out of the
@@ -58,10 +59,44 @@ const LIFT = 8;
  */
 const SETTLE = 240;
 
-export function LandingHeader({ ink }: { ink: string }) {
+export function LandingHeader({
+  ink,
+  /**
+   * Whether this bar is on the landing page itself.
+   *
+   * The two nav entries are in-page anchors, and the note beside them says
+   * exactly what goes wrong when one points at a section that is not there: it
+   * scrolls nowhere and reads as the product being broken. `/tools` mounts this
+   * same header, so off the landing page both are rooted to `/#order` and
+   * `/#tools` — they navigate home and then scroll.
+   *
+   * A prop rather than `usePathname()`, matching `LandingFooter`: this
+   * component is already a client one, but the two callers each know the
+   * answer statically and a hook here would be one more thing to reason about
+   * on first paint.
+   */
+  home = true,
+}: {
+  ink: string;
+  home?: boolean;
+}) {
+  /* Rooted once, used twice. `#order` from `/tools` is a link to nothing. */
+  const at = (hash: string) => (home ? hash : `/${hash}`);
+
   const ref = useRef<HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
+  /**
+   * Whether the Tools menu is open.
+   *
+   * The bar hides itself on a downward scroll, and the menu hangs off it — so
+   * without this the panel would ride off the top of the screen mid-read,
+   * taking the pointer's target with it. `shouldHide` below is where it is
+   * spent; the scroll listener goes on recording direction either way, so the
+   * bar behaves correctly the moment the menu closes rather than having to be
+   * scrolled again to catch up.
+   */
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     // The scroll container is this header's parent — the one `LandingPage` puts
@@ -137,7 +172,9 @@ export function LandingHeader({ ink }: { ink: string }) {
     <header
       ref={ref}
       className={`sticky top-0 z-50 transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] will-change-transform ${
-        hidden ? "pointer-events-none -translate-y-full" : "translate-y-0"
+        hidden && !menuOpen
+          ? "pointer-events-none -translate-y-full"
+          : "translate-y-0"
       }`}
     >
       <div
@@ -193,21 +230,36 @@ export function LandingHeader({ ink }: { ink: string }) {
             navigation and the pair at the end is the offer, and a row where
             all six things are the same size has no offer in it. */}
         <nav className="hidden items-center gap-8 font-sans text-[0.9375rem] font-medium text-lp-body md:flex">
-          {/* **Two anchors, not three, since 2026-08-14.** "What it does"
-              pointed at `#does`, the three-phase section, and that section came
-              off the page — so the link went with it in the same commit. A nav
-              entry whose target is not on the page is worse than a missing
-              one: it scrolls nowhere, says nothing, and is the one kind of
-              broken a visitor blames on the product rather than on the page.
+          {/* **Every entry here points at something that exists, and that rule
+              has already cost one of them.** "What it does" pointed at
+              `#does`, the three-phase section, and that section came off the
+              page — so the link went with it in the same commit. A nav entry
+              whose target is not on the page is worse than a missing one: it
+              scrolls nowhere, says nothing, and is the one kind of broken a
+              visitor blames on the product rather than on the page.
 
-              The order left standing is the order of the page itself, which is
-              what these are for: the road first, then the sixteen tools, then
-              what it costs. */}
-          <a href="#order" className="hover:text-lp-ink">
+              **The order is the page's own order**, which is what these are
+              for — the road, then what the app looks like, then the sixteen
+              tools, then the answers, then what it costs. Rebuilt on
+              2026-08-15 against the current page: two of these sections are
+              new since the last time this bar was looked at, and the page had
+              grown three screens that the nav did not admit existed. */}
+          <a href={at("#order")} className="hover:text-lp-ink">
             The order
           </a>
-          <a href="#tools" className="hover:text-lp-ink">
-            Tools
+          <a href={at("#inside")} className="hover:text-lp-ink">
+            Inside the app
+          </a>
+          {/* **Tools is a menu rather than an anchor, and it is the one entry
+              that earns the extra machinery.** The section it used to point at
+              is a cloud of marks around a count — right as a section and
+              useless as a destination, since it names none of the sixteen. The
+              menu names all of them and goes to each one's own row on
+              `/tools`. See `tools-menu.tsx`; the bar is told when it is open so
+              it does not slide away underneath it. */}
+          <ToolsMenu onOpenChange={setMenuOpen} />
+          <a href={at("#faq")} className="hover:text-lp-ink">
+            FAQ
           </a>
           {/* **The one item here that leaves the page, and it belongs with the
               anchors anyway** — a price is information, the same kind of thing

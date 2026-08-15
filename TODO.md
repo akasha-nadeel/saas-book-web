@@ -2511,6 +2511,25 @@ should either ship or lose the card.
 
 ## Known rough edges
 
+- [ ] **`/tools` has no screenshots yet, and the space for them is reserved.**
+      Added 2026-08-15. Every row draws the tool's mark on a stage at
+      `aspect-[2/1]` — the proportion the three landing captures take — so
+      dropping the real pictures in moves nothing on the page. Filling one in is
+      three steps: put the file in `public/`, add `shot: { src, width, height,
+      alt }` to that tool's entry in `src/lib/tool-guide.ts`, and the drawing is
+      replaced by the capture. The `alt` is not optional — `AppWindow` hides the
+      picture's contents behind it, so an empty one makes the screen invisible
+      rather than decorative; describe what is *on* the screen, as
+      `feature-shots.tsx` does. These are bitmaps and carry the standing cost:
+      when the screen moves, nothing fails and nothing warns.
+- [ ] **`npx tsc --noEmit` is red — 7 errors, all in test files**, found
+      2026-08-15: `editor/text-align.test.ts`, `export/docx.test.ts` and
+      `export/epub.test.ts` build `LoadedChapter`/`EpubChapter` literals that
+      have drifted from the types (`number` missing, a stray `id`). `npm run
+      test` is green because Vitest does not typecheck, so this only shows up
+      in the manual `tsc` pass CLAUDE.md tells you to run. Fixtures, not
+      product code — but it means the typecheck cannot be used as a clean
+      signal until they are updated.
 - [ ] Chapter row numbers are positions, so a row can read "2" beside a chapter
       titled "Chapter 3" after a delete. Deliberate — the number is a position
       and the title is a name — but worth revisiting if it confuses anyone.

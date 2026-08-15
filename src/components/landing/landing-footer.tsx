@@ -84,10 +84,22 @@ type Column = { heading: string; links: { href: string; label: string }[] };
 const COLUMNS: Column[] = [
   {
     heading: "Product",
+    /* **Mirrors the bar, and one of these was pointing at nothing.**
+       "What it does" linked to `#does`, the three-phase section, which came off
+       the page on 2026-08-14 — the *header's* copy of that link went with it
+       and this one was missed, so the footer has been offering a scroll to
+       nowhere since. It is `#inside` now, the feature shots, which is the
+       section that answers the same question.
+
+       The guide is a page rather than a section, so it is a `<Link>` while the
+       rows above it stay anchors. Both belong here: they answer different
+       questions — how much there is, and what any of it does. */
     links: [
       { href: "#order", label: "The order" },
-      { href: "#does", label: "What it does" },
+      { href: "#inside", label: "Inside the app" },
       { href: "#tools", label: "Tools" },
+      { href: "/tools", label: "What each tool does" },
+      { href: "#faq", label: "FAQ" },
       { href: "/upgrade", label: "Pricing" },
     ],
   },
@@ -113,7 +125,23 @@ const COLUMNS: Column[] = [
   },
 ];
 
-export function LandingFooter() {
+export function LandingFooter({
+  /**
+   * Whether this footer is on the landing page itself.
+   *
+   * **Three of the columns point at sections rather than pages**, which is
+   * honest on `/` and broken anywhere else: a bare `#order` on `/tools` scrolls
+   * to nothing, which is the dead UI this app refuses. Off the landing page
+   * they are rooted to `/#order`, so they navigate there and *then* scroll.
+   *
+   * It is a prop rather than a `usePathname()` because that would make this a
+   * client component — and the whole of the landing page and the tool guide
+   * currently ship no JavaScript beyond the header. One boolean from the two
+   * callers is cheaper than a hydration boundary around every link in the
+   * footer.
+   */
+  home = true,
+}: { home?: boolean } = {}) {
   return (
     /* `.oc-closing` paints the landscape across the whole of this element and
        reserves the reveal above the card with its own top padding. No ground
@@ -141,13 +169,22 @@ export function LandingFooter() {
                          columns point every row at one section, so hrefs
                          repeat and React would drop all but the first. */
                       <li key={`${link.label}-${i}`}>
-                        {/* In-page anchors stay anchors: a `<Link>` to
-                            `#order` would be a client navigation to the same
-                            route, which scrolls nothing. */}
+                        {/* On the landing page an in-page anchor stays an
+                            anchor: a `<Link>` to `#order` would be a client
+                            navigation to the same route, which scrolls
+                            nothing. Anywhere else the same href points at a
+                            section that is not on the page, so it is rooted
+                            and becomes an ordinary navigation — see `home`. */}
                         {link.href.startsWith("#") ? (
-                          <a href={link.href} className={LINK}>
-                            {link.label}
-                          </a>
+                          home ? (
+                            <a href={link.href} className={LINK}>
+                              {link.label}
+                            </a>
+                          ) : (
+                            <Link href={`/${link.href}`} className={LINK}>
+                              {link.label}
+                            </Link>
+                          )
                         ) : (
                           <Link href={link.href} className={LINK}>
                             {link.label}
