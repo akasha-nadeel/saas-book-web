@@ -1428,7 +1428,14 @@ export function LandingPage() {
                 preposition, and it lets the loud half open on "you" — the only
                 word in the sentence that is about the reader. */}
               <h1 className="oc-display font-serif text-[2rem] leading-[1.1] font-semibold sm:text-[2.75rem] sm:leading-[1.05] lg:text-[3rem] xl:text-[3.5rem]">
-                <span className="block text-lp-accent-soft">
+                {/* **Ink, not the soft slate it was.** The two halves used
+                    to be told apart by *value* — a grey problem above a blue
+                    answer — and they are told apart by hue alone now, at the
+                    owner's request. It reads harder, which suits the sentence:
+                    the quiet half is the bad news. `lp-accent-soft` is left in
+                    the palette; the note beside it still describes the pairing
+                    this used to be half of. */}
+                <span className="block text-lp-ink">
                   Nobody sees your book
                   <br />
                   in the shop until
@@ -1506,7 +1513,20 @@ export function LandingPage() {
                 The promise that used to end this line has moved up into the
                 headline, where it is marked. Two highlighted phrases on one
                 screen and neither is highlighted. */}
-              <p className="oc-lead mt-6 max-w-xl font-serif text-xl leading-relaxed font-medium text-lp-soft sm:mt-7 sm:text-[1.375rem]">
+              {/* `max-w-2xl` rather than `xl`: at 36rem this set as three
+                  lines and the last one carried a single word, which reads as
+                  a paragraph that ran out rather than as a sentence. 42rem
+                  turns it at the comma into two even lines.
+
+                  **`lp-ink/85` rather than `lp-soft`**, a step darker at the
+                  owner's request. Opacity rather than the next token down is
+                  safe *here specifically*: the ladder has no step between
+                  `lp-soft` and full ink, and this paragraph carries no
+                  emphasis inside it — which is the one thing an opacity would
+                  fade along with the rest. Do not copy the pattern into a
+                  deck, where the whole mechanism is the gap between the grey
+                  and the ink inside it. */}
+              <p className="oc-lead mt-6 max-w-2xl font-serif text-xl leading-relaxed font-medium text-lp-ink/85 sm:mt-7 sm:text-[1.375rem]">
                 Cover, ISBN, blurb, categories, keywords. Get one wrong and the
                 shop files your book where nobody looks.
               </p>
