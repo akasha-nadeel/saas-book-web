@@ -180,9 +180,25 @@ export function InviteSentDialog({
           <li>It lasts {INVITE_DAYS} days.</li>
           {/* The line that makes closing this safe rather than a gamble. */}
           <li>
-            {emailed ? "If the email goes astray, it" : "It"} also appears under
-            Collaborators when they next sign in — and you can copy the link
-            again from this book&rsquo;s share list.
+            {/*
+              **One template literal, not an expression followed by prose.**
+
+              This read "italso appears" in production. JSX trims a multi-line
+              text node line by line, and the *leading* space of its first line
+              goes with the trim — so `{expr} also appears under\nCollaborators`
+              compiled to `[expr, "also appears under Collaborators…"]`, two
+              adjacent strings with nothing between them. Nothing in the source
+              looks wrong; it is only visible in the built bundle, which is
+              where it was caught.
+
+              `{" "}` is the usual remedy and Prettier reformatted it straight
+              back out again, restoring the bug. Building the whole sentence as
+              one string has no JSX whitespace to trim and nothing for a
+              formatter to rearrange.
+            */}
+            {`${
+              emailed ? "If the email goes astray, it" : "It"
+            } also appears under Collaborators when they next sign in — and you can copy the link again from this book’s share list.`}
           </li>
         </ul>
       </div>
