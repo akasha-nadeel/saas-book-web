@@ -17,12 +17,19 @@ export function RailButton({
   onClick,
   href,
   glyph,
+  disabled,
   children,
 }: {
   label: string;
   active?: boolean;
   onClick?: () => void;
   href?: string;
+  /**
+   * Off while the button's own work is in flight — a file being read, so far.
+   * Never for "you may not do this": a control that is permanently dead is the
+   * thing the house rules forbid, and the rails hide those instead.
+   */
+  disabled?: boolean;
   /**
    * A typographic mark instead of a drawn icon — ¶ and nothing else so far.
    *
@@ -48,7 +55,7 @@ export function RailButton({
                        active
                          ? "bg-accent text-accent-ink"
                          : "text-muted hover:bg-raised hover:text-fg"
-                     }`;
+                     } ${disabled ? "opacity-50" : ""}`;
 
   const icon = glyph ? (
     <span
@@ -85,6 +92,7 @@ export function RailButton({
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       aria-pressed={active}
       title={label}

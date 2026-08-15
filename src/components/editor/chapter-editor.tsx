@@ -25,6 +25,7 @@ import {
   icons,
 } from "@/components/editor/icon-rail";
 import { WorkspaceRail, selectPanel } from "@/components/editor/workspace-rail";
+import { ImportChapterButton } from "@/components/editor/import-chapter-button";
 import { SelectionToolbar } from "@/components/editor/selection-toolbar";
 import { ImageToolbar } from "@/components/editor/image-toolbar";
 import { Pagination, type PageGeometry } from "@/lib/editor/pagination";
@@ -274,6 +275,10 @@ export function ChapterEditor({
    */
   const canShare =
     isSupabaseConfigured() && book !== null && !isSharedBook(book);
+  // The rail's Import button is a write, so a viewer is not offered it. Asked
+  // here as well as in `EditorSurface` because the rails are rendered by this
+  // component and that one is a different scope.
+  const canWriteThis = book !== null && canWriteBook(book);
   const chapter = book?.chapters.find((c) => c.id === chapterId) ?? null;
 
   // The part the open page belongs to, and the part the *panel* says is
@@ -403,7 +408,6 @@ export function ChapterEditor({
           paper={prefs.paper}
           mode={panelMode}
           onMode={changePanelMode}
-          dictation={dictation}
           body={body}
           entering={entering}
         />
@@ -516,6 +520,15 @@ export function ChapterEditor({
                     {icons.share}
                   </RailButton>
                 )}
+                {/* **Import, immediately above Export, because they are a
+                    pair.** It used to be a third button in the chapter list's
+                    header, which is a place you have to open a list to reach —
+                    and the two halves of moving a manuscript through this app
+                    then lived on opposite sides of the window. Neither acts on
+                    the sheet, which is what this last group is for. Hidden for
+                    a reader, like every other write: `canWrite` is the same
+                    test the chapter list used. */}
+                {canWriteThis && <ImportChapterButton book={book} />}
                 <RailButton label="Export" href={`/book/${bookId}/export`}>
                   {icons.export}
                 </RailButton>

@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { WorkspaceRail } from "@/components/editor/workspace-rail";
-import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import {
   BookPanel,
   useOpenPart,
@@ -17,11 +15,19 @@ import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
 /**
  * A book with no chapter open.
  *
- * Opening a book lands here rather than jumping into a chapter. It is the editor
- * with the manuscript taken out: the same rail, the same tool panel, and the
- * same book panel beside it — three cards for the parts of the book, and the
- * chapter list inside the middle one. Where the page would be there is a short
- * guide instead, because there is no page until a chapter is picked.
+ * Opening a book lands here rather than jumping into a chapter: the book panel
+ * — three cards for the parts of the book, with the chapter list inside the
+ * middle one — and a short guide where the page would be, because there is no
+ * page until a chapter is picked.
+ *
+ * **No workspace rail here, and no tool panel.** It carried both, on the
+ * reasoning that this is the editor with the manuscript taken out. But every
+ * one of those nine tabs is a thing you keep *beside a page you are writing* —
+ * search, notes, the story bible, versions — and on a screen with no page they
+ * were nine ways to open a panel about a chapter chosen for the writer rather
+ * than by them. What this screen actually needs at its top left is the way
+ * back out, which the rail was burying among them. So the rail belongs to the
+ * editor, and this has one button.
  *
  * It used to carry its own chapter list on the left, from before the book panel
  * existed. Two navigators for one book meant two things to keep in step and two
@@ -70,53 +76,44 @@ export function BookOverview({ bookId }: { bookId: string }) {
     // would snap the panel back the instant the writer pressed Chapters.
   }, [hydrated, bookId]);
 
-  // The tool panel, as in the editor: closed until a rail tab is picked, and
-  // "search" only as a seed — it is never seen before a tab chooses it.
-  const [tab, setTab] = useState<PanelTab>("search");
-  const [panelOpen, setPanelOpen] = useState(false);
-
   // Nothing to render until storage has been read — see useHydrated.
   if (!hydrated) return <LoadingScreen />;
 
   const book = findBook(shelf, bookId);
   if (!book) return <MissingBook />;
 
-  // The per-chapter panels (notes, bookmarks, the assistant) need a chapter to
-  // act on even though none is on the page. The last one opened is the natural
-  // anchor; a brand-new book has none, and those panels simply show empty.
-  const anchor =
-    book.chapters.find((c) => c.id === book.lastOpenedId) ??
-    book.chapters[0] ??
-    null;
-
   return (
     <div className="flex h-full">
-      <WorkspaceRail
-        bookId={bookId}
-        tab={tab}
-        onSelectTab={(next) => {
-          setTab(next);
-          setPanelOpen(true);
-        }}
-        leftPanel={panelOpen}
-        onPanel={setPanelOpen}
-        // The book panel already carries the chapter list, so the rail offering
-        // a second one would be the same list twice — the editor's reasoning,
-        // now that this screen has the same panel.
-        chapters={false}
-      />
-
-      {/* Always rendered — it owns its own mounting so it can animate out, and
-          draws nothing until first opened. See LeftPanel's `open`. */}
-      <LeftPanel
-        open={panelOpen}
-        tab={tab}
-        bookId={bookId}
-        chapterId={anchor?.id ?? ""}
-        chapterTitle={anchor?.title ?? ""}
-        getChapterText={() => ""}
-        onClose={() => setPanelOpen(false)}
-      />
+      {/* The way out, in the corner the rail used to fill.
+​
+          One button rather than a strip of them: from a book, "back" has a
+          single meaning — the shelf you came from. It keeps the rail's own
+          width and top inset so the panel beside it starts where it always
+          did, and it is a link rather than `router.back()`, which would send
+          somebody who arrived from a chapter into the chapter again. */}
+      <div className="shrink-0 px-2 pt-3">
+        <Link
+          href="/"
+          aria-label="All books"
+          title="All books"
+          className="flex h-12 w-12 items-center justify-center rounded-xl
+                     text-muted outline-none transition-colors hover:bg-raised
+                     hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+          >
+            <path d="M12 5l-5 5 5 5" />
+          </svg>
+        </Link>
+      </div>
 
       {/* Left of the guide, exactly where it sits beside the manuscript in the
           editor. This screen is that one with the page taken out, so the panel

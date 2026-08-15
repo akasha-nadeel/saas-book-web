@@ -15,7 +15,6 @@ import {
   createMatterPage,
   createMatterPages,
   deleteChapter,
-  importIntoBook,
   isSharedBook,
   orderedChapters,
   rememberMatterAsked,
@@ -35,17 +34,12 @@ import {
   MenuLabel,
   MenuSeparator,
 } from "@/components/ui/menu";
-import type { Dictation } from "@/lib/editor/use-dictation";
-import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
 import {
   RowMenu,
   menuIcons,
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
-import type { ImportedChapter } from "@/lib/import/split";
-import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
-import { showImportBanner } from "@/components/editor/import-banner-host";
 
 export type BookPanelMode = "book" | "chapters";
 
@@ -308,7 +302,6 @@ export function BookPanel({
   paper,
   mode,
   onMode,
-  dictation,
   body,
   entering = false,
   always = false,
@@ -320,14 +313,11 @@ export function BookPanel({
   paper: string;
   mode: BookPanelMode;
   onMode: (mode: BookPanelMode) => void;
-  /**
-   * The editor's live dictation, started upstream. Shared with the tool rail's
-   * microphone so the two controls are two views of one session, not two.
-   *
-   * Absent on the book overview, which has no manuscript: the microphone hides
-   * rather than appearing with nowhere to put the words.
-   */
-  dictation?: Dictation;
+  /* No `dictation`. This panel used to carry a second microphone beside the
+     manuscript rail's, on the reasoning that a writer reading the chapter list
+     might want to start speaking without going back to the page. One engine
+     with two switches is a thing to keep in step for a control the writer only
+     ever reaches by opening a list first, so the rail's is now the only one. */
   /** Which part's list is showing, owned by the editor — see useOpenPart. */
   body: OpenPart;
   /** Play the entrance. Set only when this panel’s face changes, never on the
@@ -428,22 +418,6 @@ export function BookPanel({
     ? (chapters.find((c) => c.id === chapterId) ?? null)
     : null;
   const openPart = openChapter ? chapterMatterOf(openChapter) : null;
-
-  // Named once because it is both the tooltip and the accessible name, and a
-  // toggle whose two labels disagree is a toggle screen readers misreport.
-  const dictationLabel = dictation?.listening
-    ? "Stop dictating"
-    : "Dictate — speak and the words are typed";
-
-  // Importing a file into this book — mirrors the left panel: a read in flight,
-  // any error, the hidden input, and a parsed file waiting on add-or-replace.
-  const [importing, setImporting] = useState(false);
-  const [importError, setImportError] = useState<string | null>(null);
-  const [pending, setPending] = useState<ImportedChapter[] | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  // The free plan's ten imports. This path counts too — a file brought into a
-  // book the writer made a moment ago is the same file, and a limit with an
-  // "add a book first" way round it is a limit the pricing page cannot claim.
 
   // The Book View flip-book: page 0 is the cover, 1…N the chapter's printed
   // pages. The preview reports its page count so the pager can clamp.
@@ -603,41 +577,11 @@ export function BookPanel({
     );
   };
 
-  const handleImport = async (file: File) => {
-    // `check` and not `spend`: the store counts imports at its own funnel.
-    setImporting(true);
-    setImportError(null);
-    try {
-      const parsed = await importFile(file);
-      // Already wrote here? Ask add-or-replace. An empty book just takes it in.
-      if (bookWordCount(book) > 0) {
-        setPending(parsed.chapters);
-        return;
-      }
-      runImport(parsed.chapters, "replace");
-    } catch (err) {
-      setImportError(
-        err instanceof ImportError
-          ? err.message
-          : "That file could not be read. It may be damaged, or not the format its name suggests.",
-      );
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  const runImport = (chapters: ImportedChapter[], mode: "add" | "replace") => {
-    setPending(null);
-    const result = importIntoBook(bookId, chapters, mode);
-    if (!result) {
-      setImportError(
-        "Those chapters could not be saved — the book may be too large for this browser's storage.",
-      );
-      return;
-    }
-    showImportBanner(bookId, result.undo, chapters.length);
-    open(result.firstId);
-  };
+  // The whole import flow moved to `import-chapter-button.tsx`, which is
+  // rendered on the manuscript rail beside Export. It travelled as one piece —
+  // the file input, the add-or-replace question, the undo banner and the
+  // failure — because a button in one component and its dialog in another is
+  // how a control ends up offered where it cannot be answered.
 
   return (
     <aside
@@ -802,19 +746,18 @@ export function BookPanel({
         </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col px-5 pt-4 pb-5">
-          {/* One row: the way out, the way to make a chapter, and the two ways
-              to bring one in.
+          {/* The way back to Book View, and nothing else.
+​
+              This row used to hold four controls — back, a microphone and an
+              import button behind a spacer. Both of those were second copies
+              of something the manuscript's own rail already carried, and
+              reaching them meant opening a list first; dictation lives on that
+              rail and Import now sits beside Export there, which is the pair
+              it belongs to.
 
-              The step back used to sit on its own line above, which spent a
-              whole row of a narrow panel on one small link and left the row
-              below it looking like the top of the panel anyway. Four controls
-              of one height read as one bar, and the panel starts where its
-              content starts.
-
-              Back is an icon alone. Giving it its word back would take a third
-              of the row from the primary action at this width, and a chevron at
-              the left end of a bar is the one icon nobody has to be taught. Its
-              name lives in the label and the tooltip for anyone who does. */}
+              Back is an icon alone. A chevron at the left end of a bar is the
+              one icon nobody has to be taught, and its name lives in the label
+              and the tooltip for anyone who does. */}
           <div className="flex items-stretch gap-2">
             <button
               type="button"
@@ -839,135 +782,7 @@ export function BookPanel({
                 <path d="M12 5l-5 5 5 5" />
               </svg>
             </button>
-
-            {/* Everything after this is an action, and the step back is not, so
-                the gap between them carries the difference. */}
-            <span className="flex-1" />
-
-            {/* Dictation. Hidden outright where the browser has no speech
-                engine — on Safari and Firefox this could never work, and a
-                control that is permanently dead is worse than one that was
-                never offered. It keeps the import button's exact footprint so
-                turning the microphone on cannot shift the row. */}
-            {dictation?.supported && (
-              <button
-                type="button"
-                aria-pressed={dictation.listening}
-                aria-label={dictationLabel}
-                title={dictationLabel}
-                onClick={() =>
-                  dictation.listening ? dictation.stop() : dictation.start()
-                }
-                className={`relative flex h-9 w-9 shrink-0 cursor-pointer items-center
-                            justify-center rounded-lg border outline-none
-                            transition-colors focus-visible:ring-2
-                            focus-visible:ring-accent/50 ${
-                              dictation.listening
-                                ? "border-danger bg-danger text-accent-ink"
-                                : `border-line text-fg hover:border-accent/60
-                                   hover:bg-raised`
-                            }`}
-              >
-                {/* A ring that keeps pulsing while the microphone is live. This
-                    is a control a writer switches on and then stops looking at,
-                    so the state has to carry from the corner of the eye. */}
-                {dictation.listening && (
-                  <span
-                    aria-hidden="true"
-                    className="absolute inset-0 animate-ping rounded-lg
-                               bg-danger/40"
-                  />
-                )}
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="relative h-4 w-4"
-                >
-                  <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
-                  <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
-                  <path d="M10 15v2.4" />
-                </svg>
-              </button>
-            )}
-
-            {canWrite && (
-            <button
-              type="button"
-              // Live even when the ten are gone: the refusal happens on the
-              // press, in `handleImport`, because that is the only moment the
-              // writer has asked for anything.
-              disabled={importing}
-              onClick={() => fileRef.current?.click()}
-              aria-label={importing ? "Reading file…" : "Import a file"}
-              title="Import a file"
-              className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border
-                         border-line text-fg outline-none transition-colors
-                         hover:border-accent/60 hover:bg-raised focus-visible:ring-2
-                         focus-visible:ring-accent/50 disabled:opacity-50"
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-4 w-4"
-              >
-                <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
-                <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
-              </svg>
-            </button>
-            )}
           </div>
-
-          {/* While the microphone is live, say so in words as well as colour —
-              and say where the words are going, since the writer is looking at
-              the chapter list rather than at the page they are dictating into.
-              A refused microphone reports itself here too; nothing else would
-              tell the writer why speaking is doing nothing. */}
-          {dictation?.supported && (dictation.listening || dictation.error) && (
-            <p
-              className={`mt-2 font-sans text-xs ${
-                dictation.error ? "text-danger" : "text-muted"
-              }`}
-              role={dictation.error ? "alert" : "status"}
-            >
-              {dictation.error ?? "Listening — speak and the words are typed."}
-            </p>
-          )}
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept={IMPORT_ACCEPT}
-            // sr-only hides it from the eye but *not* from a screen reader, so
-            // without a name it is an unexplained file control in the tab order.
-            aria-label="Import a chapter file"
-            className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void handleImport(file);
-            }}
-          />
-
-          {importError && (
-            <p
-              role="alert"
-              className="mt-3 rounded-md border border-line bg-raised px-2.5 py-2
-                         font-sans text-xs leading-relaxed"
-              style={{ color: "var(--color-danger)" }}
-            >
-              {importError}
-            </p>
-          )}
 
           {/* The book's three parts, one card each. Front matter opens the
               book, the body is the story, back matter closes it — the order
@@ -1135,15 +950,6 @@ export function BookPanel({
         />
       )}
 
-      {pending && (
-        <ImportModeDialog
-          existingCount={bodyChapters.length}
-          importCount={pending.length}
-          onAdd={() => runImport(pending, "add")}
-          onReplace={() => runImport(pending, "replace")}
-          onClose={() => setPending(null)}
-        />
-      )}
     </aside>
   );
 }

@@ -95,7 +95,8 @@ export function BookGuide({
                 <span className="text-fg">Chapters</span> on the body card opens
                 the list; click a chapter to open it, and{" "}
                 <span className="text-fg">New chapter</span> beside it adds one.
-                The upload button above brings a{" "}
+                Once a chapter is open, the import button on the right-hand rail
+                brings a{" "}
                 <code className="rounded bg-raised px-1">.docx</code>,{" "}
                 <code className="rounded bg-raised px-1">.epub</code>,{" "}
                 <code className="rounded bg-raised px-1">.md</code>,{" "}
@@ -109,8 +110,9 @@ export function BookGuide({
                 Read the whole book
               </h2>
               <p className="mt-1 font-sans text-sm leading-relaxed text-muted">
-                The open-book button on the rail opens a reading view — every
-                chapter on one page, top to bottom, the way the book reads.
+                Open a chapter and the open-book button on the left rail gives a
+                reading view — every chapter on one page, top to bottom, the way
+                the book reads.
                 Scroll it end to end, and click any chapter’s title to jump back
                 into editing it.
               </p>
