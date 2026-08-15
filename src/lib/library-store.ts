@@ -1676,7 +1676,34 @@ export function saveBody(
 
   const raw = JSON.stringify(doc);
   window.localStorage.setItem(bodyKey(chapterId), raw);
-  pushBody(chapterId, raw);
+
+  /*
+   * **Only prose with a chapter to hang on is sent.**
+   *
+   * `chapter_bodies` derives its book and owner from the chapter row in a
+   * trigger, which raises `foreign_key_violation` when there is no such row —
+   * and 23503 is retryable, because the ordinary cause is a body queued a beat
+   * before the chapter that carries it. For a chapter that no longer *exists*
+   * there is nothing to wait for: the job fails five times, gives up, and
+   * writes six red lines into the console for a row that could never land.
+   * Seen with a chapter that was in neither the shelf nor the trash while its
+   * body key was still in storage — a book emptied out from under an autosave
+   * in flight.
+   *
+   * The local write above still happens. Refusing that would throw away the
+   * writer's last keystrokes to tidy a key, and an orphaned body costs a few
+   * kilobytes until `uploadLibrary` drops it — which it already does, for
+   * exactly this reason. This only declines to *send* what the server has
+   * nowhere to put.
+   *
+   * Asked here rather than in `sync.ts`: that module reads no storage and owns
+   * no state on purpose, so the caller is what decides there is something to
+   * push. Same direction as every other call in this file.
+   */
+  const onShelf =
+    book?.chapters.some((c) => c.id === chapterId) ??
+    getShelf().books.some((b) => b.chapters.some((c) => c.id === chapterId));
+  if (onShelf) pushBody(chapterId, raw);
 
   // *After* the body is written, never before, and never in a way that can
   // throw: history is a nicety and the manuscript is the point. A quota error
