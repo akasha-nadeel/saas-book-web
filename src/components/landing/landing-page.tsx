@@ -717,13 +717,11 @@ const ORDER_STATIONS: Station[] = PHASES.filter(
    stays: the Track section below still draws four of its five. See TODO.md
    under "Taken out on purpose". */
 
-
 /* `PREPARE_MARKS` used to live here — one glyph per point, drawn beside the
    four Prepare claims on the stage. Those four restated four of the sixteen
    tools, which `book-tools.ts` already lists in full, so they went when that
    section took the reference's two-column header. `PREPARE` itself stays: the
    phases section above counts it. */
-
 
 /*
  * The first four are cards now rather than a column, so the notes are cut to
@@ -858,30 +856,37 @@ const REFUSALS = [
  * and the export dialog follow. All seven are shown, which is why the grid has
  * no fade at its edges: there is no eighth to imply.
  *
- * The three facts are placed *between* the marks rather than gathered at one
- * end. The reference alternates its stat tiles with its logos, and the
- * alternation is what stops a row like this reading as a table of
- * specifications with a summary bolted on. Their positions are the only
- * arbitrary thing in the list.
+ * The facts are placed *between* the marks rather than gathered at one end.
+ * The reference alternates its stat tiles with its logos, and the alternation
+ * is what stops a row like this reading as a table of specifications with a
+ * summary bolted on. Their positions are the only arbitrary thing in the list.
  *
- * Each fact is settleable by the reader today, without an account: the zero by
- * running the free validator on the file they get, the four by pressing
- * export, and the "nothing" by opening devtools while the check above reads
- * their book. That is the bar for anything that joins them — a fact that has
- * to be taken on trust belongs in the prose, not on a tile that looks like
+ * Each fact is settleable by the reader today, without an account: the four by
+ * pressing export, and the "nothing" by opening devtools while the check above
+ * reads their book. That is the bar for anything that joins them — a fact that
+ * has to be taken on trust belongs in the prose, not on a tile that looks like
  * evidence.
+ *
+ * **There were three facts and now there are two.** The first was "0 —
+ * EPUBCheck errors, and zero warnings", and it went on 2026-08-15 to make room
+ * for the brand mark. Nothing was retracted with it: the sentence directly
+ * above this grid already says the EPUB is *verified against EPUBCheck 5.3,
+ * not asserted*, so the tile was the same claim a second time, six inches
+ * lower. That is also the reason it was the one to give up — of the three it
+ * was the only one the prose already carried.
+ *
+ * The brand tile is the one thing here that is not evidence, which is why it
+ * takes a fact's slot rather than a mark's: the marks are a closed list of
+ * programs the export reaches, and a logo that is not a destination sitting
+ * among them would be claiming to be one.
  */
 type Tile =
   | { kind: "mark"; destination: (typeof DESTINATIONS)[number] }
-  | { kind: "fact"; figure: string; label: string; tone?: string };
+  | { kind: "fact"; figure: string; label: string; tone?: string }
+  | { kind: "brand" };
 
 const TILE_FACTS: Record<number, Tile> = {
-  1: {
-    kind: "fact",
-    figure: "0",
-    label: "EPUBCheck errors, and zero warnings",
-    tone: PASS,
-  },
+  1: { kind: "brand" },
   4: { kind: "fact", figure: "4", label: "export formats, free forever" },
   6: {
     kind: "fact",
@@ -891,9 +896,10 @@ const TILE_FACTS: Record<number, Tile> = {
 };
 
 const TILES: Tile[] = (() => {
-  const marks = DESTINATIONS.map(
-    (destination): Tile => ({ kind: "mark", destination }),
-  );
+  const marks = DESTINATIONS.map((destination): Tile => ({
+    kind: "mark",
+    destination,
+  }));
   /* Counted once, up front. Written as `marks.length + …` inside the
      condition it was a moving target — `shift()` empties the array as the
      loop runs, so the loop stopped four tiles short and three destinations
@@ -1164,9 +1170,7 @@ const FAQ: [question: string, answer: React.ReactNode][] = [
       or only read it — free covers you and one other, and Pro raises that.
       Whoever owns the book pays for the seats, so the person you invite needs
       an account and nothing else.{" "}
-      <Em>
-        What it is not is Google Docs: you will not see each other type.
-      </Em>{" "}
+      <Em>What it is not is Google Docs: you will not see each other type.</Em>{" "}
       Changes travel when they are saved, and if you both write the same chapter
       at once the second save is refused rather than quietly replacing the
       first. Working in different chapters, which is what usually happens, needs
@@ -1581,9 +1585,7 @@ export function LandingPage() {
             {/* Wider than the decks under a heading (`3xl`, not `2xl`): this
                 one has no title over it to set its measure, and at the deck
                 size a `2xl` column turns it into five short lines. */}
-            <p
-              className={`mx-auto max-w-3xl text-center ${SECTION_LEAD}`}
-            >
+            <p className={`mx-auto max-w-3xl text-center ${SECTION_LEAD}`}>
               Your manuscript <Em>never leaves this browser</Em>, and it comes
               back out in four formats. The EPUB is{" "}
               <Em>verified against EPUBCheck 5.3</Em>, not asserted.
@@ -1598,7 +1600,31 @@ export function LandingPage() {
                   devtools, the second with a free validator, the third by
                   pressing export. */}
               {TILES.map((tile) =>
-                tile.kind === "fact" ? (
+                tile.kind === "brand" ? (
+                  /* The mark, on a fact's tinted ground rather than a mark's
+                     bordered one — see the note on `Tile`. `/logo-mark.png` is
+                     the blue-on-transparent artwork, so it sits on the tint
+                     without a plate of its own; the white-on-blue file is the
+                     favicon and would be a filled block here.
+
+                     `alt=""` and `aria-hidden`: the wordmark is in the header
+                     and the footer of this page already, so announcing the
+                     brand a third time in the middle of a list of *other*
+                     people's programs would be noise. */
+                  <li
+                    key="brand"
+                    className="flex items-center justify-center rounded-2xl bg-lp-tint-soft p-4 sm:p-5"
+                  >
+                    <Image
+                      src="/logo-mark.png"
+                      alt=""
+                      aria-hidden="true"
+                      width={512}
+                      height={512}
+                      className="h-12 w-12 object-contain sm:h-14 sm:w-14"
+                    />
+                  </li>
+                ) : tile.kind === "fact" ? (
                   <li
                     key={tile.label}
                     className="rounded-2xl bg-lp-tint-soft p-4 sm:p-5"
@@ -2669,7 +2695,9 @@ export function LandingPage() {
 
               {/* The same scale every other section title takes — see
                   `SECTION_TITLE`. The column is hand-written; the type is not. */}
-              <h2 className={`oc-display mt-6 font-serif text-lp-ink ${SECTION_TITLE}`}>
+              <h2
+                className={`oc-display mt-6 font-serif text-lp-ink ${SECTION_TITLE}`}
+              >
                 {/* No hard break. This column is a fixed 24rem, so at the
                     section-title size the line turns after "Frequently" on its
                     own and a `<br>` changes nothing about the shape — while
@@ -2703,7 +2731,9 @@ export function LandingPage() {
                 <p className="mt-3 text-[1.0625rem] leading-[1.5] font-semibold text-lp-body">
                   Every one of these is a question this audience actually asks
                   before paying for anything. If yours is not here,{" "}
-                  <Em>one person answers — usually within {REPLY_DAYS} days.</Em>
+                  <Em>
+                    one person answers — usually within {REPLY_DAYS} days.
+                  </Em>
                 </p>
                 <Link
                   href="/contact"
@@ -2803,7 +2833,9 @@ export function LandingPage() {
               title="Four things you can check without believing a word"
               lead={
                 <>
-                  <Em>Every claim on this page can be settled by you, today,</Em>{" "}
+                  <Em>
+                    Every claim on this page can be settled by you, today,
+                  </Em>{" "}
                   without an account and without taking our word for any of it —
                   with devtools, a free validator, and the export button.
                 </>
@@ -2940,14 +2972,10 @@ function Head({
 }) {
   return (
     <div className={center ? "mx-auto max-w-3xl text-center" : "max-w-2xl"}>
-      <p
-        className="font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase"
-      >
+      <p className="font-code text-[0.6875rem] tracking-[0.18em] text-lp-faint uppercase">
         {eyebrow}
       </p>
-      <h2
-        className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}
-      >
+      <h2 className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}>
         {title}
       </h2>
       {lead && (
@@ -3261,7 +3289,6 @@ function WideFigure({ children }: { children: ReactNode }) {
    `var(--x)1f` is a string, not a colour, and CSS drops the declaration
    without a word. */
 
-
 /* ---- The figures ---------------------------------------------------------
  *
  * Drawn in markup rather than screenshotted, which is this repo's standing
@@ -3339,7 +3366,9 @@ function MoneyFigure() {
           >
             £{MONEY.spent.toLocaleString()}
           </p>
-          <p className="mt-2 text-[0.8125rem]">Cover · editing · ads · proofs</p>
+          <p className="mt-2 text-[0.8125rem]">
+            Cover · editing · ads · proofs
+          </p>
         </div>
         <div>
           <p className="font-code text-[0.6875rem] font-semibold tracking-[0.16em] text-lp-faint uppercase">
@@ -3375,8 +3404,8 @@ function MoneyFigure() {
             {MONEY_COPIES.toLocaleString()} more copies gets you level.
           </p>
           <p className="mt-2.5 text-[0.9375rem] leading-relaxed">
-            Worked from what a copy has actually earned you. With no rows
-            saying so, the figure does not appear at all.
+            Worked from what a copy has actually earned you. With no rows saying
+            so, the figure does not appear at all.
           </p>
         </div>
       )}
