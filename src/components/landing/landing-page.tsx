@@ -12,6 +12,7 @@ import { HeroWall } from "@/components/landing/hero-wall";
 import { LandingFooter } from "@/components/landing/landing-footer";
 import { LandingHeader } from "@/components/landing/landing-header";
 import { OrderRows, type Station } from "@/components/landing/order-rows";
+import { ToolCloud } from "@/components/landing/tool-cloud";
 import {
   LEAD_EM,
   SECTION_LEAD,
@@ -25,7 +26,7 @@ import {
 } from "@/components/landing/refusal-figures";
 import { StoreListingDemo } from "@/components/landing/store-listing-demo";
 import { DESTINATIONS } from "@/components/landing/works-with";
-import { ALL_TOOLS, TOOL_GROUPS } from "@/lib/book-tools";
+import { ALL_TOOLS } from "@/lib/book-tools";
 import { PHASES, SELF_TICKING, STEPS, YOURS_TO_TICK } from "@/lib/roadmap";
 import { SEATS_PER_BOOK } from "@/lib/free-limits";
 import { copiesToLevel, totals, type Entry } from "@/lib/ledger";
@@ -2142,72 +2143,39 @@ export function LandingPage() {
           </div>
         </section>
 
-        {/* ---- The bento ------------------------------------------------
+        {/* ---- The tool cloud --------------------------------------------
 
-            The tool list, read out of `book-tools.ts` so the page cannot claim
-            a tool that does not exist or miss one that does. Cards of two
-            sizes, the way the reference mixes them, with the group that answers
-            the most expensive question given the wide cell. */}
+            **Four cards of pills until 2026-08-15**, grouped by job with a
+            note on each and sixteen named chips inside them. It is a scatter
+            of the marks around the count now, to the owner's reference.
+
+            What went is the grouping and the sixteen names. That is a real
+            loss and worth being honest about: the cards said what each tool
+            was *for*, and a cloud says only how many there are. What buys it
+            back is that this is not the only place they are listed — the
+            footer carries every one by name, and the marks here are the
+            dashboard's own, so a reader meets the same sixteen objects on this
+            page that they will meet inside the product.
+
+            The count in the heading and the marks in the cloud both come from
+            `ALL_TOOLS`, so neither can claim a tool that does not exist. */}
         <section
           id="tools"
-          className="border-b border-lp-line px-6 py-14 sm:py-20"
+          className="overflow-hidden border-b border-lp-line px-6 py-14 sm:py-20"
         >
           <div className="mx-auto max-w-6xl">
-            <Head
-              center
-              eyebrow="All of it included"
-              title={`${ALL_TOOLS.length} tools, nothing held back`}
-              lead={
-                <>
-                  Grouped by the job they do rather than by what they cost, and
-                  every one of them works on a real book rather than a sample.{" "}
-                  <Em>None is behind the paid plan.</Em>
-                </>
-              }
-            />
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
-              {TOOL_GROUPS.map((group, i) => (
-                <div
-                  key={group.title}
-                  // The first group gets the wide cell *and* the brand ground:
-                  // "the parts a shop sees" is the question this audience
-                  // arrives with, so it is the one that should be read first.
-                  className={`rounded-2xl border p-6 ${
-                    i === 0
-                      ? "text-lp-accent-pale md:col-span-2"
-                      : "border-lp-edge"
-                  }`}
-                  style={
-                    i === 0
-                      ? { backgroundColor: INK, borderColor: INK }
-                      : undefined
-                  }
-                >
-                  <p
-                    className={`oc-heading font-serif text-xl ${
-                      i === 0 ? "text-lp-accent-ink" : "text-lp-ink"
-                    }`}
-                  >
-                    {group.title}
-                  </p>
-                  <p className="mt-1.5 text-sm leading-relaxed">{group.note}</p>
-                  <ul className="mt-4 flex flex-wrap gap-2">
-                    {group.tools.map((tool) => (
-                      <li
-                        key={tool.path}
-                        className={`rounded-full border px-3 py-1 text-xs ${
-                          i === 0
-                            ? "border-lp-accent-ink/20 text-lp-accent-ink"
-                            : "border-lp-edge text-lp-ink"
-                        }`}
-                      >
-                        {tool.name}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            <ToolCloud>
+              <p className="font-code text-[0.8125rem] font-semibold tracking-[0.18em] text-lp-faint uppercase">
+                All of it included
+              </p>
+              <h2 className={`oc-display mt-4 text-lp-ink ${SECTION_TITLE}`}>
+                {ALL_TOOLS.length} tools, nothing held back
+              </h2>
+              <p className={`mt-5 ${SECTION_LEAD}`}>
+                Every one of them works on a real book rather than a sample.{" "}
+                <Em>None is behind the paid plan.</Em>
+              </p>
+            </ToolCloud>
           </div>
         </section>
 

@@ -1292,6 +1292,39 @@ body {
    -------------------------------------------------------------------------- */
 
 /* --------------------------------------------------------------------------
+   The tool cloud's idle float.
+
+   A slow, small vertical drift, applied to an inner wrapper so it composes
+   with the entrance transition on the element outside it rather than
+   overwriting its transform — `left`/`top` move the mark into place, this
+   moves it a few pixels forever afterwards.
+
+   Every mark shares one keyframe and differs only by `animation-delay`, which
+   is what stops sixteen tiles rising and falling in unison like a single
+   object. Honoured motion preference: no float at all, since a permanent
+   animation is the kind somebody who asked for less movement most wants gone.
+   -------------------------------------------------------------------------- */
+.oc-tool-float {
+  animation: oc-tool-float 7s ease-in-out infinite;
+}
+
+@keyframes oc-tool-float {
+  0%,
+  100% {
+    transform: translateY(-5px);
+  }
+  50% {
+    transform: translateY(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-tool-float {
+    animation: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
    The manuscript's own scrollbar.
 
    .scroll-slim leaves the track transparent, which lets the browser fill the
