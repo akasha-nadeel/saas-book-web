@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   useEffect,
@@ -139,34 +140,35 @@ export function AuthShell({
 }
 
 /**
- * The brand mark, shown through a mask so it takes the panel's text colour
- * rather than staying the white it is on disk — the same trick the shelf uses
- * for its supplied icons, and what keeps it right in both themes.
+ * The brand mark.
  *
- * **`/logo.png` is a silhouette, not a picture**, and that is what makes the
- * mask work: the file is white throughout and carries its whole shape in the
- * alpha channel, so the counters — the holes in the O and the C, the bubble's
- * interior — stay open and the ground shows through them. Replacing it with a
- * flat coloured export would fill those and the mark would render as a solid
- * blob. It was an open book until 2026-08-15 and is the OC speech bubble now;
- * nothing here had to change, which is the point of masking rather than
- * colouring.
+ * **A real image now, not a mask, and the theme is the reason.** It used to be
+ * `/logo.png` shown through `maskImage` over `bg-current`, so the shape took
+ * the panel's own `text-fg` — near-black by day, near-white at night, right in
+ * both without a second file. That was the correct trick while the mark was a
+ * neutral glyph. It cannot survive the mark being *blue*: masking to
+ * `--color-accent` looks right in daylight and turns the logo white after
+ * sunset, because the accent is white on black by design. A brand mark that
+ * changes colour with the theme is not a brand mark.
+ *
+ * So this is `/logo-mark.png` — the artwork itself, blue, on transparency —
+ * drawn at its own colour in both themes. `/logo.png` stays for the mask sites
+ * that still want a silhouette.
+ *
+ * `object-contain` in a square box because the bubble is taller than it is
+ * wide (its tail hangs below the body) and the file is padded square, so the
+ * box is the layout and the artwork sits inside it.
  */
 function Mark() {
   return (
-    <span
+    <Image
+      src="/logo-mark.png"
+      alt=""
       aria-hidden="true"
-      className="h-14 w-14 bg-current text-fg"
-      style={{
-        maskImage: "url(/logo.png)",
-        WebkitMaskImage: "url(/logo.png)",
-        maskSize: "contain",
-        WebkitMaskSize: "contain",
-        maskRepeat: "no-repeat",
-        WebkitMaskRepeat: "no-repeat",
-        maskPosition: "center",
-        WebkitMaskPosition: "center",
-      }}
+      width={512}
+      height={512}
+      priority
+      className="h-24 w-24 object-contain"
     />
   );
 }
