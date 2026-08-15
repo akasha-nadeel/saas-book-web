@@ -1427,6 +1427,38 @@ export function LandingPage() {
                 fit the measure. That one ends the quiet half on a whole
                 preposition, and it lets the loud half open on "you" — the only
                 word in the sentence that is about the reader. */}
+              {/* **The badge, with the mark in it.**
+
+                  The same pill every other eyebrow on this page wears — the
+                  FAQ's and the tools' both — so the hero opens on a shape the
+                  reader will meet again rather than on a one-off. What changes
+                  is what sits in the dot's place: the brand mark, at 16px,
+                  which is the one place on this page the logo appears at all
+                  above the header.
+
+                  The words are the product's own line, the one the invitation
+                  email signs off with. Using it here rather than writing a
+                  fresh phrase is the same rule the rest of the page follows
+                  about claims: a sentence that already exists somewhere the
+                  code can point at is a sentence that cannot quietly become
+                  untrue. It also says nothing a SaaS badge would invent — no
+                  count, no rating, no "trusted by".
+
+                  `lp-body` rather than the `lp-faint` the other eyebrows take:
+                  those sit over a section heading with a whole section under
+                  them, and this one is the first line on the page. */}
+              <p className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-lp-edge bg-lp-ground px-3.5 py-1.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-body uppercase sm:mb-7">
+                <Image
+                  src="/logo-mark.png"
+                  alt=""
+                  aria-hidden="true"
+                  width={512}
+                  height={512}
+                  className="h-4 w-4 shrink-0 object-contain"
+                />
+                Write and publish your book
+              </p>
+
               <h1 className="oc-display font-serif text-[2rem] leading-[1.1] font-semibold sm:text-[2.75rem] sm:leading-[1.05] lg:text-[3rem] xl:text-[3.5rem]">
                 {/* **Ink, not the soft slate it was.** The two halves used
                     to be told apart by *value* — a grey problem above a blue
