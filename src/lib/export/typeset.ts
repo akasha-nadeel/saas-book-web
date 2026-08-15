@@ -250,9 +250,44 @@ section::after { content: ""; display: block; clear: both; }
 .front-page {
   text-indent: 0;
 }
+/* **The title block near the top third, the imprint at the foot.** Both blocks
+   are centred and the paper between them is the composition — a title page that
+   simply starts a third of the way down and runs on reads as the first page of
+   a document rather than the first page of a book.
+
+   In print the section is a whole sheet, so it is given the page's height to
+   push the imprint down to; on an e-reader there is no page to fill, and a
+   fixed height there would either strand the imprint mid-screen or scroll. */
 .title-page {
   text-align: center;
-  ${forPrint ? "padding-top: 30%;" : "padding-top: 4em;"}
+  ${
+    forPrint
+      ? `display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: calc(${trim.height}in - ${(ends * 2).toFixed(3)}in);
+  padding-top: 18%;
+  padding-bottom: 4%;`
+      : "padding-top: 4em;"
+  }
+}
+/* A short centred rule over the imprint, standing in for the printer's ornament
+   a title page traditionally carries here. Drawn rather than typed: see the
+   note in front-matter.ts about dingbat coverage in e-reader fonts. */
+/* The rule is a pseudo-element so it can be short while the words under it are
+   not: capping the block itself wrapped "Salt House Press" onto two lines at
+   six ems, which is a publisher's name broken in half on a title page. */
+.title-imprint::before {
+  content: "";
+  display: block;
+  width: 6em;
+  margin: 0 auto 1.1em;
+  border-top: 1px solid #999;
+}
+.title-imprint p {
+  margin: 0 0 0.3em;
+  text-indent: 0;
+  font-size: ${(t.bodyPt * 0.95).toFixed(1)}pt;
 }
 .title-page .book-title {
   font-size: ${(t.bodyPt * 2.2).toFixed(1)}pt;
@@ -277,8 +312,46 @@ section::after { content: ""; display: block; clear: both; }
   text-align: left;
 }
 .copyright p { text-indent: 0; margin: 0 0 0.6em; }
-.contents h1 { page-break-before: avoid; break-before: avoid; }
-.contents ol { list-style: none; padding: 0; margin: 1.5em 0 0; }
-.contents li { text-indent: 0; margin: 0.4em 0; }
+/* **The heading is centred, and it was not.** Every other heading in the book
+   inherits the body's justification, which for a one-word heading means it sits
+   hard against the left margin — so "Contents" started where a paragraph starts
+   while the running head above it was centred on the page, and the page looked
+   like it had been assembled rather than set. A contents heading is centred in
+   every printed book. */
+.contents h1 {
+  text-align: center;
+  page-break-before: avoid;
+  break-before: avoid;
+  margin-bottom: 2em;
+}
+.contents ol {
+  list-style: none;
+  padding: 0;
+  /* A measure of its own. Chapter names are short, and run to the full width of
+     a page they leave an arm's length of white between the name and nothing. */
+  margin: 0 auto;
+  max-width: 22em;
+}
+/* **No dot leaders and no page numbers, deliberately.** The reference for this
+   page is a printed contents, where the leader runs to a folio — and the folio
+   is the one thing this cannot know. The PDF is produced by the browser's own
+   print engine, which paginates after this markup is written; CSS can only
+   fetch a target's page with target-counter(), which is paged-media CSS that
+   Chrome does not implement. An EPUB has no page numbers at all, being
+   reflowable. So a number here would have to be guessed, and a guessed folio in
+   a contents list is a number that sends a reader to the wrong page — the
+   "no invented number" rule, in the one place a reader would trust it most.
+   Leaders without folios are worse again: a line of dots leading to nothing
+   reads as a page that failed to render. Set cleanly instead. */
+.contents li {
+  text-indent: 0;
+  margin: 0.55em 0;
+  /* Never justified: a two-word chapter title stretched across the measure is
+     the classic broken-contents look. */
+  text-align: left;
+}
+/* The chapters are the page; a link colour would make them look like something
+   to click in a printed book and like a warning in a dark e-reader theme. */
+.contents a { color: inherit; text-decoration: none; }
 `.trim();
 }

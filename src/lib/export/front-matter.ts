@@ -21,15 +21,57 @@ export interface FrontSection {
   html: string;
 }
 
+/**
+ * The title page, set the way a title page is set.
+ *
+ * **Two blocks with the sheet between them**, which is the shape every printed
+ * book uses: the title, its subtitle and the author near the top third, and the
+ * imprint down at the foot. It used to be one run of three lines starting a
+ * third of the way down, so a book with a publisher printed it directly under
+ * the author's name like a fourth credit.
+ *
+ * **Nothing is invented to fill it.** The imprint block prints the publisher
+ * and the year of publication *if the book carries them* and disappears
+ * entirely if it does not — a self-published first novel with neither gets a
+ * title, an author and a lot of quiet paper, which is exactly what that book's
+ * title page looks like. The ornament is drawn only when there is an imprint
+ * for it to sit above, because a divider dividing nothing is decoration.
+ *
+ * The year rather than the whole date: a title page carries the year of
+ * publication, and `published` is stored as `YYYY-MM-DD` because that is what a
+ * shop asks for.
+ */
 function titlePage(book: Book): string {
   const subtitle = book.subtitle
-    ? `\n    <p class="book-subtitle">${escapeXml(book.subtitle)}</p>`
+    ? `\n      <p class="book-subtitle">${escapeXml(book.subtitle)}</p>`
     : "";
   const author = book.author
-    ? `\n    <p class="book-author">${escapeXml(book.author)}</p>`
+    ? `\n      <p class="book-author">${escapeXml(book.author)}</p>`
     : "";
+
+  const publisher = book.publishing?.publisher?.trim();
+  const year = book.publishing?.published?.slice(0, 4);
+  const imprint = [
+    publisher ? `<p>${escapeXml(publisher)}</p>` : null,
+    year && /^\d{4}$/.test(year) ? `<p>${escapeXml(year)}</p>` : null,
+  ].filter(Boolean);
+
+  /* The divider above the imprint is a CSS rule rather than a printer's
+     ornament. A glyph like ❦ is the traditional mark and is the one thing here
+     that could arrive as an empty box: an e-reader substitutes a font it has,
+     and coverage of the dingbat range is not something an EPUB can rely on. A
+     border draws in every reader and is invisible to a screen reader, which a
+     decorative character is not. */
+  const foot = imprint.length
+    ? `\n    <div class="title-imprint">
+${imprint.map((line) => `      ${line}`).join("\n")}
+    </div>`
+    : "";
+
   return `<section class="front-page title-page">
-    <p class="book-title">${escapeXml(book.title)}</p>${subtitle}${author}
+    <div class="title-block">
+      <p class="book-title">${escapeXml(book.title)}</p>${subtitle}${author}
+    </div>${foot}
   </section>`;
 }
 

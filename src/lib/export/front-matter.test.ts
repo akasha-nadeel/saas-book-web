@@ -181,3 +181,59 @@ describe("generated pages stand down for written ones", () => {
     ).toContain("copyright");
   });
 });
+
+/**
+ * The title page's imprint block — the publisher and year that sit at the foot
+ * of the sheet, under a rule.
+ *
+ * The rule these guard is "nothing is invented to fill the page": a
+ * self-published first novel carries neither field, and the block must vanish
+ * rather than print an empty rule over white space.
+ */
+describe("the title page's imprint", () => {
+  const titleOf = (b: Book) =>
+    frontSections(b, chapters, {
+      ...opts,
+      copyright: false,
+      contents: false,
+    })[0].html;
+
+  it("prints the publisher and the year of publication", () => {
+    const html = titleOf({
+      ...book,
+      publishing: { publisher: "Salt House", published: "2026-08-16" },
+    });
+    expect(html).toContain("Salt House");
+    // The year alone: a title page carries a year, not a filing date.
+    expect(html).toContain("<p>2026</p>");
+    expect(html).not.toContain("2026-08-16");
+  });
+
+  it("leaves the foot off a book with neither", () => {
+    const html = titleOf(book);
+    expect(html).not.toContain("title-imprint");
+  });
+
+  it("prints a publisher with no date, and a date with no publisher", () => {
+    expect(titleOf({ ...book, publishing: { publisher: "Salt House" } })).toContain(
+      "title-imprint",
+    );
+    expect(titleOf({ ...book, publishing: { published: "2026-08-16" } })).toContain(
+      "<p>2026</p>",
+    );
+  });
+
+  // `published` is stored as YYYY-MM-DD, but nothing enforces it on an
+  // imported book — and half a date under an author's name is worse than none.
+  it("ignores a date it cannot read a year out of", () => {
+    const html = titleOf({ ...book, publishing: { published: "soon" } });
+    expect(html).not.toContain("title-imprint");
+  });
+
+  it("keeps the title, subtitle and author in their own block", () => {
+    const html = titleOf(book);
+    expect(html).toContain("title-block");
+    expect(html).toContain("Silent Wind");
+    expect(html).toContain("A. Writer");
+  });
+});
