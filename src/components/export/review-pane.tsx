@@ -12,7 +12,11 @@ import { dropPagedStyles, paginate, printDocument } from "@/lib/export/print";
 import { toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml, escapeXml } from "@/lib/export/xhtml";
 import { typesetCss, type TypesetOptions } from "@/lib/export/typeset";
-import { frontSections, writtenPages } from "@/lib/export/front-matter";
+import {
+  frontSections,
+  withoutReplaced,
+  writtenPages,
+} from "@/lib/export/front-matter";
 import { plural } from "@/lib/plural";
 import type { Book } from "@/lib/library-store";
 
@@ -61,7 +65,12 @@ export function ReviewPane({
      `single` is the whole-book case. The wizard exports a whole book — the
      per-chapter export is a different entry point — so there is no flag here
      to get out of step with. */
-  const chapters = useMemo(() => loadChapters(book), [book]);
+  /* Filtered exactly as `runExport` filters it, so the review is looking at the
+     book the file will contain and not at a longer one. */
+  const chapters = useMemo(
+    () => withoutReplaced(loadChapters(book), typeset.replaceWritten),
+    [book, typeset.replaceWritten],
+  );
 
   /* Only the two formats that generate front matter can have a generated page
      stand down, so only those two carry the note. `docx` and `markdown` build

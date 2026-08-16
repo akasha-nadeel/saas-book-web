@@ -24,6 +24,7 @@ import {
 } from "./epub-images";
 import { getPrintCover } from "@/lib/cover-store";
 import { blocksToMarkdown } from "./markdown";
+import { withoutReplaced } from "./front-matter";
 import { DEFAULT_TYPESET, type TypesetOptions } from "./typeset";
 
 export type Format = "markdown" | "docx" | "epub" | "pdf";
@@ -314,7 +315,13 @@ export async function runExport({
   manuscript,
   typeset = DEFAULT_TYPESET,
 }: ExportRequest): Promise<ExportResult | null> {
-  const chapters = loadChapters(book, chapterId);
+  /* The writer's own pages they have asked us to replace come out here, before
+     any renderer sees the book — see `withoutReplaced` for why it is one filter
+     rather than a flag threaded through each format. */
+  const chapters = withoutReplaced(
+    loadChapters(book, chapterId),
+    typeset.replaceWritten,
+  );
   const single = Boolean(chapterId);
   const base = single
     ? `${slugify(book.title)}-${slugify(chapters[0]?.title ?? "chapter")}`

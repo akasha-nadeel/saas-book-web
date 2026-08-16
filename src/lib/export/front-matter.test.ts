@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
 import { DEFAULT_TYPESET } from "./typeset";
-import { frontSections } from "./front-matter";
+import { frontSections, withoutReplaced } from "./front-matter";
 
 const book: Book = {
   id: "b",
@@ -205,6 +205,57 @@ describe("generated pages stand down for written ones", () => {
         options,
       ).map((s) => s.id),
     ).toContain("copyright");
+  });
+
+  /**
+   * The writer can ask for ours instead, and the whole of that is one filter.
+   *
+   * The pair of tests that matter are the two halves of the same press: their
+   * page leaves the book, *and* ours starts being generated — because the
+   * second falls out of the first rather than being arranged separately. If
+   * these ever disagree, the export is emitting two contents pages or none.
+   */
+  describe("withoutReplaced", () => {
+    const pages = [
+      chapter("Title page", "front"),
+      chapter("Table of contents", "front"),
+      chapter("Chapter One"),
+    ];
+
+    it("is the same list when nothing is being replaced", () => {
+      expect(withoutReplaced(pages, [])).toBe(pages);
+      expect(withoutReplaced(pages, undefined)).toBe(pages);
+    });
+
+    it("drops only the page that was asked about", () => {
+      expect(withoutReplaced(pages, ["contents"]).map((c) => c.title)).toEqual([
+        "Title page",
+        "Chapter One",
+      ]);
+    });
+
+    it("makes the generated page appear, which is the point of it", () => {
+      const kept = frontSections(written, pages, options).map((s) => s.id);
+      expect(kept).not.toContain("contents");
+
+      const swapped = frontSections(
+        written,
+        withoutReplaced(pages, ["contents"]),
+        options,
+      ).map((s) => s.id);
+      expect(swapped).toContain("contents");
+    });
+
+    it("leaves a body chapter of the same name alone", () => {
+      const body = [chapter("Title page"), chapter("Chapter One")];
+      expect(withoutReplaced(body, ["title"])).toHaveLength(2);
+    });
+
+    it("replaces more than one at a time", () => {
+      expect(
+        withoutReplaced(pages, ["title", "contents"]).map((c) => c.title),
+      ).toEqual(["Chapter One"]);
+    });
   });
 });
 

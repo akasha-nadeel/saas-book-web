@@ -204,6 +204,39 @@ export function writtenPages(chapters: LoadedChapter[]): Set<string> {
 }
 
 /**
+ * The book without the written pages the writer asked us to replace.
+ *
+ * **One filter, applied before anything reads the book, is the whole of the
+ * override** — and that is why it is done this way round rather than by
+ * teaching each renderer about the choice. Take the page out of `chapters` and
+ * `writtenPages` no longer sees it, so `frontSections` generates ours without
+ * being told to; the body loops that print every page no longer emit theirs;
+ * and the EPUB spine, the PDF flow, the Word file and the review screen all
+ * agree, because all four are built from this one list. Threading a second
+ * flag through each of them is how they end up disagreeing about which pages
+ * are in the book.
+ *
+ * Matched the same way `writtenPages` matches — by title, through
+ * `GENERATED_BY_TITLE`, front matter only — so the two can never disagree
+ * about which page is which.
+ *
+ * Nothing is deleted: this is a filter over a list that was loaded for one
+ * export, and the writer's page is untouched in the store.
+ */
+export function withoutReplaced(
+  chapters: LoadedChapter[],
+  replace: readonly string[] | undefined,
+): LoadedChapter[] {
+  if (!replace || replace.length === 0) return chapters;
+  const drop = new Set(replace);
+  return chapters.filter((chapter) => {
+    if (chapter.matter !== "front") return true;
+    const id = GENERATED_BY_TITLE[chapter.title.trim().toLowerCase()];
+    return !id || !drop.has(id);
+  });
+}
+
+/**
  * The chosen front-matter sections, in the order they appear in a book: title,
  * then copyright, then contents. `chapters` is the book's ordered chapters, used
  * to build the contents list — and to see which of these pages the writer has

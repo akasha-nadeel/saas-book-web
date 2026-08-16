@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -1620,19 +1620,57 @@ function FrontMatterStep({
 }) {
   const author = book.author?.trim();
 
+  /* Which of the three the writer is being asked about, or null. Held here
+     rather than in the card so only one dialog can ever be open. */
+  const [ask, setAsk] = useState<GeneratedPage | null>(null);
+
+  const replaced = typeset.replaceWritten ?? [];
+
+  /**
+   * One card's answer, and the two questions behind it.
+   *
+   * With no page of the writer's own this is the plain switch it always was.
+   * With one, the switch no longer means "generate this" — theirs wins — so it
+   * means *replace mine with yours*, and that is a different question with a
+   * different answer stored in a different place (`replaceWritten`). Turning it
+   * **on** is the direction that surprises, so that is the one that asks;
+   * turning it off puts their own page straight back, and a confirmation on the
+   * way out of a state nobody is stuck in is a click for its own sake.
+   */
+  const card = (id: GeneratedPage, flag: keyof TypesetOptions) => {
+    const yours = written.has(id);
+    const on = yours ? replaced.includes(id) : Boolean(typeset[flag]);
+    return {
+      yours,
+      on,
+      onChange: (next: boolean) => {
+        if (!yours) return onSet(flag, next as TypesetOptions[typeof flag]);
+        if (next) return setAsk(id);
+        onSet(
+          "replaceWritten",
+          replaced.filter((r) => r !== id),
+        );
+      },
+    };
+  };
+
+  const title = card("title", "titlePage");
+  const copyright = card("copyright", "copyright");
+  const contents = card("contents", "contents");
+
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
         <MatterCard
           label="Title page"
           hint={
-            written.has("title")
-              ? "Your own page is used instead"
+            title.yours
+              ? title.on
+                ? "Ours replaces yours in this file"
+                : "You wrote your own — yours is used"
               : "The book’s title and author"
           }
-          on={typeset.titlePage}
-          yours={written.has("title")}
-          onChange={(v) => onSet("titlePage", v)}
+          {...title}
           typeset={typeset}
           art="title"
           book={book}
@@ -1640,15 +1678,15 @@ function FrontMatterStep({
         <MatterCard
           label="Copyright page"
           hint={
-            written.has("copyright")
-              ? "Your own page is used instead"
+            copyright.yours
+              ? copyright.on
+                ? "Ours replaces yours in this file"
+                : "You wrote your own — yours is used"
               : author
                 ? "© this year, in the author’s name"
                 : "Left out — this book has no author’s name yet"
           }
-          on={typeset.copyright}
-          yours={written.has("copyright")}
-          onChange={(v) => onSet("copyright", v)}
+          {...copyright}
           typeset={typeset}
           art="copyright"
           book={book}
@@ -1656,18 +1694,29 @@ function FrontMatterStep({
         <MatterCard
           label="Contents"
           hint={
-            written.has("contents")
-              ? "Your own page is used instead"
+            contents.yours
+              ? contents.on
+                ? "Ours replaces yours in this file"
+                : "You wrote your own — yours is used"
               : "A list of the chapters"
           }
-          on={typeset.contents}
-          yours={written.has("contents")}
-          onChange={(v) => onSet("contents", v)}
+          {...contents}
           typeset={typeset}
           art="contents"
           book={book}
         />
       </div>
+
+      {ask && (
+        <ReplacePageDialog
+          page={ask}
+          onCancel={() => setAsk(null)}
+          onConfirm={() => {
+            onSet("replaceWritten", [...replaced, ask]);
+            setAsk(null);
+          }}
+        />
+      )}
 
       {/* **The filter, said out loud.**
 
@@ -1696,6 +1745,113 @@ function FrontMatterStep({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The three pages the export can build, and the writer can also have written. */
+type GeneratedPage = "title" | "copyright" | "contents";
+
+const PAGE_WORDS: Record<
+  GeneratedPage,
+  { name: string; gain: string }
+> = {
+  title: {
+    name: "title page",
+    gain: "Ours is set from the book’s title and author in the template you chose.",
+  },
+  copyright: {
+    name: "copyright page",
+    gain: "Ours is set from the book’s author and this year, in the template you chose.",
+  },
+  contents: {
+    name: "contents page",
+    gain: "Ours lists the chapters with the page number each one actually starts on, worked out when the file is made. A page you typed yourself cannot know those, and they move whenever a chapter grows.",
+  },
+};
+
+/**
+ * The question asked before ours replaces one of the writer's own pages.
+ *
+ * **Only the surprising direction asks.** Switching back needs no dialog: it
+ * restores the page they wrote and nothing is at stake. This one is worth a
+ * stop because the outcome is not guessable from the control — a switch
+ * labelled "Contents" does not obviously mean *leave my contents page out* —
+ * and because the thing at the other end of it is the writer's own words.
+ *
+ * Three things it is careful about, all of them the same instinct: say what
+ * actually happens rather than asking for agreement in the abstract. It names
+ * the page, it states plainly that nothing is deleted and the page stays in the
+ * book, and its primary button is the verb for what will happen rather than
+ * "OK". The reassurance is not a footnote — at the moment somebody is asked to
+ * take their own writing out of a file, "is this permanent" is the whole of
+ * what they want to know.
+ */
+function ReplacePageDialog({
+  page,
+  onCancel,
+  onConfirm,
+}: {
+  page: GeneratedPage;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { name, gain } = PAGE_WORDS[page];
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCancel();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onCancel]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Use the generated ${name}`}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-xl border border-line bg-panel p-5 text-left shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-base font-bold text-fg">
+          Use our {name} instead of yours?
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          You have written your own {name}, and it is the one this export uses.
+          Switch this on and yours is left out of the file and ours goes in its
+          place.
+        </p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{gain}</p>
+
+        {/* The answer to the only question that matters at this moment. */}
+        <p className="mt-3 rounded-lg border border-line bg-raised px-3 py-2.5 font-sans text-xs leading-relaxed text-fg">
+          Your page is not deleted. It stays in your book exactly as you wrote
+          it, and this changes only the file you are about to make — switch it
+          back and yours returns.
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-accent-ink"
+          >
+            Use ours in this file
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-lg border border-line px-4 py-2.5 text-sm font-semibold text-fg"
+          >
+            Keep mine
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1746,12 +1902,18 @@ function MatterCard({
         style={{ containerType: "inline-size" }}
       >
         <MatterArt art={art} book={book} typeset={typeset} />
-        {on && yours && (
+        {/* **The ribbon says which page wins, and it used to say it backwards.**
+            It read "Your own page" while the switch was *on* — over a picture
+            of ours, on a card whose switch was on and doing nothing. Now it
+            appears whenever there is a clash and names the side that is going
+            in the file, which is the only thing a writer needs off this card at
+            a glance. */}
+        {yours && (
           <span
             className="absolute inset-x-0 bottom-0 bg-fg/80 py-[3px] text-center
                        font-sans text-[9px] font-semibold text-panel"
           >
-            Your own page
+            {on ? "Ours, not yours" : "You have your own"}
           </span>
         )}
       </span>

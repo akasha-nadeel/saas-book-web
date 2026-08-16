@@ -117,6 +117,24 @@ export interface TypesetOptions {
   copyright: boolean;
   /** Generate a contents page listing the chapters. */
   contents: boolean;
+  /**
+   * Generated pages the writer has asked for *instead of* their own.
+   *
+   * **The three switches above cannot answer this on their own.** A written
+   * page wins over a generated one (see `writtenPages`), so on a book that has
+   * its own contents page the Contents switch was on and produced nothing —
+   * the dead control this app refuses. The switch could not simply be defaulted
+   * off either, because turning it back on would still have produced nothing.
+   *
+   * So the conflict gets a state of its own. An id in here means: leave the
+   * writer's own page out of this export and use ours. Empty is the default and
+   * the answer in every ordinary case, which is why this is optional — a book
+   * with no clash never mentions it.
+   *
+   * It is a choice about *this export*, never about the book: nothing is
+   * deleted, and the page is back next time.
+   */
+  replaceWritten?: readonly string[];
 }
 
 export const DEFAULT_TYPESET: TypesetOptions = {

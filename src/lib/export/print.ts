@@ -5,8 +5,21 @@ import { escapeXml, blocksToXhtml } from "./xhtml";
 import { typesetCss, type TypesetOptions } from "./typeset";
 import { frontSections } from "./front-matter";
 
-/** The anchor a contents entry points at. Positional, like the EPUB's files. */
-const anchorFor = (index: number) => `page-${index + 1}`;
+/**
+ * The anchor a contents entry points at. Positional, like the EPUB's files.
+ *
+ * **The `oc-` is load-bearing and cost a wrong number on every contents page.**
+ * These were `page-1`, `page-2`… — and Paged.js gives *its own page elements*
+ * exactly those ids. So the document held two `#page-1`s, and the
+ * `target-counter` handler resolves an anchor with a bare
+ * `querySelector(href)`, which returns the one earlier in the document: the
+ * page div. Every entry therefore printed the page whose number happened to
+ * equal the chapter's position — Chapter Four read 4 while starting on page 7 —
+ * and it looked plausible enough to survive a glance, which is what makes it
+ * the worst kind of wrong. Namespaced, nothing of ours can collide with
+ * anything of theirs.
+ */
+const anchorFor = (index: number) => `oc-ch-${index + 1}`;
 
 /**
  * The document the PDF is made of: its markup and its stylesheet.
