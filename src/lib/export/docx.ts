@@ -1,7 +1,10 @@
 import type { Book } from "@/lib/library-store";
 // Type-only, so it is erased at compile time and does not pull the library into
 // the bundle — the runtime import below stays dynamic.
-import type { Paragraph as DocxParagraph } from "docx";
+import type {
+  Paragraph as DocxParagraph,
+  ParagraphChild as DocxRun,
+} from "docx";
 import {
   printsHeading,
   toBlocks,
@@ -51,6 +54,8 @@ export async function buildDocx(
     Document,
     Header,
     HeadingLevel,
+    HorizontalPositionAlign,
+    HorizontalPositionRelativeFrom,
     ImageRun,
     LevelFormat,
     Packer,
@@ -58,6 +63,9 @@ export async function buildDocx(
     PageNumber,
     Paragraph,
     TextRun,
+    TextWrappingSide,
+    TextWrappingType,
+    VerticalPositionRelativeFrom,
     convertInchesToTwip,
   } = await import("docx");
 
@@ -100,6 +108,26 @@ export async function buildDocx(
     // break, is flush left; the rest are indented. This is how printed books
     // set body text, and manuscript format keeps it.
     let opensSection = true;
+
+    /**
+     * A wrapped picture waiting for the prose it wraps.
+     *
+     * **A floating picture has to be anchored to the paragraph the text flows
+     * around**, which is what Word itself does when you insert one with square
+     * wrapping — not to a paragraph of its own, where the words would start
+     * again underneath it and the wrap would be a picture with a gap beside
+     * it. So a wrapped image is held back and becomes the first run of the
+     * next paragraph. If a chapter ends on one, it is flushed into a paragraph
+     * of its own rather than dropped.
+     */
+    let floatingPicture: DocxRun | null = null;
+
+    const withFloat = (children: DocxRun[]) => {
+      if (!floatingPicture) return children;
+      const joined = [floatingPicture, ...children];
+      floatingPicture = null;
+      return joined;
+    };
 
     for (const block of blocks) {
       switch (block.kind) {
@@ -173,34 +201,95 @@ export async function buildDocx(
 
         case "image": {
           const picture = block.src ? pictures.get(block.src) : undefined;
+          if (!picture) {
+            // Only when it could not be decoded. A visible marker beats a
+            // silent hole where a picture was.
+            out.push(
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                spacing: bodySpacing,
+                children: withFloat([
+                  new TextRun({
+                    text: block.alt ? `[image: ${block.alt}]` : "[image]",
+                    italics: true,
+                  }),
+                ]),
+              }),
+            );
+            opensSection = true;
+            break;
+          }
+
+          const alt = block.alt
+            ? { name: block.alt, description: block.alt, title: block.alt }
+            : undefined;
+
+          /* **The writer set the picture against the words, and the file has
+             to keep that.** In the editor a wrapped picture takes one side of
+             the column and the prose runs down the other — Word's own "Square"
+             wrapping, which is where the feature's name came from. Centring it
+             on a line of its own, which is what this did, is a different
+             layout: the same picture at the same size, saying something else
+             about how the page reads.
+
+             `side` is the side the *text* takes, so it is the opposite of the
+             picture's. The margins are a tenth of an inch in EMU, which is
+             Word's own default gutter — without them the prose touches the
+             artwork. */
+          if (block.wrap) {
+            floatingPicture = new ImageRun({
+              type: picture.type,
+              data: picture.data,
+              transformation: fitImage(picture, block.imgWidth),
+              altText: alt,
+              floating: {
+                horizontalPosition: {
+                  relative: HorizontalPositionRelativeFrom.COLUMN,
+                  align:
+                    block.align === "right"
+                      ? HorizontalPositionAlign.RIGHT
+                      : HorizontalPositionAlign.LEFT,
+                },
+                verticalPosition: {
+                  relative: VerticalPositionRelativeFrom.PARAGRAPH,
+                  offset: 0,
+                },
+                wrap: {
+                  type: TextWrappingType.SQUARE,
+                  side:
+                    block.align === "right"
+                      ? TextWrappingSide.LEFT
+                      : TextWrappingSide.RIGHT,
+                  margins: { distL: 91440, distR: 91440 },
+                },
+                allowOverlap: false,
+              },
+            });
+            break;
+          }
+
           out.push(
             new Paragraph({
-              alignment: AlignmentType.CENTER,
+              // A picture the writer pushed to one side keeps that side; the
+              // rest sit in the middle, which is where a plate goes in a book.
+              alignment:
+                block.align === "left"
+                  ? AlignmentType.START
+                  : block.align === "right"
+                    ? AlignmentType.END
+                    : AlignmentType.CENTER,
               spacing: bodySpacing,
-              children: [
-                picture
-                  ? new ImageRun({
-                      type: picture.type,
-                      data: picture.data,
-                      transformation: fitImage(picture, block.imgWidth),
-                      // Word reads this out and shows it while the picture
-                      // loads; a described image is also the accessibility
-                      // claim the EPUB already makes honestly.
-                      altText: block.alt
-                        ? {
-                            name: block.alt,
-                            description: block.alt,
-                            title: block.alt,
-                          }
-                        : undefined,
-                    })
-                  : // Only when the picture could not be decoded. A visible
-                    // marker beats a silent hole where a picture was.
-                    new TextRun({
-                      text: block.alt ? `[image: ${block.alt}]` : "[image]",
-                      italics: true,
-                    }),
-              ],
+              children: withFloat([
+                new ImageRun({
+                  type: picture.type,
+                  data: picture.data,
+                  transformation: fitImage(picture, block.imgWidth),
+                  // Word reads this out and shows it while the picture loads;
+                  // a described image is also the accessibility claim the EPUB
+                  // already makes honestly.
+                  altText: alt,
+                }),
+              ]),
             }),
           );
           opensSection = true;
@@ -229,11 +318,17 @@ export async function buildDocx(
               // the same as one opening a section — see lib/editor/no-indent.ts.
               indent:
                 opensSection || block.noIndent ? undefined : bodyIndent,
-              children: runsFor(block.runs),
+              children: withFloat(runsFor(block.runs)),
             }),
           );
           opensSection = false;
       }
+    }
+
+    // A chapter that ends on a wrapped picture: it goes in a paragraph of its
+    // own rather than being dropped with the words it was waiting for.
+    if (floatingPicture) {
+      out.push(new Paragraph({ spacing: bodySpacing, children: withFloat([]) }));
     }
 
     return out;
