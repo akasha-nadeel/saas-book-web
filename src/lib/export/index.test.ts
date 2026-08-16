@@ -97,6 +97,32 @@ it("compiles a whole book with a title and chapter headings", () => {
   );
 });
 
+/**
+ * The markdown follows the same rule the EPUB does — see `printsHeading`. It
+ * used to head every page, so a copyright sheet arrived in the file as
+ * "## Copyright page", which is a heading no published book carries.
+ */
+it("heads a real division and not a piece of apparatus", () => {
+  const { bookId } = createBook("The Salt Road");
+  const book0 = findBook(getShelf(), bookId)!;
+  const contents = createMatterPage(bookId, "front", "Table of contents");
+  const dedication = createMatterPage(bookId, "front", "Dedication");
+  const text = (t: string) => ({
+    type: "doc",
+    content: [{ type: "paragraph", content: [{ type: "text", text: t }] }],
+  });
+  saveBody(bookId, contents!, text("Chapter One .... 1"), 4);
+  saveBody(bookId, dedication!, text("For Ada."), 2);
+  void book0;
+
+  const book = findBook(getShelf(), bookId)!;
+  const md = buildMarkdownFile(book, loadChapters(book));
+
+  expect(md).not.toContain("## Table of contents");
+  expect(md).toContain("Chapter One .... 1");
+  expect(md).toContain("## Dedication");
+});
+
 it("omits the book title when exporting a single chapter", () => {
   const { bookId, chapterId } = createBook("The Salt Road");
   saveBody(

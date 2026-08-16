@@ -14,6 +14,7 @@ import {
 import {
   isDraftMatter,
   isUntouchedMatter,
+  printsHeading,
   toBlocks,
   type LoadedChapter,
 } from "./blocks";
@@ -241,7 +242,12 @@ export function buildMarkdownFile(
   if (!single) parts.push(`# ${book.title}`);
 
   for (const chapter of chapters) {
-    parts.push(`${single ? "#" : "##"} ${chapter.title}`);
+    // Apparatus prints no heading, the rule the EPUB has always followed and
+    // the other three now do. See `printsHeading`. A title or copyright page
+    // sits under the book's own title, which is where it belongs.
+    if (printsHeading(chapter)) {
+      parts.push(`${single ? "#" : "##"} ${chapter.title}`);
+    }
     const body = blocksToMarkdown(toBlocks(chapter.doc));
     if (body) parts.push(body);
   }

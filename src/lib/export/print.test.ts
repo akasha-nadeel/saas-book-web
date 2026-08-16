@@ -43,6 +43,42 @@ it("names chapter anchors out of Paged.js's own id space", () => {
   expect(content).not.toMatch(/id="page-\d+"/);
 });
 
+/**
+ * **The four renderers have to agree about which pages are headed**, and for a
+ * long time three of them did not: the EPUB suppressed a heading on apparatus
+ * while the PDF, the Word file and the markdown printed one, so a single book
+ * came out of this app with a sheet headed "Copyright page" in three formats
+ * and set correctly in the fourth. `printsHeading` is the one rule now, and
+ * these guard the two ends of it.
+ */
+it("prints no heading on an apparatus page", () => {
+  const { content } = printDocument(
+    book,
+    [
+      { title: "Copyright page", doc, number: null, matter: "front" },
+      { title: "Chapter One", doc, number: 1 },
+    ],
+    DEFAULT_TYPESET,
+  );
+
+  expect(content).not.toContain("<h1>Copyright page</h1>");
+  expect(content).toContain("<h1>Chapter One</h1>");
+});
+
+it("keeps the heading on a real division of the book", () => {
+  const { content } = printDocument(
+    book,
+    [
+      { title: "Dedication", doc, number: null, matter: "front" },
+      { title: "About the author", doc, number: null, matter: "back" },
+    ],
+    DEFAULT_TYPESET,
+  );
+
+  expect(content).toContain("<h1>Dedication</h1>");
+  expect(content).toContain("<h1>About the author</h1>");
+});
+
 it("points every contents entry at an anchor that exists", () => {
   const { content } = printDocument(book, chapters, {
     ...DEFAULT_TYPESET,

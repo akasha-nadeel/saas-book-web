@@ -2,7 +2,13 @@ import type { Book } from "@/lib/library-store";
 // Type-only, so it is erased at compile time and does not pull the library into
 // the bundle — the runtime import below stays dynamic.
 import type { Paragraph as DocxParagraph } from "docx";
-import { toBlocks, type Block, type LoadedChapter, type Run } from "./blocks";
+import {
+  printsHeading,
+  toBlocks,
+  type Block,
+  type LoadedChapter,
+  type Run,
+} from "./blocks";
 
 /**
  * DOCX in standard manuscript format — the Shunn conventions an agent or editor
@@ -202,15 +208,19 @@ export async function buildDocx(
     if (index > 0) {
       children.push(new Paragraph({ children: [new PageBreak()] }));
     }
-    children.push(
-      new Paragraph({
-        alignment: AlignmentType.CENTER,
-        spacing: manuscript
-          ? { before: convertInchesToTwip(1), after: DOUBLE_SPACED }
-          : { before: 240, after: 240 },
-        children: [new TextRun({ text: chapter.title, bold: !manuscript })],
-      }),
-    );
+    // Apparatus — a title page, a copyright page, a contents list — prints no
+    // heading, the same rule the EPUB has always followed. See `printsHeading`.
+    if (printsHeading(chapter)) {
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: manuscript
+            ? { before: convertInchesToTwip(1), after: DOUBLE_SPACED }
+            : { before: 240, after: 240 },
+          children: [new TextRun({ text: chapter.title, bold: !manuscript })],
+        }),
+      );
+    }
     children.push(...paragraphsFor(toBlocks(chapter.doc)));
   });
 

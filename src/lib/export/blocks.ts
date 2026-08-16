@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/react";
 import { fontStack } from "@/lib/typography";
-import { hasPlaceholder } from "@/lib/matter";
+import { hasPlaceholder, isApparatusPage } from "@/lib/matter";
 import { getBody } from "@/lib/library-store";
 
 /**
@@ -63,6 +63,27 @@ export interface LoadedChapter {
    * them differ from the exporters' side.
    */
   matter?: "front" | "body" | "back";
+}
+
+/**
+ * Whether this page prints its own title above the prose.
+ *
+ * **The rule is the EPUB's and every renderer owes it.** A half-title, a title
+ * page, a copyright page and a contents list are furniture rather than
+ * divisions of the book: no published book has a sheet headed "Copyright
+ * page", and the name exists so the writer can find the page in a list. The
+ * EPUB has always known that; the PDF, the Word file and the markdown did not,
+ * so one book came out of this app with four different structures depending on
+ * which button was pressed — the copyright sheet headed "Copyright page" in
+ * three of them and correct in the fourth.
+ *
+ * Lives here because `LoadedChapter` does, and because a rule that four
+ * renderers apply cannot be four expressions that might drift. A dedication, a
+ * prologue or a page the writer named themselves is a real division and keeps
+ * its heading.
+ */
+export function printsHeading(chapter: LoadedChapter): boolean {
+  return !isApparatusPage(chapter.matter ?? "body", chapter.title);
 }
 
 export interface Block {

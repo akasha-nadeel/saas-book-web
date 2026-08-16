@@ -9,7 +9,7 @@ import {
 } from "@/lib/export";
 import type { LoadedChapter } from "@/lib/export/blocks";
 import { dropPagedStyles, paginate, printDocument } from "@/lib/export/print";
-import { toBlocks } from "@/lib/export/blocks";
+import { printsHeading, toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml, escapeXml } from "@/lib/export/xhtml";
 import { typesetCss, type TypesetOptions } from "@/lib/export/typeset";
 import {
@@ -693,7 +693,13 @@ function EpubReview({
           chapter.number !== null
             ? `<p class="chapter-number">${chapter.number}</p>`
             : "";
-        return `<section>${number}<h1>${escapeXml(chapter.title)}</h1>${blocksToXhtml(
+        // Apparatus carries no heading, exactly as `buildEpub` writes it. This
+        // printed one regardless, so the preview was showing a structure the
+        // file it previews does not have — the one thing this step cannot do.
+        const heading = printsHeading(chapter)
+          ? `<h1>${escapeXml(chapter.title)}</h1>`
+          : "";
+        return `<section>${number}${heading}${blocksToXhtml(
           toBlocks(chapter.doc),
         )}</section>`;
       }),
@@ -800,10 +806,15 @@ function MarkdownReview({
   return (
     <Stage
       zoom={zoom}
+      /* It said "the first file… one is written per chapter", which is a claim
+         about the export that the export does not honour: `buildMarkdownFile`
+         writes the whole book into one `.md` with the title as an `h1` and
+         each chapter an `h2`. A caption is held to what ships like any other
+         line in this app. */
       caption={
         single
-          ? "The file itself, character for character."
-          : "The first file, character for character. One is written per chapter."
+          ? "The chapter's own file, character for character."
+          : "The file itself, character for character — the whole book in one .md, with each chapter a heading."
       }
     >
       <div ref={room} className="flex h-full justify-center">

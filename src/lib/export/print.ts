@@ -1,6 +1,6 @@
 import type { Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
-import { toBlocks } from "./blocks";
+import { printsHeading, toBlocks } from "./blocks";
 import { escapeXml, blocksToXhtml } from "./xhtml";
 import { typesetCss, type TypesetOptions } from "./typeset";
 import { frontSections } from "./front-matter";
@@ -55,9 +55,14 @@ export function printDocument(
           ? `\n  <p class="chapter-number">${chapter.number}</p>`
           : "";
       /* `string-set` on the heading is what feeds the running head: the margin
-         box prints whichever chapter title is current on that page. */
-      return `<section id="${anchorFor(i)}">${number}
-  <h1>${escapeXml(chapter.title)}</h1>
+         box prints whichever chapter title is current on that page. Apparatus
+         pages carry none — see `printsHeading` — which also, and rightly,
+         leaves the running head naming the last real division rather than
+         printing "Copyright page" across the top of the sheet. */
+      const heading = printsHeading(chapter)
+        ? `\n  <h1>${escapeXml(chapter.title)}</h1>`
+        : "";
+      return `<section id="${anchorFor(i)}">${number}${heading}
 ${xhtml}
 </section>`;
     })
