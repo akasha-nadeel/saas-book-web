@@ -162,12 +162,51 @@ export function packageCover(dataUrl: string | null): PackagedImage | null {
   };
 }
 
-/** Images still carrying a `data:` src — the ones a store will reject. */
+/**
+ * Whether this picture can become a resource inside the package.
+ *
+ * **The one answer three places need, and they must not each work it out.**
+ * `buildEpub` drops what it cannot carry, `storeReadiness` counts the same
+ * pictures so the writer is told, and the export wizard's EPUB preview has to
+ * show the file rather than a hopeful version of it — a preview that draws a
+ * picture the file omits is a preview lying about the one thing it exists to
+ * check.
+ *
+ * Three ways a picture fails, and only the first used to be noticed:
+ *
+ *   - a data URL whose base64 will not decode;
+ *   - a data URL of a media type EPUB has no core support for, which is
+ *     `ERROR(RSC-032) Fallback must be provided for foreign resources`;
+ *   - a `src` on the open internet, which is `ERROR(RSC-006) Remote resource
+ *     reference is not allowed in this context`. Not fixable by declaring
+ *     anything: EPUB 3.3 permits remote audio, video and fonts, never a remote
+ *     `<img>`.
+ *
+ * It decodes rather than sniffing the header, because a corrupt payload of a
+ * *core* type would otherwise pass here and fail in `extractImages`, leaving an
+ * `<img>` pointing at a file nothing wrote. Books hold a handful of pictures
+ * and zipping them costs far more than reading them twice.
+ */
+export function packageable(block: Block): boolean {
+  if (block.kind !== "image" || !block.src) return false;
+  const parsed = parseDataUrl(block.src);
+  if (!parsed) return false;
+  return decodeBase64(parsed.base64) !== null;
+}
+
+/**
+ * Images the EPUB cannot carry, and therefore leaves out.
+ *
+ * Reported by `storeReadiness`, so the writer hears it from the pre-upload
+ * check rather than from the shop. Asked of the blocks *before* extraction —
+ * afterwards every surviving picture is a package path and the question has
+ * already been answered.
+ */
 export function undecodableImages(chapters: Block[][]): number {
   let count = 0;
   for (const blocks of chapters) {
     for (const block of blocks) {
-      if (block.kind === "image" && block.src?.startsWith("data:")) count++;
+      if (block.kind === "image" && !packageable(block)) count++;
     }
   }
   return count;

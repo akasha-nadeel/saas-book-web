@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
 import { DEFAULT_TYPESET } from "./typeset";
-import { frontSections, withoutReplaced } from "./front-matter";
+import { bindBook, frontSections, withoutReplaced } from "./front-matter";
 
 const book: Book = {
   id: "b",
@@ -312,5 +312,98 @@ describe("the title page's imprint", () => {
     expect(html).toContain("title-block");
     expect(html).toContain("Silent Wind");
     expect(html).toContain("A. Writer");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The order a book is bound in
+// ---------------------------------------------------------------------------
+
+/*
+ * **These assert positions, and they are the ones not to "fix".** The whole
+ * point of `bindBook` is that four renderers and one preview stopped answering
+ * "what page is first" for themselves. Loosen an expectation here and the
+ * formats are free to drift apart again, silently — which is exactly how a
+ * book came to open on a generated title page in the PDF and on its own
+ * half-title in the EPUB.
+ */
+describe("bindBook", () => {
+  const mixedFront: LoadedChapter[] = [
+    { title: "Half-title page", doc, number: null, matter: "front" },
+    { title: "Dedication", doc, number: null, matter: "front" },
+    { title: "Prologue", doc, number: null, matter: "front" },
+    { title: "Chapter One", doc, number: 1, matter: "body" },
+    { title: "Chapter Two", doc, number: 2, matter: "body" },
+    { title: "Acknowledgements", doc, number: null, matter: "back" },
+  ];
+  const generated = [
+    { id: "title", html: "" },
+    { id: "copyright", html: "" },
+    { id: "contents", html: "" },
+  ];
+
+  const names = (chapters: LoadedChapter[], sections = generated) =>
+    bindBook(chapters, sections).map((page) =>
+      page.kind === "generated" ? `[${page.section.id}]` : page.chapter.title,
+    );
+
+  it("binds the generated pages among the writer's own, not in front of them", () => {
+    expect(names(mixedFront)).toEqual([
+      "Half-title page",
+      "[title]",
+      "[copyright]",
+      "Dedication",
+      "[contents]",
+      "Prologue",
+      "Chapter One",
+      "Chapter Two",
+      "Acknowledgements",
+    ]);
+  });
+
+  it("leaves the body and the back matter in the order they were loaded", () => {
+    // The writer's own sequence. Nothing here has any business sorting it.
+    const bound = names(mixedFront).slice(-3);
+
+    expect(bound).toEqual(["Chapter One", "Chapter Two", "Acknowledgements"]);
+  });
+
+  it("sorts a page the writer named themselves to the end of the front matter", () => {
+    // Nothing is known about its position but that it is front matter, and
+    // last is the only honest answer.
+    const named: LoadedChapter[] = [
+      { title: "A note on the map", doc, number: null, matter: "front" },
+      { title: "Chapter One", doc, number: 1, matter: "body" },
+    ];
+
+    expect(names(named)).toEqual([
+      "[title]",
+      "[copyright]",
+      "[contents]",
+      "A note on the map",
+      "Chapter One",
+    ]);
+  });
+
+  it("keeps each chapter's loaded index, whatever position it is bound at", () => {
+    // The exporters name files and anchors positionally, so a reordering that
+    // renumbered would point every contents folio at the wrong page.
+    const bound = bindBook(mixedFront, generated);
+    const prologue = bound.find(
+      (page) => page.kind === "chapter" && page.chapter.title === "Prologue",
+    );
+
+    expect(prologue).toMatchObject({ index: 2 });
+  });
+
+  it("is the whole book when there is nothing generated", () => {
+    expect(names(mixedFront, [])).toEqual([
+      "Half-title page",
+      "Dedication",
+      "Prologue",
+      "Chapter One",
+      "Chapter Two",
+      "Acknowledgements",
+    ]);
   });
 });

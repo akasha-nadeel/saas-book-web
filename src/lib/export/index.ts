@@ -129,7 +129,8 @@ export function checkStoreReadiness(
   cover: string | null,
 ): ReadinessIssue[] {
   const chapters = loadChapters(book);
-  const { blocks } = extractImages(chapters.map((c) => toBlocks(c.doc)));
+  const source = chapters.map((c) => toBlocks(c.doc));
+  const { blocks } = extractImages(source);
 
   const undescribedImages = blocks
     .flat()
@@ -148,7 +149,10 @@ export function checkStoreReadiness(
       meta: book.publishing,
       hasCover: Boolean(packageCover(cover)),
       chapterCount: written,
-      brokenImages: undecodableImages(blocks),
+      // Asked of the blocks as the writer has them: after extraction every
+      // surviving picture is a package path and the question is already
+      // answered.
+      brokenImages: undecodableImages(source),
       undescribedImages,
     }),
     ...copyrightNames(book, chapters),
@@ -293,6 +297,22 @@ export function download(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
+/**
+ * An export this app refused, with a reason the writer can act on.
+ *
+ * Its own class so the screen can tell the two kinds of failure apart. A
+ * `TypeError` out of a renderer is ours and means nothing to a writer, so it
+ * gets the general apology; this one is a statement about *their book* and is
+ * shown word for word. Without the distinction the screen would either print
+ * stack-trace prose at somebody or bury a message that says exactly what to do.
+ */
+export class ExportRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ExportRefused";
+  }
+}
+
 export interface ExportRequest {
   book: Book;
   /** Omitted means the whole book. */
@@ -328,6 +348,31 @@ export async function runExport({
     loadChapters(book, chapterId),
     typeset.replaceWritten,
   );
+
+  /*
+   * **Nothing to export is refused, not exported.**
+   *
+   * Two filters stand between the shelf and this list — untouched matter pages
+   * come out in `loadChapters`, replaced ones in `withoutReplaced` — and a
+   * book can reach zero through either: press Start on front matter, delete
+   * the one seeded chapter, and every page left is scaffolding. The formats
+   * did not agree about what to do with that and none of them did anything
+   * good. The EPUB wrote an empty spine with an empty nav document and an
+   * empty `navMap`, which is two hard EPUBCheck errors and a file no shop
+   * takes; the Markdown was the book's title and nothing else. All of it
+   * downloaded, and the wizard said it had worked.
+   *
+   * So it stops here, in front of every format at once, with a sentence the
+   * export screen shows as it is. The house rule is that a failure is reported
+   * rather than shipped — an empty file that claims to be a book is the worst
+   * version of a silent one, because the writer finds out from the shop.
+   */
+  if (chapters.length === 0) {
+    throw new ExportRefused(
+      "There are no pages in this book to export yet. Write a chapter, or fill in one of the front-matter pages — a page still holding its [example text] is left out.",
+    );
+  }
+
   const single = Boolean(chapterId);
   const base = single
     ? `${slugify(book.title)}-${slugify(chapters[0]?.title ?? "chapter")}`
@@ -354,8 +399,14 @@ export async function runExport({
        takes a few seconds of it. Without the await the caller would clear its
        "working" state while Paged.js was still laying out pages, and the print
        dialog would arrive after the screen had said it was finished. */
-    await printBook(book, chapters, typeset);
-    return null;
+    const pdf = await printBook(book, chapters, typeset);
+    /* **A blob means a file; null means a dialog.** The PDF is rendered by a
+       browser on the server now, so most of the time there is a real file to
+       hand over and name — and the writer gets the same confirmation every
+       other format gives. An installation with no browser behind the route
+       falls back to the print dialog, and on that path the outcome genuinely is
+       not knowable from here, so nothing is claimed. See `printBook`. */
+    return pdf ? handed(pdf, `${base}.pdf`) : null;
   }
 
   const { buildEpub } = await import("./epub");

@@ -2,7 +2,7 @@ import { isGenericChapterTitle, type Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
 import type { TypesetOptions } from "./typeset";
 import { escapeXml } from "./xhtml";
-import { isApparatusPage } from "@/lib/matter";
+import { isApparatusPage, matterSectionIndex } from "@/lib/matter";
 
 /**
  * The book's generated front matter — the pages a writer does not type but a
@@ -289,4 +289,99 @@ export function frontSections(
   if (options.contents && !written.has("contents"))
     sections.push({ id: "contents", html: contentsPage(chapters, href) });
   return sections;
+}
+
+/**
+ * Where each generated section belongs among the standard front-matter pages.
+ *
+ * Read out of `MATTER_SECTIONS` rather than written down, so the one list that
+ * says what order a book is bound in stays the only one.
+ */
+const GENERATED_RANK: Record<string, number> = {
+  title: matterSectionIndex("front", "Title page"),
+  copyright: matterSectionIndex("front", "Copyright page"),
+  contents: matterSectionIndex("front", "Table of contents"),
+};
+
+/** One page of the bound book: either a generated section or a written page. */
+export type BoundPage =
+  | { kind: "generated"; section: FrontSection }
+  | {
+      kind: "chapter";
+      chapter: LoadedChapter;
+      /**
+       * Its position in the *loaded* list, not in this one.
+       *
+       * The exporters name their files and anchors positionally —
+       * `chapter-03.xhtml` is the fourth loaded chapter whatever order it is
+       * bound in — so a reordered list must never renumber. Every consumer
+       * takes the id from here.
+       */
+      index: number;
+    };
+
+/**
+ * The whole book in the order it is bound.
+ *
+ * **The generated pages sit among the writer's own, not in front of them** —
+ * and until this existed only the EPUB knew that. It was `spineOrder` in
+ * `epub.ts`, a private answer to a question three other renderers were also
+ * answering, each by emitting the generated block first and the chapters
+ * after. That was right while front matter was a single page nobody made, and
+ * became wrong the moment a book could carry its own half-title. Measured on
+ * one book with a half-title, a dedication and an epigraph:
+ *
+ *   EPUB:  half-title, [title], [copyright], dedication, epigraph, [contents]
+ *   PDF:   [title], [copyright], [contents], half-title, dedication, epigraph
+ *   Word:  the same as the PDF
+ *
+ * — three files, three books, one manuscript. The EPUB's was the correct one
+ * and the other two opened on a generated title page with the half-title that
+ * should have led the book stranded behind the contents.
+ *
+ * So the arithmetic moves here and all four read it, the export wizard's
+ * preview included. That last one is why this could not simply be fixed twice
+ * more in place: a preview built from its own idea of the order is a preview
+ * that says the file is wrong, or that a wrong file is right.
+ *
+ * Each generated section takes its own slot in the binding order
+ * (`GENERATED_RANK`); a page the writer named themselves ranks `Infinity` and
+ * sorts to the end of the front matter, which is the only honest answer for a
+ * page whose position only they know. The body and the back matter follow in
+ * the order they were loaded — they are the writer's sequence and nothing here
+ * has any business reordering them.
+ */
+export function bindBook(
+  chapters: readonly LoadedChapter[],
+  sections: readonly FrontSection[],
+): BoundPage[] {
+  const front: { page: BoundPage; rank: number; seq: number }[] = [];
+  const rest: BoundPage[] = [];
+
+  chapters.forEach((chapter, index) => {
+    const page: BoundPage = { kind: "chapter", chapter, index };
+    if (chapter.matter === "front") {
+      front.push({
+        page,
+        rank: matterSectionIndex("front", chapter.title),
+        seq: index,
+      });
+    } else {
+      rest.push(page);
+    }
+  });
+
+  sections.forEach((section, i) => {
+    // `seq` below every chapter's, so a generated page and a written one of the
+    // same rank put the generated one first. It cannot happen today — a written
+    // page suppresses its generated twin — but a tie has to resolve somehow.
+    front.push({
+      page: { kind: "generated", section },
+      rank: GENERATED_RANK[section.id] ?? -1,
+      seq: -sections.length + i,
+    });
+  });
+
+  front.sort((a, b) => a.rank - b.rank || a.seq - b.seq);
+  return [...front.map((f) => f.page), ...rest];
 }

@@ -1,7 +1,8 @@
 import type { JSONContent } from "@tiptap/react";
 import { fontStack } from "@/lib/typography";
 import { hasPlaceholder, isApparatusPage } from "@/lib/matter";
-import { getBody } from "@/lib/library-store";
+import { getBody, isGenericChapterTitle } from "@/lib/library-store";
+import { stripInvalidXml } from "./xhtml";
 
 /**
  * A format-neutral view of a Tiptap document.
@@ -86,6 +87,44 @@ export function printsHeading(chapter: LoadedChapter): boolean {
   return !isApparatusPage(chapter.matter ?? "body", chapter.title);
 }
 
+/**
+ * The standing numeral above a chapter's title, or null for no numeral.
+ *
+ * **The other half of the opener, and it had drifted exactly as the heading
+ * rule once did.** A chapter still called "Chapter 1" *is* its number, so
+ * printing a numeral above it says the same thing twice on the opening line of
+ * every chapter of every book that kept the default titles — which is most of
+ * them. `epub.ts` knew that; `print.ts`, the export wizard's own EPUB preview
+ * and the Word file each answered it differently, so one book came out with
+ * three different chapter openings depending on which button was pressed:
+ *
+ *   - EPUB:  "The Fourth Lamp" under a 3, "Chapter One" under nothing
+ *   - PDF:   "The Fourth Lamp" under a 3, "Chapter One" under a 1
+ *   - Word:  neither, ever — the file lost which chapter it was
+ *
+ * So it lives here beside `printsHeading`, for the same reason that one does:
+ * a rule four renderers apply cannot be four expressions that might disagree.
+ * `isGenericChapterTitle` is the store's own answer and knows both the digit
+ * form and the spelled one, so the contents page and the opener cannot come to
+ * different views about the same chapter.
+ *
+ * Front and back matter are named rather than numbered and carry no number to
+ * print. The writer's own `hideChapterNumbers` is a *typesetting* choice and is
+ * applied by the stylesheet, not here — one file then serves both settings, and
+ * a reader who restyles the book keeps the number.
+ */
+export function chapterNumeral(
+  /* The two fields the rule turns on, rather than a whole `LoadedChapter`:
+     the export wizard's specimen sheet asks this about a chapter it has only
+     the shelf's meta for, and making it build a document to ask a question
+     about a title would be the sort of friction that ends in a fifth copy of
+     the rule. */
+  chapter: Pick<LoadedChapter, "title" | "number">,
+): number | null {
+  if (chapter.number === null || chapter.number === undefined) return null;
+  return isGenericChapterTitle(chapter.title) ? null : chapter.number;
+}
+
 export interface Block {
   kind: BlockKind;
   /** List nesting, 0 for everything else. */
@@ -120,7 +159,13 @@ function runsFrom(content: JSONContent[] | undefined): Run[] {
     }
     if (node.type !== "text" || !node.text) continue;
 
-    const run: Run = { text: node.text };
+    /* **Cleaned once, here, so every renderer inherits it.** The XHTML side is
+       covered by `escapeXml`, but the Word file and the Markdown do not go
+       through it — and a control character is a corrupt `.docx` for the same
+       reason it is a fatal EPUB, since that format is XML in a zip too. The IR
+       is the one place all four formats agree on, so it is where the text has
+       to become text. See `stripInvalidXml`. */
+    const run: Run = { text: stripInvalidXml(node.text) };
     for (const mark of node.marks ?? []) {
       switch (mark.type) {
         case "bold":

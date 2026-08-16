@@ -1,8 +1,9 @@
 import type { Book } from "@/lib/library-store";
-import { toBlocks, type LoadedChapter } from "./blocks";
+import { chapterNumeral, toBlocks, type LoadedChapter } from "./blocks";
 import {
   extractImages,
   packageCover,
+  packageable,
   type PackagedImage,
 } from "./epub-images";
 import {
@@ -17,9 +18,8 @@ import {
   type TypesetOptions,
 } from "./typeset";
 import { blocksToXhtml, escapeXml } from "./xhtml";
-import { frontSections } from "./front-matter";
-import { isApparatusPage, matterSectionIndex } from "@/lib/matter";
-import { isGenericChapterTitle } from "@/lib/library-store";
+import { bindBook, frontSections } from "./front-matter";
+import { isApparatusPage } from "@/lib/matter";
 
 /**
  * EPUB 3, built to be accepted by a shop rather than merely opened by a reader.
@@ -134,62 +134,28 @@ function accessibility(
 }
 
 /**
- * Where each generated section belongs among the standard front-matter pages.
- *
- * Read out of `MATTER_SECTIONS` rather than written down, so the one list that
- * says what order a book is bound in stays the only one.
- */
-const GENERATED_RANK: Record<string, number> = {
-  title: matterSectionIndex("front", "Title page"),
-  copyright: matterSectionIndex("front", "Copyright page"),
-  contents: matterSectionIndex("front", "Table of contents"),
-};
-
-/**
  * The reading order of the whole book, as ids.
  *
- * **The generated pages sit among the writer's own, not in front of them.**
- * They used to be emitted first and the chapters after, which was right while
- * front matter was a single page nobody made — and became wrong the moment a
- * book could carry its own half-title: the file opened on a generated title
- * page, then the contents, and *then* the half-title that should have led the
- * book, with the dedication after the contents. Every one of those is a page in
- * the wrong place in a finished book.
- *
- * So each generated section takes its own slot in the binding order —
- * `GENERATED_RANK` — and is merged into the front matter by rank. A page the
- * writer named themselves ranks `Infinity` and sorts to the end of the front
- * matter, which is the only honest answer for a page whose position only they
- * know. The body and the back matter follow in the order they were loaded.
+ * The arithmetic is `bindBook`'s — see the long note there for why the
+ * generated pages sit *among* the writer's own rather than in front of them,
+ * and why that answer had to stop living in this file. This is the thin part:
+ * turning the bound order into the ids the manifest and spine use, which are
+ * positional and must never be renumbered by a reordering.
  */
 export function spineOrder(
   chapters: readonly EpubChapter[],
   frontIds: readonly string[],
 ): string[] {
-  const front: { id: string; rank: number; seq: number }[] = [];
-  const rest: string[] = [];
-
-  chapters.forEach((chapter, i) => {
-    if (chapter.matter === "front") {
-      front.push({
-        id: chapterId(i),
-        rank: matterSectionIndex("front", chapter.title),
-        seq: i,
-      });
-    } else {
-      rest.push(chapterId(i));
-    }
-  });
-
-  frontIds.forEach((id, i) => {
-    // `seq` below every chapter's, so a generated page and a written one of the
-    // same rank put the generated one first. It cannot happen today — a written
-    // page suppresses its generated twin — but a tie has to resolve somehow.
-    front.push({ id, rank: GENERATED_RANK[id] ?? -1, seq: -frontIds.length + i });
-  });
-
-  front.sort((a, b) => a.rank - b.rank || a.seq - b.seq);
-  return [...front.map((f) => f.id), ...rest];
+  /* `bindBook` reads a title and a `matter`, which is all `EpubChapter` and
+     `LoadedChapter` have in common — so the cast is over the fields it
+     actually touches rather than a claim that the two types are the same. */
+  const bound = bindBook(
+    chapters as unknown as readonly LoadedChapter[],
+    frontIds.map((id) => ({ id, html: "" })),
+  );
+  return bound.map((page) =>
+    page.kind === "generated" ? page.section.id : chapterId(page.index),
+  );
 }
 
 export function contentOpf(
@@ -319,12 +285,33 @@ ${spine}
 export function listedChapters(
   chapters: readonly EpubChapter[],
 ): { chapter: EpubChapter; index: number }[] {
-  return chapters
-    .map((chapter, index) => ({ chapter, index }))
-    .filter(
-      ({ chapter }) =>
-        !isApparatusPage(chapter.matter ?? "body", chapter.title),
-    );
+  const all = chapters.map((chapter, index) => ({ chapter, index }));
+  const listed = all.filter(
+    ({ chapter }) => !isApparatusPage(chapter.matter ?? "body", chapter.title),
+  );
+
+  /*
+   * **A filter that removes everything has to give it back, and this one could.**
+   *
+   * Both places this feeds require at least one entry — a nav document's `<ol>`
+   * must hold an `<li>` and an ncx `<navMap>` must hold a `navPoint` — so a
+   * book whose every page is apparatus produced an empty one of each and two
+   * hard EPUBCheck errors:
+   *
+   *     ERROR(RSC-005) element "ol" incomplete; missing required element "li"
+   *     ERROR(RSC-005) element "navMap" incomplete; missing required "navPoint"
+   *
+   * It is reachable without doing anything strange: press Start on front
+   * matter, fill in the half-title, and export before the first chapter is
+   * written. The export reported success and produced a file no shop takes.
+   *
+   * Listing the apparatus is the lesser wrong. A contents menu offering
+   * "Half-title page" is untidy; a book with no navigation at all is invalid,
+   * and a reader who cannot reach any page of it is worse served than one who
+   * is offered a page nobody usually lists. Nothing changes for an ordinary
+   * book, where the filter keeps something.
+   */
+  return listed.length > 0 ? listed : all;
 }
 
 export function tocNcx(
@@ -569,14 +556,10 @@ export function chapterXhtml(
    *  which keeps every existing caller and every test on the old behaviour. */
   matter: "front" | "body" | "back" = "body",
 ): string {
-  /* **The numeral is dropped when the heading already is the number.**
-     A chapter still called "Chapter 1" was printed as a standing "1" with
-     "Chapter 1" under it — the app saying the same thing twice on the opening
-     line of every chapter of every book that kept the default titles, which is
-     most of them. `isGenericChapterTitle` is the store's own answer and knows
-     both the digit and the spelled form; the contents page asks it too, so the
-     two cannot disagree about the same chapter. */
-  const numeral = number && !isGenericChapterTitle(title) ? number : null;
+  /* The numeral is dropped when the heading already is the number — see
+     `chapterNumeral`, which is where that rule lives now so that the PDF, the
+     Word file and the wizard's own preview answer it the same way. */
+  const numeral = chapterNumeral({ title, number: number ?? null });
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="${escapeXml(language)}" xml:lang="${escapeXml(language)}">
@@ -622,11 +605,34 @@ export async function buildEpub(
 
   zip.file("META-INF/container.xml", containerXml());
 
+  /*
+   * **A picture the package cannot legally carry is left out of the file.**
+   *
+   * Left in, it is not a missing picture, it is a rejected book — measured,
+   * three hard EPUBCheck errors from one chapter, for a remote `src` and for a
+   * media type EPUB has no core support for. None of them is fixable by
+   * declaring something. So the choice is a valid book short of a picture or
+   * an invalid book nobody can sell, and it is not close.
+   *
+   * Dropped **and named**: `undecodableImages` counts exactly these and
+   * `storeReadiness` reports them in the pre-upload check, so the writer is
+   * told before the upload rather than by the shop. A filter nobody can see is
+   * worse than the problem it solves. The wizard's preview drops them too,
+   * through the same `packageable`.
+   *
+   * Filtered before extraction rather than after, so `extractImages` only ever
+   * meets pictures it can package and no surviving `<img>` can point at a file
+   * nothing wrote.
+   */
+  const written = chapters.map((chapter) =>
+    toBlocks(chapter.doc).filter(
+      (block) => block.kind !== "image" || packageable(block),
+    ),
+  );
+
   // Every chapter's blocks in one pass, so an image repeated across chapters is
   // packaged once — and so the data URLs are gone before any XHTML is rendered.
-  const { blocks, images } = extractImages(
-    chapters.map((chapter) => toBlocks(chapter.doc)),
-  );
+  const { blocks, images } = extractImages(written);
 
   const rendered: EpubChapter[] = chapters.map((chapter, i) => ({
     title: chapter.title,
@@ -634,6 +640,10 @@ export async function buildEpub(
     ...(chapter.matter ? { matter: chapter.matter } : {}),
   }));
 
+  /* Asked of what actually went in the file. A picture that was dropped is not
+     an undescribed picture — it is not there at all — and claiming
+     `alternativeText` on the strength of the ones that survived would be the
+     false accessibility claim `accessibility()` exists to avoid. */
   const allImagesDescribed = blocks
     .flat()
     .every((block) => block.kind !== "image" || Boolean(block.alt?.trim()));

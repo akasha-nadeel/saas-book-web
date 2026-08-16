@@ -23,6 +23,7 @@ import {
   type ExportDone,
 } from "@/components/export/export-done";
 import {
+  ExportRefused,
   loadChapters,
   runExport,
   skippedMatterPages,
@@ -30,7 +31,7 @@ import {
   type Format,
 } from "@/lib/export";
 import { Spinner } from "@/components/ui/spinner";
-import { ReviewPane } from "@/components/export/review-pane";
+import { PreviewSheet } from "@/components/export/preview-sheet";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ToolStepDone } from "@/components/ui/tool-save";
 import { useToolSave } from "@/lib/use-tool-save";
@@ -41,10 +42,12 @@ import {
   TRIMS,
   templateById,
   trimById,
-  trimMargins,
+  bookSetting,
+  measureIn,
   type TypesetOptions,
 } from "@/lib/export/typeset";
 import { chapterMatterOf, findBook, type Book } from "@/lib/library-store";
+import { chapterNumeral } from "@/lib/export/blocks";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { storeReadiness } from "@/lib/publishing";
 import { type ToolPageProps } from "@/lib/tool-page";
@@ -111,8 +114,13 @@ const FORMATS: FormatOption[] = [
   {
     value: "pdf",
     label: "PDF",
-    hint: "Typeset to your trim size, through your browser’s print dialog",
-    produces: "Your browser’s print dialog — choose “Save as PDF”",
+    /* **Both of these described a print dialog until 2026-08-16**, and there is
+       no print dialog: the book is laid out by a browser on the server and the
+       finished file comes back. A card telling a writer to choose "Save as PDF"
+       from a dialog that never opens is the plainest kind of claim the code
+       cannot back. */
+    hint: "Typeset to your trim size, as a finished file",
+    produces: "One .pdf file",
   },
   {
     value: "docx",
@@ -163,7 +171,6 @@ type StepId =
   | "frontmatter"
   | "listing"
   | "blurb"
-  | "review"
   | "export";
 
 /**
@@ -274,26 +281,6 @@ function stepsFor(output: Format | null): Step[] {
     );
   }
 
-  /* **The book itself, before the file exists.**
-​
-     Every format gets this, and it is a step rather than a panel on the export
-     screen because it is a different question: everything before it asks *how*
-     the book should be made, and this one asks whether it came out right. It
-     shows the real artifact rather than a description of one — see
-     `ReviewPane`.
-
-     Deliberately not a gate. Continue is live whether or not the writer scrolls
-     it, which is what KDP and Reedsy do: they put the preview in front of you
-     and let you walk past. A primary button disabled until somebody has
-     scrolled is the dead control the house rules argue against, and it would
-     punish the writer exporting their tenth draft hardest. */
-  steps.push({
-    id: "review",
-    group: "Review",
-    title: "Read it before you send it",
-    blurb: "The book as the file will have it — not a picture of one.",
-  });
-
   steps.push({
     id: "export",
     group: "Export",
@@ -365,10 +352,30 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
    * Set by the press that produced it and by nothing else — an effect watching
    * for a finished export would fire again on a remount, which is a success
    * dialog about something the writer did yesterday. See `ExportDoneDialog`.
-   * Null for a PDF, which `runExport` answers with because the print dialog's
-   * outcome is the browser's and not ours to state.
+   * Null only when the PDF fell back to the browser's print dialog — an
+   * installation with no browser behind `/api/export/pdf`. On that path the
+   * outcome is the browser's and not ours to state; on the ordinary path a
+   * PDF is a file like any other.
    */
   const [done, setDone] = useState<ExportDone | null>(null);
+
+  /* **The book itself, and it is a layer rather than a step.**
+
+     It was the fourth of five steps until 2026-08-17, and the shape was the
+     problem: the review is *one thing* — the finished file — and a step in a
+     flow carries the flow around it, so a page of a book was competing with a
+     stepper band, a heading, a deck, a reading measure and the action bar for
+     the same window. Trimming that chrome bought some of the room back and
+     could not buy the rest. Opened over everything it gets the whole window,
+     which is what reading a page of a novel needs.
+
+     Deliberately not a gate, which is what it was before and still is: nothing
+     makes a writer open it, and Continue and Export are live whether or not
+     they do. KDP and Reedsy both put a preview in front of you and let you
+     walk past it. The cost of the change is that nobody is walked through it
+     any more, which is why the button sits on the action bar of every step
+     including the last one, beside the button that exports. */
+  const [preview, setPreview] = useState(false);
 
   const steps = useMemo(() => stepsFor(output), [output]);
 
@@ -472,10 +479,38 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   // The first *body* chapter, not the first stored one. This book opens on a
   // chapter tagged as front matter, and the specimen prints a chapter number
   // above whatever it is given — so the untagged one is the only honest sample.
+  const bodyChapters = book.chapters.filter(
+    (c) => chapterMatterOf(c) === "body",
+  );
   const sampleTitle =
-    book.chapters.find((c) => !c.matter)?.title ??
-    book.chapters[0]?.title ??
-    "Chapter One";
+    bodyChapters[0]?.title ?? book.chapters[0]?.title ?? "Chapter One";
+
+  /*
+   * **Whether the sample chapter really gets a numeral, by the file's own rule.**
+   *
+   * The sheet drew a standing "1" over whatever title it was handed, so a book
+   * that kept the default titles was shown "1" above "Chapter One" — the exact
+   * duplication `chapterNumeral` exists to prevent, on the one step whose job
+   * is to show what the switch above it does. The specimen is a preview like
+   * any other and is held to the same rule.
+   */
+  const sampleNumeral = chapterNumeral({
+    title: sampleTitle,
+    number: bodyChapters.length ? 1 : null,
+  });
+
+  /*
+   * How many chapters would carry a numeral at all.
+   *
+   * Nought means the Chapter numbers switch has nothing to do on *this* book —
+   * every title is already its own number — and a switch that quietly does
+   * nothing is the dead UI the house rules refuse. Same answer the front-matter
+   * step gives when a generated page stands down: say what will happen, on the
+   * control, at the moment of the choice.
+   */
+  const numbered = bodyChapters.filter(
+    (c, i) => chapterNumeral({ title: c.title, number: i + 1 }) !== null,
+  ).length;
 
   // With no format chosen there is only the one step, and it is not an ending —
   // it is a question waiting for an answer.
@@ -514,13 +549,19 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
         manuscript,
         typeset,
       });
-      // Null is the PDF, which went to the browser's print dialog rather than
-      // to a file we made.
+      // Null is a PDF that fell back to the browser's print dialog, where
+      // there is nothing we can honestly confirm. See `printBook`.
       if (file) setDone({ format: output, ...file });
     } catch (err) {
       console.error("[export] failed", err);
+      /* A refusal is a fact about the book and is shown as written — see
+         `ExportRefused`. Anything else is ours, and the writer gets the
+         apology rather than the message, which would be a stack trace's
+         prose. */
       setError(
-        "That export could not be produced. If the book is very large, try a single format at a time.",
+        err instanceof ExportRefused
+          ? err.message
+          : "That export could not be produced. If the book is very large, try a single format at a time.",
       );
     } finally {
       setBusy(false);
@@ -680,7 +721,13 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                 )}
 
                 {step.id === "layout" && (
-                  <LayoutStep typeset={typeset} output={output} onSet={set} />
+                  <LayoutStep
+                    typeset={typeset}
+                    output={output}
+                    onSet={set}
+                    numbered={numbered}
+                    chapters={bodyChapters.length}
+                  />
                 )}
 
                 {step.id === "frontmatter" && (
@@ -695,17 +742,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
                 {step.id === "listing" && <ListingDetails book={book} />}
                 {step.id === "blurb" && <ListingBlurb book={book} />}
-
-                {/* Same guard as the export step below: this step only exists
-                    once a format has been chosen. */}
-                {step.id === "review" && output !== null && (
-                  <ReviewPane
-                    book={book}
-                    output={output}
-                    typeset={typeset}
-                    manuscript={manuscript}
-                  />
-                )}
 
                 {/* Only reachable once a format is chosen, which is what builds
                   this step in the first place. */}
@@ -743,6 +779,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                   typeset={typeset}
                   output={output}
                   sampleTitle={sampleTitle}
+                  sampleNumeral={sampleNumeral}
                   bookTitle={book.title}
                 />
               </aside>
@@ -795,6 +832,33 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
             </button>
           )}
 
+          {/* **The way into the review, on every step that has one.**
+
+                Absent until a format is chosen rather than disabled, for the
+                reason Back is absent on the first step: there is genuinely
+                nothing to preview, and which panes exist is what the pick
+                decides.
+
+                Secondary, and in the left cluster with Back — `PrimaryAction`
+                takes `ml-auto` and this row keeps one primary. Its label
+                mirrors that primary's `Export {label}`, so "Preview EPUB" and
+                "Export EPUB" sit under the same words and nobody has to work
+                out which format is about to be shown. */}
+          {output !== null && (
+            <button
+              type="button"
+              onClick={() => setPreview(true)}
+              className="flex items-center gap-2 rounded-lg border border-line
+                           bg-panel px-4 py-2.5 font-sans text-sm font-medium
+                           text-fg outline-none transition-colors
+                           hover:bg-raised focus-visible:ring-2
+                           focus-visible:ring-accent/60"
+            >
+              <PageGlyph />
+              Preview {active?.label ?? ""}
+            </button>
+          )}
+
           {/* Only where it is true. The listing steps are genuinely optional
                 — the export runs without any of it — so saying so is honest.
                 Offering it on the format step would be a lie, since something
@@ -830,6 +894,22 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           )}
         </div>
       </footer>
+
+      {/* Mounted only while open, which is the whole point of it being a
+          layer: the PDF pane fetches a server render when it mounts, and that
+          now happens when a writer asks to see the book rather than on the way
+          past. */}
+      {preview && output !== null && (
+        <PreviewSheet
+          book={book}
+          output={output}
+          label={active?.label ?? ""}
+          typeset={typeset}
+          manuscript={manuscript}
+          cover={cover}
+          onClose={() => setPreview(false)}
+        />
+      )}
 
       {/* The one thing this screen does that leaves no trace on it. A `<dialog>`
           opened with `showModal` sits in the browser's top layer, so it clears
@@ -1180,11 +1260,20 @@ function FormatStep({
         </ComingSoonDialog>
       )}
 
+      {/* **The one format that sends the book, said before the press.** This
+          is the rule the prose-sending routes already follow — the ranking
+          card and the blurb panel both list what leaves above their button —
+          and the PDF sends more than either of them, so it says so first and
+          says what it buys. The old note described a print dialog; there is
+          no dialog any more. */}
       {output === "pdf" && (
         <Note>
-          This opens your browser’s print dialog — choose “Save as PDF”. It sets
-          the interior at your trim size. It does not add bleed or crop marks,
-          so a printer may ask you for those separately.
+          Your book is typeset on our server and the finished PDF comes
+          straight back — that is what lets the contents page carry the page
+          each chapter really starts on. The text and pictures go for as long
+          as it takes to build the file and are never stored. It sets the
+          interior at your trim size, and adds no bleed or crop marks, so a
+          printer may ask you for those separately.
         </Note>
       )}
 
@@ -1450,12 +1539,15 @@ function Sheet({
   typeset,
   output,
   sampleTitle,
+  sampleNumeral,
   bookTitle,
 }: {
   typeset: TypesetOptions;
   /** EPUB has no page of its own; see the trim below. */
   output: Format | null;
   sampleTitle: string;
+  /** The numeral this chapter really opens with, or null — `chapterNumeral`. */
+  sampleNumeral: number | null;
   bookTitle: string;
 }) {
   const t = templateById(typeset.template);
@@ -1466,7 +1558,11 @@ function Sheet({
      page instead, said so in the caption. */
   const epub = output === "epub";
   const trim = epub ? trimById("6x9") : trimById(typeset.trim);
-  const { side, ends } = trimMargins(trim);
+  /* The same call `typesetCss` makes, so the sheet is set at the size the file
+     is set at. It used to take the size from the template and the margins from
+     `trimMargins`, which was two of the three numbers and the wrong one of
+     them once the size began following the page. */
+  const { sizePt, leading, side, ends } = bookSetting(t, trim);
 
   const across = (inches: number) =>
     `${((inches / trim.width) * 100).toFixed(4)}cqw`;
@@ -1483,7 +1579,7 @@ function Sheet({
           <span
             style={{
               float: "left",
-              fontSize: pt(t.bodyPt * 3.2),
+              fontSize: pt(sizePt * 3.2),
               lineHeight: 0.82,
               padding: "0.06em 0.08em 0 0",
             }}
@@ -1515,8 +1611,8 @@ function Sheet({
             aspectRatio: `${trim.width} / ${trim.height}`,
             padding: `${across(ends)} ${across(side)}`,
             fontFamily: t.stack,
-            fontSize: pt(t.bodyPt),
-            lineHeight: t.leading,
+            fontSize: pt(sizePt),
+            lineHeight: leading,
             textAlign: "justify",
             hyphens: "auto",
           }}
@@ -1531,7 +1627,7 @@ function Sheet({
                 left: across(side),
                 right: across(side),
                 textAlign: "right",
-                fontSize: pt(t.bodyPt * 0.8),
+                fontSize: pt(sizePt * 0.8),
                 ...(t.headingCaps
                   ? { fontVariant: "small-caps", letterSpacing: "0.05em" }
                   : { fontStyle: "italic" }),
@@ -1541,17 +1637,21 @@ function Sheet({
             </span>
           )}
 
-          {!typeset.hideChapterNumbers && (
+          {/* The numeral the file will actually print above this chapter, not
+              a standing "1". A chapter still called "Chapter One" *is* its
+              number and the export prints no numeral over it — see
+              `chapterNumeral`. */}
+          {!typeset.hideChapterNumbers && sampleNumeral !== null && (
             <p
               className="text-sheet-ink/55"
               style={{
                 textAlign: "center",
                 textIndent: 0,
-                fontSize: pt(t.bodyPt * 1.4),
+                fontSize: pt(sizePt * 1.4),
                 margin: "0 0 0.4em",
               }}
             >
-              1
+              {sampleNumeral}
             </p>
           )}
 
@@ -1559,7 +1659,7 @@ function Sheet({
             style={{
               textAlign: "center",
               fontWeight: "normal",
-              fontSize: pt(t.bodyPt * 1.6),
+              fontSize: pt(sizePt * 1.6),
               margin: "2.4em 0 1.6em",
               ...caps,
             }}
@@ -1587,12 +1687,37 @@ function Sheet({
   );
 }
 
+/**
+ * What the chosen trim sets, in one sentence.
+ *
+ * The measure is the honest half of it: a page size means nothing to most
+ * writers, and "62 letters a line" is the thing that decides whether the book
+ * is comfortable to read. It is a real measurement of the real font rather than
+ * a rule of thumb — see `measureIn` — and it is stated as an approximation
+ * because an average character width is one.
+ *
+ * Manuscript is the one template the page does not resize, so it says so
+ * instead of quoting a measure that would be true of no submission.
+ */
+function trimSummary(typeset: TypesetOptions): string {
+  const template = templateById(typeset.template);
+  const trim = trimById(typeset.trim);
+  const setting = bookSetting(template, trim);
+
+  if (template.id === "manuscript") {
+    return "Standard manuscript format keeps 12pt double-spaced with 1″ margins, whatever the page size.";
+  }
+  return `Sets ${setting.sizePt}pt type on a ${(trim.width - setting.side * 2).toFixed(2)}″ measure — about ${measureIn(setting, trim)} letters a line.`;
+}
+
 /* `sampleTitle` and `bookTitle` went with the sheet — see `TemplateStep`.
    `output` stays: this step still asks it whether to draw a trim row. */
 function LayoutStep({
   typeset,
   output,
   onSet,
+  numbered,
+  chapters,
 }: {
   typeset: TypesetOptions;
   // Only ever pdf or epub in practice — this step does not exist otherwise —
@@ -1602,8 +1727,17 @@ function LayoutStep({
     key: K,
     value: TypesetOptions[K],
   ) => void;
+  /** How many chapters would carry a numeral — see `chapterNumeral`. */
+  numbered: number;
+  /** How many body chapters there are, so "none of them" can be said. */
+  chapters: number;
 }) {
   const epub = output === "epub";
+  /* Every chapter's title already *is* its number, so this switch has nothing
+     to take away on this book. Saying so is the same courtesy the front-matter
+     step pays: a control that quietly does nothing is the dead UI this app
+     refuses, and the writer would otherwise flip it twice and see no change. */
+  const noneNumbered = chapters > 0 && numbered === 0;
 
   return (
     <div className="space-y-4">
@@ -1612,13 +1746,26 @@ function LayoutStep({
             option is `hideChapterNumbers` and the switch used to be labelled
             with it, so turning the control *on* took something off the page —
             which is the one thing a switch may not do. The store keeps its
-            field; the label is inverted here, where a reader is. */}
-        <SwitchRow
-          label="Chapter numbers"
-          hint="A numeral above each chapter title"
-          on={!typeset.hideChapterNumbers}
-          onChange={(v) => onSet("hideChapterNumbers", !v)}
-        />
+            field; the label is inverted here, where a reader is.
+
+            **Absent, not explained, when the book has no numerals to show.**
+            A chapter still called "Chapter One" *is* its own number, so no
+            numeral is printed above it — and on a book where that is true of
+            every chapter this switch has nothing to act on. It was rendered
+            anyway with a sentence saying so, which is a control in the tab
+            order that can never do anything: a writer flips it twice, watches
+            the sheet beside it not move, and reasonably concludes the export
+            is broken. The trim row two below has taken exactly this treatment
+            for EPUB since it was written. The note under the card says why and
+            how to get it back. */}
+        {!noneNumbered && (
+          <SwitchRow
+            label="Chapter numbers"
+            hint="A numeral above each chapter title. Chapters you have named get one; those still called “Chapter One” already are the number, so they do not."
+            on={!typeset.hideChapterNumbers}
+            onChange={(v) => onSet("hideChapterNumbers", !v)}
+          />
+        )}
         <SwitchRow
           label="Drop caps"
           hint="A raised initial opening each chapter"
@@ -1629,16 +1776,36 @@ function LayoutStep({
         {/* No trim row for an EPUB, rather than a dead one. It was a select
             greyed out with a sentence under it saying why, which is a control
             in the tab order that can never do anything. */}
+        {/* **The hint says what this choice actually sets.** The page size
+            decides the type size now — a smaller page takes smaller type, as a
+            printed book does — so the row states the size and the measure it
+            lands on rather than leaving the writer to discover it in the file.
+            Read from `bookSetting`, the same call the stylesheet makes, so it
+            cannot promise a setting the PDF does not use. A fact, not a
+            verdict: it says what happens, and the sheet beside it shows it. */}
         {!epub && (
           <SelectRow
             label="Trim size"
-            hint="The finished page size, before binding."
+            hint={`The finished page size, before binding. ${trimSummary(typeset)}`}
             value={typeset.trim}
             onChange={(v) => onSet("trim", v)}
             options={TRIMS.map((t) => [t.id, t.label] as const)}
           />
         )}
       </SettingsCard>
+
+      {/* Why the Chapter numbers switch is not on the card, and how to get it
+          back. It is the answer the writer would otherwise have to work out
+          from a control that does nothing. */}
+      {noneNumbered && (
+        <Note>
+          There is no Chapter numbers setting here because your chapters are
+          called “Chapter One”, “Chapter Two” and so on — the title is already
+          the number, and printing a numeral above it would say the same thing
+          twice. Give a chapter a name of its own and the setting comes back,
+          so you can choose whether its number is printed above it.
+        </Note>
+      )}
 
       {epub && (
         <Note>
@@ -2241,13 +2408,23 @@ function ExportStep({
  *
  * The same arithmetic `runExport` uses, which is the only thing that makes it
  * safe to print — a filename guessed at here and produced there is a promise
- * this screen cannot keep. **Null for PDF**, for the reason `runExport`
- * answers null: what leaves is the browser's print dialog, and whether anything
- * was saved, or under what name, is not ours to say.
+ * this screen cannot keep.
+ *
+ * **PDF was null here** because what left was a print dialog, and whether
+ * anything was saved — or under what name — was not ours to say. The PDF is
+ * rendered by a browser on the server now and comes back as a file this app
+ * downloads and names, exactly like the other three, so the card can say what
+ * to look for in the downloads folder.
  */
-function exportFilename(output: Format, title: string): string | null {
-  if (output === "pdf") return null;
-  const ext = output === "docx" ? "docx" : output === "epub" ? "epub" : "md";
+function exportFilename(output: Format, title: string): string {
+  const ext =
+    output === "docx"
+      ? "docx"
+      : output === "epub"
+        ? "epub"
+        : output === "pdf"
+          ? "pdf"
+          : "md";
   return `${slugify(title)}.${ext}`;
 }
 
@@ -2453,6 +2630,31 @@ function Arrow({ className = "" }: { className?: string }) {
       className={`h-3.5 w-3.5 ${className}`}
     >
       <path d="M4 10h11M11 6l4 4-4 4" />
+    </svg>
+  );
+}
+
+/**
+ * A sheet of paper with lines of type on it, for the Preview button.
+ *
+ * A page rather than an eye: what opens is the book set on pages, and an eye is
+ * the mark this app spends on *visibility* (showing and hiding a thing already
+ * on screen) rather than on opening one.
+ */
+function PageGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3.5 w-3.5"
+    >
+      <rect x="4" y="2.5" width="12" height="15" rx="1.5" />
+      <path d="M7 6.5h6M7 10h6M7 13.5h3.5" />
     </svg>
   );
 }

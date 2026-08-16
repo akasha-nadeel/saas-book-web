@@ -1,5 +1,9 @@
-import { expect, it } from "vitest";
-import { blocksToXhtml } from "@/lib/export/xhtml";
+import { describe, expect, it } from "vitest";
+import {
+  blocksToXhtml,
+  escapeXml,
+  stripInvalidXml,
+} from "@/lib/export/xhtml";
 import type { Block } from "@/lib/export/blocks";
 
 const p = (...runs: Block["runs"]): Block => ({
@@ -228,4 +232,71 @@ it("renders an image, escaping its attributes", () => {
       { kind: "image", depth: 0, src: "x.png?a=1&b=2", alt: 'A "map"', runs: [] },
     ]),
   ).toBe('<p class="figure"><img src="x.png?a=1&amp;b=2" alt="A &quot;map&quot;" /></p>');
+});
+
+// ---------------------------------------------------------------------------
+// The characters XML cannot carry
+// ---------------------------------------------------------------------------
+
+/*
+ * These are the tests not to "fix" by loosening them. A single character from
+ * this set anywhere in a manuscript is a *fatal* EPUBCheck error — RSC-016,
+ * "an invalid XML character was found" — which fails the whole file rather
+ * than one page of it. The editor never types one; the importers accept
+ * whatever is in the file, and a form feed is how a plain-text book marks a
+ * page break.
+ */
+describe("stripInvalidXml", () => {
+  it("returns the very same string when there is nothing to do", () => {
+    const clean = "Ordinary prose — with an em dash, “quotes” and 📚.";
+
+    // Identity, not just equality: this runs on every pagination pass in the
+    // reader, so the common case must not allocate.
+    expect(stripInvalidXml(clean)).toBe(clean);
+  });
+
+  it("drops the control characters XML has no escape for", () => {
+    expect(stripInvalidXml("a\u0000b")).toBe("ab");
+    expect(stripInvalidXml("page\u000cbreak")).toBe("pagebreak");
+    expect(stripInvalidXml("a\u0008b\u000bc\u001fd")).toBe("abcd");
+  });
+
+  it("keeps the three control characters XML does allow", () => {
+    expect(stripInvalidXml("a\tb\nc\rd")).toBe("a\tb\nc\rd");
+  });
+
+  it("keeps a whole surrogate pair and drops half of one", () => {
+    // An emoji is two code units and a real character; half of one is a fatal
+    // parse error exactly like a NUL, and any cut that did not count code
+    // points can leave one behind.
+    expect(stripInvalidXml("a📚b")).toBe("a📚b");
+    expect(stripInvalidXml("a\ud83db")).toBe("ab");
+    expect(stripInvalidXml("a\udc4bb")).toBe("ab");
+  });
+
+  it("keeps every other character it is handed", () => {
+    const text = "සිංහල عربي ∑∫≠ €40 ½ ﬁ";
+
+    expect(stripInvalidXml(text)).toBe(text);
+  });
+});
+
+describe("escapeXml", () => {
+  it("escapes the metacharacters, ampersand first", () => {
+    expect(escapeXml('a & b < c > d "e"')).toBe(
+      "a &amp; b &lt; c &gt; d &quot;e&quot;",
+    );
+  });
+
+  it("strips before it escapes, since an escape needs a carryable character", () => {
+    expect(escapeXml("a\u0000&b")).toBe("a&amp;b");
+  });
+});
+
+describe("a manuscript that would not parse", () => {
+  it("renders no invalid character into the markup", () => {
+    const xhtml = blocksToXhtml([p({ text: "before\u000cafter" })]);
+
+    expect(xhtml).toBe("<p>beforeafter</p>");
+  });
 });

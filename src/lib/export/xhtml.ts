@@ -1,8 +1,89 @@
 import type { Block, Run } from "./blocks";
 
-/** Ampersand first, or every subsequent replacement double-escapes. */
+/**
+ * Whether XML 1.0 can carry this code unit at all.
+ *
+ * **The five metacharacters have escapes; these have none.** Not `&#0;`, not a
+ * CDATA section, not anything — a character outside XML's `Char` production
+ * cannot appear in a document in any form. One of them anywhere in a
+ * manuscript makes every XHTML file in the EPUB a *fatal* parse error, which
+ * is EPUBCheck's own word for it:
+ *
+ *     FATAL(RSC-016) An invalid XML character (Unicode: 0xc) was found
+ *
+ * and a fatal file is refused whole, by every shop and every reader. Nothing
+ * upstream stops one arriving. The editor never types a control character, but
+ * the importers take whatever is in the file, and a form feed (`0x0C`) is
+ * exactly how a plain-text book marks a page break — every Project Gutenberg
+ * `.txt` is full of them. So such a manuscript imports cleanly, reads correctly
+ * on screen, exports without a word of complaint, and is rejected at the shop.
+ *
+ * Written as code-unit arithmetic rather than a regular expression because the
+ * character class would have to be spelled with escapes for characters that
+ * are invisible in a source file, and an editor that helpfully rewrote one into
+ * its literal form would leave a lone surrogate sitting in this module.
+ */
+function carryable(code: number): boolean {
+  // Tab, newline and carriage return are the three control characters XML does
+  // allow, and they are the only ones a manuscript has any use for.
+  if (code < 0x20) return code === 0x09 || code === 0x0a || code === 0x0d;
+  if (code >= 0xd800 && code <= 0xdfff) return false; // handled as pairs below
+  return code !== 0xfffe && code !== 0xffff;
+}
+
+/**
+ * Text with the characters XML cannot carry taken out.
+ *
+ * **Dropped rather than replaced.** A control character carries nothing a
+ * reader could want, so there is nothing to stand in for it; a substitute
+ * glyph would put visible litter in somebody's prose to mark the absence of
+ * something invisible.
+ *
+ * A whole surrogate *pair* is a real character and survives — that is what
+ * leaves an emoji alone while dropping the half of one that lost its partner
+ * to a cut that did not count code points. A lone surrogate is a fatal parse
+ * error exactly like a NUL.
+ *
+ * Nothing is allocated when there is nothing to do, which is every manuscript
+ * anybody has ever typed: this runs over every run of every block on every
+ * pagination pass in the reader, so the common case has to cost a scan and no
+ * more. `from === 0` is how it knows nothing was dropped.
+ */
+export function stripInvalidXml(text: string): string {
+  let clean = "";
+  /** The start of the run not yet copied — only ever moved by a drop. */
+  let from = 0;
+
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const low = text.charCodeAt(i + 1);
+      // A complete pair: skip both, it is one ordinary character.
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        i++;
+        continue;
+      }
+    } else if (carryable(code)) {
+      continue;
+    }
+    clean += text.slice(from, i);
+    from = i + 1;
+  }
+
+  return from === 0 ? text : clean + text.slice(from);
+}
+
+/**
+ * Ampersand first, or every subsequent replacement double-escapes.
+ *
+ * Strips first, though: escaping is only meaningful for a character the
+ * document can hold at all. Every string that reaches the EPUB, the print
+ * document or the reading view comes through here — the prose, the chapter
+ * titles, the book's own metadata, every attribute — so this is the one place
+ * that has to hold for all of them.
+ */
 export function escapeXml(text: string): string {
-  return text
+  return stripInvalidXml(text)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

@@ -3,6 +3,7 @@ import type { Block } from "./blocks";
 import {
   extractImages,
   packageCover,
+  packageable,
   undecodableImages,
 } from "./epub-images";
 
@@ -119,11 +120,65 @@ describe("packageCover", () => {
   });
 });
 
+/*
+ * **These decide what is in somebody's book**, and each `false` below is a
+ * picture the EPUB leaves out rather than a hard EPUBCheck failure the shop
+ * finds first. Three renderers ask this one question — the packager, the
+ * pre-upload check and the wizard's preview — so it may not be re-derived
+ * anywhere.
+ */
+describe("packageable", () => {
+  it("takes a data URL of a core media type", () => {
+    expect(packageable(image(PNG))).toBe(true);
+    expect(packageable(image(GIF))).toBe(true);
+  });
+
+  it("refuses a payload that will not decode", () => {
+    // A core type with a corrupt payload would otherwise pass a header sniff
+    // and fail in extraction, leaving an <img> pointing at a file nothing
+    // wrote — RSC-007, a broken reference.
+    expect(packageable(image("data:image/png;base64,???"))).toBe(false);
+  });
+
+  it("refuses a media type EPUB has no core support for", () => {
+    // ERROR(RSC-032): a foreign resource needs a fallback, and an inline
+    // illustration is not worth that machinery.
+    expect(packageable(image("data:image/tiff;base64,SUkqAA=="))).toBe(false);
+  });
+
+  it("refuses a picture linked from the web", () => {
+    // ERROR(RSC-006): EPUB 3.3 allows a remote audio, video or font and never
+    // a remote <img>, so there is nothing to declare that would make it legal.
+    expect(packageable(image("https://example.com/plate.png"))).toBe(false);
+  });
+
+  it("refuses a path that merely looks like one of ours", () => {
+    // A book imported *from* an EPUB arrives carrying that package's own
+    // `images/…` paths in its prose, referring to files never brought across.
+    expect(packageable(image("images/plate-1.png"))).toBe(false);
+  });
+
+  it("is false for anything that is not a picture", () => {
+    expect(packageable(para("x"))).toBe(false);
+  });
+});
+
 describe("undecodableImages", () => {
-  it("counts the images a store would reject", () => {
-    expect(
-      undecodableImages([[image("data:image/png;base64,???"), para("x")]]),
-    ).toBe(1);
-    expect(undecodableImages([[image("images/img-01.png")]])).toBe(0);
+  it("counts every image the package cannot carry", () => {
+    const count = undecodableImages([
+      [
+        image(PNG),
+        image("data:image/png;base64,???"),
+        image("data:image/tiff;base64,SUkqAA=="),
+        image("https://example.com/plate.png"),
+        para("x"),
+      ],
+    ]);
+
+    expect(count).toBe(3);
+  });
+
+  it("counts nothing when every image can be packaged", () => {
+    expect(undecodableImages([[image(PNG), image(GIF)]])).toBe(0);
   });
 });

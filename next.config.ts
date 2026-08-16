@@ -52,9 +52,39 @@ if (!existsSync(pagedjsFile)) {
   );
 }
 
+/**
+ * The same `dist/` again, for the server that renders the PDF.
+ *
+ * `/api/export/pdf` injects `paged.polyfill.js` into a headless browser as
+ * source text, so it needs the file rather than the module — and it cannot ask
+ * for it by specifier for the reason spelled out above: the `exports` map has
+ * no path entries, so the bundler refuses `pagedjs/dist/…` outright. Resolved
+ * here, where `createRequire` is a build-time thing and hoisting is already
+ * being handled, and handed over as a path the route reads at runtime.
+ */
+const pagedjsDist = dirname(pagedjsFile);
+
 const nextConfig: NextConfig = {
   turbopack: {
     resolveAlias: { pagedjs },
+  },
+
+  /* Where the route finds the polyfill. Inlined at build time, so it survives
+     into the server bundle without the route resolving anything itself. */
+  env: {
+    OC_PAGEDJS_DIST: pagedjsDist,
+  },
+
+  /**
+   * The polyfill, packed into the deployed function.
+   *
+   * Nothing imports it — the route reads it off disk as text — and a tracer
+   * only packs what it can see, so without this the file is simply absent in
+   * production and every PDF export falls back to the print dialog. Named
+   * against the route that reads it rather than globally.
+   */
+  outputFileTracingIncludes: {
+    "/api/export/pdf": ["./node_modules/pagedjs/dist/paged.polyfill.js"],
   },
   /* No `webpack` hook beside this. Next 16 builds with Turbopack, and adding a
      webpack config to a Turbopack project changes how the whole graph is

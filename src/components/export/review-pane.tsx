@@ -8,16 +8,10 @@ import {
   type Format,
 } from "@/lib/export";
 import type { LoadedChapter } from "@/lib/export/blocks";
-import { dropPagedStyles, paginate, printDocument } from "@/lib/export/print";
-import { printsHeading, toBlocks } from "@/lib/export/blocks";
-import { blocksToXhtml, escapeXml } from "@/lib/export/xhtml";
-import { typesetCss, type TypesetOptions } from "@/lib/export/typeset";
-import {
-  frontSections,
-  withoutReplaced,
-  writtenPages,
-} from "@/lib/export/front-matter";
-import { plural } from "@/lib/plural";
+import { printDocument } from "@/lib/export/print";
+import { escapeXml } from "@/lib/export/xhtml";
+import { trimById, type TypesetOptions } from "@/lib/export/typeset";
+import { withoutReplaced, writtenPages } from "@/lib/export/front-matter";
 import type { Book } from "@/lib/library-store";
 
 /**
@@ -26,35 +20,58 @@ import type { Book } from "@/lib/library-store";
  * **Every one of these renders the real artifact, and that is the whole design
  * rather than a detail of it.** A preview assembled from its own code path
  * agrees with the export on the day it is written and quietly stops agreeing
- * afterwards — which is the one failure a "check before you export" step cannot
+ * afterwards — which is the one failure a "check before you export" cannot
  * have, because a writer who has checked stops looking. So:
  *
- * - **PDF** is the actual Paged.js pagination, from `printDocument` — the same
- *   markup and stylesheet the print path hands the browser. The folios and the
- *   running heads are the ones the PDF will carry, because they were worked out
- *   here by the same engine.
+ * - **PDF** is the finished file, fetched from `/api/export/pdf` — the same
+ *   call the export makes, the same bytes — and drawn by Chrome's own viewer.
+ *   Not a second pagination of it: see the note on that pane.
  * - **Word** is the real `.docx`, built and then read back by `docx-preview`.
  *   Nothing describes the file second-hand: the bytes are made and rendered.
  * - **EPUB** is the XHTML the packager puts in the file, under the book's own
  *   typography.
  * - **Markdown** is the text that will be written, shown as text.
  *
- * What this is not is a *device* preview. An e-reader picks its own page, its
- * own font and often its own margins, so a page count for the EPUB would be
- * invented — see the note on the EPUB pane. The PDF's page count is real
- * because a PDF has real pages.
+ * **What this is not is a *device* preview, and each pane says so for
+ * itself.** Building the real artifact settles what is *in* the file — the
+ * pages, their order, the stylesheet, the metadata. It cannot settle what the
+ * file will *look like* wherever it is opened, and for two of the four that
+ * gap is real: an e-reader substitutes its own font, spacing and margins and
+ * picks its own page, and `docx-preview` is a viewer rather than Word. The
+ * other two have no gap at all — the PDF pane is the finished file drawn by a
+ * PDF viewer, and Markdown is the text itself.
+ *
+ * So a caption here is not decoration. Each states what its pane can back and
+ * stops: exact for PDF and Markdown, *structure rather than looks* for EPUB,
+ * *content exact and layout close* for Word. A pane that let a writer believe
+ * their Kindle would look like this screen would be the wrong kind of preview,
+ * and the house rule is that a claim the code cannot back is cut rather than
+ * reworded.
+ *
+ * **It owns no frame.** `PreviewSheet` is what puts it over the window, and
+ * this is a flex column that fills whatever it is given — so the one thing a
+ * caller owes it is a bounded height.
  */
 export function ReviewPane({
   book,
   output,
   typeset,
   manuscript,
+  cover,
 }: {
   book: Book;
   output: Format;
   typeset: TypesetOptions;
   /** Word's manuscript furniture — the same flag the export takes. */
   manuscript: boolean;
+  /**
+   * The book's cover as a data URL.
+   *
+   * Only the EPUB pane wants it, and it wants it because that pane packages a
+   * real file: a cover is a page in the spine, so a file built without one
+   * would be a book one document short of the one it previews.
+   */
+  cover: string | null;
 }) {
   /* Derived here the way `runExport` derives it, from the book and nothing
      else, so the review cannot be looking at a different set of chapters from
@@ -80,8 +97,12 @@ export function ReviewPane({
     [chapters, output],
   );
 
+  /* A flex column rather than a stack with gaps: `PreviewSheet` gives this the
+     whole window, and the stage inside takes whatever the note above it does
+     not. `min-h-0` so it may shrink below its contents — without it a long book
+     pushes the sheet's own header off the top. */
   return (
-    <div className="space-y-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {written && <YoursInstead written={written} />}
       {output === "pdf" && (
         <PagedReview book={book} chapters={chapters} typeset={typeset} />
@@ -95,7 +116,12 @@ export function ReviewPane({
         />
       )}
       {output === "epub" && (
-        <EpubReview book={book} chapters={chapters} typeset={typeset} />
+        <EpubReview
+          book={book}
+          chapters={chapters}
+          typeset={typeset}
+          cover={cover}
+        />
       )}
       {output === "markdown" && (
         <MarkdownReview book={book} chapters={chapters} single={false} />
@@ -156,46 +182,57 @@ function YoursInstead({ written }: { written: ReadonlySet<string> }) {
 function Stage({
   caption,
   zoom,
+  bare = false,
   children,
 }: {
   caption: React.ReactNode;
   /** Omitted by a pane with nothing to scale. */
   zoom?: Zoom;
+  /**
+   * For a pane that brings its own frame — which is the PDF one, since
+   * Chrome's viewer paints its own dark ground, its own desk and its own
+   * padding around the page. Ours underneath it is a grey border drawn around
+   * a grey border, and the padding is a strip of book nobody gets to see.
+   */
+  bare?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* The caption and the zoom sit on one row: the sentence explains what is
           below, the controls act on it, and putting them anywhere else would
-          separate a control from the thing it controls. */}
-      <div className="mb-3 flex items-end justify-between gap-4">
-        <p className="font-sans text-xs text-muted">{caption}</p>
-        {zoom && <ZoomBar {...zoom} />}
-      </div>
+          separate a control from the thing it controls. The row is dropped
+          entirely when there is neither — an empty 2rem strip above a page is
+          2rem of page nobody gets to see. */}
+      {(caption || zoom) && (
+        <div className="mb-3 flex shrink-0 items-end justify-between gap-4">
+          <p className="font-sans text-xs text-muted">{caption}</p>
+          {zoom && <ZoomBar {...zoom} />}
+        </div>
+      )}
       {/* A grey desk, so the white of the page is the page rather than the
           screen. Bounded and scrolling: a four-hundred-page book cannot push
           the wizard's own controls off the bottom of the window.
 
-          **A real height rather than a `max-height`, and it is what lets a
-          whole page be a whole page.** At `max-h-[60vh]` the box took its
-          height from its contents and stopped at the cap, so a page — which is
-          taller than that at any sensible scale — arrived cropped at the top
-          and the bottom, which is the one thing a page preview must not be. A
-          fixed box is also what `useFitToStage` needs: it measures this to
-          decide the scale, so a height that came from the contents would be a
-          circle.
+          **It takes the height it is given rather than working one out**, and
+          that changed on 2026-08-17 when the review left the wizard's flow for
+          a sheet of its own. It used to be
+          `clamp(20rem, calc(100dvh - 11rem), 64rem)` — the window less the
+          action bar and the caption, with the step's heading and deck above
+          allowed to scroll away. None of that chrome is here any more, so the
+          arithmetic has nothing left to guess at: the sheet is a flex column
+          and this is what is left of it. That is also the honest version,
+          since the old sum was a guess at chrome that could change without
+          this number changing with it.
 
-          Sized off the window less only what is *permanently* on screen — the
-          action bar, and room for the caption above. The heading, the deck and
-          the stepper all scroll away with the column, so budgeting for them
-          too (the first attempt took 21rem out) left a page at a third of its
-          size in a box with half the window empty beneath it. Floored so it
-          survives a short screen and capped so it does not become a wall on a
-          tall one. */}
+          A real height either way, which is what `useFitToStage` needs — it
+          measures this box to decide the scale, so a height that came from the
+          contents would be a circle. `min-h-0` is what lets a flex item shrink
+          below its content; without it a long book pushes the action bar off
+          the window, which is the shape this replaced. */}
       <div
-        style={{ height: "clamp(20rem, calc(100dvh - 11rem), 64rem)" }}
-        className="scroll-slim overflow-auto rounded-xl border border-line
-                   bg-raised p-4"
+        className={`scroll-slim min-h-0 flex-1 overflow-auto rounded-xl
+                    border border-line ${bare ? "" : "bg-raised p-4"}`}
       >
         {children}
       </div>
@@ -408,19 +445,35 @@ const OFF_SCREEN: React.CSSProperties = {
 };
 
 /**
- * The PDF, laid out by the engine that lays out the PDF.
+ * The PDF itself, rendered by the same route the export uses.
  *
- * Rendered into *this* document rather than an iframe, which is why it needs no
- * style copying — see `paginate`. The styles Paged.js writes are global while
- * the pane is mounted, so they are taken out again on the way off the screen;
- * they are all scoped under its own `.pagedjs_*` classes, so nothing of the
- * app's is disturbed in the meantime.
+ * **It re-ran the pagination in this page until 2026-08-17, and the re-run was
+ * wrong.** Paged.js truncates a long generated contents list when it lays out
+ * inside the application's own document — measured on a 45-chapter book, five
+ * entries shown against forty-five in the file, and a page count one short
+ * because the contents never overflowed onto its second sheet. Everything else
+ * agreed. The cause is somewhere in its chunker reacting to this document;
+ * `display: flex` on the leader, `target-counter`, the anchors, the list
+ * markup, `list-item` display, the contents' own CSS, break-avoid, page size,
+ * the title page's flex layout, Tailwind's `box-sizing` reset and the
+ * stylesheet scoping were each removed and re-measured, and none of them is it.
  *
- * **Each run gets a box of its own inside the host**, rather than clearing the
- * host and rendering into it. React runs this effect twice in development, so
- * two Previewers can be in flight at once; sharing one container means the
- * second wipes the first's tree mid-layout and neither finishes. A run that is
- * superseded simply takes its own box away and the live one is untouched.
+ * So this stopped guessing at the file and started showing it. `/api/export/pdf`
+ * renders the book in a browser that has nothing else on it — the same call the
+ * export makes, byte for byte the same file — and Chrome draws it natively.
+ * That is what the note at the top of this module always claimed for the other
+ * three panes: *the real artifact, not a picture of one*. It also means this
+ * pane can never drift again, because there is no second code path left to
+ * drift.
+ *
+ * The cost is honest and worth stating: opening the preview renders the book on
+ * the server, so a writer who previews and then exports pays for two renders.
+ * That is the price of a preview that cannot lie.
+ *
+ * **The page count is gone from the caption.** It was read off the pagination
+ * this pane used to run; Chrome's viewer prints the real one in its own toolbar,
+ * and a number quoted here would be a second answer to a question the file has
+ * already answered.
  */
 function PagedReview({
   book,
@@ -431,86 +484,111 @@ function PagedReview({
   chapters: LoadedChapter[];
   typeset: TypesetOptions;
 }) {
-  const host = useRef<HTMLDivElement>(null);
-  const room = useRef<HTMLDivElement>(null);
-  const natural = useRef({ w: 0, h: 0 });
-  const [state, setState] = useState<"working" | "done" | "failed">("working");
-  const [pages, setPages] = useState(0);
-  const fit = useFitToStage(room, natural, state === "done");
-  const zoom = useZoom(fit);
+  /*
+   * **One identity per run, and the state carries it.**
+   *
+   * Resetting to "working" from the effect body would be a second render on
+   * every settings change, and — the half that matters — between the change and
+   * that reset the pane would still be showing the *previous* book's PDF as
+   * though it were the new one. Keyed instead: a result belongs to the run that
+   * produced it, and anything from an older run simply is not this run's, so
+   * the pane reads as working until the new file lands.
+   */
+  const run = useMemo(
+    () => [book, chapters, typeset] as const,
+    [book, chapters, typeset],
+  );
+  const [result, setResult] = useState<{
+    run: object;
+    url: string | null;
+  } | null>(null);
+
+  const done = result?.run === run && result.url !== null;
+  const failed = result?.run === run && result.url === null;
 
   useEffect(() => {
-    const into = host.current;
-    if (!into) return;
-
     let live = true;
-    let styles: HTMLStyleElement[] = [];
-    const box = document.createElement("div");
-    into.appendChild(box);
-    setState("working");
+    let objectUrl: string | null = null;
 
-    void paginate(printDocument(book, chapters, typeset), box)
-      .then((flow) => {
-        // Unmounted mid-layout, or the settings changed under it: throw the
-        // work away rather than painting a book nobody is looking at.
-        if (!live) {
-          dropPagedStyles(flow.adoptedStyles);
-          box.remove();
-          return;
-        }
-        styles = flow.adoptedStyles;
-        // Whatever a superseded run left behind goes now, not before: the host
-        // has to hold a laid-out box the whole way through.
-        for (const other of [...into.children]) {
-          if (other !== box) other.remove();
-        }
-        // Recorded here because here is the one moment it is knowable: the
-        // pages exist and nothing has scaled them yet. See `useFitToStage`.
-        const first = box.querySelector(".pagedjs_page")?.getBoundingClientRect();
-        natural.current = { w: first?.width ?? 0, h: first?.height ?? 0 };
-        setPages(flow.pages);
-        setState("done");
-      })
-      .catch((err) => {
-        box.remove();
-        // The writer is told, but the reason is worth having: this is somebody
-        // else's layout engine and the message is the only thing that says why.
-        console.error("[review] the pages could not be laid out", err);
-        if (live) setState("failed");
-      });
+    void (async () => {
+      try {
+        const trim = trimById(typeset.trim);
+        const response = await fetch("/api/export/pdf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...printDocument(book, chapters, typeset),
+            title: book.title,
+            width: trim.width,
+            height: trim.height,
+          }),
+        });
+        if (!response.ok) throw new Error(`the route answered ${response.status}`);
+
+        const blob = await response.blob();
+        if (!blob.size) throw new Error("the route answered with nothing");
+        /* Superseded or unmounted: drop it rather than paint a book nobody is
+           looking at, and never leak the object URL. */
+        if (!live) return;
+
+        objectUrl = URL.createObjectURL(blob);
+        setResult({ run, url: objectUrl });
+      } catch (err) {
+        if (!live) return;
+        // Worth the console: this is the same route the export uses, so a
+        // failure here is a failure the writer is about to meet again.
+        console.error("[review] the PDF could not be rendered", err);
+        setResult({ run, url: null });
+      }
+    })();
 
     return () => {
       live = false;
-      dropPagedStyles(styles);
-      box.remove();
+      // Revoked on the way out, or every settings change leaks a book.
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [book, chapters, typeset]);
+  }, [book, chapters, typeset, run]);
 
   return (
     <Stage
-      zoom={state === "done" ? zoom : undefined}
-      caption={
-        state === "done"
-          ? `${plural(pages, "page")} at ${typeset.trim ? "your trim size" : "the page size you set"}. This is the pagination the PDF will have — the page numbers in the contents are the pages these chapters actually land on.`
-          : "Laying the book out on pages…"
-      }
+      /* Nothing to say once the file is on screen: it is the file, Chrome's
+         own toolbar is over it with the page count and the zoom, and a
+         sentence there would be describing a thing the writer is looking
+         at. While it is being laid out there is nothing to look at, so the
+         caption carries the only news there is. */
+      caption={done ? null : "Laying the book out on pages…"}
+      // Chrome's viewer is a desk of its own — see `bare`.
+      bare
     >
-      {state === "working" && <Working what="Setting the pages…" />}
-      {state === "failed" && (
-        <Failed message="The pages could not be laid out. The export itself is unaffected — you can still produce the file." />
+      {/* Padded here rather than by the stage, which is `bare` for the
+          viewer's sake — these two are the only things in this pane that are
+          not the file. */}
+      {!done && !failed && (
+        <div className="px-4">
+          <Working what="Setting the pages…" />
+        </div>
       )}
-      {/* Two elements, and the outer one is never scaled — it is what says how
-          much room there is. The inner is kept mounted *and laid out* through
-          every state, because Paged.js needs a real box to measure against, so
-          it is parked off-screen rather than hidden until the pages are set.
-          See `OFF_SCREEN` and `useFitToStage`. */}
-      <div ref={room} className="h-full">
-        <div
-          ref={host}
-          className="oc-review-pages"
-          style={state === "done" ? { zoom: zoom.scale } : OFF_SCREEN}
+      {failed && (
+        <div className="px-4">
+          <Failed message="That PDF could not be laid out. If you press Export it will fail the same way — the two use the same renderer." />
+        </div>
+      )}
+      {/* **Chrome's own PDF viewer, toolbar and all.** Hiding it with
+          `#toolbar=0` made the pane look like the others and cost the two
+          things a reader of a PDF actually wants: the page count and a zoom.
+          The count matters here more than most — this pane used to print one in
+          its caption, taken from the pagination it ran itself, and that number
+          was wrong (65 against the file's 66). The viewer's is the file's own.
+          `view=Fit` opens on a whole page rather than a slice of one, which is
+          what a writer checking their layout is looking for. `title` because an
+          iframe without one is an unnamed region to a screen reader. */}
+      {done && result?.url && (
+        <iframe
+          title={`${book.title} as a PDF`}
+          src={`${result.url}#view=Fit`}
+          className="h-full w-full rounded-xl border-0 bg-sheet"
         />
-      </div>
+      )}
     </Stage>
   );
 }
@@ -582,8 +660,8 @@ function DocxReview({
       zoom={state === "done" ? zoom : undefined}
       caption={
         manuscript
-          ? "The Word file itself, opened back up. Set in manuscript format — double spaced, with the running header agents ask for."
-          : "The Word file itself, opened back up."
+          ? "The real .docx, opened back up by a viewer rather than by Word — so the content is exact and the layout is close. Set in manuscript format: double spaced, with the running header agents ask for."
+          : "The real .docx, opened back up by a viewer rather than by Word — so the content is exact and the layout is close."
       }
     >
       {state === "working" && <Working what="Building the Word file…" />}
@@ -646,14 +724,121 @@ const SHEET_EDGE = "#d9d7d0";
  */
 const PANE = { w: 620, h: 880 };
 
+/** Every `src` on an `<img>`, so a document's pictures can be loaded before it
+ *  is rewritten. Cheap and good enough: the markup is our own, one attribute
+ *  per tag, always double-quoted, written by `blocksToXhtml`. */
+const IMG_SRC = /<img[^>]+src="([^"]+)"/g;
+/** A scheme — `https:`, `data:` — which is what tells a package path from a
+ *  reference to somewhere else entirely. */
+const ABSOLUTE = /^[a-z][a-z0-9+.-]*:/i;
+
 /**
- * The EPUB's own documents, under the book's own typography.
+ * The frame the file's own documents are shown in.
  *
- * **No page count and no page furniture, deliberately.** An EPUB is reflowable:
- * the reader's device picks the page, the type size and usually the margins, so
- * a number here would be a fact about this screen dressed up as a fact about
- * the file. The reading order, the front matter, the chapter openings and the
- * typography are all real — those are the things the file actually fixes.
+ * The stylesheet is the one **out of the zip** rather than a fresh
+ * `typesetCss` call, which is the point of the whole pane: what styles these
+ * sheets is the file that will be uploaded. What follows it is preview chrome
+ * only, and it is deliberately the last word so it cannot be mistaken for part
+ * of the book's own styling — the sheets, the grey between them, and a guard
+ * on pictures so an oversized one cannot push a column sideways.
+ *
+ * **The language is on the `<html>`, and it is not decoration.** The
+ * stylesheet sets `text-align: justify` and `hyphens: auto` together, and a
+ * browser cannot hyphenate without knowing what language it is reading — so a
+ * frame with no `lang` sets the book justified and *unhyphenated*, which on a
+ * narrow column stretches the spaces instead of breaking the words. Measured in
+ * Chrome on one paragraph at 180px: 108px tall with no language against 90px
+ * with `lang="en"`, five lines instead of six. The file's own documents all
+ * carry it; this frame takes their bodies and leaves their `<html>` behind, so
+ * it has to be carried across by hand. Omitted rather than guessed at when a
+ * document declares none: hyphenating a Finnish novel by English rules is worse
+ * than not hyphenating it.
+ *
+ * The markup is ours: written by our own packager out of the writer's document
+ * and escaped on the way through, then parsed and re-serialised by `DOMParser`,
+ * which is the strictest thing it passes through. Nothing here comes from a
+ * model or off the network — and the frame is sandboxed regardless.
+ */
+function frameHtml(
+  css: string,
+  sheets: readonly string[],
+  lang: string | null,
+): string {
+  const chrome = `
+html { background: transparent; }
+body { margin: 0; padding: 10px 10px 0; background: transparent; color: ${SHEET_INK}; }
+.oc-file {
+  background: ${SHEET};
+  margin: 0 0 1.25rem;
+  padding: 3em 3em 4em;
+  border: 1px solid ${SHEET_EDGE};
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  /* **A sheet is at least a screenful, and that is a claim this can make.**
+     Sized to content, a short document — a copyright notice, a dedication —
+     came out as a stub a few lines tall between two full ones, which reads as
+     a broken page rather than as a short one. The honest minimum is the
+     *screen*: an e-reader has no page size either, and what it does have is a
+     screen, on which every new document in the spine starts at the top of a
+     fresh one. So each sheet fills the view and the next begins below it,
+     which says "a new document starts here" without stating a page count
+     nothing can know. Here that screen is a fixed box (see PANE), so this is
+     a number rather than something the window can move — and it has to be a
+     number rather than 100vh, because the frame is sized to its own contents
+     so that the *stage* does the scrolling. Against a frame as tall as the
+     book, a vh minimum would make every sheet as tall as the book and grow
+     without end. Border-box, or the padding would be added on top of the
+     minimum and overshoot by six ems. (No backticks in this comment: it sits
+     inside a template literal and one would end the string.) */
+  box-sizing: border-box;
+  min-height: ${PANE.h - 30}px;
+}
+.oc-file > :first-child { margin-top: 0; }
+img { max-width: 100%; height: auto; }`;
+
+  const body = sheets
+    .map((html) => `<div class="oc-file">${html}</div>`)
+    .join("");
+
+  /* Escaped even though it comes from our own builder, which took it from
+     `publishing.language` — a field the writer types into. */
+  const tagged = lang ? ` lang="${escapeXml(lang)}"` : "";
+
+  return `<!doctype html><html${tagged}><head><meta charset="utf-8"/><style>${css}${chrome}</style></head><body>${body}</body></html>`;
+}
+
+/**
+ * The EPUB's own documents, read back out of the finished file.
+ *
+ * **It builds the real `.epub` and opens the zip**, which it did not until
+ * 2026-08-17: it rendered the XHTML `buildEpub` *would* write, under the
+ * stylesheet it *would* write, in the order `bindBook` gives. All correct, and
+ * all of it the same arithmetic run a second time — so three things the
+ * packager does were invisible to it. `extractImages` lifting data URLs into
+ * real `OEBPS/images/` entries was never exercised; the manifest and spine,
+ * which decide what a reading system opens and in what order, were never read;
+ * and `container.xml` was never followed. A preview cannot check the half of
+ * the build it skips, and those are exactly the parts a shop's ingestion
+ * breaks on. The other three panes had all moved to the real artifact; this
+ * was the last one computing its own.
+ *
+ * It costs a build per visit, which is arithmetic in this browser and no
+ * network at all — and it buys a **check**: every document goes through
+ * `DOMParser`, so a file that is not well-formed XML says so here rather than
+ * at the shop. That is `stripInvalidXml`'s guarantee, tested from the outside
+ * for the first time.
+ *
+ * **No page count and no page furniture, deliberately** — and the caption
+ * goes further than that now. An EPUB is reflowable: the reader's device picks
+ * the page, the type size and usually the margins, so a number here would be a
+ * fact about this screen dressed up as a fact about the file. What this pane
+ * settles is the *structure* — which documents are in the book, in what order,
+ * with which headings, under the stylesheet that really ships. What it cannot
+ * settle is the appearance, because there is no single answer: Kindle converts
+ * to its own format and substitutes a good deal, and every reader can change
+ * the font under it. The caption says exactly that, because a writer who took
+ * this screen for their Kindle would have been misled by a preview built to
+ * stop precisely that.
  *
  * **It is an iframe, and that is a correctness fix rather than tidiness.** This
  * was a `<div>` with the file's stylesheet wrapped in `.oc-epub-preview { … }`
@@ -676,88 +861,144 @@ function EpubReview({
   book,
   chapters,
   typeset,
+  cover,
 }: {
   book: Book;
   chapters: LoadedChapter[];
   typeset: TypesetOptions;
+  /** The book's cover as a data URL, so the packaged file carries one. */
+  cover: string | null;
 }) {
   const room = useRef<HTMLDivElement>(null);
   /* Constants rather than a measurement: the pane's size is the fixed thing
      here, and that is the whole point of it. */
   const natural = useRef(PANE);
-  const fit = useFitToStage(room, natural, true);
+
+  /* Keyed state rather than a bare `useState`, the shape `PagedReview` uses and
+     for the same two reasons: setting state from an effect body is what the
+     lint rule forbids, and a settings change must not leave the previous
+     book's sheets on screen while the next file is built. */
+  const run = useMemo(
+    () => [book, chapters, typeset, cover] as const,
+    [book, chapters, typeset, cover],
+  );
+  const [result, setResult] = useState<{
+    run: object;
+    doc: string | null;
+  } | null>(null);
+  const done = result?.run === run && result.doc !== null;
+  const failed = result?.run === run && result.doc === null;
+
+  useEffect(() => {
+    let live = true;
+    /* Every picture in the book becomes one of these, and they are why this
+       effect has a cleanup worth reading: a blob URL is a reference the browser
+       holds until it is told otherwise, so a writer changing the trim six times
+       would leak six books' worth of artwork. */
+    const urls: string[] = [];
+
+    void (async () => {
+      try {
+        const [{ buildEpub }, { default: JSZip }, preview] = await Promise.all([
+          import("@/lib/export/epub"),
+          import("jszip"),
+          import("@/lib/export/epub-preview"),
+        ]);
+
+        const file = await buildEpub(book, chapters, typeset, { cover });
+        const zip = await JSZip.loadAsync(file);
+
+        const read = async (path: string) => {
+          const entry = zip.file(path);
+          return entry ? entry.async("string") : null;
+        };
+
+        /* Followed rather than assumed — the whole reason for reading the file
+           back is that a path this code already knows proves nothing. */
+        const container = await read("META-INF/container.xml");
+        const opfHref = container ? preview.opfPath(container) : null;
+        const opf = opfHref ? await read(opfHref) : null;
+        if (!opfHref || !opf) throw new Error("no package document");
+
+        const root = preview.dirOf(opfHref);
+        const css = await read(preview.joinPath(root, "style.css"));
+
+        /* One blob URL per picture, made once and shared by every document that
+           refers to it — which is the packager's own de-duplication showing
+           through: a repeated ornament is one entry in the zip, so it is one
+           URL here. */
+        const pictures = new Map<string, string>();
+        const picture = async (path: string) => {
+          const held = pictures.get(path);
+          if (held) return held;
+          const entry = zip.file(path);
+          if (!entry) return null;
+          const url = URL.createObjectURL(await entry.async("blob"));
+          urls.push(url);
+          pictures.set(path, url);
+          return url;
+        };
+
+        const sheets: string[] = [];
+        /* The first document that declares one wins. Every document in one of
+           our own EPUBs carries the same language, so this is a read rather
+           than a vote — and a file that somehow carried two would be set in
+           the one its first page names, which is the reading system's own
+           behaviour. */
+        let lang: string | null = null;
+
+        for (const href of preview.spineHrefs(opf, opfHref)) {
+          const xhtml = await read(href);
+          if (xhtml === null) continue;
+          lang ??= preview.documentLang(xhtml);
+
+          /* Loaded ahead of the rewrite because `documentBody` is pure and
+             synchronous while reading a zip entry is neither. Every relative
+             `src` in the document is collected, fetched out of the zip, and
+             then handed over from a map. */
+          const here = preview.dirOf(href);
+          const loaded = new Map<string, string>();
+          for (const [, src] of xhtml.matchAll(IMG_SRC)) {
+            // A data URL renders as it stands, and a remote one is the one kind
+            // the packager leaves alone — see `documentBody`.
+            if (src.startsWith("data:") || ABSOLUTE.test(src)) continue;
+            const url = await picture(preview.joinPath(here, src));
+            if (url) loaded.set(src, url);
+          }
+
+          const body = preview.documentBody(
+            xhtml,
+            (src) => loaded.get(src) ?? null,
+          );
+          /* Null means this document is not well-formed XML, which is a book no
+             shop would take — so it fails loudly rather than quietly dropping a
+             page out of the preview. */
+          if (body === null) throw new Error(href + " is not well-formed");
+          sheets.push(body);
+        }
+
+        if (sheets.length === 0) throw new Error("nothing in the spine");
+        if (!live) return;
+        setResult({ run, doc: frameHtml(css ?? "", sheets, lang) });
+      } catch (err) {
+        console.error("[export] could not read the EPUB back", err);
+        if (live) setResult({ run, doc: null });
+      }
+    })();
+
+    return () => {
+      live = false;
+      for (const url of urls) URL.revokeObjectURL(url);
+    };
+  }, [book, chapters, typeset, cover, run]);
+
+  const srcDoc = done ? (result?.doc ?? "") : "";
+
+  /* Measured only once the file is built and its frame is in flow. Passing
+     `true` here would have the observer take the room's width while the
+     `Working` line is the only thing in it, which is a different box. */
+  const fit = useFitToStage(room, natural, done);
   const zoom = useZoom(fit);
-
-
-  /* Derived, not stored. This was `useState` filled from an effect, which is
-     the pattern React's lint rule forbids and it was right to: the markup is a
-     pure function of the book and the settings, so holding it in state buys a
-     second render and a moment on screen with nothing in it. */
-  const srcDoc = useMemo(() => {
-    const files = [
-      ...frontSections(book, chapters, typeset).map((s) => s.html),
-      ...chapters.map((chapter) => {
-        const number =
-          chapter.number !== null
-            ? `<p class="chapter-number">${chapter.number}</p>`
-            : "";
-        // Apparatus carries no heading, exactly as `buildEpub` writes it. This
-        // printed one regardless, so the preview was showing a structure the
-        // file it previews does not have — the one thing this step cannot do.
-        const heading = printsHeading(chapter)
-          ? `<h1>${escapeXml(chapter.title)}</h1>`
-          : "";
-        return `<section>${number}${heading}${blocksToXhtml(
-          toBlocks(chapter.doc),
-        )}</section>`;
-      }),
-    ];
-
-    /* `typesetCss(_, false)` is the sheet that goes into the file — the same
-       call `buildEpub` makes — so the type here is the type in the file. What
-       follows it is preview chrome only, and it is deliberately the last word
-       so it cannot be mistaken for part of the book's own styling: the sheets,
-       the grey between them, and a guard on pictures so an oversized one
-       cannot push a column sideways. */
-    const css = `${typesetCss(typeset, false)}
-html { background: transparent; }
-body { margin: 0; padding: 10px 10px 0; background: transparent; color: ${SHEET_INK}; }
-.oc-file {
-  background: ${SHEET};
-  margin: 0 0 1.25rem;
-  padding: 3em 3em 4em;
-  border: 1px solid ${SHEET_EDGE};
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
-  /* **A sheet is at least a screenful, and that is a claim this can make.**
-     Sized to content, a short document — a copyright notice, a dedication —
-     came out as a stub a few lines tall between two full ones, which reads as
-     a broken page rather than as a short one. The honest minimum is the
-     *screen*: an e-reader has no page size either, and what it does have is a
-     screen, on which every new document in the spine starts at the top of a
-     fresh one. So each sheet fills the view and the next begins below it,
-     which says "a new document starts here" without stating a page count
-     nothing can know. Here that screen is a fixed box (see PANE), so this is
-     a number rather than something the window can move — and it has to be a
-     number rather than 100vh, because the frame is now sized to its own
-     contents so that the *stage* does the scrolling. Against a frame as tall
-     as the book, a vh minimum would make every sheet as tall as the book and
-     grow without end. Border-box, or the padding would be added on top of the
-     minimum and overshoot by six ems. (No backticks in this comment: it sits
-     inside a template literal and one would end the string.) */
-  box-sizing: border-box;
-  min-height: ${PANE.h - 30}px;
-}
-.oc-file > :first-child { margin-top: 0; }
-img { max-width: 100%; height: auto; }`;
-
-    // The markup is ours: built by `blocksToXhtml` from the writer's own
-    // document and escaped on the way through. Nothing here comes from a model
-    // or off the network — and the frame is sandboxed regardless.
-    return `<!doctype html><html><head><meta charset="utf-8"/><style>${css}</style></head><body>${files
-      .map((html) => `<div class="oc-file">${html}</div>`)
-      .join("")}</body></html>`;
-  }, [book, chapters, typeset]);
 
   /**
    * How tall the frame has to be to hold the whole book without scrolling.
@@ -809,12 +1050,35 @@ img { max-width: 100%; height: auto; }`;
 
   return (
     <Stage
-      zoom={zoom}
-      caption="The documents the EPUB packages, each on its own sheet, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file."
+      zoom={done ? zoom : undefined}
+      /* One line. It has two things to say and no room to say a third: that
+         these sheets come out of the built file, and why there are no page
+         numbers on them — an e-reader picks its own page, so a count here
+         would be a fact about this screen. The long version of that second
+         half is in the note above this function; a caption is not the place
+         to argue it. */
+      caption={
+        done
+          ? "The documents inside the finished .epub — the right pages, in the right order, with the file's own stylesheet. Trust it for structure rather than for looks: e-readers substitute their own font, spacing and margins, and each one picks its own page."
+          : "Packaging the book…"
+      }
     >
+      {!done && !failed && <Working what="Building the EPUB…" />}
+      {/* Only reachable if the file we have just written is not well-formed
+          XML or has nothing in its spine — a book EPUBCheck would refuse and
+          no shop would take. So it says the export is affected too, which is
+          the opposite of what the Word pane says, and it is the truth in both
+          cases: that one fails at the *viewer*, this one at the file. */}
+      {failed && (
+        <Failed message="That EPUB could not be read back after it was built, which means the file itself is wrong rather than the preview. Pressing Export would produce the same file — worth reporting." />
+      )}
       {/* `items-start`, or a flex child shorter than the row would be stretched
           to it and the frame would scroll after all. */}
-      <div ref={room} className="flex h-full items-start justify-center">
+      <div
+        ref={room}
+        className="flex h-full items-start justify-center"
+        hidden={!done}
+      >
         {/* The scaled footprint. A transform paints smaller but reserves the
             element's original size, so the box that holds the frame carries the
             scaled numbers and the frame inside it keeps its own. Its height is

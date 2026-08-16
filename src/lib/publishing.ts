@@ -323,14 +323,27 @@ export function storeReadiness({
   }
 
   if (brokenImages > 0) {
-    // Not a validity failure — the image keeps its data URL and most readers
-    // still draw it. But an image these cannot decode is usually one that was
-    // already damaged on the page, so it is worth looking at before selling it.
+    /*
+     * **These pictures are not in the file**, and the note used to say
+     * something softer because it was counting something smaller.
+     *
+     * It read "could not be read properly — check it still appears the way you
+     * meant", on the reasoning that the picture kept its data URL and most
+     * readers still drew it. That was true of the one case it counted and
+     * false of the two it missed: a `src` on the open internet and a media
+     * type EPUB has no core support for are both *hard* EPUBCheck failures,
+     * and the export now leaves such a picture out rather than ship a file no
+     * shop will take. Telling a writer to check how it looks, when it is not
+     * there at all, is advice about the wrong thing.
+     *
+     * Still advisory. The book is valid and sells; it is short a picture, and
+     * whether that matters is the writer's call, not ours.
+     */
     advisory(
       "images",
       brokenImages === 1
-        ? "One image could not be read properly. Check it still appears the way you meant."
-        : `${brokenImages} images could not be read properly. Check they still appear the way you meant.`,
+        ? "One image cannot go in an EPUB, so it is left out — it is either damaged, in an unusual format, or linked from the web rather than saved into the book."
+        : `${brokenImages} images cannot go in an EPUB, so they are left out — they are either damaged, in an unusual format, or linked from the web rather than saved into the book.`,
     );
   }
 

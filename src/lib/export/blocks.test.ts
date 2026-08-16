@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isUntouchedMatter, toBlocks, type Block } from "@/lib/export/blocks";
+import {
+  chapterNumeral,
+  isUntouchedMatter,
+  toBlocks,
+  type Block,
+} from "@/lib/export/blocks";
 import type { JSONContent } from "@tiptap/react";
 
 const doc = (...content: JSONContent[]): JSONContent => ({
@@ -347,5 +352,59 @@ describe("isUntouchedMatter", () => {
 
   it("is true for an empty page", () => {
     expect(isUntouchedMatter([])).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The chapter opener
+// ---------------------------------------------------------------------------
+
+/*
+ * **Position tests, and they are the ones not to "fix".** These four renderers
+ * each used to answer this for themselves, so one manuscript opened its
+ * chapters three different ways depending on which button was pressed. The
+ * rule is not a preference: a chapter still called "Chapter 1" *is* its
+ * number, and printing a numeral above it says the same thing twice on the
+ * opening line of every chapter of most books.
+ */
+describe("chapterNumeral", () => {
+  const page = (
+    title: string,
+    number: number | null,
+    matter?: "front" | "body" | "back",
+  ) => ({ title, doc: { type: "doc" }, number, ...(matter ? { matter } : {}) });
+
+  it("prints the number above a chapter the writer named", () => {
+    expect(chapterNumeral(page("The Fourth Lamp", 3))).toBe(3);
+  });
+
+  it("prints nothing when the title already is the number", () => {
+    expect(chapterNumeral(page("Chapter 3", 3))).toBeNull();
+    // The spelled form is this app's own default title, so it is the one that
+    // matters most — nearly every book keeps it.
+    expect(chapterNumeral(page("Chapter Three", 3))).toBeNull();
+    expect(chapterNumeral(page("  chapter   three  ", 3))).toBeNull();
+  });
+
+  it("prints nothing for front and back matter, which are named not numbered", () => {
+    expect(chapterNumeral(page("Dedication", null, "front"))).toBeNull();
+    expect(chapterNumeral(page("Acknowledgements", null, "back"))).toBeNull();
+  });
+});
+
+describe("the text the IR carries", () => {
+  it("drops characters no format can carry, in the one place all four read", () => {
+    // The XHTML side is covered by escapeXml; the Word file and the Markdown
+    // never go through it, and a .docx is XML in a zip too.
+    const blocks = toBlocks(doc(para(text("page\u000cbreak\u0000here"))));
+
+    expect(blocks[0].runs[0].text).toBe("pagebreakhere");
+  });
+
+  it("leaves ordinary prose exactly as the writer typed it", () => {
+    const written = "“Quoted” — em-dashed, 📚 and ½ of it.";
+    const blocks = toBlocks(doc(para(text(written))));
+
+    expect(blocks[0].runs[0].text).toBe(written);
   });
 });

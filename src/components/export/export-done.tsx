@@ -54,15 +54,21 @@ export interface ExportDone {
 /**
  * The headline, in the writer's words rather than the file extension's.
  *
- * PDF is absent because this dialog never sees one: the print engine is the
- * browser's, so what happened after the print dialog is not ours to state. See
- * `runExport`.
+ * **PDF joined the list on 2026-08-16.** It was absent because this dialog
+ * never saw one: the export handed the writer the browser's own print dialog,
+ * and what they did with it — saved it, cancelled it, sent it to a real
+ * printer — was never knowable from here. The PDF is rendered by a browser on
+ * the server now and comes back as bytes, so there is a file to name and a
+ * size to state, exactly like the other three. On an installation with no
+ * browser behind that route the old print dialog is still the fallback, and
+ * there `runExport` still answers null and this dialog still never opens.
  */
-const READY: Record<Exclude<DoneFormat, "pdf">, string> = {
+const READY: Record<DoneFormat, string> = {
   epub: "Your EPUB is ready",
   docx: "Your Word file is ready",
   markdown: "Your Markdown file is ready",
   audiobook: "Your audiobook is ready",
+  pdf: "Your PDF is ready",
 };
 
 /**
@@ -77,6 +83,7 @@ const CATALOGUE_FORMAT: Partial<Record<DoneFormat, string>> = {
   epub: "EPUB",
   docx: "DOCX",
   markdown: "Markdown",
+  pdf: "PDF",
 };
 
 export function ExportDoneDialog({

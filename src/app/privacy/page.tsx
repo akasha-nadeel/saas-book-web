@@ -202,6 +202,21 @@ export default function PrivacyPage() {
               still be asking; it does not write a description for you, and it
               is not sent any part of the manuscript.
             </>,
+            /* Added 2026-08-16, and it is the largest transfer on this list —
+               the whole typeset book rather than an opening or a form field.
+               It is named first among the exports for that reason, and the
+               export screen says the same thing before the button. */
+            <>
+              <Term>Making a PDF</Term> — this one sends the whole book. The
+              typeset text of every chapter and every picture in it goes to our
+              server, where a browser lays it out on pages and sends the
+              finished PDF straight back. It is the only way the page numbers
+              on your contents page can be right, and it is the only route here
+              that carries a complete manuscript. Nothing is written down: the
+              file is built, returned, and the browser it was built in is
+              closed. Your EPUB, Word file and Markdown are made entirely in
+              your own browser and send nothing at all.
+            </>,
             <>
               <Term>Sync</Term> — if you are signed in, your library as
               described above, to our database.

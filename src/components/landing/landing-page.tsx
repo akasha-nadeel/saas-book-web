@@ -876,10 +876,16 @@ type Tile =
 const TILE_FACTS: Record<number, Tile> = {
   1: { kind: "brand" },
   4: { kind: "fact", figure: "4", label: "export formats, free forever" },
+  /* **This said "None of your book is uploaded anywhere" until 2026-08-16**,
+     and the PDF stopped that being true: it is typeset by a browser on our
+     server, because the contents page's numbers cannot be worked out anywhere
+     else. The tile is held to the same standard as the two beside it — a fact
+     a reader can check today with devtools — so it now counts the formats that
+     really are built here rather than claiming all four are. */
   6: {
     kind: "fact",
-    figure: "None",
-    label: "of your book is uploaded anywhere",
+    figure: "3 of 4",
+    label: "formats are built in your browser, not on a server",
   },
 };
 
@@ -1620,9 +1626,16 @@ export function LandingPage() {
             {/* Wider than the decks under a heading (`3xl`, not `2xl`): this
                 one has no title over it to set its measure, and at the deck
                 size a `2xl` column turns it into five short lines. */}
+            {/* **"Your manuscript never leaves this browser" was here until
+                2026-08-16.** The PDF is typeset on our server now — it is the
+                only way a contents page can carry the page the chapters
+                actually land on — so the sentence was no longer true of all
+                four formats and has been narrowed to the three it is true of
+                rather than softened into something vaguer. `/privacy` names
+                the PDF route in full. */}
             <p className={`mx-auto max-w-3xl text-center ${SECTION_LEAD}`}>
-              Your manuscript <Em>never leaves this browser</Em>, and it comes
-              back out in three formats. The EPUB is{" "}
+              Your EPUB and Word file are <Em>built in this browser</Em> and
+              send nothing; only the PDF is typeset on ours. The EPUB is{" "}
               <Em>verified against EPUBCheck 5.3</Em>, not asserted.
             </p>
 

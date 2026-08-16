@@ -3,16 +3,19 @@ import {
   createBook,
   createChapter,
   createMatterPage,
+  deleteChapter,
   findBook,
   getShelf,
   saveBody,
   setBookAuthor,
 } from "@/lib/library-store";
 import {
+  ExportRefused,
   buildMarkdownFile,
   checkStoreReadiness,
   fileSize,
   loadChapters,
+  runExport,
   slugify,
 } from "@/lib/export";
 
@@ -208,4 +211,47 @@ it("says nothing about a copyright page that names the author", () => {
   expect(
     checkStoreReadiness(book, null).some((i) => i.field === "copyright-name"),
   ).toBe(false);
+});
+
+/*
+ * **An empty export is refused, not shipped.** Two filters stand in front of
+ * this list — untouched matter pages and pages the writer asked us to replace
+ * — so a book can reach nothing through either. The EPUB's answer was an empty
+ * spine with an empty nav document, which is two hard EPUBCheck errors and a
+ * file no shop takes; the Markdown's was the title and nothing else. Both
+ * downloaded, and the wizard reported success.
+ */
+it("refuses to export a book with no pages in it", async () => {
+  const { bookId, chapterId } = createBook("Nothing Yet");
+  deleteChapter(bookId, chapterId);
+  const book = findBook(getShelf(), bookId)!;
+
+  await expect(
+    runExport({ book, format: "epub", manuscript: false }),
+  ).rejects.toBeInstanceOf(ExportRefused);
+});
+
+it("refuses when every page left is still scaffolding", async () => {
+  // Start on front matter, then the one seeded chapter deleted: what is left
+  // is template text in [square brackets], which never goes in a file.
+  const { bookId, chapterId } = createBook("Scaffolding");
+  createMatterPage(bookId, "front", "Dedication");
+  deleteChapter(bookId, chapterId);
+  const book = findBook(getShelf(), bookId)!;
+
+  await expect(
+    runExport({ book, format: "markdown", manuscript: false }),
+  ).rejects.toThrow(/no pages in this book/i);
+});
+
+it("says which book it is talking about in words a writer can act on", async () => {
+  const { bookId, chapterId } = createBook("Nothing Yet");
+  deleteChapter(bookId, chapterId);
+  const book = findBook(getShelf(), bookId)!;
+
+  // The export screen prints an ExportRefused message as it is written, so it
+  // has to name what to do rather than what went wrong internally.
+  await expect(
+    runExport({ book, format: "docx", manuscript: true }),
+  ).rejects.toThrow(/write a chapter/i);
 });

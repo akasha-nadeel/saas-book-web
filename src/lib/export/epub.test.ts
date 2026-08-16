@@ -608,3 +608,49 @@ describe("the chapter numeral", () => {
     ).not.toContain("chapter-number");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Navigation a validator will accept
+// ---------------------------------------------------------------------------
+
+/*
+ * A nav document's <ol> must hold an <li> and an ncx <navMap> must hold a
+ * navPoint. Both are hard EPUBCheck errors when empty (RSC-005), and a book
+ * whose every page is apparatus produced exactly that — reachable by pressing
+ * Start on front matter and exporting before the first chapter is written.
+ */
+describe("a book with nothing a contents list would normally name", () => {
+  const apparatus = [
+    { title: "Half-title page", xhtml: "<p>Book</p>", matter: "front" as const },
+    { title: "Title page", xhtml: "<p>Book</p>", matter: "front" as const },
+  ];
+
+  it("lists the apparatus rather than listing nothing", () => {
+    expect(listedChapters(apparatus)).toHaveLength(2);
+  });
+
+  it("writes a nav document with an entry in it", () => {
+    const nav = navXhtml("Book", apparatus);
+
+    expect(nav).toContain("<li><a href=");
+    expect(nav).not.toMatch(/<ol>\s*<\/ol>/);
+  });
+
+  it("writes an ncx with a navPoint in it", () => {
+    const ncx = tocNcx("Book", apparatus, "urn:uuid:abc");
+
+    expect(ncx).toContain("<navPoint");
+    expect(ncx).not.toMatch(/<navMap>\s*<\/navMap>/);
+  });
+
+  it("still leaves apparatus out when there is anything else to name", () => {
+    const withChapter = [
+      ...apparatus,
+      { title: "Chapter One", xhtml: "<p>It began.</p>" },
+    ];
+
+    expect(listedChapters(withChapter).map((l) => l.chapter.title)).toEqual([
+      "Chapter One",
+    ]);
+  });
+});

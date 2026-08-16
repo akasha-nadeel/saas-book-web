@@ -6,6 +6,7 @@ import type {
   ParagraphChild as DocxRun,
 } from "docx";
 import {
+  chapterNumeral,
   printsHeading,
   toBlocks,
   type Block,
@@ -13,7 +14,13 @@ import {
   type Run,
 } from "./blocks";
 import { fitImage, resolveImages } from "./docx-images";
-import { copyrightLines, writtenPages } from "./front-matter";
+import {
+  bindBook,
+  copyrightLines,
+  writtenPages,
+  type FrontSection,
+} from "./front-matter";
+import { stripInvalidXml } from "./xhtml";
 import { DEFAULT_TYPESET, type TypesetOptions } from "./typeset";
 
 /**
@@ -52,6 +59,7 @@ export async function buildDocx(
   const {
     AlignmentType,
     Document,
+    ExternalHyperlink,
     Header,
     HeadingLevel,
     HorizontalPositionAlign,
@@ -81,18 +89,34 @@ export async function buildDocx(
     ),
   );
 
-  const runsFor = (runs: Run[]) =>
-    runs.map(
-      (run) =>
-        new TextRun({
-          text: run.hardBreak ? "" : run.text,
-          break: run.hardBreak ? 1 : undefined,
-          bold: run.bold,
-          italics: run.italic,
-          strike: run.strike,
-          underline: run.underline ? {} : undefined,
-        }),
-    );
+  /**
+   * A run of prose, with everything the writer marked on it.
+   *
+   * **A link keeps its destination**, which it did not: the mark was dropped
+   * on the way in, so the words survived and the URL did not — a manuscript
+   * full of live references arrived at the editor as plain text, and nothing
+   * on screen said so. The EPUB and the Markdown had always carried it. Word's
+   * own shape for one is a hyperlink wrapping its runs rather than a property
+   * on a run, which is why this branches instead of adding a field.
+   *
+   * Inline code takes a monospace face for the same reason — it is a mark the
+   * writer applied, and a formatting mark that survives in three formats and
+   * vanishes in the fourth is the drift this pass exists to end.
+   */
+  const runsFor = (runs: Run[]): DocxRun[] =>
+    runs.map((run) => {
+      const text = new TextRun({
+        text: run.hardBreak ? "" : run.text,
+        break: run.hardBreak ? 1 : undefined,
+        bold: run.bold,
+        italics: run.italic,
+        strike: run.strike,
+        underline: run.underline ? {} : undefined,
+        ...(run.code ? { font: "Courier New" } : {}),
+      });
+      if (!run.href) return text;
+      return new ExternalHyperlink({ children: [text], link: run.href });
+    });
 
   const bodySpacing = manuscript
     ? { line: DOUBLE_SPACED }
@@ -354,59 +378,112 @@ export async function buildDocx(
    * this app invented — and the EPUB's contents carries none either, for the
    * same reason pointed at a different medium.
    */
-  const front: DocxParagraph[] = [];
   const written = writtenPages(chapters);
   const holder = book.author?.trim();
+  /* Titles come from the shelf rather than from the block walk, so they miss
+     the cleaning `toBlocks` does — and a `.docx` is XML in a zip, so a control
+     character corrupts one exactly as it corrupts an EPUB. See
+     `stripInvalidXml`. */
+  const safe = stripInvalidXml;
 
   const centred = (text: string, opts: { bold?: boolean; size?: number } = {}) =>
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 240 },
       children: [
-        new TextRun({ text, bold: opts.bold, size: opts.size }),
+        new TextRun({ text: safe(text), bold: opts.bold, size: opts.size }),
       ],
     });
 
-  if (typeset.titlePage && !written.has("title")) {
-    front.push(
-      new Paragraph({ spacing: { before: convertInchesToTwip(2) }, children: [] }),
+  /** The chapters a contents list names — the EPUB's rule, `printsHeading`. */
+  const listed = chapters.filter((c) => printsHeading(c));
+
+  /** Each generated page this Word file builds, by the id `bindBook` sorts on. */
+  const generated: Record<string, DocxParagraph[]> = {
+    title: [
+      new Paragraph({
+        spacing: { before: convertInchesToTwip(2) },
+        children: [],
+      }),
       centred(book.title, { bold: true, size: 40 }),
-    );
-    if (book.subtitle) front.push(centred(book.subtitle, { size: 28 }));
-    if (book.author) front.push(centred(book.author));
-  }
+      ...(book.subtitle ? [centred(book.subtitle, { size: 28 })] : []),
+      ...(book.author ? [centred(book.author)] : []),
+    ],
+    copyright: holder
+      ? copyrightLines(book, holder).map(
+          (line) =>
+            new Paragraph({
+              spacing: { after: 160 },
+              children: [new TextRun(safe(line))],
+            }),
+        )
+      : [],
+    contents: [
+      centred("Contents", { bold: true, size: 32 }),
+      /* Numbered by the same rule the EPUB's and the PDF's contents use, so
+         one book does not list "3. The Fourth Lamp" in two files and "The
+         Fourth Lamp" in the third. See `chapterNumeral`. */
+      ...listed.map((chapter) => {
+        const numeral = chapterNumeral(chapter);
+        return new Paragraph({
+          spacing: { after: 120 },
+          children: [
+            new TextRun(
+              `${numeral === null ? "" : `${numeral}. `}${safe(chapter.title)}`,
+            ),
+          ],
+        });
+      }),
+    ],
+  };
 
-  if (typeset.copyright && holder && !written.has("copyright")) {
-    if (front.length) front.push(new Paragraph({ children: [new PageBreak()] }));
-    for (const line of copyrightLines(book, holder)) {
-      front.push(
-        new Paragraph({ spacing: { after: 160 }, children: [new TextRun(line)] }),
+  /* The three switches, under the same conditions `frontSections` applies:
+     the writer's own page wins, and a book with nobody to name gets no
+     copyright notice rather than one naming the wrong party. Empty lists are
+     dropped, so a contents page for a book with nothing to list never opens a
+     sheet of its own. */
+  const built: FrontSection[] = (
+    [
+      [typeset.titlePage, "title"],
+      [Boolean(typeset.copyright && holder), "copyright"],
+      [typeset.contents, "contents"],
+    ] as const
+  )
+    .filter(([on, id]) => on && !written.has(id) && generated[id].length > 0)
+    .map(([, id]) => ({ id, html: "" }));
+
+  /* **One bound order, the EPUB's** — see `bindBook`. This was a block of
+     generated pages followed by every chapter in load order, which opened a
+     book on a generated title page and left its own half-title stranded behind
+     the contents. A page break before every page but the first, so each one
+     starts its own sheet without the conditional arithmetic that shape needed. */
+  const children: DocxParagraph[] = [];
+
+  bindBook(chapters, built).forEach((page, i) => {
+    if (i > 0) children.push(new Paragraph({ children: [new PageBreak()] }));
+
+    if (page.kind === "generated") {
+      children.push(...generated[page.section.id]);
+      return;
+    }
+
+    const { chapter } = page;
+    /* The standing numeral, by the shared rule. Word had none at all, so a
+       chapter the writer had named lost which chapter of the book it was —
+       the one thing its title no longer says. `hideChapterNumbers` is honoured
+       here rather than in a stylesheet, because a `.docx` carries no
+       stylesheet of ours to hide it with. */
+    const numeral = typeset.hideChapterNumbers ? null : chapterNumeral(chapter);
+    if (numeral !== null) {
+      children.push(
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: manuscript
+            ? { before: convertInchesToTwip(1) }
+            : { before: 240 },
+          children: [new TextRun({ text: String(numeral) })],
+        }),
       );
-    }
-  }
-
-  if (typeset.contents && !written.has("contents")) {
-    const listed = chapters.filter((c) => printsHeading(c));
-    if (listed.length) {
-      if (front.length)
-        front.push(new Paragraph({ children: [new PageBreak()] }));
-      front.push(centred("Contents", { bold: true, size: 32 }));
-      for (const chapter of listed) {
-        front.push(
-          new Paragraph({
-            spacing: { after: 120 },
-            children: [new TextRun(chapter.title)],
-          }),
-        );
-      }
-    }
-  }
-
-  const children: DocxParagraph[] = [...front];
-
-  chapters.forEach((chapter, index) => {
-    if (index > 0 || front.length) {
-      children.push(new Paragraph({ children: [new PageBreak()] }));
     }
     // Apparatus — a title page, a copyright page, a contents list — prints no
     // heading, the same rule the EPUB has always followed. See `printsHeading`.
@@ -414,10 +491,20 @@ export async function buildDocx(
       children.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: manuscript
-            ? { before: convertInchesToTwip(1), after: DOUBLE_SPACED }
-            : { before: 240, after: 240 },
-          children: [new TextRun({ text: chapter.title, bold: !manuscript })],
+          spacing:
+            manuscript
+              ? {
+                  // The inch of space above belongs to whichever of the two
+                  // comes first, or a numbered chapter opens two inches down.
+                  ...(numeral === null
+                    ? { before: convertInchesToTwip(1) }
+                    : {}),
+                  after: DOUBLE_SPACED,
+                }
+              : { ...(numeral === null ? { before: 240 } : {}), after: 240 },
+          children: [
+            new TextRun({ text: safe(chapter.title), bold: !manuscript }),
+          ],
         }),
       );
     }
@@ -432,7 +519,7 @@ export async function buildDocx(
         children: [
           new TextRun({
             children: [
-              `${name ? `${name} / ` : ""}${book.title} / `,
+              `${name ? `${safe(name)} / ` : ""}${safe(book.title)} / `,
               PageNumber.CURRENT,
             ],
           }),
@@ -442,8 +529,8 @@ export async function buildDocx(
   });
 
   const document = new Document({
-    creator: book.author || undefined,
-    title: book.title,
+    creator: book.author ? safe(book.author) : undefined,
+    title: safe(book.title),
     numbering: {
       config: [
         {

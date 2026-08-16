@@ -968,23 +968,44 @@ real divisions and get both. A page the writer named themselves is not
 apparatus: nothing is known about it, so it keeps its heading and is listed,
 which is the answer that loses nothing if wrong.
 
-**`spineOrder` binds the generated pages among the writer's own.** They used to
-be emitted first and the chapters after — right while front matter was a single
-page nobody made, and wrong the moment a book could carry its own half-title:
-the file opened on a generated title page, then the contents, and *then* the
-half-title that should have led the book. Each generated section now takes its
-slot in `MATTER_SECTIONS.front` and merges in by rank. Note that the *files*
-are named positionally (`chapter-03.xhtml` is the fourth loaded chapter), so
-neither the spine order nor the contents filter may renumber them — every
-filtered list carries the original index.
+**`bindBook` in `front-matter.ts` binds the generated pages among the writer's
+own, and every renderer reads it.** They used to be emitted first and the
+chapters after — right while front matter was a single page nobody made, and
+wrong the moment a book could carry its own half-title: the file opened on a
+generated title page, then the contents, and *then* the half-title that should
+have led the book. Each generated section takes its slot in
+`MATTER_SECTIONS.front` and merges in by rank.
 
-**The chapter opener prints one thing, not two.** `chapterXhtml` emitted a
-standing numeral *and* the heading, and this app's own default titles **are**
-the number — so most exported books said "1" over "Chapter 1" on the opening
-line of every chapter. Both it and the contents page now ask
-`isGenericChapterTitle`, the store's own answer, which knows the digit and the
-spelled form; `front-matter.ts` used to carry a private near-duplicate that
-missed the spelled one.
+**It lived in `epub.ts` as `spineOrder` until 2026-08-16, and being private to
+one renderer was the bug.** The other three answered the same question for
+themselves and all three answered it the old way, so one manuscript came out as
+three different books — the EPUB correct, the PDF and the Word file opening on
+a generated title page, and the wizard's own EPUB *preview* agreeing with the
+wrong two. `spineOrder` survives as a thin wrapper that turns the bound order
+into manifest ids. Note that the *files* are named positionally
+(`chapter-03.xhtml` is the fourth loaded chapter), so neither the spine order
+nor the contents filter may renumber them — `BoundPage.index` carries the
+original index for exactly this reason, and every filtered list carries it too.
+
+**The chapter opener prints one thing, not two, and `chapterNumeral` in
+`blocks.ts` is the whole of that rule.** `chapterXhtml` emitted a standing
+numeral *and* the heading, and this app's own default titles **are** the number
+— so most exported books said "1" over "Chapter 1" on the opening line of every
+chapter. It asks `isGenericChapterTitle`, the store's own answer, which knows
+the digit and the spelled form; `front-matter.ts` used to carry a private
+near-duplicate that missed the spelled one.
+
+**The rule sits beside `printsHeading` because it drifted the same way that one
+did.** Fixing it in `epub.ts` alone left the PDF printing a numeral over every
+chapter, the Word file printing none at all ever, and the export wizard's
+specimen sheet drawing a standing "1" over whatever title it was handed. Four
+renderers and two previews now call the one function. Two consequences worth
+knowing: the Word file gained numerals it never had, and it honours
+`hideChapterNumbers` in the paragraph loop rather than in a stylesheet, since a
+`.docx` carries none of ours; and the wizard's Chapter-numbers switch says so
+when a book's titles are *all* generic, because on that book it has nothing to
+take away and a control that quietly does nothing is the dead UI this app
+refuses.
 
 Two things fall out of this that are easy to get wrong. The seeded body carries
 **no heading**: the page's title is printed above it by the editor and by every
@@ -1022,11 +1043,184 @@ you open and turn.
 blocks, then each renderer consumes them — the tricky parts (marks, nesting, hard
 breaks) live in one tested place. Heavy libraries (`docx`, `jszip`) are
 dynamically imported so a writer who never exports never downloads them.
-- Export: `src/lib/export/` — markdown, docx, epub, and PDF via the browser's
-  print engine (`print.ts`, rendered into a hidden iframe). `index.ts`
+- Export: `src/lib/export/` — markdown, docx, epub, and PDF rendered by a real
+  browser on the server (`/api/export/pdf`, driven from `print.ts`). `index.ts`
   orchestrates; `xhtml.ts` is the shared XHTML renderer behind epub, PDF and the
   reader; `typeset.ts` controls the look of the outputs that are ours;
-  `front-matter.ts` generates the title/copyright/contents pages.
+  `front-matter.ts` generates the title/copyright/contents pages and holds
+  `bindBook`, the binding order all four read.
+
+  **An export with nothing in it is refused rather than produced.**
+  `runExport` throws `ExportRefused` — its own class, so the wizard prints its
+  message word for word where anything else gets the general apology. Two
+  filters stand in front of that list (untouched matter pages, and pages the
+  writer asked us to replace), so a book reaches nothing without doing anything
+  strange: press Start on front matter, delete the seeded chapter, export. The
+  EPUB used to answer with an empty spine and an empty nav document — two hard
+  EPUBCheck errors — and the Markdown with the title and nothing else. Both
+  downloaded, and the wizard said it had worked.
+
+  **The PDF is rendered on the server, and it is the one route the manuscript
+  travels on.** `/api/export/pdf` loads the book into headless Chrome, injects
+  Paged.js and returns the bytes; `printBook` posts to it and falls back to the
+  old hidden-iframe print dialog on any failure at all, so an installation with
+  no browser configured exports exactly as it did before. `CHROME_PATH` names
+  the binary, `@sparticuz/chromium` supplies one on a deployment, and neither
+  set means 501 and the fallback.
+
+  **It moved because two defects could not be fixed on the writer's machine,
+  and a third went with them.** Paged.js resolves a contents folio by asking
+  `window.getComputedStyle(page)` which page a chapter landed on — the *top*
+  window — while the pages sat in the export's hidden iframe. One document
+  cannot answer for another's elements, so it counted from zero: **every folio
+  in a printed contents page read `0`**, and the same wrong measurements made
+  its chunker give up mid-list, so a 45-chapter contents printed five entries
+  and a 9-chapter one printed two. Both are gone in a document of its own —
+  verified on a real export, all nine entries with the pages they land on. It
+  also ends the print dialog, which was never an export: nothing about it was
+  knowable, which is why `runExport` used to answer `null` for PDF. It answers
+  with a file now, and `ExportDoneDialog` names it like the other three. The
+  fallback path still answers `null`, because there it still is not knowable.
+
+  **The claims moved with it, in the same commit.** `/privacy` names the route
+  and says it carries the whole book; the landing page's proof tile counted
+  "None of your book is uploaded anywhere" and now counts the three formats
+  that are still built in the browser; the export screen says what leaves
+  before the button, the rule the prose-sending routes already follow. The
+  polyfill is read off disk — the package's `exports` map has no path entries,
+  so `pagedjs/dist/…` is not a resolvable specifier — via a path
+  `next.config.ts` resolves at build time and names in
+  `outputFileTracingIncludes`, since nothing imports it and a tracer packs only
+  what it can see.
+
+  **A chapter opening page carries no running head.** The head is `string-set`
+  from the h1, so on the page that h1 appears it printed the chapter title
+  directly above itself. Every section takes a named page (`page: chapter`) so
+  Paged.js marks the page that *starts* one, and `@page chapter:first` drops
+  the head there — the folio stays, as a drop folio does in a printed book.
+  Verified both ways: no head on an opener, head present on a continuation.
+
+  **The wizard's PDF review shows the finished file, not a second pagination
+  of it.** It re-ran Paged.js in the app's own document, and that re-run was
+  wrong in one specific way: a long *generated* contents list came out
+  truncated — measured on a 45-chapter book, five entries against the file's
+  forty-five, and a page count one short because the contents never overflowed
+  onto its second sheet. Everything else agreed. The cause is in Paged.js's
+  chunker reacting to this document; `display: flex` on the leader,
+  `target-counter`, the anchors, the list markup, `list-item` display, the
+  contents' own CSS, break-avoid, page size, the title page's flex layout,
+  Tailwind's `box-sizing` reset and the stylesheet scoping were each removed
+  and re-measured, and none of them is it. So the pane stopped guessing and
+  started fetching `/api/export/pdf` — the same call the export makes, the same
+  bytes — and Chrome draws it. That is what the module's own note always
+  claimed for the other three panes, and it removes the second code path that
+  could drift. The cost is a server render per visit to the step, which is
+  stated plainly in the component. Its caption no longer prints a page count:
+  the viewer's toolbar carries the file's own, and the count this pane used to
+  print was the wrong one.
+
+  **The page decides the type size — `bookSetting` is that decision.** Every
+  template used to carry one fixed size while margins were a flat 14% of the
+  page width, so the *measure* was whatever fell out. Measured against the app's
+  own stack (Georgia averages 0.447em a character in prose), 12pt gave 48
+  characters a line on a 5×8 and 84 on A4, against a target of 66 and a
+  tolerable band of 45–75 — one trim in six was right. A real book does the
+  opposite of scaling everything together: a smaller page takes *smaller* type
+  and *smaller* margins. So `TRIM_SETTING` is a table of typographic judgements
+  rather than a formula, each row landing its page near 66; `measureIn` is the
+  check, and a test walks every trim and fails outside the band. Too narrow is
+  not merely ugly — shorter lines mean more pages, and a paperback is priced by
+  the page. `trimMargins` is gone into this, so the sheet on screen and the file
+  cannot hold different numbers.
+
+  **Two carve-outs.** `manuscript` ignores the table entirely and always returns
+  12pt / double-spaced / 1″ margins: standard manuscript format is a
+  specification an agent asks for, not a design, and resizing it would break the
+  one thing that template exists to do. And the default trim is **6×9**, not A4
+  — A4 was chosen so the browser's *print dialog* would not centre a small page
+  on a big sheet, and there is no print dialog any more.
+
+  **All of that is the *PDF's* arithmetic, and the EPUB takes none of it.**
+  `typesetCss` emitted `font-size: 11pt` on an EPUB's body and every derived
+  size in points too, which is the one unit a reflowable book may not use: an
+  e-reader has no page, the **reader** picks the size on a control in its own
+  menu, and an absolute size in the stylesheet takes that control away. Both
+  shops say so outright — Apple's asset guide ("font sizes should be defined in
+  `em` or `%`, not by point or pixel units… the main text of a book should
+  either not have a defined `font-size` or should have a `font-size` of `1em`")
+  and KDP's reflowable text guidelines ("the body text… must be all defaults…
+  any styling on body text in the HTML will override the user's preferred
+  default reading settings"). So `size()` inside `typesetCss` answers points
+  for print and `em` for everything else, the root is `100%`, and the two sizes
+  *inside* `@page` stay in points because a running head and a folio are print
+  furniture with no reader to obey. Nothing about the design moved: these were
+  written as multiples of the body size already, so a heading is 1.6 times the
+  prose either way — what changed is who decides how big the prose is. It also
+  ends a second oddity, that the **trim** was reaching the EPUB at all: the same
+  book shipped 10pt at 5×8 and 11pt at A4, a difference meaningless to a device
+  with no trim. A test walks every template × trim and fails on any `pt` or `px`
+  in an EPUB stylesheet, with a companion asserting the print one still has
+  them — one of those without the other could be satisfied by breaking the PDF.
+  Verified after the change: EPUBCheck 5.3 on a full and a bare book, 0 errors
+  and 0 warnings each.
+
+  **`text-align: justify` stays, and the reason is worth not re-litigating.**
+  It looked like the cause of some very gappy word spacing; it was not — the
+  cause was hyphenation silently not running (see the EPUB-preview note below).
+  Justification is Kindle's default anyway, so declaring it changes nothing
+  there, and Apple Books "offers user preferences for justification that can
+  override author-specified alignment in flowing books", so a reader who wants
+  ragged-right gets it. `hyphens: auto` is the correct partner and is already
+  beside it.
+
+  **The route is told the page size; it may not infer it.** `page.pdf()` ran on
+  `preferCSSPageSize`, which reads the `@page` rule off the document — and
+  Paged.js rewrites that rule. Once chapters took a named page (`@page
+  chapter:first`, which keeps the running head off a chapter opening) Chrome
+  stopped recognising a size and fell back to its own default, so a book set at
+  6×9 came out on A4: `/MediaBox 0 0 594.96 841.92` from a stylesheet that
+  plainly said `size: 6in 9in`. It fails silently, and towards a page size that
+  looks deliberate. The client sends the trim; `pageSize` in the route is the
+  only thing that decides.
+
+  **`typesetCss` states its own list and code styling rather than inheriting
+  the user agent's.** It used to leave `ul`, `ol`, `li` and `pre` alone, which
+  is a bet on the reading environment, and it lost twice: Tailwind's preflight
+  resets `ol, ul { list-style: none }` and the wizard's PDF review renders
+  inside the app to be measured, so a bulleted chapter previewed as bare
+  sentences while the PDF — laid out in a clean frame — printed bullets; and an
+  e-reader supplies its own default sheet with no obligation to draw markers at
+  all. The measurements match the writing surface's (`.manuscript .tiptap` in
+  globals.css) so a list is the same shape in the editor, the read-through and
+  the file. The contents page keeps its own `list-style: none`, which is more
+  specific and still wins.
+
+  **`typesetCss` takes a `scope`, and that is what keeps the wizard's PDF
+  review from setting the app like a book.** Paged.js writes the stylesheet it
+  is given into the document the script is running in — it has to, since that
+  is where it measures — and the review renders into the app's own document.
+  Unscoped, the wizard's headings came out centred in Georgia small-caps with a
+  first-line indent on every paragraph of the interface. Both real exports pass
+  no scope and their bytes are unchanged, which has a test on it.
+
+  **Two rules stay global even when scoped, and that is the load-bearing
+  half.** Paged.js *reads* `string-set` on `h1` and the `page-break` rules on
+  `section` and matches them against its own source document, which the host
+  element does not contain — scoped, the running heads silently stop appearing
+  and the book opens on a blank sheet. Neither has any effect on screen, so
+  global costs the app nothing. That is why `string-set` is split out of the
+  `h1` block. Everything named by one of our own classes is left alone: it
+  cannot match anything outside a page this app generated, and two of those
+  rules carry paged-media properties as well.
+
+  **An iframe was the first answer and is the wrong one**, measured: moving the
+  pages out of the document leaves every rect at zero and Paged.js throws
+  `Cannot read properties of null (reading 'getBoundingClientRect')` out of its
+  own `Layout` constructor before the second page. `printBook` gets away with a
+  frame because it is not measuring for the screen; `paginate` now *moves*
+  rather than copies the stylesheets into that frame, so a finished PDF export
+  no longer leaves the book's typography in the app for the sixty seconds it
+  waits on the print dialog.
 
   **The wizard that drives it is `export-page.tsx`, and four things in it are
   load-bearing.** *The action bar stands still* — Back and the primary sit at
@@ -1045,21 +1239,42 @@ dynamically imported so a writer who never exports never downloads them.
   its own would drift from the file. And *the fifth format is gone but not
   deleted*: see the audio note above and TODO.md.
 
-  **The step before the export is the book itself, and every pane renders the
-  real artifact.** `components/export/review-pane.tsx` is the fourth of five
-  steps. That it builds the true thing rather than a likeness is the whole
-  design: a preview assembled from its own code path agrees on the day it is
-  written and quietly stops agreeing afterwards, which is the one failure a
-  "check before you export" step cannot have, because a writer who has checked
-  stops looking. So PDF is the actual Paged.js pagination out of
-  `printDocument` — which is *why* `print.ts` splits into `printDocument` /
-  `paginate` / `dropPagedStyles`, so the preview and the print path cannot
-  drift — Word is the real `.docx` built and read back through `docx-preview`,
-  EPUB is the XHTML the packager writes under `typesetCss(_, false)`, and
-  Markdown is the text that will be written. **The EPUB pane carries no page
-  count**: an e-reader picks its own page, so a number there would be a fact
-  about this screen dressed as a fact about the file; the PDF's count is real
-  because a PDF has real pages.
+  **The preview is a layer over the whole window, and every pane renders the
+  real artifact.** `components/export/review-pane.tsx` holds the four panes and
+  `preview-sheet.tsx` is the frame; a **Preview** button beside Back on every
+  step opens it, absent until a format is chosen. That it builds the true thing
+  rather than a likeness is the whole design: a preview assembled from its own
+  code path agrees on the day it is written and quietly stops agreeing
+  afterwards, which is the one failure a "check before you export" cannot have,
+  because a writer who has checked stops looking. So PDF is the finished file
+  out of `/api/export/pdf` — the same call the export makes — Word is the real
+  `.docx` built and read back through `docx-preview`, EPUB is the built
+  `.epub` **opened as a zip**, and Markdown is the text that will be written. **The EPUB pane carries no page count**: an e-reader picks
+  its own page, so a number there would be a fact about this screen dressed as
+  a fact about the file; the PDF's count is real because a PDF has real pages,
+  and it comes from the viewer's own toolbar rather than from us.
+
+  **It was the fourth of five steps until 2026-08-17, and the shape was the
+  problem rather than the contents.** A review is *one thing* — the finished
+  file — and a step in a flow carries the flow around it: a stepper band, a
+  heading, a deck, a reading measure and the action bar all competed with a
+  page of a novel for the same laptop screen, leaving the page about half of
+  it. The heading and the deck came off first and bought back a fifth; the rest
+  could not be bought, because the rest is the wizard. `KeywordGuide` is the
+  shape the sheet copies — `z-40` so the app's dialogs at 50 still open over it
+  (a pane can raise one), Escape — with three departures, all because this
+  covers the window rather than sitting beside a page: `inset-0` with no width
+  cap, **no backdrop** (one under a full-bleed panel is a dismiss target with
+  no pressable pixel, which is the dead UI the house rules forbid, and a scrim
+  over a page nobody can see says nothing about the page), and `oc-step-in`
+  rather than `oc-panel-in`, since a layer over everything is not arriving from
+  a side.
+  Two things the change costs, and they are the step's own reasons: **nobody is
+  walked past the book any more**, which is why the button is on every step
+  including the last, beside the one that exports; and the stepper loses a
+  station. What it wins beyond the room is that the PDF pane's server render is
+  spent when somebody asks to see the book rather than on the way through.
+  Mounting it only while open is what keeps that true.
 
   Three things in it are load-bearing, and the first is the one that bites:
 
@@ -1145,11 +1360,70 @@ two listings. And the `schema:access*` metadata is written from what the book
 actually contains — claiming `alternativeText` for undescribed pictures is a
 false accessibility claim, which is worse than an absent one.
 
+**The wizard's EPUB preview opens the finished file rather than rendering the
+book again**, and `src/lib/export/epub-preview.ts` is the pure half — the
+container, the spine and a document's body, read out of the zip. It rendered
+the XHTML `buildEpub` *would* write, under the stylesheet it *would* write, in
+the order `bindBook` gives: all correct, and all of it the same arithmetic run
+a second time, so three things the packager does were invisible to it.
+`extractImages` was never exercised, the manifest and spine that decide what a
+reading system opens were never read, and `container.xml` was never followed —
+which is why the cover page, a document that exists only in the package, never
+appeared in the preview at all. A preview cannot check the half of the build it
+skips, and those are the parts a shop's ingestion breaks on. It costs a build
+per visit — arithmetic in the browser, no network — and it buys a **check**:
+every document goes through `DOMParser`, so a file that is not well-formed XML
+says so here rather than at the shop, which is `stripInvalidXml`'s guarantee
+tested from the outside for the first time. Two details are load-bearing.
+`spineHrefs` reads the manifest and the spine *together*, so an `itemref`
+naming an id the manifest lacks comes back as a gap rather than as a plausible
+list. And a picture becomes a blob URL made once per zip entry and revoked in
+the effect's cleanup — the packager's own de-duplication showing through, and
+a leak of a book's artwork per settings change if it were not.
+
+**`documentLang` exists because the frame was slandering the file, and it is
+the first thing the rebuilt pane caught.** The stylesheet sets
+`text-align: justify` and `hyphens: auto` together, and a browser will not
+hyphenate text whose language it does not know — so the preview, which takes
+each document's *body* and leaves its `<html lang="en">` behind, set the book
+justified and **unhyphenated** and grew rivers of white the real file does not
+have. Measured in Chrome, one paragraph in a 180px column: 108px tall with no
+language against 90px with `lang="en"`, five lines instead of six. The
+attribute is carried across by hand now, and **omitted rather than guessed at**
+when a document declares none, since hyphenating a Finnish novel by English
+rules is worse than not hyphenating it. Anyone tempted to drop it as decoration
+should re-run that measurement; the test says how.
+
 `epub-images.ts` lifts inline images out of their `data:` URLs into real
 `OEBPS/images/` entries, de-duplicated across the book. Note what this is *not*
 for: a `data:` src passes EPUBCheck fine (checked, not assumed). It is for size —
 base64 is a third larger than the bytes and compresses badly inside XHTML, and a
 repeated ornament is one file instead of one copy per use.
+
+**A picture the package cannot carry is left out of the file, and `packageable`
+is the one place that decides.** Three pictures fail and only the first used to
+be noticed: a data URL that will not decode, a data URL of a media type EPUB
+has no core support for (`RSC-032`, a foreign resource with no fallback), and a
+`src` on the open internet (`RSC-006`) — measured, three hard EPUBCheck errors
+out of one chapter. None is fixable by declaring anything; EPUB 3.3 permits a
+remote audio, video or font and never a remote `<img>`. So the choice is a
+valid book short of a picture or an invalid book nobody can sell. It is dropped
+**and named**: `undecodableImages` counts exactly these, `storeReadiness`
+reports them before the upload, and the wizard's EPUB preview drops them
+through the same predicate so it is not showing a picture the file will not
+have. A remote `src` is not hypothetical — the importers take whatever an HTML
+or EPUB file refers to.
+
+**Nothing reaches an XHTML document that XML cannot carry.** `stripInvalidXml`
+in `xhtml.ts` takes out the characters outside XML 1.0's `Char` production —
+the control characters that have no escape, and lone surrogates — and
+`escapeXml` strips before it escapes, so every string in the EPUB, the print
+document and the reading view goes through it; `toBlocks` applies it too, since
+the Word file and the Markdown never meet `escapeXml` and a `.docx` is XML in a
+zip as well. One form feed anywhere in a manuscript used to make every file in
+the EPUB a *fatal* parse error (`RSC-016`), refused whole by every shop. The
+editor never types one; a plain-text book marks its page breaks with them, so
+the manuscript imported cleanly, read correctly and was rejected at the shop.
 
 `src/lib/publishing.ts` holds the listing details (ISBN with a checked digit,
 language, publisher, blurb, categories, series) as `Book.publishing`, and
