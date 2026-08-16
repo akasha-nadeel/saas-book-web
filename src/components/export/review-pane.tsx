@@ -72,11 +72,11 @@ export function ReviewPane({
     [book, typeset.replaceWritten],
   );
 
-  /* Only the two formats that generate front matter can have a generated page
-     stand down, so only those two carry the note. `docx` and `markdown` build
-     no title, copyright or contents page of their own. */
+  /* Only the formats that generate front matter can have a generated page
+     stand down, so only those carry the note. Word joined them on 2026-08-16;
+     markdown builds no title, copyright or contents page of its own. */
   const written = useMemo(
-    () => (output === "pdf" || output === "epub" ? writtenPages(chapters) : null),
+    () => (output === "markdown" ? null : writtenPages(chapters)),
     [chapters, output],
   );
 
@@ -87,7 +87,12 @@ export function ReviewPane({
         <PagedReview book={book} chapters={chapters} typeset={typeset} />
       )}
       {output === "docx" && (
-        <DocxReview book={book} chapters={chapters} manuscript={manuscript} />
+        <DocxReview
+          book={book}
+          chapters={chapters}
+          manuscript={manuscript}
+          typeset={typeset}
+        />
       )}
       {output === "epub" && (
         <EpubReview book={book} chapters={chapters} typeset={typeset} />
@@ -521,10 +526,12 @@ function DocxReview({
   book,
   chapters,
   manuscript,
+  typeset,
 }: {
   book: Book;
   chapters: LoadedChapter[];
   manuscript: boolean;
+  typeset: TypesetOptions;
 }) {
   const host = useRef<HTMLDivElement>(null);
   const room = useRef<HTMLDivElement>(null);
@@ -548,7 +555,7 @@ function DocxReview({
           import("@/lib/export/docx"),
           import("docx-preview"),
         ]);
-        const blob = await buildDocx(book, chapters, { manuscript });
+        const blob = await buildDocx(book, chapters, { manuscript, typeset });
         if (!live) return;
         await docxPreview.renderAsync(blob, into, undefined, {
           className: "docx",
@@ -568,7 +575,7 @@ function DocxReview({
     return () => {
       live = false;
     };
-  }, [book, chapters, manuscript]);
+  }, [book, chapters, manuscript, typeset]);
 
   return (
     <Stage

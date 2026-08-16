@@ -233,14 +233,25 @@ function stepsFor(output: Format | null): Step[] {
             ? "The opening of every chapter, and how the type sits under it."
             : "How a chapter opens, and how big the page it opens on is.",
       },
-      {
-        id: "frontmatter",
-        group: "Front matter",
-        title: "The pages before the story",
-        blurb:
-          "Built from what the book already knows, and placed at the front for you.",
-      },
     );
+  }
+
+  /* **Word builds these too, as of 2026-08-16, so it is asked the question.**
+     It used to go Format → Review → Export, which meant one book exported with
+     a title page as an EPUB and opened straight onto chapter one as a `.docx`
+     — an agent's copy with nothing at the front saying whose book it is. The
+     step sits outside the `isTypeset` block because it is not about
+     typesetting: it asks which pages the file carries, and three of the four
+     formats build them. Markdown is the exception and has no step of its own
+     to hang it on. */
+  if (isTypeset(output) || output === "docx") {
+    steps.push({
+      id: "frontmatter",
+      group: "Front matter",
+      title: "The pages before the story",
+      blurb:
+        "Built from what the book already knows, and placed at the front for you.",
+    });
   }
 
   if (output === "epub") {

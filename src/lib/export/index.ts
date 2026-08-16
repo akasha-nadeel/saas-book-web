@@ -343,7 +343,7 @@ export async function runExport({
     // never download.
     const { buildDocx } = await import("./docx");
     return handed(
-      await buildDocx(book, chapters, { manuscript }),
+      await buildDocx(book, chapters, { manuscript, typeset }),
       `${base}.docx`,
     );
   }

@@ -95,22 +95,38 @@ ${imprint.map((line) => `      ${line}`).join("\n")}
  * narrative non-fiction can type their own disclaimer on a front-matter page,
  * where a wrong one generated for them could not be found and removed.
  */
-function copyrightPage(book: Book, holder: string): string {
+/**
+ * The copyright page as plain lines, in order.
+ *
+ * **Split out from the markup so the Word file can say the same thing.** The
+ * DOCX writer builds paragraphs rather than HTML, and a second copy of this
+ * notice living there would be two copyright statements that agree until one
+ * of them is edited. Every rule above — the fiction disclaimer only for
+ * fiction, the publisher and ISBN only when the book carries them — belongs to
+ * this function, so every format inherits it.
+ */
+export function copyrightLines(book: Book, holder: string): string[] {
   const year = new Date().getFullYear();
   const publisher = book.publishing?.publisher?.trim();
   const isbn = book.publishing?.isbn?.trim();
   const fiction = book.genre !== "Memoir" && book.genre !== "Other";
-  const lines = [
-    `<p>${escapeXml(book.title)}</p>`,
-    `<p>Copyright &#169; ${year} ${escapeXml(holder)}</p>`,
-    `<p>All rights reserved.</p>`,
-    `<p>No part of this book may be reproduced in any form without written permission from the author, except brief quotations in a review.</p>`,
+  return [
+    book.title,
+    `Copyright © ${year} ${holder}`,
+    "All rights reserved.",
+    "No part of this book may be reproduced in any form without written permission from the author, except brief quotations in a review.",
     fiction
-      ? `<p>This is a work of fiction. Names, characters, places and incidents are the product of the author&#8217;s imagination or are used fictitiously.</p>`
+      ? "This is a work of fiction. Names, characters, places and incidents are the product of the author’s imagination or are used fictitiously."
       : null,
-    publisher ? `<p>Published by ${escapeXml(publisher)}</p>` : null,
-    isbn ? `<p>ISBN ${escapeXml(isbn)}</p>` : null,
-  ].filter(Boolean);
+    publisher ? `Published by ${publisher}` : null,
+    isbn ? `ISBN ${isbn}` : null,
+  ].filter((line): line is string => Boolean(line));
+}
+
+function copyrightPage(book: Book, holder: string): string {
+  const lines = copyrightLines(book, holder).map(
+    (line) => `<p>${escapeXml(line)}</p>`,
+  );
   return `<section class="front-page copyright">
     ${lines.join("\n    ")}
   </section>`;
