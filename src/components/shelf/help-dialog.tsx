@@ -259,6 +259,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "For EPUB and PDF, a title page, a copyright page and a contents list are built from your book and placed at the front — all three on unless you switch them off. The copyright page needs an author’s name and is left out when the book has none, rather than naming the wrong rights holder.",
       },
       {
+        name: "Read it before you send it",
+        desc: "The step before the export shows the book as the file will actually have it, not a picture of one. The PDF is laid out by the same engine that lays out the PDF, so the page count and the page numbers beside the contents entries are the ones you will get. Word is the real .docx, built and opened back up. EPUB is the pages the file packages, in your own typography — no page count there, because an e-reader picks its own page. If you have written your own title, copyright or contents page, the review says so: yours is used and ours stands down for it.",
+      },
+      {
         name: "Store listing",
         desc: "Choosing EPUB adds the details a shop asks for — ISBN, language, publisher, categories, blurb, series. They are saved to the book, so you fill them in once.",
       },

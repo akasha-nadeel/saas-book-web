@@ -1045,6 +1045,61 @@ dynamically imported so a writer who never exports never downloads them.
   its own would drift from the file. And *the fifth format is gone but not
   deleted*: see the audio note above and TODO.md.
 
+  **The step before the export is the book itself, and every pane renders the
+  real artifact.** `components/export/review-pane.tsx` is the fourth of five
+  steps. That it builds the true thing rather than a likeness is the whole
+  design: a preview assembled from its own code path agrees on the day it is
+  written and quietly stops agreeing afterwards, which is the one failure a
+  "check before you export" step cannot have, because a writer who has checked
+  stops looking. So PDF is the actual Paged.js pagination out of
+  `printDocument` — which is *why* `print.ts` splits into `printDocument` /
+  `paginate` / `dropPagedStyles`, so the preview and the print path cannot
+  drift — Word is the real `.docx` built and read back through `docx-preview`,
+  EPUB is the XHTML the packager writes under `typesetCss(_, false)`, and
+  Markdown is the text that will be written. **The EPUB pane carries no page
+  count**: an e-reader picks its own page, so a number there would be a fact
+  about this screen dressed as a fact about the file; the PDF's count is real
+  because a PDF has real pages.
+
+  Three things in it are load-bearing, and the first is the one that bites:
+
+  - **The pages are parked off-screen, never hidden.** `display: none` is not a
+    slower layout here, it is a failed one — Paged.js decides every break with
+    `getBoundingClientRect`, and inside a hidden box every rect is zero, so it
+    lays two pages and then throws `Cannot read properties of null` out of its
+    own `Layout` constructor. Exactly why `printBook`'s iframe is 1200×900 at
+    `left:-10000px` rather than 0×0.
+  - **Each run renders into a box of its own inside the host.** React runs the
+    effect twice in development, so two Previewers can be in flight at once;
+    sharing one container means the second wipes the first's tree mid-layout
+    and neither finishes.
+  - **`useFitToStage` scales the pages to the column, and neither measurement
+    is taken through the zoom.** A page box is its real printed size and the
+    column is narrower, so at true size the writer gets a horizontal scrollbar
+    and a screenful of one page's margin. `zoom` rather than a transform, since
+    a transform leaves the original height behind and the stage would scroll
+    through a book's worth of empty space. The subtlety is that `zoom` scales
+    the coordinate system *inside* the element it is on, so a page's rect and
+    the box holding it both come back in scaled units and their ratio no longer
+    says what fraction of the room the page needs — measure through it and
+    every pass shrinks the page again. Hence two elements: the *room* is an
+    outer one that is never scaled, and the page's true width is recorded by
+    the pane at the one moment it is known, after the pages exist and before
+    anything scales them. A `ResizeObserver`, so the scale survives the window
+    moving.
+
+  **The review also says when a generated page has stood down for one of the
+  writer's own** (`YoursInstead`, over `writtenPages`, and only for the two
+  formats that generate front matter at all — `docx` and `markdown` build
+  none). The front-matter step already says this beside the *switch*; this says
+  it beside the *result*, which is where the question actually gets asked. A
+  writer who wrote their own contents page is looking at page numbers they
+  typed by hand, wrong the moment a chapter grew, where ours would have carried
+  the folios `target-counter` works out — and without the note that reads as
+  the feature failing rather than as their own page winning. It is a note
+  rather than a warning: nothing is wrong, and a writer who wrote their own
+  meant it.
+
   **A finished export says so, and PDF is the one that cannot.** `runExport`
   answers with an `ExportResult` — the filename and the blob — and
   `ExportDoneDialog` (`components/export/export-done.tsx`) is what a writer sees
