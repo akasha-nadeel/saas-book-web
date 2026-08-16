@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { NewBookForm } from "@/components/shelf/new-book-form";
 
 /**
@@ -11,5 +12,21 @@ export const metadata = {
 };
 
 export default function NewBookPage() {
-  return <NewBookForm />;
+  /*
+   * **The boundary is load-bearing, and only `next build` says so.**
+   *
+   * This route reads nothing on the server, so Next prerenders it — at which
+   * point the form's `useSearchParams` (the `?source=` reader that decides
+   * whether the writer is importing) has to be allowed to bail out to the
+   * client, and without a boundary the *build* fails rather than the page.
+   * Dev never notices: it renders every route on demand.
+   *
+   * The same lesson, learned the same way, is written up at `app/page.tsx` —
+   * the dashboard's `?area=` reader needs this for exactly the same reason.
+   */
+  return (
+    <Suspense>
+      <NewBookForm />
+    </Suspense>
+  );
 }

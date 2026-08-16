@@ -30,6 +30,7 @@ import {
   type Format,
 } from "@/lib/export";
 import { Spinner } from "@/components/ui/spinner";
+import { ReviewPane } from "@/components/export/review-pane";
 import { ToolStepDone } from "@/components/ui/tool-save";
 import { useToolSave } from "@/lib/use-tool-save";
 import { writtenPages } from "@/lib/export/front-matter";
@@ -128,6 +129,7 @@ type StepId =
   | "frontmatter"
   | "listing"
   | "blurb"
+  | "review"
   | "export";
 
 /**
@@ -226,6 +228,26 @@ function stepsFor(output: Format | null): Step[] {
       },
     );
   }
+
+  /* **The book itself, before the file exists.**
+​
+     Every format gets this, and it is a step rather than a panel on the export
+     screen because it is a different question: everything before it asks *how*
+     the book should be made, and this one asks whether it came out right. It
+     shows the real artifact rather than a description of one — see
+     `ReviewPane`.
+
+     Deliberately not a gate. Continue is live whether or not the writer scrolls
+     it, which is what KDP and Reedsy do: they put the preview in front of you
+     and let you walk past. A primary button disabled until somebody has
+     scrolled is the dead control the house rules argue against, and it would
+     punish the writer exporting their tenth draft hardest. */
+  steps.push({
+    id: "review",
+    group: "Review",
+    title: "Read it before you send it",
+    blurb: "The book as the file will have it — not a picture of one.",
+  });
 
   steps.push({
     id: "export",
@@ -628,6 +650,17 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
                 {step.id === "listing" && <ListingDetails book={book} />}
                 {step.id === "blurb" && <ListingBlurb book={book} />}
+
+                {/* Same guard as the export step below: this step only exists
+                    once a format has been chosen. */}
+                {step.id === "review" && output !== null && (
+                  <ReviewPane
+                    book={book}
+                    output={output}
+                    typeset={typeset}
+                    manuscript={manuscript}
+                  />
+                )}
 
                 {/* Only reachable once a format is chosen, which is what builds
                   this step in the first place. */}

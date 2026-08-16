@@ -3617,3 +3617,47 @@ body {
     animation: none;
   }
 }
+
+/* ---- The review step's paginated pages ----------------------------------
+ *
+ * Paged.js draws its own page boxes at the book's real trim size and gives
+ * them `.pagedjs_page`. All this adds is the desk they sit on: white paper on
+ * the grey of the panel, one under the next, with the margin boxes' contents
+ * (the running head and the folio) left exactly as the engine set them.
+ *
+ * Nothing here touches type, measure or margins. Those come from `typesetCss`
+ * and are the file's own — a rule here that nudged them would make the review
+ * a picture of a different book, which is the one thing this step must not be.
+ *
+ * The sheet colours are the paper tokens, which are stated identically in both
+ * themes: what leaves this app is black ink on white paper for every reader,
+ * so a preview that turned charcoal after sunset would be a picture of a file
+ * nobody will open.
+ */
+.oc-review-pages .pagedjs_page {
+  background: var(--color-sheet);
+  color: var(--color-sheet-ink);
+  margin: 0 auto 1rem;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+/* Paged.js lays its pages out in a flow container of its own; centring it
+   keeps a narrow trim size in the middle of a wide panel rather than hard
+   against the left edge. */
+.oc-review-pages .pagedjs_pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* `docx-preview` ships its own layout and page sizing; this is only the desk,
+   as above. `.docx-wrapper` is its outer box and `.docx` each section. */
+.docx-wrapper {
+  background: transparent !important;
+  padding: 0 !important;
+}
+.docx-wrapper > section.docx {
+  margin: 0 auto 1rem !important;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
