@@ -1107,14 +1107,86 @@ function chapterRowsOf(
  *   Positions are still taken from the full list, so a filtered row carries its
  *   real place in the book rather than its index in the subset.
  */
+/**
+ * Chapter ids waiting to go up, per book, accumulated across coalesced pushes.
+ *
+ * **This exists because coalescing and a partial payload do not mix**, and the
+ * two were introduced separately. `enqueue` replaces a job by key on the
+ * reasoning that "only the newest state of a given row is worth sending" —
+ * true of a body or of a book's own fields, where the newest copy contains
+ * everything the older one had. It is false of `pushBook`, which carries a
+ * *subset*: the newest job's `changed` set describes only the newest diff, so
+ * every id named by the job it replaced was silently dropped.
+ *
+ * The shape of the loss is the giveaway. Making one chapter at a time is fine —
+ * each push has time to run. Making thirty in a couple of minutes is one
+ * `commit` per chapter, each enqueuing `book:<id>` with a single-chapter set,
+ * each discarding the one before: only the last chapter of each flush window
+ * reaches the server. Measured on a real library — 51 chapters locally, 27 on
+ * the server, and every missing body reported as `23503 no chapter … to attach
+ * this to`, which is the *body* correctly refusing to attach to a chapter row
+ * that was never sent. The bodies were the symptom; this is the cause.
+ *
+ * `null` means "send the whole list" — what `undefined` means to `pushBook` —
+ * and it wins over any set, because a push that was going to send everything
+ * still has to.
+ */
+const pendingChapters = new Map<string, Set<string> | null>();
+
+/**
+ * What a coalesced push must carry: everything already waiting, plus this.
+ *
+ * Pure and exported because it is the decision the bug turned on, and the rest
+ * of `pushBook` is Supabase I/O that cannot be tested here.
+ *
+ * `null` is "the whole list" on both sides, and it wins: a push that was going
+ * to send everything still has to, and one that must send everything cannot be
+ * narrowed by a later, smaller diff. `undefined` for `held` means nothing is
+ * waiting yet.
+ */
+export function mergeChanged(
+  held: Set<string> | null | undefined,
+  incoming?: Set<string>,
+): Set<string> | null {
+  // A copy, never the caller's own set — the store builds that per commit and
+  // is free to keep a reference to it.
+  if (held === undefined) return incoming ? new Set(incoming) : null;
+  if (held === null || !incoming) return null;
+  for (const id of incoming) held.add(id);
+  return held;
+}
+
+function rememberChanged(bookId: string, changed?: Set<string>) {
+  pendingChapters.set(
+    bookId,
+    mergeChanged(pendingChapters.get(bookId), changed),
+  );
+}
+
 export function pushBook(
   book: Book,
   position: number,
   changed?: Set<string>,
 ) {
+  rememberChanged(book.id, changed);
+
   enqueue(`book:${book.id}`, async () => {
+    /* Read at run time, not captured: everything queued since the last
+       successful push is in here, including the ids from jobs this one
+       replaced. Cleared only once the rows are away — a throw leaves it
+       standing, so the retry carries the same work rather than the last
+       fragment of it. */
+    const held = pendingChapters.get(book.id);
+    const changed = held === null || held === undefined ? undefined : held;
+    const sent = () => pendingChapters.delete(book.id);
     const owner = await ownerOf(book);
-    if (!owner) return;
+    /* Signed out, so nothing is going anywhere and the queue is dropped rather
+       than held (see `flush`). Letting go of the ids too keeps this map from
+       being the one thing that outlives a sign-out. */
+    if (!owner) {
+      sent();
+      return;
+    }
     const me = await currentOwner();
     const db = createClient();
 
@@ -1131,12 +1203,20 @@ export function pushBook(
      * asking is what keeps a read-only session from filling the console with
      * denials on every keystroke.
      */
-    if (book.role === "viewer") return;
+    // A viewer never pushes, so the ids are not waiting for anything.
+    if (book.role === "viewer") {
+      sent();
+      return;
+    }
     if (book.ownerId && me && book.ownerId !== me) {
       const rows = chapterRowsOf(book, owner, changed);
-      if (rows.length === 0) return;
+      if (rows.length === 0) {
+        sent();
+        return;
+      }
       const { error } = await db.from("chapters").upsert(rows);
       if (error) throw denied(error, "chapters");
+      sent();
       return;
     }
 
@@ -1181,9 +1261,13 @@ export function pushBook(
     // one who may write this row. `pushShelfDiff` sends only the changed rows for
     // a shared book — see the note there.
     const rows = chapterRowsOf(book, owner, changed);
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+      sent();
+      return;
+    }
     const { error: chapterError } = await db.from("chapters").upsert(rows);
     if (chapterError) throw denied(chapterError, "chapters");
+    sent();
   });
 }
 

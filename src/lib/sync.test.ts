@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pushOwner, rank, worthRetrying } from "./sync";
+import { mergeChanged, pushOwner, rank, worthRetrying } from "./sync";
 
 /**
  * The two pure decisions in the push queue, and both of them were wrong.
@@ -87,5 +87,55 @@ describe("pushOwner", () => {
     // with a hint recommending we grant `anon` write access to `books`.
     expect(pushOwner({ ownerId: them }, null)).toBeNull();
     expect(pushOwner({}, null)).toBeNull();
+  });
+});
+
+/**
+ * What a coalesced book push carries.
+ *
+ * `enqueue` replaces a queued job by key, which is right for a body (the newer
+ * copy contains everything the older had) and wrong for `pushBook`, which
+ * sends a *subset*: the replacing job's set named only its own diff, so every
+ * id the discarded job was carrying went with it.
+ *
+ * The damage was proportional to speed. One chapter at a time is fine — each
+ * push runs before the next arrives. Thirty in a couple of minutes is one
+ * commit per chapter inside a flush window, each discarding the last, so only
+ * the final chapter of each window was ever sent. Found on a real library at
+ * 51 chapters local against 27 on the server, with every missing body
+ * reporting `23503 no chapter … to attach this to` — the body refusing,
+ * correctly, to attach to a chapter row that had never gone up.
+ */
+describe("mergeChanged", () => {
+  it("keeps the ids a replaced push was carrying", () => {
+    const merged = mergeChanged(new Set(["a"]), new Set(["b"]));
+    expect(merged).toEqual(new Set(["a", "b"]));
+  });
+
+  it("accumulates across several replacements", () => {
+    let held = mergeChanged(undefined, new Set(["a"]));
+    held = mergeChanged(held, new Set(["b"]));
+    held = mergeChanged(held, new Set(["c"]));
+    expect(held).toEqual(new Set(["a", "b", "c"]));
+  });
+
+  it("starts from nothing waiting", () => {
+    expect(mergeChanged(undefined, new Set(["a"]))).toEqual(new Set(["a"]));
+  });
+
+  // null is "send the whole list", and neither side may narrow it: a push that
+  // was going to send everything still has to.
+  it("lets send-everything win from either side", () => {
+    expect(mergeChanged(null, new Set(["a"]))).toBeNull();
+    expect(mergeChanged(new Set(["a"]), undefined)).toBeNull();
+    expect(mergeChanged(undefined, undefined)).toBeNull();
+  });
+
+  // The store hands over a set it built for its own diff and keeps using it.
+  it("does not keep the caller's set", () => {
+    const theirs = new Set(["a"]);
+    const merged = mergeChanged(undefined, theirs);
+    theirs.add("b");
+    expect(merged).toEqual(new Set(["a"]));
   });
 });
