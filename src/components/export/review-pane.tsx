@@ -479,13 +479,44 @@ function DocxReview({
 }
 
 /**
- * The EPUB's own pages, under the book's own typography.
+ * The paper the EPUB's own pages are drawn on.
+ *
+ * Literal values rather than the `--color-sheet` tokens, because an iframe
+ * inherits no custom properties from the page that wrote it. Safe to repeat:
+ * those two tokens are stated *identically* in both theme blocks, for the
+ * standing reason that drawn artwork of a real object stays literal — what
+ * leaves this app is dark ink on light paper for every reader, so a preview
+ * that turned charcoal after sunset would be a picture of a file nobody will
+ * open. If `globals.css` ever moves them, move these.
+ */
+const SHEET = "#fcfbf7";
+const SHEET_INK = "#1f1d1a";
+
+/**
+ * The EPUB's own documents, under the book's own typography.
  *
  * **No page count and no page furniture, deliberately.** An EPUB is reflowable:
  * the reader's device picks the page, the type size and usually the margins, so
  * a number here would be a fact about this screen dressed up as a fact about
  * the file. The reading order, the front matter, the chapter openings and the
  * typography are all real — those are the things the file actually fixes.
+ *
+ * **It is an iframe, and that is a correctness fix rather than tidiness.** This
+ * was a `<div>` with the file's stylesheet wrapped in `.oc-epub-preview { … }`
+ * to scope it — which native CSS nesting turns into descendant selectors, so
+ * every rule `typesetCss` writes for `body` became `.oc-epub-preview body` and
+ * matched nothing. The result was a preview claiming to show the book's
+ * typography while the body text fell through to the app's own sans-serif: the
+ * headings were right, because `h1` nests to something real, and the prose —
+ * the whole point — was not. A real document is the only place `body` means
+ * body. It also stops the app's CSS leaking into a picture of a file it has
+ * nothing to do with, which was the other half of the mess.
+ *
+ * **One sheet per file, not one long scroll.** An EPUB is a set of documents
+ * and a reader opens each on a fresh screen; running them together put the
+ * copyright notice directly under the author's name as though they shared a
+ * page. Each spine document gets its own sheet here, which is what the file
+ * actually contains.
  */
 function EpubReview({
   book,
@@ -500,12 +531,10 @@ function EpubReview({
      the pattern React's lint rule forbids and it was right to: the markup is a
      pure function of the book and the settings, so holding it in state buys a
      second render and a moment on screen with nothing in it. */
-  const html = useMemo(() => {
-    const front = frontSections(book, chapters, typeset)
-      .map((s) => s.html)
-      .join("\n");
-    const body = chapters
-      .map((chapter) => {
+  const srcDoc = useMemo(() => {
+    const files = [
+      ...frontSections(book, chapters, typeset).map((s) => s.html),
+      ...chapters.map((chapter) => {
         const number =
           chapter.number !== null
             ? `<p class="chapter-number">${chapter.number}</p>`
@@ -513,26 +542,48 @@ function EpubReview({
         return `<section>${number}<h1>${escapeXml(chapter.title)}</h1>${blocksToXhtml(
           toBlocks(chapter.doc),
         )}</section>`;
-      })
-      .join("\n");
-    return `${front}\n${body}`;
+      }),
+    ];
+
+    /* `typesetCss(_, false)` is the sheet that goes into the file — the same
+       call `buildEpub` makes — so the type here is the type in the file. What
+       follows it is preview chrome only, and it is deliberately the last word
+       so it cannot be mistaken for part of the book's own styling: the sheets,
+       the grey between them, and a guard on pictures so an oversized one
+       cannot push a column sideways. */
+    const css = `${typesetCss(typeset, false)}
+html { background: transparent; }
+body { margin: 0; background: transparent; color: ${SHEET_INK}; }
+.oc-file {
+  background: ${SHEET};
+  margin: 0 auto 1.5rem;
+  max-width: 42rem;
+  padding: 3em 3em 4em;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+.oc-file > :first-child { margin-top: 0; }
+img { max-width: 100%; height: auto; }`;
+
+    // The markup is ours: built by `blocksToXhtml` from the writer's own
+    // document and escaped on the way through. Nothing here comes from a model
+    // or off the network — and the frame is sandboxed regardless.
+    return `<!doctype html><html><head><meta charset="utf-8"/><style>${css}</style></head><body>${files
+      .map((html) => `<div class="oc-file">${html}</div>`)
+      .join("")}</body></html>`;
   }, [book, chapters, typeset]);
 
   return (
-    <Stage caption="The pages the EPUB packages, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file.">
-      <div className="mx-auto max-w-[42rem] rounded-lg bg-sheet p-8 text-sheet-ink shadow-sm">
-          {/* The EPUB's own stylesheet, scoped to this box. `typesetCss(_,
-              false)` is the sheet that goes into the file — the same call
-              `buildEpub` makes — so the type here is the type in the file. */}
-          <style>{`.oc-epub-preview { ${typesetCss(typeset, false)} }`}</style>
-          <div
-            className="oc-epub-preview"
-            // The XHTML is ours: built by `blocksToXhtml` from the writer's own
-            // document, escaped on the way through. Nothing here comes from a
-            // model or off the network.
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
-      </div>
+    <Stage caption="The documents the EPUB packages, each on its own sheet, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file.">
+      {/* `sandbox` with no permissions: no scripts, no forms, no navigation.
+          The content is ours, and a preview of a book has no business doing any
+          of those things. */}
+      <iframe
+        title="The EPUB's pages"
+        sandbox=""
+        srcDoc={srcDoc}
+        className="h-full w-full border-0"
+      />
     </Stage>
   );
 }
