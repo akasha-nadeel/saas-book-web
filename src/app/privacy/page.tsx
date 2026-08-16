@@ -229,8 +229,8 @@ export default function PrivacyPage() {
         />
         <p>
           Everything else — writing, importing, page setup, the pre-upload
-          check, the roadmap, the structure and progress tools, and all four
-          export formats — runs entirely in your browser.
+          check, the roadmap, the structure and progress tools, and every
+          export format — runs entirely in your browser.
         </p>
       </Section>
 
@@ -259,7 +259,7 @@ export default function PrivacyPage() {
           items={[
             <>
               <Term>A copy of everything</Term> — you already have it. Export
-              any book to EPUB, DOCX, Markdown or PDF, free and without a limit,
+              any book to EPUB, DOCX or PDF, free and without a limit,
               at any time.
             </>,
             <>

@@ -1522,6 +1522,58 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **The Markdown export** — marked **Soon** on **2026-08-16** at the owner's
+  request, to be switched back on once it ships as a folder rather than a file.
+
+  **Nothing is deleted.** `buildMarkdownFile`, `blocksToMarkdown`, their tests
+  and the review pane's `MarkdownReview` are all whole and still exercised —
+  the format is simply not selectable. Switching it on is deleting `soon: true`
+  from its entry in `FORMATS` (`export-page.tsx`) and putting back the claims
+  listed below.
+
+  **Why it went.** The text half is correct. What is not is a book with a
+  picture in it: `blocksToMarkdown` writes the image into the file as a base64
+  `data:` URL, which makes a small book an enormous file and does not reliably
+  display — GitHub and many parsers refuse a `data:` image outright, so the
+  writer gets a wall of code where a picture should be.
+
+  **What it comes back as**, from a search of what the field does:
+
+  - **Notion** exports a zip of the markdown plus an `assets/` folder. Its one
+    wart is worth avoiding — its image paths are relative to the zip root, so
+    they break the moment the `.md` is moved out. Use paths relative to the
+    file.
+  - **Bear** and **Ulysses** use **TextBundle** (`textbundle.org`), which is
+    the same idea standardised: a folder holding `text.md`, `info.json` and
+    `assets/`, zipped as `.textpack`. More correct, but almost no writer has
+    heard of the extension, and a file nobody can open is not a handoff.
+  - **Obsidian** does not do it built-in; its most-installed export plugin
+    exists to add exactly this, which is the tell that the base behaviour was
+    wrong.
+  - **Scrivener** is the counter-example: its markdown export drops images
+    altogether. Silently losing part of the book is worse than either.
+
+  So: a plain `.md` when the book has no pictures, a zip of `book.md` plus
+  `images/` when it has. `epub-images.ts` already lifts `data:` URLs into real
+  files for the EPUB, so the hard half exists.
+
+  **What was reworded and has to come back with it** — every one of these named
+  Markdown as a shipping format, and the house rule is that nothing claims what
+  the code cannot back:
+
+  - `plans.tsx` — the Exports row: detail was "EPUB, DOCX, PDF, Markdown" and
+    both plan cells said "All four"; now three. Its two comments too.
+  - `landing-page.tsx` — the shop-refusal answer ("with DOCX, PDF and Markdown
+    beside it"), the privacy claim ("all four exports"), two FAQ answers, the
+    "back out in four formats" lead, and the mosaic's "exactly seven
+    destinations" comment.
+  - `works-with.tsx` — the **Obsidian** entry left `DESTINATIONS` with it,
+    since a destination there needs an export that opens in it. Its mark and
+    licence note go back in the same commit.
+  - `help-dialog.tsx` — the Formats entry, and the free-plan paragraph.
+  - `free-limits.ts`, `privacy/page.tsx`, `terms/page.tsx` — "all four
+    exports" / the format lists.
+
 - **The landing page's "Not built yet" section — "What comes after that"** —
   removed **2026-08-14** at the owner's request. The owner asked to be reminded
   of it in future sessions, so it is here and in the assistant's memory both.

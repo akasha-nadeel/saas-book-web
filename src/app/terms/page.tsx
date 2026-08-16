@@ -46,8 +46,8 @@ export default function TermsPage() {
         <p>
           {TRADING_NAME} is a web application for authors publishing their own
           books: writing and organising a manuscript, checking a finished book
-          against what online bookstores require, exporting it to EPUB, DOCX,
-          Markdown and PDF, and working through the steps of publishing it. It
+          against what online bookstores require, exporting it to EPUB, DOCX
+          and PDF, and working through the steps of publishing it. It
           is software delivered over the web. There are no physical goods and
           nothing is shipped.
         </p>
@@ -80,7 +80,7 @@ export default function TermsPage() {
 
       <Section title="5. Free and paid">
         <p>
-          Writing, importing, all four export formats, sync, the pre-upload
+          Writing, importing, every export format, sync, the pre-upload
           check and the publishing roadmap are free and stay free. Each research
           tool has its own free allowance — {FREE_LIMITS.comps.free} comparable-title
           searches and {FREE_LIMITS.titleCheck.free} title checks a day,{" "}

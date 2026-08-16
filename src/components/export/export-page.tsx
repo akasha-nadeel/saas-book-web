@@ -31,6 +31,7 @@ import {
 } from "@/lib/export";
 import { Spinner } from "@/components/ui/spinner";
 import { ReviewPane } from "@/components/export/review-pane";
+import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ToolStepDone } from "@/components/ui/tool-save";
 import { useToolSave } from "@/lib/use-tool-save";
 import { writtenPages } from "@/lib/export/front-matter";
@@ -76,6 +77,15 @@ interface FormatOption {
   hint: string;
   /** What the reader gets, in the words a file manager would use. */
   produces: string;
+  /**
+   * Offered, but not finished — so the card says so and cannot be chosen.
+   *
+   * The house rule is that a control either works or plainly says it does not,
+   * and this is the second of those. It stays on the step rather than being
+   * deleted because a format that vanishes reads as one this app cannot do,
+   * where the truth is that it is half-done and coming.
+   */
+  soon?: true;
 }
 
 /**
@@ -115,6 +125,30 @@ const FORMATS: FormatOption[] = [
     label: "Markdown",
     hint: "Plain text that reads anywhere",
     produces: "One .md file",
+    /*
+     * **Held back on 2026-08-16 over pictures, and only over pictures.**
+     *
+     * The text half is done and correct. What is not done is what happens to a
+     * book with an image in it: `blocksToMarkdown` writes the picture into the
+     * file as a base64 `data:` URL, which makes a small book a very large file
+     * and does not reliably display — GitHub and a good many parsers refuse a
+     * `data:` image outright, so the writer gets a wall of code where a
+     * picture should be.
+     *
+     * Every tool that does this properly ships a *folder*, not a file: Notion
+     * exports a zip of the markdown plus an `assets/` directory, Bear and
+     * Ulysses use TextBundle, which is the same idea standardised. Obsidian's
+     * most-installed export plugin exists to add exactly this. Scrivener is
+     * the counter-example and the reason not to ship the third option — its
+     * markdown export silently drops images altogether.
+     *
+     * So this comes back as: a plain `.md` when the book has no pictures, a
+     * zip of `book.md` plus `images/` when it has. `epub-images.ts` already
+     * lifts `data:` URLs into real files for the EPUB, so the hard half
+     * exists. Nothing here is deleted — the builder, its tests and its review
+     * pane are all whole and still exercised.
+     */
+    soon: true,
   },
 ];
 
@@ -1091,6 +1125,10 @@ function FormatStep({
   manuscript: boolean;
   onManuscript: (on: boolean) => void;
 }) {
+  /* Which unfinished format the writer pressed, or null. Held here rather than
+     in the card so only one poster can be open. */
+  const [soon, setSoon] = useState<FormatOption | null>(null);
+
   return (
     <div className="space-y-4">
       {/* **Four cards of one size.** EPUB led at full width and half again as
@@ -1111,10 +1149,25 @@ function FormatStep({
             format={f}
             book={book}
             selected={output === f.value}
-            onPick={onPick}
+            // An unfinished format explains itself instead of being chosen —
+            // it never reaches `output`, so no later step has to know about it.
+            onPick={f.soon ? () => setSoon(f) : onPick}
           />
         ))}
       </div>
+
+      {soon && (
+        <ComingSoonDialog
+          title={`${soon.label} is nearly there`}
+          onClose={() => setSoon(null)}
+        >
+          The text is done. What is not is what happens to a book with pictures
+          in it — they would be written into the file as code rather than as
+          pictures, which most readers refuse to show. It comes back as a
+          folder: the text file with your images beside it. Until then, EPUB,
+          PDF and Word are all here and all complete.
+        </ComingSoonDialog>
+      )}
 
       {output === "pdf" && (
         <Note>
@@ -1177,8 +1230,10 @@ function FormatCard({
   return (
     <button
       type="button"
-      role="radio"
-      aria-checked={selected}
+      // Not a radio when it cannot be chosen: announcing an unbuildable option
+      // as one of the choices is the same lie as a switch that does nothing.
+      role={format.soon ? undefined : "radio"}
+      aria-checked={format.soon ? undefined : selected}
       onClick={() => onPick(format.value)}
       // h-* and overflow-hidden are load-bearing, not styling: they are what
       // crops the preview at the corner. See .oc-tilt-card.
@@ -1191,13 +1246,18 @@ function FormatCard({
                   pt-4 text-left outline-none
                   transition-[border-color,box-shadow] focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
-                    selected
-                      ? // A ring on top of the border rather than a tint behind
-                        // the sheet: the card's ground is what the paper is read
-                        // against, and washing it in the accent makes the one
-                        // chosen preview the one hardest to look at.
-                        "border-accent ring-1 ring-accent"
-                      : "border-line hover:border-fg/35"
+                    format.soon
+                      ? // Dimmed but not disabled. A disabled button cannot be
+                        // pressed, so there would be no moment to explain
+                        // itself — the same reasoning the limit banners follow.
+                        "border-dashed border-line opacity-60 hover:opacity-80"
+                      : selected
+                        ? // A ring on top of the border rather than a tint behind
+                          // the sheet: the card's ground is what the paper is read
+                          // against, and washing it in the accent makes the one
+                          // chosen preview the one hardest to look at.
+                          "border-accent ring-1 ring-accent"
+                        : "border-line hover:border-fg/35"
                   }`}
     >
       {/* Above the preview, which passes under the text on its way out of the
@@ -1218,6 +1278,14 @@ function FormatCard({
         {format.value === "epub" && (
           <span className="rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 font-sans text-[10px] font-semibold tracking-[0.06em] text-accent uppercase">
             Store-ready
+          </span>
+        )}
+        {/* The status family rather than the accent: the accent means "this is
+            the way forward" everywhere in this app, and it is the one thing
+            this card is not. */}
+        {format.soon && (
+          <span className="rounded-full border border-note-line bg-note-bg px-2 py-0.5 font-sans text-[10px] font-semibold tracking-[0.06em] text-note-fg uppercase">
+            Soon
           </span>
         )}
       </span>

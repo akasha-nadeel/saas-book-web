@@ -792,7 +792,7 @@ const REFUSALS = [
     "We will not upload to Amazon for you",
     "There is no public API. Anyone automating that dashboard is risking your publishing account, not theirs.",
     "We will hand you the file that shop takes",
-    "An EPUB that clears EPUBCheck with no errors and no warnings, with DOCX, PDF and Markdown beside it. The last step stays yours, and it is one upload.",
+    "An EPUB that clears EPUBCheck with no errors and no warnings, with DOCX and PDF beside it. The last step stays yours, and it is one upload.",
   ],
 ] as const;
 
@@ -829,9 +829,11 @@ const REFUSALS = [
    Writer and Obsidian because three word processors on one line read as a
    compatibility matrix and a Markdown notes app beside four bookshops
    answered a question nobody was asking at that point in the page. The mosaic
-   below shows all seven as tiles, where neither problem arises, so the filter
+   below shows all of them as tiles, where neither problem arises, so the filter
    went with the row it was written for. Nothing was retracted — both were
-   always in `DESTINATIONS`, which is still the complete and only list. */
+   always in `DESTINATIONS`, which is still the complete and only list.
+   (Obsidian has since left that list with the Markdown export, and returns
+   with it.) */
 
 /**
  * The mosaic under the hero: every program a finished file opens in, with
@@ -839,7 +841,7 @@ const REFUSALS = [
  *
  * **The marks are read from `DESTINATIONS` rather than listed here**, so this
  * cannot name a program the export does not reach — the same rule the footer
- * and the export dialog follow. All seven are shown, which is why the grid has
+ * and the export dialog follow. All of them are shown, which is why the grid has
  * no fade at its edges: there is no eighth to imply.
  *
  * The facts are placed *between* the marks rather than gathered at one end.
@@ -1094,7 +1096,7 @@ const PROOFS = [
   [
     "shelf",
     "Your manuscript stays in this browser",
-    "Writing, importing, page setup, the check, all four exports — none of it sends the book anywhere. The few features that do send text name themselves before they run, and the privacy page lists every one.",
+    "Writing, importing, page setup, the check, every export — none of it sends the book anywhere. The few features that do send text name themselves before they run, and the privacy page lists every one.",
   ],
   [
     "check",
@@ -1104,7 +1106,7 @@ const PROOFS = [
   [
     "formats",
     "Leaving costs nothing and needs no permission",
-    "All four formats are free forever, on the free plan, with no export limit. Markdown is plain text: it opens in an editor written thirty years ago.",
+    "Every format is free forever, on the free plan, with no export limit. The EPUB is the one a shop takes, and the DOCX is what an agent asks for.",
   ],
   [
     "steps",
@@ -1191,16 +1193,16 @@ const FAQ: [question: string, answer: React.ReactNode][] = [
   [
     "Can I get my work out if I stop using it?",
     <>
-      <Em>Yes, without asking us.</Em> EPUB, DOCX, PDF and Markdown, whenever
-      you want. <Em>Markdown is plain text</Em> — it opens in any editor,
-      including one written thirty years ago.
+      <Em>Yes, without asking us.</Em> EPUB, DOCX and PDF, whenever you want.
+      <Em> The EPUB is an open format</Em> — it opens in any e-reader, and the
+      DOCX opens in Word, Pages and Google Docs.
     </>,
   ],
   [
     "I’ve paid for tools that did none of this. Why is this different?",
     <>
       <Em>You can test the whole claim in an afternoon without paying</Em>:
-      import a draft, run the check, export all four files, open them in Word
+      import a draft, run the check, export the files, open them in Word
       and an e-reader. If any of it does not work,{" "}
       <Em>you have lost an afternoon rather than a thousand pounds.</Em>
     </>,
@@ -1604,8 +1606,12 @@ export function LandingPage() {
 
             **No edge fade.** The reference crops its grid at both sides so it
             bleeds, which says *there is more of this than the page has room
-            for*. There are exactly seven destinations and all seven are here,
-            so a fade would be implying a count we do not have. */}
+            for*. Every destination in `DESTINATIONS` is here, so a fade would
+            be implying a count we do not have. The number is deliberately not
+            written down in this comment or on the page: it was seven until
+            Obsidian came off with the Markdown export, and a figure repeated
+            in prose is the thing that goes stale while the grid stays
+            correct. */}
         <section className="border-b border-lp-line px-6 pb-14 sm:pb-20">
           {/* Lifted over the hero, which is what makes it a panel rather than
               the next band down. The hero keeps its own bottom rule, so the
@@ -1616,7 +1622,7 @@ export function LandingPage() {
                 size a `2xl` column turns it into five short lines. */}
             <p className={`mx-auto max-w-3xl text-center ${SECTION_LEAD}`}>
               Your manuscript <Em>never leaves this browser</Em>, and it comes
-              back out in four formats. The EPUB is{" "}
+              back out in three formats. The EPUB is{" "}
               <Em>verified against EPUBCheck 5.3</Em>, not asserted.
             </p>
 

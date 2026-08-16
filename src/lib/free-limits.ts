@@ -33,7 +33,7 @@
  *   say — see `TotalLimit`.
  *
  * Everything else stays unbounded on both plans: books, words, chapters,
- * **imports**, all four exports, sync, the pre-upload check and the roadmap,
+ * **imports**, every export format, sync, the pre-upload check and the roadmap,
  * structure, progress, the writing record, the series read of the story bible
  * and typing in the keyword boxes yourself.
  *

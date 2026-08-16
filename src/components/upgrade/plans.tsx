@@ -95,7 +95,7 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
  * **The split is by what a row costs to run and who it is for**, not by what
  * would squeeze hardest. Three lines govern it:
  *
- * - **Writing a book and getting it out is free, whole.** All four exports, the
+ * - **Writing a book and getting it out is free, whole.** All three exports, the
  *   pre-upload check and the roadmap included. Every competitor charges for
  *   formatting — Scrivener at $60, Atticus at $147, Vellum at $200 and up — so
  *   giving it away is the wedge, and the landing page has already promised it
@@ -233,7 +233,7 @@ const ROWS: {
    * charges for formatting. Naming them costs one line and answers it.
    *
    * They sit in the *label* rather than the badge because the badge column is a
-   * column of short answers, and "All four (EPUB, DOCX, PDF, Markdown)" in a
+   * column of short answers, and "All three (EPUB, DOCX, PDF)" in a
    * pill would be twice the width of every other one and break the alignment
    * that makes the column scannable.
    *
@@ -249,9 +249,11 @@ const ROWS: {
   {
     group: "Getting it ready",
     label: "Exports",
-    detail: "EPUB, DOCX, PDF, Markdown",
-    starter: "All four",
-    pro: "All four",
+    // Markdown is off this row until it ships properly — see `FORMATS` in
+    // `export-page.tsx`. A pricing page is where a claim costs the most.
+    detail: "EPUB, DOCX, PDF",
+    starter: "All three",
+    pro: "All three",
   },
   {
     group: "Getting it ready",
