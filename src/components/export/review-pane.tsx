@@ -491,6 +491,35 @@ function DocxReview({
  */
 const SHEET = "#fcfbf7";
 const SHEET_INK = "#1f1d1a";
+/** The sheet's own hairline. Without it two off-whites a gap apart do not read
+ *  as two documents — the desk behind is near-white too, so the seam between
+ *  one sheet and the next was a line you had to look for. */
+const SHEET_EDGE = "#d9d7d0";
+
+/**
+ * The reading pane the EPUB is shown in, in CSS pixels.
+ *
+ * **Fixed, and that is the fix.** The sheets were sized in `rem` and `vh`,
+ * both of which the *window* decides — so browser zoom, which changes how many
+ * CSS pixels the window holds, changed the shape of the page. Zoomed out, the
+ * viewport grew and the sheet grew tall and slender; zoomed in, `42rem`
+ * outran the frame and the same sheet came out squat and full-bleed with the
+ * type looming. A preview whose page changes proportion depending on the
+ * reader's zoom is not showing them their book.
+ *
+ * So the frame is a box of a fixed size and everything inside it — the sheet,
+ * the measure, the type against the margins — is laid out against that box and
+ * nothing else. The window can then only decide how big the whole picture is
+ * drawn, never its shape, which is exactly the arrangement the PDF pane has
+ * had all along. It is scaled to fit by the same hook, capped at 1 so it never
+ * grows past its natural size and simply sits centred in a large stage.
+ *
+ * The proportions are a reading screen's rather than a sheet of paper's,
+ * because that is what an EPUB is read on, and the width is chosen for the
+ * measure: at the templates' 11pt body this leaves a line of about sixty
+ * characters, which is the range a book is set in.
+ */
+const PANE = { w: 620, h: 880 };
 
 /**
  * The EPUB's own documents, under the book's own typography.
@@ -527,6 +556,12 @@ function EpubReview({
   chapters: LoadedChapter[];
   typeset: TypesetOptions;
 }) {
+  const room = useRef<HTMLDivElement>(null);
+  /* Constants rather than a measurement: the pane's size is the fixed thing
+     here, and that is the whole point of it. */
+  const natural = useRef(PANE);
+  const fit = useFitToStage(room, natural, true);
+
   /* Derived, not stored. This was `useState` filled from an effect, which is
      the pattern React's lint rule forbids and it was right to: the markup is a
      pure function of the book and the settings, so holding it in state buys a
@@ -553,14 +588,29 @@ function EpubReview({
        cannot push a column sideways. */
     const css = `${typesetCss(typeset, false)}
 html { background: transparent; }
-body { margin: 0; background: transparent; color: ${SHEET_INK}; }
+body { margin: 0; padding: 0.6rem 0.6rem 0; background: transparent; color: ${SHEET_INK}; }
 .oc-file {
   background: ${SHEET};
-  margin: 0 auto 1.5rem;
-  max-width: 42rem;
+  margin: 0 0 1.25rem;
   padding: 3em 3em 4em;
+  border: 1px solid ${SHEET_EDGE};
   border-radius: 4px;
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+  /* **A sheet is at least a screenful, and that is a claim this can make.**
+     Sized to content, a short document — a copyright notice, a dedication —
+     came out as a stub a few lines tall between two full ones, which reads as
+     a broken page rather than as a short one. The honest minimum is the
+     *screen*: an e-reader has no page size either, and what it does have is a
+     screen, on which every new document in the spine starts at the top of a
+     fresh one. So each sheet fills the view and the next begins below it,
+     which says "a new document starts here" without stating a page count
+     nothing can know. Here that screen is a fixed box (see PANE), so this is
+     a fixed height rather than something the window can move. Border-box, or
+     the padding would be added on top of the minimum and overshoot by six
+     ems. (No backticks in this comment: it sits inside a template literal and
+     one would end the string.) */
+  box-sizing: border-box;
+  min-height: calc(100vh - 1.25rem);
 }
 .oc-file > :first-child { margin-top: 0; }
 img { max-width: 100%; height: auto; }`;
@@ -575,15 +625,31 @@ img { max-width: 100%; height: auto; }`;
 
   return (
     <Stage caption="The documents the EPUB packages, each on its own sheet, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file.">
-      {/* `sandbox` with no permissions: no scripts, no forms, no navigation.
-          The content is ours, and a preview of a book has no business doing any
-          of those things. */}
-      <iframe
-        title="The EPUB's pages"
-        sandbox=""
-        srcDoc={srcDoc}
-        className="h-full w-full border-0"
-      />
+      <div ref={room} className="flex h-full justify-center">
+        {/* The scaled footprint. A transform paints smaller but reserves the
+            element's original size, so the box that holds the frame carries the
+            scaled numbers and the frame inside it keeps its own. */}
+        <div
+          style={{ width: PANE.w * fit, height: PANE.h * fit }}
+          className="shrink-0"
+        >
+          {/* `sandbox` with no permissions: no scripts, no forms, no
+              navigation. The content is ours, and a preview of a book has no
+              business doing any of those things. */}
+          <iframe
+            title="The EPUB's pages"
+            sandbox=""
+            srcDoc={srcDoc}
+            style={{
+              width: PANE.w,
+              height: PANE.h,
+              transform: `scale(${fit})`,
+              transformOrigin: "top left",
+            }}
+            className="border-0"
+          />
+        </div>
+      </div>
     </Stage>
   );
 }
