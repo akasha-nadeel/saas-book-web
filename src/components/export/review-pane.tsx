@@ -150,14 +150,23 @@ function YoursInstead({ written }: { written: ReadonlySet<string> }) {
 /** The shell every pane sits in: one scrolling stage with a caption over it. */
 function Stage({
   caption,
+  zoom,
   children,
 }: {
   caption: React.ReactNode;
+  /** Omitted by a pane with nothing to scale. */
+  zoom?: Zoom;
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <p className="mb-3 font-sans text-xs text-muted">{caption}</p>
+      {/* The caption and the zoom sit on one row: the sentence explains what is
+          below, the controls act on it, and putting them anywhere else would
+          separate a control from the thing it controls. */}
+      <div className="mb-3 flex items-end justify-between gap-4">
+        <p className="font-sans text-xs text-muted">{caption}</p>
+        {zoom && <ZoomBar {...zoom} />}
+      </div>
       {/* A grey desk, so the white of the page is the page rather than the
           screen. Bounded and scrolling: a four-hundred-page book cannot push
           the wizard's own controls off the bottom of the window.
@@ -180,11 +189,107 @@ function Stage({
           tall one. */}
       <div
         style={{ height: "clamp(20rem, calc(100dvh - 11rem), 64rem)" }}
-        className="scroll-slim overflow-y-auto rounded-xl border border-line
+        className="scroll-slim overflow-auto rounded-xl border border-line
                    bg-raised p-4"
       >
         {children}
       </div>
+    </div>
+  );
+}
+
+/** What `useZoom` hands the stage. */
+type Zoom = {
+  /** The scale to draw at: 1 is the page at its true size. */
+  scale: number;
+  percent: number;
+  atFit: boolean;
+  canIn: boolean;
+  canOut: boolean;
+  In: () => void;
+  Out: () => void;
+  toFit: () => void;
+};
+
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 1.25;
+
+/**
+ * The reader's own scale, over the top of the fitted one.
+ *
+ * **Fit is the default, not a mode you have to ask for**, which is why the
+ * state starts `null` rather than at 1. A preview's first duty is to show the
+ * whole page; wanting a closer look at the type is the second thing anybody
+ * does, and every document reader offers it. Pressing in or out from the
+ * fitted scale simply continues from wherever that landed, so the ladder has
+ * no fixed rungs and cannot jump on the first press.
+ *
+ * The number shown is the true one — 100% is the page at the size it will be
+ * printed or read at, not "however big the box happens to make it". A
+ * percentage that meant something different on every window would be worth
+ * less than no percentage at all.
+ */
+function useZoom(fit: number): Zoom {
+  const [chosen, setChosen] = useState<number | null>(null);
+  const scale = chosen ?? fit;
+
+  const to = (next: number) =>
+    setChosen(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next)));
+
+  return {
+    scale,
+    percent: Math.round(scale * 100),
+    atFit: chosen === null,
+    canIn: scale < ZOOM_MAX - 0.001,
+    canOut: scale > ZOOM_MIN + 0.001,
+    In: () => to(scale * ZOOM_STEP),
+    Out: () => to(scale / ZOOM_STEP),
+    toFit: () => setChosen(null),
+  };
+}
+
+/** Out, the figure, in, and the way back to a whole page. */
+function ZoomBar({ percent, atFit, canIn, canOut, In, Out, toFit }: Zoom) {
+  const button =
+    "flex h-7 w-7 items-center justify-center rounded-md border border-line " +
+    "font-sans text-sm text-fg transition-colors hover:bg-raised " +
+    "disabled:opacity-35 disabled:hover:bg-transparent";
+
+  return (
+    <div className="flex shrink-0 items-center gap-1.5">
+      <button
+        type="button"
+        onClick={Out}
+        disabled={!canOut}
+        className={button}
+        aria-label="Zoom out"
+      >
+        −
+      </button>
+      {/* Tabular figures, or the row jostles as the number changes width. */}
+      <span className="w-11 text-center font-sans text-xs tabular-nums text-muted">
+        {percent}%
+      </span>
+      <button
+        type="button"
+        onClick={In}
+        disabled={!canIn}
+        className={button}
+        aria-label="Zoom in"
+      >
+        +
+      </button>
+      <button
+        type="button"
+        onClick={toFit}
+        disabled={atFit}
+        className="ml-1 rounded-md border border-line px-2 py-1 font-sans text-xs
+                   font-semibold text-fg transition-colors hover:bg-raised
+                   disabled:opacity-35 disabled:hover:bg-transparent"
+      >
+        Fit
+      </button>
     </div>
   );
 }
@@ -262,8 +367,14 @@ function useFitToStage(
 
     const watch = new ResizeObserver(() => {
       const { w, h } = natural.current;
-      if (w <= 0 || h <= 0) return;
-      setFit(Math.min(1, box.clientWidth / w, box.clientHeight / h));
+      if (w <= 0) return;
+      /* A height of nought means "no height to fit" rather than an unmeasured
+         one — the markdown pane is a column of text that runs as long as it
+         runs, so only its measure binds. Left as a division it would be
+         `Infinity`, which `Math.min` would ignore anyway; stated, it is a
+         decision rather than an accident. */
+      const byHeight = h > 0 ? box.clientHeight / h : Infinity;
+      setFit(Math.min(1, box.clientWidth / w, byHeight));
     });
     watch.observe(box);
     return () => watch.disconnect();
@@ -321,6 +432,7 @@ function PagedReview({
   const [state, setState] = useState<"working" | "done" | "failed">("working");
   const [pages, setPages] = useState(0);
   const fit = useFitToStage(room, natural, state === "done");
+  const zoom = useZoom(fit);
 
   useEffect(() => {
     const into = host.current;
@@ -371,6 +483,7 @@ function PagedReview({
 
   return (
     <Stage
+      zoom={state === "done" ? zoom : undefined}
       caption={
         state === "done"
           ? `${plural(pages, "page")} at ${typeset.trim ? "your trim size" : "the page size you set"}. This is the pagination the PDF will have — the page numbers in the contents are the pages these chapters actually land on.`
@@ -390,7 +503,7 @@ function PagedReview({
         <div
           ref={host}
           className="oc-review-pages"
-          style={state === "done" ? { zoom: fit } : OFF_SCREEN}
+          style={state === "done" ? { zoom: zoom.scale } : OFF_SCREEN}
         />
       </div>
     </Stage>
@@ -419,6 +532,7 @@ function DocxReview({
   const [state, setState] = useState<"working" | "done" | "failed">("working");
   // A Word page is its printed size too — see `useFitToStage`.
   const fit = useFitToStage(room, natural, state === "done");
+  const zoom = useZoom(fit);
 
   useEffect(() => {
     const into = host.current;
@@ -458,6 +572,7 @@ function DocxReview({
 
   return (
     <Stage
+      zoom={state === "done" ? zoom : undefined}
       caption={
         manuscript
           ? "The Word file itself, opened back up. Set in manuscript format — double spaced, with the running header agents ask for."
@@ -472,7 +587,10 @@ function DocxReview({
           an outer box that is never scaled itself — both for the reasons the
           PDF pane gives. */}
       <div ref={room} className="h-full">
-        <div ref={host} style={state === "done" ? { zoom: fit } : OFF_SCREEN} />
+        <div
+          ref={host}
+          style={state === "done" ? { zoom: zoom.scale } : OFF_SCREEN}
+        />
       </div>
     </Stage>
   );
@@ -561,6 +679,7 @@ function EpubReview({
      here, and that is the whole point of it. */
   const natural = useRef(PANE);
   const fit = useFitToStage(room, natural, true);
+  const zoom = useZoom(fit);
 
   /* Derived, not stored. This was `useState` filled from an effect, which is
      the pattern React's lint rule forbids and it was right to: the markup is a
@@ -624,13 +743,16 @@ img { max-width: 100%; height: auto; }`;
   }, [book, chapters, typeset]);
 
   return (
-    <Stage caption="The documents the EPUB packages, each on its own sheet, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file.">
+    <Stage
+      zoom={zoom}
+      caption="The documents the EPUB packages, each on its own sheet, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file."
+    >
       <div ref={room} className="flex h-full justify-center">
         {/* The scaled footprint. A transform paints smaller but reserves the
             element's original size, so the box that holds the frame carries the
             scaled numbers and the frame inside it keeps its own. */}
         <div
-          style={{ width: PANE.w * fit, height: PANE.h * fit }}
+          style={{ width: PANE.w * zoom.scale, height: PANE.h * zoom.scale }}
           className="shrink-0"
         >
           {/* `sandbox` with no permissions: no scripts, no forms, no
@@ -643,7 +765,7 @@ img { max-width: 100%; height: auto; }`;
             style={{
               width: PANE.w,
               height: PANE.h,
-              transform: `scale(${fit})`,
+              transform: `scale(${zoom.scale})`,
               transformOrigin: "top left",
             }}
             className="border-0"
@@ -666,20 +788,39 @@ function MarkdownReview({
 }) {
   const text = buildMarkdownFile(book, chapters, { single });
 
+  const room = useRef<HTMLDivElement>(null);
+  /* A markdown file has no page, so the sheet is the *measure* — a plain-text
+     column of a fixed width, which is the one thing that makes zooming it mean
+     anything. Only the width binds: the text runs as long as it runs, so a
+     height here would either crop the file or pad it with nothing. */
+  const natural = useRef({ w: PANE.w, h: 0 });
+  const fit = useFitToStage(room, natural, true);
+  const zoom = useZoom(fit);
+
   return (
     <Stage
+      zoom={zoom}
       caption={
         single
           ? "The file itself, character for character."
           : "The first file, character for character. One is written per chapter."
       }
     >
-      <pre
-        className="scroll-slim overflow-x-auto rounded-lg bg-sheet p-6 font-mono
-                   text-xs leading-relaxed whitespace-pre-wrap text-sheet-ink"
-      >
-        {text}
-      </pre>
+      <div ref={room} className="flex h-full justify-center">
+        {/* `zoom` rather than a transform here, unlike the EPUB's frame: this
+            is ordinary text, so zoom reflows it and the box keeps a real
+            height. A transform would paint it smaller while reserving the
+            unscaled height, and the stage would scroll through a screenful of
+            nothing under a long file. */}
+        <pre
+          style={{ width: PANE.w, zoom: zoom.scale }}
+          className="h-fit rounded border border-sheet-edge bg-sheet p-8
+                     font-mono text-xs leading-relaxed whitespace-pre-wrap
+                     text-sheet-ink shadow-sm"
+        >
+          {text}
+        </pre>
+      </div>
     </Stage>
   );
 }

@@ -3634,10 +3634,16 @@ body {
  * so a preview that turned charcoal after sunset would be a picture of a file
  * nobody will open.
  */
+/* One sheet, drawn the same way in all four panes — the two here, the EPUB's
+   documents and the markdown column — so walking between the formats reads as
+   one thing changing rather than four screens. The hairline is what makes a
+   sheet an object: the desk behind it is near-white in daylight, and without
+   an edge a page bleeds into it. */
 .oc-review-pages .pagedjs_page {
   background: var(--color-sheet);
   color: var(--color-sheet-ink);
-  margin: 0 auto 1rem;
+  margin: 0 auto 1.25rem;
+  border: 1px solid var(--color-sheet-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
 }
 
@@ -3658,6 +3664,12 @@ body {
   padding: 0 !important;
 }
 .docx-wrapper > section.docx {
-  margin: 0 auto 1rem !important;
+  margin: 0 auto 1.25rem !important;
+  /* The paper token rather than `docx-preview`'s own flat white, so this sheet
+     is the same object the other three panes draw. The file sets no page
+     colour of its own, so nothing is being misreported — the choice is only
+     what colour we draw paper, and it is answered once for the whole app. */
+  background: var(--color-sheet) !important;
+  border: 1px solid var(--color-sheet-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
 }
