@@ -160,10 +160,28 @@ function Stage({
       <p className="mb-3 font-sans text-xs text-muted">{caption}</p>
       {/* A grey desk, so the white of the page is the page rather than the
           screen. Bounded and scrolling: a four-hundred-page book cannot push
-          the wizard's own controls off the bottom of the window. */}
+          the wizard's own controls off the bottom of the window.
+
+          **A real height rather than a `max-height`, and it is what lets a
+          whole page be a whole page.** At `max-h-[60vh]` the box took its
+          height from its contents and stopped at the cap, so a page — which is
+          taller than that at any sensible scale — arrived cropped at the top
+          and the bottom, which is the one thing a page preview must not be. A
+          fixed box is also what `useFitToStage` needs: it measures this to
+          decide the scale, so a height that came from the contents would be a
+          circle.
+
+          Sized off the window less only what is *permanently* on screen — the
+          action bar, and room for the caption above. The heading, the deck and
+          the stepper all scroll away with the column, so budgeting for them
+          too (the first attempt took 21rem out) left a page at a third of its
+          size in a box with half the window empty beneath it. Floored so it
+          survives a short screen and capped so it does not become a wall on a
+          tall one. */}
       <div
-        className="scroll-slim max-h-[60vh] overflow-y-auto rounded-xl border
-                   border-line bg-raised p-4"
+        style={{ height: "clamp(20rem, calc(100dvh - 11rem), 64rem)" }}
+        className="scroll-slim overflow-y-auto rounded-xl border border-line
+                   bg-raised p-4"
       >
         {children}
       </div>
@@ -219,12 +237,21 @@ function Failed({ message }: { message: string }) {
  *   moves with the window, and a scale worked out once is wrong the moment
  *   somebody resizes. It also fires on `observe`, so the first fit costs no
  *   extra pass.
+ *
+ * **Both dimensions bind, which is what makes a page a whole page.** Fitting
+ * the width alone left the top and bottom of every page outside the box —
+ * a preview of a page that never showed one. So the scale is the smaller of
+ * what the width allows and what the height allows, which is the "fit page"
+ * every PDF reader offers and the only setting under which somebody can check
+ * a title page's balance or see where a chapter opening sits on the sheet.
+ * Whichever way round the two come out, the page is whole; a portrait page in
+ * a wider box simply leaves a margin either side, as it does in a reader.
  */
 function useFitToStage(
-  /** The unzoomed box whose width is the room available. */
+  /** The unzoomed box the pages have to fit inside. */
   room: React.RefObject<HTMLDivElement | null>,
-  /** The page's width before anything scaled it, in CSS pixels. */
-  natural: React.RefObject<number>,
+  /** The page's size before anything scaled it, in CSS pixels. */
+  natural: React.RefObject<{ w: number; h: number }>,
   ready: boolean,
 ): number {
   const [fit, setFit] = useState(1);
@@ -234,8 +261,9 @@ function useFitToStage(
     if (!ready || !box) return;
 
     const watch = new ResizeObserver(() => {
-      const wide = natural.current;
-      if (wide > 0) setFit(Math.min(1, box.clientWidth / wide));
+      const { w, h } = natural.current;
+      if (w <= 0 || h <= 0) return;
+      setFit(Math.min(1, box.clientWidth / w, box.clientHeight / h));
     });
     watch.observe(box);
     return () => watch.disconnect();
@@ -289,7 +317,7 @@ function PagedReview({
 }) {
   const host = useRef<HTMLDivElement>(null);
   const room = useRef<HTMLDivElement>(null);
-  const natural = useRef(0);
+  const natural = useRef({ w: 0, h: 0 });
   const [state, setState] = useState<"working" | "done" | "failed">("working");
   const [pages, setPages] = useState(0);
   const fit = useFitToStage(room, natural, state === "done");
@@ -321,8 +349,8 @@ function PagedReview({
         }
         // Recorded here because here is the one moment it is knowable: the
         // pages exist and nothing has scaled them yet. See `useFitToStage`.
-        natural.current =
-          box.querySelector(".pagedjs_page")?.getBoundingClientRect().width ?? 0;
+        const first = box.querySelector(".pagedjs_page")?.getBoundingClientRect();
+        natural.current = { w: first?.width ?? 0, h: first?.height ?? 0 };
         setPages(flow.pages);
         setState("done");
       })
@@ -358,7 +386,7 @@ function PagedReview({
           every state, because Paged.js needs a real box to measure against, so
           it is parked off-screen rather than hidden until the pages are set.
           See `OFF_SCREEN` and `useFitToStage`. */}
-      <div ref={room}>
+      <div ref={room} className="h-full">
         <div
           ref={host}
           className="oc-review-pages"
@@ -387,7 +415,7 @@ function DocxReview({
 }) {
   const host = useRef<HTMLDivElement>(null);
   const room = useRef<HTMLDivElement>(null);
-  const natural = useRef(0);
+  const natural = useRef({ w: 0, h: 0 });
   const [state, setState] = useState<"working" | "done" | "failed">("working");
   // A Word page is its printed size too — see `useFitToStage`.
   const fit = useFitToStage(room, natural, state === "done");
@@ -415,8 +443,8 @@ function DocxReview({
         });
         if (!live) return;
         // Before anything scales it — see `useFitToStage`.
-        natural.current =
-          into.querySelector("section")?.getBoundingClientRect().width ?? 0;
+        const first = into.querySelector("section")?.getBoundingClientRect();
+        natural.current = { w: first?.width ?? 0, h: first?.height ?? 0 };
         setState("done");
       } catch {
         if (live) setState("failed");
@@ -443,7 +471,7 @@ function DocxReview({
       {/* Parked off-screen rather than hidden while it builds, and scaled from
           an outer box that is never scaled itself — both for the reasons the
           PDF pane gives. */}
-      <div ref={room}>
+      <div ref={room} className="h-full">
         <div ref={host} style={state === "done" ? { zoom: fit } : OFF_SCREEN} />
       </div>
     </Stage>
