@@ -157,26 +157,44 @@ export function typesetCss(
   const { side, ends } = trimMargins(trim);
 
   return `
-${forPrint ? `@page { size: ${trim.width}in ${trim.height}in; margin: ${ends}in ${side}in; }` : ""}
 ${
-  // The running head: the book's title in the top margin of every printed page,
-  // on the outer (right) edge. A fixed element the browser repeats per page.
-  // It only reads cleanly with the browser's own centred header switched off —
-  // which the export dialog asks the writer to do.
+  /* **The page, and what sits in its margins.**
+​
+     Paged.js implements these boxes; the browser does not, which is why the
+     running head used to be a `position: fixed` element floated over the text
+     and why the contents page carried no folios. Both are ordinary paged-media
+     CSS now.
+
+     The head names the *chapter*, not the book — that is what a running head is
+     for, and the book's title is on the cover, the title page and the spine
+     already. It is set from `string-set` on each `h1`, so it follows the
+     manuscript rather than being passed in. The first page of a chapter carries
+     no head and no folio: a number under the chapter opening is the mark of a
+     document rather than a book. */
   forPrint
-    ? `.running-head {
-  position: fixed;
-  top: ${(ends * 0.4).toFixed(2)}in;
-  left: 0;
-  right: 0;
-  text-align: right;
-  padding-right: ${side}in;
-  margin: 0;
-  text-indent: 0;
-  font-size: ${(t.bodyPt * 0.8).toFixed(1)}pt;
-  color: #555;
-  ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.05em;" : "font-style: italic;"}
-}`
+    ? `@page {
+  size: ${trim.width}in ${trim.height}in;
+  margin: ${ends}in ${side}in;
+  @top-center {
+    content: string(chaptertitle);
+    font-family: ${t.stack};
+    font-size: ${(t.bodyPt * 0.8).toFixed(1)}pt;
+    color: #555;
+    ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.05em;" : "font-style: italic;"}
+  }
+  @bottom-center {
+    content: counter(page);
+    font-family: ${t.stack};
+    font-size: ${(t.bodyPt * 0.85).toFixed(1)}pt;
+    color: #555;
+  }
+}
+/* The title page takes neither: a folio under a book's title is the mark of a
+   document. Front matter is the first page of the document, so :first is all
+   this needs — the copyright and contents pages that follow do carry a folio,
+   as they do in a printed book. (No backticks in here: this is inside a
+   template literal, and one would end the string.) */
+@page :first { @top-center { content: none; } @bottom-center { content: none; } }`
     : ""
 }
 body {
@@ -194,6 +212,13 @@ h1 {
   font-size: ${(t.bodyPt * 1.6).toFixed(1)}pt;
   margin: ${forPrint ? "2.4em 0 1.6em" : "2em 0 1em"};
   ${t.headingCaps ? "font-variant: small-caps; letter-spacing: 0.06em;" : ""}
+  ${
+    /* What the running head says on the pages that follow. Read from the
+       heading rather than passed in, so it is always the chapter the reader is
+       actually in. Ignored outside Paged.js, which is why it costs the EPUB
+       nothing. */
+    forPrint ? "string-set: chaptertitle content(text);" : ""
+  }
 }
 ${
   // Each chapter (and each generated front-matter page) is its own <section>,
@@ -332,17 +357,6 @@ section::after { content: ""; display: block; clear: both; }
   margin: 0 auto;
   max-width: 22em;
 }
-/* **No dot leaders and no page numbers, deliberately.** The reference for this
-   page is a printed contents, where the leader runs to a folio — and the folio
-   is the one thing this cannot know. The PDF is produced by the browser's own
-   print engine, which paginates after this markup is written; CSS can only
-   fetch a target's page with target-counter(), which is paged-media CSS that
-   Chrome does not implement. An EPUB has no page numbers at all, being
-   reflowable. So a number here would have to be guessed, and a guessed folio in
-   a contents list is a number that sends a reader to the wrong page — the
-   "no invented number" rule, in the one place a reader would trust it most.
-   Leaders without folios are worse again: a line of dots leading to nothing
-   reads as a page that failed to render. Set cleanly instead. */
 .contents li {
   text-indent: 0;
   margin: 0.55em 0;
@@ -353,5 +367,35 @@ section::after { content: ""; display: block; clear: both; }
 /* The chapters are the page; a link colour would make them look like something
    to click in a printed book and like a warning in a dark e-reader theme. */
 .contents a { color: inherit; text-decoration: none; }
+${
+  /* **The leader and the folio, in print only.**
+​
+     The number is `target-counter`, which asks what page the anchor in the
+     `href` actually landed on. It is real: it cannot be off by one, because
+     nobody counted. This is the whole reason the PDF is paginated by Paged.js —
+     Chrome does not implement `target-counter`, so before this the contents
+     page had no honest number to print and printed none.
+
+     Nothing here reaches the EPUB, which is reflowable and has no page numbers
+     to point at; there the entry is a link and that is the right answer. */
+  forPrint
+    ? `.contents a {
+  display: flex;
+  align-items: baseline;
+}
+.contents .toc-dots {
+  flex: 1;
+  margin: 0 0.4em;
+  /* Sat on the baseline, the dots collide with descenders in the title beside
+     them; lifted, they run through the middle of the line as a leader does. */
+  border-bottom: 1px dotted #777;
+  transform: translateY(-0.28em);
+}
+.contents a::after {
+  content: target-counter(attr(href), page);
+  font-variant-numeric: tabular-nums;
+}`
+    : ""
+}
 `.trim();
 }

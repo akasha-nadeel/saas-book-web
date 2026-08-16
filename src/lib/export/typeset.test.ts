@@ -85,11 +85,49 @@ it("adds no page rules to an EPUB, whose reader paginates", () => {
   expect(css).not.toContain("page-break-before: always");
 });
 
-it("puts a running head on the right in print, not in the EPUB", () => {
+/**
+ * The running head and the folio live in `@page` margin boxes now, not in a
+ * `position: fixed` element floated over the prose.
+ *
+ * That was the only way to repeat something per page without paged-media CSS,
+ * and it is why this used to be a `.running-head` div: the browser does not
+ * implement margin boxes, and Paged.js — which paginates the print export —
+ * does. The head names the chapter rather than the book, which is what a
+ * running head is for.
+ */
+it("prints the running head and folio from @page margin boxes", () => {
   const print = typesetCss(DEFAULT_TYPESET, true);
-  expect(print).toContain(".running-head");
-  expect(print).toContain("position: fixed");
-  expect(print).toMatch(/\.running-head[^}]*right:/);
+  expect(print).toContain("@top-center");
+  expect(print).toContain("string(chaptertitle)");
+  expect(print).toContain("@bottom-center");
+  expect(print).toContain("counter(page)");
+  // Fed from the heading, so it follows the manuscript.
+  expect(print).toMatch(/string-set:\s*chaptertitle content\(text\)/);
+  // The old float is gone.
+  expect(print).not.toContain(".running-head");
+});
 
-  expect(typesetCss(DEFAULT_TYPESET, false)).not.toContain(".running-head");
+/** None of the paged-media machinery reaches the EPUB, which has no pages. */
+it("leaves page furniture out of the EPUB", () => {
+  const epub = typesetCss(DEFAULT_TYPESET, false);
+  expect(epub).not.toContain("@top-center");
+  expect(epub).not.toContain("@bottom-center");
+  expect(epub).not.toContain("target-counter");
+  expect(epub).not.toContain("string-set");
+  expect(epub).not.toContain(".running-head");
+});
+
+/**
+ * The contents folio, which is the whole reason the print export is paginated
+ * by Paged.js rather than by the browser.
+ *
+ * `target-counter` asks what page the anchor actually landed on. A number
+ * arrived at any other way would be a guess, and a guessed folio sends a reader
+ * to the wrong page — the invented-number rule in the one place a reader would
+ * trust it most.
+ */
+it("takes the contents page numbers from the pages themselves", () => {
+  const print = typesetCss(DEFAULT_TYPESET, true);
+  expect(print).toMatch(/content:\s*target-counter\(attr\(href\), page\)/);
+  expect(print).toContain(".toc-dots");
 });

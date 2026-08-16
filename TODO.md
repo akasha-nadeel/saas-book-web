@@ -2008,9 +2008,20 @@ should either ship or lose the card.
 - [ ] **Endnotes.** The reference offers "at end of page / end of book". We have
       no endnote feature at all, so this is two jobs: notes in the editor, then
       placement at export.
-- [ ] **Real print-ready PDF.** Current PDF is the browser's print engine: no
-      bleed, no crop marks, no CMYK, and the page says so. A true printer's file
-      needs a real PDF library and is a project of its own.
+- [ ] **Real print-ready PDF.** Paged.js paginates the PDF now, so the interior
+      is properly set — trim size, running heads, a folio on every page, and a
+      contents list whose numbers are real. What is still missing is what the
+      *browser* cannot write, whatever paginates first: no bleed, no crop marks,
+      no CMYK. Every page that mentions the PDF says so.
+      Bleed and crop marks are the reachable half — Paged.js implements
+      `@page { bleed; marks }`, and the trim numbers are already computed by the
+      paperback screen; that needs verifying against a real printer's spec
+      rather than assumed. CMYK is the half that cannot be reached this way at
+      all: the colour space belongs to the file the browser writes. That one
+      needs a true PDF library owning line-breaking and justification — which
+      would likely set worse prose than the browser does — or server-side
+      rendering, which would break "the manuscript never leaves the browser".
+      Weigh it against KDP accepting RGB; IngramSpark is the one that asks.
 
 ## Billing
 
@@ -2499,9 +2510,13 @@ should either ship or lose the card.
       version (drill-down, per-part drop strips) stays cut — see `207f805`.
       *Phase 2 (done):* the export dialog generates a title page, copyright page,
       and contents list for EPUB and PDF, and front/back matter is set unnumbered
-      (only body chapters carry a numeral). *Left:* the same generated pages for
-      DOCX/Markdown if wanted, and real page numbers in the print contents (the
-      browser print engine cannot produce them).
+      (only body chapters carry a numeral). *Phase 3 (done):* real page numbers
+      in the print contents, which this entry said the browser print engine
+      could not produce — true of the browser, and the reason the print export
+      is now paginated by Paged.js before the browser writes the file. The
+      contents carries dot leaders and a folio from `target-counter`, and every
+      page carries a running head naming its chapter. *Left:* the same generated
+      pages for DOCX/Markdown if wanted.
 - [x] **Search across a book.** The editor's Search tab (⌘K) reads every
       chapter's text — walked out of the Tiptap JSON in `src/lib/search.ts` —
       matches title and prose, and shows a snippet that jumps to the chapter.

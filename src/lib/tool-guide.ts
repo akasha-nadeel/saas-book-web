@@ -96,9 +96,9 @@ export const TOOL_GUIDES: ToolGuide[] = [
           "A missing ISBN, an undersized cover, no author name: each is listed with the field that fixes it. Nothing here blocks the export, because a file you want for your own reader is a perfectly good reason to make one.",
       },
       {
-        term: "The print PDF is the browser's own print engine",
+        term: "The print PDF is set on real pages, and numbered",
         detail:
-          "It sets the book on real pages at your trim size. It is not a printer-ready file in the trade sense, and every page in the app that mentions it says so rather than letting you find out at the printer.",
+          "Your trim size, a running head naming the chapter, a page number on every page, and a contents list whose numbers are the pages the chapters actually land on. It is still not a printer-ready file in the trade sense — no bleed, no crop marks, no CMYK — and every page in the app that mentions it says so rather than letting you find out at the printer.",
       },
     ],
   },

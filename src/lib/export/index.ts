@@ -337,7 +337,11 @@ export async function runExport({
 
   if (format === "pdf") {
     const { printBook } = await import("./print");
-    printBook(book, chapters, typeset);
+    /* Awaited, unlike before: pagination now happens in here, and a long book
+       takes a few seconds of it. Without the await the caller would clear its
+       "working" state while Paged.js was still laying out pages, and the print
+       dialog would arrive after the screen had said it was finished. */
+    await printBook(book, chapters, typeset);
     return null;
   }
 

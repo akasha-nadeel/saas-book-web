@@ -144,7 +144,13 @@ function contentsPage(
     .map(({ c, i }) => {
       const numbered = c.number !== null && !isGenericChapterTitle(c.title);
       const label = `${numbered ? `${c.number}. ` : ""}${escapeXml(c.title)}`;
-      return `      <li>${href ? `<a href="${href(i)}">${label}</a>` : label}</li>`;
+      if (!href) return `      <li>${label}</li>`;
+      /* **The leader and the folio are drawn by CSS, from this markup.** The
+         span is the dotted rule; the page number is a `target-counter` on the
+         link in `typeset.ts`, resolved against the anchor this href points at.
+         Both are empty here on purpose — a number written into the markup would
+         be a number this module had to know, and it cannot. */
+      return `      <li><a href="${href(i)}"><span class="toc-title">${label}</span><span class="toc-dots"></span></a></li>`;
     })
     .join("\n");
   return `<section class="front-page contents">

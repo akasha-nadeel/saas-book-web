@@ -207,9 +207,10 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
 
         <p className="mt-6 text-xs text-muted">
           The PDF this app exports is a clean interior file at your trim size
-          with fonts embedded. It has no bleed, no crop marks and no CMYK,
-          because it comes from your browser&rsquo;s print engine — if your
-          printer asks for those, that step still needs another tool.
+          with fonts embedded, page numbers, and a running head. It has no
+          bleed, no crop marks and no CMYK — the browser writes the file, and
+          those are not things it can put in one. If your printer asks for them,
+          that step still needs another tool.
         </p>
       </div>
     </div>

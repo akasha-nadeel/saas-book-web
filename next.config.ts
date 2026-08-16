@@ -1,6 +1,67 @@
 import type { NextConfig } from "next";
+import { createRequire } from "node:module";
+import { existsSync } from "node:fs";
+import { dirname, relative, resolve, sep } from "node:path";
+
+/**
+ * Paged.js, resolved to the build that survives bundling.
+ *
+ * Its `exports` map sends `import` at `src/index.js` — the unbundled ES source,
+ * which pulls in `event-emitter` and the `es5-ext` shims underneath it. Those
+ * are old CommonJS packages that reach for things like
+ * `es5-ext/string/#/contains` and call `.call` on the result; bundled, that
+ * arrives as a module namespace rather than a function and Paged.js dies inside
+ * `new Handlers()` with `TypeError: contains.call is not a function`. It is
+ * thrown at the first `preview()`, so the failure is a PDF export that produces
+ * nothing rather than anything the compiler could have caught.
+ *
+ * `dist/paged.esm.js` is the same library with all of that already resolved and
+ * bundled, and it is what Paged.js ships for browsers. It cannot be imported by
+ * path — the `exports` map has no wildcard, so a deep import is refused — hence
+ * the alias, which is the only place that knows about any of this.
+ *
+ * Found from the package's own entry point rather than from a hand-written
+ * path, so a hoisted or nested `node_modules` resolves either way — and *via*
+ * the entry rather than by asking for the file directly, because the same
+ * `exports` map refuses `require.resolve("pagedjs/dist/paged.esm.js")` with
+ * ERR_PACKAGE_PATH_NOT_EXPORTED. Both entry points it does expose (`src/` and
+ * `lib/`) sit one level under the package root, so `../dist` is the same
+ * journey from either.
+ *
+ * Checked rather than assumed: if a future version moves that file, this throws
+ * at boot with a sentence saying what happened. The alternative is an alias
+ * quietly pointing at nothing, which shows up as a PDF export that fails at the
+ * press with no clue why.
+ */
+const pagedjsFile = resolve(
+  dirname(createRequire(import.meta.url).resolve("pagedjs")),
+  "../dist/paged.esm.js",
+);
+
+/* Turbopack wants a path it can treat as a request, not a bare absolute one:
+   given `D:\…\paged.esm.js` it reports "Module not found" for the very file
+   that is sitting there. Project-relative with forward slashes is the form it
+   takes, and webpack is happy with either. */
+const pagedjs = `./${relative(process.cwd(), pagedjsFile).split(sep).join("/")}`;
+
+if (!existsSync(pagedjsFile)) {
+  throw new Error(
+    `Paged.js's bundled build is not at ${pagedjs}. The print export aliases ` +
+      `'pagedjs' to it because the package's own ESM entry cannot be bundled ` +
+      `(see the note above). Check what dist/ ships in the installed version.`,
+  );
+}
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    resolveAlias: { pagedjs },
+  },
+  /* No `webpack` hook beside this. Next 16 builds with Turbopack, and adding a
+     webpack config to a Turbopack project changes how the whole graph is
+     resolved rather than merely adding an alias to a second bundler — with one
+     here, `/read`, `/chapter/[chapterId]` and `/roadmap` all began answering
+     404 while every other route was fine. The alias above is enough. */
+
   /**
    * The dev-tools badge, out of the sidebar's corner.
    *

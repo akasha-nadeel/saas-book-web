@@ -90,7 +90,33 @@ it("links each chapter when the format has somewhere to link to", () => {
     { ...opts, titlePage: false, copyright: false },
     (i) => `chapter-${String(i + 1).padStart(2, "0")}.xhtml`,
   );
-  expect(sections[0].html).toContain('<a href="chapter-02.xhtml">Chapter One</a>');
+  // The title and the leader are separate elements so the folio can sit at the
+  // far end of the line — see the `target-counter` rule in typeset.ts.
+  expect(sections[0].html).toContain('<a href="chapter-02.xhtml">');
+  expect(sections[0].html).toContain('<span class="toc-title">Chapter One</span>');
+  expect(sections[0].html).toContain('<span class="toc-dots"></span>');
+});
+
+/**
+ * The folio is never written into the markup, and this is the test that keeps
+ * it that way.
+ *
+ * A page number here would have to be one this module worked out, and it cannot
+ * — the pages do not exist until the document is laid out. It comes from
+ * `target-counter` at render time instead, which is the difference between a
+ * real number and a plausible one.
+ */
+it("writes no page number of its own into the contents", () => {
+  const html = frontSections(
+    book,
+    chapters,
+    { ...opts, titlePage: false, copyright: false },
+    (i) => `#page-${i + 1}`,
+  )[0].html;
+
+  expect(html).toContain('class="toc-dots"');
+  // Nothing between the leader and the end of the entry.
+  expect(html).toMatch(/<span class="toc-dots"><\/span><\/a>/);
 });
 
 it("leaves the contents unlinked when no target is given", () => {
