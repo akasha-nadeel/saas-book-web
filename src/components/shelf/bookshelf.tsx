@@ -1992,18 +1992,39 @@ function PhaseRing({ done, total }: { done: number; total: number }) {
  * anything.
  */
 function TargetBar({ words, target }: { words: number; target: number }) {
-  const share = Math.min(100, Math.round((words / target) * 100));
+  /* **Rounded down, and the verdict read off the words rather than the
+     percentage.** This was `Math.round`, which is wrong at both ends of the
+     bar. At the bottom it turned every early session into "0% of target" — 215
+     words into a 110,000-word novel is 0.195%, and a writer who has just
+     written a page being told they are at nought is the app failing to count
+     what it asked them to do. At the top it was worse: 99.6% rounds to 100, so
+     a book *short* of its target printed "100% of target" in the green that is
+     kept for having got there. A number that rounds up into a claim is the one
+     kind this screen must not print.
+
+     So the figure only ever understates, and `met` asks the question directly
+     — the words against the target, not the percentage they were flattened
+     into. Guarded against a target of nought, which would divide to Infinity. */
+  const exact = target > 0 ? (words / target) * 100 : 0;
+  const share = Math.max(0, Math.min(100, Math.floor(exact)));
+  const met = target > 0 && words >= target;
+
+  /* Under one per cent is said in words. Rounding down is honest and "0%" is
+     not: it reads as *nothing counted*, which is a different fact from *a
+     little counted*, and the writer it is shown to has just written the
+     little. */
+  const label = words > 0 && share === 0 ? "under 1%" : `${share}%`;
+
   // The bar is the accent while it is a *measure* and turns green once the
   // target is met, because at that point it stops measuring and becomes a
   // verdict — which is the one thing green is kept for here. Reaching a target
   // you set yourself is the rarest good news on this screen and it should not
   // look like 94%.
-  const met = share >= 100;
   return (
     <div className="mt-3.5 max-w-sm">
       <div className="flex items-baseline justify-between text-xs">
         <span className={`font-semibold ${met ? "text-ok-fg" : "text-fg"}`}>
-          {share}% of target
+          {label} of target
         </span>
         <span className="text-muted">
           {words.toLocaleString()} of {target.toLocaleString()}

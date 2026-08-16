@@ -1195,8 +1195,16 @@ function MatterCard({
       // its content, and with the list open that content is every chapter row —
       // so `shrink-0` set a floor at the height of the whole list and the back
       // matter was pushed off the screen. Allowed to shrink, the card takes what
-      // the panel has and the list scrolls inside it. The other two keep
-      // `shrink-0`: they hold two lines of text, and squeezing those clips them.
+      // the panel has and the list scrolls inside it.
+      //
+      // **The closed ones keep `shrink-0`, and for a while only this comment
+      // said so.** They were given plain `shrink` along with the open card,
+      // which is the same thing flexbox does by default — so at thirty-odd
+      // chapters the open card's content squeezed the other two until "Front
+      // matter" and "Back matter" were clipped strips with their own titles cut
+      // through. They hold two lines of text and have nothing to give: the card
+      // with the list is the one thing on this panel that can absorb a long
+      // book, because its list scrolls.
       //
       // Height is `grow` alone, never `flex-1`. `flex-1` sets a basis of 0%,
       // and switching a basis between 0% and auto is a discrete change no
@@ -1228,7 +1236,7 @@ function MatterCard({
                         }`
                   }
                   min-h-0
-                  ${listOpen ? "shrink grow" : "shrink grow-0"}`}
+                  ${listOpen ? "shrink grow" : "shrink-0 grow-0"}`}
     >
       {/* Two rules running out of the selected card towards the page, in that
           part's own colour — the page's edge is already wearing it, and these
