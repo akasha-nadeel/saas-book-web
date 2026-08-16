@@ -681,6 +681,7 @@ function EpubReview({
   const fit = useFitToStage(room, natural, true);
   const zoom = useZoom(fit);
 
+
   /* Derived, not stored. This was `useState` filled from an effect, which is
      the pattern React's lint rule forbids and it was right to: the markup is a
      pure function of the book and the settings, so holding it in state buys a
@@ -713,7 +714,7 @@ function EpubReview({
        cannot push a column sideways. */
     const css = `${typesetCss(typeset, false)}
 html { background: transparent; }
-body { margin: 0; padding: 0.6rem 0.6rem 0; background: transparent; color: ${SHEET_INK}; }
+body { margin: 0; padding: 10px 10px 0; background: transparent; color: ${SHEET_INK}; }
 .oc-file {
   background: ${SHEET};
   margin: 0 0 1.25rem;
@@ -730,12 +731,15 @@ body { margin: 0; padding: 0.6rem 0.6rem 0; background: transparent; color: ${SH
      fresh one. So each sheet fills the view and the next begins below it,
      which says "a new document starts here" without stating a page count
      nothing can know. Here that screen is a fixed box (see PANE), so this is
-     a fixed height rather than something the window can move. Border-box, or
-     the padding would be added on top of the minimum and overshoot by six
-     ems. (No backticks in this comment: it sits inside a template literal and
-     one would end the string.) */
+     a number rather than something the window can move — and it has to be a
+     number rather than 100vh, because the frame is now sized to its own
+     contents so that the *stage* does the scrolling. Against a frame as tall
+     as the book, a vh minimum would make every sheet as tall as the book and
+     grow without end. Border-box, or the padding would be added on top of the
+     minimum and overshoot by six ems. (No backticks in this comment: it sits
+     inside a template literal and one would end the string.) */
   box-sizing: border-box;
-  min-height: calc(100vh - 1.25rem);
+  min-height: ${PANE.h - 30}px;
 }
 .oc-file > :first-child { margin-top: 0; }
 img { max-width: 100%; height: auto; }`;
@@ -748,29 +752,83 @@ img { max-width: 100%; height: auto; }`;
       .join("")}</body></html>`;
   }, [book, chapters, typeset]);
 
+  /**
+   * How tall the frame has to be to hold the whole book without scrolling.
+   *
+   * **The frame must not scroll, so that the stage can.** Left at the pane's
+   * own height it scrolled internally, which put its scrollbar *inside* the
+   * desk, hard against the right edge of the sheet — and the stage's own
+   * scrollbar beside it, two bars for one document. The PDF pane never had
+   * that because its pages are laid into the stage directly. Growing the frame
+   * to its contents gets the same arrangement here: one column of sheets on
+   * the desk, one scrollbar, at the edge of the window where the other panes
+   * put theirs.
+   *
+   * Measured rather than guessed, because only the frame knows how long the
+   * book set out to be. A `ResizeObserver` on its document keeps it right when
+   * the manuscript font lands and every line re-wraps a moment after load.
+   */
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [tall, setTall] = useState(PANE.h);
+
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+
+    let watch: ResizeObserver | null = null;
+
+    const attach = () => {
+      const doc = el.contentDocument;
+      if (!doc) return;
+      watch?.disconnect();
+      // Fires once on `observe`, so the first measurement costs no extra pass —
+      // and setting state from an observer is a subscription rather than the
+      // synchronous effect-body write the lint rule refuses.
+      watch = new ResizeObserver(() =>
+        setTall(Math.max(PANE.h, doc.documentElement.scrollHeight)),
+      );
+      watch.observe(doc.documentElement);
+    };
+
+    // `srcDoc` can already have landed by the time this runs, in which case no
+    // further load event is coming.
+    el.addEventListener("load", attach);
+    attach();
+    return () => {
+      el.removeEventListener("load", attach);
+      watch?.disconnect();
+    };
+  }, [srcDoc]);
+
   return (
     <Stage
       zoom={zoom}
       caption="The documents the EPUB packages, each on its own sheet, in the book's own typography. No page numbers: an e-reader picks its own page, so a count here would be about this screen rather than about the file."
     >
-      <div ref={room} className="flex h-full justify-center">
+      {/* `items-start`, or a flex child shorter than the row would be stretched
+          to it and the frame would scroll after all. */}
+      <div ref={room} className="flex h-full items-start justify-center">
         {/* The scaled footprint. A transform paints smaller but reserves the
             element's original size, so the box that holds the frame carries the
-            scaled numbers and the frame inside it keeps its own. */}
+            scaled numbers and the frame inside it keeps its own. Its height is
+            the *measured* one, so the stage scrolls the whole book. */}
         <div
-          style={{ width: PANE.w * zoom.scale, height: PANE.h * zoom.scale }}
+          style={{ width: PANE.w * zoom.scale, height: tall * zoom.scale }}
           className="shrink-0"
         >
-          {/* `sandbox` with no permissions: no scripts, no forms, no
-              navigation. The content is ours, and a preview of a book has no
-              business doing any of those things. */}
+          {/* **`allow-same-origin` and nothing else.** The frame has to be
+              readable from here to be measured, and with no `allow-scripts`
+              nothing can run inside it to make that a risk — no scripts, no
+              forms, no navigation. The content is ours either way. */}
           <iframe
+            ref={frame}
             title="The EPUB's pages"
-            sandbox=""
+            sandbox="allow-same-origin"
             srcDoc={srcDoc}
+            scrolling="no"
             style={{
               width: PANE.w,
-              height: PANE.h,
+              height: tall,
               transform: `scale(${zoom.scale})`,
               transformOrigin: "top left",
             }}
