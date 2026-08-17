@@ -8,6 +8,8 @@ import {
   templateById,
   trimById,
   typesetCss,
+  typesetMetrics,
+  typesetVars,
 } from "@/lib/export/typeset";
 
 it("falls back rather than returning undefined for an unknown template", () => {
@@ -448,4 +450,70 @@ it("defaults to a trim a book is actually printed at", () => {
 
   expect(trim.id).toBe("6x9");
   expect(["letter", "a4"]).not.toContain(trim.id);
+});
+
+/**
+ * The page and the type, said the way the reading view asks for them.
+ *
+ * These back the export wizard's Preview step, which is the screen that claims
+ * to show the file. It was set from the *book's* page setup and typography
+ * instead, so a writer who chose 5×8 and Romance was shown 6×9 in Garamond —
+ * every line breaking somewhere the file does not. What these tests hold is
+ * that the two answers come from the one table: a preview computing its own
+ * page is a preview that drifts.
+ */
+describe("the setting a preview is drawn at", () => {
+  it("cuts the sheet to the chosen trim and the margins that go with it", () => {
+    for (const trim of TRIMS) {
+      const options = { ...DEFAULT_TYPESET, trim: trim.id };
+      const setting = bookSetting(templateById(options.template), trim);
+      const metrics = typesetMetrics(options);
+
+      expect(metrics.width).toBe(trim.width);
+      expect(metrics.height).toBe(trim.height);
+      // The margins are `bookSetting`'s, not a second opinion about them.
+      expect([metrics.left, metrics.right]).toEqual([setting.side, setting.side]);
+      expect([metrics.top, metrics.bottom]).toEqual([setting.ends, setting.ends]);
+    }
+  });
+
+  it("sets the prose in the template's own face and size", () => {
+    for (const template of TEMPLATES) {
+      const options = { ...DEFAULT_TYPESET, template: template.id };
+      const { sizePt, leading } = bookSetting(template, trimById(options.trim));
+      const vars = typesetVars(options);
+
+      expect(vars["--ms-font"]).toBe(template.stack);
+      expect(vars["--ms-leading"]).toBe(String(leading));
+      // Points to pixels at 96 to the inch, as typographyVars does it.
+      expect(vars["--ms-size"]).toBe(`${(sizePt * (96 / 72)).toFixed(2)}px`);
+    }
+  });
+
+  it("indents its paragraphs rather than spacing them, as typesetCss does", () => {
+    /* One signal that a paragraph has begun, never two. `typesetCss` says
+       `p { margin: 0; text-indent: 1.5em }`, and these variables have to say
+       the same thing or the preview marks its paragraphs a second way the file
+       does not. */
+    const vars = typesetVars(DEFAULT_TYPESET);
+    const size = Number.parseFloat(vars["--ms-size"]);
+
+    expect(vars["--ms-para-gap"]).toBe("0px");
+    expect(vars["--ms-indent"]).toBe(`${(size * 1.5).toFixed(2)}px`);
+    expect(vars["--ms-align"]).toBe("justify");
+    expect(typesetCss(DEFAULT_TYPESET, true)).toContain("text-indent: 1.5em");
+  });
+
+  it("keeps the manuscript template's specification whatever the trim", () => {
+    // The carve-out in `bookSetting` has to reach the preview too, or the one
+    // template that exists to be exact is previewed inexactly.
+    for (const trim of TRIMS) {
+      const metrics = typesetMetrics({
+        ...DEFAULT_TYPESET,
+        template: "manuscript",
+        trim: trim.id,
+      });
+      expect([metrics.top, metrics.left]).toEqual([1, 1]);
+    }
+  });
 });

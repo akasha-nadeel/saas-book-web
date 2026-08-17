@@ -123,7 +123,11 @@ export function ReaderPages({
         className="flex flex-col items-center gap-8 px-3 py-8 md:py-12"
       >
         {chapters.map((chapter) => {
-          const opener = (
+          // The prose setting, or the front-matter one for a page this app
+          // built — the same split the flip-book makes. See `.reader-front`.
+          const body = chapter.generated ? "reader-front" : "tiptap";
+          // Apparatus prints no title of its own; see `printsHeading`.
+          const opener = chapter.heading ? (
             <Link
               href={`/book/${bookId}/chapter/${chapter.id}`}
               title="Edit this chapter"
@@ -134,7 +138,7 @@ export function ReaderPages({
               )}
               <h2 className="reader-title">{chapter.title}</h2>
             </Link>
-          );
+          ) : null;
 
           if (chapter.empty) {
             return (
@@ -162,7 +166,7 @@ export function ReaderPages({
               >
                 {opener}
                 <div
-                  className="tiptap"
+                  className={body}
                   dangerouslySetInnerHTML={{ __html: chapter.html }}
                 />
               </article>
@@ -177,7 +181,7 @@ export function ReaderPages({
             >
               {index === 0 && opener}
               <div
-                className={`tiptap${index > 0 ? " reader-cont" : ""}`}
+                className={`${body}${index > 0 && !chapter.generated ? " reader-cont" : ""}`}
                 dangerouslySetInnerHTML={{ __html: html }}
               />
             </article>

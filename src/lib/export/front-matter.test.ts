@@ -55,18 +55,23 @@ it("dates the copyright and names the author as holder", () => {
 it("numbers only the body chapters in the contents", () => {
   const sections = frontSections(
     book,
+    /* Title and number only: the contents list is built from `ListedPage`, which
+       is the two fields it reads. A `doc` here would be a document nothing in
+       this path opens. */
     [
-      { title: "Dedication", number: null, doc: { type: "doc", content: [] } },
-      { title: "The Last Lamp", number: 1, doc: { type: "doc", content: [] } },
-      { title: "Epilogue", number: null, doc: { type: "doc", content: [] } },
+      { title: "Dedication", number: null },
+      { title: "The Last Lamp", number: 1 },
+      { title: "Epilogue", number: null },
     ],
     { ...opts, titlePage: false, copyright: false },
   );
   const html = sections[0].html;
   // Body chapters carry a number; front and back matter are listed by name.
-  expect(html).toContain("1. The Last Lamp");
-  expect(html).toContain("<li>Dedication</li>");
-  expect(html).toContain("<li>Epilogue</li>");
+  // The label is what is asserted, not the markup around it — with no `href`
+  // this is the screen's shape, a leader and an empty folio slot.
+  expect(html).toContain(">1. The Last Lamp<");
+  expect(html).toContain(">Dedication<");
+  expect(html).toContain(">Epilogue<");
 });
 
 // "1. Chapter One" was what shipped, and it says the same thing twice. The
@@ -77,7 +82,7 @@ it("drops the numeral when the title already carries the number", () => {
     titlePage: false,
     copyright: false,
   });
-  expect(sections[0].html).toContain("<li>Chapter One</li>");
+  expect(sections[0].html).toContain(">Chapter One<");
   expect(sections[0].html).not.toContain("1. Chapter One");
 });
 

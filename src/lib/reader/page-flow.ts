@@ -39,6 +39,71 @@ export interface ReaderChapter {
   label: string | null;
   html: string;
   empty: boolean;
+  /**
+   * Whether this page opens with its own title above the prose.
+   *
+   * `printsHeading`'s answer, carried through. Apparatus — a half-title, a
+   * title page, a copyright page, a contents list — is furniture rather than a
+   * division of the book, so no published book heads that sheet with its name;
+   * the name exists so the writer can find the page in a list. Every exporter
+   * has known that and this view did not, so it headed somebody's copyright
+   * page "Copyright page" on the screen that claims to show the file.
+   */
+  heading: boolean;
+  /**
+   * A page this app built rather than one the writer typed — the generated
+   * title page, copyright page or contents.
+   *
+   * Two things follow, and they are the only two: its markup is a `<section>`
+   * of its own that takes the front-matter setting rather than the prose
+   * setting (`reader-front`, not `tiptap`), and there is no chapter behind it
+   * to click into. Nothing else may hang off this flag.
+   */
+  generated: boolean;
+  /**
+   * Where this page sat in the list the contents was built from, or null for a
+   * generated page.
+   *
+   * The generated contents names each chapter by that index — `data-page-of` —
+   * because the exporters name their files and anchors positionally and a bound
+   * order must never renumber them. This is what lets `withFolios` turn "the
+   * fourth loaded page" into "page 11" once the sheets have been cut.
+   */
+  source: number | null;
+}
+
+/**
+ * A contents page with its page numbers filled in.
+ *
+ * **The reading view is the one place that can answer this, and it can only
+ * answer it last.** A printed contents takes its folios from `target-counter`,
+ * which Paged.js resolves against real pages; a screen has no such mechanism,
+ * and the numbers cannot be known until the book has been measured and cut —
+ * which is after the contents page itself has been written. So the page is
+ * built with empty slots, the whole book is laid out, and the slots are filled
+ * here.
+ *
+ * **It is not circular, and that is by construction:** a folio is set on the
+ * line its leader already occupies, so filling one changes no height, and the
+ * layout that produced the number still stands. `pageOf` answering null leaves
+ * the slot empty rather than guessing — an entry with no number reads as a gap,
+ * where a wrong number reads as a fact.
+ */
+export function withFolios(
+  html: string,
+  pageOf: (source: number) => number | null,
+): string {
+  if (typeof document === "undefined" || !html.includes("toc-folio")) return html;
+  // A <template>'s contents are inert, so nothing is fetched by the parse.
+  const holder = document.createElement("template");
+  holder.innerHTML = html;
+  for (const slot of holder.content.querySelectorAll(".toc-folio")) {
+    const source = Number(slot.getAttribute("data-page-of"));
+    if (!Number.isInteger(source)) continue;
+    const page = pageOf(source);
+    if (page !== null) slot.textContent = String(page);
+  }
+  return holder.innerHTML;
 }
 
 /**
@@ -314,17 +379,90 @@ export function paginate(
   // hidden`, which is one). Without it the two disagree by that margin.
   col.style.display = "flow-root";
 
+  /* Apparatus prints no heading — `printsHeading`, carried on `heading`. So the
+     opener is absent rather than empty: measured with an empty opener in the
+     flow, a copyright page would be laid out an inch and a half short of the
+     sheet the writer is shown. */
   const labelHtml = chapter.label
     ? `<p class="chapter-label">${escapeXml(chapter.label)}</p>`
     : "";
+  const opener = chapter.heading
+    ? `<div class="chapter-opener reader-opener-link">${labelHtml}` +
+      `<h2 class="reader-title">${escapeXml(chapter.title)}</h2></div>`
+    : "";
+  /* Prose is set as prose and a generated page is set as front matter — two
+     different settings, so two different wrappers. See `.reader-front` in
+     globals.css, which is the reading view's half of `typesetCss`'s
+     front-matter block. */
   col.innerHTML =
-    `<div class="chapter-opener reader-opener-link">${labelHtml}` +
-    `<h2 class="reader-title">${escapeXml(chapter.title)}</h2></div>` +
-    `<div class="tiptap">${chapter.html}</div>`;
+    opener +
+    `<div class="${chapter.generated ? "reader-front" : "tiptap"}">${chapter.html}</div>`;
 
-  const tiptap = col.lastElementChild as HTMLElement;
-  const kids = Array.from(tiptap.children) as HTMLElement[];
+  const host = col.lastElementChild as HTMLElement;
+
+  /* **A generated page is one `<section>`, and one element is one block, which
+     a page break cannot get inside.** Left as it was, a contents list longer
+     than a sheet went on the sheet anyway and `.reader-page`'s `overflow:
+     hidden` cut it off — the exact defect `page-breaks.ts` was extracted to fix,
+     reappearing on the pages this app writes itself. Measured on a 66-chapter
+     book: the heading alone on one sheet, twenty-five entries on the next, and
+     the remaining forty simply absent.
+
+     So the section's children are the blocks — and a *list* among them is
+     opened out into its items, because a contents page is one `<ol>` and
+     nothing else, so leaving it whole would put the entire page back into a
+     single block. Breaking between entries is also the only place a contents
+     page *can* break: cutting one in half would leave a chapter's name on one
+     sheet and its folio on the next. */
+  const shell = chapter.generated
+    ? (host.firstElementChild as HTMLElement | null)
+    : null;
+  /** Each block, and the list it belongs to if it is an item of one. */
+  const pieces: { el: HTMLElement; list: HTMLElement | null }[] = [];
+  for (const child of Array.from((shell ?? host).children) as HTMLElement[]) {
+    if (shell && (child.tagName === "OL" || child.tagName === "UL")) {
+      for (const item of Array.from(child.children) as HTMLElement[]) {
+        pieces.push({ el: item, list: child });
+      }
+    } else {
+      pieces.push({ el: child, list: null });
+    }
+  }
+  const kids = pieces.map((piece) => piece.el);
   if (kids.length === 0) return [""];
+
+  /**
+   * One sheet's blocks, back inside what they came out of.
+   *
+   * Runs of items are gathered into a shallow clone of their own list and the
+   * whole sheet into a clone of the section, so a continuation is still a real
+   * `<ol>` inside a real `front-page contents` — which is what carries the
+   * setting. Rebuilt rather than sliced because a list cut by a Range comes
+   * back as a fragment of items with no list around them.
+   */
+  const sheet = (parts: { html: string; list: HTMLElement | null }[]): string => {
+    let out = "";
+    for (let i = 0; i < parts.length; ) {
+      const list = parts[i].list;
+      if (!list) {
+        out += parts[i].html;
+        i += 1;
+        continue;
+      }
+      let inner = "";
+      while (i < parts.length && parts[i].list === list) {
+        inner += parts[i].html;
+        i += 1;
+      }
+      const listClone = list.cloneNode(false) as HTMLElement;
+      listClone.innerHTML = inner;
+      out += listClone.outerHTML;
+    }
+    if (!shell) return out;
+    const clone = shell.cloneNode(false) as HTMLElement;
+    clone.innerHTML = out;
+    return clone.outerHTML;
+  };
 
   // The column's top is the sheet's own content top, so a block's position here
   // is its position on the first page — the opener included, since it is in the
@@ -341,7 +479,9 @@ export function paginate(
       // Only prose splits. A picture, a scene break or a heading has nothing to
       // break between, and a wrapped picture is out of the flow entirely — the
       // text beside it would re-wrap on the next sheet, where the picture is
-      // not.
+      // not. A contents entry is not split either: it is opened out into its own
+      // block above, and a chapter's name on one sheet with its page number on
+      // the next is not a page break anybody wants.
       splittable:
         el.tagName === "P" &&
         !el.hasAttribute("data-wrap") &&
@@ -416,17 +556,19 @@ export function paginate(
   }
 
   const pages: string[] = [];
-  let current: string[] = [];
+  let current: { html: string; list: HTMLElement | null }[] = [];
 
-  kids.forEach((el, index) => {
-    if (opensPage.has(index) && current.length) {
-      pages.push(current.join(""));
-      current = [];
-    }
+  const breakHere = () => {
+    pages.push(sheet(current));
+    current = [];
+  };
+
+  pieces.forEach(({ el, list }, index) => {
+    if (opensPage.has(index) && current.length) breakHere();
 
     const cuts = cutsIn.get(index);
     if (!cuts || cuts.length === 0) {
-      current.push(el.outerHTML);
+      current.push({ html: el.outerHTML, list });
       return;
     }
 
@@ -434,14 +576,14 @@ export function paginate(
     const total = nodes.reduce((n, t) => n + t.data.length, 0);
     const bounds = [0, ...cuts, total];
     for (let i = 0; i < bounds.length - 1; i++) {
-      current.push(sliceBlock(el, nodes, total, bounds[i], bounds[i + 1]));
-      if (i < bounds.length - 2) {
-        pages.push(current.join(""));
-        current = [];
-      }
+      current.push({
+        html: sliceBlock(el, nodes, total, bounds[i], bounds[i + 1]),
+        list,
+      });
+      if (i < bounds.length - 2) breakHere();
     }
   });
 
-  pages.push(current.join(""));
+  pages.push(sheet(current));
   return pages;
 }

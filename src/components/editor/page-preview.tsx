@@ -11,6 +11,7 @@ import {
 import { BOOK_SHADOW, BookCover } from "@/components/shelf/book-cover";
 import {
   chapterLabel,
+  chapterMatterOf,
   chapterNumberOf,
   getBody,
   isGenericChapterTitle,
@@ -21,7 +22,7 @@ import {
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
 import { typographyVars } from "@/lib/typography";
-import { toBlocks } from "@/lib/export/blocks";
+import { printsHeading, toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml } from "@/lib/export/xhtml";
 import { paginate, type ReaderChapter } from "@/components/reader/reader-pages";
 import { needsSecondPass, picturesSettled } from "@/lib/reader/page-flow";
@@ -40,6 +41,8 @@ interface FlatPage {
   html: string;
   empty: boolean;
   first: boolean;
+  /** Whether the page opens with its own title — see `printsHeading`. */
+  heading: boolean;
 }
 
 /**
@@ -104,6 +107,22 @@ export function PagePreview({
           label,
           html,
           empty: html.trim() === "",
+          /* Apparatus prints no title of its own, here as everywhere else —
+             see `printsHeading`. This is a picture of the printed page, so a
+             sheet headed "Copyright page" would be a page no book has. */
+          heading: printsHeading({
+            title: chapter.title,
+            matter: chapterMatterOf(chapter),
+          }),
+          /* The manuscript as written. This is the *editor's* Book View, a
+             preview of the pages the writer is typing, not of a file — the
+             generated title page and contents belong to an export and are bound
+             in by `boundReaderPages`, which the reading view calls and this
+             deliberately does not. */
+          generated: false,
+          /* Nothing here is listed in a contents page, because this builds no
+             contents page — see above. */
+          source: null,
         };
       }),
     [book],
@@ -161,6 +180,7 @@ export function PagePreview({
           html,
           empty: chapter.empty,
           first: i === 0,
+          heading: chapter.heading,
         }),
       );
     }
@@ -306,7 +326,7 @@ export function PagePreview({
               transformOrigin: "top left",
             }}
           >
-            {page?.first && !page.empty && (
+            {page?.first && page.heading && !page.empty && (
               <div className="chapter-opener">
                 {page.label && <p className="chapter-label">{page.label}</p>}
                 <h2 className="reader-title">{page.title}</h2>

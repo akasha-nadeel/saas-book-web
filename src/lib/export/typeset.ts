@@ -19,6 +19,8 @@
  * that hold it.
  */
 
+import type { PageMetrics } from "@/lib/page-setup";
+
 export type TemplateId = "manuscript" | "classic" | "romance";
 
 export interface Template {
@@ -221,6 +223,73 @@ export function bookSetting(template: Template, trim: Trim): BookSetting {
 export function measureIn(setting: BookSetting, trim: Trim): number {
   const textWidthPt = (trim.width - setting.side * 2) * 72;
   return Math.round(textWidthPt / (0.447 * setting.sizePt));
+}
+
+/**
+ * The same setting, said the way the reading view asks for it.
+ *
+ * **This pair exists so the export wizard's Preview can be set like the file
+ * rather than like the editor.** `BookPages` draws its sheets from a
+ * `PageMetrics` and sets its prose from the `--ms-*` custom properties, and it
+ * was being handed the *book's* page setup and typography — so a writer who
+ * chose 5×8 and Romance on the Layout step was shown 6×9 in Garamond and told
+ * by the step's own deck that it was "the trim and typography you have set".
+ * Every line broke in a different place from the file's.
+ *
+ * They live here, next to `bookSetting` and `templateById`, for the reason
+ * `bookSetting` itself is exported: a preview that computes its own page is a
+ * preview that drifts. `typesetCss` and these two read the one table, so the
+ * page a writer approves is the page that prints.
+ *
+ * Note what is *not* here: nothing reads `pageSetupOf(book)` or
+ * `typographyOf(book)`. Those are the writing surface's settings and the
+ * read-through stays paired with them — see `BookPages`, which takes these only
+ * when it is standing in for the file.
+ */
+export function typesetMetrics(options: TypesetOptions): PageMetrics {
+  const trim = trimById(options.trim);
+  const { side, ends } = bookSetting(templateById(options.template), trim);
+  return {
+    width: trim.width,
+    height: trim.height,
+    top: ends,
+    bottom: ends,
+    left: side,
+    right: side,
+  };
+}
+
+/**
+ * The `--ms-*` variables for a book set by this template.
+ *
+ * Every value mirrors a rule in `typesetCss`, and the mirroring is the whole
+ * point — change one and change the other:
+ *
+ * - the face and size come from the template and `bookSetting`, as `${root}`
+ *   and `size()` do;
+ * - `justify` is `${root} { text-align: justify }`;
+ * - the indent is `${s}p { text-indent: 1.5em }`, in the pixels the reading
+ *   view measures in;
+ * - the paragraph gap is nought, because that rule is `${s}p { margin: 0 }`.
+ *   A book is set with an indent *or* a space between paragraphs and never
+ *   both — see `paragraphStyleSettings` in typography.ts, which makes the same
+ *   choice for the writing surface.
+ *
+ * Points and inches become pixels at 96 to the inch, exactly as
+ * `typographyVars` does it, so the two are interchangeable at the call site.
+ */
+export function typesetVars(options: TypesetOptions): Record<string, string> {
+  const template = templateById(options.template);
+  const { sizePt, leading } = bookSetting(template, trimById(options.trim));
+  const sizePx = sizePt * (96 / 72);
+  return {
+    "--ms-font": template.stack,
+    "--ms-size": `${sizePx.toFixed(2)}px`,
+    "--ms-leading": String(leading),
+    "--ms-align": "justify",
+    "--ms-indent": `${(sizePx * 1.5).toFixed(2)}px`,
+    "--ms-para-gap": "0px",
+  };
 }
 
 export interface TypesetOptions {
@@ -550,7 +619,17 @@ ${s}.figure[data-wrap] img { width: 100%; }
 ${s}section::after { content: ""; display: block; clear: both; }
 
 /* Generated front matter. Each opens its own page in print (the section rule
-   above), and an e-reader paginates as it likes. */
+   above), and an e-reader paginates as it likes.
+
+   **The reading view sets these same pages too, and its rules are in
+   globals.css under "Generated front matter, on a reading-view page".** That is
+   the screen the export wizard's Preview mounts, so the two are a pair and a
+   change here belongs there as well — the same standing arrangement the
+   .reader-title class and the h1 above already have. It cannot simply import
+   this sheet: it draws these pages in the *book's* own face on the read-through
+   and in the template's face in the Preview, so it sizes everything off
+   --ms-size instead. (No backticks in this comment: it sits inside a template
+   literal and one would end the string.) */
 ${s}.front-page {
   text-indent: 0;
 }

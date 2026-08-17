@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -13,7 +14,11 @@ import type { PageMetrics } from "@/lib/page-setup";
 import type { Book } from "@/lib/library-store";
 import { BookCover } from "@/components/shelf/book-cover";
 import { paginate, type ReaderChapter } from "@/components/reader/reader-pages";
-import { needsSecondPass, picturesSettled } from "@/lib/reader/page-flow";
+import {
+  needsSecondPass,
+  picturesSettled,
+  withFolios,
+} from "@/lib/reader/page-flow";
 
 const PX_PER_IN = 96;
 /** One page's display width at 100% zoom; the zoom control scales from here. */
@@ -29,6 +34,21 @@ interface FlatPage {
   html: string;
   empty: boolean;
   first: boolean;
+  /** Whether this page opens with its own title — see `ReaderChapter`. */
+  heading: boolean;
+  /** A page this app built, so there is no chapter behind it to open. */
+  generated: boolean;
+  /** Its place in the list the contents was built from — see `ReaderChapter`. */
+  source: number | null;
+  /**
+   * The number printed at the foot of this sheet, one-based.
+   *
+   * The same count the PDF's `counter(page)` makes: its first page is the first
+   * bound page, since nothing puts a cover sheet in front of it. Page one takes
+   * no folio, matching `@page :first` in `typesetCss` — a number under a book's
+   * title is the mark of a document.
+   */
+  folio: number;
 }
 
 /**
@@ -109,21 +129,56 @@ export function ReaderFlipbook({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentKey, contentW, contentH, typographyKey]);
 
-  const flat: FlatPage[] = [];
-  for (const chapter of chapters) {
-    const pages =
-      layout?.[chapter.id] ?? (chapter.empty ? [""] : [chapter.html]);
-    pages.forEach((html, i) =>
-      flat.push({
-        chapterId: chapter.id,
-        title: chapter.title,
-        label: chapter.label,
-        html,
-        empty: chapter.empty,
-        first: i === 0,
-      }),
+  /**
+   * The book as one run of sheets, with the contents page's folios filled in.
+   *
+   * **Two steps, and the order is the whole of it.** The pages have to be cut
+   * before anybody knows what page a chapter lands on, and the contents page is
+   * one of the pages being cut — so it is written with empty folio slots, the
+   * book is flattened, and only then are the numbers put in. Filling a slot
+   * changes no height (the folio sits on the line its leader already occupies),
+   * so the layout that produced the numbers still holds and there is no second
+   * pass to run. See `withFolios`.
+   *
+   * Memoised because it parses the contents page's markup, and a page turn
+   * re-renders this component several times.
+   */
+  const flat = useMemo<FlatPage[]>(() => {
+    const out: FlatPage[] = [];
+    for (const chapter of chapters) {
+      const pages =
+        layout?.[chapter.id] ?? (chapter.empty ? [""] : [chapter.html]);
+      pages.forEach((html, i) =>
+        out.push({
+          chapterId: chapter.id,
+          title: chapter.title,
+          label: chapter.label,
+          html,
+          empty: chapter.empty,
+          first: i === 0,
+          heading: chapter.heading,
+          generated: chapter.generated,
+          source: chapter.source,
+          folio: out.length + 1,
+        }),
+      );
+    }
+
+    /* Which sheet each chapter opens on, one-based — the same count the printed
+       folio makes, because the PDF's first page is the first bound page too
+       (there is no cover sheet in it). */
+    const opensOn = new Map<number, number>();
+    for (const page of out) {
+      if (page.first && page.source !== null) opensOn.set(page.source, page.folio);
+    }
+
+    return out.map((page) =>
+      page.html.includes("toc-folio")
+        ? { ...page, html: withFolios(page.html, (s) => opensOn.get(s) ?? null) }
+        : page,
     );
-  }
+  }, [chapters, layout]);
+
   const pageAt = (i: number): FlatPage | null => flat[i] ?? null;
 
   const spreadCount = Math.max(1, Math.ceil(flat.length / 2));
@@ -285,7 +340,11 @@ export function ReaderFlipbook({
             transformOrigin: "top left",
           }}
         >
-          {p.first && !p.empty && (
+          {/* Apparatus opens with no title of its own — see `printsHeading`.
+              The condition is `heading` rather than the part of the book,
+              because that is the exporters' own answer and this screen exists
+              to agree with them. */}
+          {p.first && p.heading && !p.empty && (
             <div
               className="chapter-opener reader-opener-link"
               onClick={(e) => {
@@ -302,11 +361,38 @@ export function ReaderFlipbook({
           )}
           {p.empty ? (
             <p className="reader-empty">This chapter is empty.</p>
+          ) : p.generated ? (
+            /* Front matter this app built, set as front matter rather than as
+               prose. `reader-cont` has nothing to say about it either: that
+               class is about the indent on a paragraph a page break cut in
+               half, and these pages have no such paragraph. */
+            <div
+              className="reader-front"
+              dangerouslySetInnerHTML={{ __html: p.html }}
+            />
           ) : (
             <div
               className={`tiptap${p.first ? "" : " reader-cont"}`}
               dangerouslySetInnerHTML={{ __html: p.html }}
             />
+          )}
+
+          {/* **The folio, in the bottom margin, exactly where the file prints
+              it.** `typesetCss` puts `counter(page)` in the PDF's
+              `@bottom-center` and drops it on `@page :first` — a number under a
+              book's title is the mark of a document rather than a book — so
+              this is the same rule, and it counts the same pages because the
+              PDF opens on the first bound page too. It sits in the margin, not
+              in the text block: the box is the sheet's own bottom padding, so a
+              wider margin moves the number rather than the prose. */}
+          {p.folio > 1 && (
+            <div
+              aria-hidden="true"
+              className="reader-folio"
+              style={{ height: metrics.bottom * PX_PER_IN }}
+            >
+              {p.folio}
+            </div>
           )}
         </div>
       )}

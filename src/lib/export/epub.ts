@@ -146,11 +146,13 @@ export function spineOrder(
   chapters: readonly EpubChapter[],
   frontIds: readonly string[],
 ): string[] {
-  /* `bindBook` reads a title and a `matter`, which is all `EpubChapter` and
-     `LoadedChapter` have in common — so the cast is over the fields it
-     actually touches rather than a claim that the two types are the same. */
+  /* `bindBook` asks for a title and a `matter` and nothing else — which is all
+     `EpubChapter` and `LoadedChapter` have in common, and is now what its
+     parameter says (`MatterPage`). It took a `LoadedChapter[]` and this had to
+     write `as unknown as` past it; the cast is gone because the signature stopped
+     claiming more than the function reads. */
   const bound = bindBook(
-    chapters as unknown as readonly LoadedChapter[],
+    chapters,
     frontIds.map((id) => ({ id, html: "" })),
   );
   return bound.map((page) =>

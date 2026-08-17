@@ -292,14 +292,23 @@ function stepsFor(output: Format | null): Step[] {
      stepper, and this is that cost paid back. It keeps the writer inside the
      wizard, which a link out cannot: the format, the template, the trim and
      the front-matter switches are component state, so leaving throws all of
-     them away. And it is honest about what it shows — the book on its pages,
-     not the file — which is why the deck says so and why the step exists for
-     every format rather than only the two we typeset. */
+     them away. And it exists for every format rather than only the two we
+     typeset, because every format binds the same pages in the same order.
+
+     **The deck said "at the trim and typography you have set" while the pages
+     were drawn at neither**, and that is the sort of claim the house rules
+     forbid: the sheets came from the book's page setup and the prose from the
+     book's own face, so the Layout step moved nothing on it. It is true now —
+     see the two props on `BookPages` below — and the deck names the front
+     matter as well, because that is the other half of what a writer is
+     checking here. What it deliberately does not claim is the packaged file;
+     the note beside the component says what is still missing from it. */
   steps.push({
     id: "preview",
     group: "Preview",
     title: "Read it before you send it",
-    blurb: "Your book on its pages, at the trim and typography you have set.",
+    blurb:
+      "The whole book as this export will build it — front matter and all, at the trim and template you have set.",
   });
 
   steps.push({
@@ -816,25 +825,39 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
                     `BookPages` is the reading view's own setting — the same
                     `.manuscript` wrapper, the same `--ms-*` variables, the same
-                    trim, the same `paginate`. Shared rather than rebuilt, since
-                    a preview assembled from its own code path agrees on the day
-                    it is written and quietly stops agreeing afterwards, which is
-                    the one failure a "check before you export" cannot have.
+                    `paginate`. Shared rather than rebuilt, since a preview
+                    assembled from its own code path agrees on the day it is
+                    written and quietly stops agreeing afterwards, which is the
+                    one failure a "check before you export" cannot have.
+
+                    **Both props are the whole of what makes this a preview of
+                    the file rather than of the manuscript**, and it took neither
+                    for a while. `typeset` binds in the generated title,
+                    copyright and contents pages and honours the "ours, not
+                    yours" switches from the step before — without it a writer
+                    pressed *ours*, walked one station, and found their own
+                    contents page still on the sheet. `setting="export"` cuts
+                    the sheets to the chosen trim and sets them in the template's
+                    face at the size `bookSetting` picks for that page — without
+                    it the trim and template chosen two steps back changed
+                    nothing on screen, so every line broke somewhere the file
+                    does not.
 
                     A box with a height, because the flip-book centres itself in
                     `h-full` and would collapse in a box sized by its content. It
                     holds a 510px spread, its caption and the padding around
                     them.
 
-                    **It is the book, not the file**, and the deck above says so.
-                    What it cannot show is anything the packagers do — the EPUB's
-                    manifest, a `.docx`'s styles, the PDF's running heads. That
-                    was the four-pane review's job; see TODO.md for what is owed
-                    when it returns. */}
+                    What it still cannot show is what the *packagers* do — the
+                    EPUB's manifest, a `.docx`'s styles, the PDF's running heads
+                    and its contents folios. That was the four-pane review's job;
+                    see TODO.md for what is owed when it returns. */}
                 {step.id === "preview" && (
                   <BookPages
                     book={book}
                     cover={cover}
+                    typeset={typeset}
+                    setting="export"
                     className="h-[38rem] w-full overflow-hidden rounded-lg
                                border border-line bg-surface"
                   />

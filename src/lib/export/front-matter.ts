@@ -22,6 +22,25 @@ export interface FrontSection {
 }
 
 /**
+ * What the rules below actually read off a page: its name, and which part of
+ * the book it is in.
+ *
+ * **Stated as the two fields rather than as `LoadedChapter`, because four
+ * different shapes are put through these functions and only these two are
+ * common to all of them.** `epub.ts` passes `EpubChapter`s and had to write
+ * `as unknown as readonly LoadedChapter[]` with a comment explaining that the
+ * cast was over the fields actually touched; the reading view passes pages that
+ * still carry their chapter **id**, which `LoadedChapter` deliberately does not
+ * have (see the note in `index.ts`). Widening the parameter is what lets both
+ * go through the *same* filter rather than each growing its own copy of the
+ * rule — which is the thing `withoutReplaced`'s own note exists to protect.
+ */
+export type MatterPage = Pick<LoadedChapter, "title" | "matter">;
+
+/** A page the contents list can name: the above, plus the numeral it prints. */
+export type ListedPage = MatterPage & Pick<LoadedChapter, "number">;
+
+/**
  * The title page, set the way a title page is set.
  *
  * **Two blocks with the sheet between them**, which is the shape every printed
@@ -135,19 +154,29 @@ function copyrightPage(book: Book, holder: string): string {
 /**
  * The visible contents.
  *
- * **`href` is what makes this a table of contents rather than a list of
- * names.** In a printed book the page number is the link; on an e-reader there
- * are no page numbers, so a contents page that cannot be tapped is one a
- * reader looks at once and never opens again. The EPUB passes each chapter's
- * own file; the print PDF passes nothing, because paper has nowhere to go and
- * an anchor there would be a dead blue word.
+ * **Three consumers, three ways of naming where a chapter is**, and `href` is
+ * what tells them apart:
+ *
+ * - **Print** passes an anchor, which is not there to be followed — paper has
+ *   nowhere to go — but for `target-counter` to resolve into the folio beside
+ *   each entry. That is the whole reason the PDF is paginated by Paged.js.
+ * - **The EPUB** passes each chapter's own file. A reflowable book has no page
+ *   numbers, so the link *is* the answer; a contents page that cannot be tapped
+ *   is one a reader looks at once and never opens again.
+ * - **A screen** passes nothing, and gets the same leader with an **empty folio
+ *   slot** carrying the chapter's loaded index. The reading view works out its
+ *   own page numbers by measuring, so nothing here can know them yet;
+ *   `withFolios` fills the slots once the pages have been cut. It used to emit
+ *   a bare `<li>` with no leader at all, which made the previewed contents a
+ *   different page from the printed one on the screen whose job is to show the
+ *   printed one.
  *
  * The numeral is dropped when the title already carries it — "1. Chapter One"
  * says the same thing twice, and "Chapter One" is this app's own default
  * title, so nearly every book exported it that way.
  */
 function contentsPage(
-  chapters: LoadedChapter[],
+  chapters: readonly ListedPage[],
   href?: (index: number) => string,
 ): string {
   /* **Apparatus is not listed**, and a contents page listing itself least of
@@ -160,7 +189,18 @@ function contentsPage(
     .map(({ c, i }) => {
       const numbered = c.number !== null && !isGenericChapterTitle(c.title);
       const label = `${numbered ? `${c.number}. ` : ""}${escapeXml(c.title)}`;
-      if (!href) return `      <li>${label}</li>`;
+      /* The screen's shape: the same leader, and a folio the caller fills from
+         its own measured layout. `data-page-of` is the chapter's index in the
+         list passed here — the same index `href` above is built from, and the
+         same one `BoundPage.index` carries — because the exporters name their
+         files and anchors positionally and a bound order must never renumber
+         them. See `withFolios`. */
+      if (!href)
+        return (
+          `      <li><span class="toc-line"><span class="toc-title">${label}</span>` +
+          `<span class="toc-dots"></span>` +
+          `<span class="toc-folio" data-page-of="${i}"></span></span></li>`
+        );
       /* **The leader and the folio are drawn by CSS, from this markup.** The
          span is the dotted rule; the page number is a `target-counter` on the
          link in `typeset.ts`, resolved against the anchor this href points at.
@@ -209,7 +249,7 @@ export const GENERATED_BY_TITLE: Record<string, string> = {
 /** Which generated pages this book already has a written page for. Exported
  *  so the export screen can say so beside the switch rather than leaving a
  *  writer to notice the missing page in the finished file. */
-export function writtenPages(chapters: LoadedChapter[]): Set<string> {
+export function writtenPages(chapters: readonly MatterPage[]): Set<string> {
   const out = new Set<string>();
   for (const chapter of chapters) {
     if (chapter.matter !== "front") continue;
@@ -239,10 +279,10 @@ export function writtenPages(chapters: LoadedChapter[]): Set<string> {
  * Nothing is deleted: this is a filter over a list that was loaded for one
  * export, and the writer's page is untouched in the store.
  */
-export function withoutReplaced(
-  chapters: LoadedChapter[],
+export function withoutReplaced<T extends MatterPage>(
+  chapters: T[],
   replace: readonly string[] | undefined,
-): LoadedChapter[] {
+): T[] {
   if (!replace || replace.length === 0) return chapters;
   const drop = new Set(replace);
   return chapters.filter((chapter) => {
@@ -260,7 +300,7 @@ export function withoutReplaced(
  */
 export function frontSections(
   book: Book,
-  chapters: LoadedChapter[],
+  chapters: readonly ListedPage[],
   options: TypesetOptions,
   /** Where each chapter lives, when the format has somewhere to link to. */
   href?: (index: number) => string,
@@ -304,11 +344,11 @@ const GENERATED_RANK: Record<string, number> = {
 };
 
 /** One page of the bound book: either a generated section or a written page. */
-export type BoundPage =
+export type BoundPage<T extends MatterPage = LoadedChapter> =
   | { kind: "generated"; section: FrontSection }
   | {
       kind: "chapter";
-      chapter: LoadedChapter;
+      chapter: T;
       /**
        * Its position in the *loaded* list, not in this one.
        *
@@ -351,15 +391,15 @@ export type BoundPage =
  * the order they were loaded — they are the writer's sequence and nothing here
  * has any business reordering them.
  */
-export function bindBook(
-  chapters: readonly LoadedChapter[],
+export function bindBook<T extends MatterPage>(
+  chapters: readonly T[],
   sections: readonly FrontSection[],
-): BoundPage[] {
-  const front: { page: BoundPage; rank: number; seq: number }[] = [];
-  const rest: BoundPage[] = [];
+): BoundPage<T>[] {
+  const front: { page: BoundPage<T>; rank: number; seq: number }[] = [];
+  const rest: BoundPage<T>[] = [];
 
   chapters.forEach((chapter, index) => {
-    const page: BoundPage = { kind: "chapter", chapter, index };
+    const page: BoundPage<T> = { kind: "chapter", chapter, index };
     if (chapter.matter === "front") {
       front.push({
         page,

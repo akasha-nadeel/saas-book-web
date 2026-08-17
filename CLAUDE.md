@@ -42,7 +42,9 @@ logic: the import/export pipelines (including the XHTML and front-matter
 renderers), the store — twice over, once on `localStorage` and once on
 IndexedDB, see `store-db.test.ts` —
 page setup, typography, search, book kinds, the custom
-Tiptap marks, pagination and click-to-type arithmetic, caret scrolling,
+Tiptap marks, pagination and click-to-type arithmetic, the reading view's bound
+page list (`reader/bound-pages.ts`, which is how the export wizard's Preview and
+the file are held to one answer), caret scrolling,
 narration chunking, transcript paragraphing, publishing details and the ISBN
 check digit, the billing price/cycle arithmetic, PayHere's two MD5s and
 Paddle's status mapping, the
@@ -1163,6 +1165,84 @@ three break pages identically; keep them on the one function.
 `reader-pages.tsx` re-exports it, since that is where the other two already look
 for it.
 
+**It shows the book the *export* would build, and `boundReaderPages`
+(`src/lib/reader/bound-pages.ts`) is the whole of that.** Until **2026-08-17**
+it walked `orderedChapters(book)` and stopped, so four things every exporter
+does were invisible on the one screen that exists to show the file: the
+generated title page, copyright page and contents were never built, the "ours,
+not yours" switches were never applied, `bindBook`'s order was never used, and
+apparatus was headed with its own name — a sheet reading "Copyright page",
+which no published book has. A writer who pressed *ours* on the contents step
+walked one station to Preview and found their own page still on the sheet. That
+module calls `withoutReplaced → frontSections → bindBook`, the export's own
+functions in the export's own order; **anything that looks like a rule about
+which pages go in, or in what order, belongs in `front-matter.ts` with the other
+four renderers and not here.** Three consequences worth knowing:
+
+- **The export's filters take the fields rather than the type** (`MatterPage`,
+  `ListedPage`), which is what lets the reading view put pages that still carry
+  a chapter **id** through the very same functions — `LoadedChapter`
+  deliberately has none. `epub.ts` had already needed this and was writing
+  `as unknown as readonly LoadedChapter[]` past it; that cast is gone. A second,
+  reader-side copy of `withoutReplaced` is the thing this avoids, and it is the
+  thing that module's own note exists to forbid.
+- **`ReaderChapter` carries `heading` and `generated`, and nothing else may hang
+  off them.** `heading` is `printsHeading`'s answer, so apparatus opens with no
+  title; `generated` says only that the markup is a `<section>` taking the
+  front-matter setting (`reader-front`, not `tiptap`) and that there is no
+  chapter behind it to click into. The cost, accepted: a writer's own copyright
+  page no longer has a heading to press in the read-through.
+- **A generated page is laid out as its section's *children*, and a list among
+  them is opened out into its items.** One element is one block and a block
+  cannot be broken inside, so a contents page — which is one `<ol>` and nothing
+  else — went on a single sheet however long it was, and `overflow: hidden` cut
+  it off: the very defect `page-breaks.ts` was extracted to fix, reappearing on
+  the pages this app writes itself. Measured on a 66-chapter book: the heading
+  alone on one sheet, twenty-five entries on the next, forty absent. Splitting
+  the `<ol>` by *line* was tried first and does not work — `.toc-line` is a flex
+  row, so the line measuring returns nothing usable and the block moves whole
+  again. Between entries is also the only place a contents page may break, since
+  cutting one leaves a chapter's name on one sheet and its folio on the next.
+  Each sheet is reassembled: runs of items into a clone of their list, the whole
+  into a clone of the section, which is what keeps `front-page contents` on it.
+
+**Two knobs on `BookPages`, and they are separate on purpose.** `typeset` says
+which pages are bound in; `setting` says what the sheets are cut to.
+`/book/[bookId]/read` takes `DEFAULT_TYPESET` and `setting="book"` — the
+generated front matter, at the writer's own page setup in their own face, which
+is what pairs the read-through with the writing surface. The export wizard's
+Preview takes the wizard's state and `setting="export"`, so the trim, margins,
+size and template face are the file's (`typesetMetrics` / `typesetVars` in
+`typeset.ts`, derived from `bookSetting` so a preview cannot compute its own
+page). Folding the two together would put `/read` on 6×9 in Classic for every
+book, which is a claim about a file rather than a view of a manuscript.
+
+**The sheets carry folios, and the contents lists real ones.** The number at the
+foot of a page is `typesetCss`'s `@bottom-center` rule drawn in markup — same
+count, since the PDF's first page is the first bound page too, and page one
+takes none, matching `@page :first`. It sits in the sheet's own bottom margin
+rather than in the text block, so a wider margin moves the number and not the
+prose. The contents is the harder half and **`withFolios` is the whole of it**:
+a printed contents gets its folios from `target-counter`, which Paged.js
+resolves against real pages and no browser implements on screen, so the numbers
+cannot be known until the book has been measured and cut — which is after the
+contents page itself has been written. So `contentsPage` given no `href` emits
+the leader with an **empty folio slot** carrying the chapter's *loaded* index
+(`data-page-of`, the same index the print anchors use, because a bound order
+must never renumber), the book is flattened, and the slots are filled. It does
+not iterate: a folio sits on the line its leader already occupies, so filling
+one changes no height and the layout that produced the number still stands. A
+slot whose page cannot be resolved is **left empty rather than guessed at** — an
+entry with no number reads as a gap, where a wrong number reads as a fact. The
+two engines are not the same, so a long book's preview can differ from the PDF
+by a page; both are measured rather than invented, and neither is claimed to be
+the other. The generated pages are set by
+the `.reader-front` block in `globals.css`, which is the reading view's half of
+`typesetCss`'s front-matter block and is paired with it by comment at both ends:
+it cannot simply import that sheet, because it must draw these pages in the
+book's face on one screen and the template's on the other, so it sizes
+everything off `--ms-size`.
+
 **It breaks the pages with the editor's own `pageBreaks`, and until 2026-08-17
 it did not.** This view packed whole *blocks*: a paragraph that did not fit went
 to the next sheet entire, and a paragraph longer than a page went on anyway and
@@ -1439,10 +1519,21 @@ dynamically imported so a writer who never exports never downloads them.
     back on step one. A step keeps them inside the flow. Do not make it a link
     again without persisting the wizard first.
   - **It exists for every format and names none.** The panes depended on the
-    pick; the book does not. And the deck says *your book on its pages* rather
-    than anything about the file, because "Preview EPUB" over a page of the
-    manuscript would be a claim the code cannot back — what a reading view
-    cannot show is exactly what the packagers do.
+    pick; the book does not, and every format binds the same pages in the same
+    order.
+  - **It shows the book this export will build, and for its first day it showed
+    the manuscript instead.** It was mounted as `<BookPages book cover />` —
+    neither the wizard's `typeset` nor `setting="export"` — so the three
+    front-matter switches, the "ours, not yours" toggles, the trim and the
+    template all changed nothing on it, and it printed a heading over apparatus
+    that no exporter writes. Its deck meanwhile read *"at the trim and
+    typography you have set"*, which was a claim the code could not back: the
+    sheets came from the book's page setup and the prose from the book's own
+    face. Both props are passed now and the deck names the front matter too. See
+    the reading-view note above for the mechanism, and `bound-pages.ts` for the
+    rule that the order is never worked out twice. What it still cannot claim is
+    the packaged file — the EPUB's manifest, a `.docx`'s styles, the PDF's
+    running heads — which is exactly what the panes were for.
   - **It pays back the cost the layer version recorded** — "nobody is walked
     past the book any more". The last moment a mistake is cheap wants to be
     passed through rather than found. Still not a gate: Continue is live and

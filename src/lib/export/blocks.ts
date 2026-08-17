@@ -82,8 +82,19 @@ export interface LoadedChapter {
  * renderers apply cannot be four expressions that might drift. A dedication, a
  * prologue or a page the writer named themselves is a real division and keeps
  * its heading.
+ *
+ * **The reading view is the fifth caller**, and it was the one screen still
+ * answering this for itself — by not asking at all. It headed the writer's own
+ * contents page "Table of contents" and their copyright page "Copyright page",
+ * neither of which is in the file, on the screen whose whole job is to show the
+ * file. It takes the two fields the rule turns on rather than a whole
+ * `LoadedChapter`, for the reason `chapterNumeral` below does: the reader's
+ * pages carry a chapter id and no `doc`, and making them build a document to
+ * ask a question about a title is how a sixth copy of this rule gets written.
  */
-export function printsHeading(chapter: LoadedChapter): boolean {
+export function printsHeading(
+  chapter: Pick<LoadedChapter, "title" | "matter">,
+): boolean {
   return !isApparatusPage(chapter.matter ?? "body", chapter.title);
 }
 

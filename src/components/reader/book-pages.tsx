@@ -16,8 +16,14 @@ import { pageMetrics } from "@/lib/page-setup";
 import { typographyVars } from "@/lib/typography";
 import { isDraftMatter, toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml } from "@/lib/export/xhtml";
+import {
+  DEFAULT_TYPESET,
+  typesetMetrics,
+  typesetVars,
+  type TypesetOptions,
+} from "@/lib/export/typeset";
 import { usePrefs } from "@/lib/use-library";
-import { type ReaderChapter } from "@/lib/reader/page-flow";
+import { boundReaderPages, type LoadedPage } from "@/lib/reader/bound-pages";
 import { ReaderFlipbook } from "@/components/reader/reader-flipbook";
 
 /**
@@ -26,16 +32,34 @@ import { ReaderFlipbook } from "@/components/reader/reader-flipbook";
  * Pulled out of `book-reader.tsx` when the export wizard grew a Preview step,
  * because that step shows the same thing and the setting is the part that is
  * easy to get subtly wrong: the `.manuscript` class and `data-paper` that
- * re-point the page palette, the `--ms-*` variables that carry the book's own
- * face and leading, and the trim the sheets are cut to. Two copies of that
- * would be two books, and the whole point of a preview is that it is not a
- * second rendering of anything.
+ * re-point the page palette, the `--ms-*` variables that carry the face and
+ * leading, and the trim the sheets are cut to. Two copies of that would be two
+ * books, and the whole point of a preview is that it is not a second rendering
+ * of anything.
  *
  * The caller supplies the frame: the reader route gives it the window, the
  * export step gives it a box on a scrolling page.
+ *
+ * **It shows the book the export would produce, and for a while it did not.**
+ * It walked `orderedChapters(book)` and stopped there, so four things the file
+ * does were invisible on the one screen that exists to show the file: the
+ * generated title page, copyright page and contents were never built, the
+ * "ours, not yours" switches were never applied, `bindBook`'s order was never
+ * used, and apparatus was headed with its own name — a sheet reading "Copyright
+ * page", which no published book has and no exporter here writes. A writer who
+ * pressed *ours* on the contents step walked to Preview and found their own
+ * page still there. See `boundReaderPages`, which is the whole of the fix and
+ * calls the export's own functions rather than restating them.
+ *
+ * **The sheets carry page numbers and so does the contents**, drawn from this
+ * view's own measured layout — see `withFolios`, and the `.reader-folio` rule
+ * in globals.css. The one thing not claimed: the reading view and Paged.js are
+ * two engines measuring the same book, so a long one can differ by a page.
+ * Both are measured rather than invented, and neither is presented as the
+ * other.
  */
 
-function loadForReading(book: Book): ReaderChapter[] {
+function loadForReading(book: Book): LoadedPage[] {
   return (
     orderedChapters(book)
       /*
@@ -79,7 +103,11 @@ function loadForReading(book: Book): ReaderChapter[] {
           title: chapter.title,
           label,
           html,
-          empty: html.trim() === "",
+          number,
+          /* Carried because the export's own filters turn on it: which part a
+             page is in decides whether it can be replaced by a generated one,
+             where it binds, and whether it prints a heading. */
+          matter: chapterMatterOf(chapter),
         };
       })
   );
@@ -90,6 +118,8 @@ export function BookPages({
   cover,
   zoom = 1,
   className = "",
+  typeset = DEFAULT_TYPESET,
+  setting = "book",
 }: {
   book: Book;
   cover: string | null;
@@ -98,24 +128,58 @@ export function BookPages({
    *  itself in `h-full`, which collapses inside a box that is sized by its
    *  content. */
   className?: string;
+  /**
+   * Which pages the export would build, so this shows the same book.
+   *
+   * The three switches decide whether a title page, a copyright page and a
+   * contents list are bound in, and `replaceWritten` decides whether the
+   * writer's own page or ours is used where both exist. Defaulted rather than
+   * required, because the read-through has no wizard behind it and the default
+   * is what an export nobody has configured produces — see `DEFAULT_TYPESET`.
+   */
+  typeset?: TypesetOptions;
+  /**
+   * Where the page and the type come from. **The second knob, and it is a
+   * second knob on purpose.**
+   *
+   * `"book"` sets the sheets at the writer's own page setup in their own face,
+   * which is what pairs the read-through with the writing surface — one setting
+   * styles both, and a reader who chose Garamond should not be shown Georgia.
+   * `"export"` sets them at the trim, margins, size and template face the file
+   * will use, which is what the export wizard's Preview is for.
+   *
+   * Folding this into `typeset` would force `/read` onto 6×9 in Classic for
+   * every book, which is a claim about a file rather than a view of the
+   * manuscript.
+   */
+  setting?: "book" | "export";
 }) {
   const prefs = usePrefs();
 
-  // Parsing every body is the expensive part, so it is memoised on the book
-  // snapshot — a rename repaints without re-reading forty documents.
-  const chapters = useMemo(() => loadForReading(book), [book]);
+  /* Parsing every body is the expensive part, so it is memoised on the book
+     snapshot — a rename repaints without re-reading forty documents. The
+     typeset is in here too: turning off the contents, or asking for ours
+     instead of theirs, changes which pages exist. */
+  const chapters = useMemo(
+    () => boundReaderPages(book, loadForReading(book), typeset),
+    [book, typeset],
+  );
 
   const dark = prefs.paper === "slate" || prefs.paper === "black";
 
-  // The book's own face, size and spacing — the same variables the editor sets,
-  // so the read-through matches the writing surface exactly.
-  const typoVars = typographyVars(typographyOf(book));
-
-  // Each chapter is set on real pages at the book's own trim size, and flows
-  // onto further pages when it runs long — the pagination lives in page-flow.
-  // The `fit` setting (which fills the editor column) is ignored here, exactly
-  // as export ignores it.
-  const metrics = pageMetrics(pageSetupOf(book));
+  /* Either the book's own face, size and spacing — the same variables the
+     editor sets, so the read-through matches the writing surface exactly — or
+     the template's, when this is standing in for the file. Same for the sheet
+     below. See `typesetVars`.
+     The `fit` setting (which fills the editor column) is ignored either way,
+     exactly as export ignores it. */
+  const asExport = setting === "export";
+  const typoVars = asExport
+    ? typesetVars(typeset)
+    : typographyVars(typographyOf(book));
+  const metrics = asExport
+    ? typesetMetrics(typeset)
+    : pageMetrics(pageSetupOf(book));
 
   return (
     /* `data-paper` re-points the palette so the sheets and their prose take the

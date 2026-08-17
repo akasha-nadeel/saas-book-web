@@ -2856,13 +2856,25 @@ body {
 }
 
 /* No indent on the first paragraph, or on one that opens a scene — this is
-   how printed books actually set body text. */
+   how printed books actually set body text.
+
+   The last two are the *rendered* spellings of the first two, and they are here
+   so the reading view agrees with the file. `typesetCss` says
+   `.scene-break + p, .figure + p { text-indent: 0 }`; a scene break is an `hr`
+   on the writing surface and a `p.scene-break` once `blocksToXhtml` has been
+   through it, and an image is `.image-nv` here and `p.figure` there. Without
+   both spellings the paragraph after a scene break or a picture came out
+   indented in the read-through and flush in the exported book — the same class
+   of drift as the two `text-align` spellings above, and the reason that note
+   says to keep both. */
 .manuscript .tiptap p:first-child,
 .manuscript .tiptap h1 + p,
 .manuscript .tiptap h2 + p,
 .manuscript .tiptap h3 + p,
 .manuscript .tiptap hr + p,
-.manuscript .tiptap blockquote + p {
+.manuscript .tiptap blockquote + p,
+.manuscript .tiptap .scene-break + p,
+.manuscript .tiptap .figure + p {
   text-indent: 0;
 }
 
@@ -3096,6 +3108,29 @@ body {
    -------------------------------------------------------------------------- */
 .reader-page {
   overflow: hidden;
+  /* The containing block for the folio below, which sits in the margin rather
+     than in the text block. */
+  position: relative;
+}
+/* The page number, where the printed page carries it.
+   `typesetCss` puts `counter(page)` in the PDF's `@bottom-center` margin box;
+   this is that box. The caller gives it the sheet's own bottom margin as a
+   height and it centres the number in it, so a book set with wide margins moves
+   the folio and not the prose. Page one takes none — see `@page :first` there,
+   and the condition in reader-flipbook.tsx. */
+.reader-folio {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--ms-font, var(--font-serif));
+  font-size: calc(var(--ms-size, 1rem) * 0.85);
+  line-height: 1;
+  color: var(--paper-muted);
+  font-variant-numeric: tabular-nums;
 }
 /* The chapter opener — an optional "Chapter Five" label above the title, then
    the title — the way a printed book opens a chapter. There is one heading, not
@@ -3161,6 +3196,148 @@ body {
 .manuscript .tiptap p[data-cont],
 .manuscript .reader-cont.tiptap > p[data-cont]:first-child {
   text-indent: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Generated front matter, on a reading-view page.
+
+   The title page, copyright page and contents this app builds are the same
+   markup the file gets — `frontSections` in lib/export/front-matter.ts — and
+   this is the second half of how they are set. The first half is the
+   `.front-page` block at the foot of `typesetCss` in lib/export/typeset.ts,
+   which dresses them for the PDF and the EPUB; **change one and change the
+   other.** The same pairing already exists a few rules up (`.reader-title` is
+   `typesetCss`'s `h1`) and in `.manuscript .tiptap ul`, whose own note in
+   typeset.ts says so.
+
+   Two copies rather than injecting that stylesheet, and the reason is the
+   knob: `BookPages` draws these pages at the *book's* face on the read-through
+   and at the *template's* face in the export wizard's Preview. Sizing
+   everything off `--ms-size` gets both for nothing, where an injected sheet
+   would have set the chapters in Garamond and the title page in Georgia on the
+   same book.
+
+   Sized in ems of the body text, so the proportions hold at any size, and
+   coloured `--paper-fg`, so dark paper needs no rules of its own.
+   -------------------------------------------------------------------------- */
+.manuscript .reader-front {
+  font-family: var(--ms-font, var(--font-serif));
+  font-size: var(--ms-size, 1rem);
+  line-height: var(--ms-leading, 1.5);
+  color: var(--paper-fg);
+  /* Its own height, so a title page can push its imprint to the foot of the
+     sheet. `.reader-page` is a fixed box with the trim's margins as padding, so
+     100% here is exactly the printed text block. */
+  height: 100%;
+}
+.manuscript .reader-front .front-page {
+  text-indent: 0;
+}
+
+/* The title block near the top third and the imprint at the foot, with the
+   paper between them as the composition — `typesetCss`'s print branch, which is
+   the one that matches a sheet. A title page that simply starts a third of the
+   way down and runs on reads as the first page of a document. */
+.manuscript .reader-front .title-page {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  padding-top: 18%;
+  padding-bottom: 4%;
+  text-align: center;
+}
+.manuscript .reader-front .book-title {
+  margin: 0 0 0.8em;
+  font-size: 2.2em;
+  font-weight: normal;
+}
+.manuscript .reader-front .book-subtitle {
+  margin: 0 0 1.5em;
+  font-size: 1.3em;
+  font-style: italic;
+}
+.manuscript .reader-front .book-author {
+  margin: 0;
+  font-size: 1.2em;
+}
+/* A short centred rule standing in for the printer's ornament a title page
+   carries here — drawn rather than typed, for the reason front-matter.ts gives
+   about dingbat coverage. A pseudo-element so the rule can be short while the
+   publisher's name under it is not. */
+.manuscript .reader-front .title-imprint::before {
+  content: "";
+  display: block;
+  width: 6em;
+  margin: 0 auto 1.1em;
+  border-top: 1px solid var(--paper-muted);
+}
+.manuscript .reader-front .title-imprint p {
+  margin: 0 0 0.3em;
+  font-size: 0.95em;
+  text-indent: 0;
+}
+
+.manuscript .reader-front .copyright {
+  padding-top: 60%;
+  font-size: 0.9em;
+  text-align: left;
+}
+.manuscript .reader-front .copyright p {
+  margin: 0 0 0.6em;
+  text-indent: 0;
+}
+
+/* A contents heading is centred in every printed book; the rest of the page
+   inherits the body's justification, which for one word would leave it hard
+   against the left margin. */
+.manuscript .reader-front .contents h1 {
+  /* The file's own measurements: `typesetCss` sets every h1 at 2.4em/1.6em and
+     the contents heading overrides the space beneath it to 2em. */
+  margin: 2.4em 0 2em;
+  font-size: 1.6em;
+  font-weight: normal;
+  text-align: center;
+}
+.manuscript .reader-front .contents ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.manuscript .reader-front .contents li {
+  margin: 0.55em 0;
+  text-indent: 0;
+  /* Never justified: a two-word chapter title stretched across the measure is
+     the classic broken-contents look. */
+  text-align: left;
+}
+/* A measure of its own, centred, matching the print branch of `typesetCss`.
+   Chapter names are short and a leader running the full width of the page would
+   leave an arm's length of dots between the name and the number. */
+.manuscript .reader-front .contents ol {
+  max-width: 22em;
+  margin: 0 auto;
+}
+/* The leader and the folio. The printed page gets its number from
+   `target-counter`, which no browser implements on screen — so the reading view
+   works its own out by measuring and `withFolios` writes it into the slot. An
+   entry whose page could not be resolved keeps an empty slot rather than a
+   guess. */
+.manuscript .reader-front .contents .toc-line {
+  display: flex;
+  align-items: baseline;
+}
+.manuscript .reader-front .contents .toc-dots {
+  flex: 1;
+  margin: 0 0.4em;
+  /* Sat on the baseline the dots collide with the descenders in the title
+     beside them; lifted, they run through the middle of the line as a leader
+     does. */
+  border-bottom: 1px dotted var(--paper-muted);
+  transform: translateY(-0.28em);
+}
+.manuscript .reader-front .contents .toc-folio {
+  font-variant-numeric: tabular-nums;
 }
 
 /* --------------------------------------------------------------------------
