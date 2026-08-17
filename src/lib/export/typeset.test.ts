@@ -6,6 +6,8 @@ import {
   bookSetting,
   measureIn,
   templateById,
+  templateFor,
+  templatesFor,
   trimById,
   typesetCss,
   typesetMetrics,
@@ -106,21 +108,63 @@ describe("what the EPUB's stylesheet may state", () => {
     );
   });
 
-  /* The leading is a multiple rather than a measurement for the same reason,
-     and Apple's guide asks for it by name: "set the value to a unit-less
-     multiple of the font-size". A leading in points would not grow with the
-     type when the reader turns it up, and the lines would collide. */
-  it("leaves the leading unitless so it grows with the type", () => {
-    expect(typesetCss(DEFAULT_TYPESET, false)).toMatch(
-      /line-height:\s*[\d.]+\s*;/,
-    );
+  /*
+   * **This test used to assert the opposite, and the quote it rested on says
+   * less than it looked like it said.**
+   *
+   * It required a `line-height` on the EPUB's body, citing Apple's guide —
+   * "set the value to a unit-less multiple of the font-size". Read again, that
+   * is a rule about *how* to express a leading if you state one; it is not an
+   * instruction to state one. KDP's reflowable guidance is the stronger claim
+   * and points the other way: "the body text… must be all defaults… any
+   * styling on body text in the HTML will override the user's preferred
+   * default reading settings".
+   *
+   * A book was arriving in Times New Roman, double-spaced, with a margin of
+   * its own, whatever the device was set to — the same fault the size rule
+   * above exists to prevent, in the four declarations it did not cover.
+   */
+  it("leaves the reader's own settings alone on the body", () => {
+    const body = /body\s*\{[^}]*\}/.exec(typesetCss(DEFAULT_TYPESET, false));
+    expect(body).not.toBeNull();
+    expect(body![0]).not.toMatch(/font-family/);
+    expect(body![0]).not.toMatch(/line-height/);
+    expect(body![0]).not.toMatch(/margin/);
   });
 
-  /* The other half, so the guard above cannot be satisfied by breaking the PDF:
-     a printed page still gets real points. */
+  /*
+   * The exception, and it is a decision rather than an oversight: justify is
+   * Kindle's own default so declaring it takes nothing away there, Apple Books
+   * offers a preference that overrides it, and it is half of a pair with
+   * `hyphens: auto` — which is what actually fixes the gappy setting that gets
+   * blamed on justification.
+   */
+  it("keeps justification and hyphenation, which the reader can still override", () => {
+    const body = /body\s*\{[^}]*\}/.exec(typesetCss(DEFAULT_TYPESET, false))![0];
+    expect(body).toMatch(/text-align:\s*justify/);
+    expect(body).toMatch(/hyphens:\s*auto/);
+  });
+
+  /* A heading is the book's own voice rather than body text, so it keeps its
+     face and its size — no reader control is taken away by one. */
+  it("still sets the headings", () => {
+    const css = typesetCss(DEFAULT_TYPESET, false);
+    expect(css).toMatch(/h1\s*\{[^}]*font-family/);
+    expect(css).toMatch(/h1\s*\{[^}]*font-size:\s*[\d.]+em/);
+  });
+
+  /* The other half, so the guards above cannot be satisfied by breaking the
+     PDF: a printed page has real paper and still gets real measurements. */
   it("leaves the print stylesheet in points", () => {
     const css = typesetCss(DEFAULT_TYPESET, true);
     expect(css).toMatch(/body\s*\{[^}]*font-size:\s*[\d.]+pt/);
+  });
+
+  it("still sets the face, the leading and the margins for print", () => {
+    const body = /body\s*\{[^}]*\}/.exec(typesetCss(DEFAULT_TYPESET, true))![0];
+    expect(body).toMatch(/font-family/);
+    expect(body).toMatch(/line-height:\s*[\d.]+/);
+    expect(body).toMatch(/margin:\s*0/);
   });
 });
 
@@ -515,5 +559,61 @@ describe("the setting a preview is drawn at", () => {
       });
       expect([metrics.top, metrics.left]).toEqual([1, 1]);
     }
+  });
+});
+
+/* --- which templates a format may be set in -------------------------------
+ *
+ * Standard manuscript format is a specification an agent asks for — Times New
+ * Roman, double spaced, wide margins so a reader with a pencil has room to
+ * write. A reflowable book has no paper and no margin to write in. Offered in
+ * the wizard it was chosen, and the EPUB that came out is what prompted this.
+ * ------------------------------------------------------------------------- */
+
+describe("templatesFor", () => {
+  it("offers every template where there is a page", () => {
+    for (const format of ["pdf", "docx"] as const) {
+      expect(templatesFor(format)).toHaveLength(TEMPLATES.length);
+    }
+  });
+
+  it("withholds Manuscript from the formats with no page", () => {
+    for (const format of ["epub", "markdown"] as const) {
+      const ids = templatesFor(format).map((t) => t.id);
+      expect(ids).not.toContain("manuscript");
+      expect(ids.length).toBe(TEMPLATES.length - 1);
+    }
+  });
+
+  it("never offers an empty list", () => {
+    // Every caller picks from this; nothing to pick is a step with no answer.
+    for (const format of ["pdf", "docx", "epub", "markdown"] as const) {
+      expect(templatesFor(format).length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("templateFor", () => {
+  it("keeps a choice the format allows", () => {
+    expect(templateFor("pdf", "manuscript")).toBe("manuscript");
+    expect(templateFor("epub", "romance")).toBe("romance");
+  });
+
+  /*
+   * **Hiding a control does not change the value behind it**, which is the
+   * whole reason this function exists beside the list. A writer who sets
+   * Manuscript for a PDF and switches to EPUB would otherwise carry it into
+   * the file — a double-spaced Times ebook chosen by a control they could no
+   * longer see.
+   */
+  it("falls back when the format does not allow the choice", () => {
+    expect(templateFor("epub", "manuscript")).not.toBe("manuscript");
+    expect(templateFor("markdown", "manuscript")).not.toBe("manuscript");
+  });
+
+  it("falls back to the default rather than to whatever is first", () => {
+    // TEMPLATES[0] is manuscript, so "the first one" would be the wrong answer
+    // in exactly the case this is for.
+    expect(templateFor("epub", "manuscript")).toBe(DEFAULT_TYPESET.template);
   });
 });

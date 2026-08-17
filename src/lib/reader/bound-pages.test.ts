@@ -65,10 +65,36 @@ describe("what the export builds, the reading view shows", () => {
   });
 
   it("stands ours down for a page the writer wrote", () => {
-    /* The default everywhere: theirs wins, because ours is the fallback for a
-       book that said nothing. */
+    /* The default for the two pages assembled from fields: theirs wins,
+       because ours is the fallback for a book that said nothing. */
+    const own = page("rights", "Copyright page", "front");
+    const pages = boundReaderPages(book, [own, chapter], DEFAULT_TYPESET);
+
+    expect(pages.map((p) => p.id)).toContain("rights");
+    expect(pages.map((p) => p.id)).not.toContain("generated:copyright");
+  });
+
+  /*
+   * **The contents page is the exception, and it is the one that is navigated
+   * rather than read.** Ours is built from the book's own chapter list and
+   * carries a link to every one of them; a written one carries text, and is
+   * stale the moment a chapter moves. See `REPLACED_BY_DEFAULT`.
+   */
+  it("prefers ours for the contents, even when the writer wrote one", () => {
     const own = page("toc", "Table of contents", "front");
     const pages = boundReaderPages(book, [own, chapter], DEFAULT_TYPESET);
+
+    expect(pages.map((p) => p.id)).toContain("generated:contents");
+    expect(pages.map((p) => p.id)).not.toContain("toc");
+  });
+
+  it("gives the writer their contents back when the switch is turned off", () => {
+    // Reversible by the control that already exists — nothing is deleted.
+    const own = page("toc", "Table of contents", "front");
+    const pages = boundReaderPages(book, [own, chapter], {
+      ...DEFAULT_TYPESET,
+      replaceWritten: [],
+    });
 
     expect(pages.map((p) => p.id)).toContain("toc");
     expect(pages.map((p) => p.id)).not.toContain("generated:contents");

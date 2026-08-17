@@ -41,6 +41,8 @@ import {
   TEMPLATES,
   TRIMS,
   templateById,
+  templateFor,
+  templatesFor,
   trimById,
   bookSetting,
   measureIn,
@@ -575,6 +577,14 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const pick = (value: Format) => {
     setOutput(value);
     setError(null);
+    /* **The template has to survive the format changing, and Manuscript does
+       not.** It is offered for print and withheld from an e-reader
+       (`templatesFor`), so a writer who set it for a PDF and then switched to
+       EPUB would carry a template the list no longer shows — and get a
+       double-spaced Times ebook chosen by a control they could not see.
+       Resolved rather than left to the radio group, because the value is what
+       reaches the file. */
+    setTypeset((t) => ({ ...t, template: templateFor(value, t.template) }));
     // Standing on "format" already, so the step id stays valid whatever the new
     // format's road looks like.
     setStepId("format");
@@ -794,6 +804,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                 {step.id === "template" && (
                   <TemplateStep
                     typeset={typeset}
+                    output={output}
                     onPick={(id) => set("template", id)}
                   />
                 )}
@@ -1525,11 +1536,20 @@ function FormatCard({
    column beside this one now, and it already holds every one of them. */
 function TemplateStep({
   typeset,
+  output,
   onPick,
 }: {
   typeset: TypesetOptions;
+  /* Which format is being built — Manuscript is print-only, see `templatesFor`.
+     Only ever pdf or epub in practice, since this step does not exist
+     otherwise, but typed as the caller has it rather than asserted here — the
+     same shape `LayoutStep` below takes, and for the same reason. */
+  output: Format | null;
   onPick: (id: TypesetOptions["template"]) => void;
 }) {
+  /* No format picked yet is not a state this step is reachable in; showing the
+     full list is the harmless answer if it ever were. */
+  const offered = output ? templatesFor(output) : TEMPLATES;
   return (
     <div className="space-y-4">
       <div
@@ -1538,7 +1558,7 @@ function TemplateStep({
         className="divide-y divide-line overflow-hidden rounded-xl border
                    border-line bg-panel"
       >
-        {TEMPLATES.map((t) => {
+        {offered.map((t) => {
           const checked = typeset.template === t.id;
           return (
             <button

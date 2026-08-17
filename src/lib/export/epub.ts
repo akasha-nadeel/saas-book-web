@@ -287,8 +287,38 @@ ${spine}
  */
 export function listedChapters(
   chapters: readonly EpubChapter[],
+  /** The generated front-matter ids, so this binds the same book the spine does. */
+  frontIds: readonly string[] = [],
 ): { chapter: EpubChapter; index: number }[] {
-  const all = chapters.map((chapter, index) => ({ chapter, index }));
+  /*
+   * **Bound first, and for a long time it was not.**
+   *
+   * `spineOrder` runs `bindBook`; this walked the loaded array. Both answer
+   * "what order is this book in" and they answered differently, so the file
+   * shipped with a reading order and a *navigation* order that disagreed —
+   * measured on a real export, a spine of `01, 05, 12, 02, 03…` against a nav
+   * of `04, 07, 08, 10, 11…`. Amazon names that one specifically, and a reader
+   * jumping from the contents lands somewhere the book does not go next.
+   *
+   * It needs no duplicates to happen: any book whose front matter is not
+   * already in binding order gets two answers, because binding is exactly what
+   * puts it in that order. The duplicates in the export that turned this up
+   * only made it wide enough to see.
+   *
+   * Generated pages are dropped here rather than filtered later — every one of
+   * them is apparatus (a title page, a copyright page, a contents list), so the
+   * rule below would drop them anyway, and `BoundPage.index` is the loaded
+   * position, which is the number this function has always returned and the
+   * number the filenames are built from. A bound order must never renumber.
+   */
+  const all = bindBook(
+    chapters,
+    frontIds.map((id) => ({ id, html: "" })),
+  ).flatMap((page) =>
+    page.kind === "chapter"
+      ? [{ chapter: page.chapter, index: page.index }]
+      : [],
+  );
   const listed = all.filter(
     ({ chapter }) => !isApparatusPage(chapter.matter ?? "body", chapter.title),
   );
@@ -321,8 +351,10 @@ export function tocNcx(
   title: string,
   chapters: EpubChapter[],
   identifier: string,
+  /** As `listedChapters` — the ncx must be in the spine's order. */
+  frontIds: readonly string[] = [],
 ): string {
-  const points = listedChapters(chapters)
+  const points = listedChapters(chapters, frontIds)
     .map(
       ({ chapter, index }, n) => `    <navPoint id="${chapterId(index)}" playOrder="${n + 1}">
       <navLabel><text>${escapeXml(chapter.title)}</text></navLabel>
@@ -352,8 +384,10 @@ export function navXhtml(
   language = DEFAULT_LANGUAGE,
   /** Whether a cover page exists to point the landmarks at. */
   hasCover = false,
+  /** As `listedChapters` — the nav must be in the spine's order. */
+  frontIds: readonly string[] = [],
 ): string {
-  const items = listedChapters(chapters)
+  const items = listedChapters(chapters, frontIds)
     .map(
       ({ chapter, index }) =>
         `        <li><a href="${chapterId(index)}.xhtml">${escapeXml(chapter.title)}</a></li>`,
@@ -674,21 +708,28 @@ export async function buildEpub(
   const front = frontSections(book, chapters, typeset, (i) => `${chapterId(i)}.xhtml`);
 
   zip.file("OEBPS/style.css", typesetCss(typeset, false));
+  /* The generated front-matter ids, shared by all three orders in the file:
+     the spine binds with them, and the nav and the ncx bind with them too, or
+     the book reads in one order and navigates in another. */
+  const frontIds = front.map((s) => s.id);
   zip.file(
     "OEBPS/content.opf",
     contentOpf(
       { title: book.title, author: book.author, publishing },
       rendered,
       identifier,
-      front.map((s) => s.id),
+      frontIds,
       { cover, images, allImagesDescribed },
     ),
   );
   zip.file(
     "OEBPS/nav.xhtml",
-    navXhtml(book.title, rendered, language, Boolean(cover)),
+    navXhtml(book.title, rendered, language, Boolean(cover), frontIds),
   );
-  zip.file("OEBPS/toc.ncx", tocNcx(book.title, rendered, identifier));
+  zip.file(
+    "OEBPS/toc.ncx",
+    tocNcx(book.title, rendered, identifier, frontIds),
+  );
 
   if (cover) {
     zip.file(`OEBPS/${COVER_PAGE}.xhtml`, coverXhtml(book.title, cover.href, language));

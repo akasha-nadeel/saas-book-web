@@ -20,6 +20,9 @@
  */
 
 import type { PageMetrics } from "@/lib/page-setup";
+/* Type-only, so it is erased at compile time: `index.ts` imports this module at
+   runtime, and a value import here would close the circle. */
+import type { Format } from "./index";
 
 export type TemplateId = "manuscript" | "classic" | "romance";
 
@@ -86,6 +89,46 @@ export const TEMPLATES: readonly Template[] = [
 
 export function templateById(id: TemplateId): Template {
   return TEMPLATES.find((t) => t.id === id) ?? TEMPLATES[0];
+}
+
+/**
+ * The templates a given format may be set in.
+ *
+ * **Manuscript is not one of them for an e-reader, and that is the whole of
+ * this function.** Standard manuscript format — Times New Roman, double
+ * spaced, wide margins — is a *specification an agent asks for*, not a design:
+ * it exists so a reader with a pencil has room to write in, on paper. A
+ * reflowable book has no paper and no margin to write in, and nobody has ever
+ * wanted a double-spaced Times ebook. Offered in the wizard it was chosen, and
+ * the file that came out was the reason this pass happened.
+ *
+ * `bookSetting` already carries the other half of the same knowledge — it
+ * refuses to resize `manuscript` at all, because a specification is not ours
+ * to adjust. This says where the specification applies.
+ *
+ * Keyed on whether the format has a page rather than on a list of ids, so a
+ * fifth format arrives with the right answer instead of the default one.
+ */
+export function templatesFor(format: Format): readonly Template[] {
+  const onPaper = format === "pdf" || format === "docx";
+  return onPaper ? TEMPLATES : TEMPLATES.filter((t) => t.id !== "manuscript");
+}
+
+/**
+ * The template to actually set `format` in, given what the writer last picked.
+ *
+ * **Hiding a control does not change the value behind it.** A writer who
+ * chooses Manuscript for a PDF, goes back a step and switches to EPUB still
+ * has `template: "manuscript"` in the wizard's state, and would get the very
+ * file the list above exists to prevent — silently, having been shown a list
+ * it was not on. So the choice is resolved here as well as offered there.
+ */
+export function templateFor(format: Format, chosen: TemplateId): TemplateId {
+  const offered = templatesFor(format);
+  return offered.some((t) => t.id === chosen)
+    ? chosen
+    : (offered.find((t) => t.id === DEFAULT_TYPESET.template)?.id ??
+        offered[0].id);
 }
 
 /** Trim sizes, in inches. The names are what a printer's form asks for. */
@@ -325,8 +368,35 @@ export interface TypesetOptions {
   replaceWritten?: readonly string[];
 }
 
+/**
+ * The one page whose written version does *not* win by default.
+ *
+ * **A contents page is navigation, and a written one is a photograph of the
+ * book at the moment it was typed.** The rule everywhere else — the writer's
+ * page beats ours, because ours is a fallback assembled from fields and has
+ * nothing to add once somebody has set their own words — holds for a title
+ * page and a copyright page and breaks here. Ours is not assembled from
+ * fields: it is built from the book's own chapter list, it carries a real
+ * `<a href>` to every one of them, and in print it carries a folio that
+ * `target-counter` resolves against the page the chapter actually lands on.
+ * Theirs carries text. It is stale the moment a chapter is renamed, moved or
+ * added, and it is stale *silently*.
+ *
+ * It was found in a real export: a manuscript imported from Word brought its
+ * own "Table of contents" page, ours stood down, and the file shipped with a
+ * contents nobody could tap — the one thing a shop's navigation guidance asks
+ * for by name.
+ *
+ * Reversible, and by the control that already exists: this seeds
+ * `replaceWritten`, so the front-matter step's switch shows the page as
+ * replaced and turning it off puts the writer's own page back. Nothing is
+ * deleted from the book either way.
+ */
+export const REPLACED_BY_DEFAULT: readonly string[] = ["contents"];
+
 export const DEFAULT_TYPESET: TypesetOptions = {
   template: "classic",
+  replaceWritten: REPLACED_BY_DEFAULT,
   /* **6×9, the commonest self-published trim.**
 ​
      It was A4 — office paper — so that a browser saving to A4 or Letter filled
@@ -433,6 +503,45 @@ export function typesetCss(
   const size = (multiple: number) =>
     forPrint ? `${(sizePt * multiple).toFixed(1)}pt` : `${multiple}em`;
 
+  /**
+   * The rest of the body's typography, and **print is the only format entitled
+   * to it**.
+   *
+   * The same argument as `size`, finished. That function moved the *size* off
+   * the EPUB's body and stopped there, which left four more declarations doing
+   * the very thing it had just been written to prevent: a face, a leading, a
+   * margin and an alignment stated on the root of a reflowable book, each one
+   * overriding a control the reader has in their own menu. KDP's reflowable
+   * guidance is explicit — "the body text… must be all defaults… any styling
+   * on body text in the HTML will override the user's preferred default
+   * reading settings" — and an exported book was arriving in Times New Roman,
+   * double-spaced, with a margin of its own, whatever the device was set to.
+   *
+   * Three of the four go. **`text-align: justify` stays**, and that is a
+   * decision rather than an oversight: it is Kindle's own default, so
+   * declaring it takes nothing away there; Apple Books offers a justification
+   * preference that overrides an author's; and it is the half of a pair with
+   * `hyphens: auto`, which is what actually fixes the gappy setting people
+   * blame justification for. See the note in CLAUDE.md.
+   *
+   * Nothing about the *design* is lost. Headings keep their face, their `em`
+   * sizes and their centring — a heading is the book's own voice, not body
+   * text, and no reader setting is being taken away by it.
+   */
+  const bodyRule = [
+    forPrint ? `font-family: ${t.stack};` : "",
+    `font-size: ${forPrint ? `${sizePt}pt` : "100%"};`,
+    forPrint ? `line-height: ${leading};` : "",
+    forPrint ? "margin: 0;" : "",
+    "text-align: justify;",
+    "hyphens: auto;",
+  ]
+    // Dropped rather than left blank: an empty line where a declaration used
+    // to be is a stylesheet that looks like something went wrong in it.
+    .filter(Boolean)
+    .map((line) => `  ${line}`)
+    .join("\n");
+
   /** Prefix for a rule that must not reach past the book. */
   const s = scope ? `${scope} ` : "";
   /** What carries the book's inherited typography: the document, or the host. */
@@ -495,12 +604,7 @@ section { page: chapter; }
     : ""
 }
 ${root} {
-  font-family: ${t.stack};
-  font-size: ${forPrint ? `${sizePt}pt` : "100%"};
-  line-height: ${leading};
-  ${forPrint ? "margin: 0;" : "margin: 1em;"}
-  text-align: justify;
-  hyphens: auto;
+${bodyRule}
 }
 ${s}h1 {
   font-family: ${t.stack};

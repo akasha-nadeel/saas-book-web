@@ -561,6 +561,68 @@ describe("binding order and the contents", () => {
   });
 
   /*
+   * **The book reads in one order and must navigate in the same one.**
+   *
+   * `spineOrder` bound the book and `listedChapters` walked the loaded array,
+   * so the two answered the same question differently and the file shipped
+   * with a reading order its own contents disagreed with — the fault Amazon
+   * names by itself. It takes no duplicates: a front matter that is not
+   * already in binding order is enough, because binding is what puts it in
+   * that order.
+   *
+   * Asserted as a *relative* order rather than a fixed list, because the nav
+   * is a subset — apparatus is left out of it and belongs in the spine.
+   */
+  it("navigates in the order the spine reads", () => {
+    // Written out of order on purpose — an epigraph filed before the
+    // dedication it is bound after. Binding is what sorts them, so a book
+    // already in canonical order could not tell the two answers apart.
+    const jumbled = [
+      page("Epigraph", "front"),
+      page("Dedication", "front"),
+      page("Half-title page", "front"),
+      page("Chapter One"),
+      page("Acknowledgements", "back"),
+    ];
+    const frontIds = ["title", "contents"];
+
+    const spine = spineOrder(jumbled, frontIds);
+    // The same positional names the spine and the files use.
+    const id = (index: number) => `chapter-${String(index + 1).padStart(2, "0")}`;
+    const listed = listedChapters(jumbled, frontIds);
+    const nav = listed.map((l) => id(l.index));
+
+    // Every listed page is in the spine, and in the same sequence.
+    expect(nav.every((entry) => spine.includes(entry))).toBe(true);
+    expect(nav).toEqual(spine.filter((entry) => nav.includes(entry)));
+
+    // And it is genuinely the bound order rather than the written one: the
+    // dedication was written second and is navigated to first.
+    expect(listed.map((l) => l.chapter.title)).toEqual([
+      "Dedication",
+      "Epigraph",
+      "Chapter One",
+      "Acknowledgements",
+    ]);
+    expect(nav[0]).toBe(id(1));
+  });
+
+  it("orders the nav and the ncx the same way as each other", () => {
+    const jumbled = [
+      page("Epigraph", "front"),
+      page("Dedication", "front"),
+      page("Chapter One"),
+    ];
+    const titles = listedChapters(jumbled, []).map((l) => l.chapter.title);
+    const nav = navXhtml("T", jumbled, "en", false, []);
+    const ncx = tocNcx("T", jumbled, "urn:x", []);
+    // A dedication is bound before an epigraph whatever order they arrived in.
+    expect(titles).toEqual(["Dedication", "Epigraph", "Chapter One"]);
+    expect(nav.indexOf("Dedication")).toBeLessThan(nav.indexOf("Epigraph"));
+    expect(ncx.indexOf("Dedication")).toBeLessThan(ncx.indexOf("Epigraph"));
+  });
+
+  /*
    * No published book has a sheet headed "Copyright page". The name exists so
    * a writer can find the page in a list; it is not part of the book.
    */

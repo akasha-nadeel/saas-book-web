@@ -33,7 +33,7 @@ proposing a feature or rebuilding something that looks missing.
 - `java -jar epubcheck.jar book.epub` — the EPUB check the unit tests can't do
   (see below). Not in CI, and **the jar is not in the repo** — download EPUBCheck
   5.3 first. Run it by hand after touching `epub.ts`.
-- The suite is 91 files / ~1,785 tests and takes about a minute; jsdom prints
+- The suite is 91 files / ~1,803 tests and takes about a minute; jsdom prints
   `HTMLCanvasElement's getContext()` warnings from the image recoder and they
   are expected, not failures.
 - `node scripts/feature-shots.cjs` — regenerates the landing page's bitmap
@@ -1255,12 +1255,26 @@ direction to be wrong in — matching is on the exact title (`GENERATED_BY_TITLE
 page still full of `[placeholders]` has already been filtered out by
 `loadChapters` so it does not count as written.
 
+**The contents page is the one exception, and it goes the other way**
+(`REPLACED_BY_DEFAULT`, since 2026-08-18). The rule above rests on ours being a
+*fallback assembled from fields* — true of a title page and a copyright page,
+and false here: our contents is built from the book's own chapter list, carries
+an `<a href>` to every one of them, and in print carries a folio
+`target-counter` resolves against the page the chapter really lands on. A
+written one carries text, and is stale the moment a chapter is renamed or
+moved — silently. It was found in a real export: a manuscript imported from
+Word brought its own "Table of contents", ours stood down, and the file shipped
+with a contents nobody could tap, which is the one thing a shop's navigation
+guidance asks for by name. So `DEFAULT_TYPESET.replaceWritten` seeds
+`contents`, which means the switch below shows it as replaced and turning that
+switch off hands the writer their own page back. Nothing is deleted either way.
+
 **The writer can overrule that default, and `withoutReplaced` is the whole of
 it.** The switch on the export's front-matter step means *generate this* while
 there is no page of their own and **replace mine with yours** once there is — a
 different question, so it is stored in a different place
-(`typeset.replaceWritten`) and reads **off** to begin with, since theirs is what
-the file uses. Three things hold it. **Only the surprising direction asks**:
+(`typeset.replaceWritten`) and reads **off** to begin with for the two pages
+above, since theirs is what the file uses. Three things hold it. **Only the surprising direction asks**:
 turning it *on* opens `ReplacePageDialog`, because "Contents" on a switch does
 not obviously mean *leave my contents page out*, and the thing at the other end
 is the writer's own words; turning it back off restores their page with no
@@ -1318,6 +1332,26 @@ into manifest ids. Note that the *files* are named positionally
 (`chapter-03.xhtml` is the fourth loaded chapter), so neither the spine order
 nor the contents filter may renumber them — `BoundPage.index` carries the
 original index for exactly this reason, and every filtered list carries it too.
+
+**The same bug survived one floor down until 2026-08-18: the file navigated in
+a different order from the one it read in.** `spineOrder` bound the book;
+`listedChapters` — which is the whole of `nav.xhtml` and `toc.ncx` — walked the
+*loaded* array and never bound it. Two functions, one question, two answers, so
+an exported book's contents pointed through it in an order the spine does not
+go: measured on a real export, a spine of `01, 05, 12, 02, 03…` against a nav
+of `04, 07, 08, 10, 11…`. Amazon's navigation guidance names that one by
+itself. It needs no duplicates — any book whose front matter is not *already*
+in binding order gets two answers, because binding is what puts it in that
+order. `listedChapters` takes the generated ids and binds first now, and a test
+asserts the nav is the spine's own subsequence.
+
+**EPUBCheck had been saying so all along, and the note below saying "0 errors
+and 0 warnings" had gone stale.** Run on the export that turned this up, 5.3.0
+reports three of `WARNING(NAV-011): "toc" nav must be in reading order; link
+target … is before the previous link's target in spine order` — and none on the
+same book after the fix. The claim was true when it was written and stopped
+being true when front matter became a list of pages a writer can hold several
+of. Re-run it rather than trusting the sentence.
 
 **The chapter opener prints one thing, not two, and `chapterNumeral` in
 `blocks.ts` is the whole of that rule.** `chapterXhtml` emitted a standing
@@ -1680,6 +1714,33 @@ dynamically imported so a writer who never exports never downloads them.
   them — one of those without the other could be satisfied by breaking the PDF.
   Verified after the change: EPUBCheck 5.3 on a full and a bare book, 0 errors
   and 0 warnings each.
+
+  **That rule covered one declaration out of five until 2026-08-18, and the
+  other four were doing the same harm.** `size()` moved the *size* off an
+  EPUB's body and stopped there, leaving `font-family`, `line-height` and
+  `margin: 1em` stated on the root of a reflowable book — each overriding a
+  control the reader has in their own menu, which is precisely what the KDP
+  sentence quoted above forbids. An exported book arrived in Times New Roman,
+  double-spaced, with a margin of its own, whatever the device was set to. All
+  three are print-only now; the EPUB's body states `font-size: 100%`,
+  `text-align: justify` and `hyphens: auto` and nothing else. **Headings keep
+  everything** — a heading is the book's own voice rather than body text, so
+  its face, its `em` size and its centring take no reader setting away. The
+  test that used to *require* a `line-height` here now forbids one: it rested
+  on Apple's "set the value to a unit-less multiple of the font-size", which is
+  a rule about how to express a leading if you state one, not an instruction to
+  state one.
+
+  **The Manuscript template is not offered for an EPUB** (`templatesFor`), and
+  that is what actually produced the double-spaced file above. Standard
+  manuscript format is a specification an agent asks for — Times, double
+  spaced, wide margins so a reader with a pencil has room — and a reflowable
+  book has no paper and no margin to write in. `bookSetting` already refused to
+  *resize* that template for the same reason; this says where it applies at
+  all. Hiding a radio does not change the value behind it, so `templateFor`
+  resolves the choice as well: a writer who sets Manuscript for a PDF and
+  switches to EPUB gets the default back rather than a template the list no
+  longer shows.
 
   **`text-align: justify` stays, and the reason is worth not re-litigating.**
   It looked like the cause of some very gappy word spacing; it was not — the
