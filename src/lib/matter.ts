@@ -139,9 +139,15 @@ export const MATTER_SECTIONS: Record<MatterPart, readonly MatterSection[]> = {
       // an absence explains nothing. The page says what the export already
       // does, so nobody writes a contents list by hand for no reason — and
       // because the line is bracketed, an untouched one never ships.
+      /* **Not marked `usual`, and it is the one that looks like it should be.**
+         A contents page is universal in non-fiction and the exception in a
+         novel: most printed novels omit it, and most fiction ebooks show no
+         visible one either, because numbered chapters list nothing a reader
+         wants. What a shop actually asks for is working *navigation*, and the
+         EPUB's nav and ncx carry that whatever is on this list. Marking it
+         would also have contradicted the hint beside it. */
       title: "Table of contents",
       apparatus: true,
-      usual: true,
       hint: "Only if you want to write your own — we build this if you skip it.",
       lines: [
         "[OpenChapter builds the contents for you when you export, from your chapter titles. You only need this page if you want to write your own — otherwise delete it.]",
@@ -196,11 +202,20 @@ export const MATTER_SECTIONS: Record<MatterPart, readonly MatterSection[]> = {
       lines: ["[Title], [year]", "[Title], [year]"],
     },
     {
-      // A self-publishing convention rather than a printer's one, and the
-      // single most-repeated piece of advice given to first-time authors: the
-      // ask has to be in the book, at the end, where a reader who has just
-      // finished it is.
+      /* A self-publishing convention rather than a printer's one, and the
+         single most-repeated piece of advice given to first-time authors: the
+         ask has to be in the book, at the end, where a reader who has just
+         finished it is.
+
+         **Marked `usual` for that reason and not because Chicago says so** —
+         it does not, and no printed trade novel carries one. The flag answers
+         "do books like yours have this", and the books this app is for are
+         self-published, where the review ask sits in the standard back-matter
+         set beside the bio. "Also by the author" is the near miss: the advice
+         is just as emphatic, and it is empty in a first novel, which is the
+         book most people here are publishing. */
       title: "A word about reviews",
+      usual: true,
       hint: "Ask readers to leave one, and say where.",
       lines: [
         "[Ask your reader to leave a review, and say where — the shop they bought it from is usually the right answer.]",

@@ -77,14 +77,14 @@ it("offers only the sections a book does not have yet", () => {
  */
 it("keeps the few usual pages apart from the rest", () => {
   const front = missingSections("front", []);
-  // The three the export builds are usual *pages* — nearly every printed book
-  // carries them — which is a separate fact from whether the writer should
-  // tick the row. See the note on `usual` and `isGeneratedPage`.
+  // The title and copyright pages are the two Chicago calls compulsory, and a
+  // dedication is standard in a novel. They are usual *pages* whether or not
+  // the writer should tick the row — the export builds two of them. See the
+  // note on `usual` and `isGeneratedPage`.
   expect(front.usual.map((s) => s.title)).toEqual([
     "Title page",
     "Copyright page",
     "Dedication",
-    "Table of contents",
   ]);
   expect(front.rest.map((s) => s.title)).toContain("Epigraph");
 
@@ -92,8 +92,24 @@ it("keeps the few usual pages apart from the rest", () => {
   expect(back.usual.map((s) => s.title)).toEqual([
     "Acknowledgements",
     "About the author",
+    "A word about reviews",
   ]);
   expect(back.rest.map((s) => s.title)).toContain("Glossary");
+});
+
+/**
+ * **A contents page is not marked, and this is the one to leave alone.**
+ *
+ * It looks like the most standard page on the list and is the exception in
+ * fiction: most printed novels omit it, most fiction ebooks show no visible
+ * one, and what a shop asks for is working navigation, which the EPUB's nav
+ * and ncx carry regardless. Marking it would also contradict its own hint.
+ */
+it("does not call a contents page usual", () => {
+  const contents = MATTER_SECTIONS.front.find(
+    (s) => s.title === "Table of contents",
+  );
+  expect(contents?.usual).toBeUndefined();
 });
 
 it("offers nothing once every standard page exists", () => {
