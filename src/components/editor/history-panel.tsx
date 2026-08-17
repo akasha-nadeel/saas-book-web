@@ -19,9 +19,12 @@ import { useHistory } from "@/lib/use-library";
  * to show it.
  *
  * **It is a safety net, not an archive**, and the panel says so. Eight versions
- * at most and a byte budget behind that, because `localStorage` is about 5MB an
- * origin and the manuscript has first claim on it. What this can promise is
- * "this chapter as it was before lunch". What it cannot promise is last March.
+ * at most, a byte budget behind that, and a budget across the whole library
+ * behind *that*. Those bounds were drawn against a five-megabyte origin and
+ * outlived it: the manuscript is on IndexedDB now, and eight versions of every
+ * chapter of every book a writer will ever own is still the archive this
+ * refuses to be. What this can promise is "this chapter as it was before
+ * lunch". What it cannot promise is last March.
  */
 export function HistoryPanel({
   bookId,
@@ -45,7 +48,11 @@ export function HistoryPanel({
     // true: the current text was snapshotted on its own last autosave and is
     // still in the list, so restoring is reversible by restoring again.
     try {
-      saveBody(bookId, chapterId, JSON.parse(body), words);
+      // It answers a promise since the manuscript moved onto IndexedDB, and a
+      // rejection here is the disk refusing — which raises the out-of-room
+      // dialog for itself. The catch is for the parse, as it always was; this
+      // one is so a refusal is not an unhandled rejection in the console.
+      void saveBody(bookId, chapterId, JSON.parse(body), words).catch(() => {});
     } catch {
       // A version that will not parse is a version that cannot be restored.
       // Nothing sensible to do, and nothing has been damaged.

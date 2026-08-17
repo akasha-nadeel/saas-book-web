@@ -33,7 +33,26 @@ import {
   parseHistory,
   shouldSnapshot,
 } from "./history";
-import { clearPrintCovers, deletePrintCover } from "./cover-store";
+import {
+  clearPrintCovers,
+  deletePrintCover,
+  printCoverIds,
+} from "./cover-store";
+import { openStoreChannel, postStoreNote, type StoreNote } from "./store-channel";
+import {
+  BODIES,
+  COVERS,
+  HISTORY,
+  META,
+  NOTES,
+  clearStore,
+  diskReady,
+  entriesOf,
+  readOne,
+  removeOne,
+  writeAll,
+  writeOne,
+} from "./store-db";
 import {
   MATTER_SECTIONS,
   matterSection,
@@ -96,6 +115,15 @@ const COVER_PREFIX = "openchapter:cover:";
  * nothing at all.
  */
 const COVER_FACTS_PREFIX = "openchapter:coverfacts:";
+/**
+ * Up next to the other prefixes, rather than down beside the history code.
+ *
+ * `LEGACY_PREFIX` below is an object literal evaluated when this module loads,
+ * and a `const` declared further down the file is in its temporal dead zone at
+ * that moment — so keeping this one where it used to live would throw before a
+ * single screen rendered.
+ */
+const HISTORY_PREFIX = "openchapter:history:";
 
 /**
  * Which of a book's three parts a chapter belongs to. Absent means the body —
@@ -351,6 +379,7 @@ const bodyKey = (id: string) => `${BODY_PREFIX}${id}`;
 const notesKey = (id: string) => `${NOTES_PREFIX}${id}`;
 const coverKey = (id: string) => `${COVER_PREFIX}${id}`;
 const coverFactsKey = (id: string) => `${COVER_FACTS_PREFIX}${id}`;
+const historyKey = (chapterId: string) => `${HISTORY_PREFIX}${chapterId}`;
 
 function newId(): string {
   // randomUUID needs a secure context; plain http://<lan-ip>:3000 isn't one.
@@ -367,6 +396,562 @@ function readRaw(key: string): string | null {
     // Private-mode Safari and friends throw rather than degrade.
     return null;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Where the library actually lives
+//
+// **`localStorage` is about five megabytes for the whole origin, and the
+// library outgrew it.** Bodies run 20–40KB a chapter, cover thumbnails are
+// capped at 250KB each and the version history is bounded in the megabytes, so
+// three finished novels with covers is most of the budget before a word is
+// typed; measured on a real library, 23 books and 298 chapters is roughly nine.
+// What fails first is an autosave, on a chapter that had nothing to do with
+// whatever filled the room. No amount of sweeping fixes a ceiling.
+//
+// So the four unbounded stores — bodies, notes, history and the cover
+// thumbnails — live in IndexedDB, which is measured in tens of gigabytes.
+//
+// **Three things stay in `localStorage` and must not follow.** `prefs`, because
+// `layout.tsx` reads it in an inline `<script>` before React to set the theme
+// pre-paint, and IndexedDB is async; `owner`, which `reconcile` reads around
+// the wipe; and the `shelf`, which is ~50KB and is the index every screen
+// paints from — keeping it synchronous keeps first paint instant. Most of the
+// risk in this change is avoided by not moving those.
+//
+// **Memory is the read path; IndexedDB is the disk.** Every moved store keeps a
+// `Map` mirror, so `getBody` and friends stay synchronous and keep returning
+// the same string reference until it is replaced — which is exactly what
+// `useSyncExternalStore` needs and the whole reason none of the sixty-odd files
+// that read this module changed. A write sets the mirror at once and queues the
+// disk write behind it.
+//
+// **`mirror.get(key) ?? readRaw(legacyKey)` is the line that makes all of this
+// safe.** An interrupted migration is harmless, a failed one is a non-event, a
+// browser with no IndexedDB behaves exactly as it did before, and a test that
+// seeds `openchapter:chapter:<id>` by hand still works. `localStorage` stays a
+// fallback *read* path for good.
+// ---------------------------------------------------------------------------
+
+/** The stores that moved, in the order the migration walks them. */
+const MOVED = [BODIES, NOTES, HISTORY, COVERS] as const;
+
+const mirrors: Record<string, Map<string, string>> = {
+  [BODIES]: new Map(),
+  [NOTES]: new Map(),
+  [HISTORY]: new Map(),
+  [COVERS]: new Map(),
+};
+
+const bodyMirror = mirrors[BODIES];
+const notesMirror = mirrors[NOTES];
+const historyMirror = mirrors[HISTORY];
+const coverMirror = mirrors[COVERS];
+
+/** Where each moved store used to sit, and still falls back to. */
+const LEGACY_PREFIX: Record<string, string> = {
+  [BODIES]: BODY_PREFIX,
+  [NOTES]: NOTES_PREFIX,
+  [HISTORY]: HISTORY_PREFIX,
+  [COVERS]: COVER_PREFIX,
+};
+
+/**
+ * Whether this browser gave us a database *and* the move has been made.
+ *
+ * False is not a failure state: it is exactly the app as it was before any of
+ * this existed, five-megabyte ceiling included. Firefox in private browsing
+ * refuses IndexedDB outright, so this has to be a working configuration rather
+ * than an error path.
+ */
+let onDisk = false;
+
+/**
+ * Keys written while the disk was still being read, per store.
+ *
+ * **The load window is short and it is not empty.** `saveBody` is barred during
+ * it, but nothing else is: the landing page's check writes a whole imported book
+ * the moment a visitor presses a fix, and a cover, a note or a matter page can
+ * land in the same few hundred milliseconds. Those writes go to `localStorage`,
+ * because that is what a not-yet-migrated browser does.
+ *
+ * Without this record they are lost twice over. Hydration arrives with what the
+ * disk held a moment *before* the write and would put it straight over the top;
+ * and on a browser that had already migrated — where no scan runs to pick the
+ * old key up — the write would never reach the disk at all, leaving a book that
+ * worked all session and was gone on reload.
+ *
+ * So a key in here is **newer than the disk by construction**: hydration leaves
+ * it alone, and `flushPending` puts it on the disk before the app stops writing
+ * old keys.
+ */
+const pending: Record<string, Set<string>> = {
+  [BODIES]: new Set(),
+  [NOTES]: new Set(),
+  [HISTORY]: new Set(),
+  [COVERS]: new Set(),
+};
+
+const DURABLE = Promise.resolve(true);
+
+function readStored(store: string, key: string): string | null {
+  const held = mirrors[store].get(key);
+  if (held !== undefined) return held;
+  return readRaw(LEGACY_PREFIX[store] + key);
+}
+
+/**
+ * Keep one value, and answer when it is really on the disk.
+ *
+ * The mirror is set first and synchronously, so the very next render sees it
+ * and the existing fan-out is unchanged. The promise is for the one caller that
+ * has to be honest about durability — `saveBody`, because the word "Saved" in
+ * the corner of the editor is a claim about the disk and not about memory.
+ *
+ * **Throws on the `localStorage` path, as it always did.** That is what the
+ * quota escapes are built on, and an installation with no IndexedDB still needs
+ * them.
+ */
+function writeStored(store: string, key: string, value: string): Promise<boolean> {
+  mirrors[store].set(key, value);
+
+  if (!onDisk) {
+    window.localStorage.setItem(LEGACY_PREFIX[store] + key, value);
+    // Recorded only while a read is actually in flight. On a browser with no
+    // IndexedDB every write takes this path for the life of the session, and a
+    // set that grew all session would be a slow leak for nothing.
+    if (readingDisk) pending[store].add(key);
+    return DURABLE;
+  }
+
+  postStoreNote(store, key);
+  return writeOne(store, key, value).then((ok) => {
+    if (!ok) reportStorage("full");
+    return ok;
+  });
+}
+
+/**
+ * Everything one chapter owns, gone: its prose, its notes, its versions.
+ *
+ * **A helper now, where the four call sites used to each write the three lines
+ * inline.** That was the right shape while a delete was three `removeItem`
+ * calls and the note beside the history section said so; it stopped being right
+ * the moment a delete meant a mirror, a legacy key and an IndexedDB
+ * transaction, because a fifth site is then twelve lines of ceremony and a
+ * fourth site that forgets one of the three leaks a manuscript's worth of prose
+ * under a key nothing will ever ask for again.
+ */
+function forgetChapter(chapterId: string): void {
+  forgetStored(BODIES, chapterId);
+  forgetStored(NOTES, chapterId);
+  forgetStored(HISTORY, chapterId);
+}
+
+/**
+ * Forget one value everywhere it could be.
+ *
+ * **The legacy key goes too, always.** Reads fall back to `localStorage`, so a
+ * delete that left the old copy behind would resurrect a chapter the writer
+ * had erased — the one way this fallback could hurt rather than help.
+ */
+function forgetStored(store: string, key: string): void {
+  mirrors[store].delete(key);
+  // A deletion during the load window cancels the write that preceded it, or
+  // the migration would put the chapter back on the disk after it was erased.
+  pending[store].delete(key);
+  try {
+    window.localStorage.removeItem(LEGACY_PREFIX[store] + key);
+  } catch {
+    // Unreachable bytes, not a broken app.
+  }
+  if (!onDisk) return;
+  postStoreNote(store, key);
+  void removeOne(store, key);
+}
+
+// ---------------------------------------------------------------------------
+// Reading the disk, once, before anything reads the library
+//
+// **The load phase is modelled on `syncPhase` below and must be**: something
+// happens outside React that every screen has to wait for, and the store's one
+// way of saying so is a value plus a subscription. It starts "loading" rather
+// than flipping there from an effect, because starting settled would paint the
+// empty state first — which is the bug that note records.
+//
+// **This is the dangerous part of the whole change and the gate is not
+// optional.** The editor keys its writing surface on the chapter id rather than
+// on the text, deliberately, to protect the caret. Mount it while `getBody`
+// still answers null and the prose arrives afterwards, and the key never
+// changes, Tiptap keeps its empty document, and the next autosave writes that
+// empty document over the chapter. So `useHydrated()` — which every screen
+// already gates on — now means "storage has been read" in the full sense, and
+// `saveBody` throws rather than writing while this is still loading.
+// ---------------------------------------------------------------------------
+
+type StoragePhase = "loading" | "ready";
+
+/**
+ * **Decided synchronously, by whether there is a disk to read at all.**
+ *
+ * Exactly the shape `syncPhase` uses for "is there a server". A browser with no
+ * IndexedDB — Firefox in private browsing, some privacy extensions, and Node
+ * during SSR — has nothing to wait for and starts ready, so it behaves precisely
+ * as the app did before any of this existed. Starting ready and flipping to
+ * loading inside an effect would be a first paint with the loaded state on it,
+ * which is the bug.
+ */
+let storagePhase: StoragePhase =
+  typeof indexedDB === "undefined" ? "ready" : "loading";
+const storageLoadListeners = new Set<() => void>();
+
+export function getStoragePhase(): StoragePhase {
+  return storagePhase;
+}
+
+/** Whether the library is on the disk rather than in `localStorage`. */
+export function isOnDisk(): boolean {
+  return onDisk;
+}
+
+export function subscribeToStorageLoad(onStoreChange: () => void) {
+  storageLoadListeners.add(onStoreChange);
+  return () => {
+    storageLoadListeners.delete(onStoreChange);
+  };
+}
+
+/**
+ * Ready, whatever the outcome — the same rule `settleSync` follows.
+ *
+ * A browser that refuses IndexedDB, a database that will not open, a read that
+ * hangs: all of them have to release the app onto the `localStorage` path
+ * rather than leave every screen on a spinner. A writer whose browser cannot do
+ * this should meet their library as it was, not a load that never finishes.
+ */
+function settleStorage(): void {
+  if (storagePhase === "ready") return;
+  storagePhase = "ready";
+  for (const listener of storageLoadListeners) listener();
+  // Anything already on screen re-reads: the mirrors were empty when it
+  // rendered and are not now.
+  refreshEverything();
+}
+
+let loading: Promise<void> | null = null;
+
+/** True for exactly as long as the read is in flight. See `pending`. */
+let readingDisk = false;
+
+/**
+ * Read the library off the disk. Safe to call more than once; runs once.
+ *
+ * Called from `LibrarySync`'s mount effect, **before** `syncWithServer` —
+ * a download that landed in the mirrors before hydration filled them would be
+ * overwritten by the hydration a moment later.
+ *
+ * **There is no timeout on it, and that is a decision rather than an
+ * omission.** One was written — release the screens after eight seconds and
+ * carry on with `localStorage` — and it is a way to lose a manuscript. A
+ * browser that has already migrated has nothing in `localStorage`, so giving up
+ * would show the writer an empty book; the editor's surface is keyed on the
+ * chapter id and a reload counter rather than on the text, so prose arriving
+ * afterwards would not remount it; and anything typed into that empty document
+ * is, quite correctly, *newer* than the disk, so it would be flushed over the
+ * real chapter. A spinner is the safe failure here and a stale screen is not.
+ *
+ * What the timeout was guarding against is handled where it belongs: `openDb`
+ * resolves null on `onerror` and on `onblocked` — Firefox in private browsing,
+ * which neither succeeds nor errors — and `typeof indexedDB === "undefined"`
+ * never gets this far. Every one of those settles in milliseconds.
+ */
+export function loadFromDisk(): Promise<void> {
+  loading ??= (async () => {
+    readingDisk = true;
+    try {
+      await hydrate();
+    } catch (err) {
+      console.error("[store] could not read the library from disk", err);
+    } finally {
+      readingDisk = false;
+      settleStorage();
+    }
+  })();
+  return loading;
+}
+
+async function hydrate(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (!(await diskReady())) return;
+
+  const loaded = new Map<string, [string, string][]>();
+  for (const store of MOVED) loaded.set(store, await entriesOf(store));
+  const moved = await readOne(META, MIGRATION_FLAG);
+
+  for (const store of MOVED) {
+    const mirror = mirrors[store];
+    for (const [key, value] of loaded.get(store) ?? []) {
+      // A key written while this read was in flight is newer than what came
+      // back and must not be clobbered by it. See `pending`.
+      if (!pending[store].has(key)) mirror.set(key, value);
+    }
+  }
+
+  if (moved === null && !(await moveOffLocalStorage())) return;
+  if (!(await flushPending())) return;
+
+  onDisk = true;
+  openStoreChannel(onStoreNote);
+  void sweepOrphanedArtwork();
+}
+
+/**
+ * Full-size cover artwork belonging to books that no longer exist.
+ *
+ * **Cleaning up after a real leak rather than guarding against a live one.**
+ * `deletePrintCover` was reachable only from `clearCover` until 2026-08-17, so
+ * every book deleted before that left its artwork in IndexedDB — measured at
+ * about sixteen megabytes on one library. `deleteBook` closes the leak going
+ * forward; this is for what is already in there, and for the one case the fix
+ * cannot cover, a book removed on another machine.
+ *
+ * Three things keep it safe. It runs **after** the load, so the shelf it
+ * compares against is the real one; it **does nothing on an empty shelf**,
+ * because "no books" is also what a corrupt or half-downloaded shelf looks like
+ * and deleting every writer's artwork on the strength of that is not a guess
+ * worth making; and it counts the **trash and the archive** as books, since
+ * both come back.
+ */
+async function sweepOrphanedArtwork(): Promise<void> {
+  try {
+    const books = getShelf().books;
+    if (books.length === 0) return;
+
+    const known = new Set(books.map((b) => b.id));
+    const stray = (await printCoverIds()).filter((id) => !known.has(id));
+    if (stray.length === 0) return;
+
+    for (const id of stray) await deletePrintCover(id);
+    console.info(
+      `[store] cleared cover artwork for ${stray.length} book${
+        stray.length === 1 ? "" : "s"
+      } that no longer exist`,
+    );
+  } catch {
+    // Housekeeping. Nothing on any screen depends on it having run.
+  }
+}
+
+/**
+ * Put the load window's writes on the disk, and only then stop using the old
+ * keys.
+ *
+ * The migration catches most of them, because a write during the window also
+ * writes the legacy key it scans. This is for the rest: a browser that had
+ * *already* migrated runs no scan at all, so without this a book imported in
+ * those few hundred milliseconds would live in `localStorage` and the mirror
+ * and never reach the disk — readable through the fallback, and invisible to
+ * every other tab.
+ *
+ * **Every pending key is written, including ones the disk already had.** An
+ * earlier version skipped those, on the reasoning that the disk's copy was
+ * already there — which is exactly backwards: a pending key is newer than the
+ * disk *by definition*, so those are the ones that most need writing. It cost a
+ * cover changed in the first half-second of a session, correct on screen for
+ * that session and reverted to the old picture on the next load. Re-putting a
+ * handful of values that happen to be identical is not worth a check that can
+ * be wrong in that direction.
+ *
+ * Answers false if anything would not land, which leaves the whole session on
+ * `localStorage` rather than half on each.
+ */
+async function flushPending(): Promise<boolean> {
+  for (const store of MOVED) {
+    const strays: [string, string][] = [];
+    for (const key of pending[store]) {
+      const value = mirrors[store].get(key);
+      if (value !== undefined) strays.push([key, value]);
+    }
+    if (!(await writeAll(store, strays))) return false;
+    for (const [key] of strays) {
+      try {
+        window.localStorage.removeItem(LEGACY_PREFIX[store] + key);
+      } catch {
+        // Left behind, and harmless: the mirror shadows it on every read.
+      }
+    }
+    pending[store].clear();
+  }
+  return true;
+}
+
+/** Set once the library is on the disk and the old keys are gone. */
+const MIGRATION_FLAG = "moved-off-localstorage";
+
+/**
+ * The one-time move, and it is written to survive being interrupted.
+ *
+ * Disk first, flag second, `localStorage` last. A browser closed at any point
+ * before the flag simply re-runs this on the next load; a browser closed after
+ * it has the copy that matters. Nothing is deleted until the copy it duplicates
+ * has been confirmed written, so there is no window in which a manuscript
+ * exists in neither place.
+ *
+ * **While the flag is absent, `localStorage` always wins**, and working out why
+ * is the subtle part of this whole change. An earlier version skipped anything
+ * the disk already held, on the reasoning that a half-finished first attempt
+ * had put a newer copy there. It is the other way round: the flag is what
+ * switches the app onto the disk, so a session that got as far as writing some
+ * chapters and then failed goes on writing *only* to `localStorage` — and every
+ * edit made in it is newer than the disk copy that attempt left behind.
+ * Preferring the disk there would take a writer's afternoon and replace it with
+ * the version from before the failure, silently, on the next load.
+ *
+ * The reverse cannot happen. Nothing writes to the disk before the flag is set,
+ * so there is no way for the disk to be ahead of `localStorage` while this is
+ * running. That makes the rule as simple as it looks.
+ */
+async function moveOffLocalStorage(): Promise<boolean> {
+  const found = new Map<string, [string, string][]>();
+  const doomed: string[] = [];
+  let bytes = 0;
+
+  for (let i = 0; i < window.localStorage.length; i += 1) {
+    const key = window.localStorage.key(i);
+    if (!key) continue;
+    for (const store of MOVED) {
+      const prefix = LEGACY_PREFIX[store];
+      if (!key.startsWith(prefix)) continue;
+      const id = key.slice(prefix.length);
+
+      const value = readRaw(key);
+      if (value === null) break;
+      const list = found.get(store) ?? [];
+      list.push([id, value]);
+      found.set(store, list);
+      doomed.push(key);
+      bytes += value.length;
+      break;
+    }
+  }
+
+  for (const store of MOVED) {
+    const entries = found.get(store);
+    if (!entries?.length) continue;
+    if (!(await writeAll(store, entries))) {
+      // Nothing is deleted and the flag is not set, so this is a load that
+      // simply behaved like the old one. It will be tried again next time.
+      console.error(`[store] could not move ${store} onto the disk`);
+      return false;
+    }
+    for (const [id, value] of entries) mirrors[store].set(id, value);
+  }
+
+  if (!(await writeOne(META, MIGRATION_FLAG, new Date().toISOString()))) {
+    return false;
+  }
+
+  for (const key of doomed) {
+    try {
+      window.localStorage.removeItem(key);
+    } catch {
+      // Left behind, and harmless: the mirror shadows it on every read.
+    }
+  }
+  rebuildCoverIndex();
+
+  if (bytes > 0) {
+    console.info(
+      `[store] moved ${describeBytes(bytes)} of the library off localStorage`,
+    );
+  }
+  return true;
+}
+
+function describeBytes(n: number): string {
+  return n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}MB` : `${Math.round(n / 1000)}KB`;
+}
+
+/**
+ * A note from another tab: one key in one store has moved.
+ *
+ * **The value is re-read from the disk rather than carried in the message.**
+ * That keeps a note cheap enough to send on every autosave, and it means this
+ * tab can never act on a value that has since been written over — the message
+ * says *what* changed and the disk says what it changed to.
+ *
+ * The mirror is updated *before* anybody is told. Notify first and the editor
+ * remounts on the text it already had.
+ */
+function onStoreNote(note: StoreNote): void {
+  const mirror = mirrors[note.store];
+  if (!mirror) return;
+  void readOne(note.store, note.key).then((value) => {
+    if (value === null) mirror.delete(note.key);
+    else mirror.set(note.key, value);
+    announce(note.store, note.key);
+  });
+}
+
+function announce(store: string, key: string): void {
+  switch (store) {
+    case BODIES:
+      // Once per write, not once per listener: the editor keys its surface on
+      // this counter and a double bump is a double remount.
+      bodyReloads.set(key, (bodyReloads.get(key) ?? 0) + 1);
+      fireFor(bodyListeners, key);
+      break;
+    case NOTES:
+      fireFor(noteListeners, key);
+      break;
+    case HISTORY:
+      for (const listener of historyListeners) listener();
+      break;
+    case COVERS:
+      coverEpoch += 1;
+      emitShelf();
+      break;
+  }
+}
+
+/** Everything, once, after the disk has been read. */
+function refreshEverything(): void {
+  coverEpoch += 1;
+  emitShelf();
+  for (const set of bodyListeners.values()) for (const l of set) l();
+  for (const set of noteListeners.values()) for (const l of set) l();
+  for (const listener of historyListeners) listener();
+}
+
+// ---------------------------------------------------------------------------
+// Per-key listeners
+//
+// The `storage` event used to do this: it fires only in *other* tabs, which is
+// exactly what a body listener wants, and it is keyed by the storage key. There
+// is no such event for IndexedDB, so the registry is ours now. The `storage`
+// listeners stay beside these — a browser without IndexedDB still writes to
+// localStorage and still needs cross-tab freshness from the old mechanism.
+// ---------------------------------------------------------------------------
+
+type KeyListeners = Map<string, Set<() => void>>;
+
+const bodyListeners: KeyListeners = new Map();
+const noteListeners: KeyListeners = new Map();
+
+function listenFor(reg: KeyListeners, key: string, onStoreChange: () => void) {
+  const set = reg.get(key) ?? new Set<() => void>();
+  set.add(onStoreChange);
+  reg.set(key, set);
+  return () => {
+    set.delete(onStoreChange);
+    if (set.size === 0) reg.delete(key);
+  };
+}
+
+function fireFor(reg: KeyListeners, key: string): void {
+  const set = reg.get(key);
+  if (!set) return;
+  for (const listener of set) listener();
 }
 
 // ---------------------------------------------------------------------------
@@ -413,12 +998,16 @@ export function subscribeToShelf(onStoreChange: () => void) {
 }
 
 export function subscribeToBody(id: string, onStoreChange: () => void) {
+  const stopListening = listenFor(bodyListeners, id, onStoreChange);
   const key = bodyKey(id);
   const onStorage = (event: StorageEvent) => {
     if (event.key === null || event.key === key) onStoreChange();
   };
   window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+  return () => {
+    stopListening();
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -435,6 +1024,11 @@ export function subscribeToBody(id: string, onStoreChange: () => void) {
 const bodyReloads = new Map<string, number>();
 
 export function subscribeToBodyReload(id: string, onStoreChange: () => void) {
+  // The counter itself is bumped by `announce`, once per cross-tab write rather
+  // than once per listener — two subscribers would otherwise move it twice for
+  // one save, and the editor keys its surface on it.
+  const stopListening = listenFor(bodyListeners, id, onStoreChange);
+
   const key = bodyKey(id);
   const onStorage = (event: StorageEvent) => {
     if (event.key === null || event.key === key) {
@@ -443,7 +1037,10 @@ export function subscribeToBodyReload(id: string, onStoreChange: () => void) {
     }
   };
   window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+  return () => {
+    stopListening();
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function getBodyReload(id: string): number {
@@ -496,7 +1093,7 @@ export function getServerShelf(): Shelf {
 }
 
 export function getBody(id: string): string | null {
-  return readRaw(bodyKey(id));
+  return readStored(BODIES, id);
 }
 
 export function getServerBody(): string | null {
@@ -505,7 +1102,7 @@ export function getServerBody(): string | null {
 
 /** A data URL, or null when the book has no cover art. */
 export function getCover(bookId: string): string | null {
-  return readRaw(coverKey(bookId));
+  return readStored(COVERS, bookId);
 }
 
 export function getServerCover(): string | null {
@@ -579,13 +1176,72 @@ export function setCoverFacts(bookId: string, facts: CoverFacts | null): void {
   emitShelf();
 }
 
+/**
+ * Which books have artwork — a few hundred bytes, kept in `localStorage`.
+ *
+ * **`hasCover` has to answer synchronously, correctly, before the disk has been
+ * read.** Every other moved read may be null for a moment and come right; this
+ * one cannot, because `checkup()` turns it straight into "No cover" on the
+ * dashboard. A finding that appears on load and retracts itself half a second
+ * later is worse than a slow one — the writer has already started reading it.
+ *
+ * So the artwork is on the disk and the *list of ids* stays here, cached on the
+ * raw string it was parsed from exactly as the shelf is, which is what lets
+ * another tab's write bust it for free.
+ */
+const COVER_INDEX_KEY = "openchapter:covers";
+
+let coverIndexRaw: string | null = null;
+let coverIndexIds: ReadonlySet<string> = new Set();
+
+function coverIds(): ReadonlySet<string> {
+  const raw = readRaw(COVER_INDEX_KEY);
+  if (raw === coverIndexRaw) return coverIndexIds;
+
+  coverIndexRaw = raw;
+  let ids: string[] = [];
+  try {
+    const parsed = JSON.parse(raw ?? "[]");
+    if (Array.isArray(parsed)) ids = parsed.filter((x) => typeof x === "string");
+  } catch {
+    // A malformed index costs a cover finding, never a render.
+  }
+  coverIndexIds = new Set(ids);
+  return coverIndexIds;
+}
+
+function writeCoverIndex(ids: Iterable<string>): void {
+  try {
+    window.localStorage.setItem(COVER_INDEX_KEY, JSON.stringify([...ids]));
+  } catch {
+    // The index is an optimisation with a fallback under it; see `hasCover`.
+  }
+  coverIndexRaw = null;
+}
+
+function noteCover(bookId: string, has: boolean): void {
+  const ids = new Set(coverIds());
+  if (has === ids.has(bookId)) return;
+  if (has) ids.add(bookId);
+  else ids.delete(bookId);
+  writeCoverIndex(ids);
+}
+
+/** Rebuilt from what is actually held, after a migration or a wipe. */
+function rebuildCoverIndex(): void {
+  writeCoverIndex(coverMirror.keys());
+}
+
 export function hasCover(bookId: string): boolean {
   if (typeof window === "undefined") return false;
+  if (coverMirror.has(bookId)) return true;
+  if (coverIds().has(bookId)) return true;
   try {
-    // A named-property test rather than a read, so a 250KB data URL is never
-    // materialised just to answer a yes/no — see the note above. Wrapped
-    // because even this throws where storage is walled off, and it is called
-    // during a render.
+    // The pre-index fallback: a browser with no IndexedDB, or a library that
+    // has not been migrated yet. A named-property test rather than a read, so a
+    // 250KB data URL is never materialised just to answer a yes/no — see the
+    // note above. Wrapped because even this throws where storage is walled off,
+    // and it is called during a render.
     return coverKey(bookId) in window.localStorage;
   } catch {
     return false;
@@ -616,12 +1272,13 @@ export function subscribeToCover(bookId: string, onStoreChange: () => void) {
  */
 export function setCover(bookId: string, dataUrl: string | null): boolean {
   try {
-    if (dataUrl === null) window.localStorage.removeItem(coverKey(bookId));
-    else window.localStorage.setItem(coverKey(bookId), dataUrl);
+    if (dataUrl === null) forgetStored(COVERS, bookId);
+    else void writeStored(COVERS, bookId, dataUrl);
   } catch (err) {
     console.error("[store] could not write cover", err);
     return false;
   }
+  noteCover(bookId, dataUrl !== null);
   // The shelf did not change, but what the shelf *renders* did — and since the
   // shelf snapshot is identical, the fan-out alone moves nothing. Bump first,
   // so listeners woken by `emitShelf` read the new value.
@@ -983,11 +1640,8 @@ export function deleteBook(bookId: string) {
   // Shelf first, bodies second. The shelf entry is what makes the book visible,
   // so if this half fails the writer sees a consistent app with some dead bytes
   // in storage — the reverse order would show a book whose chapters are gone.
-  try {
-    window.localStorage.removeItem(coverKey(bookId));
-  } catch {
-    // Unreachable bytes, not a broken app.
-  }
+  forgetStored(COVERS, bookId);
+  noteCover(bookId, false);
 
   /* The full-size artwork too, which this never used to do.
      `deletePrintCover` was reachable only from `clearCover`, so every book ever
@@ -999,13 +1653,7 @@ export function deleteBook(bookId: string) {
 
   // Active chapters and anything still sitting in the book's trash.
   for (const chapter of [...doomed.chapters, ...(doomed.trash ?? [])]) {
-    try {
-      window.localStorage.removeItem(bodyKey(chapter.id));
-      window.localStorage.removeItem(notesKey(chapter.id));
-      window.localStorage.removeItem(historyKey(chapter.id));
-    } catch {
-      // Unreachable bytes, not a broken app.
-    }
+    forgetChapter(chapter.id);
   }
 }
 
@@ -1175,8 +1823,9 @@ export function createMatterPages(
   for (const pick of picks) {
     const id = newId();
     try {
-      window.localStorage.setItem(
-        bodyKey(id),
+      void writeStored(
+        BODIES,
+        id,
         JSON.stringify(matterPageDoc(pick.part, pick.title)),
       );
       made.push({ ...pick, id });
@@ -1265,10 +1914,15 @@ export function createBookFromImport(
   const metas: ChapterMeta[] = [];
   const written: string[] = [];
 
+  /* **The rollback below is the `localStorage` path's.** On a disk a write
+     cannot fail synchronously, so a refused import lands in the mirrors, works
+     for this session, and raises the out-of-room dialog through
+     `writeStored` — which on a store measured in gigabytes means the machine
+     itself is full, not that this app has outgrown a budget. */
   try {
     for (const chapter of chapters) {
       const id = newId();
-      window.localStorage.setItem(bodyKey(id), JSON.stringify(chapter.doc));
+      void writeStored(BODIES, id, JSON.stringify(chapter.doc));
       written.push(id);
       /* **A page the file declared as front or back matter stays one.**
          Only an EPUB says — see `parseEpub` — and only for the pages it typed;
@@ -1282,13 +1936,7 @@ export function createBookFromImport(
     }
   } catch (err) {
     console.error("[store] import failed, rolling back", err);
-    for (const id of written) {
-      try {
-        window.localStorage.removeItem(bodyKey(id));
-      } catch {
-        // Nothing further to try; the shelf is untouched either way.
-      }
-    }
+    for (const id of written) forgetStored(BODIES, id);
     return null;
   }
 
@@ -1355,7 +2003,7 @@ export function createBookFromImport(
    * however the timers fall.
    */
   for (const meta of metas) {
-    const raw = window.localStorage.getItem(bodyKey(meta.id));
+    const raw = getBody(meta.id);
     if (raw !== null) pushBody(meta.id, raw);
   }
 
@@ -1458,7 +2106,7 @@ export function importIntoBook(
     // because the matter pages mixed in among them take no number.
     chapters.forEach((chapter) => {
       const id = newId();
-      window.localStorage.setItem(bodyKey(id), JSON.stringify(chapter.doc));
+      void writeStored(BODIES, id, JSON.stringify(chapter.doc));
       written.push(id);
       /* A matter page keeps its own name; only body chapters are renumbered,
          because "Chapter 4 – Dedication" is what happens when they are not. */
@@ -1479,13 +2127,7 @@ export function importIntoBook(
     });
   } catch (err) {
     console.error("[store] import failed, rolling back", err);
-    for (const id of written) {
-      try {
-        window.localStorage.removeItem(bodyKey(id));
-      } catch {
-        // The shelf is untouched; these are just unreachable bytes.
-      }
-    }
+    for (const id of written) forgetStored(BODIES, id);
     return null;
   }
 
@@ -1509,15 +2151,7 @@ export function importIntoBook(
       body: getBody(c.id),
       notes: getNotes(c.id),
     }));
-    for (const c of clearing) {
-      try {
-        window.localStorage.removeItem(bodyKey(c.id));
-        window.localStorage.removeItem(notesKey(c.id));
-        window.localStorage.removeItem(historyKey(c.id));
-      } catch {
-        // Unreachable bytes, not a broken book.
-      }
-    }
+    for (const c of clearing) forgetChapter(c.id);
     commitBook(bookId, (b) => ({
       ...b,
       // Regrouped front → body → back, as every other write to this array is,
@@ -1546,21 +2180,12 @@ export function importIntoBook(
 export function undoChapterImport(undo: ImportUndo) {
   if (!findBook(getShelf(), undo.bookId)) return;
 
-  for (const id of undo.addedIds) {
-    try {
-      window.localStorage.removeItem(bodyKey(id));
-      window.localStorage.removeItem(notesKey(id));
-      window.localStorage.removeItem(historyKey(id));
-    } catch {
-      // Unreachable bytes either way.
-    }
-  }
+  for (const id of undo.addedIds) forgetChapter(id);
 
   for (const r of undo.removed) {
     try {
-      if (r.body !== null) window.localStorage.setItem(bodyKey(r.meta.id), r.body);
-      if (r.notes !== null)
-        window.localStorage.setItem(notesKey(r.meta.id), r.notes);
+      if (r.body !== null) void writeStored(BODIES, r.meta.id, r.body);
+      if (r.notes !== null) void writeStored(NOTES, r.meta.id, r.notes);
     } catch {
       // Best effort; the shelf below is what makes the chapter visible.
     }
@@ -1675,13 +2300,7 @@ export function deleteChapterForever(bookId: string, chapterId: string) {
     trash: (book.trash ?? []).filter((t) => t.id !== chapterId),
   }));
 
-  try {
-    window.localStorage.removeItem(bodyKey(chapterId));
-    window.localStorage.removeItem(notesKey(chapterId));
-    window.localStorage.removeItem(historyKey(chapterId));
-  } catch {
-    // Unreachable bytes, not a broken app.
-  }
+  forgetChapter(chapterId);
 }
 
 /** Moves the chapter at `from` so that it sits at index `to`. */
@@ -1707,13 +2326,34 @@ export function moveChapter(bookId: string, from: number, to: number) {
  * Persists a chapter's text. Body and word count are two writes, so they can
  * in principle diverge — the body goes first, since a stale count in the
  * sidebar is cosmetic and lost prose is not.
+ *
+ * **It answers a promise now, and the reason is one word on the screen.** The
+ * manuscript is on IndexedDB, which is asynchronous, so "the mirror has it"
+ * and "the disk has it" stopped being the same moment. The indicator in the
+ * corner of the editor says **Saved**, and that is a claim about the disk — a
+ * version of this that answered synchronously would say it while the write was
+ * still in the air and go on saying it after the write had been refused, which
+ * is precisely the "Saved beside a QuotaExceededError" this app has already met
+ * once.
+ *
+ * Three outcomes, and each means something different to the caller:
+ *
+ * - **Resolves true** — the bytes are on the disk.
+ * - **Resolves false** — refused because this writer may only read the book. Do
+ *   *not* retry; nothing about waiting changes it.
+ * - **Rejects** — the write did not land. Retry, which is what the autosave's
+ *   backoff already does.
+ *
+ * The mirror is set synchronously before any of that, so `getBody` immediately
+ * after this call already returns the new text. Every existing caller that
+ * ignores the result keeps working.
  */
-export function saveBody(
+export async function saveBody(
   bookId: string,
   chapterId: string,
   doc: unknown,
   words: number,
-): boolean {
+): Promise<boolean> {
   const book = findBook(getShelf(), bookId);
 
   /*
@@ -1730,17 +2370,38 @@ export function saveBody(
    */
   if (book && !canWriteBook(book)) return false;
 
+  /*
+   * **Nothing is written while the disk is still being read, and this rejects
+   * rather than answering false.**
+   *
+   * The editor keys its writing surface on the chapter id rather than on the
+   * text, deliberately, to protect the caret. So a surface mounted before the
+   * mirrors are warm holds an empty Tiptap document, the key never changes when
+   * the prose lands, and the next autosave would write that empty document over
+   * the chapter. The screens gate on `useHydrated`, which now waits for this
+   * phase; this is the second guard, because losing a manuscript to a race is
+   * not something to leave to one.
+   *
+   * A rejection rather than a false: false is the viewer refusal above and
+   * means *do not retry*, where this must be retried — `use-autosave` puts the
+   * value back and tries again on its own timer, which is exactly right for a
+   * condition that clears itself in a few hundred milliseconds.
+   */
+  if (storagePhase === "loading") {
+    throw new Error("[store] the library is still loading; not saving yet");
+  }
+
   const raw = JSON.stringify(doc);
 
   /*
    * **A full origin costs the writer their history, never their prose.**
    *
-   * `localStorage` is about 5MB for the whole origin and everything shares it:
-   * every chapter of every book, the cover thumbnails, the tool stores — and
-   * the version history, which is eight snapshots a chapter and by far the
-   * largest thing here that nobody would choose to keep over the manuscript.
-   * Seen for real while pasting into a long chapter: `setItem` threw
-   * `QuotaExceededError`, the autosave caught it, and the writing simply
+   * `localStorage` is about 5MB for the whole origin and everything used to
+   * share it: every chapter of every book, the cover thumbnails, the tool
+   * stores — and the version history, which is eight snapshots a chapter and
+   * by far the largest thing there that nobody would choose to keep over the
+   * manuscript. Seen for real while pasting into a long chapter: `setItem`
+   * threw `QuotaExceededError`, the autosave caught it, and the writing simply
    * stopped being saved.
    *
    * So a failed write is not the end of the attempt. History is what
@@ -1749,9 +2410,18 @@ export function saveBody(
    * second attempt fails too the error is thrown, which is what puts the
    * editor into "Save failed" — at that point there is genuinely nowhere to
    * put the words and saying so is the only honest thing left.
+   *
+   * **This is the `localStorage` path only, and that is not an oversight.** The
+   * escape trades one store's contents for another's room, which is a trade
+   * only a *shared* budget makes sense of. On IndexedDB the histories are on
+   * the same disk as everything else on the machine, so giving them up frees a
+   * megabyte and a half against a quota measured in gigabytes — it would not
+   * rescue the save, and it would spend the writer's safety net finding that
+   * out. A disk genuinely out of room is reported, not worked around.
    */
+  let durable: Promise<boolean>;
   try {
-    window.localStorage.setItem(bodyKey(chapterId), raw);
+    durable = writeStored(BODIES, chapterId, raw);
   } catch (err) {
     // `dropAllHistory` raises "history-dropped" for itself when it frees
     // something; both throws below are the case where it could not, and the
@@ -1761,7 +2431,7 @@ export function saveBody(
       throw err;
     }
     try {
-      window.localStorage.setItem(bodyKey(chapterId), raw);
+      durable = writeStored(BODIES, chapterId, raw);
     } catch (stillFull) {
       reportStorage("full");
       throw stillFull;
@@ -1802,16 +2472,25 @@ export function saveBody(
   rememberVersion(chapterId, raw, words);
 
   const current = book?.chapters.find((c) => c.id === chapterId);
-  if (!current || current.words === words) return true;
+  if (current && current.words !== words) {
+    // The day's log, before the shelf is updated — `current.words` is still the
+    // previous count at this point, and the difference is the day's work.
+    rememberActivity(words - current.words);
 
-  // The day's log, before the shelf is updated — `current.words` is still the
-  // previous count at this point, and the difference is the day's work.
-  rememberActivity(words - current.words);
+    commitBook(bookId, (b) => ({
+      ...b,
+      chapters: b.chapters.map((c) => (c.id === chapterId ? { ...c, words } : c)),
+    }));
+  }
 
-  commitBook(bookId, (b) => ({
-    ...b,
-    chapters: b.chapters.map((c) => (c.id === chapterId ? { ...c, words } : c)),
-  }));
+  /* **The one await, and it is last on purpose.** Everything above is
+     synchronous — the mirror, the push, the snapshot, the word count — so a
+     caller that ignores the promise sees exactly the behaviour it always saw.
+     What waiting buys is the truth of the word the editor prints when this
+     resolves. */
+  if (!(await durable)) {
+    throw new Error("[store] this browser would not store the chapter");
+  }
   return true;
 }
 
@@ -1939,7 +2618,7 @@ function migrateSpike(): boolean {
 
   const { chapterId } = createBook("Untitled Book");
   try {
-    window.localStorage.setItem(bodyKey(chapterId), body);
+    void writeStored(BODIES, chapterId, body);
     window.localStorage.removeItem(LEGACY_SPIKE_KEY);
   } catch {
     // Couldn't carry the text over. The new book still exists.
@@ -2917,15 +3596,19 @@ function rememberActivity(delta: number) {
 // same reason: versions are the largest thing this app stores per chapter and
 // must never ride along in a write of anything else.
 //
-// Everything here is best-effort. `localStorage` is about 5MB an origin and a
-// library of forty chapters could not possibly keep eight versions of each, so
-// a failed write is swallowed: the body has already been saved by the time any
-// of this runs, and losing a snapshot is a nicety lost, while throwing here
-// would be a backup feature that loses work.
+// Everything here is best-effort. A failed write is swallowed: the body has
+// already been saved by the time any of this runs, and losing a snapshot is a
+// nicety lost, while throwing here would be a backup feature that loses work.
+//
+// **The library budget stayed after the move onto the disk, and it is not
+// vestigial.** It was written to stop history eating a five-megabyte origin the
+// manuscript shared, which IndexedDB ends — but the promise history makes is
+// "this chapter as it was before lunch", not "last March", and eight snapshots
+// of every chapter of every book a writer will ever own is an archive nobody
+// asked for. The number is now a statement about what history is for rather
+// than about what the browser will hold.
 // ---------------------------------------------------------------------------
 
-const HISTORY_PREFIX = "openchapter:history:";
-const historyKey = (chapterId: string) => `${HISTORY_PREFIX}${chapterId}`;
 const historyListeners = new Set<() => void>();
 
 export function subscribeToHistory(id: string, onStoreChange: () => void) {
@@ -2942,7 +3625,7 @@ export function subscribeToHistory(id: string, onStoreChange: () => void) {
 }
 
 export function getHistoryRaw(chapterId: string): string | null {
-  return readRaw(historyKey(chapterId));
+  return readStored(HISTORY, chapterId);
 }
 
 export function getServerHistoryRaw(): string | null {
@@ -2963,7 +3646,7 @@ function rememberVersion(chapterId: string, body: string, words: number) {
     if (!shouldSnapshot(history, body, now)) return;
 
     const next = addSnapshot(history, { at: now, body, words });
-    window.localStorage.setItem(historyKey(chapterId), JSON.stringify(next));
+    void writeStored(HISTORY, chapterId, JSON.stringify(next));
     sweepHistory(chapterId);
     for (const listener of historyListeners) listener();
   } catch {
@@ -2996,35 +3679,54 @@ function rememberVersion(chapterId: string, body: string, words: number) {
  * paid rarely, on the write that caused the growth.
  */
 function sweepHistory(keep: string) {
-  const kept: { key: string; bytes: number; newest: number }[] = [];
+  const kept: { id: string; bytes: number; newest: number }[] = [];
   let total = 0;
 
-  for (let i = 0; i < window.localStorage.length; i++) {
-    const key = window.localStorage.key(i);
-    if (!key?.startsWith(HISTORY_PREFIX)) continue;
-    const raw = readRaw(key);
-    if (raw === null) continue;
+  for (const [id, raw] of everyHistory()) {
     total += raw.length;
     // `addSnapshot` puts the newest first, so entry zero dates the chapter. A
     // history that will not parse sorts as ancient and is swept first, which is
     // the right answer for a value nothing can read anyway.
-    kept.push({
-      key,
-      bytes: raw.length,
-      newest: parseHistory(raw)[0]?.at ?? 0,
-    });
+    kept.push({ id, bytes: raw.length, newest: parseHistory(raw)[0]?.at ?? 0 });
   }
 
   if (total <= MAX_LIBRARY_HISTORY_BYTES) return;
 
-  const keepKey = historyKey(keep);
   kept.sort((a, b) => a.newest - b.newest);
   for (const entry of kept) {
     if (total <= MAX_LIBRARY_HISTORY_BYTES) break;
-    if (entry.key === keepKey) continue;
-    window.localStorage.removeItem(entry.key);
+    if (entry.id === keep) continue;
+    forgetStored(HISTORY, entry.id);
     total -= entry.bytes;
   }
+}
+
+/**
+ * Every chapter's history, wherever it is being kept.
+ *
+ * Both places, because both can hold one: the mirror after the move, and
+ * `localStorage` before it or on a browser that never made it. Anything the
+ * mirror already answers for is not read twice, which is the same precedence
+ * `readStored` applies — otherwise a chapter with a stale legacy key would be
+ * counted twice against the budget and swept for being large.
+ */
+function everyHistory(): [string, string][] {
+  const out: [string, string][] = [...historyMirror];
+  const seen = new Set(historyMirror.keys());
+
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (!key?.startsWith(HISTORY_PREFIX)) continue;
+      const id = key.slice(HISTORY_PREFIX.length);
+      if (seen.has(id)) continue;
+      const raw = readRaw(key);
+      if (raw !== null) out.push([id, raw]);
+    }
+  } catch {
+    // A locked-down browser. Whatever the mirror holds is still swept.
+  }
+  return out;
 }
 
 // A chapter's history is removed wherever its body and notes are, inline at
@@ -3046,22 +3748,17 @@ function sweepHistory(keep: string) {
  * reports the original failure instead of retrying into it.
  */
 function dropAllHistory(): boolean {
-  const keys: string[] = [];
+  const ids = everyHistory().map(([id]) => id);
   try {
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (key?.startsWith(HISTORY_PREFIX)) keys.push(key);
-    }
-    for (const key of keys) window.localStorage.removeItem(key);
+    for (const id of ids) forgetStored(HISTORY, id);
   } catch {
-    // Enumerating or removing can itself fail in a locked-down browser. What
-    // was removed before that stays removed, and the count below is honest
-    // about it.
+    // Removing can itself fail in a locked-down browser. What went stays gone,
+    // and the count below is honest about it.
   }
 
-  if (keys.length === 0) return false;
+  if (ids.length === 0) return false;
   console.warn(
-    `[storage] full — dropped ${keys.length} chapter histories to save the manuscript`,
+    `[storage] full — dropped ${ids.length} chapter histories to save the manuscript`,
   );
   reportStorage("history-dropped");
   for (const listener of historyListeners) listener();
@@ -3173,16 +3870,20 @@ export function saveIdeasRaw(json: string) {
 }
 
 export function subscribeToNotes(id: string, onStoreChange: () => void) {
+  const stopListening = listenFor(noteListeners, id, onStoreChange);
   const key = notesKey(id);
   const onStorage = (event: StorageEvent) => {
     if (event.key === null || event.key === key) onStoreChange();
   };
   window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
+  return () => {
+    stopListening();
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 export function getNotes(id: string): string | null {
-  return readRaw(notesKey(id));
+  return readStored(NOTES, id);
 }
 
 export function getServerNotes(): string | null {
@@ -3191,8 +3892,8 @@ export function getServerNotes(): string | null {
 
 export function saveNotes(id: string, text: string) {
   try {
-    if (text) window.localStorage.setItem(notesKey(id), text);
-    else window.localStorage.removeItem(notesKey(id));
+    if (text) void writeStored(NOTES, id, text);
+    else forgetStored(NOTES, id);
   } catch (err) {
     console.error("[store] could not write notes", err);
     return;
@@ -3422,7 +4123,7 @@ const OWNER_KEY = "openchapter:owner";
  * on a machine inherits the first one's shelf — and now with a server behind
  * it, would push those books up under their own account.
  */
-export function clearLocalLibrary() {
+export async function clearLocalLibrary(): Promise<void> {
   const doomed: string[] = [];
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
@@ -3430,20 +4131,31 @@ export function clearLocalLibrary() {
   }
   for (const key of doomed) window.localStorage.removeItem(key);
 
-  /* **Cover artwork lives in IndexedDB and has to go with the rest.**
-     Without this, the second writer on a shared browser inherits the first
-     one's full-size covers — invisible on every screen, because the shelf
-     reads the localStorage thumbnail that has just been deleted, and then
-     packaged into their EPUB the first time they export. Not awaited: the
-     synchronous half is what the caller is waiting on, and this module stays
-     synchronous. See `cover-store.ts`. */
-  void clearPrintCovers();
+  /* The mirrors are the read path, so emptying the disk without emptying these
+     would leave the previous writer's manuscript on screen. */
+  for (const store of MOVED) mirrors[store].clear();
+  coverIndexRaw = null;
+  coverIndexIds = new Set();
 
   cachedRaw = null;
   cachedShelf = EMPTY_SHELF;
   pushedBooks = [];
   emitShelf();
+  refreshEverything();
   for (const listener of prefsListeners) listener();
+
+  /* **Awaited now, and that is a data-loss fix rather than tidiness.**
+     This used to fire and forget, which was survivable only while nothing on
+     this path wrote to IndexedDB. The manuscript is in there now, so a `clear()`
+     still in flight can land *after* the new owner's first bodies are written
+     and take them with it. `reconcile` awaits this before it writes a byte.
+     Cover artwork goes with the rest for the reason it always did: without it
+     the second writer on a shared browser packages the first one's picture into
+     their EPUB. */
+  await Promise.all([
+    ...MOVED.map((store) => clearStore(store)),
+    clearPrintCovers(),
+  ]);
 }
 
 /** Writes a downloaded library over the local one. */
@@ -3584,13 +4296,14 @@ function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
     for (const [id, raw] of remote.bodies) {
       // The one chapter the download may not touch: our copy is the unsent one.
       if (conflicted.has(id)) continue;
-      window.localStorage.setItem(bodyKey(id), raw);
+      void writeStored(BODIES, id, raw);
     }
     for (const [id, text] of remote.notes) {
-      window.localStorage.setItem(notesKey(id), text);
+      void writeStored(NOTES, id, text);
     }
     for (const [id, dataUrl] of remote.covers) {
-      window.localStorage.setItem(coverKey(id), dataUrl);
+      void writeStored(COVERS, id, dataUrl);
+      noteCover(id, true);
     }
     if (remote.prefs) {
       // The spread is last-writer-wins, which is right for a preference and
@@ -3624,14 +4337,24 @@ function applyRemote(remote: Awaited<ReturnType<typeof fetchLibrary>>) {
   pushedBooks = getShelf().books;
 
   emitShelf();
+  refreshEverything();
   for (const listener of prefsListeners) listener();
 }
 
-/** The whole local library, in the shape uploadLibrary wants. */
+/**
+ * The whole local library, in the shape uploadLibrary wants.
+ *
+ * **Read out of the mirrors and out of `localStorage`, in that precedence.**
+ * The mirrors are where the library lives once it has moved; the prefix scan
+ * stays for a browser that never moved and for anything a half-finished
+ * migration left behind, which is the same rule `readStored` follows one key at
+ * a time. Dropping the scan would upload an empty library from a browser with
+ * no IndexedDB.
+ */
 function collectLocal() {
-  const bodies = new Map<string, string>();
-  const notes = new Map<string, string>();
-  const covers = new Map<string, string>();
+  const bodies = new Map(bodyMirror);
+  const notes = new Map(notesMirror);
+  const covers = new Map(coverMirror);
 
   for (let i = 0; i < window.localStorage.length; i += 1) {
     const key = window.localStorage.key(i);
@@ -3639,9 +4362,16 @@ function collectLocal() {
     const value = window.localStorage.getItem(key);
     if (value === null) continue;
 
-    if (key.startsWith(BODY_PREFIX)) bodies.set(key.slice(BODY_PREFIX.length), value);
-    else if (key.startsWith(NOTES_PREFIX)) notes.set(key.slice(NOTES_PREFIX.length), value);
-    else if (key.startsWith(COVER_PREFIX)) covers.set(key.slice(COVER_PREFIX.length), value);
+    if (key.startsWith(BODY_PREFIX)) {
+      const id = key.slice(BODY_PREFIX.length);
+      if (!bodies.has(id)) bodies.set(id, value);
+    } else if (key.startsWith(NOTES_PREFIX)) {
+      const id = key.slice(NOTES_PREFIX.length);
+      if (!notes.has(id)) notes.set(id, value);
+    } else if (key.startsWith(COVER_PREFIX)) {
+      const id = key.slice(COVER_PREFIX.length);
+      if (!covers.has(id)) covers.set(id, value);
+    }
   }
 
   return { bodies, notes, covers };
@@ -3717,6 +4447,12 @@ function settleSync(): void {
  */
 export async function syncWithServer(): Promise<void> {
   try {
+    /* **The disk first, always.** A download that landed in the mirrors before
+       hydration filled them would be written straight over by the hydration a
+       moment later — the server's copy of a chapter replaced by this browser's
+       older one, silently, on every load. Idempotent, so calling it here as
+       well as from `LibrarySync` costs nothing. */
+    await loadFromDisk();
     await reconcile();
   } finally {
     // In a `finally` because every path out of `reconcile` has to settle the
@@ -3732,7 +4468,12 @@ async function reconcile(): Promise<void> {
   if (!owner) return;
 
   if (window.localStorage.getItem(OWNER_KEY) !== owner) {
-    if (window.localStorage.getItem(OWNER_KEY) !== null) clearLocalLibrary();
+    // Awaited: the wipe now clears IndexedDB, and a `clear()` still in flight
+    // when the download starts writing would take the new owner's books with
+    // it. See `clearLocalLibrary`.
+    if (window.localStorage.getItem(OWNER_KEY) !== null) {
+      await clearLocalLibrary();
+    }
     window.localStorage.setItem(OWNER_KEY, owner);
   }
 

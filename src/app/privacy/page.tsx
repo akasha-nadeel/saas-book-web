@@ -68,8 +68,9 @@ export default function PrivacyPage() {
 
       <Section title="What is stored on your own device">
         <p>
-          In your browser&rsquo;s local storage and, for cover artwork, its
-          IndexedDB:
+          In your browser&rsquo;s own storage — its IndexedDB for the
+          manuscript and the pictures, its local storage for the book list and
+          your settings:
         </p>
         <List
           items={[

@@ -1,14 +1,20 @@
 /**
  * Turning a picked file into something the manuscript can hold.
  *
- * The whole app lives in localStorage, which browsers cap at roughly 5MB per
- * origin — for the entire library, not per book. A single phone photo is 3–5MB
- * before base64 inflates it by a third, so embedding one unchanged would fill
- * the quota and start failing autosaves on every chapter, not just this one.
+ * A picture goes *inside* the chapter, as a data URL in the Tiptap document —
+ * so it is carried by every save of that chapter, sent up on every sync, and
+ * packaged into every export. A single phone photo is 3–5MB before base64
+ * inflates it by a third.
+ *
+ * **That was a quota argument and is now a weight argument.** The manuscript
+ * moved off `localStorage`'s five megabytes onto IndexedDB in 2026-08-17, so an
+ * unshrunk photo no longer threatens autosaves on unrelated chapters. What it
+ * still does is make the chapter slow to save, slow to sync and heavy in the
+ * finished file a reader downloads — and a 4000px photograph in a book set at
+ * 6×9 is carrying about eight times the pixels the page can print.
  *
  * So every image is downscaled and re-encoded before it goes near the document,
- * and one that is still too big afterwards is refused with a reason rather than
- * quietly breaking saves later.
+ * and one that is still too big afterwards is refused with a reason.
  */
 
 /** Longest edge, in pixels, after downscaling. */
@@ -23,8 +29,9 @@ export const ACCEPTED = "image/png,image/jpeg,image/webp,image/gif";
  * What to re-encode as, when a resize forces a re-encode at all.
  *
  * **WebP is right inside the manuscript and wrong on a cover.** An inline
- * illustration is stored a dozen times over against a 5MB budget, and WebP is
- * meaningfully smaller at the same quality; no shop has ever objected to one.
+ * illustration rides along in every save, every sync and every exported file,
+ * and WebP is meaningfully smaller at the same quality; no shop has ever
+ * objected to one.
  * A cover is different: it is the single image a shop's converter looks at
  * first, and while WebP is a legal EPUB 3 core media type, KDP's pipeline is
  * not a safe bet for it. One cover per book is not where bytes are won.

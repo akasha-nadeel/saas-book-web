@@ -18,9 +18,9 @@ import type { PrintCover } from "../cover-store";
  *
  * **Two copies come out, for the two jobs.** The thumbnail is held to the
  * budget every other cover is (`COVER_MAX_EDGE` / `COVER_MAX_BYTES` — the same
- * numbers the cover dialog passes), because it lands at the same key in the
- * same five megabytes as covers chosen by hand, and the shelf renders it about
- * 150px wide. The full-size copy goes to IndexedDB, where a few hundred
+ * numbers the cover dialog passes), because it lands in the same store as
+ * covers chosen by hand and is *synced*, and the shelf renders it about 150px
+ * wide. The full-size copy goes to IndexedDB, where a few hundred
  * kilobytes cost nothing, because it is what the *next* export packages — an
  * imported book whose cover arrived at 1600×2560 and left at 495×700 is the
  * same silent downgrade this whole change exists to stop.

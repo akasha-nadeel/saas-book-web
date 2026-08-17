@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { syncWithServer } from "@/lib/library-store";
+import { loadFromDisk, syncWithServer } from "@/lib/library-store";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { askToPersist } from "@/lib/storage-space";
 import { flushNow } from "@/lib/sync";
@@ -27,6 +27,14 @@ export function LibrarySync() {
        for. See `askToPersist`: without it a browser may clear the whole origin
        under disk pressure, and Safari does it after a week away. */
     void askToPersist();
+
+    /* **The disk, before anything else and above the guard for the same
+       reason.** The manuscript lives in IndexedDB, and every screen is waiting
+       on `useHydrated` until it has been read — so a local-only writer whose
+       app never reached this line would sit on a loading screen forever. It is
+       idempotent and `syncWithServer` awaits it too, which is belt and braces
+       on the one thing here that must not fail to happen. */
+    void loadFromDisk();
 
     if (!isSupabaseConfigured()) return;
 

@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { clearStorageTrouble } from "@/lib/library-store";
+import { clearStorageTrouble, isOnDisk } from "@/lib/library-store";
 import { useStorageTrouble } from "@/lib/use-library";
 import {
   LOCAL_STORAGE_LIMIT,
   describeSpace,
   localBytes,
+  spaceUsed,
 } from "@/lib/storage-space";
 
 /**
@@ -42,7 +43,9 @@ export function StorageAlert() {
      wrong; the figure changes only when the writer goes and frees something,
      at which point they are not looking at this. A memo rather than an effect
      with state, which is the same fix one render later and one the lint rule
-     rightly refuses.
+     rightly refuses. (The walk is cheap now that the library is on the disk and
+     `localStorage` holds the shelf and the prefs — but this branch only runs
+     where it *has not* moved, which is exactly where it is still expensive.)
 
      **Not `navigator.storage.estimate()`**, which does not count
      `localStorage` at all — measured on the library that hit this, it reported
@@ -51,9 +54,28 @@ export function StorageAlert() {
      would have told a writer whose book had stopped saving that they had ten
      gigabytes spare. */
   const used = useMemo(
-    () => (trouble === "full" ? localBytes() : 0),
+    () => (trouble === "full" && !isOnDisk() ? localBytes() : 0),
     [trouble],
   );
+
+  /* **On the disk the figure is the browser's own and has to be asked for.**
+     `localBytes` counts `localStorage`, which since the library moved holds the
+     shelf and the prefs and nothing else — a few dozen kilobytes. Quoting that
+     to somebody whose manuscript will not save would be the most misleading
+     number in the app, on the one screen they are deciding what to delete from.
+     Resolved into state rather than memoised, because `estimate()` is async and
+     there is no synchronous way to ask. */
+  const [disk, setDisk] = useState<{ used: number; quota: number } | null>(null);
+  useEffect(() => {
+    if (trouble !== "full" || !isOnDisk()) return;
+    let live = true;
+    void spaceUsed().then((found) => {
+      if (live) setDisk(found);
+    });
+    return () => {
+      live = false;
+    };
+  }, [trouble]);
 
   useEffect(() => {
     if (trouble !== "full") return;
@@ -109,17 +131,18 @@ export function StorageAlert() {
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-sans text-base font-bold text-fg">
-          This browser is out of room
+          {isOnDisk() ? "This device is out of room" : "This browser is out of room"}
         </h2>
         <p className="mt-2 font-sans text-sm leading-relaxed text-muted">
           Your last few edits have not been saved. Nothing already saved is lost
           — but until there is space, new writing cannot be stored.
         </p>
 
-        {/* "About", because it is: the limit is not queryable and browsers
-            differ on whether they charge for UTF-16. An invented figure here
+        {/* "About", because it is: neither limit is exact — the browser pads its
+            own estimate to stop a page fingerprinting the disk, and the
+            localStorage one is not queryable at all. An invented figure here
             would be the most believable invented number in the app, on the one
-            screen a writer is deciding what to delete from — so the word does
+            screen a writer is deciding what to delete from, so the word does
             real work. */}
         {used > 0 && (
           <p className="mt-3 rounded-lg border border-line bg-raised px-3 py-2.5 font-sans text-xs leading-relaxed text-fg">
@@ -127,22 +150,44 @@ export function StorageAlert() {
             {describeSpace(LOCAL_STORAGE_LIMIT)} this browser allows one site.
           </p>
         )}
+        {disk && (
+          <p className="mt-3 rounded-lg border border-line bg-raised px-3 py-2.5 font-sans text-xs leading-relaxed text-fg">
+            About {describeSpace(disk.used)} stored, of the{" "}
+            {describeSpace(disk.quota)} this browser will give this site.
+          </p>
+        )}
 
+        {/* **Two different pieces of advice, because there are two different
+            problems.** A full `localStorage` is this app having outgrown a
+            five-megabyte budget, and deleting a book is the fix. A full disk is
+            the *machine* being out of space — the browser's share of it is
+            measured in gigabytes — so deleting a book frees a few megabytes
+            against a wall a few megabytes will not move, and sending somebody
+            to delete their own manuscript for it would be the wrong advice at
+            the worst possible moment. */}
         <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
-          Deleting a book you no longer need — and emptying the trash after —
-          frees the most.
+          {isOnDisk()
+            ? "Freeing space on your device — emptying its bin, or clearing downloads — is what fixes this. Your books are safe here in the meantime."
+            : "Deleting a book you no longer need — and emptying the trash after — frees the most."}
         </p>
 
         <div className="mt-5 flex flex-col gap-2">
-          <Link
-            href="/"
-            onClick={clearStorageTrouble}
-            className="rounded-lg bg-accent px-4 py-2.5 text-center font-sans
-                       text-sm font-semibold text-accent-ink outline-none
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            Manage your books
-          </Link>
+          {/* The shelf is offered only when going there is the fix. On a full
+              device it is a working button that does not help, which is the
+              same failure as a button that does nothing — and the primary
+              action on this dialog is the one place that reads as instruction
+              rather than as an option. */}
+          {!isOnDisk() && (
+            <Link
+              href="/"
+              onClick={clearStorageTrouble}
+              className="rounded-lg bg-accent px-4 py-2.5 text-center font-sans
+                         text-sm font-semibold text-accent-ink outline-none
+                         focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              Manage your books
+            </Link>
+          )}
           <button
             type="button"
             onClick={clearStorageTrouble}
@@ -151,7 +196,7 @@ export function StorageAlert() {
                        hover:bg-raised focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >
-            Not now
+            {isOnDisk() ? "Close" : "Not now"}
           </button>
         </div>
       </div>

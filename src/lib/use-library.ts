@@ -53,9 +53,11 @@ import {
   subscribeToPrefs,
   getCoverEpoch,
   getServerStorageTrouble,
+  getStoragePhase,
   getStorageTrouble,
   getSyncPhase,
   subscribeToShelf,
+  subscribeToStorageLoad,
   subscribeToStorageTrouble,
   subscribeToSync,
   type Prefs,
@@ -75,19 +77,31 @@ export function useShelf(): Shelf {
   return useSyncExternalStore(subscribeToShelf, getShelf, getServerShelf);
 }
 
-const NEVER_CHANGES = () => () => {};
-const onClient = () => true;
 const onServer = () => false;
+const readOnClient = () => getStoragePhase() === "ready";
 
 /**
- * False during SSR and the first render, true afterwards.
+ * False during SSR and until this browser's storage has been read.
  *
  * Needed because an empty shelf means two different things: "no books yet" and
  * "storage hasn't been read yet". Without telling them apart, every valid page
  * would flash an empty or not-found screen on load.
+ *
+ * **It waits on the disk now, and every screen that already gated on it is
+ * covered by that without changing a line.** The manuscript moved to IndexedDB,
+ * which is asynchronous, so "the client is running" and "the library is
+ * readable" stopped being the same instant — and the gap is the dangerous one:
+ * the editor keys its writing surface on the chapter id rather than on the
+ * text, deliberately, to protect the caret, so a surface mounted over a null
+ * body keeps its empty document when the prose lands and the next autosave
+ * writes that empty document over the chapter.
+ *
+ * A browser with no IndexedDB at all — private-mode Firefox, and the server —
+ * has nothing to wait for and this reads exactly as it did before. See
+ * `getStoragePhase`.
  */
 export function useHydrated(): boolean {
-  return useSyncExternalStore(NEVER_CHANGES, onClient, onServer);
+  return useSyncExternalStore(subscribeToStorageLoad, readOnClient, onServer);
 }
 
 /**

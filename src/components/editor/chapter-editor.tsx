@@ -837,11 +837,21 @@ function EditorSurface({
   }, [prefs.typewriter]);
 
   const { schedule, status, lastSavedAt } = useAutosave<ChapterSnapshot>({
-    // `saveBody` answers whether it wrote — it refuses a book this writer may
-    // only read — but autosave has nothing useful to do with the answer here: the
-    // surface is not editable for a viewer, so a refusal means a bug upstream
-    // rather than something to report at the bottom of the screen.
-    save: ({ doc, words }) => void saveBody(bookId, chapterId, doc, words),
+    /* **Awaited, which is what makes the word in the corner true.**
+       The manuscript is on IndexedDB now, so "we have it" and "the disk has it"
+       are two different moments; `saveBody` resolves at the second one and
+       rejects if the bytes never landed, and the autosave turns that into
+       "Saved" or "Save failed". A version of this that did not wait would print
+       "Saved" while the write was still in the air — which is the "Saved beside
+       a QuotaExceededError" this app has already met once.
+
+       A resolved `false` is the viewer refusal and is deliberately *not* an
+       error: the surface is not editable for a viewer, so reaching it means a
+       bug upstream rather than something to report at the bottom of the
+       screen. */
+    save: async ({ doc, words }) => {
+      await saveBody(bookId, chapterId, doc, words);
+    },
   });
 
   const editor = useEditor({

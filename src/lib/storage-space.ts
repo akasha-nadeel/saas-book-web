@@ -103,8 +103,10 @@ export function localBytes(): number {
  * What is stored and what the ceiling is, or null when the browser will not say.
  *
  * **This is the IndexedDB budget, not the `localStorage` one** — see
- * `localBytes`. Nothing reads it today; it is here for the move to IndexedDB,
- * where it is the right question and this is the only way to ask it.
+ * `localBytes`. Which of the two `StorageAlert` quotes depends on where the
+ * library is: since the manuscript moved onto the disk, `localBytes` counts the
+ * shelf and the prefs and nothing else, so quoting it to somebody whose book
+ * will not save would be the most misleading number in the app.
  *
  * An estimate by name and by nature: browsers pad the figures to stop a page
  * fingerprinting the disk, and the number moves between identical calls.

@@ -258,10 +258,14 @@ than replacing it.
       answer the first; counting them answers the second, because nobody can see
       themselves circling from the inside.
 
-      **It is a safety net, not an archive, and the panel says so.** The ceiling
-      is what shapes it: `localStorage` is ~5MB an origin and this app already
-      lives near it, so history is bounded twice — eight versions a chapter, and
-      a 400KB budget behind that, oldest evicted first. A snapshot is taken at
+      **It is a safety net, not an archive, and the panel says so.** A ceiling
+      is what shaped it — `localStorage` was ~5MB an origin and this app lived
+      near it — so history is bounded three ways: eight versions a chapter, a
+      400KB budget behind that, and 1.5MB across the whole library, oldest
+      evicted first. The bounds survived the move to IndexedDB on 2026-08-17
+      and are no longer about the browser: eight versions of every chapter of
+      every book a writer will ever own is the archive this refuses to be.
+      A snapshot is taken at
       most every ten minutes *and* only when the text really changed, or a
       chapter left open with autosave ticking would push out the eight versions
       that mattered with eight identical ones. What it can promise is "this
@@ -673,7 +677,10 @@ than replacing it.
 
       *Left:* keystroke-level history was the original idea and is not what got
       built — the app keeps eight snapshots per chapter and a net figure per
-      day, not every edit. Storing more is a localStorage question first.
+      day, not every edit. That was a storage question first, and since the move
+      to IndexedDB the room is there; what is left is whether a writer wants
+      every keystroke kept, which is a different question and has not been
+      asked.
 
 ### Built on two free APIs
 
@@ -2579,7 +2586,7 @@ should either ship or lose the card.
       no upgrade call, so it is genuinely two steps and wants designing before
       it is built.
 
-## Storage — the ceiling is close
+## Storage — the ceiling is gone
 
 - [x] **Auth.** Supabase email/password, done as its own step ahead of the
       storage move. `src/proxy.ts` refreshes the session and holds the sign-in
@@ -2598,11 +2605,34 @@ should either ship or lose the card.
       refresh rather than live; and two machines editing one chapter resolve
       last-write-wins by the server clock, which is honest for one author and
       wrong for two.
-- [ ] **Storage pressure.** localStorage is ~5MB per origin. Covers are capped at
-      250KB each and inline images at 900KB, but a library of illustrated books
-      will hit the wall. There is no usage indicator and no warning before a
-      write fails. `createBookFromImport` and `setCover` already fail cleanly;
-      nothing tells the writer they are running out.
+- [x] **Storage pressure.** Done in two halves on 2026-08-17, after a writer hit
+      `QuotaExceededError` pasting into a long chapter and their work stopped
+      being saved.
+
+      *First, the leak and the silence.* `history.ts` had always said its
+      per-chapter 400KB cap was made safe by a global sweep in the store — and
+      **the sweep was never written**, so forty-five chapters were each entitled
+      to 400KB against an origin of five megabytes. That is what filled the
+      origin. The sweep exists now (whole chapters, oldest first, 1.5MB
+      library-wide); `commit` and `saveBody` give up the whole history rather
+      than fail a write; `StorageAlert` in the root layout says so — a dialog
+      when work is at risk and a dismissible note when only the history went;
+      `navigator.storage.persist()` asks the browser to stop evicting the
+      origin; `deleteBook` stopped leaking its full-size cover into IndexedDB
+      and a boot sweep clears the ones already there.
+
+      *Then the ceiling itself.* Bodies, notes, history and cover thumbnails
+      moved to **IndexedDB** — ~60% of free disk in Chrome against five
+      megabytes — with the shelf, prefs and owner deliberately left behind. See
+      the long note in CLAUDE.md: memory is the read path so every getter stays
+      synchronous, `localStorage` stays a fallback read path for good, and
+      `useHydrated` waits for the disk because the editor's surface is keyed on
+      the chapter id rather than the text.
+
+      *Left:* no usage indicator anywhere until something actually fails. That
+      is now a much smaller gap — the wall is gigabytes away — but a writer with
+      a genuinely full device still meets it for the first time at the moment of
+      failure.
 
 ## Editor
 

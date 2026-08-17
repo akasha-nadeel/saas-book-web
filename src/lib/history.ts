@@ -6,12 +6,16 @@
  * The answer is not a version-control system; it is being able to say "give me
  * this chapter as it was before lunch".
  *
- * **The ceiling shapes everything here.** `localStorage` is about 5MB an origin
- * and this app already lives close to it — covers are capped at 250KB, inline
- * images at 900KB, imports at 8MB. Keeping every version of every chapter would
- * eat the manuscript's own room, so history is bounded twice: by how many
- * snapshots a chapter keeps, and by how many bytes they may occupy together.
- * Oldest goes first.
+ * **A ceiling shaped everything here, and the bounds outlived it.**
+ * `localStorage` is about 5MB an origin and this app lived close to it, so
+ * history is bounded twice: by how many snapshots a chapter keeps, and by how
+ * many bytes they may occupy together. Oldest goes first.
+ *
+ * The manuscript moved to IndexedDB on 2026-08-17 and the room is now measured
+ * in gigabytes — and the numbers stayed, because they were only ever half about
+ * the browser. What history promises is *"this chapter as it was before
+ * lunch"*, and eight versions of every chapter of every book a writer will ever
+ * own is the archive the first paragraph refuses to be.
  *
  * **And history must never cost the manuscript.** If a snapshot cannot be
  * written there is nothing to tell the writer and nothing to do: the chapter
@@ -51,12 +55,12 @@ export const MAX_HISTORY_BYTES = 400_000;
  * was an autosave — on a chapter that had nothing to do with the history that
  * had eaten the room.
  *
- * 1.5MB is under a third of the origin, which is the most this can defensibly
- * claim: the manuscript has first claim on that budget, and the panel already
- * tells the writer this is a safety net rather than an archive. What it buys at
- * that size is still every recent version of the chapters actually being worked
- * on, which is the promise — "this chapter as it was before lunch", not "last
- * March".
+ * 1.5MB was chosen as under a third of that origin, and it stayed when the
+ * library moved onto IndexedDB — where there is no shortage to ration. What it
+ * buys at that size is every recent version of the chapters actually being
+ * worked on, which is the whole promise: "this chapter as it was before lunch",
+ * not "last March". Raising it would not deliver more of what history is for,
+ * only more of what it declines to be.
  */
 export const MAX_LIBRARY_HISTORY_BYTES = 1_500_000;
 
