@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Rail,
   RailButton,
@@ -79,22 +80,75 @@ const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
 };
 
 /**
- * The left rail shared by the chapter editor and the book overview.
+ * **The way out, standing where the rail would be.**
+ *
+ * Two screens show a book with no page on it — the book overview, and the
+ * editor switched to Book View — and neither carries the rail. Every one of
+ * those tabs is something a writer keeps *beside a page they are writing*:
+ * search, the notes on this chapter, versions of it. With no page on screen
+ * they are nine ways to open a panel about a chapter nobody chose. What such a
+ * screen wants in that corner is the way back out, which the rail was burying
+ * among them — the same argument that already takes the manuscript's right rail
+ * away in Book View.
+ *
+ * One button rather than a strip: from a book, "back" has a single meaning, the
+ * shelf you came from. It is a link rather than `router.back()`, which would
+ * send somebody who arrived from a chapter into the chapter again.
+ *
+ * It takes the rail's **own** width and top inset from `--rail-width` rather
+ * than from a padding that happens to add up — that variable steps at three
+ * breakpoints, so a hand-measured 4rem box agreed with the rail on medium
+ * screens and disagreed on every other one, moving the panel beside it. Living
+ * here, next to the rail it stands in for, is what keeps the two screens from
+ * drifting apart on the one measurement they share.
+ */
+export function BackToBooks() {
+  return (
+    <div className="flex w-(--rail-width) shrink-0 justify-center pt-4">
+      <Link
+        href="/"
+        aria-label="All books"
+        title="All books"
+        className="flex h-12 w-12 items-center justify-center rounded-xl
+                   text-muted outline-none transition-colors hover:bg-raised
+                   hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-5 w-5"
+        >
+          <path d="M12 5l-5 5 5 5" />
+        </svg>
+      </Link>
+    </div>
+  );
+}
+
+/**
+ * The left rail, which belongs to the editor and to a page being written.
  *
  * It selects which panel is open and doubles as the way to hide it: clicking the
  * tab you are already on closes the panel, so there is one control, never two.
- * Both screens want this identical behaviour, so it lives here rather than being
- * copied — a change to the tabs then lands in both places at once.
+ *
+ * **It stands down wherever there is no manuscript** — on the book overview, and
+ * in the editor's own Book View — and `BackToBooks` above takes its place. See
+ * the note there.
  *
  * Two tabs are left out where something else already carries them, and both
  * for the same reason — one control, never two:
  *
- * - **Chapters.** Both screens draw the book panel, which already is a chapter
+ * - **Chapters.** The editor draws the book panel, which already is a chapter
  *   list, so the tab would be the same list twice.
- * - **Assistant.** In the editor the manuscript's own right rail carries it,
- *   next to the tools that act on the page it talks about. The overview has no
- *   right rail — it has no manuscript for one to belong to — so there this tab
- *   is the only way to reach the assistant and stays.
+ * - **Assistant.** The manuscript's own right rail carries it, next to the tools
+ *   that act on the page it talks about. Both flags stay props rather than being
+ *   assumed here, so a screen that has neither of those things can still ask for
+ *   the full set.
  */
 export function WorkspaceRail({
   bookId,

@@ -8,6 +8,7 @@ import {
   type BookPanelMode,
 } from "@/components/editor/book-panel";
 import { BookGuide } from "@/components/editor/book-guide";
+import { BackToBooks } from "@/components/editor/workspace-rail";
 import { LoadingScreen } from "@/components/loading-screen";
 import { findBook, setPref, touchLastOpenedBook } from "@/lib/library-store";
 import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
@@ -84,36 +85,10 @@ export function BookOverview({ bookId }: { bookId: string }) {
 
   return (
     <div className="flex h-full">
-      {/* The way out, in the corner the rail used to fill.
-​
-          One button rather than a strip of them: from a book, "back" has a
-          single meaning — the shelf you came from. It keeps the rail's own
-          width and top inset so the panel beside it starts where it always
-          did, and it is a link rather than `router.back()`, which would send
-          somebody who arrived from a chapter into the chapter again. */}
-      <div className="shrink-0 px-2 pt-3">
-        <Link
-          href="/"
-          aria-label="All books"
-          title="All books"
-          className="flex h-12 w-12 items-center justify-center rounded-xl
-                     text-muted outline-none transition-colors hover:bg-raised
-                     hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-          >
-            <path d="M12 5l-5 5 5 5" />
-          </svg>
-        </Link>
-      </div>
+      {/* The way out, in the corner the rail used to fill — the same control
+          the editor puts there in Book View, so the two screens that show a
+          book with no page on it cannot drift. See BackToBooks. */}
+      <BackToBooks />
 
       {/* Left of the guide, exactly where it sits beside the manuscript in the
           editor. This screen is that one with the page taken out, so the panel

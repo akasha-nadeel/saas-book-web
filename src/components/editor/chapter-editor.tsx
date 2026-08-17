@@ -24,7 +24,11 @@ import {
   RailDivider,
   icons,
 } from "@/components/editor/icon-rail";
-import { WorkspaceRail, selectPanel } from "@/components/editor/workspace-rail";
+import {
+  BackToBooks,
+  WorkspaceRail,
+  selectPanel,
+} from "@/components/editor/workspace-rail";
 import { ImportChapterButton } from "@/components/editor/import-chapter-button";
 import { SelectionToolbar } from "@/components/editor/selection-toolbar";
 import { ImageToolbar } from "@/components/editor/image-toolbar";
@@ -232,6 +236,12 @@ export function ChapterEditor({
   }, [isNewBook]);
   const changePanelMode = (mode: BookPanelMode) => {
     setEntering(true);
+    // Book View takes the rail down with the manuscript, and the rail is what
+    // opens and closes the tool panel. Left open it would be a drawer anchored
+    // at `left-(--rail-width)` against a rail that is no longer there, with its
+    // own header button the only way to shut it — and every tab in it is about
+    // a chapter that is no longer on screen.
+    if (mode === "book") setPanelOpen(false);
     setPref("bookPanel", mode);
   };
   useEffect(() => {
@@ -319,13 +329,22 @@ export function ChapterEditor({
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
+        // Book View has no rail for the drawer to come out from — only the way
+        // back out, which the drawer would cover. Searching is something you do
+        // beside a page, so asking for it asks for the page back; without this
+        // the one shortcut that can still open the panel opens it onto the one
+        // screen with nothing to close it with.
+        if (panelMode === "book") {
+          setEntering(true);
+          setPref("bookPanel", "chapters");
+        }
         setTab("search");
         setPanelOpen(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [panelMode]);
 
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
@@ -368,19 +387,32 @@ export function ChapterEditor({
     // panels and manuscript fill the rest, and the word count and save status
     // float in the workspace's top-left corner (see EditorSurface).
     <div className="flex h-full">
-      <WorkspaceRail
-        bookId={bookId}
-        tab={tab}
-        onSelectTab={setTab}
-        leftPanel={panelOpen}
-        onPanel={setPanelOpen}
-        chapters={false}
-        // The manuscript's own right rail carries it now, beside the tools
-        // that act on the page it talks about. Two sparkles on two edges of
-        // one screen is the duplication the book panel already taught us to
-        // avoid — and the panel it opens is the same panel either way.
-        assistant={false}
-      />
+      {/* **Book View takes the left rail down too, and for the right rail's own
+          reason.** The rail is what a writer keeps beside a page — search, this
+          chapter's notes, its versions — and Book View unmounts the page. So a
+          rail left standing there is nine ways into panels about a chapter that
+          is no longer on screen, drawn around a manuscript that is not there.
+          The book overview is this screen with the page taken out and has never
+          carried one; showing one here made the same book look like two
+          different screens depending on which way in the writer took.
+          `BackToBooks` is what the overview puts in that corner. */}
+      {panelMode === "book" ? (
+        <BackToBooks />
+      ) : (
+        <WorkspaceRail
+          bookId={bookId}
+          tab={tab}
+          onSelectTab={setTab}
+          leftPanel={panelOpen}
+          onPanel={setPanelOpen}
+          chapters={false}
+          // The manuscript's own right rail carries it now, beside the tools
+          // that act on the page it talks about. Two sparkles on two edges of
+          // one screen is the duplication the book panel already taught us to
+          // avoid — and the panel it opens is the same panel either way.
+          assistant={false}
+        />
+      )}
 
       {/* One continuous gradient wash behind the book panel and the paper — the
           shelf hero's, in both themes — so the two read as one surface rather
