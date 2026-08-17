@@ -242,6 +242,44 @@ look. Three things in that module are load-bearing:
 - **Nothing is invented** — no score, no grade, no percentage. Two counts and
   real problems say more and claim less, and the first screen a writer sees is
   the worst possible place to print a made-up number.
+- **One finding per *errand*, not per fault, and the cover is where those two
+  came apart.** `findingsFrom` is the one way readiness issues become findings
+  — Overview, Prepare and the landing page's hero check all go through it, so
+  none of them can word or group a finding differently from the screen it sends
+  people to. What it adds to `fromReadiness` is that the cover *file's* faults
+  fold into a single row. All twelve of `checkCover`'s findings map to the same
+  `covers?check=1` report, so a cover that was both squarer than Amazon asks for
+  and smaller than recommended produced two rows and two buttons to one screen,
+  and the writer went twice — for a file that screen fixes in one visit, since
+  it re-reads and re-checks the result of each fix in place. Three rules hold
+  the fold: **two or more fold and exactly one is left alone** (a single fault
+  keeps its `fix=shape` intent, which is what opens the crop window already
+  loaded); **the row names every fault it counts**, because every other row here
+  opens by naming the problem; and it **counts only faults that have a
+  destination**, so the count cannot promise a row the list then drops. The
+  folded row stands where the first of its members stood, so the severity order
+  the three screens sort on is untouched — and `checkup` filters its advisories
+  *before* folding, or a book shown one of two faults would announce two and
+  list one. `ReadinessIssue.label` exists for this and nothing else: the cover
+  checks arrive as a label and a detail, and the row needs the short halves back
+  to say several in one breath. `publishing.ts` still reports them one by one,
+  which is right for a list that is read rather than pressed.
+
+  **The covers screen keys its arrival on `check`, not on `fix`, and folding is
+  what forced the distinction.** Landing there from a finding loads the cover
+  already on the book, so a writer who was just told what is wrong with it sees
+  it rather than an empty drop zone. That was hung off the `fix=` intent, which
+  was the same thing while every cover row carried one — the folded row carries
+  none, so the commonest arrival lost the picture. Two halves now: the **picture
+  and its note** on any `?check=1` arrival, and **`setFacts` only for the two
+  errands that exist to work on the stored copy** (`fix=shape`, `fix=enlarge`).
+  That split is load-bearing rather than tidy: what is stored is a 700px
+  compressed copy, so making it the file under examination rewrites the report —
+  a cover the dashboard called "smaller than recommended" would greet the writer
+  with "Too small to upload", a harder verdict about a file they did not ask
+  about. So a plain arrival keeps the original's numbers, read back from
+  `coverfacts:`, and the note beside the picture says which of the two is on
+  screen.
 
 **Advice is raised only once a book has asked.** `checkup` gates its advisory
 findings on the roadmap's own phase: a shop's *refusals* travel at any stage,

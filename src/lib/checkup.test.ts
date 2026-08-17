@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { checkup, countFindings, type Finding } from "./checkup";
+import {
+  checkup,
+  countFindings,
+  findingsFrom,
+  type Finding,
+} from "./checkup";
 import type { Book } from "./library-store";
 import { storeReadiness } from "./publishing";
 
@@ -147,5 +152,136 @@ describe("checkup", () => {
     const counts = countFindings(found);
     expect(counts.fix).toBe(1);
     expect(counts.note).toBe(1);
+  });
+});
+
+/**
+ * The cover file's faults, gathered into one row.
+ *
+ * All five of the cover destinations are the same `covers?check=1` report, so a
+ * writer with two faults in one file used to get two rows and two buttons to
+ * one screen — and made the trip twice, for a file the covers screen can put
+ * both right in a single visit. These hold the fold together with the one case
+ * it deliberately leaves alone.
+ */
+describe("findingsFrom", () => {
+  const coverIssue = (
+    field: string,
+    label: string,
+    level: "blocking" | "advisory" = "advisory",
+  ) => ({ level, field, message: `${label}. Some detail.`, label });
+
+  it("folds two cover faults into one row with one button", () => {
+    const found = findingsFrom([
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+      coverIssue("cover-small-ish", "Smaller than recommended"),
+    ]);
+
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe("readiness:cover-file");
+    // The plain report, with no `fix=` intent: with several faults there is no
+    // single repair window that is the right one to open.
+    expect(found[0].fix).toEqual({
+      kind: "route",
+      path: "covers?check=1",
+      action: "Check the cover",
+    });
+  });
+
+  it("names every fault it counts", () => {
+    const found = findingsFrom([
+      coverIssue("cover-too-small", "Too small to upload"),
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+      coverIssue("cover-too-heavy", "Too large a file"),
+    ]);
+
+    expect(found[0].title).toBe(
+      "Three things about the cover file: too small to upload, squarer than Amazon asks for and too large a file.",
+    );
+  });
+
+  it("leaves a single fault completely alone", () => {
+    /* The case that still works: one fault keeps its own wording and its own
+       `fix=shape` intent, which is what opens the crop window already loaded.
+       Folding this too would trade a working shortcut for tidiness. */
+    const found = findingsFrom([
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+    ]);
+
+    expect(found).toHaveLength(1);
+    expect(found[0].id).toBe("readiness:cover-shape");
+    expect(found[0].fix).toEqual({
+      kind: "route",
+      path: "covers?check=1&fix=shape",
+      action: "Fix the shape",
+    });
+  });
+
+  it("takes the worst level of the faults it folds", () => {
+    const mixed = findingsFrom([
+      coverIssue("cover-too-small", "Too small to upload", "blocking"),
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+    ]);
+    const notes = findingsFrom([
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+      coverIssue("cover-small-ish", "Smaller than recommended"),
+    ]);
+
+    expect(mixed[0].level).toBe("fix");
+    expect(notes[0].level).toBe("note");
+  });
+
+  it("keeps an acronym's capitals when a label moves mid-sentence", () => {
+    // "jPEG is not a format Amazon takes" is worse than a capital mid-sentence.
+    const found = findingsFrom([
+      coverIssue("cover-too-small", "JPEG is not a format Amazon takes"),
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+    ]);
+
+    expect(found[0].title).toContain("JPEG is not a format Amazon takes");
+  });
+
+  it("does not count a cover fault with nowhere to go", () => {
+    /* Every cover check `storeReadiness` emits has a destination today, and a
+       walk test above keeps it that way — so this uses a field that does not
+       exist. What it holds is the guard for the *next* check added without one:
+       a row that counted it would announce a fault the list then failed to
+       show, which is worse than the dead end the drop exists to prevent. */
+    const found = findingsFrom([
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+      coverIssue("cover-small-ish", "Smaller than recommended"),
+      coverIssue("cover-not-a-real-check", "Something with no destination"),
+    ]);
+
+    expect(found).toHaveLength(1);
+    expect(found[0].title.startsWith("Two things")).toBe(true);
+    expect(found[0].title).not.toContain("Something with no destination");
+  });
+
+  it("stands where the first of the folded rows stood, and moves nothing else", () => {
+    const found = findingsFrom([
+      { level: "blocking", field: "author", message: "No author name." },
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+      coverIssue("cover-small-ish", "Smaller than recommended"),
+      { level: "advisory", field: "isbn", message: "No ISBN." },
+    ]);
+
+    expect(ids(found)).toEqual([
+      "readiness:author",
+      "readiness:cover-file",
+      "readiness:isbn",
+    ]);
+  });
+
+  it("leaves a book with no cover alone — that is a different fix", () => {
+    // `cover` is a book with no cover at all and is put right in a dialog the
+    // shelf owns, not on the covers screen's file checker.
+    const found = findingsFrom([
+      { level: "blocking", field: "cover", message: "No cover." },
+      coverIssue("cover-shape", "Squarer than Amazon asks for"),
+      coverIssue("cover-small-ish", "Smaller than recommended"),
+    ]);
+
+    expect(ids(found)).toEqual(["readiness:cover", "readiness:cover-file"]);
   });
 });

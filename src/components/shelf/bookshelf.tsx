@@ -42,12 +42,7 @@ import {
   type Book,
   type BookView,
 } from "@/lib/library-store";
-import {
-  fromReadiness,
-  type Finding,
-  type FindingLevel,
-  type Fix,
-} from "@/lib/checkup";
+import { findingsFrom, type FindingLevel, type Fix } from "@/lib/checkup";
 import { relativeTime } from "@/lib/relative-time";
 import { nounFor, plural } from "@/lib/plural";
 import { withReturn, type AreaId } from "@/lib/areas";
@@ -2536,11 +2531,11 @@ function PrepareRow({
   }, [startOpen]);
   const blocking = issues.filter((i) => i.level === "blocking");
   const advisory = issues.filter((i) => i.level === "advisory");
-  // Only the ones with somewhere to go. A field with no destination would be a
-  // line of text in a list whose whole promise is that each row is actionable.
-  const findings = issues
-    .map(fromReadiness)
-    .filter((f): f is Finding => f !== null);
+  /* Only the ones with somewhere to go — a field with no destination would be a
+     line of text in a list whose whole promise is that each row is actionable —
+     and the cover file's several faults as one row, since all of their buttons
+     open the same report. See `findingsFrom`. */
+  const findings = findingsFrom(issues);
 
   return (
     <li

@@ -337,8 +337,22 @@ function CoverChecker({ bookId }: { bookId: string }) {
    * window under somebody who has moved on is the kind of help that has to be
    * dismissed.
    */
-  const askedFor = useSearchParams().get("fix") ?? "";
+  const params = useSearchParams();
+  const askedFor = params.get("fix") ?? "";
   const [intent, setIntent] = useState(askedFor);
+  /**
+   * Whether a dashboard finding sent the writer here, rather than a rail link.
+   *
+   * **`check` and not `fix`, and the difference cost a picture.** Every cover
+   * destination carries `?check=1`; only some carry a `fix=` intent, and once
+   * the dashboard began folding several cover faults into one row (see
+   * `findingsFrom`) the commonest arrival carried none at all. The stored cover
+   * was loaded off the back of the *intent*, so pressing "Check the cover"
+   * landed on an empty drop zone — the exact thing the note below says was
+   * fixed. This is the arrival itself, which is what that behaviour was always
+   * about.
+   */
+  const sentByFinding = params.get("check") !== null;
 
   /**
    * True when the picture loaded is the copy stored on the book rather than a
@@ -776,14 +790,29 @@ function CoverChecker({ bookId }: { bookId: string }) {
   const notes = report.filter((c) => c.status === "note").length;
 
   /*
-   * Open the promised window on the cover the book already has.
+   * Put the cover the book already has on screen, and open the promised window
+   * over it when one was asked for.
    *
-   * Runs once, only when sent here by a finding, and only when the stored
-   * cover really does have the problem the finding named — the same guard the
-   * dropped-file path uses, for the same reason.
+   * **Arriving from a finding is what triggers this, not the errand.** It used
+   * to run only for `fix=shape` and `fix=enlarge`, which was the same thing
+   * while every cover finding carried an intent; the dashboard folds several
+   * faults into one row now and that row sends none, so the commonest arrival
+   * showed an empty drop zone — a writer who had just been told what was wrong
+   * with their cover, pressing the button about it, and landing somewhere that
+   * said nothing about a cover at all. That is the defect `fromStored` was
+   * written to fix, reappearing through the door it did not cover.
+   *
+   * **The picture is shown; the report is left alone.** `setFacts` would make
+   * the compressed copy the file under examination, and it is 700px — so a
+   * cover the dashboard called "smaller than recommended" would greet the
+   * writer with "Too small to upload", a harder verdict about a file they were
+   * not asking about. So the numbers on screen stay the original's, read back
+   * from `coverfacts`, and only the two errands that exist *to work on the
+   * stored copy* make it the subject. The note beside the picture says which
+   * one is which.
    */
   useEffect(() => {
-    if ((intent !== "shape" && intent !== "enlarge") || facts) return;
+    if (!sentByFinding || facts) return;
     const dataUrl = getCover(bookId);
     if (!dataUrl) return;
 
@@ -794,28 +823,29 @@ function CoverChecker({ bookId }: { bookId: string }) {
       /* Spent here rather than in the effect body: a synchronous setState in
          an effect cascades renders, and this is a callback from an external
          system, which is what effects are actually for. Spent whether or not
-         the window opens — the stored cover has been examined either way. */
+         a window opens — the stored cover has been examined either way. */
       setIntent("");
       const w = image.naturalWidth;
       const h = image.naturalHeight;
 
-      /* Load the stored cover for either errand, but only *open* a window for
-         the one that has a decision in it. An enlarge has none — it is a
-         single button on the panel below — and running it unasked would
-         replace somebody's cover with a blurrier one before they had read why
-         that is what enlarging does. */
-      const wantsShape = intent === "shape";
-      if (wantsShape && Math.abs(h / w - IDEAL_RATIO) <= 0.05) return;
-
-      /* Shown, not stored: `setCoverFacts` is deliberately not called here.
-         These are the compressed copy's dimensions, and writing them over the
-         original's measurement would make the dashboard report the wrong
-         file — the exact confusion this screen warns about. */
+      /* Always, so the writer sees the cover they were just told about. */
       setFromStored(true);
       setPreview(dataUrl);
+
+      /* Only an errand that is explicitly about the stored copy makes it the
+         file being judged — which is what puts the repair panel under it. A
+         plain "Check the cover" is a request to see the report, and the report
+         is about the original. */
+      const wantsShape = intent === "shape";
+      if (!wantsShape && intent !== "enlarge") return;
       setFacts({ width: w, height: h, bytes: 0 });
 
-      if (wantsShape) {
+      /* Open a window only for the errand that has a decision in it. An
+         enlarge has none — it is a single button on the panel below — and
+         running it unasked would replace somebody's cover with a blurrier one
+         before they had read why that is what enlarging does. And not at all
+         when the stored copy does not have the problem the finding named. */
+      if (wantsShape && Math.abs(h / w - IDEAL_RATIO) > 0.05) {
         const out = reshape(w, h, "crop");
         setShaping({
           id: "crop",
@@ -832,7 +862,7 @@ function CoverChecker({ bookId }: { bookId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [intent, facts, bookId]);
+  }, [sentByFinding, intent, facts, bookId]);
 
   /* Named rather than inlined twice: the panel's visibility and each button's
      own visibility are the same two questions, and they must not drift. */
@@ -859,6 +889,132 @@ function CoverChecker({ bookId }: { bookId: string }) {
   const wrongFormat = Boolean(
     facts?.type && !COVER_TYPES.includes(facts.type as never),
   );
+
+  /**
+   * What can be done about one row of the report, attached to that row.
+   *
+   * **The remedies used to be a panel of their own under the list**, headed
+   * "Fix the file" — three buttons in a blue box below four findings, with
+   * nothing joining a button to the sentence it answered. A writer read "Too
+   * small to upload", read "Squarer than Amazon asks for", and then met Crop,
+   * Pad and Enlarge as a set and had to work out for themselves which belonged
+   * to which. It is the same fault the dashboard's own rule exists to prevent:
+   * *every finding carries its own way to be fixed*. The report already knows
+   * which rule each row is, so the button belongs on the row.
+   *
+   * Three things this has to keep from the panel it replaces:
+   *
+   * - **The cost is on the button.** "29px trimmed", "falls under 1000px",
+   *   "adds no detail" — a fix that quietly makes a different rule fail, or
+   *   invents pixels, has to say so where it is pressed rather than in a
+   *   dialog afterwards.
+   * - **A row may carry two.** Shape is the one question with two honest
+   *   answers — crop something away, or pad something on — so it gets both and
+   *   the writer chooses. That is why this returns a list.
+   * - **Most rows carry none.** A file too *large*, one already upscaled, a
+   *   CMYK profile, a pale edge: real findings this app cannot mechanically
+   *   put right, and inventing a button for them would be worse than the panel
+   *   ever was. They stay as words.
+   *
+   * Gated on `facts`, so a row shows a fix only when there is a file to make
+   * one from — arriving from a dashboard finding brings the numbers and not the
+   * artwork — and on the row not being a pass, since a rule that passed has
+   * nothing to answer.
+   */
+  const fixesFor = (
+    check: CoverCheck,
+  ): { key: string; label: string; cost: string; run: () => void }[] => {
+    if (!facts || check.status === "pass") return [];
+
+    /* Straight to the file with no dialog: nothing is cropped, nothing is
+       scaled, and the only thing that can be lost is transparency, which an
+       ebook cover must not have anyway. The container changes and nothing
+       else. */
+    if (check.id === "format" && wrongFormat) {
+      return [
+        {
+          key: "format",
+          label: "Save it as a JPEG",
+          cost: `${facts.width} × ${facts.height} · same pixels, a format Amazon takes`,
+          run: () =>
+            void downloadShape(
+              {
+                id: "crop",
+                width: facts.width,
+                height: facts.height,
+                drawWidth: facts.width,
+                drawHeight: facts.height,
+                factor: 1,
+                tooSmall: false,
+              },
+              { x: 0, y: 0 },
+            ),
+        },
+      ];
+    }
+
+    /* Both, because the question has two answers and neither is ours to make.
+       They open a window rather than downloading, since each asks *where* —
+       which part of the picture survives a crop, where the bars fall. */
+    if (check.id === "shape" && shapeOff) {
+      return (["crop", "pad"] as const).map((mode) => {
+        const out = reshape(facts.width, facts.height, mode);
+        return {
+          key: mode,
+          label: mode === "crop" ? "Crop to fit" : "Pad with bars",
+          cost:
+            `${out.width} × ${out.height} · ` +
+            `${out.changed}px ${mode === "crop" ? "trimmed" : "added"}` +
+            (out.tooSmall ? " · falls under 1000px" : ""),
+          run: () =>
+            setShaping({
+              id: mode,
+              width: out.width,
+              height: out.height,
+              // Crop and pad draw the artwork at its own size: 1:1, nothing
+              // invented.
+              drawWidth: facts.width,
+              drawHeight: facts.height,
+              factor: 1,
+              tooSmall: out.tooSmall,
+            }),
+        };
+      });
+    }
+
+    /* **Straight to the file, no dialog.** Enlarging asks nothing: the artwork
+       is scaled to cover the frame and, when the shape is already right, there
+       is not a pixel of slack to drag. A modal whose only content is a preview
+       of the single possible answer is a step that exists to be dismissed.
+       Centred, which is exact when the ratio matches and the sane default when
+       it does not — and a writer who wants to choose has Crop and Pad, which
+       appear on the row above for exactly that case. */
+    if (check.id === "size" && smallerThanIdeal) {
+      const big = enlarge(facts.width, facts.height);
+      return [
+        {
+          key: "enlarge",
+          label: `Enlarge to ${big.width} × ${big.height}`,
+          cost: `scaled up ${big.factor.toFixed(1)}× · adds no detail`,
+          run: () =>
+            void downloadShape(
+              { id: "enlarge", ...big, tooSmall: false },
+              {
+                x: (big.width - big.drawWidth) / 2,
+                y: (big.height - big.drawHeight) / 2,
+              },
+            ),
+        },
+      ];
+    }
+
+    return [];
+  };
+
+  /* Worked out once, so the promise above the list and the buttons in it
+     cannot disagree about whether there is anything to press. */
+  const rows = report.map((check) => ({ check, fixes: fixesFor(check) }));
+  const anyFix = rows.some((row) => row.fixes.length > 0);
 
   return (
     /* **No heading of its own.** It carried one — "Check the file" — from when
@@ -1148,12 +1304,21 @@ function CoverChecker({ bookId }: { bookId: string }) {
             )}
 
             {fromStored && (
-              /* Which picture this is, said before anything is done to it. */
+              /* **Which picture this is, said before anything is done to it —
+                 and it now has two things to say, because there are two ways
+                 to arrive.** The second sentence used to promise that "putting
+                 its shape right" fixes the EPUB, which is true of the crop and
+                 enlarge errands and nonsense on a plain "Check the cover",
+                 where there is no repair panel under it at all. So the offer is
+                 made only when it is on offer, and the plain arrival is told
+                 the thing it actually needs: the report is about the original,
+                 and the original is what to hand over. */
               <p className="mb-4 rounded-lg border border-note-line bg-note-bg px-3.5 py-2.5 text-sm text-note-fg">
                 This is the cover already on the book, not your original — the
-                copy kept here is compressed to fit a browser. Putting its shape
-                right fixes the cover in your EPUB and on the shelf. For the
-                file you upload to a shop, fix the original and check that.
+                copy kept here is compressed to fit a browser.{" "}
+                {facts
+                  ? "Putting its shape right fixes the cover in your EPUB and on the shelf. For the file you upload to a shop, fix the original and check that."
+                  : "The report beside it is of the original, measured when you last checked it. Drop that file in to work on it."}
               </p>
             )}
 
@@ -1174,6 +1339,21 @@ function CoverChecker({ bookId }: { bookId: string }) {
               </span>
             </p>
 
+            {/* **The panel's one surviving sentence.** "Fix the file" carried a
+                deck promising that nothing is uploaded and the file is not
+                changed, and that promise outlived the box: the buttons are on
+                the rows now, so it is said once here, above all of them,
+                rather than repeated on each. Only when there is something to
+                press — a standing reassurance about a thing nobody can do is
+                furniture. */}
+            {anyFix && (
+              <p className="mt-1 max-w-prose text-sm text-muted">
+                Where a fix is offered below, you choose what shows before
+                anything is written. Nothing is uploaded and this file is not
+                changed — you get a copy.
+              </p>
+            )}
+
             {/* **The passes are shown, and that is the change that matters.**
 
                 This drew only the failures, so a clean file rendered as one
@@ -1191,10 +1371,12 @@ function CoverChecker({ bookId }: { bookId: string }) {
                 two that mattered the same weight as the two that did not. The
                 mark carries the status and the row carries the words. */}
             <ul className="mt-3 divide-y divide-line border-y border-line">
-              {report.map((check) => (
+              {rows.map(({ check, fixes }) => (
                 <li key={check.id} className="flex gap-3 py-3">
                   <CheckMark status={check.status} />
-                  <div className="min-w-0">
+                  {/* `flex-1` so a fix beneath the words spans the column the
+                      words are in rather than shrinking to its own label. */}
+                  <div className="min-w-0 flex-1">
                     <p
                       className={`text-sm font-semibold ${
                         check.status === "pass" ? "text-muted" : "text-fg"
@@ -1217,6 +1399,32 @@ function CoverChecker({ bookId }: { bookId: string }) {
                     >
                       {check.detail}
                     </p>
+
+                    {/* **Under the words, not beside them.** A fix answers the
+                        sentence above it, and a control on the right of a row
+                        reads as a destination — which these are not: they act
+                        here, on this file. Stacked when there are two, each
+                        one line: what it will do on the left, what it costs on
+                        the right. */}
+                    {fixes.length > 0 && (
+                      <div className="mt-2.5 flex flex-col gap-2">
+                        {fixes.map((fix) => (
+                          <button
+                            key={fix.key}
+                            type="button"
+                            onClick={fix.run}
+                            className={FIX_BUTTON}
+                          >
+                            <span className="text-sm font-semibold">
+                              {fix.label}
+                            </span>
+                            <span className="text-xs text-badge-blue-ink/70 tabular-nums">
+                              {fix.cost}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </li>
               ))}
@@ -1232,202 +1440,19 @@ function CoverChecker({ bookId }: { bookId: string }) {
                 different question, and the shelf is how you answer it.
               </p>
             )}
+            {/* **The remedies are on the rows now, and the panel is gone.**
 
-            {/* **Putting the shape right, and only the shape.**
-
-                Offered when the ratio is off, which is the one complaint on
-                this screen that can be answered honestly without inventing
-                pixels: both modes draw the artwork at 1:1, so nothing is
-                resampled. "Too small" gets no button on purpose — scaling a
-                554px cover up to 1600 would clear the shop's check and hand
-                back a softer picture, and a tool that makes its own warning
-                disappear while making the book worse has helped nobody.
-
-                Both choices are shown with what each costs, rather than one
-                being picked: cropping trims the long edge and on a cover that
-                is usually a byline near the border, while padding keeps every
-                pixel and adds bars. Neither is right in general.
-
-                Nothing is uploaded and the original is untouched — the result
-                is drawn in a canvas and handed straight to the writer as a
-                download. */}
-            {/* **Every fix the file has, in one panel.** Shape when the ratio
-                is off; size when it is under what shops recommend. The panel
-                appears when either applies and hides when neither does, so a
-                clean file gets no repair shop it does not need.
-
-                The enlarge is the one that resamples, and it took two asks to
-                add. It is here because refusing it did not stop anyone wanting
-                a 1600×2560 file — it only stopped them getting one where the
-                screen could say what it costs. So the cost is on the button, in
-                the dialog, and in the confirmation afterwards, and it is the
-                only fix whose green message declines to call the result
-                better. */}
-            {/* **Under the report, not over it.** It sat above the findings,
-                so a writer met three buttons offering to change their file
-                before reading a word about what was wrong with it — a remedy
-                ahead of the diagnosis. The order is what the report is for:
-                here is the file, here is what each rule says, here is what can
-                be done about the two that failed. */}
-            {/* **Blue, and the blue is the badge family rather than a new
-                hue.** `--color-badge-blue-*` is the app's one *state* colour —
-                a tinted ground, a hairline of the same hue, ink of that hue,
-                correct in both themes — where the status family means a
-                verdict and the accent means "the way forward". This panel is
-                neither: it is the workshop under the diagnosis, so it wants to
-                be told apart from the report above it without claiming
-                anything about the file. Grey said nothing at all, and amber or
-                green would have read as a fourth finding.
-
-                The buttons inside stay `panel` on it, which is the shape the
-                panel already had: white cards on a ground, one blue ground
-                rather than three blue boxes. */}
-            {facts && (shapeOff || smallerThanIdeal || wrongFormat) && (
-              <div className="mt-5 rounded-lg border border-badge-blue-line bg-badge-blue-bg p-4">
-                <p className="text-sm font-bold text-badge-blue-ink">
-                  Fix the file
-                </p>
-                <p className="mt-1 max-w-prose text-sm text-muted">
-                  You choose what shows before anything is written. Nothing is
-                  uploaded and this file is not changed — you get a copy.
-                </p>
-
-                {/* **The format fix, and it is the plainest one here.**
-
-                    It had no button at first, on the reasoning that re-saving
-                    is the writer's job. That was wrong twice over. The remedy
-                    is entirely mechanical — the same canvas the other two fixes
-                    already use, drawing the artwork at its own size so not a
-                    pixel moves — and the writers who most need it are the ones
-                    least likely to own something that re-encodes an image.
-                    Telling somebody their file is the wrong container while
-                    holding the one line of code that changes the container is
-                    the sort of help that is really a shrug.
-
-                    Straight to the file with no dialog, like the enlarge: there
-                    is nothing to choose. Nothing is cropped, nothing is scaled,
-                    and the only thing that can be lost is transparency, which
-                    an ebook cover must not have anyway. */}
-                {wrongFormat && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void downloadShape(
-                        {
-                          id: "crop",
-                          width: facts.width,
-                          height: facts.height,
-                          drawWidth: facts.width,
-                          drawHeight: facts.height,
-                          factor: 1,
-                          tooSmall: false,
-                        },
-                        { x: 0, y: 0 },
-                      )
-                    }
-                    className={`mt-3 ${FIX_BUTTON}`}
-                  >
-                    <span className="text-sm font-semibold">
-                      Save it as a JPEG
-                    </span>
-                    <span className="text-xs text-badge-blue-ink/70 tabular-nums">
-                      {facts.width} × {facts.height} · same pixels, a format
-                      Amazon takes
-                    </span>
-                  </button>
-                )}
-                {/* **Banners, not chips.** These were small boxes in a row
-                    while the findings under them were full-width bordered
-                    rows, so the *actions* were the smallest thing in a panel
-                    of statements — and on a narrow window the third one
-                    wrapped onto its own line and looked like a different kind
-                    of control from the two beside it.
-
-                    Stacked and full width, each reads as one line: what it
-                    will do on the left, what it costs on the right. Same shape
-                    as the rows they sit above, which is what makes the panel
-                    read as answer-then-consequence rather than as two
-                    unrelated lists. */}
-                <div className="mt-3 flex flex-col gap-2">
-                  {shapeOff &&
-                    (["crop", "pad"] as const).map((mode) => {
-                      const out = reshape(facts.width, facts.height, mode);
-                      return (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() =>
-                            setShaping({
-                              id: mode,
-                              width: out.width,
-                              height: out.height,
-                              // Crop and pad draw the artwork at its own size:
-                              // 1:1, nothing invented.
-                              drawWidth: facts.width,
-                              drawHeight: facts.height,
-                              factor: 1,
-                              tooSmall: out.tooSmall,
-                            })
-                          }
-                          className={FIX_BUTTON}
-                        >
-                          <span className="text-sm font-semibold">
-                            {mode === "crop" ? "Crop to fit" : "Pad with bars"}
-                          </span>
-                          <span className="text-xs text-badge-blue-ink/70 tabular-nums">
-                            {out.width} × {out.height} ·{" "}
-                            {mode === "crop"
-                              ? `${out.changed}px trimmed`
-                              : `${out.changed}px added`}
-                            {out.tooSmall ? " · falls under 1000px" : ""}
-                          </span>
-                        </button>
-                      );
-                    })}
-
-                  {smallerThanIdeal &&
-                    (() => {
-                      const big = enlarge(facts.width, facts.height);
-                      return (
-                        <button
-                          type="button"
-                          /* **Straight to the file, no dialog.** The other two
-                             open one because they ask a question — which part
-                             of the picture survives a crop, where the bars
-                             fall. Enlarging asks nothing: the artwork is
-                             scaled to cover the frame and, when the shape is
-                             already right, there is not a pixel of slack to
-                             drag. A modal whose only content is a preview of
-                             the single possible answer is a step that exists
-                             to be dismissed.
-
-                             Centred, which is exact when the ratio matches and
-                             the sane default when it does not — and a writer
-                             who wants to choose has Crop and Pad, which appear
-                             for exactly that case. */
-                          onClick={() =>
-                            void downloadShape(
-                              { id: "enlarge", ...big, tooSmall: false },
-                              {
-                                x: (big.width - big.drawWidth) / 2,
-                                y: (big.height - big.drawHeight) / 2,
-                              },
-                            )
-                          }
-                          className={FIX_BUTTON}
-                        >
-                          <span className="text-sm font-semibold">
-                            Enlarge to {big.width} × {big.height}
-                          </span>
-                          <span className="text-xs text-badge-blue-ink/70 tabular-nums">
-                            scaled up {big.factor.toFixed(1)}× · adds no detail
-                          </span>
-                        </button>
-                      );
-                    })()}
-                </div>
-              </div>
-            )}
+                It stood here — "Fix the file", a blue box holding Crop, Pad,
+                Enlarge and the JPEG re-save — below a list of four findings
+                that named the very problems those buttons answered, with
+                nothing joining one to the other. A writer read two complaints
+                and then met three remedies as a set, and had to pair them up
+                themselves. The dashboard's own rule says a finding carries its
+                own way to be fixed; the report knows which rule each row is, so
+                the button belongs on the row. See `fixesFor`, which kept the
+                three things the panel was right about: the cost is on the
+                button, shape offers both of its answers, and a finding this app
+                cannot mechanically put right gets no button at all. */}
 
             {/* **Where the "these were measured earlier" box used to be.**
                 It stood here — under the report, where the fix panel would
@@ -1597,11 +1622,26 @@ function DropZone({
  * the focus ring is offset against the panel — a ring drawn *on* a fill of
  * nearly its own hue is a ring nobody can see.
  */
+/**
+ * A fix, on the row that names the problem it answers.
+ *
+ * **The ground moved down a step when the blue panel went away.** These were
+ * `badge-blue-soft` cards *on* a `badge-blue-bg` panel; standing on the report's
+ * own white they would have been the darker of the two blues against no blue at
+ * all — a control shouting on a list of sentences. So the panel's ground becomes
+ * the button's, its line stays the border, and `soft` becomes the hover: the
+ * same three tokens, each moved one place, which is what keeps this the app's
+ * one *state* colour rather than a new blue invented for a button.
+ *
+ * The ring offsets against `panel`, which is what the report actually sits on
+ * now — offsetting against a colour that is no longer behind it draws a halo in
+ * the wrong shade.
+ */
 const FIX_BUTTON = `flex w-full flex-wrap items-center justify-between gap-x-4
-  gap-y-1 rounded-lg border border-badge-blue-line bg-badge-blue-soft px-4 py-3
-  text-left text-badge-blue-ink transition-colors hover:bg-badge-blue-line
+  gap-y-1 rounded-lg border border-badge-blue-line bg-badge-blue-bg px-4 py-3
+  text-left text-badge-blue-ink transition-colors hover:bg-badge-blue-soft
   focus-visible:ring-2 focus-visible:ring-badge-blue-ink
-  focus-visible:ring-offset-2 focus-visible:ring-offset-badge-blue-bg
+  focus-visible:ring-offset-2 focus-visible:ring-offset-panel
   focus-visible:outline-none`;
 
 /**

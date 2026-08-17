@@ -188,6 +188,21 @@ export interface ReadinessIssue {
   /** What is wrong, in the writer's terms rather than the validator's. */
   message: string;
   /**
+   * The first clause of `message`, on its own — "Too small to upload".
+   *
+   * **Set only by the cover checks, and only so several of them can be said in
+   * one breath.** Those findings arrive as a label and a detail (see
+   * `checkCover`) and are joined here into the one sentence a list wants; the
+   * dashboard folds two or more of them into a single row and needs the short
+   * halves back to write "Two things about the cover file: too small to upload,
+   * and squarer than Amazon asks for". Splitting `message` on its first full
+   * stop would work today and break the moment a label contains one.
+   *
+   * Nothing else sets it and nothing may require it: an issue without one is
+   * an issue whose `message` is already the whole of what there is to say.
+   */
+  label?: string;
+  /**
    * Where it is put right, when that is a *page in this book* rather than a
    * field on a form.
    *
@@ -248,10 +263,13 @@ export function storeReadiness({
   coverFacts,
 }: ReadinessInput): ReadinessIssue[] {
   const issues: ReadinessIssue[] = [];
-  const blocking = (field: string, message: string) =>
-    issues.push({ level: "blocking", field, message });
-  const advisory = (field: string, message: string) =>
-    issues.push({ level: "advisory", field, message });
+  /* `label` is optional and only the cover checks pass one — see the field's
+     own note. Spread rather than always set, so an issue without one carries
+     no empty string for a consumer to have to treat as absent. */
+  const blocking = (field: string, message: string, label?: string) =>
+    issues.push({ level: "blocking", field, message, ...(label ? { label } : {}) });
+  const advisory = (field: string, message: string, label?: string) =>
+    issues.push({ level: "advisory", field, message, ...(label ? { label } : {}) });
 
   // Matched without regard to case, because the placeholder is written three
   // different ways in this codebase already: `createBook` and five other sites
@@ -291,10 +309,16 @@ export function storeReadiness({
    * screen to be told, and a check that only speaks where you happen to be
    * standing is a check that gets missed.
    *
-   * **Each keeps its own field** rather than collapsing into one "cover" row,
-   * because the field is what `DESTINATIONS` maps to a button — one row per
-   * problem, each landing on the thing that fixes it, which is the shape the
-   * rest of this list already has.
+   * **Each keeps its own field**, because the field is what `DESTINATIONS`
+   * maps to a button and what a screen keys a row on. That is *not* a claim
+   * that each gets its own row: this comment used to add "one row per problem,
+   * each landing on the thing that fixes it", and the second half was never
+   * true — all five cover destinations are the same `covers?check=1` report,
+   * differing only by a `fix=` hint. So a writer with two faults in one file
+   * was given two buttons to the same screen and made the trip twice. The
+   * dashboard folds them into one row now (`findingsFrom` in checkup.ts); this
+   * module goes on reporting them one by one, which is right for a list that
+   * is read rather than pressed.
    *
    * Levels are carried across as the cover check set them: its `problem` is a
    * shop refusing the file, which is blocking, and its notes are advisory.
@@ -317,8 +341,10 @@ export function storeReadiness({
        * is what the covers screen needs; this list needs the sentence.
        */
       const message = `${finding.label}. ${finding.detail}`;
-      if (finding.level === "problem") blocking(field, message);
-      else advisory(field, message);
+      /* The label rides along as well, so the dashboard can say several of
+         these in one sentence without picking the joined message apart. */
+      if (finding.level === "problem") blocking(field, message, finding.label);
+      else advisory(field, message, finding.label);
     }
   }
 

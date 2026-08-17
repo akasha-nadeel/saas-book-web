@@ -1,5 +1,5 @@
 import { withReturn } from "./areas";
-import { countFindings, fromReadiness, type Finding, type Fix } from "./checkup";
+import { countFindings, findingsFrom, type Finding, type Fix } from "./checkup";
 import type { ImportedBook } from "./import/split";
 import type { Book } from "./library-store";
 import { storeReadiness } from "./publishing";
@@ -71,22 +71,26 @@ function asBook(file: ImportedBook): Book {
 export function checkFile(file: ImportedBook): FileFindings {
   const withProse = file.chapters.filter((chapter) => chapter.words > 0);
 
-  const findings: Finding[] = [];
-  for (const issue of storeReadiness({
-    book: asBook(file),
-    ...(file.publishing ? { meta: file.publishing } : {}),
-    // What the *file* carries, which is not the same as what could be stored:
-    // a cover too large for the browser's budget is still a cover as far as a
-    // shop is concerned, and reporting it missing would be a false finding.
-    hasCover: Boolean(file.hasCover),
-    chapterCount: withProse.length,
-    // The two image checks need the manuscript walked block by block, which is
-    // the export screen's job and needs a book to exist first.
-    brokenImages: 0,
-  })) {
-    const finding = fromReadiness(issue);
-    if (finding) findings.push(finding);
-  }
+  /* Through the same `findingsFrom` the dashboard uses, so this page cannot
+     word or group a finding differently from the screen it sends people to —
+     which is the one thing this check exists to promise. Nothing here supplies
+     `coverFacts`, so it raises no cover-file findings and the grouping inside
+     is inert; it goes through it anyway rather than becoming the one caller
+     that could drift. */
+  const findings = findingsFrom(
+    storeReadiness({
+      book: asBook(file),
+      ...(file.publishing ? { meta: file.publishing } : {}),
+      // What the *file* carries, which is not the same as what could be stored:
+      // a cover too large for the browser's budget is still a cover as far as a
+      // shop is concerned, and reporting it missing would be a false finding.
+      hasCover: Boolean(file.hasCover),
+      chapterCount: withProse.length,
+      // The two image checks need the manuscript walked block by block, which
+      // is the export screen's job and needs a book to exist first.
+      brokenImages: 0,
+    }),
+  );
 
   const ordered = [
     ...findings.filter((f) => f.level === "fix"),

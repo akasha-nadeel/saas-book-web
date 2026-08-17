@@ -1,5 +1,5 @@
 import { GENRES } from "./book-kinds";
-import type { Book } from "./library-store";
+import { spellNumber, type Book } from "./library-store";
 import { storeReadiness, type ReadinessIssue } from "./publishing";
 import { roadmapFor, progressOf, type Phase } from "./roadmap";
 
@@ -94,6 +94,15 @@ const DESTINATIONS: Record<string, Fix> = {
    * arrives at the controls that fix it instead of at a search box. The
    * wording differs per row because the action does: this list's promise is
    * that a button says what pressing it will do.
+   *
+   * **They are the same destination, though, and that is why two of them at
+   * once become one row.** A writer whose cover was both squarer than Amazon
+   * asks for and smaller than recommended got two rows and two buttons, both
+   * opening the same report, and made the trip twice — for a file the covers
+   * screen can put both faults right in a single visit, since it re-checks the
+   * result of each fix in place. `findingsFrom` folds them; these entries are
+   * still what a *single* fault uses, and keeping them one-per-field is what
+   * lets that case carry its own `fix=` intent.
    */
   "cover-too-small": {
     kind: "route",
@@ -258,6 +267,96 @@ export function fromReadiness(issue: ReadinessIssue): Finding | null {
   };
 }
 
+/** A label as it reads mid-sentence: "Too small to upload" → "too small to
+ *  upload", while "JPEG is not a format Amazon takes" keeps its capitals. A
+ *  first word in full caps is an acronym, and lower-casing one letter of it
+ *  ("jPEG") is worse than leaving the sentence with a capital in the middle. */
+function midSentence(label: string): string {
+  const first = label.split(" ")[0] ?? "";
+  if (first.length > 1 && first === first.toUpperCase()) return label;
+  return label.charAt(0).toLowerCase() + label.slice(1);
+}
+
+/** "a, b and c" — the Oxford comma left off, as the rest of the app writes lists. */
+function andList(parts: readonly string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+/** Findings about the cover *file* — the ones `checkCover` raises, as against
+ *  `cover`, which is a book with no cover at all and is fixed by a dialog. */
+const isCoverFile = (issue: ReadinessIssue) => issue.field.startsWith("cover-");
+
+/**
+ * Every readiness issue that has somewhere to go, as findings — with the
+ * cover file's own faults gathered into one.
+ *
+ * **The gathering is the reason this exists, and the reason it is one function
+ * rather than three.** Overview, Prepare and the landing page's hero check each
+ * ran `.map(fromReadiness).filter(Boolean)` for themselves, which was fine
+ * while every finding was its own errand and stopped being fine for the cover:
+ * all five of its destinations are the same `covers?check=1` report, so a file
+ * that was both squarer than Amazon asks for *and* smaller than recommended
+ * produced two rows and two buttons to one screen. The writer went twice. They
+ * never had to — the covers screen re-checks the result of each fix in place,
+ * so both are done in one visit — but nothing on the dashboard said so.
+ *
+ * Three rules hold it:
+ *
+ * - **Two or more fold; exactly one is left alone.** A single fault keeps its
+ *   own row, its own wording and its own `fix=` intent, which is what makes
+ *   "Fix the shape" open the crop window already loaded. Folding that case too
+ *   would trade a working shortcut for consistency nobody asked for.
+ * - **The row names every fault it counts**, because every other row on this
+ *   list opens by naming the problem, and a row that only counts them makes a
+ *   reader press through to find out whether it is serious.
+ * - **It counts only the faults that have a destination**, which today is all
+ *   twelve `checkCover` raises — a walk test over `storeReadiness` exists
+ *   precisely to keep it that way. So the row's count and the covers screen's
+ *   agree, and the guard is there for the next check added without a
+ *   destination: it would be dropped from the list as it always was, rather
+ *   than counted in a row and then missing from it.
+ *
+ * The folded row takes the place of the *first* of its members, so the
+ * severity order the three screens sort and count on is untouched.
+ */
+export function findingsFrom(issues: readonly ReadinessIssue[]): Finding[] {
+  const cover = issues.filter(
+    (issue) => isCoverFile(issue) && DESTINATIONS[issue.field],
+  );
+
+  const findings: Finding[] = [];
+  let folded = false;
+
+  for (const issue of issues) {
+    if (cover.length > 1 && isCoverFile(issue)) {
+      // The whole group stands in the first member's place; the rest vanish.
+      if (!DESTINATIONS[issue.field] || folded) continue;
+      folded = true;
+      findings.push({
+        id: "readiness:cover-file",
+        level: cover.some((c) => c.level === "blocking") ? "fix" : "note",
+        title: `${spellNumber(cover.length)} things about the cover file: ${andList(
+          // `label` is the short half — see ReadinessIssue. The message is the
+          // fallback, and on these findings it is never absent.
+          cover.map((c) => midSentence(c.label ?? c.message)),
+        )}.`,
+        why: WHY.cover ?? "",
+        /* No `fix=` intent. Each of the five carries one that opens a
+           particular repair, and with several faults there is no single right
+           one to open — the report lists them all and has every fix under it. */
+        fix: { kind: "route", path: "covers?check=1", action: "Check the cover" },
+      });
+      continue;
+    }
+
+    const finding = fromReadiness(issue);
+    if (finding) findings.push(finding);
+  }
+
+  return findings;
+}
+
 /**
  * The second half of each shop check: what it is *for*.
  *
@@ -323,7 +422,7 @@ export function checkup({
     });
   }
 
-  for (const issue of storeReadiness({
+  const readiness = storeReadiness({
     book,
     ...(book.publishing ? { meta: book.publishing } : {}),
     hasCover,
@@ -331,15 +430,21 @@ export function checkup({
     // The two that need the manuscript are the export screen's job; it walks
     // every chapter, which a dashboard listing seven books must not.
     brokenImages: 0,
-  })) {
-    // Only the shop's own refusals travel to a book still being written. The
-    // rest — no ISBN, no categories, no publisher — are true and premature,
-    // and a dashboard repeating them at somebody on chapter three is the
-    // scold this audience has already been sold once.
-    if (!selling && issue.level === "advisory") continue;
-    const finding = fromReadiness(issue);
-    if (finding) findings.push(finding);
-  }
+  });
+
+  /* Only the shop's own refusals travel to a book still being written. The
+     rest — no ISBN, no categories, no publisher — are true and premature, and a
+     dashboard repeating them at somebody on chapter three is the scold this
+     audience has already been sold once.
+
+     Filtered *before* `findingsFrom` rather than after, so the cover row counts
+     and names what this book is actually being shown. Two faults of which one
+     is advisory would otherwise announce two and list one. */
+  findings.push(
+    ...findingsFrom(
+      readiness.filter((issue) => selling || issue.level !== "advisory"),
+    ),
+  );
 
   if (!book.targetWords) {
     findings.push({
