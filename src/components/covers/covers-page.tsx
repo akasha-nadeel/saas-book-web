@@ -376,7 +376,14 @@ function CoverChecker({ bookId }: { bookId: string }) {
     tooSmall: boolean;
   } | null>(null);
   /** What was just put right, shown in green until the next file or fix. */
-  const [done, setDone] = useState<string | null>(null);
+  /* **A tone, not just a sentence.** This one slot carried three outcomes and
+     painted all of them in `ok` green — including "this browser would not store
+     the full-size copy", which is the one message on the screen that is not
+     good news. A writer skims the colour before the words. */
+  const [done, setDone] = useState<{
+    text: string;
+    tone: "ok" | "note";
+  } | null>(null);
 
   /**
    * Throw away the checked file and everything said about it.
@@ -667,13 +674,15 @@ function CoverChecker({ bookId }: { bookId: string }) {
        confirmation that overstates what it did is the same fault as a check
        that clears a bad file. */
     const sameSize = out.width === facts.width && out.height === facts.height;
-    setDone(
-      plan.factor > 1
-        ? `Written at ${out.width} × ${out.height}. It now passes the size check — but it was scaled up ${plan.factor.toFixed(1)}×, so it carries no more detail than the file you started with.`
-        : sameSize
-          ? `Written as a JPEG at ${out.width} × ${out.height}. Every pixel is where it was — only the format changed. Upload the download, not this file.`
-          : `Written at ${out.width} × ${out.height}, ${IDEAL_RATIO}:1. Check the download and upload that file, not this one.`,
-    );
+    setDone({
+      tone: "ok",
+      text:
+        plan.factor > 1
+          ? `Written at ${out.width} × ${out.height}. It now passes the size check — but it was scaled up ${plan.factor.toFixed(1)}×, so it carries no more detail than the file you started with.`
+          : sameSize
+            ? `Written as a JPEG at ${out.width} × ${out.height}. Every pixel is where it was — only the format changed. Upload the download, not this file.`
+            : `Written at ${out.width} × ${out.height}, ${IDEAL_RATIO}:1. Check the download and upload that file, not this one.`,
+    });
   }
 
   /**
@@ -727,8 +736,17 @@ function CoverChecker({ bookId }: { bookId: string }) {
        have. */
     setDone(
       result.printStored
-        ? `Set as this book's cover, at ${result.width}×${result.height} — that is what goes into your EPUB.`
-        : "Set as this book's cover. This browser would not store the full-size copy, so the export will use a smaller one — download the file and upload it to the shop yourself.",
+        ? {
+            tone: "ok",
+            text: `Set as this book's cover, at ${result.width}×${result.height} — that is what goes into your EPUB.`,
+          }
+        : {
+            // Half of this worked and half did not, so it is `note` rather than
+            // `ok` or `stop`: the cover *is* on the book, and what the writer
+            // has to act on is the export being worse than their artwork.
+            tone: "note",
+            text: "Set as this book's cover. This browser would not store the full-size copy, so the export will use a smaller one — download the file and upload it to the shop yourself.",
+          },
     );
   }
 
@@ -1119,9 +1137,13 @@ function CoverChecker({ bookId }: { bookId: string }) {
             {done && (
               <p
                 role="status"
-                className="mb-4 rounded-lg border border-ok-line bg-ok-bg px-3.5 py-2.5 text-sm text-ok-fg"
+                className={`mb-4 rounded-lg border px-3.5 py-2.5 text-sm ${
+                  done.tone === "ok"
+                    ? "border-ok-line bg-ok-bg text-ok-fg"
+                    : "border-note-line bg-note-bg text-note-fg"
+                }`}
               >
-                {done}
+                {done.text}
               </p>
             )}
 

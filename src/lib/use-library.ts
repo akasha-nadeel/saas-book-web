@@ -52,11 +52,15 @@ import {
   subscribeToNotes,
   subscribeToPrefs,
   getCoverEpoch,
+  getServerStorageTrouble,
+  getStorageTrouble,
   getSyncPhase,
   subscribeToShelf,
+  subscribeToStorageTrouble,
   subscribeToSync,
   type Prefs,
   type Shelf,
+  type StorageTrouble,
 } from "./library-store";
 
 /**
@@ -104,6 +108,21 @@ export function useLibrarySettled(): boolean {
   return (
     useSyncExternalStore(subscribeToSync, getSyncPhase, pendingOnServer) ===
     "settled"
+  );
+}
+
+/**
+ * Whether this browser has run out of room, and how badly.
+ *
+ * Read by one component — `StorageAlert` in the root layout — because a full
+ * origin is a fact about the whole app rather than about the screen that
+ * happened to notice it. See `StorageTrouble` in the store.
+ */
+export function useStorageTrouble(): StorageTrouble {
+  return useSyncExternalStore(
+    subscribeToStorageTrouble,
+    getStorageTrouble,
+    getServerStorageTrouble,
   );
 }
 

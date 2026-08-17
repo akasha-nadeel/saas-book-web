@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { syncWithServer } from "@/lib/library-store";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { askToPersist } from "@/lib/storage-space";
 import { flushNow } from "@/lib/sync";
 
 /**
@@ -19,6 +20,14 @@ import { flushNow } from "@/lib/sync";
  */
 export function LibrarySync() {
   useEffect(() => {
+    /* **Above the guard, deliberately.**
+       Everything below this line is about the server, and the writers who most
+       need the browser to stop evicting their library are exactly the ones with
+       no server behind them — the local-only writers the guard returns early
+       for. See `askToPersist`: without it a browser may clear the whole origin
+       under disk pressure, and Safari does it after a week away. */
+    void askToPersist();
+
     if (!isSupabaseConfigured()) return;
 
     void syncWithServer();

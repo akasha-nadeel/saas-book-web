@@ -42,6 +42,25 @@ export const MAX_SNAPSHOTS = 8;
 export const MAX_HISTORY_BYTES = 400_000;
 
 /**
+ * How much room *all* of it may take, across every chapter of every book.
+ *
+ * **The sweep the comment above promised did not exist**, and that is what
+ * filled a real writer's storage: the per-chapter cap is not a bound on
+ * anything, because nothing bounds the number of chapters. Forty-five chapters
+ * at 400KB each is 18MB against an origin of five, so the first thing to fail
+ * was an autosave — on a chapter that had nothing to do with the history that
+ * had eaten the room.
+ *
+ * 1.5MB is under a third of the origin, which is the most this can defensibly
+ * claim: the manuscript has first claim on that budget, and the panel already
+ * tells the writer this is a safety net rather than an archive. What it buys at
+ * that size is still every recent version of the chapters actually being worked
+ * on, which is the promise — "this chapter as it was before lunch", not "last
+ * March".
+ */
+export const MAX_LIBRARY_HISTORY_BYTES = 1_500_000;
+
+/**
  * How long between snapshots of the same chapter.
  *
  * A snapshot per save would be a snapshot every few seconds, which fills the

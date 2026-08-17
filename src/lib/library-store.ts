@@ -27,8 +27,13 @@ import {
   record as recordActivity,
   trim as trimActivity,
 } from "./activity";
-import { addSnapshot, parseHistory, shouldSnapshot } from "./history";
-import { clearPrintCovers } from "./cover-store";
+import {
+  MAX_LIBRARY_HISTORY_BYTES,
+  addSnapshot,
+  parseHistory,
+  shouldSnapshot,
+} from "./history";
+import { clearPrintCovers, deletePrintCover } from "./cover-store";
 import {
   MATTER_SECTIONS,
   matterSection,
@@ -545,8 +550,11 @@ export function getCoverEpoch(): number {
 }
 
 export function getCoverFacts(bookId: string): CoverFacts | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(coverFactsKey(bookId));
+  // Through `readRaw`, which it used to bypass. Its own try/catch wraps only
+  // the parse, so in a browser that throws on `getItem` — private-mode Safari
+  // and friends — this took the render down with it, and it is called during
+  // one.
+  const raw = readRaw(coverFactsKey(bookId));
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
@@ -573,7 +581,15 @@ export function setCoverFacts(bookId: string, facts: CoverFacts | null): void {
 
 export function hasCover(bookId: string): boolean {
   if (typeof window === "undefined") return false;
-  return coverKey(bookId) in window.localStorage;
+  try {
+    // A named-property test rather than a read, so a 250KB data URL is never
+    // materialised just to answer a yes/no — see the note above. Wrapped
+    // because even this throws where storage is walled off, and it is called
+    // during a render.
+    return coverKey(bookId) in window.localStorage;
+  } catch {
+    return false;
+  }
 }
 
 export function subscribeToCover(bookId: string, onStoreChange: () => void) {
@@ -673,13 +689,45 @@ export function bookChapterCount(book: Book): number {
 // no partial update: a torn shelf is far worse than a redundant write.
 // ---------------------------------------------------------------------------
 
+/**
+ * The shelf, written — and the one write that must survive a full origin.
+ *
+ * **Because it is the way out.** Every escape a writer has from "this browser
+ * is out of room" goes through here: archiving a book, trashing one, emptying
+ * the trash, deleting one outright. And `deleteBook` commits the shelf
+ * *before* it removes the bodies, deliberately — a book whose chapters are
+ * gone but which is still on the shelf is the worse failure. So a `commit`
+ * that gives up on a quota error locks the door from the inside: the writer is
+ * told to delete a book, presses the button, and nothing happens but a line in
+ * a console they will never open. Seen for real, from the trash menu.
+ *
+ * So it does what `saveBody` does — spends the version history to land the
+ * write, which is the same trade and an easier one here, because what is at
+ * stake is the writer's ability to fix the problem at all.
+ */
 function commit(next: Shelf) {
-  try {
-    window.localStorage.setItem(SHELF_KEY, JSON.stringify(next));
-  } catch (err) {
-    console.error("[store] could not write shelf", err);
-    return;
+  const raw = JSON.stringify(next);
+
+  const write = (): boolean => {
+    try {
+      window.localStorage.setItem(SHELF_KEY, raw);
+      return true;
+    } catch (err) {
+      console.error("[store] could not write shelf", err);
+      return false;
+    }
+  };
+
+  if (!write()) {
+    // `dropAllHistory` reports "history-dropped" for itself when it frees
+    // something. Reaching the end of this means the shelf did not move, so
+    // whatever the writer just pressed did not happen.
+    if (!dropAllHistory() || !write()) {
+      reportStorage("full");
+      return;
+    }
   }
+
   emitShelf();
   pushShelfDiff(next);
 }
@@ -940,6 +988,14 @@ export function deleteBook(bookId: string) {
   } catch {
     // Unreachable bytes, not a broken app.
   }
+
+  /* The full-size artwork too, which this never used to do.
+     `deletePrintCover` was reachable only from `clearCover`, so every book ever
+     deleted left its print cover — up to 2560px of JPEG — in IndexedDB forever,
+     under a key nothing would ever ask for again. Not awaited, the same shape
+     `clearLocalLibrary` uses: the book is already gone from the shelf and the
+     bytes are housekeeping. */
+  void deletePrintCover(bookId);
 
   // Active chapters and anything still sitting in the book's trash.
   for (const chapter of [...doomed.chapters, ...(doomed.trash ?? [])]) {
@@ -1675,7 +1731,42 @@ export function saveBody(
   if (book && !canWriteBook(book)) return false;
 
   const raw = JSON.stringify(doc);
-  window.localStorage.setItem(bodyKey(chapterId), raw);
+
+  /*
+   * **A full origin costs the writer their history, never their prose.**
+   *
+   * `localStorage` is about 5MB for the whole origin and everything shares it:
+   * every chapter of every book, the cover thumbnails, the tool stores — and
+   * the version history, which is eight snapshots a chapter and by far the
+   * largest thing here that nobody would choose to keep over the manuscript.
+   * Seen for real while pasting into a long chapter: `setItem` threw
+   * `QuotaExceededError`, the autosave caught it, and the writing simply
+   * stopped being saved.
+   *
+   * So a failed write is not the end of the attempt. History is what
+   * `history.ts` calls a safety net rather than an archive, and it is the one
+   * store whose whole contents can be given up to land a keystroke. If the
+   * second attempt fails too the error is thrown, which is what puts the
+   * editor into "Save failed" — at that point there is genuinely nowhere to
+   * put the words and saying so is the only honest thing left.
+   */
+  try {
+    window.localStorage.setItem(bodyKey(chapterId), raw);
+  } catch (err) {
+    // `dropAllHistory` raises "history-dropped" for itself when it frees
+    // something; both throws below are the case where it could not, and the
+    // writer's keystrokes are now going nowhere.
+    if (!dropAllHistory()) {
+      reportStorage("full");
+      throw err;
+    }
+    try {
+      window.localStorage.setItem(bodyKey(chapterId), raw);
+    } catch (stillFull) {
+      reportStorage("full");
+      throw stillFull;
+    }
+  }
 
   /*
    * **Only prose with a chapter to hang on is sent.**
@@ -2873,15 +2964,167 @@ function rememberVersion(chapterId: string, body: string, words: number) {
 
     const next = addSnapshot(history, { at: now, body, words });
     window.localStorage.setItem(historyKey(chapterId), JSON.stringify(next));
+    sweepHistory(chapterId);
     for (const listener of historyListeners) listener();
   } catch {
     // Deliberately silent. See the note at the head of this section.
   }
 }
 
+/**
+ * Keep the *library's* history inside its budget, not just each chapter's.
+ *
+ * **`MAX_HISTORY_BYTES` is not a bound on anything, because nothing bounds the
+ * number of chapters.** `history.ts` has always said this sweep was what made
+ * the per-chapter cap safe — and the sweep was never written. Forty-five
+ * chapters entitled to 400KB each is 18MB against an origin of five, so on a
+ * real library the first thing to fail was an autosave, on a chapter that had
+ * nothing to do with the history that had eaten the room. That is the bug this
+ * closes; `dropAllHistory` below is the fire extinguisher for when it has
+ * already happened.
+ *
+ * **Whole chapters go, oldest first.** Trimming a snapshot from each would keep
+ * the library under budget and leave every chapter with a history too shallow
+ * to be worth opening — "before lunch" is the promise, and it is the *recent*
+ * versions of a chapter that deliver it. Ordered by each chapter's newest
+ * snapshot, so the chapter last touched a month ago loses its net before the
+ * one being typed into. `keep` is that chapter: it was just written and must
+ * survive its own sweep.
+ *
+ * Runs only after a snapshot was actually taken — at most once per chapter per
+ * ten minutes, per `shouldSnapshot` — so reading every history back is a cost
+ * paid rarely, on the write that caused the growth.
+ */
+function sweepHistory(keep: string) {
+  const kept: { key: string; bytes: number; newest: number }[] = [];
+  let total = 0;
+
+  for (let i = 0; i < window.localStorage.length; i++) {
+    const key = window.localStorage.key(i);
+    if (!key?.startsWith(HISTORY_PREFIX)) continue;
+    const raw = readRaw(key);
+    if (raw === null) continue;
+    total += raw.length;
+    // `addSnapshot` puts the newest first, so entry zero dates the chapter. A
+    // history that will not parse sorts as ancient and is swept first, which is
+    // the right answer for a value nothing can read anyway.
+    kept.push({
+      key,
+      bytes: raw.length,
+      newest: parseHistory(raw)[0]?.at ?? 0,
+    });
+  }
+
+  if (total <= MAX_LIBRARY_HISTORY_BYTES) return;
+
+  const keepKey = historyKey(keep);
+  kept.sort((a, b) => a.newest - b.newest);
+  for (const entry of kept) {
+    if (total <= MAX_LIBRARY_HISTORY_BYTES) break;
+    if (entry.key === keepKey) continue;
+    window.localStorage.removeItem(entry.key);
+    total -= entry.bytes;
+  }
+}
+
 // A chapter's history is removed wherever its body and notes are, inline at
 // each of the four sites — the same shape those two already use. A helper here
 // would be a fifth way to do a thing that is done four ways already.
+
+/**
+ * Give up every snapshot in the library to make room for a save.
+ *
+ * The one caller is `saveBody`, and only after `setItem` has already thrown.
+ * It is deliberately all of it rather than the oldest few: the write that
+ * failed can be any size, trimming guesses at how much is needed, and a second
+ * quota error costs the writer their keystrokes. History is the store designed
+ * to be disposable — `rememberVersion` already swallows its own failures on
+ * exactly this reasoning — so the trade is the whole safety net against one
+ * paragraph of the book, which is not a close call.
+ *
+ * Answers whether anything was actually freed, so a caller that gained no room
+ * reports the original failure instead of retrying into it.
+ */
+function dropAllHistory(): boolean {
+  const keys: string[] = [];
+  try {
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (key?.startsWith(HISTORY_PREFIX)) keys.push(key);
+    }
+    for (const key of keys) window.localStorage.removeItem(key);
+  } catch {
+    // Enumerating or removing can itself fail in a locked-down browser. What
+    // was removed before that stays removed, and the count below is honest
+    // about it.
+  }
+
+  if (keys.length === 0) return false;
+  console.warn(
+    `[storage] full — dropped ${keys.length} chapter histories to save the manuscript`,
+  );
+  reportStorage("history-dropped");
+  for (const listener of historyListeners) listener();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// What the writer is told when the browser runs out of room
+//
+// The same shape as `syncPhase` below, and for the same reason: something
+// happens deep in a write that a screen has to react to, and the store's one
+// way of saying so is a value plus a subscription.
+//
+// **Two states, because there are two situations and they are not the same
+// size.** `history-dropped` is the save that *worked* — the quota was hit,
+// `dropAllHistory` freed the room, the prose landed. Nothing is at risk and the
+// writer has lost only their version history, which they should hear about
+// without being interrupted. `full` is the save that did not work: keystrokes
+// are not being written down, and no smaller signal is proportionate to that.
+//
+// Only ever raised louder, never quieter, until it is cleared: a `full` that
+// arrives after a `history-dropped` must not be talked over by the next
+// successful save, because the writer still has a book that is not saving.
+// ---------------------------------------------------------------------------
+
+export type StorageTrouble = "none" | "history-dropped" | "full";
+
+let storageTrouble: StorageTrouble = "none";
+const storageListeners = new Set<() => void>();
+
+const TROUBLE_RANK: Record<StorageTrouble, number> = {
+  none: 0,
+  "history-dropped": 1,
+  full: 2,
+};
+
+function reportStorage(next: StorageTrouble) {
+  if (TROUBLE_RANK[next] <= TROUBLE_RANK[storageTrouble]) return;
+  storageTrouble = next;
+  for (const listener of storageListeners) listener();
+}
+
+/** Dismissed by the writer. The next failure raises it again — this clears what
+ *  has been read, not the condition, which only more room can fix. */
+export function clearStorageTrouble() {
+  if (storageTrouble === "none") return;
+  storageTrouble = "none";
+  for (const listener of storageListeners) listener();
+}
+
+export function getStorageTrouble(): StorageTrouble {
+  return storageTrouble;
+}
+
+/** Nothing has gone wrong on a server that has not rendered yet. */
+export function getServerStorageTrouble(): StorageTrouble {
+  return "none";
+}
+
+export function subscribeToStorageTrouble(onStoreChange: () => void) {
+  storageListeners.add(onStoreChange);
+  return () => storageListeners.delete(onStoreChange);
+}
 
 // ---------------------------------------------------------------------------
 // The idea parking lot

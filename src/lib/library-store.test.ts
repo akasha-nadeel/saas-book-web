@@ -22,8 +22,11 @@ import {
   rememberMatterAsked,
   shouldAskMatter,
   startMatter,
+  clearStorageTrouble,
   deleteChapterForever,
   getBody,
+  getHistoryRaw,
+  getStorageTrouble,
   isGenericChapterTitle,
   orderedChapters,
   setChapterMatter,
@@ -66,10 +69,14 @@ import {
   type Book,
 } from "@/lib/library-store";
 import { localDay } from "@/lib/free-limits";
+import { MAX_LIBRARY_HISTORY_BYTES } from "@/lib/history";
 import { DEFAULT_TYPOGRAPHY } from "@/lib/typography";
 
 beforeEach(() => {
   localStorage.clear();
+  // Module state, so it outlives the store being emptied — a test that filled
+  // the origin would otherwise leave the next one thinking it is still full.
+  clearStorageTrouble();
 });
 
 it("starts with an empty shelf", () => {
@@ -1182,6 +1189,160 @@ it("archives and unarchives a book", () => {
 
   restoreBook(bookId);
   expect(booksIn(getShelf(), "active").map((b) => b.id)).toEqual([bookId]);
+});
+
+/*
+ * **A full browser must not lock the writer in.**
+ *
+ * Every way out of "this browser is out of room" — archiving, trashing,
+ * emptying the trash, deleting outright — goes through `commit`, and
+ * `deleteBook` commits the shelf *before* it removes the bodies, deliberately.
+ * So a `commit` that gave up on a quota error bolted the door from the inside:
+ * the writer is told to delete a book, presses the button, and nothing happens
+ * but a line in a console they will never open. That is exactly what a real
+ * writer hit, from the trash menu, with their storage already full.
+ *
+ * These are the tests not to "fix" by letting the shelf write fail quietly
+ * again. Spending the version history to land a shelf write is the intended
+ * trade: what is at stake is the writer's ability to fix the problem at all.
+ */
+describe("a shelf write with the origin full", () => {
+  /** Refuse the shelf until the history has been given up. */
+  function refuseShelfUntilHistoryGoes() {
+    const real = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(function (
+      this: Storage,
+      k: string,
+      v: string,
+    ) {
+      const historyLeft = Object.keys(localStorage).some((key) =>
+        key.startsWith("openchapter:history:"),
+      );
+      if (k === "openchapter:shelf" && historyLeft) {
+        throw new DOMException("quota", "QuotaExceededError");
+      }
+      real.call(this, k, v);
+    });
+  }
+
+  it("gives up the history rather than the writer's way out", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 5);
+    expect(getHistoryRaw(chapterId)).not.toBeNull();
+
+    refuseShelfUntilHistoryGoes();
+    trashBook(bookId);
+    vi.restoreAllMocks();
+
+    // The book really moved, and the history is what paid for it.
+    expect(booksIn(getShelf(), "trashed").map((b) => b.id)).toEqual([bookId]);
+    expect(getHistoryRaw(chapterId)).toBeNull();
+  });
+
+  it("deletes a book when there is no room, which is the whole point", () => {
+    const { bookId, chapterId } = createBook("A");
+    saveBody(bookId, chapterId, { type: "doc" }, 5);
+
+    refuseShelfUntilHistoryGoes();
+    deleteBook(bookId);
+    vi.restoreAllMocks();
+
+    expect(getShelf().books).toHaveLength(0);
+    expect(getBody(chapterId)).toBeNull();
+  });
+
+  it("says so when even that is not enough", () => {
+    const { bookId } = createBook("A");
+    // Nothing left to give up, and the shelf refuses whatever happens.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation((k) => {
+      if (k === "openchapter:shelf") {
+        throw new DOMException("quota", "QuotaExceededError");
+      }
+    });
+    trashBook(bookId);
+    vi.restoreAllMocks();
+
+    // The one signal the writer gets, since the shelf did not move.
+    expect(getStorageTrouble()).toBe("full");
+    clearStorageTrouble();
+  });
+});
+
+/*
+ * **The library's history budget, which nothing enforced until 2026-08-17.**
+ *
+ * `history.ts` has always said the per-chapter cap was made safe by a global
+ * sweep in the store, and the sweep was never written — so forty-five chapters
+ * were each entitled to 400KB against an origin of five megabytes, and the
+ * first thing to fail on a real library was an autosave of a chapter that had
+ * nothing to do with the history that had eaten the room.
+ *
+ * The two assertions that matter are the two halves of "which net do you give
+ * up": the library comes back under budget, and the chapter being written keeps
+ * its own versions. A sweep that took those would be a backup feature deleting
+ * the backup of the thing you are doing.
+ */
+describe("the library-wide history budget", () => {
+  /** A history for one chapter, `bytes` long, last touched at `at`. */
+  function seedHistory(chapterId: string, at: number, bytes: number) {
+    const body = "x".repeat(Math.max(1, bytes - 60));
+    localStorage.setItem(
+      `openchapter:history:${chapterId}`,
+      JSON.stringify([{ at, body, words: 1 }]),
+    );
+  }
+
+  function historyIds(): string[] {
+    return Object.keys(localStorage)
+      .filter((k) => k.startsWith("openchapter:history:"))
+      .map((k) => k.slice("openchapter:history:".length));
+  }
+
+  function historyBytes(): number {
+    return Object.keys(localStorage)
+      .filter((k) => k.startsWith("openchapter:history:"))
+      .reduce((n, k) => n + (localStorage.getItem(k)?.length ?? 0), 0);
+  }
+
+  it("drops whole chapters, oldest first, until it is back under budget", () => {
+    const { bookId, chapterId } = createBook("A");
+
+    // Four chapters' worth, well over the budget between them.
+    const half = Math.round(MAX_LIBRARY_HISTORY_BYTES / 2);
+    seedHistory("ancient", 1_000, half);
+    seedHistory("old", 2_000, half);
+    seedHistory("recent", 3_000, half);
+
+    // Any save takes the first snapshot of a chapter, which runs the sweep.
+    saveBody(bookId, chapterId, { type: "doc" }, 5);
+
+    expect(historyBytes()).toBeLessThanOrEqual(MAX_LIBRARY_HISTORY_BYTES);
+    // Oldest first: "ancient" goes before "old", and "recent" survives.
+    expect(historyIds()).not.toContain("ancient");
+    expect(historyIds()).toContain("recent");
+  });
+
+  it("never sweeps the chapter that was just written", () => {
+    const { bookId, chapterId } = createBook("A");
+
+    // One seeded history alone blows the budget, and it is *newer* than the
+    // snapshot about to be taken would sort — so only the "keep" rule saves the
+    // chapter being typed into.
+    seedHistory("hog", Date.now() + 60_000, MAX_LIBRARY_HISTORY_BYTES * 2);
+
+    saveBody(bookId, chapterId, { type: "doc" }, 5);
+
+    expect(getHistoryRaw(chapterId)).not.toBeNull();
+  });
+
+  it("leaves a library that is within budget alone", () => {
+    const { bookId, chapterId } = createBook("A");
+    seedHistory("small", 1_000, 500);
+
+    saveBody(bookId, chapterId, { type: "doc" }, 5);
+
+    expect(historyIds()).toContain("small");
+  });
 });
 
 it("trashes a book without touching its chapters", () => {

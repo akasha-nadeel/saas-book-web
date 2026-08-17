@@ -8,6 +8,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import { LibrarySync } from "@/components/library-sync";
+import { StorageAlert } from "@/components/storage-alert";
 import { ThemeSync } from "@/components/theme/theme-sync";
 
 /**
@@ -135,6 +136,11 @@ export default function RootLayout({
       <body className="h-full overflow-hidden bg-surface text-fg">
         <ThemeSync />
         <LibrarySync />
+        {/* Renders nothing until a write runs out of room. Here rather than in
+            the editor because the tool screens write unguarded too, and a
+            manuscript that has stopped saving is the app's problem wherever the
+            writer happens to be standing. */}
+        <StorageAlert />
         {/* `AppLoader` stood here and is gone, at the owner's request. It held
             the loading screen up for a second on every route but `/` so the
             logo's fill animation had time to play — a delay the product
