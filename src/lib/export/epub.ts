@@ -6,6 +6,7 @@ import {
   packageable,
   type PackagedImage,
 } from "./epub-images";
+import { recodeBlocks, recodeDataUrl } from "./image-recode";
 import {
   bookIdentifier,
   DEFAULT_LANGUAGE,
@@ -626,10 +627,18 @@ export async function buildEpub(
    * meets pictures it can package and no surviving `<img>` can point at a file
    * nothing wrote.
    */
-  const written = chapters.map((chapter) =>
-    toBlocks(chapter.doc).filter(
-      (block) => block.kind !== "image" || packageable(block),
-    ),
+  /* **Converted before it is judged**, or the filter below throws away the
+     pictures this is meant to save. The editor stores an inline illustration as
+     WebP, which EPUB does not name as a core media type, so every one of them
+     used to be packaged as a foreign resource with no fallback and drawn by
+     nothing. `recodeBlocks` re-encodes them to PNG or JPEG; one it cannot
+     convert stays as it was and is dropped by `packageable` on the next line,
+     which is the behaviour that was always intended for a picture the package
+     cannot carry. See image-recode.ts. */
+  const recoded = await recodeBlocks(chapters.map((c) => toBlocks(c.doc)));
+
+  const written = recoded.map((blocks) =>
+    blocks.filter((block) => block.kind !== "image" || packageable(block)),
   );
 
   // Every chapter's blocks in one pass, so an image repeated across chapters is
@@ -653,7 +662,12 @@ export async function buildEpub(
   const publishing = book.publishing;
   const language = publishing?.language?.trim() || DEFAULT_LANGUAGE;
   const identifier = bookIdentifier(book, publishing);
-  const cover = packageCover(options.cover ?? null);
+  /* Through the recoder as well. `cover-save.ts` writes JPEG, so today this
+     changes nothing — but a book covered before that rule existed still holds a
+     WebP, and the cover is the one picture a shop's converter meets first. */
+  const cover = packageCover(
+    options.cover ? await recodeDataUrl(options.cover) : null,
+  );
 
   // Generated title / copyright / contents pages, before the chapters.
   // The contents page links to the chapter files this builder writes.

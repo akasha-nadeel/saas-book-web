@@ -38,19 +38,45 @@ export interface PackagedImage {
 }
 
 /**
- * The image types EPUB 3 defines as core media types. Anything else has to be
- * declared with a fallback, which is more machinery than an inline illustration
- * is worth — an unrecognised type is dropped instead, and the prose survives.
+ * The image types EPUB 3 defines as core media types, and the extension each
+ * takes inside the package. Anything else has to be declared with a fallback,
+ * which is more machinery than an inline illustration is worth — an
+ * unrecognised type is dropped instead, and the prose survives.
+ *
+ * **`image/webp` was in this list and does not belong in it.** EPUB 3 names
+ * four image types a reading system must understand and WebP is not one of
+ * them, so a manifest entry declaring it is a foreign resource with no fallback
+ * — `RSC-032`. It was not an abstract fault: the editor stores inline pictures
+ * as WebP, so every illustration in every exported book was packaged in a
+ * format the reader was entitled to ignore, and a real one did. Measured on an
+ * export of a 45-chapter book: the JPEG cover drew, all four inline pictures
+ * were blank.
+ *
+ * Removing it does not lose those pictures. `recodeBlocks` in
+ * `image-recode.ts` converts them to PNG or JPEG before any of this runs, and
+ * the list is now what decides *what needs converting* — which is why
+ * `EPUB_CORE_IMAGE_TYPES` lives there and this maps the same four to their
+ * extensions. One that could not be converted falls through to `packageable`,
+ * which refuses it, and `undecodableImages` counts it for the pre-upload check.
  */
 const CORE_TYPES: Record<string, string> = {
   "image/jpeg": "jpeg",
   "image/png": "png",
   "image/gif": "gif",
   "image/svg+xml": "svg",
-  "image/webp": "webp",
 };
 
-/** `data:image/png;base64,iVBOR…` → the type and the payload. */
+/**
+ * `data:image/png;base64,iVBOR…` → the type and the payload.
+ *
+ * **The core-type check is no longer in here**, and moving it out is what lets
+ * the two questions below be asked separately: *what can be zipped as it
+ * stands* and *what will reach the reader once it has been converted*. While
+ * this refused a non-core type outright, the readiness check counted every
+ * WebP illustration as a picture the book could not carry — which stopped
+ * being true the moment `recodeBlocks` started converting them, and would have
+ * put a false alarm in front of every writer with a picture in their book.
+ */
 function parseDataUrl(
   src: string,
 ): { mediaType: string; base64: string } | null {
@@ -64,9 +90,33 @@ function parseDataUrl(
   // rare here — the editor never writes one — and guessing wrong would put
   // corrupt bytes in the package rather than no bytes.
   if (!/;base64/i.test(match[2] ?? "")) return null;
-  if (!CORE_TYPES[mediaType]) return null;
+  if (!mediaType.startsWith("image/")) return null;
 
   return { mediaType, base64: match[3] };
+}
+
+/**
+ * Non-core types the check is willing to *promise* will reach the reader.
+ *
+ * **Deliberately one entry, and deliberately narrower than what `recodeBlocks`
+ * will attempt.** It tries to convert anything the browser can decode, so an
+ * AVIF or a BMP out of an imported EPUB is very likely converted too — but
+ * "very likely" is not what a pre-upload check should say. WebP is what this
+ * app's own editor stores, so it is the one type whose conversion is a fact
+ * about our own code rather than a hope about the browser's.
+ *
+ * The asymmetry is the point: the check under-promises and the export
+ * over-delivers. The other way round is a writer told their pictures are fine
+ * and then finding gaps in the file.
+ */
+const RECODABLE_TYPES = new Set(["image/webp"]);
+
+/** The same, refusing anything the package cannot carry without a fallback. */
+function parseCoreDataUrl(
+  src: string,
+): { mediaType: string; base64: string } | null {
+  const parsed = parseDataUrl(src);
+  return parsed && CORE_TYPES[parsed.mediaType] ? parsed : null;
 }
 
 export function decodeBase64(base64: string): Uint8Array | null {
@@ -117,7 +167,7 @@ export function extractImages(chapters: Block[][]): ExtractedImages {
       const existing = seen.get(block.src);
       if (existing) return { ...block, src: existing };
 
-      const parsed = parseDataUrl(block.src);
+      const parsed = parseCoreDataUrl(block.src);
       if (!parsed) return block;
       const bytes = decodeBase64(parsed.base64);
       if (!bytes) return block;
@@ -149,7 +199,7 @@ export function extractImages(chapters: Block[][]): ExtractedImages {
  */
 export function packageCover(dataUrl: string | null): PackagedImage | null {
   if (!dataUrl) return null;
-  const parsed = parseDataUrl(dataUrl);
+  const parsed = parseCoreDataUrl(dataUrl);
   if (!parsed) return null;
   const bytes = decodeBase64(parsed.base64);
   if (!bytes) return null;
@@ -189,8 +239,40 @@ export function packageCover(dataUrl: string | null): PackagedImage | null {
  */
 export function packageable(block: Block): boolean {
   if (block.kind !== "image" || !block.src) return false;
+  const parsed = parseCoreDataUrl(block.src);
+  if (!parsed) return false;
+  return decodeBase64(parsed.base64) !== null;
+}
+
+/**
+ * Whether this picture will reach the reader — after conversion, if it needs
+ * one.
+ *
+ * **The looser half of the pair above, and the difference is a step in time.**
+ * `packageable` asks what can be zipped *as it stands*, which is the question
+ * the packager has once `recodeBlocks` has run. This asks what the writer will
+ * actually get, which is the question the pre-upload check has *before* it —
+ * and the two answers differ for exactly the pictures the editor stores, since
+ * a WebP illustration cannot be zipped as it stands and will be converted to
+ * one that can.
+ *
+ * Asking `packageable` here instead would report every picture in every book
+ * as one the EPUB cannot carry. A wrong alarm is the failure this app takes
+ * most seriously in a check: nobody hunts a problem they have been told they do
+ * not have, but a writer told their pictures will be missing goes and re-makes
+ * them.
+ *
+ * What it still refuses is what conversion cannot rescue: a payload that will
+ * not decode, and a `src` on the open internet, which EPUB forbids for an
+ * `<img>` under any declaration.
+ */
+export function carriable(block: Block): boolean {
+  if (block.kind !== "image" || !block.src) return false;
   const parsed = parseDataUrl(block.src);
   if (!parsed) return false;
+  if (!CORE_TYPES[parsed.mediaType] && !RECODABLE_TYPES.has(parsed.mediaType)) {
+    return false;
+  }
   return decodeBase64(parsed.base64) !== null;
 }
 
@@ -200,13 +282,15 @@ export function packageable(block: Block): boolean {
  * Reported by `storeReadiness`, so the writer hears it from the pre-upload
  * check rather than from the shop. Asked of the blocks *before* extraction —
  * afterwards every surviving picture is a package path and the question has
- * already been answered.
+ * already been answered — and therefore through `carriable` rather than
+ * `packageable`, since conversion has not happened yet at this point. See the
+ * note there.
  */
 export function undecodableImages(chapters: Block[][]): number {
   let count = 0;
   for (const blocks of chapters) {
     for (const block of blocks) {
-      if (block.kind === "image" && !packageable(block)) count++;
+      if (block.kind === "image" && !carriable(block)) count++;
     }
   }
   return count;

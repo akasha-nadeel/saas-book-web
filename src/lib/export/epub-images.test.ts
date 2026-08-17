@@ -182,3 +182,40 @@ describe("undecodableImages", () => {
     expect(undecodableImages([[image(PNG), image(GIF)]])).toBe(0);
   });
 });
+
+/**
+ * WebP, which is the bug this pair of predicates was split to fix.
+ *
+ * The editor stores every inline picture as WebP, and this file used to name it
+ * a core media type — so an exported book carried
+ * `media-type="image/webp"` with no fallback, EPUB does not require a reading
+ * system to decode that, and a real one did not: measured on a 45-chapter
+ * export, the JPEG cover drew and all four illustrations were blank. WebP is
+ * converted to PNG or JPEG on the way into the package now (`image-recode.ts`),
+ * which is why the two questions below have two different answers.
+ */
+describe("WebP", () => {
+  const WEBP = "data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==";
+
+  it("cannot be zipped as it stands", () => {
+    // EPUB 3 names four image types and WebP is not one of them. Packaging it
+    // is ERROR(RSC-032), a foreign resource with no fallback.
+    expect(packageable(image(WEBP))).toBe(false);
+  });
+
+  it("still reaches the reader, so the check must not report it as lost", () => {
+    // `recodeBlocks` converts it before the packager ever sees it. Counting it
+    // here would put a false alarm in front of every writer with a picture in
+    // their book — and a writer told their illustrations will be missing goes
+    // and re-makes them.
+    expect(undecodableImages([[image(WEBP)]])).toBe(0);
+  });
+
+  it("is not a blanket pass for anything that decodes", () => {
+    // The check promises only what this app's own code converts. A type the
+    // browser may or may not decode is still reported, because the export
+    // over-delivering is safe and the check over-promising is not.
+    expect(undecodableImages([[image("data:image/tiff;base64,SUkqAA==")]])).toBe(1);
+    expect(undecodableImages([[image("https://example.com/plate.png")]])).toBe(1);
+  });
+});

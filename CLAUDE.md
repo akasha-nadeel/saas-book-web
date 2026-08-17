@@ -1715,6 +1715,48 @@ through the same predicate so it is not showing a picture the file will not
 have. A remote `src` is not hypothetical — the importers take whatever an HTML
 or EPUB file refers to.
 
+**`image/webp` was in that core list for most of this app's life, and it does
+not belong there.** EPUB 3 names four image types a reading system must
+understand — GIF, JPEG, PNG, SVG — and the editor stores every inline picture
+as WebP, so every illustration in every exported book was packaged as a foreign
+resource with no fallback. It was found by opening a real export in a real
+reader on **2026-08-17**: the JPEG cover drew and all four illustrations were
+blank, and the manifest read `media-type="image/webp"` four times. Nothing was
+missing from the zip — the reader was simply entitled to ignore what was in it.
+
+`src/lib/export/image-recode.ts` is the fix, and three things about it are
+load-bearing:
+
+- **It converts at export, not at import.** Changing what the editor stores
+  would only help pictures added afterwards; every manuscript written before
+  today would go on exporting blank illustrations. The manuscript keeps WebP,
+  because a third off every picture matters inside a shared browser origin and
+  does not matter inside a zip downloaded once.
+- **PNG when the source has any alpha, JPEG otherwise**, decided by reading the
+  pixels rather than guessing: JPEG has no alpha channel, so a logo on a
+  transparent ground would come out on a black box, and PNG multiplies a
+  photograph's size for nothing. Any failure to read them answers "has alpha",
+  since a larger file beats a ruined picture. Re-encoded at 0.92 rather than
+  the editor's 0.82 — this is already lossy once, and twice at the same setting
+  is where it shows.
+- **Every failure returns the picture untouched, and `loadDataUrl` has a
+  timeout.** Untouched means `packageable` refuses it and the readiness check
+  counts it, which is the path this app already takes. The timeout is not about
+  patience — a data URL is bytes in hand — but about an `Image` that fires
+  neither `load` nor `error` leaving `buildEpub` pending for ever, which is the
+  writer losing the book rather than one picture.
+
+**That split `packageable` in two, and the difference is a step in time.**
+`packageable` asks what can be zipped *as it stands* — the packager's question,
+once recoding has run. **`carriable`** asks what will reach the reader after
+conversion, which is the pre-upload check's question, since it runs before it.
+Ask the strict one there and every picture in every book is reported as lost.
+`RECODABLE_TYPES` holds one entry on purpose: the recoder *attempts* anything
+the browser can decode, but the check promises only WebP, because that is a
+fact about our own code rather than a hope about the browser's. The check
+under-promises and the export over-delivers; the other way round is a writer
+told their pictures are fine and finding gaps in the file.
+
 **Nothing reaches an XHTML document that XML cannot carry.** `stripInvalidXml`
 in `xhtml.ts` takes out the characters outside XML 1.0's `Char` production —
 the control characters that have no escape, and lone surrogates — and
@@ -1792,11 +1834,15 @@ inflates it by a third against a budget the whole library shares; eight books
 would fill it and start failing autosaves on unrelated chapters. **Every
 failure resolves rather than throwing**, so Firefox in private browsing (which
 refuses IndexedDB outright) degrades to exactly the old behaviour instead of
-breaking the export. **Covers are JPEG, inline images stay WebP** — the size
-saving matters inside a manuscript and no shop has objected, while a cover is
-the one image a shop's converter meets first and KDP is not a safe bet for
-WebP; `importImage` takes an `encode` option, and `originalImage` keeps the
-writer's own bytes untouched when they are already JPEG or PNG. And **it does
+breaking the export. **Covers are JPEG, inline images are stored as WebP and
+converted on the way out** — the size saving matters inside a manuscript and
+not inside a zip downloaded once, while a cover is the one image a shop's
+converter meets first and KDP is not a safe bet for WebP; `importImage` takes
+an `encode` option, and `originalImage` keeps the writer's own bytes untouched
+when they are already JPEG or PNG. That sentence read "inline images stay
+WebP … and no shop has objected" until **2026-08-17**, and the second half was
+wrong in a way nobody had checked: see the EPUB note below, where a real
+reader drew the JPEG cover and left all four illustrations blank. And **it does
 not sync** — `sync.ts` carries the thumbnail and knows nothing about this
 store, so a writer on a second machine exports at thumbnail quality until they
 upload the artwork again. The covers tool says so; don't quietly drop that line.
