@@ -55,8 +55,24 @@ export interface Spacer {
 export interface LineBox {
   top: number;
   height: number;
-  /** Where a break before this line inserts its gap. */
-  pos: number;
+  /**
+   * Where a break before this line inserts its gap — or a function that works
+   * it out, for callers where finding it is expensive.
+   *
+   * **The editor's is expensive, and eagerly is what froze it.** Its only way
+   * to turn a laid-out line back into a document position is
+   * `view.posAtCoords`, a hit test that walks the DOM, and it was calling one
+   * per line before this function had decided anything. A paragraph pasted at
+   * 300,000 characters is about thirteen thousand lines and thirteen thousand
+   * hit tests, and the tab stops answering — measured.
+   *
+   * Almost all of that work is thrown away: a break lands on perhaps one line
+   * in a page, so twenty positions out of thirteen thousand are ever read.
+   * Passing a closure defers the cost to exactly those, and a closure that
+   * cannot answer returns null, which loses that one break rather than the
+   * paragraph's whole ability to split.
+   */
+  pos: number | (() => number | null);
   /** True for every line but a block's first: breaking there splits a
    *  paragraph, so the gap is inline. A block's first line breaks between
    *  blocks, which is the older and simpler case. */
@@ -137,9 +153,14 @@ export function pageBreaks(
       // needs to, so this runs over all of its lines rather than stopping at
       // the first.
       for (const line of lines) {
-        if (canMove(line.top) && runsPast(line.top, line.height)) {
-          breakBefore(line.top, line.pos, line.inline);
-        }
+        if (!canMove(line.top) || !runsPast(line.top, line.height)) continue;
+        // Resolved here and nowhere else, which is the point of allowing a
+        // closure at all — see `LineBox.pos`.
+        const at = typeof line.pos === "number" ? line.pos : line.pos();
+        // A line that cannot say where it is loses its own break and nothing
+        // else; the overhang check below then moves the block whole, which is
+        // how this worked before lines were consulted at all.
+        if (at !== null) breakBefore(line.top, at, line.inline);
       }
 
       // The lines are found by measuring, and a measurement can come up short.

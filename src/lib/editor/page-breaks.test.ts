@@ -103,6 +103,54 @@ describe("pageBreaks", () => {
     expect(spy.mock.calls[0][0].pos).toBe(300);
   });
 
+  /*
+   * **A line's position is looked up only where a break lands.**
+   *
+   * The editor's only way to turn a laid-out line back into a document
+   * position is `posAtCoords`, a DOM hit test. Doing that for every line
+   * *before* deciding anything froze the tab on a 300,000-character paste —
+   * one paragraph, thirteen thousand lines, thirteen thousand hit tests. This
+   * is the test that keeps it lazy: 100 lines, four page edges crossed, so at
+   * most a handful of lookups.
+   */
+  it("resolves a line's position only when it breaks there", () => {
+    const asked = vi.fn(() => 999);
+    const long: BlockBox = { top: 0, height: 100 * LINE, pos: 0, splittable: true };
+    const lines: LineBox[] = Array.from({ length: 100 }, (_, i) => ({
+      top: i * LINE,
+      height: LINE,
+      pos: i === 0 ? 0 : asked,
+      inline: i > 0,
+    }));
+
+    const breaks = pageBreaks([long], G, () => lines);
+
+    // 100 lines over 21-line pages is four seams, and four lookups — not 99.
+    expect(breaks).toHaveLength(4);
+    expect(asked).toHaveBeenCalledTimes(4);
+    expect(breaks.every((b) => b.pos === 999)).toBe(true);
+  });
+
+  it("loses one break, not the paragraph, when a line cannot place itself", () => {
+    // A hit test that comes back outside the paragraph is untrustworthy — a
+    // break there would tear a different block in half. Skipping that one line
+    // leaves the others, where returning null used to abandon splitting
+    // altogether and drop the whole paragraph onto the next sheet.
+    const long: BlockBox = { top: 0, height: 60 * LINE, pos: 0, splittable: true };
+    const lines: LineBox[] = Array.from({ length: 60 }, (_, i) => ({
+      top: i * LINE,
+      height: LINE,
+      pos: i === 0 ? 0 : () => (i === 21 ? null : 500 + i),
+      inline: i > 0,
+    }));
+
+    const breaks = pageBreaks([long], G, () => lines);
+
+    // The seam at line 21 is lost; the later ones still land.
+    expect(breaks.length).toBeGreaterThan(0);
+    expect(breaks.every((b) => b.pos !== null)).toBe(true);
+  });
+
   it("moves a block down whole when it cannot be split", () => {
     // An unsplittable block — an image 400px tall — after 10 lines. Only 330px
     // of the text area is left, so it moves down whole, and the gap has to

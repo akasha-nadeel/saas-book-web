@@ -539,18 +539,29 @@ class PaginationView {
         continue;
       }
 
-      // Just inside the line's leading edge, half way down it: the point the
-      // browser resolves to this line's first character rather than to the end
-      // of the line above.
-      const at = view.posAtCoords({
-        left: row.left + 1,
-        top: (row.top + row.bottom) / 2,
-      });
-      // A position outside this paragraph means the mapping is not to be
-      // trusted — a break there would tear a different block in half.
-      if (!at || at.pos <= first || at.pos >= last) return null;
+      /* **A closure, not a hit test.** `posAtCoords` walks the DOM, and this
+         used to run for every line of the paragraph before `pageBreaks` had
+         decided which lines matter. On a 300,000-character paste — one
+         paragraph, about thirteen thousand lines — that is thirteen thousand
+         hit tests in one measure, and the tab stops responding. `pageBreaks`
+         reads a position only where it actually places a break, perhaps one
+         line in a page, so deferring turns thirteen thousand into twenty.
 
-      lines.push({ ...box, pos: at.pos, inline: true });
+         The coordinates are captured now because they are already measured;
+         only the lookup waits. */
+      const at = () => {
+        const found = view.posAtCoords({
+          left: row.left + 1,
+          top: (row.top + row.bottom) / 2,
+        });
+        // A position outside this paragraph means the mapping is not to be
+        // trusted — a break there would tear a different block in half. Null
+        // now costs this one break rather than the paragraph's whole ability
+        // to split, which is what returning null from here used to do.
+        return found && found.pos > first && found.pos < last ? found.pos : null;
+      };
+
+      lines.push({ ...box, pos: at, inline: true });
     }
 
     return lines;
