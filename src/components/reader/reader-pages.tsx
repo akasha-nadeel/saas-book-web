@@ -3,7 +3,12 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { PageMetrics } from "@/lib/page-setup";
-import { escapeXml } from "@/lib/export/xhtml";
+import {
+  needsSecondPass,
+  paginate,
+  picturesSettled,
+  type ReaderChapter,
+} from "@/lib/reader/page-flow";
 
 /**
  * The book laid out as real pages.
@@ -11,8 +16,9 @@ import { escapeXml } from "@/lib/export/xhtml";
  * A page is a fixed sheet at the book's trim size; when a chapter's prose runs
  * past the bottom, it continues on the next sheet, the way Word and a PDF break
  * a document — not one endless page per chapter. The browser has no on-screen
- * pagination, so this measures the rendered blocks off-screen and packs them
- * into page-height groups itself.
+ * pagination, so this measures the rendered blocks off-screen and cuts them
+ * into page-height sheets itself; the whole of that lives in
+ * `lib/reader/page-flow.ts`, over the same `pageBreaks` the editor uses.
  *
  * Measurement runs in a hidden column at the page's true content width, kept
  * out of the zoomed wrapper so `zoom` never distorts the numbers. It re-runs
@@ -22,66 +28,9 @@ import { escapeXml } from "@/lib/export/xhtml";
 
 const PX_PER_IN = 96;
 
-export interface ReaderChapter {
-  id: string;
-  title: string;
-  /** The spelled "Chapter Five" label, or null when the title is its own label
-   *  (a generic "Chapter 5") or the chapter is front/back matter. */
-  label: string | null;
-  html: string;
-  empty: boolean;
-}
-
-/** Split one chapter's prose into pages of block HTML, measuring in `col`. The
- *  first page leaves room for the chapter opener (its label and title). Shared
- *  with the editor's Book View page preview, so both break the pages the same. */
-export function paginate(col: HTMLElement, chapter: ReaderChapter, contentH: number): string[] {
-  // The opener sits on the first page and eats into its height. Measured with
-  // the very markup the page renders, so the space reserved matches the space
-  // taken.
-  const labelHtml = chapter.label
-    ? `<p class="chapter-label">${escapeXml(chapter.label)}</p>`
-    : "";
-  col.innerHTML = `<div class="chapter-opener reader-opener-link">${labelHtml}<h2 class="reader-title">${escapeXml(
-    chapter.title,
-  )}</h2></div>`;
-  const openerH = (col.firstElementChild as HTMLElement).getBoundingClientRect()
-    .height;
-
-  col.innerHTML = `<div class="tiptap">${chapter.html}</div>`;
-  const tiptap = col.firstElementChild as HTMLElement;
-  const kids = Array.from(tiptap.children) as HTMLElement[];
-  if (kids.length === 0) return [""];
-
-  // Positions relative to the top of the flow, so inter-block margins show up
-  // as the gaps between one block's bottom and the next block's top.
-  const base = tiptap.getBoundingClientRect().top;
-  const blocks = kids.map((el) => {
-    const r = el.getBoundingClientRect();
-    return { top: r.top - base, bottom: r.bottom - base, html: el.outerHTML };
-  });
-
-  const pages: string[] = [];
-  let current: string[] = [];
-  let pageTop = 0;
-  let first = true;
-
-  for (const block of blocks) {
-    const budget = first ? contentH - openerH : contentH;
-    // A block that would spill past the page's bottom starts the next page —
-    // unless the page is empty, so a block taller than a page still lands
-    // somewhere rather than looping.
-    if (current.length && block.bottom - pageTop > budget) {
-      pages.push(current.join(""));
-      current = [];
-      pageTop = block.top;
-      first = false;
-    }
-    current.push(block.html);
-  }
-  pages.push(current.join(""));
-  return pages;
-}
+// Both live in page-flow now; re-exported because the flip-book and the Book
+// View preview already reach for them here.
+export { paginate, type ReaderChapter };
 
 export function ReaderPages({
   chapters,
@@ -125,10 +74,14 @@ export function ReaderPages({
     };
 
     run();
-    // A first pass may run before the serif has loaded; its metrics differ, so
-    // re-measure once it has and let the breaks settle.
-    if (typeof document !== "undefined" && document.fonts?.status !== "loaded") {
-      document.fonts?.ready.then(run).catch(() => {});
+    // A first pass may run before the serif has loaded and before the pictures
+    // have a size; both change how much fits on a page — see `picturesSettled`
+    // — so re-measure once they have settled and let the breaks settle with
+    // them.
+    if (needsSecondPass(chapters)) {
+      Promise.all([document.fonts?.ready, picturesSettled(chapters)])
+        .then(run)
+        .catch(() => {});
     }
 
     return () => {

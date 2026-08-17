@@ -1522,6 +1522,57 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **The export wizard's four-pane review** — the way in came off on
+  **2026-08-17** at the owner's request, to be put back once the panes
+  themselves are fixed. The owner asked to be reminded of it, so it is here and
+  in the assistant's memory both.
+
+  **What changed.** The **Preview** button on the wizard's action bar opened
+  `PreviewSheet` — a full-window layer holding `ReviewPane`'s four panes, each
+  building the *real* artifact: the PDF fetched from `/api/export/pdf`, the
+  `.docx` built and read back through `docx-preview`, the `.epub` built and
+  opened as a zip, and the Markdown as it would be written. In its place the
+  wizard has a **Preview step**, one station before Export, mounting
+  `BookPages` — the reading view's flip-book of the book's own pages.
+
+  **Nothing is deleted.** `preview-sheet.tsx`, `review-pane.tsx` and
+  `epub-preview.ts` are whole, still tested and now callerless, the standing
+  `templates-dialog.tsx` has. Putting them back means restoring a `preview`
+  state and the `PreviewSheet` mount in `export-page.tsx`, plus a way in — and
+  the decision to make then is whether they replace the Preview step or sit
+  beside it. The comment above `stepsFor`'s preview entry records why the step
+  is a step.
+
+  **Three consequences of the swap, and they are what has to be weighed when it
+  returns:**
+
+  1. **The reading view is the book, not the file.** It sets the manuscript on
+     real page sheets through the same `toBlocks` → `blocksToXhtml` path the
+     exporters use, so the prose and the page breaks are right — but it is not
+     the EPUB, not the `.docx` and not the PDF, and it cannot catch what the
+     packagers do. Nothing a shop's ingestion breaks on is visible in it.
+  2. **So nothing here names a format.** The old button said "Preview EPUB"
+     beside "Export EPUB"; the step's deck says *your book on its pages*,
+     because the old label over a page of the manuscript would be a claim the
+     code cannot back.
+  3. **And it is no longer conditional on a format being chosen.** The panes
+     depended on the pick; the book does not.
+
+  **A link out is not the shape to reach for.** Briefly on the same day Preview
+  was a `<Link>` to `/book/<id>/read?from=export`, and it cost the wizard's
+  memory: `output`, `typeset`, `manuscript` and `stepId` are component state
+  persisted nowhere, so leaving the route dropped the writer's format,
+  template, trim and front-matter switches and landed them on step one.
+  Whatever replaces the step has to stay inside the flow, or the wizard's state
+  has to be persisted first.
+
+  **Two things the panes were the only check for**, and neither has a
+  replacement today: that every EPUB document parses as XML before it reaches a
+  shop (`epub-preview.ts` runs each through `DOMParser`, which is
+  `stripInvalidXml`'s only test from the outside), and that the cover page —
+  a document that exists only in the package — is really there. Whatever
+  replaces the panes owes those two.
+
 - **The Markdown export** — marked **Soon** on **2026-08-16** at the owner's
   request, to be switched back on once it ships as a folder rather than a file.
 

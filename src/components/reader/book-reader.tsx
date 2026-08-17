@@ -1,90 +1,24 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import {
-  chapterLabel,
-  chapterMatterOf,
-  chapterNumberOf,
-  findBook,
-  getBody,
-  isGenericChapterTitle,
-  orderedChapters,
-  pageSetupOf,
-  typographyOf,
-  type Book,
-} from "@/lib/library-store";
-import { pageMetrics } from "@/lib/page-setup";
-import { typographyVars } from "@/lib/typography";
-import { isDraftMatter, toBlocks } from "@/lib/export/blocks";
-import { blocksToXhtml } from "@/lib/export/xhtml";
-import { useCover, useHydrated, usePrefs, useShelf } from "@/lib/use-library";
+import { findBook } from "@/lib/library-store";
+import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { LoadingScreen } from "@/components/loading-screen";
-import { type ReaderChapter } from "@/components/reader/reader-pages";
-import { ReaderFlipbook } from "@/components/reader/reader-flipbook";
+import { BookPages } from "@/components/reader/book-pages";
 
 /**
- * The whole book on one scrolling page.
+ * The whole book, as a book you open and turn.
  *
  * The editor mounts one chapter at a time — a deliberate choice, so opening a
  * forty-chapter book parses no prose. This is the other view: every chapter, in
- * reading order, rendered read-only as continuous pages a writer can scroll
- * end to end, the way a PDF reads. Editing stays in the editor; a chapter's
- * title here is a link back into it.
+ * reading order, set read-only on real page sheets at the book's trim size.
+ * Editing stays in the editor; a chapter's opener here is a link back into it.
  *
- * The prose is rendered through the same block IR the exporters use, wrapped in
- * `.manuscript .tiptap` so it inherits the page's own typography for free.
+ * The setting itself is `BookPages`, shared with the export wizard's Preview
+ * step; this file is the window around it — the way back, the title and the
+ * zoom.
  */
-
-function loadForReading(book: Book): ReaderChapter[] {
-  return (
-    orderedChapters(book)
-      /*
-       * **The same pages the export takes, so the read-through matches the file.**
-       *
-       * Front and back matter are lists of pages now, each seeded with the shape
-       * of the thing and the writer's own details left in `[brackets]`. A book
-       * that has pressed Start and filled in two of them would otherwise read
-       * with fourteen sheets of `[Term] — [what it means]` bound into it, which
-       * is not what this view is for: it exists to show the book as it will be,
-       * and the exporters leave those pages out. See `isUntouchedMatter`.
-       *
-       * Body chapters are never dropped, however empty — an unwritten chapter is
-       * a hole in the book, and this is exactly the view for seeing one.
-       */
-      .filter(
-        (chapter) =>
-          chapterMatterOf(chapter) === "body" || !isDraftMatter(chapter.id),
-      )
-      .map((chapter) => {
-        const raw = getBody(chapter.id);
-        let html = "";
-        if (raw) {
-          try {
-            html = blocksToXhtml(toBlocks(JSON.parse(raw)));
-          } catch {
-            // A corrupt body reads as an empty chapter rather than breaking the
-            // whole scroll — the same call the exporters make.
-            html = "";
-          }
-        }
-        // A spelled "Chapter Five" label sits above the title, but only when the
-        // title is a real name — a chapter still called "Chapter 5" is its own label.
-        const number = chapterNumberOf(book, chapter.id);
-        const label =
-          number !== null && !isGenericChapterTitle(chapter.title)
-            ? chapterLabel(number)
-            : null;
-        return {
-          id: chapter.id,
-          title: chapter.title,
-          label,
-          html,
-          empty: html.trim() === "",
-        };
-      })
-  );
-}
 
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
@@ -103,7 +37,6 @@ export function BookReader({
 }) {
   const hydrated = useHydrated();
   const shelf = useShelf();
-  const prefs = usePrefs();
   const book = findBook(shelf, bookId);
   const cover = useCover(bookId);
 
@@ -114,10 +47,6 @@ export function BookReader({
     setZoom((z) =>
       Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round((z + by) * 10) / 10)),
     );
-
-  // Parsing every body is the expensive part, so it is memoised on the shelf
-  // snapshot — a rename repaints without re-reading forty documents.
-  const chapters = useMemo(() => (book ? loadForReading(book) : []), [book]);
 
   if (!hydrated) return <LoadingScreen />;
   if (!book) return <MissingBook />;
@@ -147,6 +76,16 @@ export function BookReader({
     phase ? `?phase=${encodeURIComponent(phase)}` : ""
   }`;
 
+  /*
+   * The export wizard is *not* a door here, and that is deliberate.
+   *
+   * Its Preview was a link to this screen for part of 2026-08-17, and the cost
+   * showed at once: the wizard holds the format, the template, the trim and the
+   * front-matter switches in component state, so leaving it threw all of them
+   * away and dropped the writer back on step one. Preview is a step of the
+   * wizard now, mounting `BookPages` in place — see `export-page.tsx`.
+   */
+
   // Otherwise: back into the editor at the chapter last open, or the first one.
   const resumeId = book.chapters.some((c) => c.id === book.lastOpenedId)
     ? book.lastOpenedId
@@ -163,18 +102,6 @@ export function BookReader({
     : cameFromShelf
       ? "Back to your books"
       : "Back to editing";
-
-  const dark = prefs.paper === "slate" || prefs.paper === "black";
-
-  // The book's own face, size and spacing — the same variables the editor sets,
-  // so the read-through matches the writing surface exactly.
-  const typoVars = typographyVars(typographyOf(book));
-
-  // Each chapter is set on real pages at the book's own trim size, and flows
-  // onto further pages when it runs long — the pagination lives in ReaderPages.
-  // The `fit` setting (which fills the editor column) is ignored here, exactly
-  // as export ignores it.
-  const metrics = pageMetrics(pageSetupOf(book));
 
   return (
     <div className="flex h-dvh flex-col bg-surface">
@@ -273,30 +200,13 @@ export function BookReader({
         </div>
       </header>
 
-      {/* The pages. `data-paper` re-points the palette so the sheets and their
-          prose take the writer's chosen page colour, light or dark, independent
-          of the app theme — exactly as the editor's surface does. `overflow-auto`
-          rather than y-only: a page at its true trim width can be wider than a
-          narrow window, and clipping it would hide the text. */}
-      <main
-        data-paper={prefs.paper}
-        style={
-          {
-            colorScheme: dark ? "dark" : "light",
-            ...typoVars,
-          } as CSSProperties
-        }
-        className="manuscript min-h-0 flex-1 overflow-hidden bg-surface"
-      >
-        <ReaderFlipbook
-          chapters={chapters}
+      {/* The pages themselves, given the rest of the window. */}
+      <main className="min-h-0 flex-1 bg-surface">
+        <BookPages
           book={book}
           cover={cover}
-          metrics={metrics}
-          paper={prefs.paper}
           zoom={zoom}
-          bookId={bookId}
-          typographyKey={JSON.stringify(typoVars)}
+          className="h-full overflow-hidden"
         />
       </main>
     </div>

@@ -13,6 +13,7 @@ import type { PageMetrics } from "@/lib/page-setup";
 import type { Book } from "@/lib/library-store";
 import { BookCover } from "@/components/shelf/book-cover";
 import { paginate, type ReaderChapter } from "@/components/reader/reader-pages";
+import { needsSecondPass, picturesSettled } from "@/lib/reader/page-flow";
 
 const PX_PER_IN = 96;
 /** One page's display width at 100% zoom; the zoom control scales from here. */
@@ -94,8 +95,13 @@ export function ReaderFlipbook({
       if (!cancelled) setLayout(next);
     };
     run();
-    if (typeof document !== "undefined" && document.fonts?.status !== "loaded") {
-      document.fonts?.ready.then(run).catch(() => {});
+    // The first pass can run before the serif has loaded and before the
+    // pictures have a size, and both decide how much fits on a page — see
+    // `picturesSettled`. Measure again once they have settled.
+    if (needsSecondPass(chapters)) {
+      Promise.all([document.fonts?.ready, picturesSettled(chapters)])
+        .then(run)
+        .catch(() => {});
     }
     return () => {
       cancelled = true;

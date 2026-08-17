@@ -741,7 +741,9 @@ sheets by *measuring* the rendered text and inserting
 spacer **decorations** at each page break — never document content, so undo,
 autosave and export see the same text. It measures in **lines**, not blocks, so a
 long paragraph fills the page and continues over the seam the way Word's does;
-the break arithmetic is the pure, tested `pageBreaks()`. Two things hold it
+the break arithmetic is the pure, tested `pageBreaks()`, which lives in
+**`page-breaks.ts`** and is shared with the reading view — see the reader note
+below for what being private to this file used to cost. Two things hold it
 together: every measure runs with the existing spacers `display:none`, so breaks
 are always computed from the document's natural flow and can never drift pass by
 pass; and a mid-paragraph gap is a full-width **inline-block**, because a block
@@ -954,7 +956,43 @@ in `front-matter.ts` matches by title and the *written* page wins: ours is the
 fallback, assembled from fields so that a book which said nothing still opens
 properly, and there is nothing left for it to add once somebody has set their
 own words there. Renaming the page hands the job back to us, which is the safe
-direction to be wrong in.
+direction to be wrong in — matching is on the exact title (`GENERATED_BY_TITLE`:
+"title page", "copyright page", "table of contents"), front matter only, and a
+page still full of `[placeholders]` has already been filtered out by
+`loadChapters` so it does not count as written.
+
+**The writer can overrule that default, and `withoutReplaced` is the whole of
+it.** The switch on the export's front-matter step means *generate this* while
+there is no page of their own and **replace mine with yours** once there is — a
+different question, so it is stored in a different place
+(`typeset.replaceWritten`) and reads **off** to begin with, since theirs is what
+the file uses. Three things hold it. **Only the surprising direction asks**:
+turning it *on* opens `ReplacePageDialog`, because "Contents" on a switch does
+not obviously mean *leave my contents page out*, and the thing at the other end
+is the writer's own words; turning it back off restores their page with no
+dialog, which is a state nobody is stuck in. **The dialog's job is to say
+nothing is deleted** — that is the only question anybody has at that moment —
+and its primary button is the verb ("Use ours in this file"), not "OK". And the
+override is **one filter over the chapter list, applied before anything reads
+the book**: drop their page and `writtenPages` no longer sees it, so
+`frontSections` generates ours without being told to, and the EPUB spine, the
+PDF flow, the Word file and the review all agree because all four are built from
+that one list. Threading a second flag through each renderer is how they end up
+disagreeing about which pages are in the book.
+
+**A card has three things to say, not two, and the third was missing.** A page
+of one of these kinds that is still all `[placeholders]` never reaches
+`loadChapters`, so `writtenPages` cannot see it and ours is generated — correct,
+and silent: the card read "© this year, in the author's name" while a copyright
+page the writer had started sat in their book, and the only mention of it was
+one title among five in the note at the foot of the step. A writer looking at
+three cards concluded the app could not see their pages at all. So a card now
+reads *yours is winning* (ribbon "You have your own"), *yours is unfinished*
+(ribbon "Yours is blank", hint "Yours is still the example text, so ours goes
+in") or *you have no page of this kind*. The third state is derived from
+`skipped` — the note's own list — so the card and the note cannot disagree. The
+switch keeps its plain meaning on an unfinished page and asks nothing: there is
+nothing of the writer's to prefer, so there is no surprising direction.
 
 **Four pages are apparatus, and the flag is in `matter.ts`.** A half-title, a
 title page, a copyright page and a contents list are furniture rather than
@@ -1026,17 +1064,83 @@ neither of which a layout can see. The import banner is the exception and does
 live in that layout — it has to survive the writer clicking chapter to chapter.
 
 **The reading view** (`/book/[bookId]/read`, `src/components/reader/`) sets the
-whole book on real page sheets at the book's trim size. Prose is not re-laid out:
+whole book on real page sheets at the book's trim size. **`book-pages.tsx` is
+the setting and `book-reader.tsx` is the window around it** — the split exists
+because the export wizard's Preview step shows the same thing, and the setting
+is the part that is easy to get subtly wrong: the `.manuscript` class and
+`data-paper` that re-point the page palette, the `--ms-*` variables carrying the
+book's own face and leading, and the trim the sheets are cut to. Two copies of
+that would be two books, which is the one thing a preview may not be. The caller
+supplies the frame and it must have a height — the flip-book centres itself in
+`h-full`, which collapses in a box sized by its content. Prose is not re-laid out:
 each chapter is walked through the export path (`toBlocks` → `blocksToXhtml`) and
 styled with the book's typography, so the read-through, the print PDF and the
 EPUB match. Pagination *is* ours — the browser has none on screen — so
-`paginate()` in `reader-pages.tsx` measures the rendered blocks in a hidden
-column at the page's true content width (outside any `zoom` wrapper, which would
-distort the numbers) and packs them into page-height groups, re-running once the
+`paginate()` in `src/lib/reader/page-flow.ts` measures the rendered blocks in a
+hidden column at the page's true content width (outside any `zoom` wrapper,
+which would distort the numbers) and cuts them into sheets, re-running once the
 manuscript font loads. **That same `paginate()` backs the editor's Book View
-preview** (`page-preview.tsx`), so both break pages identically; keep them on the
-one function. `reader-flipbook.tsx` is the same flowed pages presented as a book
-you open and turn.
+preview** (`page-preview.tsx`) and the flip-book (`reader-flipbook.tsx`), so all
+three break pages identically; keep them on the one function.
+`reader-pages.tsx` re-exports it, since that is where the other two already look
+for it.
+
+**It breaks the pages with the editor's own `pageBreaks`, and until 2026-08-17
+it did not.** This view packed whole *blocks*: a paragraph that did not fit went
+to the next sheet entire, and a paragraph longer than a page went on anyway and
+ran off the bottom — where `.reader-page`'s `overflow: hidden` clipped it. So a
+dozen lines of somebody's novel were simply **absent** from the read-through,
+the flip-book and the Book View preview, with a half-empty sheet after them,
+while the editor — measuring the same manuscript in lines — broke it correctly.
+One book, two answers, and the wrong one was the one that claims to show the
+finished thing. Hence `page-breaks.ts`: the arithmetic is pure and `pos` is an
+opaque handle the caller chooses, a document position in the editor and a block
+index here, so neither side needs to know about the other.
+
+Cutting rather than pushing is the reader's half, and three things hold it:
+
+- **A cut lands on a word, found by binary search on the character tops.** A
+  soft wrap happens at a space, so cutting anywhere else re-wraps both halves
+  into lines that are not the ones that were measured. One rectangle read per
+  probe, since counting the rows of every prefix would be O(text) per probe on
+  a paragraph of a thousand characters.
+- **The two halves are made with a Range and `cloneContents`**, so an emphasis
+  spanning the seam comes out as an `<em>` on both sheets rather than an
+  unclosed tag on one. The tail is marked `data-cont`, which is what stops it
+  taking a first-line indent — it is the rest of a sentence, not a new
+  paragraph, and on the page it *is* the first child of its sheet's prose.
+- **The chapter opener is laid out in the measuring column, not measured on its
+  own and subtracted.** Measured apart, the title's bottom margin collapses out
+  of the box being measured, so it went uncounted and every chapter's first
+  sheet over-filled by about two lines — 52px of the 715 a 6×9 page has. The
+  column is `display: flow-root` for the matching reason: `.reader-page` is
+  `overflow: hidden`, so a first child's top margin stays inside the sheet, and
+  a column that let it collapse out would disagree by that margin.
+- **The second measuring pass waits on the pictures as well as the font**
+  (`picturesSettled`, `needsSecondPass`, called by all three screens). A
+  picture with no intrinsic size yet measures nothing, and a *wrapped* one
+  contributes no height at all — so the prose beside it never shortens its
+  lines and the page fills past its own foot. Measured on a real book: three
+  chapter openings 70px over, three lines clipped. A `data:` URL is no
+  exception; it decodes asynchronously like any other. What made it look
+  intermittent is that it only bites on a **first** measure — leave the screen
+  and come back and the pictures are decoded, so the second pass is right and
+  the one the writer saw was the wrong one. `document.fonts.ready` was already
+  waited on for glyph metrics; this is the other half of the same rule, and
+  anything else that changes an element's size after layout belongs beside it.
+
+**A wrapped picture carries no margin of its own, and that is a page count
+rather than a nicety.** A bare `p > img` takes `1.5em auto`; unfloated those
+margins collapse with the paragraph's and cost nothing, but a float is a block
+formatting context, so inside one they stop collapsing and the picture's box
+grows by 3em. The editor's node view zeroes them and so does `typesetCss`, so
+the reading view was the only one of the three adding the space — the prose
+beside a picture wrapped one line further down and a chapter came out a whole
+sheet longer than the editor said it was.
+
+One difference is left and is correct: the editor's surface is `pre-wrap`, so a
+run of typed spaces holds its width there and collapses here. The reading view
+agrees with the exported file, which is what it is for.
 
 **Import, export and the reading view share a format-neutral block IR**
 (`Block`/`Run` in `src/lib/export/blocks.ts`). A Tiptap doc is walked once into
@@ -1239,10 +1343,36 @@ dynamically imported so a writer who never exports never downloads them.
   its own would drift from the file. And *the fifth format is gone but not
   deleted*: see the audio note above and TODO.md.
 
-  **The preview is a layer over the whole window, and every pane renders the
-  real artifact.** `components/export/review-pane.tsx` holds the four panes and
-  `preview-sheet.tsx` is the frame; a **Preview** button beside Back on every
-  step opens it, absent until a format is chosen. That it builds the true thing
+  **Preview is a step again, and it holds the reading view.** As of
+  **2026-08-17**, at the owner's request: the four panes have problems to be
+  fixed later rather than shipped around, so the way in came off and
+  `preview-sheet.tsx` and `review-pane.tsx` stand whole and callerless, like
+  `templates-dialog.tsx`. **Do not tidy either away**, and read TODO.md under
+  "Taken out on purpose" before putting them back — it records what that means
+  and the two checks nothing else performs now. What stands in their place is
+  `BookPages` (see the reading-view note above), mounted in the step, one
+  station before Export. Three things about the new shape:
+
+  - **It is a step rather than a link out, and the reason is state.**
+    Everything the wizard knows — `output`, `typeset`, `manuscript`, `stepId` —
+    is component state persisted nowhere, so for part of that same day Preview
+    was a `<Link>` to `/book/<id>/read` and leaving threw the format, the
+    template, the trim and the front-matter switches away and landed the writer
+    back on step one. A step keeps them inside the flow. Do not make it a link
+    again without persisting the wizard first.
+  - **It exists for every format and names none.** The panes depended on the
+    pick; the book does not. And the deck says *your book on its pages* rather
+    than anything about the file, because "Preview EPUB" over a page of the
+    manuscript would be a claim the code cannot back — what a reading view
+    cannot show is exactly what the packagers do.
+  - **It pays back the cost the layer version recorded** — "nobody is walked
+    past the book any more". The last moment a mistake is cheap wants to be
+    passed through rather than found. Still not a gate: Continue is live and
+    nothing here has to be looked at.
+
+  **The rest of this passage describes the panes as they stand, unreachable.**
+  `components/export/review-pane.tsx` holds the four and `preview-sheet.tsx` is
+  the frame; a Preview button beside Back opened it. That it builds the true thing
   rather than a likeness is the whole design: a preview assembled from its own
   code path agrees on the day it is written and quietly stops agreeing
   afterwards, which is the one failure a "check before you export" cannot have,
@@ -1274,7 +1404,9 @@ dynamically imported so a writer who never exports never downloads them.
   including the last, beside the one that exports; and the stepper loses a
   station. What it wins beyond the room is that the PDF pane's server render is
   spent when somebody asks to see the book rather than on the way through.
-  Mounting it only while open is what keeps that true.
+  Mounting it only while open is what keeps that true. (That reasoning about
+  the button's *place* survives the panes coming off — it is still on every
+  step, and still not a gate.)
 
   Three things in it are load-bearing, and the first is the one that bites:
 

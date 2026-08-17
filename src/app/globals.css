@@ -2995,10 +2995,23 @@ body {
   float: right;
   margin: 0.25em 0 0.8em 1.4em;
 }
-/* The picture is inside its float, which is already the right width. */
+/* The picture is inside its float, which is already the right width.
+
+   It carries no margin of its own either, and that half is load-bearing rather
+   than tidy. A bare `p > img` takes `1.5em auto` a few rules up; unfloated
+   those margins collapse with the paragraph's own and cost nothing, but a float
+   is a block formatting context, so inside one they stop collapsing and the
+   picture's box grows by 3em — 48px at the default body size. The editor's node
+   view zeroes them (`.image-nv-frame img`), so the same picture was three lines
+   taller in the reading view than on the page it was placed on, the prose
+   beside it wrapped one line further down, and a chapter could come out a whole
+   sheet longer than the editor said it was. */
 .image-nv[data-wrap] .image-nv-frame,
 .manuscript .tiptap p.figure[data-wrap] img {
   width: 100%;
+}
+.manuscript .tiptap p.figure[data-wrap] img {
+  margin: 0;
 }
 /* A wrapped picture is out of the flow, so the block that closes a chapter must
    reach past it — otherwise a short chapter ends level with the words and the
@@ -3113,6 +3126,17 @@ body {
    first line, which lives on the opening page. */
 .manuscript .reader-cont.tiptap > p:first-child {
   text-indent: var(--ms-indent, 1.5em);
+}
+
+/* ...unless it is the *rest* of a paragraph the page break cut in half, which
+   is what data-cont marks (see lib/reader/page-flow.ts). That is not a new
+   paragraph, so it takes no opening indent however the book sets its
+   paragraphs — a stepped-in line halfway through a sentence reads as a break
+   the writer did not make. Stated twice because the rule above is the more
+   specific selector on exactly the element this has to beat. */
+.manuscript .tiptap p[data-cont],
+.manuscript .reader-cont.tiptap > p[data-cont]:first-child {
+  text-indent: 0;
 }
 
 /* --------------------------------------------------------------------------

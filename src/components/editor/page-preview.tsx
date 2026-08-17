@@ -24,6 +24,7 @@ import { typographyVars } from "@/lib/typography";
 import { toBlocks } from "@/lib/export/blocks";
 import { blocksToXhtml } from "@/lib/export/xhtml";
 import { paginate, type ReaderChapter } from "@/components/reader/reader-pages";
+import { needsSecondPass, picturesSettled } from "@/lib/reader/page-flow";
 
 const PX_PER_IN = 96;
 /** How wide the preview sheet is drawn, in CSS pixels. The cover and every page
@@ -132,8 +133,13 @@ export function PagePreview({
       if (!cancelled) setLayout(next);
     };
     run();
-    if (typeof document !== "undefined" && document.fonts?.status !== "loaded") {
-      document.fonts?.ready.then(run).catch(() => {});
+    // The first pass can run before the serif has loaded and before the
+    // pictures have a size, and both decide how much fits on a page — see
+    // `picturesSettled`. Measure again once they have settled.
+    if (needsSecondPass(readerChapters)) {
+      Promise.all([document.fonts?.ready, picturesSettled(readerChapters)])
+        .then(run)
+        .catch(() => {});
     }
     return () => {
       cancelled = true;

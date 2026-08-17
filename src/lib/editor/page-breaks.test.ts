@@ -4,7 +4,7 @@ import {
   type BlockBox,
   type LineBox,
   type PageGeometry,
-} from "./pagination";
+} from "./page-breaks";
 
 // A 6×9 novel page at 96px to the inch with the book's mirrored margins: the
 // text area is 630px tall, which holds exactly 21 lines of 30px.

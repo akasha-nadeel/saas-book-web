@@ -31,11 +31,11 @@ import {
   type Format,
 } from "@/lib/export";
 import { Spinner } from "@/components/ui/spinner";
-import { PreviewSheet } from "@/components/export/preview-sheet";
+import { BookPages } from "@/components/reader/book-pages";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ToolStepDone } from "@/components/ui/tool-save";
 import { useToolSave } from "@/lib/use-tool-save";
-import { writtenPages } from "@/lib/export/front-matter";
+import { GENERATED_BY_TITLE, writtenPages } from "@/lib/export/front-matter";
 import {
   DEFAULT_TYPESET,
   TEMPLATES,
@@ -171,6 +171,7 @@ type StepId =
   | "frontmatter"
   | "listing"
   | "blurb"
+  | "preview"
   | "export";
 
 /**
@@ -281,6 +282,26 @@ function stepsFor(output: Format | null): Step[] {
     );
   }
 
+  /* **The book, one step before the file.**
+
+     A station rather than a button, and rather than the four-pane review this
+     replaced (see the note beside the Preview body below, and TODO.md). Three
+     reasons it is a step. It is the last moment a mistake is cheap, so it wants
+     to be *passed through* rather than found — the review's own note recorded
+     "nobody is walked past the book any more" as the cost of taking it off the
+     stepper, and this is that cost paid back. It keeps the writer inside the
+     wizard, which a link out cannot: the format, the template, the trim and
+     the front-matter switches are component state, so leaving throws all of
+     them away. And it is honest about what it shows — the book on its pages,
+     not the file — which is why the deck says so and why the step exists for
+     every format rather than only the two we typeset. */
+  steps.push({
+    id: "preview",
+    group: "Preview",
+    title: "Read it before you send it",
+    blurb: "Your book on its pages, at the trim and typography you have set.",
+  });
+
   steps.push({
     id: "export",
     group: "Export",
@@ -359,23 +380,25 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
    */
   const [done, setDone] = useState<ExportDone | null>(null);
 
-  /* **The book itself, and it is a layer rather than a step.**
+  /* **The review has been a step, a layer and a link, and is a step again.**
 
-     It was the fourth of five steps until 2026-08-17, and the shape was the
-     problem: the review is *one thing* — the finished file — and a step in a
-     flow carries the flow around it, so a page of a book was competing with a
-     stepper band, a heading, a deck, a reading measure and the action bar for
-     the same window. Trimming that chrome bought some of the room back and
-     could not buy the rest. Opened over everything it gets the whole window,
-     which is what reading a page of a novel needs.
+     Its *contents* are what moved, not its place. It was the fourth of five
+     steps holding four panes that built the real artifacts; the panes needed
+     more of the window than a step can give, so they became a full-window
+     sheet. On **2026-08-17** the owner asked for the panes to come out
+     altogether, to be fixed later — they are whole and callerless in
+     `preview-sheet.tsx` and `review-pane.tsx`, and TODO.md records what is
+     owed. What stands in their place is the reading view, which is small
+     enough to live in a step and so goes back into one.
 
-     Deliberately not a gate, which is what it was before and still is: nothing
-     makes a writer open it, and Continue and Export are live whether or not
-     they do. KDP and Reedsy both put a preview in front of you and let you
-     walk past it. The cost of the change is that nobody is walked through it
-     any more, which is why the button sits on the action bar of every step
-     including the last one, beside the button that exports. */
-  const [preview, setPreview] = useState(false);
+     Briefly in between it was a Preview button linking out to `/read`, and
+     that is the shape not to go back to: everything this wizard knows —
+     `output`, `typeset`, `manuscript`, `stepId` below — is component state,
+     so leaving the route threw the writer's format and formatting away and
+     landed them back on step one.
+
+     Still not a gate: Continue is live and nothing here has to be looked at.
+     KDP and Reedsy both put a preview in the flow and let you walk past it. */
 
   const steps = useMemo(() => stepsFor(output), [output]);
 
@@ -395,11 +418,11 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   /**
    * Which of the three generated pages the writer has already written.
    *
-   * The switch above each one stays on and the *written* page wins — see
-   * `writtenPages`. That is the right outcome and the wrong thing to leave
-   * unsaid: a switch that is on and produces nothing is the dead UI this app
-   * refuses, and the writer would only find out by counting pages in the
-   * finished file. So the hint changes to say which page is being used.
+   * The *written* page wins by default — see `writtenPages` — and the card says
+   * so rather than leaving the writer to find out by counting pages in the
+   * finished file. The switch is what changes meaning: with a page of their own
+   * it no longer means "generate this" but *replace mine with yours*, so it
+   * reads off and asks before it goes on. See `FrontMatterStep`.
    */
   const written = useMemo(() => {
     const b = findBook(shelf, bookId);
@@ -466,6 +489,16 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
       </main>
     );
   }
+
+  /* Where "Open the editor" goes: the chapter last worked on, or the first one
+     with the book's overview as the fallback — the same chain the reading view
+     uses for its way back, so the two doors agree about where the book "is". */
+  const resumeId = book.chapters.some((c) => c.id === book.lastOpenedId)
+    ? book.lastOpenedId
+    : (book.chapters[0]?.id ?? null);
+  const editorHref = resumeId
+    ? `/book/${bookId}/chapter/${resumeId}`
+    : `/book/${bookId}`;
 
   // A format change can retire the step we are standing on (EPUB → Markdown
   // takes the listing away). Falling back to the first step is the only answer
@@ -664,7 +697,14 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
               hole in it. */}
           <div
             className={
-              showSheet
+              /* The book wants the room: two 340px pages plus the turn arrows
+                 that sit outside their fore-edges is a shade over 800px, and
+                 the reading measure the other steps take would crop the arrows
+                 off. Capped rather than full-bleed so both edges still line up
+                 with every other step. */
+              step.id === "preview"
+                ? "mx-auto w-full max-w-4xl"
+                : showSheet
                 ? /* 28rem, and the number is measured rather than picked. The
                      sheet renders at its trim's natural 72px to the inch and
                      caps there — 432px for a 6in page — and its figure spends
@@ -679,6 +719,35 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
             }
           >
             <div className="min-w-0">
+              {/* **The way out to the prose, on the step that shows it.**
+
+                  Reading the book is the moment a typo is found, and until now
+                  the only way to act on it was to notice a chapter's own
+                  opener is a link and press that — which serves "fix *this*
+                  chapter" and not "the book needs work". So the step carries
+                  an explicit door.
+
+                  It navigates, which the note above says a Preview must not
+                  do, and the distinction is the writer's intent rather than
+                  the mechanics: leaving to look at the book and coming back to
+                  a reset wizard is a trap, while leaving to *rewrite* the book
+                  is going somewhere on purpose, and the format and formatting
+                  are decisions you would want to make again afterwards
+                  anyway. A `<Link>`, so the unsaved-draft guard catches it. */}
+              {step.id === "preview" && editorHref && (
+                <Link
+                  href={editorHref}
+                  className="float-right ml-4 flex items-center gap-2 rounded-lg
+                             border border-line bg-panel px-4 py-2.5 font-sans
+                             text-sm font-medium text-fg outline-none
+                             transition-colors hover:bg-raised
+                             focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  <PencilGlyph />
+                  Open the editor
+                </Link>
+              )}
+
               <h1 className="font-serif text-2xl text-fg md:text-[1.75rem]">
                 {step.title}
               </h1>
@@ -742,6 +811,34 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
                 {step.id === "listing" && <ListingDetails book={book} />}
                 {step.id === "blurb" && <ListingBlurb book={book} />}
+
+                {/* **The book itself, mounted in place.**
+
+                    `BookPages` is the reading view's own setting — the same
+                    `.manuscript` wrapper, the same `--ms-*` variables, the same
+                    trim, the same `paginate`. Shared rather than rebuilt, since
+                    a preview assembled from its own code path agrees on the day
+                    it is written and quietly stops agreeing afterwards, which is
+                    the one failure a "check before you export" cannot have.
+
+                    A box with a height, because the flip-book centres itself in
+                    `h-full` and would collapse in a box sized by its content. It
+                    holds a 510px spread, its caption and the padding around
+                    them.
+
+                    **It is the book, not the file**, and the deck above says so.
+                    What it cannot show is anything the packagers do — the EPUB's
+                    manifest, a `.docx`'s styles, the PDF's running heads. That
+                    was the four-pane review's job; see TODO.md for what is owed
+                    when it returns. */}
+                {step.id === "preview" && (
+                  <BookPages
+                    book={book}
+                    cover={cover}
+                    className="h-[38rem] w-full overflow-hidden rounded-lg
+                               border border-line bg-surface"
+                  />
+                )}
 
                 {/* Only reachable once a format is chosen, which is what builds
                   this step in the first place. */}
@@ -832,33 +929,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
             </button>
           )}
 
-          {/* **The way into the review, on every step that has one.**
-
-                Absent until a format is chosen rather than disabled, for the
-                reason Back is absent on the first step: there is genuinely
-                nothing to preview, and which panes exist is what the pick
-                decides.
-
-                Secondary, and in the left cluster with Back — `PrimaryAction`
-                takes `ml-auto` and this row keeps one primary. Its label
-                mirrors that primary's `Export {label}`, so "Preview EPUB" and
-                "Export EPUB" sit under the same words and nobody has to work
-                out which format is about to be shown. */}
-          {output !== null && (
-            <button
-              type="button"
-              onClick={() => setPreview(true)}
-              className="flex items-center gap-2 rounded-lg border border-line
-                           bg-panel px-4 py-2.5 font-sans text-sm font-medium
-                           text-fg outline-none transition-colors
-                           hover:bg-raised focus-visible:ring-2
-                           focus-visible:ring-accent/60"
-            >
-              <PageGlyph />
-              Preview {active?.label ?? ""}
-            </button>
-          )}
-
           {/* Only where it is true. The listing steps are genuinely optional
                 — the export runs without any of it — so saying so is honest.
                 Offering it on the format step would be a lie, since something
@@ -894,22 +964,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           )}
         </div>
       </footer>
-
-      {/* Mounted only while open, which is the whole point of it being a
-          layer: the PDF pane fetches a server render when it mounts, and that
-          now happens when a writer asks to see the book rather than on the way
-          past. */}
-      {preview && output !== null && (
-        <PreviewSheet
-          book={book}
-          output={output}
-          label={active?.label ?? ""}
-          typeset={typeset}
-          manuscript={manuscript}
-          cover={cover}
-          onClose={() => setPreview(false)}
-        />
-      )}
 
       {/* The one thing this screen does that leaves no trace on it. A `<dialog>`
           opened with `showModal` sits in the browser's top layer, so it clears
@@ -1006,14 +1060,20 @@ function TopBar({
        bands, and without an edge the content slides under them with nothing
        marking where the page stops. */
     <header className="shrink-0 border-b border-line bg-surface">
-      {/* `pt-14` below `sm` is the room the absolute Cancel needs, the same
+      {/* `pt-12` below `sm` is the room the absolute Cancel needs, the same
           arithmetic `/book/new` uses: the stack is centred and the button is
           out of the flow, so on a phone the two would otherwise share a line.
           Padding rather than a margin on the heading, which would collapse
-          through this box and take the button with it. */}
+          through this box and take the button with it.
+
+          Every number here is tighter than it was, at the owner's request: the
+          band is context and was spending about a seventh of a laptop screen
+          saying so. Nothing was removed to do it — the padding, the heading and
+          the gap above the stepper each gave up a few pixels, and the stepper
+          itself is untouched because it is the part that is read. */}
       <div
-        className={`relative px-5 pb-4 md:px-12 ${
-          embedded ? "pt-5" : "pt-14 sm:pt-5"
+        className={`relative px-5 pb-3 md:px-12 ${
+          embedded ? "pt-4" : "pt-12 sm:pt-4"
         }`}
       >
         {/* The one way out, in the corner, in red — `/book/new`'s control and
@@ -1026,8 +1086,8 @@ function TopBar({
         {!embedded && (
           <Link
             href={areaLabel(from) ? `/?area=${from}` : "/?area=tools"}
-            className="absolute top-5 right-5 z-10 rounded-md border border-stop-line
-                       bg-stop-bg px-4 py-2 font-sans text-sm font-medium text-stop-fg
+            className="absolute top-3.5 right-5 z-10 rounded-md border border-stop-line
+                       bg-stop-bg px-4 py-1.5 font-sans text-sm font-medium text-stop-fg
                        outline-none transition-colors hover:border-stop-fg
                        focus-visible:ring-2 focus-visible:ring-stop-fg/60 md:right-12"
           >
@@ -1035,7 +1095,11 @@ function TopBar({
           </Link>
         )}
 
-        <h1 className="text-center font-serif text-2xl text-fg md:text-[1.75rem]">
+        {/* Smaller than the step's own heading below, which is the right way
+            round and was not: two `h1`s at one size made the band compete with
+            the question being asked. This one names the flow, which a writer
+            reads once. */}
+        <h1 className="text-center font-serif text-lg text-fg md:text-xl">
           Export your book
         </h1>
 
@@ -1064,7 +1128,7 @@ function TopBar({
             with `w-max mx-auto` inside, so it centres when it fits and scrolls
             from the left when it does not — a centred flex row that overflows
             clips its first item unreachably. */}
-        <nav className="scroll-none mt-2.5 overflow-x-auto">
+        <nav className="scroll-none mt-2 overflow-x-auto">
           <div className="mx-auto flex w-max items-center gap-1">
             {groups.map((g, i) => {
               const indices = g.steps.map((s) => steps.indexOf(s));
@@ -1873,6 +1937,25 @@ function FrontMatterStep({
   const replaced = typeset.replaceWritten ?? [];
 
   /**
+   * The pages of these three kinds the book has *started* and not filled in.
+   *
+   * A page still carrying its `[placeholders]` never reaches `loadChapters`, so
+   * `written` cannot see it and ours is generated — right, and silent: the card
+   * said "© this year, in the author's name" while the writer had a copyright
+   * page of their own sitting in the book, and the only mention of it was among
+   * the five titles in the note at the foot of the step. That is a writer
+   * looking at three cards and concluding the app cannot see their pages.
+   *
+   * Derived from `skipped`, which is that note's own list, so the card and the
+   * note cannot end up disagreeing about which pages were left out.
+   */
+  const blank = new Set(
+    skipped
+      .map((title) => GENERATED_BY_TITLE[title.trim().toLowerCase()])
+      .filter(Boolean),
+  );
+
+  /**
    * One card's answer, and the two questions behind it.
    *
    * With no page of the writer's own this is the plain switch it always was.
@@ -1882,12 +1965,16 @@ function FrontMatterStep({
    * **on** is the direction that surprises, so that is the one that asks;
    * turning it off puts their own page straight back, and a confirmation on the
    * way out of a state nobody is stuck in is a click for its own sake.
+   *
+   * A started-but-blank page is neither case: there is nothing of theirs to
+   * prefer, so the switch keeps its plain meaning and only the hint changes.
    */
   const card = (id: GeneratedPage, flag: keyof TypesetOptions) => {
     const yours = written.has(id);
     const on = yours ? replaced.includes(id) : Boolean(typeset[flag]);
     return {
       yours,
+      unfinished: !yours && blank.has(id),
       on,
       onChange: (next: boolean) => {
         if (!yours) return onSet(flag, next as TypesetOptions[typeof flag]);
@@ -1900,6 +1987,21 @@ function FrontMatterStep({
     };
   };
 
+  /** The hint under a card, in the order the three states have to be told
+   *  apart: yours is winning, yours is unfinished, or there is no page of
+   *  yours at all. */
+  const hintFor = (
+    state: { yours: boolean; unfinished: boolean; on: boolean },
+    mine: string,
+  ) =>
+    state.yours
+      ? state.on
+        ? "Ours replaces yours in this file"
+        : "You wrote your own — yours is used"
+      : state.unfinished
+        ? "Yours is still the example text, so ours goes in"
+        : mine;
+
   const title = card("title", "titlePage");
   const copyright = card("copyright", "copyright");
   const contents = card("contents", "contents");
@@ -1909,13 +2011,7 @@ function FrontMatterStep({
       <div className="grid gap-3 sm:grid-cols-3">
         <MatterCard
           label="Title page"
-          hint={
-            title.yours
-              ? title.on
-                ? "Ours replaces yours in this file"
-                : "You wrote your own — yours is used"
-              : "The book’s title and author"
-          }
+          hint={hintFor(title, "The book’s title and author")}
           {...title}
           typeset={typeset}
           art="title"
@@ -1923,15 +2019,12 @@ function FrontMatterStep({
         />
         <MatterCard
           label="Copyright page"
-          hint={
-            copyright.yours
-              ? copyright.on
-                ? "Ours replaces yours in this file"
-                : "You wrote your own — yours is used"
-              : author
-                ? "© this year, in the author’s name"
-                : "Left out — this book has no author’s name yet"
-          }
+          hint={hintFor(
+            copyright,
+            author
+              ? "© this year, in the author’s name"
+              : "Left out — this book has no author’s name yet",
+          )}
           {...copyright}
           typeset={typeset}
           art="copyright"
@@ -1939,13 +2032,7 @@ function FrontMatterStep({
         />
         <MatterCard
           label="Contents"
-          hint={
-            contents.yours
-              ? contents.on
-                ? "Ours replaces yours in this file"
-                : "You wrote your own — yours is used"
-              : "A list of the chapters"
-          }
+          hint={hintFor(contents, "A list of the chapters")}
           {...contents}
           typeset={typeset}
           art="contents"
@@ -2108,6 +2195,7 @@ function MatterCard({
   hint,
   on,
   yours,
+  unfinished,
   onChange,
   typeset,
   art,
@@ -2118,6 +2206,8 @@ function MatterCard({
   on: boolean;
   /** The writer has a page of this kind, so theirs is what the file will use. */
   yours: boolean;
+  /** They have one, but it is still the example text — so ours goes in. */
+  unfinished: boolean;
   onChange: (on: boolean) => void;
   typeset: TypesetOptions;
   art: "title" | "copyright" | "contents";
@@ -2154,12 +2244,20 @@ function MatterCard({
             appears whenever there is a clash and names the side that is going
             in the file, which is the only thing a writer needs off this card at
             a glance. */}
-        {yours && (
+        {/* A started-but-empty page of the writer's own is the third thing
+            this can say, and it names the same fact from the other side: they
+            have one, it is not going in, and ours is. Without it the card was
+            silent about a page sitting in their book. */}
+        {(yours || unfinished) && (
           <span
             className="absolute inset-x-0 bottom-0 bg-fg/80 py-[3px] text-center
                        font-sans text-[9px] font-semibold text-panel"
           >
-            {on ? "Ours, not yours" : "You have your own"}
+            {yours
+              ? on
+                ? "Ours, not yours"
+                : "You have your own"
+              : "Yours is blank"}
           </span>
         )}
       </span>
@@ -2634,14 +2732,8 @@ function Arrow({ className = "" }: { className?: string }) {
   );
 }
 
-/**
- * A sheet of paper with lines of type on it, for the Preview button.
- *
- * A page rather than an eye: what opens is the book set on pages, and an eye is
- * the mark this app spends on *visibility* (showing and hiding a thing already
- * on screen) rather than on opening one.
- */
-function PageGlyph() {
+/** A pencil, for the way out to the manuscript. */
+function PencilGlyph() {
   return (
     <svg
       aria-hidden="true"
@@ -2653,8 +2745,8 @@ function PageGlyph() {
       strokeLinejoin="round"
       className="h-3.5 w-3.5"
     >
-      <rect x="4" y="2.5" width="12" height="15" rx="1.5" />
-      <path d="M7 6.5h6M7 10h6M7 13.5h3.5" />
+      <path d="M13.5 3.5l3 3L7 16H4v-3z" />
+      <path d="M11.5 5.5l3 3" />
     </svg>
   );
 }
