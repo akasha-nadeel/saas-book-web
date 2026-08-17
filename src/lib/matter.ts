@@ -253,6 +253,87 @@ export function matterSection(
 }
 
 /**
+ * The other names a standard division goes by.
+ *
+ * **A table, not a rule**, and that is the whole of the design. The temptation
+ * here is a clever matcher — strip "page", allow a plural, take a prefix — and
+ * it is the same temptation `series.ts` refuses for merging characters, for the
+ * same reason: a rule loose enough to see that "Preface" is "Preface or
+ * introduction" is also loose enough to decide somebody's chapter called
+ * "Prologue to a Murder" is apparatus and move it out of their book. A table
+ * can be read, argued with and added to; a heuristic can only be discovered
+ * after it has done something.
+ *
+ * The right-hand side is always an exact `MATTER_SECTIONS` title, so nothing
+ * here can name a page that does not exist.
+ *
+ * Every entry earns its place. **Preface** and **Introduction** are what a
+ * manuscript actually calls that page — "Preface or introduction" is a name for
+ * a *slot*, not a heading anybody types. **Foreword** is a different thing
+ * strictly (somebody else writes it) and shares the slot because there is no
+ * other. **Contents** is what a printed book says where our slot says "Table of
+ * contents". **Acknowledgments** is the American spelling of the one page most
+ * likely to carry it. And **half title** without the hyphen is how it is
+ * written about as often as not.
+ */
+const MATTER_ALIASES: Record<string, string> = {
+  preface: "Preface or introduction",
+  introduction: "Preface or introduction",
+  foreword: "Preface or introduction",
+  contents: "Table of contents",
+  "table of contents": "Table of contents",
+  acknowledgments: "Acknowledgements",
+  "half title": "Half-title page",
+  "half title page": "Half-title page",
+  "half-title": "Half-title page",
+  "about the authors": "About the author",
+};
+
+/**
+ * The division a heading names — which part of the book it belongs to, and what
+ * that page is properly called — or null for a name we know nothing about.
+ *
+ * **This is how a manuscript that does not declare its own structure gets one.**
+ * An EPUB says which page is which — every spine document carries an
+ * `epub:type` — and the importer believes it. A Word file, a Markdown file and
+ * a plain text file say nothing at all, so every heading in them used to arrive
+ * as a body chapter: a manuscript opening with a half-title, a title page, a
+ * copyright page and a dedication produced four chapters of a novel that has
+ * none, and the glossary at the far end became chapter twenty-one.
+ *
+ * **It answers with the catalogue's own spelling, not the manuscript's**, and
+ * that is not tidiness. A Word file shouts its headings, so `HALF-TITLE PAGE`
+ * came in under exactly that name and sat in the list beside the app's own
+ * `Half-title page` looking like a second, unrelated page — two rows for one
+ * division, in two different cases, and no way for anything matching on name to
+ * see they were the same. The EPUB importer has always canonicalised
+ * (`DIVISION_TITLES` in `import/epub.ts` maps `halftitlepage` to the catalogue
+ * spelling), so without this the same book imported as a `.docx` and as an
+ * `.epub` produced differently-named pages.
+ *
+ * Null is the important answer and the common one. It means *this is a chapter*
+ * — which is what nearly every heading in a book is — and a name this does not
+ * recognise keeps its own spelling and its own place.
+ */
+export function matterDivisionOf(
+  title: string,
+): { part: MatterPart; title: string } | null {
+  const wanted = title.trim().toLowerCase();
+  if (!wanted) return null;
+  const canonical = MATTER_ALIASES[wanted] ?? title;
+  for (const part of ["front", "back"] as const) {
+    const section = matterSection(part, canonical);
+    if (section) return { part, title: section.title };
+  }
+  return null;
+}
+
+/** Just the part, for a caller that has no use for the name. */
+export function matterPartOf(title: string): MatterPart | null {
+  return matterDivisionOf(title)?.part ?? null;
+}
+
+/**
  * Where a page belongs among the part's pages.
  *
  * A page the writer named themselves is not in the list and sorts to the end —

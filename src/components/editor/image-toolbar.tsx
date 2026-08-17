@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { NodeSelection } from "@tiptap/pm/state";
@@ -45,6 +45,14 @@ function Btn({
   return (
     <button
       type="button"
+      // The same refusal the text bar's buttons carry, and for a sharper
+      // reason. Pressing a button moves focus to it, which blurs the
+      // manuscript; Tiptap then re-focuses on the next frame *and scrolls the
+      // caret into view*, so every press on this bar jumped the page under the
+      // picture being worked on. Refused, focus never leaves the prose, the
+      // node selection is never disturbed, and the bar is still there for the
+      // next press — which is what "align it, then size it" needs.
+      onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
@@ -86,10 +94,32 @@ const WIDTHS: { value: string | null; label: string }[] = [
 export function ImageToolbar({ editor }: { editor: Editor | null }) {
   useEditorTick(editor);
 
-  const shouldShow = useCallback(
-    () => (editor ? editor.isEditable && imageSelected(editor) : false),
-    [editor],
-  );
+  /**
+   * Whether the pointer is on the bar.
+   *
+   * A press legitimately blurs the manuscript for a moment, and the focus test
+   * below would take the bar away underneath it. The text toolbar keeps the
+   * same ref for the same reason, and it is a ref rather than state there and
+   * here alike: a render makes new props for the menu plugin, and new props
+   * start a loop.
+   */
+  const pointerOnBar = useRef(false);
+
+  const shouldShow = useCallback(() => {
+    if (!editor?.isEditable) return false;
+    if (pointerOnBar.current) return true;
+    /*
+     * **Gone once the writer is working somewhere else.** ProseMirror keeps its
+     * selection when focus leaves the editor, so a selected picture stays
+     * selected indefinitely and this bar went on floating over the manuscript
+     * while somebody typed in the Search panel. Tiptap's own default
+     * `shouldShow` tests focus for exactly this reason and passing a custom one
+     * replaces it — which is how the check went missing here after the text bar
+     * had already been fixed for it.
+     */
+    if (!editor.isFocused) return false;
+    return imageSelected(editor);
+  }, [editor]);
   const options = useMemo(() => ({ placement: "top" as const, offset: 8 }), []);
 
   if (!editor) return null;
@@ -126,6 +156,15 @@ export function ImageToolbar({ editor }: { editor: Editor | null }) {
       options={options}
       className="flex items-center gap-0.5 rounded-lg border border-line
                  bg-panel px-1 py-1 shadow-xl"
+      // Entering and leaving, rather than pressing and releasing: a writer who
+      // presses a button and drags a little before letting go is still on the
+      // bar, and so is one moving between two of its buttons.
+      onMouseEnter={() => {
+        pointerOnBar.current = true;
+      }}
+      onMouseLeave={() => {
+        pointerOnBar.current = false;
+      }}
     >
       {ALIGNS.map((option) => (
         <Btn

@@ -1478,6 +1478,124 @@ const imported = (title: string, words = 10) => ({
   words,
 });
 
+/** An imported page the file said belongs at the front or the back. */
+const importedPage = (title: string, matter: "front" | "back") => ({
+  ...imported(title),
+  matter,
+});
+
+/*
+ * **A division the book already has is not added a second time.**
+ *
+ * Front and back matter are a set of *named* pages: a book has one dedication
+ * and one glossary, and two rows called "Epilogue" say nothing an exporter
+ * could act on. This became reachable when the importer learned to read a
+ * manuscript's own headings — before it, only an EPUB declared matter pages, so
+ * importing a `.docx` twice duplicated chapters and nothing else. Now every
+ * re-import carries the whole apparatus with it.
+ */
+it("does not add a matter page the book already has", () => {
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [importedPage("Dedication", "front")], "add");
+  importIntoBook(bookId, [importedPage("Dedication", "front")], "add");
+
+  const front = findBook(getShelf(), bookId)!.chapters.filter(
+    (c) => c.matter === "front",
+  );
+  expect(front.map((c) => c.title)).toEqual(["Dedication"]);
+});
+
+it("matches a page the manuscript spelled differently", () => {
+  // A book carrying `PREFACE` from an import made before names were
+  // canonicalised meets an incoming `Preface or introduction` — the same
+  // division under the catalogue's name. Comparing the words rather than the
+  // division would let it through and put both in the book.
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [importedPage("PREFACE", "front")], "add");
+  importIntoBook(
+    bookId,
+    [importedPage("Preface or introduction", "front")],
+    "add",
+  );
+
+  const front = findBook(getShelf(), bookId)!.chapters.filter(
+    (c) => c.matter === "front",
+  );
+  expect(front.map((c) => c.title)).toEqual(["PREFACE"]);
+});
+
+it("matches a page the manuscript shouted", () => {
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [importedPage("HALF-TITLE PAGE", "front")], "add");
+  importIntoBook(bookId, [importedPage("Half-title page", "front")], "add");
+
+  expect(
+    findBook(getShelf(), bookId)!.chapters.filter((c) => c.matter === "front"),
+  ).toHaveLength(1);
+});
+
+it("still tells two pages the writer named apart", () => {
+  // Neither is a division, so each falls back to its own name.
+  const { bookId } = createBook("A");
+  importIntoBook(
+    bookId,
+    [
+      importedPage("A note on the maps", "front"),
+      importedPage("A note on the names", "front"),
+    ],
+    "add",
+  );
+
+  expect(
+    findBook(getShelf(), bookId)!.chapters.filter((c) => c.matter === "front"),
+  ).toHaveLength(2);
+});
+
+it("keeps the same name in the other part, which is a different page", () => {
+  // Both parts can hold a Glossary — the reason the check is keyed on part and
+  // title rather than on the name alone.
+  const { bookId } = createBook("A");
+  importIntoBook(
+    bookId,
+    [importedPage("Glossary", "front"), importedPage("Glossary", "back")],
+    "add",
+  );
+
+  const pages = findBook(getShelf(), bookId)!.chapters.filter((c) => c.matter);
+  expect(pages).toHaveLength(2);
+});
+
+it("still adds body chapters of a name the book already has", () => {
+  // The opposite rule, and the reason the filter is only ever about matter: a
+  // book may genuinely have two chapters of one name, and they are renumbered.
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [imported("The Woods")], "add");
+  importIntoBook(bookId, [imported("The Woods")], "add");
+
+  const body = findBook(getShelf(), bookId)!.chapters.filter((c) => !c.matter);
+  expect(body).toHaveLength(3); // the book's own first chapter, plus two
+});
+
+it("does not add matter pages a replace has just spared", () => {
+  // `replace` clears the body and deliberately *keeps* the writer's front and
+  // back matter, so incoming pages would land on top of the ones it spared.
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [importedPage("Epilogue", "back")], "add");
+  importIntoBook(
+    bookId,
+    [importedPage("Epilogue", "back"), imported("Chapter One")],
+    "replace",
+  );
+
+  const chapters = findBook(getShelf(), bookId)!.chapters;
+  expect(chapters.filter((c) => c.matter === "back")).toHaveLength(1);
+  // "Chapter One" is a generic title, so it is renumbered rather than kept as
+  // a description — see `renumberTitle`.
+  expect(chapters.filter((c) => !c.matter).map((c) => c.title)).toEqual([
+    "Chapter 1",
+  ]);
+});
+
 it("appends imported chapters and continues the numbering", () => {
   const { bookId, chapterId } = createBook("A");
   renameChapter(bookId, chapterId, "Chapter 1");

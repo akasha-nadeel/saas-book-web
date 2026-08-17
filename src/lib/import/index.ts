@@ -8,6 +8,34 @@ import {
   type ImportedChapter,
 } from "./split";
 import type { EpubSection } from "./epub";
+import { matterDivisionOf } from "../matter";
+
+/**
+ * Read a split book's chapter names for the standard divisions.
+ *
+ * Kept beside its one caller rather than in `split.ts`, because
+ * `splitIntoChapters` is also the EPUB's path and that one has already been
+ * told the answer by the file — running this over it would be second-guessing
+ * a declaration with a guess.
+ *
+ * Everything downstream already handles the tag: `ImportedChapter.matter` has
+ * carried it since the EPUB importer was written, and `createBookFromImport`
+ * writes it and groups the chapters front → body → back. Nothing else changes.
+ */
+function taggedByName(book: ImportedBook): ImportedBook {
+  return {
+    ...book,
+    chapters: book.chapters.map((chapter) => {
+      const division = matterDivisionOf(chapter.title);
+      // The catalogue's spelling, not the manuscript's — see `matterDivisionOf`.
+      // A Word file shouts its headings, and `HALF-TITLE PAGE` sitting beside
+      // the app's own `Half-title page` is one division showing as two rows.
+      return division
+        ? { ...chapter, title: division.title, matter: division.part }
+        : chapter;
+    }),
+  };
+}
 
 /**
  * Turning a file the writer already has into a book.
@@ -203,7 +231,34 @@ export async function importFile(file: File): Promise<ImportedBook> {
               .chapters,
         ),
       }
-    : splitIntoChapters(blocks, title);
+    : /*
+       * **A file that does not declare its structure is read for one.**
+       *
+       * The branch above is the EPUB's: it said which page is which and we
+       * believed it. Nothing else does — a `.docx`, a `.md`, a `.txt` and an
+       * HTML file carry headings and no more — so until now every one of those
+       * headings became a body chapter. A manuscript opening with a half-title,
+       * a title page, a copyright page, a dedication and an epigraph arrived as
+       * five chapters of a novel that has none, with the glossary and the
+       * acknowledgements at the far end as two more.
+       *
+       * So the headings are read against the names of the standard divisions.
+       * `matterPartOf` matches exactly, against a table of titles and a short
+       * table of aliases — never a heuristic, because a rule loose enough to
+       * catch every way of writing "Preface" is loose enough to take somebody's
+       * chapter away from them. A name it does not know is a chapter, which is
+       * what nearly every heading in a book is.
+       *
+       * Position is deliberately *not* consulted. Every name in that table is a
+       * division that belongs at the front or the back by the convention of the
+       * trade — that is why it is in the table — so a glossary is back matter
+       * whether or not something unrecognised follows it. Requiring an unbroken
+       * run from each end was tried on paper and is worse: one stray heading
+       * after the last real page (a bare "The End", say) would silently strand
+       * everything before it in the body, which is exactly the manuscript this
+       * was built for.
+       */
+      taggedByName(splitIntoChapters(blocks, title));
   const pages: ImportedChapter[] = matter.map((section, i) => ({
     title: section.title || `Page ${i + 1}`,
     doc: toDoc(section.blocks),

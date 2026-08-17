@@ -42,6 +42,35 @@ const FONT = "Times New Roman";
 const SIZE_HALF_POINTS = 24; // docx measures font size in half-points: 24 = 12pt
 const DOUBLE_SPACED = 480; // twips; 240 is single
 
+/**
+ * A CSS font stack reduced to the one name Word can be given.
+ *
+ * The block IR carries a face as a *stack* — `'Garamond, "EB Garamond",
+ * Georgia, serif'` — because that is what the three CSS renderers want. A
+ * `.docx` names a single font per run and has no notion of a fallback list, so
+ * the first real name in the stack is the answer.
+ *
+ * Two kinds of entry are stepped over rather than taken. A **generic family**
+ * (`serif`, `ui-serif`) is CSS's instruction to the browser to choose, and a
+ * font literally named "serif" is not installed on anybody's machine. And a
+ * **custom property** (`var(--font-fraunces)`) resolves to a webfont this app
+ * loads, which a word processor has no way to fetch — the stack's next real
+ * name is the fallback its author already chose for exactly that case.
+ *
+ * Undefined when there is nothing usable, which leaves the run on the
+ * document's own face rather than on a name Word would silently substitute.
+ */
+export function docxFontName(stack: string): string | undefined {
+  const GENERIC =
+    /^(serif|sans-serif|monospace|cursive|fantasy|system-ui|ui-serif|ui-sans-serif|ui-monospace|ui-rounded|math|emoji|fangsong)$/i;
+  for (const part of stack.split(",")) {
+    const name = part.trim().replace(/^["']|["']$/g, "").trim();
+    if (!name || name.startsWith("var(") || GENERIC.test(name)) continue;
+    return name;
+  }
+  return undefined;
+}
+
 /** Last word of the author's name, per manuscript convention. */
 function surname(author: string | undefined): string {
   const parts = (author ?? "").trim().split(/\s+/).filter(Boolean);
@@ -102,9 +131,23 @@ export async function buildDocx(
    * Inline code takes a monospace face for the same reason — it is a mark the
    * writer applied, and a formatting mark that survives in three formats and
    * vanishes in the fourth is the drift this pass exists to end.
+   *
+   * **Inline size and face were that drift, and this is where they stopped.**
+   * Both reached the reading view, the EPUB and the PDF and neither reached
+   * here, so a passage a writer had set larger, or in another face, came back
+   * from Word looking like every other paragraph — silently, in the one format
+   * an agent asks for. `font-family.ts` recorded the gap in its own header for
+   * months.
+   *
+   * The multiple is taken against **this document's** body size rather than the
+   * book's own. A `.docx` carries none of our typography: its body is 12pt
+   * whatever the editor is set to (`SIZE_HALF_POINTS`), so a run set at one and
+   * a half times the body has to be one and a half times *that* or it would
+   * disagree with the paragraph it sits in.
    */
   const runsFor = (runs: Run[]): DocxRun[] =>
     runs.map((run) => {
+      const face = run.fontFamily ? docxFontName(run.fontFamily) : undefined;
       const text = new TextRun({
         text: run.hardBreak ? "" : run.text,
         break: run.hardBreak ? 1 : undefined,
@@ -112,7 +155,12 @@ export async function buildDocx(
         italics: run.italic,
         strike: run.strike,
         underline: run.underline ? {} : undefined,
-        ...(run.code ? { font: "Courier New" } : {}),
+        ...(run.sizeMultiple
+          ? { size: Math.round(SIZE_HALF_POINTS * run.sizeMultiple) }
+          : {}),
+        // Code wins the face: a monospace run is monospace because of what it
+        // is, and a face chosen for prose says nothing about how it should look.
+        ...(run.code ? { font: "Courier New" } : face ? { font: face } : {}),
       });
       if (!run.href) return text;
       return new ExternalHyperlink({ children: [text], link: run.href });

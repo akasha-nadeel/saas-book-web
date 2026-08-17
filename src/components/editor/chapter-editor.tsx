@@ -1363,7 +1363,12 @@ function EditorSurface({
                 <EditorContent editor={editor} />
                 {/* The Word-style mini toolbars: one over a text selection, one
                     over a selected image. */}
-                <SelectionToolbar editor={editor} />
+                {/* The size list speaks in points, which only means anything
+                    against the size this book's body is set in. */}
+                <SelectionToolbar
+                  editor={editor}
+                  bodyPt={typographyOf(book).sizePt}
+                />
                 <ImageToolbar editor={editor} />
               </div>
             </div>

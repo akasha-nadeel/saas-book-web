@@ -2987,6 +2987,19 @@ body {
 .image-nv-frame.is-selected {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+  /* It carries `data-drag-handle`, so it can be dragged to another paragraph —
+     say so. Only while selected: a grab cursor over every picture in the
+     chapter would offer a gesture that does nothing until one is picked, and
+     the handles it is dragged *by* only appear then either. */
+  cursor: grab;
+}
+.image-nv-frame.is-selected:active {
+  cursor: grabbing;
+}
+/* The handles keep their own cursor over the frame's — they resize rather than
+   move, and they sit on top of it. */
+.image-nv-frame.is-selected .image-nv-handle {
+  cursor: ew-resize;
 }
 
 /* Paragraph marks, as a word processor's ¶ button shows them.

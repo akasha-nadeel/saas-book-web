@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 
 import { ACCEPTED, importImage } from "@/lib/image-import";
+import { insertWidthPercent } from "@/lib/editor/image-resize";
 import {
   setPref,
   setTypography,
@@ -685,7 +686,38 @@ export function ToolRail({
             setProblem(result.error);
             return;
           }
-          editor.chain().focus().setImage({ src: result.src }).run();
+          /*
+           * **With a width, because without one it arrives filling the page.**
+           *
+           * No width means no width *style*, which sounds like "its own size"
+           * and is not: the stylesheet caps every picture at `max-width: 100%`,
+           * and an imported one has been resized to 1400px on its longest edge
+           * against a text column nearer 430. So every photograph landed at
+           * exactly the full column and the writer's first act on it was always
+           * to shrink it. `insertWidthPercent` leaves a picture that already
+           * fits alone — a small logo blown up to half a column would be worse
+           * than the problem.
+           */
+          const width = insertWidthPercent(
+            result.stored.width,
+            editor.view.dom.clientWidth,
+          );
+          /*
+           * `insertContent` rather than `setImage`, and only because of the
+           * types: the base extension declares its `width` as a number of
+           * pixels, while ours is a percentage of the column (see
+           * `resizable-image.ts`). `setImage` is a one-line wrapper around this
+           * call in the extension itself, so nothing is being worked around
+           * except its signature.
+           */
+          editor
+            .chain()
+            .focus()
+            .insertContent({
+              type: "image",
+              attrs: { src: result.src, ...(width ? { width } : null) },
+            })
+            .run();
         }}
       />
 

@@ -3,6 +3,7 @@ import {
   MATTER_SECTIONS,
   hasPlaceholder,
   isGeneratedPage,
+  matterPartOf,
   matterSection,
   matterSectionIndex,
   matterTitles,
@@ -143,4 +144,61 @@ it("spots a placeholder, and is not fooled by ordinary prose", () => {
   expect(hasPlaceholder("He wrote [ and then stopped\nand carried on")).toBe(
     false,
   );
+});
+
+/* --- reading a heading for its part ---------------------------------------
+ *
+ * How a manuscript that declares nothing about itself gets a structure. An
+ * EPUB says which page is which; a Word file, a Markdown file and a plain text
+ * file carry headings and nothing else, so these names are all there is to go
+ * on. See `matterPartOf`.
+ * ------------------------------------------------------------------------- */
+
+it("places every standard division in its own part", () => {
+  // Walks the catalogue rather than a list written out here, so a section added
+  // to `MATTER_SECTIONS` without a thought for import fails this.
+  for (const part of ["front", "back"] as const) {
+    for (const section of MATTER_SECTIONS[part]) {
+      expect(matterPartOf(section.title)).toBe(part);
+    }
+  }
+});
+
+it("reads a heading in the case a manuscript actually writes it", () => {
+  // Word files shout their headings; nobody types "Half-title page".
+  expect(matterPartOf("HALF-TITLE PAGE")).toBe("front");
+  expect(matterPartOf("Copyright Page")).toBe("front");
+  expect(matterPartOf("  glossary  ")).toBe("back");
+});
+
+it("knows the other names for a division", () => {
+  // "Preface or introduction" is the name of a slot, not a heading anybody
+  // writes. Without these the commonest front-matter page in a manuscript is
+  // the one that lands in the body.
+  expect(matterPartOf("Preface")).toBe("front");
+  expect(matterPartOf("Introduction")).toBe("front");
+  expect(matterPartOf("Foreword")).toBe("front");
+  expect(matterPartOf("Contents")).toBe("front");
+  // The American spelling of the page most likely to carry it.
+  expect(matterPartOf("Acknowledgments")).toBe("back");
+});
+
+it("every alias names a page that exists", () => {
+  // A table entry pointing at a title `MATTER_SECTIONS` does not have would
+  // answer null and look like a name nobody had thought of.
+  for (const alias of ["Preface", "Contents", "Acknowledgments", "Half title"]) {
+    expect(matterPartOf(alias)).not.toBeNull();
+  }
+});
+
+it("leaves a chapter alone, which is nearly every heading in a book", () => {
+  // Null is the important answer here: it means the writer's own page stays
+  // exactly where they put it. A rule loose enough to catch the third of these
+  // would take somebody's chapter out of their novel.
+  expect(matterPartOf("Chapter One")).toBeNull();
+  expect(matterPartOf("Returning to Mirissa")).toBeNull();
+  expect(matterPartOf("Prologue to a Murder")).toBeNull();
+  expect(matterPartOf("The End")).toBeNull();
+  expect(matterPartOf("")).toBeNull();
+  expect(matterPartOf("   ")).toBeNull();
 });

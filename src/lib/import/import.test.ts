@@ -3,7 +3,7 @@ import { countWords, toDoc, type Block } from "@/lib/import/blocks";
 import { parseHtml } from "@/lib/import/html";
 import { parseText } from "@/lib/import/plain-text";
 import { splitIntoChapters } from "@/lib/import/split";
-import { titleFromFileName } from "@/lib/import/index";
+import { importFile, titleFromFileName } from "@/lib/import/index";
 
 // --- plain text ------------------------------------------------------------
 
@@ -283,4 +283,101 @@ it("carries marks into the document", () => {
 it("makes a book title out of a file name", () => {
   expect(titleFromFileName("the_salt_road.docx")).toBe("the salt road");
   expect(titleFromFileName("My-Novel-Draft-3.md")).toBe("My Novel Draft 3");
+});
+
+/* --- front and back matter from a file that declares nothing ---------------
+ *
+ * An EPUB carries an `epub:type` on every document and the importer believes
+ * it (see `archive.test.ts`). A Word file, a Markdown file and a plain text
+ * file carry headings and no more, so until this existed every one of those
+ * headings became a body chapter — a manuscript opening with a half-title, a
+ * title page and a copyright page arrived as three chapters of a novel that
+ * has none.
+ * ------------------------------------------------------------------------- */
+
+const asFile = (text: string, name: string) =>
+  new File([text], name, { type: "text/markdown" });
+
+/** The shape of a real manuscript: apparatus, then the story, then the rest. */
+const MANUSCRIPT = [
+  "# Half-title page",
+  "The Lighthouse Beyond the Rain",
+  "# Title page",
+  "A Novel",
+  "# Copyright page",
+  "Copyright 2026",
+  "# Dedication",
+  "For everyone who left.",
+  "# Preface",
+  "Some places stay with us.",
+  "# Chapter One",
+  "The bus reached Mirissa after noon.",
+  "# Chapter Two",
+  "Arun barely slept.",
+  "# Epilogue",
+  "One year later.",
+  "# Acknowledgements",
+  "Thank you.",
+  "# Glossary",
+  "Amma — mother.",
+].join("\n\n");
+
+it("files a manuscript's apparatus as front and back matter", async () => {
+  const book = await importFile(asFile(MANUSCRIPT, "novel.md"));
+  const part = (title: string) =>
+    book.chapters.find((c) => c.title === title)?.matter ?? "body";
+
+  expect(part("Half-title page")).toBe("front");
+  expect(part("Title page")).toBe("front");
+  expect(part("Copyright page")).toBe("front");
+  expect(part("Dedication")).toBe("front");
+  // "Preface" is not a title `MATTER_SECTIONS` carries — the slot is "Preface
+  // or introduction" — so it lands by way of the alias table, under the
+  // catalogue's name rather than the manuscript's.
+  expect(part("Preface or introduction")).toBe("front");
+
+  expect(part("Epilogue")).toBe("back");
+  expect(part("Acknowledgements")).toBe("back");
+  expect(part("Glossary")).toBe("back");
+});
+
+it("files a page under the catalogue's name, not the manuscript's", async () => {
+  // A Word file shouts its headings. Left alone, `HALF-TITLE PAGE` sat in the
+  // panel beside the app's own `Half-title page` as a second, unrelated row —
+  // one division showing as two, in two different cases, with nothing matching
+  // on name able to see they were the same.
+  const book = await importFile(
+    asFile(
+      "# HALF-TITLE PAGE\n\nThe Lighthouse\n\n# Chapter One\n\nOne.\n\n# GLOSSARY\n\nAmma — mother.",
+      "novel.md",
+    ),
+  );
+  const titles = book.chapters.map((c) => c.title);
+  expect(titles).toContain("Half-title page");
+  expect(titles).toContain("Glossary");
+  expect(titles).not.toContain("HALF-TITLE PAGE");
+  // A heading it does not recognise keeps its own spelling and its own place.
+  expect(titles).toContain("Chapter One");
+});
+
+it("leaves the story in the body", async () => {
+  const book = await importFile(asFile(MANUSCRIPT, "novel.md"));
+  const body = book.chapters.filter((c) => !c.matter).map((c) => c.title);
+  // The whole risk of reading headings for a part: a chapter taken out of the
+  // book is worse than a page left in it.
+  expect(body).toEqual(["Chapter One", "Chapter Two"]);
+});
+
+it("keeps the prose with the page it was written on", async () => {
+  const book = await importFile(asFile(MANUSCRIPT, "novel.md"));
+  const dedication = book.chapters.find((c) => c.title === "Dedication");
+  expect(dedication?.matter).toBe("front");
+  expect(JSON.stringify(dedication?.doc)).toContain("For everyone who left.");
+});
+
+it("does not tag a heading it does not recognise", async () => {
+  const book = await importFile(
+    asFile("# Chapter One\n\nOne.\n\n# The End\n\nDone.", "novel.md"),
+  );
+  expect(book.chapters.every((c) => !c.matter)).toBe(true);
 });

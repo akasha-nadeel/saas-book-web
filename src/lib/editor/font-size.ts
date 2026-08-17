@@ -79,26 +79,55 @@ export const FontSize = Mark.create({
 });
 
 /**
- * The multiples the grow/shrink buttons step through. 1 is the body size itself
- * — reaching it clears the mark rather than storing a redundant one.
+ * The multiples the size list offers. 1 is the body size itself — choosing it
+ * clears the mark rather than storing a redundant one.
  */
 export const FONT_SIZE_STEPS = [0.85, 1, 1.15, 1.3, 1.5, 1.75, 2, 2.5] as const;
 
-const BASE_INDEX = FONT_SIZE_STEPS.indexOf(1);
+/** One row of the size list. */
+export interface FontSizeOption {
+  /** What to store. **Null is the body size**, which clears the mark. */
+  multiple: number | null;
+  /** What to print, in points, against this book's own body size. */
+  pt: number;
+  /** Whether this row is the body size, which the list says so on. */
+  body: boolean;
+}
 
-/** The next size up or down from the current one, clamped to the scale. Returns
- *  null for the body size, so the caller clears the mark instead of setting it. */
-export function steppedFontSize(
-  current: number | null,
-  direction: 1 | -1,
-): number | null {
-  let index =
-    current != null ? FONT_SIZE_STEPS.indexOf(current as never) : BASE_INDEX;
-  if (index === -1) index = BASE_INDEX;
-  const next = Math.min(
-    FONT_SIZE_STEPS.length - 1,
-    Math.max(0, index + direction),
-  );
-  const multiple = FONT_SIZE_STEPS[next];
-  return multiple === 1 ? null : multiple;
+/**
+ * The size list, in points, for a book set at `bodyPt`.
+ *
+ * **The mark stores a multiple and the list shows points**, which is the whole
+ * of why this function exists. A writer thinks in points because that is what
+ * every word processor and every one of this app's own type controls says
+ * (`TEXT_SIZES` in `typography.ts`); the document has to store a ratio, or a
+ * run would keep its absolute size when the book's body size moved and the
+ * page would come apart. Resolving one into the other at the moment of drawing
+ * means the label cannot go stale: the same 1.5× run reads 18 pt in a 12 pt
+ * book and 21 pt in a 14 pt one, and both are true.
+ *
+ * Rounded to a whole point. The scale is multiplicative, so it lands on halves
+ * and thirds of a point that mean nothing to anybody choosing a size — and the
+ * *stored* value is untouched by this, so nothing is lost to the rounding.
+ */
+export function fontSizeOptions(bodyPt: number): FontSizeOption[] {
+  return FONT_SIZE_STEPS.map((multiple) => ({
+    multiple: multiple === 1 ? null : multiple,
+    pt: fontSizePt(bodyPt, multiple === 1 ? null : multiple),
+    body: multiple === 1,
+  }));
+}
+
+/**
+ * What a stored multiple comes to, in points, in a book set at `bodyPt`.
+ *
+ * Takes the mark's own value — `null` meaning no mark, which is the body size —
+ * so the trigger can print **the size the selection really is** rather than the
+ * nearest row of the list. A document can carry an off-scale multiple (an
+ * import, or a chapter written before this scale existed), and rounding that to
+ * the closest offered size on the control that reports it would be the screen
+ * quietly misreporting the document.
+ */
+export function fontSizePt(bodyPt: number, multiple: number | null): number {
+  return Math.round(bodyPt * (multiple ?? 1));
 }

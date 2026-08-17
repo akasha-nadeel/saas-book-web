@@ -319,6 +319,20 @@ export const menuIcons = {
       <path d="M3.2 5.4v4.2h4.2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   ),
+  /* Moving a page between the three parts of the book: a stack of leaves with
+     one of them lifted clear. */
+  movePart: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="11" width="14" height="2.6" rx="0.8" />
+      <rect x="3" y="15" width="14" height="2.6" rx="0.8" />
+      <path d="M10 2.6v6" strokeLinecap="round" />
+      <path
+        d="m7.4 5.2 2.6-2.6 2.6 2.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  ),
   export: (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M10 2.9v8.7" strokeLinecap="round" />

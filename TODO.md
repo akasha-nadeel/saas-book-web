@@ -2637,10 +2637,16 @@ should either ship or lose the card.
 ## Editor
 
 - [x] **Front/back matter.** Back, as a flat tag rather than the old drill-down.
-      A chapter's ⋯ menu moves it to front matter, the body, or back matter; the
+      A page's ⋯ menu moves it to front matter, the body, or back matter; the
       list stays one sequence with a quiet label per part, only body chapters are
       numbered, and export lays out front → body → back. The old sectioned
       version (drill-down, per-part drop strips) stays cut — see `207f805`.
+      *That first sentence was untrue from the rebuild until 2026-08-18*:
+      `setChapterMatter` was written and tested and had no caller anywhere in
+      `src/components`, so the row menu offered Star, Rename and Delete and a
+      page in the wrong part could only be deleted and typed again. It is wired
+      now, in `book-panel.tsx`, and it is what repairs a book imported before
+      the importer could read its own headings (below).
       *Phase 2 (done):* the export dialog generates a title page, copyright page,
       and contents list for EPUB and PDF, and front/back matter is set unnumbered
       (only body chapters carry a numeral). *Phase 3 (done):* real page numbers

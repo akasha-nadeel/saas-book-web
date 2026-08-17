@@ -31,7 +31,19 @@ proposing a feature or rebuilding something that looks missing.
 - One test file: `npx vitest run src/lib/export/epub.test.ts`
 - One test by name: `npx vitest run -t "scene break"`
 - `java -jar epubcheck.jar book.epub` — the EPUB check the unit tests can't do
-  (see below). Not in CI; run it by hand after touching `epub.ts`.
+  (see below). Not in CI, and **the jar is not in the repo** — download EPUBCheck
+  5.3 first. Run it by hand after touching `epub.ts`.
+- The suite is 91 files / ~1,785 tests and takes about a minute; jsdom prints
+  `HTMLCanvasElement's getContext()` warnings from the image recoder and they
+  are expected, not failures.
+- `node scripts/feature-shots.cjs` — regenerates the landing page's bitmap
+  product shots from raw captures kept outside the repo. A one-shot tool, not
+  part of the build; see the landing note on screenshots going stale silently.
+
+`/.shot-app/` is a gitignored scratch copy of the app with its own `.next/` in
+it. Do not `git add .` around it, and if `npm run lint` ever reports thousands
+of problems that is what it has found — `src/` lints clean, so a large number is
+noise rather than news.
 
 Every environment variable is optional and every one of them is documented, with
 its failure mode, in `.env.local.example`. That file is the canonical list —
@@ -42,7 +54,8 @@ logic: the import/export pipelines (including the XHTML and front-matter
 renderers), the store — twice over, once on `localStorage` and once on
 IndexedDB, see `store-db.test.ts` —
 page setup, typography, search, book kinds, the custom
-Tiptap marks, pagination and click-to-type arithmetic, the reading view's bound
+Tiptap marks, pagination, click-to-type and image-resize arithmetic (the last
+of these being where the zoom correction a drag needs is held still), the reading view's bound
 page list (`reader/bound-pages.ts`, which is how the export wizard's Preview and
 the file are held to one answer), caret scrolling,
 narration chunking, transcript paragraphing, publishing details and the ISBN
@@ -61,6 +74,10 @@ out a book with no sales rows instead of drawing it at zero, that the series
 bible refuses to merge on anything fuzzier than an exact name, and that the
 money page names no company and every figure carries its provenance. If one of
 those goes red the feature has lost the thing it was built to say.
+`export/consistency.test.ts` is the same idea across files rather than inside
+one — it asserts that all four renderers bind the same pages in the same order
+with the same chapter openers, and it is the suite that would have caught the
+drift nothing else was shaped to see.
 
 `docs/plans/` holds the design and implementation notes for the bigger pieces
 (the bookshelf, export, and the Supabase persistence design). They record what
@@ -79,6 +96,32 @@ typed with the generated helpers `PageProps<"/route">` / `LayoutProps<"/route">`
 Both shapes are in the tree — the older routes use the helpers, the sixteen tool
 routes write `props: { params: Promise<{ bookId: string }> }` by hand. Either is
 fine; awaiting `params` is not optional.
+
+**`next.config.ts` is load-bearing, not boilerplate**, and every one of its four
+entries was paid for. Read the comments in the file before touching it; the
+short version:
+
+- **`turbopack.resolveAlias.pagedjs`** points at `dist/paged.esm.js`, found via
+  the package's own entry rather than by path (its `exports` map refuses a deep
+  import). Without it Paged.js pulls in `es5-ext` shims that die under bundling
+  with `TypeError: contains.call is not a function`, thrown at the first
+  `preview()` — a PDF export that produces nothing, and nothing the compiler
+  could have caught. It throws at boot if the file moves, rather than aliasing
+  quietly to nothing.
+- **`env.OC_PAGEDJS_DIST` + `outputFileTracingIncludes`** are the *server* half:
+  `/api/export/pdf` reads the polyfill off disk as text, so a tracer that only
+  packs what it can see would leave it absent in production and drop every PDF
+  export onto the print-dialog fallback.
+- **There is no `webpack` hook and one must not be added.** Next 16 builds with
+  Turbopack, and a webpack config changes how the whole graph resolves rather
+  than adding an alias to a second bundler — with one present, `/read`,
+  `/chapter/[chapterId]` and `/roadmap` all began answering 404 while every
+  other route was fine.
+- **`images.qualities` is required in Next 16.** It defaults to `[75]` and
+  anything else is *refused rather than honoured* — silently, with no error and
+  no warning, the optimizer falling back to the nearest allowed value. A
+  `quality={95}` on a component simply did nothing. Add a value here only with a
+  call site that needs it.
 
 ## Architecture
 
@@ -160,8 +203,41 @@ receiver re-reads from the disk before telling anyone.
 
 `src/lib/store-db.test.ts` is the only suite that imports `fake-indexeddb`. That
 is deliberate: every other suite runs with no IndexedDB at all, which is Firefox
-in private browsing, and those 1600-odd tests are the proof that configuration
+in private browsing, and those 1,700-odd tests are the proof that configuration
 still behaves exactly as the app did before any of this existed.
+
+**Room can still run out, and it is said out loud.** `src/lib/storage-space.ts`
+plus `StorageAlert` in the root layout are the other half of the move above, and
+they are the part a screen must never re-implement. Everything a browser stores
+is *best effort* until something asks otherwise: when the device runs short,
+browsers evict **the whole origin at once** rather than the least useful part of
+it, and Safari clears an origin nobody has visited in seven days — so a
+signed-out writer whose only copy is here can lose all of it silently.
+`askToPersist()`, called once per load by `LibrarySync`, is the one call that
+changes that, and it is a *request*: Firefox asks the writer, Chrome and Safari
+decide from how the site has been used, all three may say no, and the app has to
+be correct either way. Every function in that module resolves rather than
+throwing, the policy `cover-store.ts` already follows.
+
+Four things about the alert are load-bearing:
+
+- **The store raises it, never an effect on mount.** `StorageTrouble` is
+  module-level state in `library-store.ts` (`reportStorage`,
+  `getStorageTrouble`, `subscribeToStorageTrouble`), read through
+  `useStorageTrouble`. An effect that opened this on load would meet a writer
+  who filled their storage yesterday with a dialog about it today — the
+  `LimitDialog` rule.
+- **Two states, two volumes.** `history-dropped` is a save that hit the quota
+  and then succeeded because the version history was given up, and it is a note
+  in the corner; `full` is a save that could not be written at all, which is the
+  words going nowhere, and it stops the screen. Nothing smaller is proportionate
+  to that.
+- **It is only ever raised louder** (`TROUBLE_RANK`), never quieter, until the
+  writer dismisses it. A `full` must not be talked over by the next successful
+  save, because the book is still not saving.
+- **It sits in the root layout** because the editor's autosave is merely the
+  likeliest place to hit a full origin — the bible, the ARC list and the ledger
+  all write unguarded and would throw with nothing on screen to explain why.
 
 There is **exactly one exception, and grepping will find it**: the
 `THEME_BOOTSTRAP` string in `src/app/layout.tsx` reads `openchapter:prefs` by
@@ -218,6 +294,21 @@ store and they are all the same shape — `useShelf`, `useChapterBody`,
 `useBodyReload`, `useCover`, `useNotes`, `usePrefs`, and one each for the tool
 stores (`useBible`, `useArc`, `useLedger`, `useActivity`, `useHistory`,
 `useIdeas`); a new store gets a new hook here rather than an effect in a screen.
+
+**There are two gates, not one, and `useHydrated` is only the first.**
+`useLibrarySettled()` (over `getSyncPhase`) is false until the first reconcile
+with the server has finished, and it exists for the state `useHydrated` cannot
+see: storage read, genuinely empty, **books still arriving**. A screen that
+treats that as "no books" tells a writer their library is gone and then takes it
+back. The rule is **guard the empty states on `useLibrarySettled` and never the
+loaded ones** — a shelf with books on it is worth showing the instant it is
+readable, whether or not the download has caught up. Both phases are decided
+*synchronously* by whether there is anything to wait for at all (no IndexedDB,
+no Supabase → start ready), because starting ready and flipping to loading
+inside an effect is a first paint with the loaded state on it, which is the bug
+these exist to prevent. Two hooks here are not per-store and are named for what
+they answer rather than for a key: `useStorageTrouble` (below) and
+`useCoverEpoch`.
 
 **The front door is a dashboard, not a shelf.**
 `src/components/shelf/bookshelf.tsx` is six areas — Overview, Write, Prepare,
@@ -793,16 +884,31 @@ must leave the indent alone, which is why the two aren't one attribute.
 `caret-scroll.ts` is the other pure one: move the view only when the caret would
 leave it, and then only as far as the edge.
 
-**The selection bar's font picker is the one control on it that takes two
-clicks, and that is what made it the one control that did not work.** Every
-other button acts on the first press, while the selection is still there.
-Opening a menu and then choosing does not: the press collapses the browser's
-selection — `preventDefault` keeps *focus* in the prose but not the range — and
-ProseMirror syncs that collapse into its own state a tick later. So the command
-landed on an empty cursor and the face never changed. Three things hold it
-together now, and each fixes a different symptom of that one cause. The picker
-**remembers the range when it opens** and puts it back with `setTextSelection`
-before applying, so the command lands. It also **puts that range back from
+**Pressing a control on the selection bar collapses the selection, and the bar
+now puts it back.** `preventDefault` keeps *focus* in the prose but not the
+range, and ProseMirror syncs the collapse into its own state a tick after the
+click handler has run. For most of this bar's life only the font picker knew:
+it took two clicks, so it met the problem first and was given a `range` ref, a
+`guarding` ref and a restore inside `selectionUpdate` — while a comment beside
+it recorded that "every other control has finished its work by then".
+
+**That was true of the first press and false of every one after it, which is
+the bug the writer actually met.** Bold landed; the Italic after it ran against
+`from === to` and set a *stored mark* for the next character typed instead of
+touching the words still highlighted under the bar. Nothing said so, because
+`pointerOnBar` holds `shouldShow` true, so the bar went on floating over a
+caret, and the active pills — read from that same collapsed selection — could
+be wrong too. So the range is now **the bar's**, not the picker's: captured on
+every non-empty `TextSelection`, put back the moment a collapse arrives while
+the pointer is on the bar or a list is open, and put back again inside `apply()`
+— which every control routes through, and which is what covers the keyboard and
+a touchscreen, where nothing hovers and the pointer guard never fires. It
+cannot recurse (what it restores is not collapsed) and it is inert on a browser
+that does not collapse at all.
+
+Three things still hold the picker together, each fixing a different symptom of
+that one cause. It **remembers the range when it opens** and puts it back with
+`setTextSelection` before applying, so the command lands. It also **puts that range back from
 inside the `selectionUpdate` event itself** — the bubble is anchored to the
 selection, and a caret sits at the *start* of what was highlighted, so opening
 the list threw the whole toolbar leftwards away from the words it was about.
@@ -840,6 +946,29 @@ reason the Aa flyout in the rail is portalled; same consequence, that it shuts
 on an outside scroll or a resize, since a fixed position from a rect goes stale
 the moment the page moves.
 
+**All of that lives in `BarMenu` now, because there are two lists.** The
+placement, the portal, the upwards-only rule and the four ways out are one
+component that both pickers mount; a second copy would have been the first
+one's bugs again a year later. It keeps its own `openedOn` snapshot for the
+close-on-new-selection test, distinct from the bar's shared `range` — that one
+follows the writer by design, so comparing against it would mean nothing had
+ever changed.
+
+**The size control is the second list, and it reads and writes points while
+storing a multiple.** It replaced an A− / A+ pair that walked
+`FONT_SIZE_STEPS` a notch a press with nothing on screen saying what size the
+selection was or what the next press would give. What is stored is unchanged
+and must stay so — a ratio against `--ms-size`, so a run keeps its proportion
+when the book's own type size moves — and `fontSizeOptions(bodyPt)` in
+`font-size.ts` is the join, resolving one into the other at the moment of
+drawing so a label cannot go stale: the same 1.5× run reads 18 pt in a 12 pt
+book and 21 pt in a 14 pt one, and both are true. The trigger prints the size
+the selection **really is** rather than the nearest row, since a chapter can
+carry an off-scale multiple from an import and rounding it on the control that
+reports it would be the screen misreporting the document. No hover preview
+here, where the face has one: Live Preview earns its keep on a typeface because
+nobody can pick one from a name, and "14 pt" is not a name.
+
 Around that sit the two behaviours the tools writers already use have taught
 them to expect. **The trigger names the face** rather than showing "Aa" in it,
 which is what Google Docs and Word do: two letters cannot tell Garamond from
@@ -867,9 +996,56 @@ are always computed from the document's natural flow and can never drift pass by
 pass; and a mid-paragraph gap is a full-width **inline-block**, because a block
 box there would make the browser split the paragraph into anonymous blocks and
 the continuation would take the book's first-line indent. A paragraph whose lines
-can't be read falls back to moving whole, which is how this worked before. Inline images are a resizable node
-(`resizable-image.ts` + `image-node-view.tsx`) that stores width as a percentage
-of the column; `src/lib/image-import.ts` handles paste/drop, capped at 900KB.
+can't be read falls back to moving whole, which is how this worked before.
+
+**Inline images are a resizable node** (`resizable-image.ts` +
+`image-node-view.tsx`) that stores width as a **percentage of the column**, so a
+picture keeps its proportion whatever the trim size; `src/lib/image-import.ts`
+re-encodes on the way in, capped at 1400px on the longest edge and 900KB. (That
+last sentence said it "handles paste/drop" until 2026-08-18 and there is no
+paste or drop path in the tree at all — no `handlePaste`, no `handleDrop`. The
+file picker in the right rail is the only way in. Worth building; it is not
+built.)
+
+**Three things about handling one were wrong together**, all found 2026-08-18
+and all with different causes:
+
+- **The resize ignored the page zoom.** The manuscript is drawn inside a CSS
+  `zoom` whose "100%" is really 1.3 (`PAGE_SCALE`), and `startResize` added
+  `clientX` deltas (viewport pixels) to `clientWidth` (layout pixels). So the
+  edge ran a third ahead of the pointer and hit full width three quarters of the
+  way across; at the 200% setting, two and a half times. The editor already
+  knows this rule in both of its other measuring sites — `pagination.ts`
+  normalises every rect by the same scale and click-to-type divides by it — and
+  this was the one calculation that never got it, because the zoom landed four
+  days after the resize did and nothing failed when it arrived. The arithmetic
+  is now the pure, tested `src/lib/editor/image-resize.ts`.
+- **A picture could not be moved.** ProseMirror drags a node view by an element
+  marked `data-drag-handle`, Tiptap cancels every `dragstart` without one, and
+  there was none anywhere in the view. Cut and paste was the only way and
+  nothing said so. The frame carries it now — not the `<img>`, which keeps
+  `draggable={false}` so the browser's own image drag cannot race the handles.
+- **A picture arrived filling the column.** `setImage({ src })` set no width,
+  and no width means no width *style* — which sounds like "its own size" and is
+  not, since the stylesheet caps every picture at `max-width: 100%` and an
+  imported one is 1400px against a column nearer 430. `insertWidthPercent` gives
+  one a starting size and **leaves a picture that already fits alone**, because
+  half a column would *enlarge* a small logo past its own pixels. The fraction
+  is 50%, which is the number the node view had already been using as its
+  wrapped-picture fallback for the same reason.
+
+**The image toolbar had none of the text bar's protections** and has them now:
+its buttons refuse `mousedown` (without it, every press blurred the editor,
+Tiptap re-focused on the next frame *and* scrolled the caret into view, so the
+page jumped under the picture being worked on), and `shouldShow` tests focus
+behind a `pointerOnBar` ref, which the text bar's own comment had already
+explained after that bar was seen floating through three panel switches.
+
+One thing checked and found **not** to be a problem, so nobody re-fixes it: the
+two `BubbleMenu`s do not collide despite only one naming a `pluginKey`. Tiptap
+v3's `getAutoPluginKey` mints a fresh `PluginKey` and ProseMirror de-duplicates
+the name, so the un-keyed one is `bubbleMenu$`. It *would* have collided in v2,
+where both defaulted to the literal string.
 
 **The editor shell is a rail, a tool panel, and the book panel.**
 `workspace-rail.tsx` selects which tool panel (`PanelTab` in `left-panel.tsx`:
@@ -1344,11 +1520,52 @@ blocks, then each renderer consumes them — the tricky parts (marks, nesting, h
 breaks) live in one tested place. Heavy libraries (`docx`, `jszip`) are
 dynamically imported so a writer who never exports never downloads them.
 - Export: `src/lib/export/` — markdown, docx, epub, and PDF rendered by a real
-  browser on the server (`/api/export/pdf`, driven from `print.ts`). `index.ts`
+  browser on the server (`/api/export/pdf`, driven from `print.ts`, whose
+  standalone document is the pure, tested `pdf-html.ts`). `index.ts`
   orchestrates; `xhtml.ts` is the shared XHTML renderer behind epub, PDF and the
   reader; `typeset.ts` controls the look of the outputs that are ours;
   `front-matter.ts` generates the title/copyright/contents pages and holds
-  `bindBook`, the binding order all four read.
+  `bindBook`, the binding order all four read; `epub-images.ts` and
+  `docx-images.ts` are each format's answer to a picture — the Word file
+  packaged the italic words `[image]` until 2026-08-17, which is a manuscript
+  reaching an agent without its illustrations.
+
+  **Inline size and face were the same drift and were fixed on 2026-08-18.**
+  Both reached the reading view, the EPUB and the PDF; neither reached the Word
+  file, because `runsFor` read bold/italic/strike/underline and nothing else. So
+  a passage a writer had set larger, or in another face, came back from Word
+  looking like every other paragraph — silently, in the one format an agent asks
+  for, and `font-family.ts` had recorded the gap in its own header for months.
+  Two details are load-bearing. `Run` carries **both forms** of the size, the
+  CSS string for the renderers that have a stylesheet and `sizeMultiple` for the
+  one that does not, because re-parsing the string a line after building it is
+  reading back your own output. And the multiple is taken against **the
+  document's** 12pt body (`SIZE_HALF_POINTS`) rather than the book's editor
+  setting: a `.docx` carries none of our typography, so a run set at one and a
+  half times the body must be one and a half times *that* or it disagrees with
+  the paragraph around it. `docxFontName` is the other join — CSS takes a whole
+  stack and Word names one font per run, so it takes the first real name,
+  stepping over generic families and over a `var()` that resolves to a webfont
+  no word processor can fetch.
+
+  **`consistency.test.ts` is the suite that holds the four to one answer**, and
+  it belongs on the list of tests not to "fix": every renderer had its own
+  passing tests and each was right about *itself*, while nothing asked whether
+  they agreed — and they did not, about binding order and about chapter
+  openers. It compares the formats against each other rather than against a
+  fixed string, so a change is welcome to move the order and may not move it in
+  one place only. Nothing in it asserts a *look*, because a PDF has pages and an
+  EPUB reflows.
+
+  **Markdown is built, tested and reachable from nothing** — `soon: true` on its
+  card in `export-page.tsx`, which opens `ComingSoonDialog` instead of
+  exporting, since **2026-08-16**. The text half is right; what is not done is a
+  book with a picture in it, which `blocksToMarkdown` writes as a base64 `data:`
+  URL that GitHub and many parsers refuse outright. It comes back as a plain
+  `.md` for a book with no pictures and a zip of `book.md` plus `images/` for
+  one with them — `epub-images.ts` already does the hard half. **Every "four
+  formats" claim comes back in the same commit**; the pricing page says "All
+  three exports" today, and TODO.md records the rest.
 
   **An export with nothing in it is refused rather than produced.**
   `runExport` throws `ExportRefused` — its own class, so the wizard prints its
@@ -1835,6 +2052,59 @@ half that has to read the manuscript, which is why it is not in the pure module.
   generated title page's `<title>` is the *book's* title and importing a page
   called "The Salt Ledger" is a page nobody can find in a list.
 
+  **Every other format is read for its structure instead, as of 2026-08-18.**
+  A `.docx`, a `.md`, a `.txt` and an HTML file declare nothing, so until then
+  every heading in them became a body chapter: a manuscript opening with a
+  half-title, a title page, a copyright page, a dedication and an epigraph
+  arrived as five chapters of a novel that has none, with the acknowledgements
+  and the glossary at the far end as two more. `taggedByName` in
+  `import/index.ts` reads each chapter's title through **`matterPartOf`** in
+  `matter.ts`, which matches against the catalogue's own titles plus a short
+  `MATTER_ALIASES` table — "Preface" and "Contents" and the American
+  "Acknowledgments" are what a manuscript actually writes where the catalogue
+  names a slot. Four things about it:
+
+  - **A table, never a heuristic**, the posture `series.ts` takes for merging
+    characters and for the same reason: a rule loose enough to catch every way
+    of writing "Preface" is loose enough to decide somebody's chapter called
+    "Prologue to a Murder" is apparatus and take it out of their book. Null —
+    *this is a chapter* — is the important answer and the common one.
+  - **The page takes the catalogue's spelling, not the manuscript's.** A Word
+    file shouts its headings, so `HALF-TITLE PAGE` first came in under exactly
+    that name and sat in the panel beside the app's own `Half-title page` as a
+    second, unrelated row — one division showing as two, in two different
+    cases, with nothing matching on name able to see they were the same. The
+    EPUB path had always canonicalised (`DIVISION_TITLES`), so the same book
+    imported as a `.docx` and as an `.epub` produced differently-named pages.
+    `matterDivisionOf` returns the part *and* the name; `matterPartOf` is the
+    thin wrapper for callers with no use for the second.
+  - **Position is deliberately not consulted.** Every name in that table belongs
+    at one end of a book by the convention of the trade, which is why it is in
+    the table. Requiring an unbroken run from each end was considered and is
+    worse: one stray heading after the last real page (a bare "The End") would
+    silently strand every back-matter page before it in the body.
+  - **It runs only on the branch that has no declaration.** Applying it to the
+    EPUB path would be second-guessing a file that has already said.
+  - **Nothing below it changed** in `createBookFromImport`, which has carried
+    `ImportedChapter.matter` since the EPUB importer was written and already
+    groups the chapters front → body → back. **`importIntoBook` did need
+    changing**, and it is the one consequence worth knowing: a division the
+    book already has is now dropped from an import rather than added. Front and
+    back matter are a set of *named* pages — a book has one dedication, and two
+    rows called "Epilogue" say nothing an exporter could act on — where a body
+    chapter may legitimately repeat and is renumbered instead. Both modes need
+    it: `add` appends everything, and `replace` deliberately *keeps* the
+    writer's existing matter while clearing the body, so incoming pages would
+    have landed on top of the ones it had just spared. Before the importer read
+    headings this could not arise, because only an EPUB declared matter pages,
+    so re-importing a `.docx` duplicated chapters and nothing else.
+
+  The repair for a book imported *before* this is the page ⋯ menu's **Move to
+  front matter / the body / back matter**, wired in `book-panel.tsx` on the same
+  day over `setChapterMatter` — which had been written and tested with no caller
+  anywhere, so a page in the wrong part could previously only be deleted and
+  typed again.
+
   **A file's own metadata is read and kept** (`metadata.ts`, `epubMetadata()`,
   `docxMetadata()`, `cover.ts`): an EPUB carries an author, an ISBN, a blurb,
   categories and usually cover artwork, and all of it used to be dropped at the
@@ -1894,7 +2164,11 @@ of components so they can be tested and changed in one place: `book-kinds.ts`
 `book-templates.ts`
 (chapter skeletons only — never boilerplate prose), `search.ts` (walks plain text
 out of stored Tiptap JSON for the ⌘K panel), `page-setup.ts`, `typography.ts`,
-`relative-time.ts`, `use-typewriter.ts`.
+`relative-time.ts`, `use-typewriter.ts`, and `plural.ts` — which is the
+third-copy rule again: it was private to `bookshelf.tsx`, so the shelf said
+"1 book" correctly while a dozen other screens printed "1 words", "1 days
+written" and "1 copies". Its irregular form is a *parameter*, not a rule, since
+English plurals are not derivable and "copy" is the one that matters here.
 
 `resume.ts` belongs to that set and is the one to understand, because it stores
 nothing: the "where you left off" card on the book overview
@@ -2330,7 +2604,7 @@ one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
 **What is free is what a book needs to exist and leave.** Unlimited books,
-words, chapters and **imports**, all four exports, sync, the pre-upload check and
+words, chapters and **imports**, every export that ships, sync, the pre-upload check and
 the roadmap, structure, progress, categories and typing in its keyword boxes
 yourself — having those boxes *suggested* is the one part of that screen with a
 number on it, five for the life of the account — the writing
@@ -2708,12 +2982,21 @@ field, add it there too.
 
 **The root layout carries three things no screen owns.** `ThemeSync` — which
 applies `[data-theme]`, listens to `prefers-color-scheme` while the pref is
-"system", and runs the one-time theme migration — `LibrarySync` — which runs `syncWithServer()` once per mount, enough because
-every way of signing in ends in a redirect or full navigation, and flushes
+"system", and runs the one-time theme migration — `LibrarySync` — which runs
+`syncWithServer()` once per mount, enough because
+every way of signing in ends in a redirect or full navigation, flushes
 queued pushes on `visibilitychange` so a closed tab doesn't take the last save
-with it — and `AppLoader`, the held splash. `AppLoader` skips `/` deliberately
-and is *seeded* to "gone" there rather than switched off in an effect, or it
-paints and is taken away, which is the flash it exists to prevent.
+with it, and calls `askToPersist()` — and **`StorageAlert`**, which renders
+nothing until a write runs out of room (see the storage-room note above). All
+three are facts about the app rather than about whichever screen noticed them.
+
+**`AppLoader` was the fourth and is gone**, at the owner's request: it held the
+loading screen up for a second on every route but `/` so the logo's fill
+animation had time to play, which is a delay the product invented and a writer
+paid for. `LoadingScreen` (`src/components/loading-screen.tsx`) still renders
+wherever a screen genuinely has nothing yet, and is a spinner rather than a
+mark, so there is nothing left that needs holding. Do not reintroduce a splash
+to cover a load that is already instant.
 
 **The landing page is one Server Component** —
 `src/components/landing/landing-page.tsx`, what a signed-out visitor sees at

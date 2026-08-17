@@ -15,9 +15,12 @@ import { FONTS, fontStack } from "@/lib/typography";
  * `typography.ts` does not leave stale CSS in old chapters.
  *
  * The mark reaches the export IR (`blocks.ts` → `xhtml.ts`), so the face holds
- * in the reading view, the EPUB and the print PDF. It does *not* reach the DOCX
- * exporter — nor does inline size, which has the same gap — so a chapter opened
- * in Word comes back in the book's one face.
+ * in the reading view, the EPUB and the print PDF — and, since 2026-08-18, in
+ * the Word file too. It did not for most of this app's life, and inline size
+ * had the same gap: a passage a writer had set in another face came back from
+ * Word looking like every other paragraph, silently, in the one format an agent
+ * asks for. `docxFontName` in `export/docx.ts` is the join — a `.docx` names one
+ * font per run where CSS takes a whole stack.
  */
 
 declare module "@tiptap/core" {

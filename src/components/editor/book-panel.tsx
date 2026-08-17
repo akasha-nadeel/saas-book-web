@@ -19,6 +19,7 @@ import {
   orderedChapters,
   rememberMatterAsked,
   renameChapter,
+  setChapterMatter,
   shouldAskMatter,
   startMatter,
   toggleBookmark,
@@ -40,6 +41,42 @@ import {
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
+
+/**
+ * The two parts of the book a page is not already in.
+ *
+ * **The store has been able to do this since front and back matter existed and
+ * nothing could ask it to.** `setChapterMatter` was written, tested and left
+ * with no caller: the row menu offered Star, Rename and Delete, so a page that
+ * came into the book in the wrong part could only be got out of it by deleting
+ * it and typing it again. That was survivable while every page was made by hand
+ * in the right place, and stopped being survivable the moment an import could
+ * put one in the wrong one — a heading this app does not recognise lands in the
+ * body, and the repair has to be somewhere.
+ *
+ * Named for the destination rather than the action ("Move to front matter", not
+ * "Change part") because the writer knows where they want it, and the current
+ * part is left out of the list rather than shown ticked: an item that does
+ * nothing is the dead UI the house rules forbid.
+ */
+function movePartItems(
+  bookId: string,
+  chapterId: string,
+  from: ChapterMatter,
+): RowMenuItem[] {
+  const parts: { part: ChapterMatter; label: string }[] = [
+    { part: "front", label: "Move to front matter" },
+    { part: "body", label: "Move to the body" },
+    { part: "back", label: "Move to back matter" },
+  ];
+  return parts
+    .filter((p) => p.part !== from)
+    .map(({ part, label }) => ({
+      label,
+      icon: menuIcons.movePart,
+      onSelect: () => setChapterMatter(bookId, chapterId, part),
+    }));
+}
 
 export type BookPanelMode = "book" | "chapters";
 
@@ -890,6 +927,11 @@ export function BookPanel({
                           if (trimmed) renameChapter(bookId, c.id, trimmed);
                         },
                       },
+                      // An imported manuscript is where this earns its place: a
+                      // dedication or a glossary whose heading was not
+                      // recognised arrives here, in the body, and this is how it
+                      // is put right.
+                      ...movePartItems(bookId, c.id, "body"),
                       {
                         label: "Delete",
                         icon: menuIcons.trash,
@@ -1689,6 +1731,10 @@ function MatterPagesCard({
                   if (trimmed) renameChapter(bookId, page.id, trimmed);
                 },
               },
+              // Both directions: a page filed at the front that belongs at the
+              // back, and one that was never apparatus at all and should go
+              // back to being a chapter.
+              ...movePartItems(bookId, page.id, part),
               {
                 label: "Delete",
                 icon: menuIcons.trash,

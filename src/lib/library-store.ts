@@ -55,10 +55,14 @@ import {
 } from "./store-db";
 import {
   MATTER_SECTIONS,
+  matterDivisionOf,
   matterSection,
   matterSectionIndex,
   type MatterPart,
 } from "./matter";
+// Only the key, and only a string builder. `matter-picks` reaches back here for
+// a *type*, which is erased, so there is no cycle at runtime.
+import { matterKey } from "./matter-picks";
 import { DEFAULT_PAGE, type PageSetup } from "./page-setup";
 // Types and one date helper. free-limits.ts is pure and imports nothing back, so
 // the policy stays out of the store and the store stays the only place that keeps
@@ -2095,6 +2099,57 @@ export function importIntoBook(
      pages produced "Chapter 19, 20, 21" — numbers with nothing before them. The
      banner and the panel both count the body, and so does this. */
   const startNumber = mode === "replace" ? 0 : bookChapterCount(book);
+
+  /*
+   * **A division the book already has is not added a second time.**
+   *
+   * Front and back matter are a *set of named pages*, not a sequence: a book
+   * has one dedication and one glossary, and two rows called "Epilogue" say
+   * nothing a reader or an exporter could act on. Body chapters are the
+   * opposite — a book may genuinely have two chapters of the same name, and
+   * they are renumbered on the way in — so this filter is only ever about
+   * matter.
+   *
+   * It became necessary the moment the importer learned to read a manuscript's
+   * own headings for its structure. Before that only an EPUB declared matter
+   * pages, so importing a `.docx` twice duplicated chapters and nothing else;
+   * now every re-import carries the whole apparatus with it. Both modes needed
+   * it and for the same reason — `add` appends everything, and `replace`
+   * deliberately *keeps* the writer's existing matter while clearing the body,
+   * so the incoming pages would have landed on top of the ones it just spared.
+   *
+   * Keyed on part *and* title, because both parts can hold a page of the same
+   * name — `matterKey`'s own reason for existing.
+   *
+   * **And keyed on the *division*, not the spelling.** A book already holding a
+   * page called `PREFACE` — imported before the importer canonicalised names —
+   * meets an incoming `Preface or introduction`, which is the same page under
+   * the catalogue's name. Comparing the words would let that one through and
+   * put both in the book, which is the exact fault this filter exists to
+   * prevent, surviving in the one case where the two halves disagree about what
+   * a page is called. A page the writer named themselves has no division, and
+   * falls back to its own name.
+   */
+  const divisionKey = (part: MatterPart, title: string) =>
+    matterKey(
+      part,
+      (matterDivisionOf(title)?.title ?? title).trim().toLowerCase(),
+    );
+
+  const surviving =
+    mode === "replace"
+      ? book.chapters.filter((c) => chapterMatterOf(c) !== "body")
+      : book.chapters;
+  const alreadyThere = new Set(
+    surviving
+      .filter((c) => c.matter)
+      .map((c) => divisionKey(c.matter as MatterPart, c.title)),
+  );
+  const incoming = chapters.filter(
+    (c) => !c.matter || !alreadyThere.has(divisionKey(c.matter, c.title)),
+  );
+  if (!incoming.length) return null;
+
   // Counts the body chapters as they are made, so the matter pages mixed in
   // among them do not consume numbers.
   let bodyAt = 0;
@@ -2104,7 +2159,7 @@ export function importIntoBook(
   try {
     // No index: the numbering counts body chapters (`bodyAt`), not positions,
     // because the matter pages mixed in among them take no number.
-    chapters.forEach((chapter) => {
+    incoming.forEach((chapter) => {
       const id = newId();
       void writeStored(BODIES, id, JSON.stringify(chapter.doc));
       written.push(id);

@@ -45,6 +45,15 @@ export type ImportResult =
       bytes: number;
       /** The pixel size of the file the writer picked, before any resize. */
       natural: { width: number; height: number };
+      /**
+       * The pixel size actually stored, after the resize to `maxEdge`.
+       *
+       * Distinct from `natural` because it is the one the *page* meets: how
+       * wide a picture will draw, and so whether it fits the text column, is a
+       * fact about the bytes kept rather than about the file chosen. See
+       * `insertWidthPercent`, which is the caller that cares.
+       */
+      stored: { width: number; height: number };
     }
   | { ok: false; error: string };
 
@@ -164,6 +173,7 @@ export async function importImage(
     src,
     bytes,
     natural: { width: img.naturalWidth, height: img.naturalHeight },
+    stored: size,
   };
 }
 

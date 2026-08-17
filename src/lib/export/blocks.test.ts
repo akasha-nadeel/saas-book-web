@@ -79,14 +79,22 @@ it("reads the flush-at-the-margin mark, independently of alignment", () => {
   ]);
 });
 
-it("reads an inline font size from its mark", () => {
+it("reads an inline font size from its mark, in both forms", () => {
+  // The CSS string for the three renderers that have a stylesheet, and the bare
+  // multiple for the Word file, which has none and measures in half-points.
   expect(
     toBlocks(doc(para(text("big", [{ type: "fontSize", attrs: { size: 1.5 } }])))),
   ).toEqual([
     {
       kind: "paragraph",
       depth: 0,
-      runs: [{ text: "big", fontSize: "calc(var(--ms-size, 1em) * 1.5)" }],
+      runs: [
+        {
+          text: "big",
+          fontSize: "calc(var(--ms-size, 1em) * 1.5)",
+          sizeMultiple: 1.5,
+        },
+      ],
     },
   ]);
 });
@@ -295,6 +303,36 @@ describe("isUntouchedMatter", () => {
 
   it("counts empty paragraphs between headings as still untouched", () => {
     expect(isUntouchedMatter([heading("Dedication"), para("   ")])).toBe(true);
+  });
+
+  /**
+   * **A half-title page is one heading, and it used to be thrown away.**
+   *
+   * Every heading was ignored outright, so a page whose writing *is* a heading
+   * read as empty: imported from a manuscript, a half-title arrives as a single
+   * `<h2>` carrying the book's title, showed Draft in the panel, and was left
+   * out of every exported file. The rule is narrower now — a heading naming a
+   * standard division is the old one-page template, anything else is writing.
+   */
+  it("counts a heading that is the writer's own words as content", () => {
+    expect(isUntouchedMatter([heading("The Lighthouse Beyond the Rain")])).toBe(
+      false,
+    );
+    // Even beside the empty paragraph an import leaves after it.
+    expect(
+      isUntouchedMatter([heading("The Salt Road"), para("")]),
+    ).toBe(false);
+  });
+
+  it("still drops a page of nothing but division names", () => {
+    // The old one-page design, untouched: a stack of printer's terms that must
+    // not ship. Its headings are names from the catalogue, which is what tells
+    // it apart from the page above.
+    expect(
+      isUntouchedMatter([heading("Glossary"), heading("Acknowledgements")]),
+    ).toBe(true);
+    // Case and spacing are the catalogue's own comparison.
+    expect(isUntouchedMatter([heading("  COPYRIGHT PAGE ")])).toBe(true);
   });
 
   it("is true for a page still carrying its seeded placeholder", () => {

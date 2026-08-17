@@ -1,6 +1,6 @@
 import type { JSONContent } from "@tiptap/react";
 import { fontStack } from "@/lib/typography";
-import { hasPlaceholder, isApparatusPage } from "@/lib/matter";
+import { hasPlaceholder, isApparatusPage, matterPartOf } from "@/lib/matter";
 import { getBody, isGenericChapterTitle } from "@/lib/library-store";
 import { stripInvalidXml } from "./xhtml";
 
@@ -38,6 +38,13 @@ export interface Run {
   href?: string;
   /** An inline font size, as a CSS length (e.g. "1.3em"). See lib/editor/font-size. */
   fontSize?: string;
+  /**
+   * The same size as the multiple of the body size it is stored as.
+   *
+   * For the Word file, which carries none of our CSS and wants half-points.
+   * Set whenever `fontSize` is.
+   */
+  sizeMultiple?: number;
   /** An inline font family, as a CSS stack. See lib/editor/font-family. */
   fontFamily?: string;
 }
@@ -211,8 +218,16 @@ function runsFrom(content: JSONContent[] | undefined): Run[] {
           // The mark stores a multiple of the body size; render it the same way
           // the editor does. Kept inline rather than importing the editor module
           // so the export layer stays free of it.
+          //
+          // **Both forms, because the four renderers do not want the same
+          // one.** The CSS string is what the EPUB, the print document and the
+          // reading view emit; a `.docx` has no stylesheet of ours and measures
+          // type in half-points, so it needs the number the string was built
+          // from. Re-parsing the string a line later would be reading back
+          // something this function had just written.
           if (typeof mark.attrs?.size === "number") {
             run.fontSize = `calc(var(--ms-size, 1em) * ${mark.attrs.size})`;
+            run.sizeMultiple = mark.attrs.size;
           }
           break;
       }
@@ -360,11 +375,31 @@ export function toBlocks(doc: JSONContent): Block[] {
  *
  * Two things count as scaffolding, and the second is the useful one:
  *
- * - **Nothing under the heading.** A page with no prose at all has nothing to
+ * - **Nothing on the page.** A page with no content at all has nothing to
  *   print but its own title.
  * - **A `[placeholder]` left anywhere on it.** Deliberately unforgiving — a
  *   copyright page with the year filled in and `[author name]` still in it is
  *   half-done, and half-done is the state that actually ships by accident.
+ *
+ * **A heading counts, unless it is the name of a division.** Every heading was
+ * ignored outright for a long time, and that discarded the pages this matters
+ * most for: a half-title page carries the book's title and nothing else, so
+ * imported from a manuscript it arrives as a single `<h2>` — which was marked
+ * Draft in the panel and dropped from every exported file, the writer's own
+ * page silently missing from the book.
+ *
+ * The exclusion was not baseless, though, and the narrower rule is what keeps
+ * both cases right. **The old one-page design** put every standard division on
+ * a single sheet as a heading, and books made before it changed still carry
+ * one; untouched, that page is a stack of printer's terms and nothing else,
+ * and it must not ship. Its headings are division *names* — "Copyright page",
+ * "Dedication" — where an imported page's heading is the writer's own words.
+ * So the catalogue decides: a heading naming a standard section is
+ * scaffolding, any other heading is writing.
+ *
+ * (Nothing this app seeds today is affected either way. `matterPageDoc` writes
+ * paragraphs only and never a heading, because the page's name is printed
+ * above the body by the editor and by each exporter.)
  *
  * The cost is a writer who genuinely wants square brackets in their front
  * matter, which is why the export screen **names every page it left out**
@@ -384,7 +419,11 @@ export function isUntouchedMatter(blocks: readonly Block[]): boolean {
     }
     const text = b.runs.map((r) => r.text).join("");
     if (hasPlaceholder(text)) return true;
-    if (b.kind !== "heading" && text.trim() !== "") prose = true;
+    if (text.trim() === "") continue;
+    // A heading that names one of the standard divisions is the old one-page
+    // template talking, not the writer — see the note above.
+    if (b.kind === "heading" && matterPartOf(text) !== null) continue;
+    prose = true;
   }
   return !prose;
 }
