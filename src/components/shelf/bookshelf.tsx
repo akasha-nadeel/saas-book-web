@@ -606,30 +606,37 @@ export function Bookshelf({
                 </kbd>
               </div>
 
-              {/* A split button. New book is the verb; import and templates are
-              two other ways to arrive at the same place, and three peer
-              buttons in a header made none of them read as the main one. */}
+              {/* **One button that opens the menu, not a split one.**
+
+              It was a split button — the label a `<Link>` straight to
+              `/book/new`, a hairline, and the chevron opening the other three
+              ways in. The shape is a promise that the two halves do different
+              things, and it collects mis-presses for it: the target that reads
+              as "the button" is the words, and pressing the words skipped the
+              choice the menu exists to offer. Nothing is lost by folding them
+              together, because **"Blank book" is the first item in that menu**
+              and goes exactly where the label used to — one press became two
+              for the commonest path, and the other three stopped being hidden
+              behind a 20px chevron.
+
+              The divider went with it. A hairline down a button says there are
+              two controls here; there is one. */}
               <div className="ml-auto flex items-center gap-3">
                 <div className="flex items-stretch">
-                  <Link
-                    href="/book/new"
-                    className="flex items-center gap-1.5 rounded-l-lg bg-accent py-2 pr-3 pl-3.5
-                         text-sm font-semibold text-accent-ink"
-                  >
-                    {shelfIcons.plus}
-                    New book
-                  </Link>
-                  {/* The ink, not white: this divider sits *on* the accent fill,
-                    and the fill is white at night — a fixed white hairline is
-                    invisible in exactly the theme nobody checks. Same rule as
-                    `text-accent-ink`. */}
-                  <span aria-hidden="true" className="w-px bg-accent-ink/25" />
                   <Menu
-                    label="Other ways to start a book"
+                    label="New book"
                     align="end"
                     width={248}
-                    triggerClassName="flex items-center rounded-r-lg bg-accent px-1.5 text-accent-ink"
-                    trigger={shelfIcons.chevron}
+                    triggerClassName="flex items-center gap-1.5 rounded-lg bg-accent py-2 pr-2.5 pl-3.5 text-sm font-semibold text-accent-ink"
+                    trigger={
+                      <>
+                        {shelfIcons.plus}
+                        New book
+                        {/* Kept, and it is the whole of what tells a writer
+                            this opens rather than acts. */}
+                        {shelfIcons.chevron}
+                      </>
+                    }
                   >
                     {/* **Four ways in, and all four are the same road.**
                         "Import a file…" used to open a dialog that parsed the
