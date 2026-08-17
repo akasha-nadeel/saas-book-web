@@ -145,8 +145,8 @@ export function MatterSetupDialog({
                     A panel reading "your export already builds a title page, a
                     copyright page and a contents list" sat at the top of this
                     column — true, useful, and *already written on the three
-                    rows it describes*, whose hints each end "The export builds
-                    one if you skip this." Saying it twice bought nothing and
+                    rows it describes*, each of which asks the question outright
+                    the moment it is ticked. Saying it twice bought nothing and
                     cost the thing you see first: the box pushed the front
                     column a hundred and thirty pixels below the back one, so
                     two lists that should scan as a pair were visibly out of

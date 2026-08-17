@@ -77,7 +77,15 @@ it("offers only the sections a book does not have yet", () => {
  */
 it("keeps the few usual pages apart from the rest", () => {
   const front = missingSections("front", []);
-  expect(front.usual.map((s) => s.title)).toEqual(["Dedication"]);
+  // The three the export builds are usual *pages* — nearly every printed book
+  // carries them — which is a separate fact from whether the writer should
+  // tick the row. See the note on `usual` and `isGeneratedPage`.
+  expect(front.usual.map((s) => s.title)).toEqual([
+    "Title page",
+    "Copyright page",
+    "Dedication",
+    "Table of contents",
+  ]);
   expect(front.rest.map((s) => s.title)).toContain("Epigraph");
 
   const back = missingSections("back", []);

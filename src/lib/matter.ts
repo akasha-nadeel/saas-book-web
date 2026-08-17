@@ -58,6 +58,14 @@ export interface MatterSection {
    *
    * Marked here rather than in the dialog because the panel's Add-page menu
    * makes the same distinction, and two lists of "the usual ones" would drift.
+   *
+   * **It answers "does a book have this", not "should you tick it".** The
+   * title page, the copyright page and the contents list are marked and are
+   * also the three the export builds for itself — nearly every printed book
+   * carries them, and on this screen that is a reason to *skip* the row rather
+   * than tick it. The badge says the first half and the hint says the second.
+   * Nothing is pre-ticked from this flag, which is what keeps the two from
+   * being read as one instruction.
    */
   usual?: true;
   /**
@@ -89,7 +97,8 @@ export const MATTER_SECTIONS: Record<MatterPart, readonly MatterSection[]> = {
     {
       title: "Title page",
       apparatus: true,
-      hint: "Title, subtitle, author, publisher. The export builds one if you skip this.",
+      usual: true,
+      hint: "Title, subtitle, author, publisher. We build this if you skip it.",
       lines: [
         "[Book title]",
         "[Subtitle — delete this line if the book has none]",
@@ -100,7 +109,8 @@ export const MATTER_SECTIONS: Record<MatterPart, readonly MatterSection[]> = {
     {
       title: "Copyright page",
       apparatus: true,
-      hint: "Who holds the rights, and the year. The export builds one if you skip this.",
+      usual: true,
+      hint: "Who holds the rights, and the year. We build this if you skip it.",
       lines: [
         "[Book title]",
         "Copyright © [year] [author name]",
@@ -131,7 +141,8 @@ export const MATTER_SECTIONS: Record<MatterPart, readonly MatterSection[]> = {
       // because the line is bracketed, an untouched one never ships.
       title: "Table of contents",
       apparatus: true,
-      hint: "Only if you want to write your own — the export builds one if you skip this.",
+      usual: true,
+      hint: "Only if you want to write your own — we build this if you skip it.",
       lines: [
         "[OpenChapter builds the contents for you when you export, from your chapter titles. You only need this page if you want to write your own — otherwise delete it.]",
       ],

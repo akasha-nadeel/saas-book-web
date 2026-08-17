@@ -20,22 +20,27 @@ it("suggests only pages that are on the offered list", () => {
 });
 
 /**
- * The starting ticks are what a first novel almost always has *and* what
- * nothing else in the app will make — not everything that looks standard. A
- * default that ticks most of the list is the Start button this screen was
- * written to replace, and it ships empty epigraphs.
+ * **Nothing is ticked until the writer ticks it**, and this is the test not to
+ * "fix" by putting a sensible default back.
+ *
+ * The screen asks what you will *write*. A tick that arrives already made is
+ * not an answer to that — it seeds a page of `[placeholders]`, which the export
+ * then has to leave out and explain in its "not going in" note. Advice belongs
+ * in the `usual` marker, which is shown rather than acted on.
  */
-it("starts with a small default rather than most of the list", () => {
-  const picked = defaultPicked();
-  const offered = MATTER_SECTIONS.front.length + MATTER_SECTIONS.back.length;
-
-  expect(picked.size).toBeLessThan(offered / 2);
-  expect(picked.has(matterKey("front", "Dedication"))).toBe(true);
+it("ticks nothing until the writer does", () => {
+  expect(defaultPicked().size).toBe(0);
+  for (const part of ["front", "back"] as const) {
+    expect(SUGGESTED[part]).toEqual([]);
+  }
 });
 
 it("never suggests a page the export already builds", () => {
   // Ticking one of these makes a written page that replaces the generated one,
-  // which is a choice rather than a default — see `isGeneratedPage`.
+  // which is a choice rather than a default — see `isGeneratedPage`. They carry
+  // the `usual` marker (a book does have a title page) *and* a line saying the
+  // export builds one, which is the pair of facts a writer needs; neither is a
+  // reason to tick the row for them.
   for (const generated of [
     "Title page",
     "Copyright page",

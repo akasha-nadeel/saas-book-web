@@ -11,26 +11,34 @@ import type { MatterPick } from "./library-store";
  * or one made before the wizard existed) — and the three things they must agree
  * about are here rather than in either of them: what is ticked to begin with,
  * how a tick is keyed, and what order the pages come out in. Two copies of
- * `SUGGESTED` would be two answers to "what does a first novel usually have",
- * which is exactly the drift the `usual` flag in `matter.ts` was written to
- * avoid.
+ * `SUGGESTED` would be two answers to one question, which is exactly the drift
+ * the `usual` flag in `matter.ts` was written to avoid.
  */
 
 /**
- * Ticked when the question is first put.
+ * Ticked when the question is first put — **nothing, on purpose**.
  *
- * A dedication and nothing else at the front, two pages at the back.
+ * It was a dedication at the front and two pages at the back, on the reasoning
+ * that those are what a first novel almost always has. That is true and it is
+ * not the question the screen asks. The deck says *tick only what you will
+ * actually write*, and a tick that arrives already made is not something the
+ * writer said: it makes a page of `[placeholders]` they never asked for, which
+ * then turns up in the export's "not going in" note as a page they have to be
+ * told about. Three pages nobody chose, explained back to them later.
  *
- * The temptation is to pre-tick everything that looks standard, which is how a
- * setup screen turns into the Start button it was written to replace. What is
- * ticked here is what a first novel almost always has *and* what nothing else
- * in the app will make for you: the title, copyright and contents pages are
- * generated at export, the epigraph and the preface are genuine choices, and a
- * prologue is a decision about the story rather than about the book.
+ * The `usual` flag is what carries the advice now — it marks the rows most
+ * books have, so the recommendation is *shown* rather than *acted on*, and the
+ * writer's own ticks are the only ones in the set. Which is also what makes
+ * the count under the list honest: "0 pages selected" is true of somebody who
+ * has not chosen yet.
+ *
+ * Kept as a table rather than deleted: it is the one place the default lives,
+ * and a future decision to pre-tick something again belongs here rather than
+ * in whichever screen thought of it first.
  */
 export const SUGGESTED: Record<MatterPart, readonly string[]> = {
-  front: ["Dedication"],
-  back: ["Acknowledgements", "About the author"],
+  front: [],
+  back: [],
 };
 
 /**

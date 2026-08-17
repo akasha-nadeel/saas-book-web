@@ -248,6 +248,25 @@
   --color-badge-pro-line: #3b1f6b;
   --color-badge-pro-ink: #d8b4fe; /* 9.1:1 */
 
+  /* **The one badge in the family that is a fill rather than a tint**, worn by
+     the "Usually" marker on the front- and back-matter rows.
+
+     The others are a pale ground with hue-matched ink, which is a *label*
+     treatment; this is a solid green lozenge carrying white, which reads
+     louder — and the rows it sits on are a list of sixteen near-identical
+     checkboxes where the whole job of the marker is to be found without
+     reading. So it follows `--color-upgrade-*` rather than the three above it
+     and is **stated identically in both theme blocks**: a saturated mid-tone
+     fill carries white type on either ground, and a value that need not change
+     should not.
+
+     The green is darker than the eye first reaches for, and it has to be. This
+     text is 10px uppercase, so it needs 4.5:1 — a bright green-500 fill sits
+     near 2:1 with white and is unreadable at this size. #15803d is 5.2:1 and
+     still unmistakably green. Do not lighten it without re-measuring. */
+  --color-badge-new-bg: #15803d;
+  --color-badge-new-ink: #ffffff; /* 5.2:1 */
+
   /* The second half of the wordmark — the "Chapter" in OpenChapter, and
      nothing else. It is a *brand* colour rather than chrome, which is why it
      is allowed a hue at all: same reasoning as the fifteen tool marks, and the
@@ -744,6 +763,11 @@
   --color-badge-pro-bg: #faf5ff;
   --color-badge-pro-line: #e9d5ff;
   --color-badge-pro-ink: #7e22ce; /* 6.7:1 */
+
+  /* Identical to the dark block on purpose — see the note there. A fill, not a
+     tint, so it does not belong to its theme the way the three above it do. */
+  --color-badge-new-bg: #15803d;
+  --color-badge-new-ink: #ffffff; /* 5.2:1 */
 
   /* The wordmark's second half, in daylight: the indigo of the landing page's
      closing banner, lifted a step. That family is the whole reason for the

@@ -46,14 +46,23 @@ export function MatterPartRows({
  * problem with the flat list was never its length — eight rows a column is
  * nothing to scan — it was that sixteen identical rows read as a checklist to
  * complete. Splitting them into "Usually included" and an "Optional" section
- * folded away would have fixed that by *hiding* thirteen real choices behind a
- * click, which is the wrong trade: a writer who wants a prologue should not
- * have to go looking for it, and progressive disclosure earns its keep on long
- * lists rather than on short ones with an uneven distribution.
+ * folded away would have fixed that by *hiding* real choices behind a click,
+ * which is the wrong trade: a writer who wants a prologue should not have to go
+ * looking for it, and progressive disclosure earns its keep on long lists
+ * rather than on short ones with an uneven distribution.
  *
- * So the rows stay where they are and three of them are marked. The eye lands
+ * So the rows stay where they are and the usual ones are marked. The eye lands
  * on the few most books have, everything else is one glance away, and nothing
  * is hidden.
+ *
+ * **Every row ticks freely, including the three the export builds.** Two
+ * louder shapes were tried on those three and both came off: a blue line under
+ * the hint reading "We build this if you skip it.", which sat there whether or
+ * not anybody was thinking about the row, and then a dialog on the tick, which
+ * put a decision in front of a writer who had already made one. Ticking a box
+ * is cheap and reversible, the page is deletable, and the export sorts out the
+ * clash later and says so at the time. A checkbox that argues back is worse
+ * than a page nobody wanted.
  */
 function SectionRow({
   section,
@@ -126,29 +135,30 @@ function SectionRow({
           <span className="font-sans text-sm font-medium text-fg">
             {section.title}
           </span>
-          {/* **A blue badge, in the palette's own blue.**
-              `--color-badge-blue-*` is the set the pricing table and the
-              shared-book badge already wear, borrowed rather than a new blue
-              invented: it is stated in both theme blocks and already measured
-              (6.4:1 by day, 10:1 at night), and a second blue three shades off
-              the first is how a palette starts lying.
+          {/* **A filled green lozenge, not a tint like the family's others.**
 
-              It is the right *family* for this word too. Blue here is a
-              state — "most books have this one" — where the `note` amber
-              would read as a warning and `ok` green as something already
-              done. It is a note about convention rather than a
-              recommendation, and it sits beside the title rather than
-              replacing the hint, because "what is this page" is still the
-              question a first novelist is asking.
+              `--color-badge-new-*` is the one badge in the palette that is a
+              fill: solid green carrying white, stated identically in both
+              theme blocks the way `--color-upgrade-*` is, because a saturated
+              mid-tone reads on either ground. It was the pale blue tint the
+              pricing table wears, and a tint is a *label* treatment — right
+              on a table of values, too quiet here, where sixteen
+              near-identical checkbox rows mean the marker's whole job is to be
+              found without reading.
 
-              `rounded` rather than a capsule: a full pill is a *control* in
+              It says a book usually *has* this page. On the three rows the
+              export builds it sits beside the blue line saying we make it, and
+              the two halves are deliberately different colours: one is a fact
+              about books, the other is a fact about this app.
+
+              `rounded-md` rather than a capsule: a full pill is a *control* in
               this app, and a label you cannot press should not borrow the
               shape of one. */}
           {section.usual && (
             <span
-              className="rounded border border-badge-blue-line bg-badge-blue-bg
-                         px-1.5 py-px font-sans text-[10px] font-semibold
-                         tracking-wide text-badge-blue-ink uppercase"
+              className="rounded-md bg-badge-new-bg px-1.5 py-0.5 font-sans
+                         text-[10px] font-bold tracking-wide text-badge-new-ink
+                         uppercase"
             >
               Usually
             </span>
