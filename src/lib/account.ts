@@ -70,7 +70,7 @@ export function accountFromClaims(claims: Record<string, unknown>): Account {
  *
  * The real name when there is one, the email's local part when there is not,
  * and "Guest" when there are no accounts at all. The middle case is a guess —
- * "kha.akashanadeel" is not what anyone calls themselves — which is exactly why
+ * "hma.priyanwada" is not what anyone calls themselves — which is exactly why
  * the real name is preferred wherever a provider gave us one.
  */
 export function displayName(account: Account | null): string {
@@ -85,7 +85,7 @@ export function displayName(account: Account | null): string {
  * Just the first word.
  *
  * For the header chip, which has room for about nine characters before it
- * truncates — and "Akasha Nadeel gun…" is worse than "Akasha" in every way: it
+ * truncates — and "Priyanwada Herath b…" is worse than "Priyanwada" in every way: it
  * is longer, less readable, and ends mid-word. The full name still appears in
  * the menu the chip opens, where there is room for it.
  */

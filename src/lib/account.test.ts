@@ -13,8 +13,8 @@ const GOOGLE_CLAIMS = {
   user_metadata: {
     avatar_url: "https://lh3.googleusercontent.com/a/photo=s96-c",
     email: "writer@gmail.com",
-    full_name: "Akasha Nadeel gunathilake",
-    name: "Akasha Nadeel gunathilake",
+    full_name: "Priyanwada Herath",
+    name: "Priyanwada Herath",
     picture: "https://lh3.googleusercontent.com/a/photo=s96-c",
   },
 };
@@ -29,7 +29,7 @@ describe("accountFromClaims", () => {
   it("reads the name and photo a provider gave us", () => {
     expect(accountFromClaims(GOOGLE_CLAIMS)).toEqual({
       email: "writer@gmail.com",
-      name: "Akasha Nadeel gunathilake",
+      name: "Priyanwada Herath",
       avatarUrl: "https://lh3.googleusercontent.com/a/photo=s96-c",
     });
   });
@@ -98,21 +98,21 @@ describe("accountFromClaims", () => {
 
 describe("displayName", () => {
   const account = (over: Partial<Account> = {}): Account => ({
-    email: "kha.akashanadeel@gmail.com",
+    email: "hma.priyanwada@gmail.com",
     name: null,
     avatarUrl: null,
     ...over,
   });
 
   it("prefers the real name", () => {
-    expect(displayName(account({ name: "Akasha Nadeel gunathilake" }))).toBe(
-      "Akasha Nadeel gunathilake",
+    expect(displayName(account({ name: "Priyanwada Herath" }))).toBe(
+      "Priyanwada Herath",
     );
   });
 
   // A guess, and a poor one — which is the whole reason the name above wins.
   it("falls back to the email's local part", () => {
-    expect(displayName(account())).toBe("kha.akashanadeel");
+    expect(displayName(account())).toBe("hma.priyanwada");
   });
 
   it("says Guest when there is no account at all", () => {
@@ -126,20 +126,20 @@ describe("displayName", () => {
 
 describe("firstNameOf", () => {
   it("takes the first word", () => {
-    expect(firstNameOf("Akasha Nadeel gunathilake")).toBe("Akasha");
+    expect(firstNameOf("Priyanwada Herath bandara")).toBe("Priyanwada");
   });
 
   it("leaves a single word alone", () => {
-    expect(firstNameOf("Akasha")).toBe("Akasha");
+    expect(firstNameOf("Priyanwada")).toBe("Priyanwada");
   });
 
   // The email-fallback case: no spaces, so there is nothing to cut.
   it("leaves an email local part alone", () => {
-    expect(firstNameOf("kha.akashanadeel")).toBe("kha.akashanadeel");
+    expect(firstNameOf("hma.priyanwada")).toBe("hma.priyanwada");
   });
 
   it("ignores surrounding and repeated space", () => {
-    expect(firstNameOf("  Akasha   Nadeel ")).toBe("Akasha");
+    expect(firstNameOf("  Priyanwada   Herath ")).toBe("Priyanwada");
   });
 
   it("gives back what it was given when there is no word at all", () => {
@@ -149,8 +149,8 @@ describe("firstNameOf", () => {
 
 describe("initialOf", () => {
   it("takes the first letter, upper-cased", () => {
-    expect(initialOf("Akasha Nadeel gunathilake")).toBe("A");
-    expect(initialOf("kha.akashanadeel")).toBe("K");
+    expect(initialOf("Priyanwada Herath bandara")).toBe("P");
+    expect(initialOf("hma.priyanwada")).toBe("H");
   });
 
   it("ignores leading space", () => {

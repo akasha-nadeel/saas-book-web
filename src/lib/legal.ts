@@ -23,8 +23,24 @@ export const TRADING_NAME = "OpenChapter";
 /** Where the operator is, which is also whose law governs the terms. */
 export const COUNTRY = "Sri Lanka";
 
-/** The one address on the site. Support, refunds, privacy requests, all of it. */
-export const CONTACT_EMAIL = "kha.akashanadeel@gmail.com";
+/**
+ * The one address on the site. Support, refunds, privacy requests, all of it.
+ *
+ * **On the domain rather than a personal inbox, and that is not vanity.** This
+ * was a `gmail.com` address until 2026-08-20, printed beside the operator's
+ * full legal name on the landing page, the footer and all four legal pages —
+ * which is the pairing a payment reviewer reads as an individual rather than a
+ * business, on the one product that is asking for a card. It is the same
+ * reasoning `send.ts` gives for never sending *as* the owner: an address on the
+ * domain that is selling is what a gateway, a card network and a customer with
+ * a complaint all expect to find.
+ *
+ * It has to **receive**, not merely exist — Resend sends and does not give the
+ * domain an inbox. Forwarded to a real mailbox, and tested before this line
+ * changed, because an address on four legal pages that bounces is worse than
+ * the personal one it replaced.
+ */
+export const CONTACT_EMAIL = "contact@openchapterapp.com";
 
 /**
  * When these pages last changed, written out rather than generated.
@@ -33,7 +49,7 @@ export const CONTACT_EMAIL = "kha.akashanadeel@gmail.com";
  * day, which tells a reader nothing and is untrue. Bump it by hand when the
  * words change.
  */
-export const UPDATED = "8 August 2026";
+export const UPDATED = "20 August 2026";
 
 /**
  * The no-questions refund window, in days from the first payment.

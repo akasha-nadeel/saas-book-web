@@ -232,7 +232,7 @@ export function AccountMenu({
             arrow never did.
 
             Only the first name: the chip truncates at about nine characters,
-            and "Akasha Nadeel gun…" is longer and less readable than "Akasha".
+            and "Priyanwada Herath b…" is longer and less readable than "Priyanwada".
             The full name is in the menu, where there is room for it.
 
             The two lines are set tight and the block is centred on the avatar
