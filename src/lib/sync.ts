@@ -93,6 +93,10 @@ interface ChapterRow {
   matter: "front" | "back" | null;
   matter_key: "front" | "back" | null;
   bookmarked: boolean | null;
+  /** Arrives with the chapter-numbering migration; absent on an older database
+   *  and survivable, which is what `upsertChapters` below is for. Optional so
+   *  the retry can drop it and still be a `ChapterRow`. */
+  unnumbered?: boolean | null;
   trashed_at: string | null;
 }
 
@@ -209,6 +213,7 @@ function chapterToRow(
     // Coerced, not passed through: a truthy non-boolean here would be rejected
     // by the column just as surely.
     bookmarked: chapter.bookmarked ? true : null,
+    unnumbered: chapter.unnumbered ? true : null,
     trashed_at: toIso(trashedAt),
   };
 }
@@ -221,6 +226,7 @@ function rowToChapter(row: ChapterRow): ChapterMeta {
   };
   // Only set when true/present — see the note above about absence.
   if (row.bookmarked) chapter.bookmarked = true;
+  if (row.unnumbered) chapter.unnumbered = true;
   if (row.matter) chapter.matter = row.matter;
   if (row.matter_key) chapter.matterKey = row.matter_key;
   return chapter;
@@ -1099,6 +1105,49 @@ function chapterRowsOf(
   return changed ? rows.filter((r) => changed.has(r.id)) : rows;
 }
 
+/** So a whole library's worth of chapters does not each say the same thing. */
+let warnedMissingUnnumbered = false;
+
+/**
+ * Chapter rows up, surviving a database that has not learned `unnumbered` yet.
+ *
+ * **PostgREST refuses the whole row for one unknown column**, so a shelf
+ * carrying this field against a database without the migration would stop
+ * syncing chapters entirely — prose, titles, order and all — for the sake of
+ * one optional flag. That is the catastrophe `pushBook` already defends the
+ * `publishing` column against, and this is the same answer in the same shape:
+ * send it, and on that one error send what worked before.
+ *
+ * Both push paths go through here, the owner's and a collaborator's, because a
+ * fallback only one of them has is a fallback that fails for somebody.
+ */
+async function upsertChapters(
+  db: ReturnType<typeof createClient>,
+  rows: ChapterRow[],
+) {
+  const { error } = await db.from("chapters").upsert(rows);
+  if (!error) return;
+  if (!missingColumn(error, "unnumbered")) throw denied(error, "chapters");
+
+  if (!warnedMissingUnnumbered) {
+    warnedMissingUnnumbered = true;
+    console.warn(
+      "[sync] the chapters table has no `unnumbered` column, so a chapter " +
+        "taken out of the numbering is not being saved to the server. " +
+        "Everything else is syncing normally. Apply " +
+        "supabase/migrations/20260820000000_chapter_unnumbered.sql.",
+    );
+  }
+
+  const without = rows.map((row) => {
+    const copy = { ...row };
+    delete copy.unnumbered;
+    return copy;
+  });
+  const retry = await db.from("chapters").upsert(without);
+  if (retry.error) throw denied(retry.error, "chapters");
+}
+
 /**
  * @param changed Which chapter ids actually differ from the last push, or
  *   undefined when there is no baseline to compare against and everything must
@@ -1214,8 +1263,7 @@ export function pushBook(
         sent();
         return;
       }
-      const { error } = await db.from("chapters").upsert(rows);
-      if (error) throw denied(error, "chapters");
+      await upsertChapters(db, rows);
       sent();
       return;
     }
@@ -1265,8 +1313,7 @@ export function pushBook(
       sent();
       return;
     }
-    const { error: chapterError } = await db.from("chapters").upsert(rows);
-    if (chapterError) throw denied(chapterError, "chapters");
+    await upsertChapters(db, rows);
     sent();
   });
 }

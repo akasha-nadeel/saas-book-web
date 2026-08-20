@@ -20,6 +20,7 @@ import {
   rememberMatterAsked,
   renameChapter,
   setChapterMatter,
+  setChapterUnnumbered,
   shouldAskMatter,
   startMatter,
   toggleBookmark,
@@ -43,38 +44,41 @@ import {
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
 
 /**
- * The two parts of the book a page is not already in.
+ * Moving a page between the parts, and why it is back.
  *
- * **The store has been able to do this since front and back matter existed and
- * nothing could ask it to.** `setChapterMatter` was written, tested and left
- * with no caller: the row menu offered Star, Rename and Delete, so a page that
- * came into the book in the wrong part could only be got out of it by deleting
- * it and typing it again. That was survivable while every page was made by hand
- * in the right place, and stopped being survivable the moment an import could
- * put one in the wrong one — a heading this app does not recognise lands in the
- * body, and the repair has to be somewhere.
+ * This menu offered **Move to front matter / the body / back matter** until
+ * 2026-08-20, when the owner asked for them off: three destinations on every
+ * page's menu, for a repair most books never need. The objection was right
+ * about the *three* — one of them was always the part the page was already in,
+ * so a third of that clutter did nothing at all.
  *
- * Named for the destination rather than the action ("Move to front matter", not
- * "Change part") because the writer knows where they want it, and the current
- * part is left out of the list rather than shown ticked: an item that does
- * nothing is the dead UI the house rules forbid.
+ * It came back the same day, and the reason is the import. `matterDivisionOf`
+ * reads a heading against a table and calls everything it does not recognise a
+ * chapter, which is the right default and is also, sometimes, wrong: a novel
+ * with a chapter genuinely called "The End" now has it filed as back matter.
+ * Widening that table — which is what makes the common case work — is only safe
+ * while there is a way back from a wrong answer. Without this menu there was
+ * none: the page could be deleted and typed again, and that is all.
+ *
+ * So: restored, minus the no-op. `destinationsFrom` leaves out the part the
+ * page is in, so a row offers two moves rather than three.
  */
-function movePartItems(
+function destinationsFrom(
   bookId: string,
   chapterId: string,
   from: ChapterMatter,
 ): RowMenuItem[] {
-  const parts: { part: ChapterMatter; label: string }[] = [
-    { part: "front", label: "Move to front matter" },
-    { part: "body", label: "Move to the body" },
-    { part: "back", label: "Move to back matter" },
+  const all: { to: ChapterMatter; label: string }[] = [
+    { to: "front", label: "Move to front matter" },
+    { to: "body", label: "Move to the body" },
+    { to: "back", label: "Move to back matter" },
   ];
-  return parts
-    .filter((p) => p.part !== from)
-    .map(({ part, label }) => ({
-      label,
+  return all
+    .filter((d) => d.to !== from)
+    .map((d) => ({
+      label: d.label,
       icon: menuIcons.movePart,
-      onSelect: () => setChapterMatter(bookId, chapterId, part),
+      onSelect: () => setChapterMatter(bookId, chapterId, d.to),
     }));
 }
 
@@ -927,11 +931,21 @@ export function BookPanel({
                           if (trimmed) renameChapter(bookId, c.id, trimmed);
                         },
                       },
-                      // An imported manuscript is where this earns its place: a
-                      // dedication or a glossary whose heading was not
-                      // recognised arrives here, in the body, and this is how it
-                      // is put right.
-                      ...movePartItems(bookId, c.id, "body"),
+                      /* **Only on the body's list, and only one item.** The
+                         three Move-to-part entries came off this menu the same
+                         day for being three destinations on every page; this is
+                         one line, on the one list where it means anything — a
+                         front-matter page is named rather than numbered and has
+                         nothing to take out. See `ChapterMeta.unnumbered`. */
+                      {
+                        label: c.unnumbered
+                          ? "Number this one"
+                          : "Don’t number this one",
+                        icon: menuIcons.numbering,
+                        onSelect: () =>
+                          setChapterUnnumbered(bookId, c.id, !c.unnumbered),
+                      },
+                      ...destinationsFrom(bookId, c.id, "body"),
                       {
                         label: "Delete",
                         icon: menuIcons.trash,
@@ -1731,10 +1745,9 @@ function MatterPagesCard({
                   if (trimmed) renameChapter(bookId, page.id, trimmed);
                 },
               },
-              // Both directions: a page filed at the front that belongs at the
-              // back, and one that was never apparatus at all and should go
-              // back to being a chapter.
-              ...movePartItems(bookId, page.id, part),
+              /* The direction that matters most for an import: a page the
+                 catalogue put in the wrong part, back into the story. */
+              ...destinationsFrom(bookId, page.id, part),
               {
                 label: "Delete",
                 icon: menuIcons.trash,

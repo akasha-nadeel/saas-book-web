@@ -3,6 +3,7 @@ import {
   MATTER_SECTIONS,
   hasPlaceholder,
   isGeneratedPage,
+  matterDivisionOf,
   matterPartOf,
   matterSection,
   matterSectionIndex,
@@ -198,7 +199,135 @@ it("leaves a chapter alone, which is nearly every heading in a book", () => {
   expect(matterPartOf("Chapter One")).toBeNull();
   expect(matterPartOf("Returning to Mirissa")).toBeNull();
   expect(matterPartOf("Prologue to a Murder")).toBeNull();
-  expect(matterPartOf("The End")).toBeNull();
+  /* "The End" used to be asserted null here and is now recognised — see the
+     import-only tests below. The principle this test protects is unchanged: no
+     *rule* may reach into a manuscript and take a chapter. An exact-match table
+     entry is not that rule, and the heading it catches was costing a real book
+     a chapter number. */
   expect(matterPartOf("")).toBeNull();
   expect(matterPartOf("   ")).toBeNull();
+});
+
+it("recognises the closing lines a manuscript ends on", () => {
+  /* The case this was built for: a bare "END" is not in `MATTER_SECTIONS`, so
+     it arrived as the last *chapter* of the book and spent a chapter number.
+     Every chapter after a stray like that counts one too high, which is how a
+     writer's chapter nine came to print "Chapter Ten". */
+  expect(matterPartOf("END")).toBe("back");
+  expect(matterPartOf("The End")).toBe("back");
+  expect(matterPartOf("the end")).toBe("back");
+  expect(matterPartOf("Fin")).toBe("back");
+});
+
+it("recognises the apparatus a novel carries but we do not offer", () => {
+  expect(matterPartOf("Author's Note")).toBe("back");
+  expect(matterPartOf("Discussion Questions")).toBe("back");
+  expect(matterPartOf("Content Warning")).toBe("front");
+  expect(matterPartOf("Dramatis Personae")).toBe("front");
+});
+
+it("gives an import-only page the catalogue's spelling, not the manuscript's", () => {
+  // Same rule the standard divisions follow: a Word file shouts its headings,
+  // and `THE END` sitting beside `The End` is one page showing as two rows.
+  expect(matterDivisionOf("THE END")?.title).toBe("The End");
+  expect(matterDivisionOf("fin")?.title).toBe("The End");
+  expect(matterDivisionOf("A NOTE FROM THE AUTHOR")?.title).toBe("Author's note");
+});
+
+it("never offers an import-only page in the Add-page menu", () => {
+  /* The whole reason the table is separate. A name here is recognised on the
+     way in and is *not* a `MatterSection`, so it takes the path a page the
+     writer named themselves already takes — and nobody is offered "The End" as
+     a page to create. */
+  for (const name of ["The End", "Author's note", "Content warning"]) {
+    for (const part of ["front", "back"] as const) {
+      expect(matterSection(part, name)).toBeNull();
+      expect(matterTitles(part)).not.toContain(name);
+    }
+  }
+});
+
+it("lets a standard section win over an import-only name", () => {
+  // The offer is the stronger claim: the second table is asked last, so it can
+  // never shadow a page the panel can actually create.
+  for (const part of ["front", "back"] as const) {
+    for (const section of MATTER_SECTIONS[part]) {
+      expect(matterDivisionOf(section.title)).toEqual({
+        part,
+        title: section.title,
+      });
+    }
+  }
+});
+
+it("does not mistake an inherited property for a division", () => {
+  /* The key is a heading out of somebody's manuscript, and a plain object
+     answers these with something inherited rather than undefined. A chapter
+     called "Constructor" being filed as back matter is the writer losing a
+     chapter to a JavaScript detail. */
+  for (const name of ["toString", "constructor", "__proto__", "valueOf"]) {
+    expect(matterPartOf(name)).toBeNull();
+    expect(matterDivisionOf(name)).toBeNull();
+  }
+});
+
+it("recognises the spellings a manuscript actually writes", () => {
+  /* Measured, not guessed: of 36 headings a real book carries, six were
+     recognised before this. "Copyright" is the one that mattered — the slot is
+     "Copyright page" and a manuscript writes the word, so the commonest
+     apparatus page in publishing was arriving as chapter one. */
+  expect(matterDivisionOf("Copyright")).toEqual({
+    part: "front",
+    title: "Copyright page",
+  });
+  expect(matterDivisionOf("Acknowledgment")?.title).toBe("Acknowledgements");
+  expect(matterDivisionOf("Acknowledgement")?.title).toBe("Acknowledgements");
+  expect(matterDivisionOf("Dedication page")?.title).toBe("Dedication");
+  expect(matterDivisionOf("Author Bio")?.title).toBe("About the author");
+  expect(matterDivisionOf("TOC")?.title).toBe("Table of contents");
+});
+
+it("recognises the apparatus at the far end of a book", () => {
+  for (const name of [
+    "Colophon", "Bibliography", "Index", "Appendix", "Appendices",
+    "Endnotes", "Postscript", "About the Publisher", "Translator's Note",
+  ]) {
+    expect(matterPartOf(name)).toBe("back");
+  }
+  for (const name of ["A Note on the Text", "Pronunciation Guide", "Family Tree"]) {
+    expect(matterPartOf(name)).toBe("front");
+  }
+});
+
+it("still leaves the headings that could be a chapter alone", () => {
+  /* The other half of the same decision, and the one that protects the writer.
+     Each of these is a plausible chapter heading — a thriller opening on "The
+     Map", a literary novel with an "Interlude" — so none of them is in either
+     table. Taking a chapter out of somebody's book is worse than leaving a
+     stray page in it. If one of these is ever added, this test should be the
+     argument against it. */
+  for (const name of [
+    "Map", "Maps", "Notes", "Preview", "Praise", "Reviews",
+    "Timeline", "Interlude", "Coda", "Part One", "Part I",
+  ]) {
+    expect(matterPartOf(name)).toBeNull();
+  }
+});
+
+it("every alias and import-only name lands on a real page", () => {
+  /* Walks the answers rather than the tables, which are private: whatever a
+     name resolves to has to be a title something can actually show — a
+     standard section, or a page carrying its own name in the right part. */
+  const names = [
+    "Copyright", "Acknowledgment", "Dedication page", "TOC", "Author Bio",
+    "The End", "Fin", "Colophon", "Index", "Family Tree", "Content Warning",
+  ];
+  for (const name of names) {
+    const division = matterDivisionOf(name);
+    expect(division).not.toBeNull();
+    expect(division!.title.trim()).not.toBe("");
+    // Idempotent: feeding a division's own title back in returns the same
+    // answer, or the panel and a re-import would disagree about one page.
+    expect(matterDivisionOf(division!.title)).toEqual(division);
+  }
 });

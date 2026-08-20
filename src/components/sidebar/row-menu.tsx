@@ -333,6 +333,16 @@ export const menuIcons = {
       />
     </svg>
   ),
+  /* Taking a page out of the numbering, or putting it back: a numeral over the
+     page it heads. The digit is drawn rather than typed so it takes
+     `currentColor` and scales with the rest of the set. */
+  numbering: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M8.1 3.6 9.9 2.6v5.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.4 8.2h3" strokeLinecap="round" />
+      <rect x="3.4" y="11" width="13.2" height="6.4" rx="1.1" />
+    </svg>
+  ),
   export: (
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M10 2.9v8.7" strokeLinecap="round" />

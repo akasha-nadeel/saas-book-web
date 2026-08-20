@@ -287,6 +287,97 @@ const MATTER_ALIASES: Record<string, string> = {
   "half title page": "Half-title page",
   "half-title": "Half-title page",
   "about the authors": "About the author",
+  /* Measured rather than guessed: of 36 headings a real book carries, the
+     catalogue recognised six. **"Copyright" is the one that mattered** — the
+     slot is called "Copyright page" and a manuscript simply writes the word, so
+     the commonest apparatus page in publishing was arriving as chapter one.
+     The rest are the same shape: a spelling of a page that already exists. */
+  copyright: "Copyright page",
+  "copyright notice": "Copyright page",
+  // Singular, in both spellings. The plural was here; the page most likely to
+  // carry either was not.
+  acknowledgment: "Acknowledgements",
+  acknowledgement: "Acknowledgements",
+  "dedication page": "Dedication",
+  "contents page": "Table of contents",
+  toc: "Table of contents",
+  "author bio": "About the author",
+  "author biography": "About the author",
+  "glossary of terms": "Glossary",
+  "also by": "Also by the author",
+  "also by the same author": "Also by the author",
+};
+
+/**
+ * Names a manuscript uses that are not chapters — and are not pages we offer.
+ *
+ * **`MATTER_SECTIONS` was doing two jobs, and they had come apart.** That list
+ * is both the table the importer matches against *and* the offer in the panel's
+ * Add-page menu, so the only way to teach the importer about a heading was to
+ * start offering it as a page to create. "The End" is the case that made it
+ * plain: it is the commonest closing line in a manuscript, and nobody has ever
+ * wanted it in a menu of pages to add.
+ *
+ * The cost of not knowing it was not cosmetic. An unrecognised heading is a
+ * *chapter* — which is the right default and the reason `matterDivisionOf`
+ * answers null so often — so a bare `END` became the last chapter of the book
+ * and took a chapter number with it. Every chapter after a stray like that
+ * counts one too high, and the writer sees it as chapter nine printing
+ * "Chapter Ten": the opener and the title disagreeing with nothing to say why.
+ *
+ * **A name here is recognised, not offered.** It is deliberately *not* a
+ * `MatterSection`, so `matterSection()` still answers null for it and
+ * `matterSectionIndex` sorts it after the standard pages — the path a page the
+ * writer named themselves already takes. Nothing downstream learns a new idea.
+ *
+ * Same discipline as `MATTER_ALIASES`: exact matches, a table rather than a
+ * rule. Each entry is a phrase that is a heading and cannot be a chapter title.
+ * "The End" and "Fin" close a book; an author's note, a content warning, a cast
+ * list and a set of discussion questions are apparatus a reader skips past.
+ * When in doubt the entry stays out — leaving a heading as a chapter is a
+ * mistake the writer can see and fix, while taking one out of their book is a
+ * mistake they have to notice first.
+ */
+const IMPORT_ONLY: Record<string, { part: MatterPart; title: string }> = {
+  "the end": { part: "back", title: "The End" },
+  end: { part: "back", title: "The End" },
+  fin: { part: "back", title: "The End" },
+  "author's note": { part: "back", title: "Author's note" },
+  "authors note": { part: "back", title: "Author's note" },
+  "a note from the author": { part: "back", title: "Author's note" },
+  "note from the author": { part: "back", title: "Author's note" },
+  "content warning": { part: "front", title: "Content warning" },
+  "content warnings": { part: "front", title: "Content warning" },
+  "trigger warning": { part: "front", title: "Content warning" },
+  "trigger warnings": { part: "front", title: "Content warning" },
+  "cast of characters": { part: "front", title: "Cast of characters" },
+  "dramatis personae": { part: "front", title: "Cast of characters" },
+  "discussion questions": { part: "back", title: "Discussion questions" },
+  "book club questions": { part: "back", title: "Discussion questions" },
+  "reading group guide": { part: "back", title: "Discussion questions" },
+  /* The apparatus at the far end of a book. Every one of these is a printer's
+     term for a division and none of them is a sentence anybody would head a
+     chapter with — which is the whole test for being on this list. */
+  colophon: { part: "back", title: "Colophon" },
+  bibliography: { part: "back", title: "Bibliography" },
+  index: { part: "back", title: "Index" },
+  appendix: { part: "back", title: "Appendix" },
+  appendices: { part: "back", title: "Appendix" },
+  endnotes: { part: "back", title: "Endnotes" },
+  postscript: { part: "back", title: "Postscript" },
+  "about the publisher": { part: "back", title: "About the publisher" },
+  "translator's note": { part: "back", title: "Translator's note" },
+  "translators note": { part: "back", title: "Translator's note" },
+  "a note on the text": { part: "front", title: "A note on the text" },
+  "note on the text": { part: "front", title: "A note on the text" },
+  "pronunciation guide": { part: "front", title: "Pronunciation guide" },
+  "family tree": { part: "front", title: "Family tree" },
+  /* **Deliberately not here**, and worth writing down so it is not "fixed"
+     later: Map, Notes, Preview, Praise, Reviews, Timeline, Interlude, Coda.
+     Each is a plausible chapter heading — a thriller opening on "The Map", a
+     literary novel with an "Interlude" — and taking a chapter out of somebody's
+     book is a worse failure than leaving a stray page in it. Those are what the
+     import banner and `unnumbered` are for. */
 };
 
 /**
@@ -320,12 +411,28 @@ export function matterDivisionOf(
 ): { part: MatterPart; title: string } | null {
   const wanted = title.trim().toLowerCase();
   if (!wanted) return null;
-  const canonical = MATTER_ALIASES[wanted] ?? title;
+  /* **`hasOwn`, not a bare lookup, and it is not a nicety.** The key is a
+     heading out of somebody's manuscript, and a plain object answers
+     `toString`, `constructor` and `valueOf` with an inherited *function*. That
+     function then arrived here as `canonical` and went into `matterSection`,
+     which called `.trim()` on it — so a chapter headed with any of those words
+     did not import as a chapter, or as a matter page: it threw a TypeError and
+     took the whole import down with it. */
+  const canonical = Object.hasOwn(MATTER_ALIASES, wanted)
+    ? MATTER_ALIASES[wanted]
+    : title;
   for (const part of ["front", "back"] as const) {
     const section = matterSection(part, canonical);
     if (section) return { part, title: section.title };
   }
-  return null;
+  /* The pages we recognise but do not offer, asked *after* the standard ones so
+     a name that is both is answered by the section it has — the offer is the
+     stronger claim, and this table can never shadow it.
+
+     Guarded with `hasOwn` for the same reason the alias lookup above is — a
+     heading of "toString" or "constructor" is otherwise answered with something
+     inherited from `Object.prototype` rather than with undefined. */
+  return Object.hasOwn(IMPORT_ONLY, wanted) ? IMPORT_ONLY[wanted] : null;
 }
 
 /** Just the part, for a caller that has no use for the name. */

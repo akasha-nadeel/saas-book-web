@@ -30,6 +30,7 @@ import {
   isGenericChapterTitle,
   orderedChapters,
   setChapterMatter,
+  setChapterUnnumbered,
   spellNumber,
   importIntoBook,
   restoreChapter,
@@ -1825,6 +1826,43 @@ it("numbers only body chapters, never front or back matter", () => {
   expect(chapterNumberOf(book, body2)).toBe(2);
   expect(chapterNumberOf(book, back)).toBeNull();
 });
+
+it("steps over a body page the writer took out of the numbering", () => {
+  /* A part title, an interlude, or a heading the importer could not place sits
+     in the body and would otherwise spend a chapter number, so every chapter
+     after it counts one too high — the bug that had a writer's chapter nine
+     printing "Chapter Ten". See `ChapterMeta.unnumbered`. */
+  const { bookId, chapterId } = createBook();
+  const stray = createChapter(bookId, "END");
+  const after = createChapter(bookId, "Chapter Two");
+
+  setChapterUnnumbered(bookId, stray, true);
+
+  const book = findBook(getShelf(), bookId)!;
+  // No number of its own...
+  expect(chapterNumberOf(book, stray)).toBeNull();
+  // ...and it does not spend one: the run carries on unbroken rather than
+  // skipping from one to three.
+  expect(chapterNumberOf(book, chapterId)).toBe(1);
+  expect(chapterNumberOf(book, after)).toBe(2);
+});
+
+it("puts a chapter back in the numbering, carrying no field when it is", () => {
+  const { bookId, chapterId } = createBook();
+  const second = createChapter(bookId, "Chapter Two");
+
+  setChapterUnnumbered(bookId, second, true);
+  expect(chapterNumberOf(findBook(getShelf(), bookId)!, second)).toBeNull();
+
+  setChapterUnnumbered(bookId, second, false);
+  const book = findBook(getShelf(), bookId)!;
+  expect(chapterNumberOf(book, second)).toBe(2);
+  // Absence means false, like `bookmarked` — a chapter put back carries no
+  // field at all, or the shelf grows a key for every chapter ever toggled.
+  expect("unnumbered" in book.chapters.find((c) => c.id === second)!).toBe(false);
+  expect(chapterNumberOf(book, chapterId)).toBe(1);
+});
+
 
 it("numbers a new chapter past the body, ignoring front matter", () => {
   const { bookId, chapterId } = createBook();

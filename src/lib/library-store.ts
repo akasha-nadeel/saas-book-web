@@ -145,6 +145,29 @@ export interface ChapterMeta {
   /** Front or back matter. Absent means a body chapter — see ChapterMatter. */
   matter?: "front" | "back";
   /**
+   * In the body, but not one of the numbered chapters.
+   *
+   * **A chapter's number is its position, and that is only right while every
+   * body page is a chapter.** A part title, an interlude, or a heading the
+   * importer could not place — a bare "END" is the one that started this —
+   * sits in the body and silently takes a number, and every chapter after it
+   * counts one too high. What the writer sees is chapter nine printing
+   * "Chapter Ten", with the opener and the title disagreeing and nothing on
+   * screen saying why.
+   *
+   * Marked by the writer from the panel's row menu, never detected. The
+   * alternative was to compare the titles' own numbers against their positions
+   * and exclude what looked like a stray, and that is a guess — silently wrong
+   * in exactly the case it is meant to catch, which is the failure this field
+   * exists to end. Vellum and Scrivener both settle it the same way: the
+   * document is excluded because somebody said so.
+   *
+   * Absent rather than false, like `bookmarked` — the common case carries no
+   * field, so the shelf stays small and an older tab reading a newer book sees
+   * a chapter it understands.
+   */
+  unnumbered?: true;
+  /**
    * **Legacy: the one combined front- or back-matter page.**
    *
    * Front and back matter used to be a single page each, holding every standard
@@ -194,11 +217,22 @@ export function matterPages(
  * A body chapter's number — its position among the body chapters alone, so the
  * count is 1, 2, 3 no matter how much front or back matter sits around it.
  * Returns null for front and back matter, which are named, not numbered.
+ *
+ * **A chapter marked `unnumbered` is stepped over rather than counted**, and
+ * the two halves of that are both deliberate: it gets no number of its own, and
+ * it does not spend one, so the chapters after it carry on unbroken. Counting
+ * it and hiding its number would leave a book that skips from nine to eleven.
+ * See `ChapterMeta.unnumbered` for what it is for.
  */
 export function chapterNumberOf(book: Book, chapterId: string): number | null {
   let n = 0;
   for (const chapter of orderedChapters(book)) {
     if (chapterMatterOf(chapter) !== "body") continue;
+    if (chapter.unnumbered) {
+      // Asked about the stray itself: it is in the body and has no number.
+      if (chapter.id === chapterId) return null;
+      continue;
+    }
     n += 1;
     if (chapter.id === chapterId) return n;
   }
@@ -278,6 +312,32 @@ export function setChapterMatter(
     );
     return { ...book, chapters: grouped };
   });
+}
+
+/**
+ * Takes a body chapter out of the numbering, or puts it back.
+ *
+ * No reordering, unlike `setChapterMatter` above: the page stays exactly where
+ * the writer put it and only stops spending a number. That is the difference
+ * between the two controls and the reason both exist — a part title belongs
+ * between chapters nine and ten and would be wrong at either end of the book.
+ */
+export function setChapterUnnumbered(
+  bookId: string,
+  chapterId: string,
+  unnumbered: boolean,
+) {
+  commitBook(bookId, (book) => ({
+    ...book,
+    chapters: book.chapters.map((c) => {
+      if (c.id !== chapterId) return c;
+      const next = { ...c };
+      // Absent rather than false, so an untouched chapter carries no field.
+      if (unnumbered) next.unnumbered = true;
+      else delete next.unnumbered;
+      return next;
+    }),
+  }));
 }
 
 /** A chapter that was deleted but kept, so it can be restored. Its body and

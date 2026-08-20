@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { undoChapterImport, type ImportUndo } from "@/lib/library-store";
 import { ImportBanner } from "@/components/editor/import-banner";
+import type { ImportSummary } from "@/lib/import/split";
 
 /**
  * Holds and shows the post-import undo banner.
@@ -17,8 +18,14 @@ import { ImportBanner } from "@/components/editor/import-banner";
  */
 interface BannerState {
   bookId: string;
-  undo: ImportUndo;
-  count: number;
+  /**
+   * Absent when a whole book was imported rather than chapters added to one.
+   * There is nothing to undo *to* in that case — the book did not exist a
+   * moment ago — so the banner reports and dismisses instead of offering a
+   * button that would have to mean "delete this book".
+   */
+  undo?: ImportUndo;
+  summary: ImportSummary;
 }
 
 let current: BannerState | null = null;
@@ -28,8 +35,12 @@ function emit() {
   for (const listener of listeners) listener();
 }
 
-export function showImportBanner(bookId: string, undo: ImportUndo, count: number) {
-  current = { bookId, undo, count };
+export function showImportBanner(
+  bookId: string,
+  summary: ImportSummary,
+  undo?: ImportUndo,
+) {
+  current = { bookId, summary, undo };
   emit();
 }
 
@@ -53,21 +64,29 @@ export function ImportBannerHost() {
 
   if (!state) return null;
 
+  // Narrowed once here: inside the callback below, `state.undo` is optional
+  // again as far as the compiler is concerned.
+  const undo = state.undo;
+
   return (
     <ImportBanner
-      count={state.count}
+      summary={state.summary}
       onKeep={clearImportBanner}
-      onUndo={() => {
-        undoChapterImport(state.undo);
-        clearImportBanner();
-        // Back to whatever was open before the import, or the book root if that
-        // chapter is now gone.
-        router.push(
-          state.undo.prevLastOpenedId
-            ? `/book/${state.bookId}/chapter/${state.undo.prevLastOpenedId}`
-            : `/book/${state.bookId}`,
-        );
-      }}
+      onUndo={
+        undo
+          ? () => {
+              undoChapterImport(undo);
+              clearImportBanner();
+              // Back to whatever was open before the import, or the book root
+              // if that chapter is now gone.
+              router.push(
+                undo.prevLastOpenedId
+                  ? `/book/${state.bookId}/chapter/${undo.prevLastOpenedId}`
+                  : `/book/${state.bookId}`,
+              );
+            }
+          : undefined
+      }
     />
   );
 }

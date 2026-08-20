@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { countWords, toDoc, type Block } from "@/lib/import/blocks";
 import { parseHtml } from "@/lib/import/html";
 import { parseText } from "@/lib/import/plain-text";
-import { splitIntoChapters } from "@/lib/import/split";
+import { importSummary, splitIntoChapters } from "@/lib/import/split";
 import { importFile, titleFromFileName } from "@/lib/import/index";
 
 // --- plain text ------------------------------------------------------------
@@ -257,6 +257,109 @@ it("still splits a declared document that holds several chapters", () => {
   ]);
 });
 
+/**
+ * The number and the name on two lines — the shape most manuscripts use, and
+ * the one that used to leave a chapter titled "Chapter Two" with its real name
+ * sitting in its own prose. See `nameFromLeadingHeading` in `split.ts`.
+ */
+it("lifts a chapter's real name out of the prose when its title is only a number", () => {
+  const book = splitIntoChapters(
+    [
+      head("Chapter One", 1),
+      head("The House by the Sea", 2),
+      para("The bus reached Mirissa shortly after noon."),
+      head("Chapter Two", 1),
+      head("The Keeper's Journal", 2),
+      para("The lamp had not been lit for a year."),
+    ],
+    "fallback",
+  );
+
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "The House by the Sea",
+    "The Keeper's Journal",
+  ]);
+  // And the heading is gone from the body, or the exporter prints both.
+  for (const chapter of book.chapters) {
+    const nodes = (chapter.doc.content ?? []) as { type?: string }[];
+    expect(nodes.map((n) => n.type)).not.toContain("heading");
+  }
+});
+
+it("counts the words of the body it kept, not the heading it lifted", () => {
+  const book = splitIntoChapters(
+    [head("Chapter One", 1), head("The House by the Sea", 2), para("One two three.")],
+    "The Salt Ledger",
+    true,
+  );
+
+  expect(book.chapters[0].words).toBe(3);
+});
+
+/**
+ * The guard that matters most: under a chapter the writer *named*, a heading is
+ * their own subhead. Taking it would be losing text they wrote.
+ */
+it("leaves a subheading alone when the chapter already has a real name", () => {
+  const book = splitIntoChapters(
+    [
+      head("The Salt Road", 1),
+      head("A morning in June", 2),
+      para("She left at dawn."),
+      head("The Long Way Back", 1),
+      head("A night in October", 2),
+      para("The road turned."),
+    ],
+    "fallback",
+  );
+
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "The Salt Road",
+    "The Long Way Back",
+  ]);
+  const nodes = (book.chapters[0].doc.content ?? []) as { type?: string }[];
+  expect(nodes.map((n) => n.type)).toContain("heading");
+});
+
+it("leaves a numbered chapter alone when its body opens with prose", () => {
+  const book = splitIntoChapters(
+    [
+      head("Chapter One", 1),
+      para("She left at dawn."),
+      head("Chapter Two", 1),
+      para("The road turned."),
+    ],
+    "fallback",
+  );
+
+  expect(book.chapters.map((c) => c.title)).toEqual(["Chapter One", "Chapter Two"]);
+});
+
+it("never lifts a heading that would leave the chapter empty", () => {
+  // A lone heading under a numbered title is a contents entry, not a name to
+  // promote — taking it would leave a titled chapter with nothing in it.
+  const book = splitIntoChapters(
+    [head("Chapter One", 1), head("The House by the Sea", 2)],
+    "The Salt Ledger",
+    true,
+  );
+
+  expect(book.chapters[0].title).toBe("Chapter One");
+});
+
+it("lifts a heading that merely repeats a numbered title", () => {
+  // "Chapter One" over "Chapter One" — promoting is how the duplicate goes.
+  const book = splitIntoChapters(
+    [head("Chapter 1", 1), head("Chapter One", 2), para("The tide went out.")],
+    "The Salt Ledger",
+    true,
+  );
+
+  expect(book.chapters[0].title).toBe("Chapter One");
+  const nodes = (book.chapters[0].doc.content ?? []) as { type?: string }[];
+  expect(nodes.map((n) => n.type)).not.toContain("heading");
+});
+
 // --- document building -----------------------------------------------------
 
 it("counts words the way the editor does", () => {
@@ -322,6 +425,37 @@ const MANUSCRIPT = [
   "Amma — mother.",
 ].join("\n\n");
 
+/**
+ * The whole way through, on the file shape that caused this: `#` marks the
+ * chapter and `##` names it. Covers what the unit tests above cannot — that
+ * markdown's own heading levels come out such that the number is the divider
+ * and the name is the block underneath it.
+ */
+it("imports a numbered manuscript under the names its headings carry", async () => {
+  const file = asFile(
+    [
+      "# Chapter One",
+      "## The House by the Sea",
+      "The bus reached Mirissa after noon.",
+      "# Chapter Two",
+      "## The Keeper's Journal",
+      "The lamp had not been lit for a year.",
+    ].join("\n\n"),
+    "novel.md",
+  );
+
+  const book = await importFile(file);
+
+  expect(book.chapters.map((c) => c.title)).toEqual([
+    "The House by the Sea",
+    "The Keeper's Journal",
+  ]);
+  for (const chapter of book.chapters) {
+    const nodes = (chapter.doc.content ?? []) as { type?: string }[];
+    expect(nodes.map((n) => n.type)).not.toContain("heading");
+  }
+});
+
 it("files a manuscript's apparatus as front and back matter", async () => {
   const book = await importFile(asFile(MANUSCRIPT, "novel.md"));
   const part = (title: string) =>
@@ -376,8 +510,71 @@ it("keeps the prose with the page it was written on", async () => {
 });
 
 it("does not tag a heading it does not recognise", async () => {
+  /* The example was "The End" until that heading joined the import-only
+     table - see `IMPORT_ONLY` in matter.ts. What this test protects is
+     unchanged, and is the more important half of the rule: a name the
+     catalogue does not carry is a *chapter*, and stays where it was put. */
   const book = await importFile(
-    asFile("# Chapter One\n\nOne.\n\n# The End\n\nDone.", "novel.md"),
+    asFile("# Chapter One\n\nOne.\n\n# The Last Light\n\nDone.", "novel.md"),
   );
   expect(book.chapters.every((c) => !c.matter)).toBe(true);
+});
+
+// --- what the import decided ----------------------------------------------
+
+/**
+ * The whole reason this pair exists: a manuscript that closes on "END".
+ *
+ * Before the import-only table that heading was not in the catalogue, so it was
+ * a chapter — the last one — and it spent a chapter number. Everything after a
+ * stray like that counts one too high, and the writer sees it as chapter nine
+ * printing "Chapter Ten" with nothing on screen saying why.
+ */
+it("does not make a chapter out of the line a manuscript ends on", async () => {
+  const book = await importFile(
+    asFile(
+      [
+        "# Chapter One",
+        "The bus reached Mirissa after noon.",
+        "# Chapter Two",
+        "Arun barely slept.",
+        "# END",
+        "Thank you for reading.",
+      ].join("\n\n"),
+      "novel.md",
+    ),
+  );
+
+  const body = book.chapters.filter((c) => (c.matter ?? "body") === "body");
+  expect(body.map((c) => c.title)).toEqual(["Chapter One", "Chapter Two"]);
+
+  // Kept, not dropped — and under the catalogue's spelling rather than the
+  // manuscript's shouted one.
+  const end = book.chapters.find((c) => c.title === "The End");
+  expect(end?.matter).toBe("back");
+});
+
+it("counts what an import decided, by part", async () => {
+  const book = await importFile(asFile(MANUSCRIPT, "novel.md"));
+  const summary = importSummary(book.chapters);
+
+  // Half-title, title, copyright, dedication, preface.
+  expect(summary.front).toBe(5);
+  expect(summary.body).toBe(2);
+  // Epilogue, acknowledgements, glossary.
+  expect(summary.back).toBe(3);
+  expect(summary.front + summary.body + summary.back).toBe(
+    book.chapters.length,
+  );
+});
+
+it("counts a chapter that says nothing about its part as body", () => {
+  // Absence means the body everywhere else in the store, and this has to agree
+  // or the banner reports a book the panel does not show.
+  expect(importSummary([{}, {}, { matter: "front" }])).toEqual({
+    front: 1,
+    body: 2,
+    back: 0,
+  });
+  expect(importSummary([])).toEqual({ front: 0, body: 0, back: 0 });
 });

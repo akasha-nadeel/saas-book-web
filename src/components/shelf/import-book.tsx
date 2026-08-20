@@ -10,10 +10,11 @@ import {
   importFile,
   setupFromImport,
 } from "@/lib/import";
-import type { ImportedBook } from "@/lib/import/split";
+import { importSummary, type ImportedBook } from "@/lib/import/split";
 import { createBookFromImport } from "@/lib/library-store";
 import { plural } from "@/lib/plural";
 import { keepImportedCover } from "@/lib/cover-save";
+import { showImportBanner } from "@/components/editor/import-banner-host";
 
 /**
  * Bringing an existing manuscript in.
@@ -78,6 +79,14 @@ export function ImportBook() {
       return;
     }
     void keepImportedCover(result.bookId, proposal.printCover);
+    /* **What the import decided, on the path that never said.** The two
+       chapters-into-a-book routes have shown this banner since they were
+       written; a whole-book import — the one where the structure has the most
+       to get wrong, because it is reading front and back matter as well as
+       chapters — landed silently. Set before navigating: the state is
+       module-level and the host is mounted by the book layout, so it survives
+       the route change. No undo here — see `showImportBanner`. */
+    showImportBanner(result.bookId, importSummary(proposal.chapters));
     router.push(`/book/${result.bookId}/chapter/${result.chapterId}`);
   };
 

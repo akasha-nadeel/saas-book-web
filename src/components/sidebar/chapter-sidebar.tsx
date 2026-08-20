@@ -22,7 +22,7 @@ import {
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { useShelf } from "@/lib/use-library";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
-import type { ImportedChapter } from "@/lib/import/split";
+import { importSummary, type ImportedChapter } from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
@@ -119,7 +119,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     // Show the banner first, then navigate — the banner lives in the book
     // layout, so it survives the chapter change and stays up while the writer
     // checks the order.
-    showImportBanner(bookId, result.undo, chapters.length);
+    showImportBanner(bookId, importSummary(chapters), result.undo);
     router.push(`/book/${bookId}/chapter/${result.firstId}`);
   };
 

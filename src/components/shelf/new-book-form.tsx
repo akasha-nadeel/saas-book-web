@@ -22,7 +22,8 @@ import {
   rememberMatterAsked,
 } from "@/lib/library-store";
 import { setupFromImport } from "@/lib/import";
-import type { ImportedBook } from "@/lib/import/split";
+import { importSummary, type ImportedBook } from "@/lib/import/split";
+import { showImportBanner } from "@/components/editor/import-banner-host";
 import {
   SourceStep,
   isSourceKind,
@@ -315,6 +316,13 @@ export function NewBookForm() {
        query parameter is how the rest of the app carries this kind of arrival
        state (`?area=`, `?from=`, `?open=`). The editor drops it from the URL
        once it has played. */
+    /* **Only when a file was read.** A book started from scratch has nothing
+       to report — its one chapter is not a guess. The count is what the
+       *import* decided, which is what the banner claims; the pages `picks`
+       just added are ones the writer ticked two steps ago and are not part of
+       that answer. See `importSummary`. */
+    if (imported) showImportBanner(bookId, importSummary(imported.chapters));
+
     router.push(`/book/${bookId}/chapter/${chapterId}?new=1`);
   };
 

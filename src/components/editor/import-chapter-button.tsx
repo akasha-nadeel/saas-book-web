@@ -6,7 +6,7 @@ import { RailButton } from "@/components/editor/icon-rail";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
-import type { ImportedChapter } from "@/lib/import/split";
+import { importSummary, type ImportedChapter } from "@/lib/import/split";
 import { bookWordCount, importIntoBook, type Book } from "@/lib/library-store";
 
 /**
@@ -65,7 +65,7 @@ export function ImportChapterButton({ book }: { book: Book }) {
       );
       return;
     }
-    showImportBanner(bookId, result.undo, chapters.length);
+    showImportBanner(bookId, importSummary(chapters), result.undo);
     router.push(`/book/${bookId}/chapter/${result.firstId}`);
   };
 
