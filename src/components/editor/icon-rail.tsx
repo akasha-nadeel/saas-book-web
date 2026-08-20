@@ -128,25 +128,17 @@ export function Rail({
   side,
   children,
   footer,
-  paper,
   className = "",
 }: {
   side: "left" | "right";
   children: React.ReactNode;
   footer?: React.ReactNode;
-  /**
-   * Set to take the page's colours instead of the chrome's. The tools act on
-   * the manuscript, so they sit with it; the left rail navigates the app and
-   * stays with the app.
-   */
-  paper?: string;
   /** Extra classes — e.g. to hide the tool rail on small screens. */
   className?: string;
 }) {
   return (
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
-      data-paper={paper}
       /* Marks both rails as "not outside the tool panel".
 ​
          The panel closes on a press anywhere else, and the controls that open
@@ -155,9 +147,15 @@ export function Rail({
          you are on would close the panel on `pointerdown` and the `click`
          behind it would find it shut and open it straight back up. */
       data-rail={side}
-      // The left rail is app navigation, so it wears the nav chrome (see
-      // .nav-chrome) to match the shelf's sidebar. The right rail takes the
-      // paper's colours instead: its tools belong to the page, not the app.
+      /* **Both rails wear the app's chrome.** The right one used to take the
+         *page's* colours, on the reasoning that its tools act on the manuscript
+         and so belong with it. That reads well on paper and badly on a screen:
+         with a white sheet on a dark app — the commonest pairing — it put a
+         white strip down the side of a black window, brighter than anything
+         else on it, for a column of buttons that open dialogs and panels. A
+         control that navigates the app is chrome wherever it points, and the
+         page is the thing between the two rails rather than a thing they are
+         part of. */
       /* **The left rail sits above the tool panel, so the panel can come out
          from behind it.** Both surfaces are opaque, so with the rail underneath
          a drawer sliding in from `translateX(-100%)` would travel *across* it
@@ -165,9 +163,7 @@ export function Rail({
          panel appears from the rail's own edge, which is where it comes from.
          45 rather than 50: under the app's dialogs, over the panel at 40. */
       className={`scroll-slim flex w-(--rail-width) shrink-0 flex-col
-                  items-center gap-2 overflow-y-auto pt-4 pb-14 ${
-                    paper ? "rail-paper" : "nav-chrome"
-                  } ${
+                  items-center gap-2 overflow-y-auto pt-4 pb-14 nav-chrome ${
                     side === "left" ? "relative z-[45] border-r" : "border-l"
                   } border-line ${className}`}
     >

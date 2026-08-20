@@ -1171,6 +1171,24 @@ body {
      exact inverse of the tokens above; the dark papers below take the light
      value instead. */
   --paper-edge-on: #111111;
+
+  /* **The caret and the selection band are drawn on the sheet, so they are
+     paired with the paper and never with the chrome.**
+
+     Both took `--color-accent`, and the accent is `#ffffff` in the dark set —
+     so a writer on the dark app with a white sheet got a white caret on white
+     paper and a white selection band on white paper. There was no cursor to
+     find and no way to see what was selected, on a surface that was working
+     perfectly: the selection was really there, the browser was really painting
+     it, and all of it was the colour of the page.
+
+     Derived from `--paper-fg` rather than stated per paper, which is what makes
+     them follow all five: a custom property is substituted where it is *used*,
+     so the sheets below that re-point the ink re-point these with it. The ink
+     is also the one value guaranteed to be legible on its own paper, since it
+     is what the prose is already drawn in. */
+  --paper-caret: var(--paper-fg);
+  --paper-select: color-mix(in srgb, var(--paper-fg) 22%, transparent);
 }
 
 /* Was cream. A paper-white that has had the glare taken off it. */
@@ -1483,28 +1501,10 @@ body {
   background-color: var(--color-accent-strong);
 }
 
-/* --------------------------------------------------------------------------
-   A rail that belongs to the page.
-
-   Re-points the theme variables rather than restyling each control. Tailwind
-   compiles text-muted to color: var(--color-muted), so overriding the variable
-   here carries every utility in the subtree — including the toolbar's buttons,
-   which live in another file and are not touched.
-   -------------------------------------------------------------------------- */
-.rail-paper {
-  background: var(--paper-bg);
-
-  --color-fg: var(--paper-fg);
-  /* Full-strength ink, not the muted grey the dark chrome uses. A tool sitting
-     on the page should read as clearly as the page does; the hover tint below
-     is what distinguishes the one under the pointer. */
-  --color-muted: var(--paper-fg);
-  --color-line: var(--paper-rule);
-  --color-panel: var(--paper-bg);
-  /* Hover tint mixed from the page's own ink, so it lands right on all five
-     papers instead of being a grey that only suits white. */
-  --color-raised: color-mix(in srgb, var(--paper-fg) 12%, transparent);
-}
+/* `.rail-paper` stood here: the right rail re-pointed to the *paper* palette,
+   so its tools took the page's colours. Removed on 2026-08-20 — on a dark app
+   with a white sheet it was a white strip beside a black window. Both rails
+   take `.nav-chrome` now; see the note in `icon-rail.tsx`. */
 
 /* --------------------------------------------------------------------------
    Navigation chrome.
@@ -3386,11 +3386,11 @@ body {
 }
 
 .manuscript .tiptap {
-  caret-color: var(--color-accent);
+  caret-color: var(--paper-caret);
 }
 
 .manuscript .tiptap ::selection {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: var(--paper-select);
 }
 
 /* The words being previewed while the font menu is open.
