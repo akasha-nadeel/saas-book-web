@@ -67,3 +67,11 @@ next-env.d.ts
 # directories are copies of each other.
 /.agents/
 /.claude/
+
+# The Supabase CLI's scratch (a version stamp it refreshes on every run).
+supabase/.temp/
+
+# Hand-made backups of the instruction file. Useful on the machine that made
+# one, noise in the history: a second, stale copy of CLAUDE.md that nothing
+# reads and that goes out of date the moment the real one changes.
+CLAUDE.md.backup-*
