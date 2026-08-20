@@ -28,7 +28,11 @@ it("separates paragraphs one way, never both", () => {
 it("defaults to the paragraph a writer coming from Word recognises", () => {
   expect(DEFAULT_TYPOGRAPHY.sizePt).toBe(12);
   expect(DEFAULT_TYPOGRAPHY.leading).toBe(1.4);
-  expect(DEFAULT_TYPOGRAPHY.align).toBe("justify");
+  // Left, not justified: justified text redistributes the slack across a whole
+  // paragraph, so bolding half a sentence re-spaces every line of it. Word
+  // drafts ragged-right and so does this; the exported book is still justified
+  // by its own template, which `typeset.test.ts` asserts separately.
+  expect(DEFAULT_TYPOGRAPHY.align).toBe("left");
   // Space between, no indent — the word-processor paragraph. The printed-novel
   // setting (an indent and no space) is a click away in the Aa panel.
   expect(DEFAULT_TYPOGRAPHY.indentIn).toBe(0);
@@ -78,7 +82,9 @@ it("turns points and inches into page pixels at 96 to the inch", () => {
   expect(vars["--ms-indent"]).toBe("24.00px");
   expect(vars["--ms-para-gap"]).toBe("0.00px");
   expect(vars["--ms-leading"]).toBe("1.4");
-  expect(vars["--ms-align"]).toBe("justify");
+  // The writing surface drafts left-aligned, like Word; the exported book is
+  // justified by its own template. See DEFAULT_TYPOGRAPHY.
+  expect(vars["--ms-align"]).toBe("left");
   expect(vars["--ms-font"]).toBe(fontStack(DEFAULT_TYPOGRAPHY.font));
 });
 

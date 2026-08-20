@@ -83,14 +83,31 @@ export interface Typography {
  * what the book starts on now, and the Aa panel switches to the printed-novel
  * setting for anyone who wants the page to read as a book.
  *
+ * **Alignment is the same argument and was settled the same way.** This began
+ * justified, because that is how a printed novel is set — and it made every
+ * formatting press jump the page. Justified text distributes the slack across
+ * a whole paragraph, so bolding half a sentence re-spaces every line of it,
+ * not just the line it is on: measured on a 57-word paragraph, bolding sixty
+ * characters moved 53 words. Left-aligned, the same press moves only what
+ * follows it, which is what Word does and what a writer expects to see.
+ *
+ * The face amplifies it and cannot be fixed here: Monotype Garamond — the
+ * Garamond most Windows machines have, since Office installs it — sets its
+ * italic 16% narrower than its roman, so italicising a line visibly yanks it
+ * leftwards. Georgia's italic is within 2% of its roman for anyone that
+ * bothers.
+ *
  * Export is unaffected either way: an EPUB or PDF is set by its own template
- * (see lib/export/typeset.ts), which sets body text as a book regardless.
+ * (see lib/export/typeset.ts), which sets body text as a book regardless —
+ * `text-align: justify` is stated there and has a test on it. So the finished
+ * book is still justified; this is the writing surface only, and the Aa panel
+ * switches it back for anyone who wants to draft on the page as it will print.
  */
 export const DEFAULT_TYPOGRAPHY: Typography = {
   font: "garamond",
   sizePt: 12,
   leading: 1.4,
-  align: "justify",
+  align: "left",
   indentIn: 0,
   paraSpacingPt: 8,
 };

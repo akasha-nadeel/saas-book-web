@@ -710,12 +710,35 @@ export function ToolRail({
            * call in the extension itself, so nothing is being worked around
            * except its signature.
            */
+          /*
+           * **A new picture arrives right-aligned with the prose running past
+           * it** — Word's "Square" wrap against the right margin, which is
+           * where a figure sits in most manuscripts and what a writer inserting
+           * one is nearly always about to set by hand.
+           *
+           * Set here rather than on the node's own `default`, deliberately: the
+           * defaults are what `parseHTML` falls back to, so moving them would
+           * re-align every picture in every book that carries no `data-align`
+           * — including one coming back in through an import. This only decides
+           * what a *newly inserted* picture starts as, which is the thing being
+           * asked for. The toolbar's own controls still change either.
+           *
+           * `wrap` is only meaningful beside a left or right alignment (a
+           * centred picture has no side for the words to take), so the two are
+           * set together and stay in step, exactly as the image toolbar keeps
+           * them.
+           */
           editor
             .chain()
             .focus()
             .insertContent({
               type: "image",
-              attrs: { src: result.src, ...(width ? { width } : null) },
+              attrs: {
+                src: result.src,
+                align: "right",
+                wrap: true,
+                ...(width ? { width } : null),
+              },
             })
             .run();
         }}

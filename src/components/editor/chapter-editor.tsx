@@ -494,7 +494,6 @@ export function ChapterEditor({
         {panelMode !== "book" && (
           <Rail
             side="right"
-            paper={prefs.paper}
             // Hidden on phones: the formatting tools want a pointer and room, and
             // the screen has neither to spare next to the page. Export moves to the
             // manuscript header there instead.
@@ -961,6 +960,38 @@ function EditorSurface({
       handleScrollToSelection: (view) => {
         if (!typewriterRef.current) keepCaretInView(view);
         return true;
+      },
+      handleDOMEvents: {
+        /**
+         * **Selected prose cannot be dragged; a picture still can.**
+         *
+         * ProseMirror drags a text selection by default, and in a manuscript
+         * that is a way to lose a paragraph rather than a way to move one: the
+         * gesture that starts it — press inside the words you have just
+         * highlighted, move the pointer — is the same one a writer makes to
+         * *extend* a selection, so a sentence lands somewhere nobody chose and
+         * the only sign is that the prose has changed under the pointer. Cut
+         * and paste says where the text went and can be undone in one step.
+         *
+         * Refused here rather than with `user-select` or `-webkit-user-drag`:
+         * both of those would take the *selection* away too, and selecting is
+         * the thing this has to leave working.
+         *
+         * The exception is the one drag the editor deliberately offers —
+         * `data-drag-handle` on the image frame, which is the only way to move
+         * a picture (see `image-node-view.tsx`). Anything else is prose.
+         *
+         * `preventDefault` stops the browser's own drag of the selection, and
+         * the `true` stops ProseMirror's: it is consulted before the built-in
+         * handler, so returning handled means `view.dragging` is never set and
+         * there is no drop for it to complete.
+         */
+        dragstart: (_view, event) => {
+          const target = event.target as HTMLElement | null;
+          if (target?.closest?.("[data-drag-handle]")) return false;
+          event.preventDefault();
+          return true;
+        },
       },
     },
     onCreate: ({ editor }) => {

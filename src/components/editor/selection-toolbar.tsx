@@ -12,6 +12,7 @@ import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import { TextSelection, type EditorState } from "@tiptap/pm/state";
+import { posToDOMRect } from "@tiptap/core";
 import { fontSizeOptions, fontSizePt } from "@/lib/editor/font-size";
 import { previewFont } from "@/lib/editor/font-preview";
 import { FONTS } from "@/lib/typography";
@@ -178,6 +179,27 @@ export function SelectionToolbar({
   const menuOpen = useRef(false);
 
   /**
+   * The rectangle this bar is anchored to, held still while it is being used.
+   *
+   * **The bar is positioned from the selection, and a press changes the
+   * selection's shape.** Bold sets Garamond's roman as its bold, which is 9%
+   * wider; italic swaps in a face 16% narrower. So the rect the bar is centred
+   * over grew or shrank under the writer's own pointer and the bar slid
+   * sideways — out from under the button they were about to press next, which
+   * is how one press of B becomes a press of I.
+   *
+   * Word's mini toolbar does not move while you work in it, and this is that:
+   * the anchor is frozen the moment the pointer arrives (or a list opens), so
+   * every press after it computes the same position, and released when the
+   * writer leaves. Frozen at *the rect it already has*, so freezing is itself
+   * invisible — nothing moves at the moment of pinning, only afterwards.
+   *
+   * A ref, like the two above, for the same reason: a render here makes new
+   * props for the menu and new props start a loop.
+   */
+  const pinnedRect = useRef<DOMRect | null>(null);
+
+  /**
    * The words this bar is about, kept for the whole of its life.
    *
    * **This is what makes a second press work**, and for most of this bar's life
@@ -228,6 +250,11 @@ export function SelectionToolbar({
       const { from, to } = selection;
       if (from !== to) {
         range.current = { from, to };
+        // A new selection made anywhere but on the bar releases the held
+        // anchor, so a pin can never survive into the next thing highlighted.
+        // Inline rather than through `releasePosition`, which is declared past
+        // this effect's early return.
+        if (!pointerOnBar.current && !menuOpen.current) pinnedRect.current = null;
         return;
       }
       if (!pointerOnBar.current && !menuOpen.current) return;
@@ -273,6 +300,15 @@ export function SelectionToolbar({
   );
   const options = useMemo(() => ({ placement: "top" as const, offset: 8 }), []);
 
+  // Memoised with the other two, or the BubbleMenu re-dispatches "updateOptions"
+  // on every render. Returning null is how the plugin is told to fall back to
+  // its own `posToDOMRect(view, from, to)` — see its `virtualElement` getter.
+  const getReferencedVirtualElement = useCallback(() => {
+    const rect = pinnedRect.current;
+    if (!rect) return null;
+    return { getBoundingClientRect: () => rect, getClientRects: () => [rect] };
+  }, []);
+
   if (!editor) return null;
 
   // The selected text's current inline size (a multiple of body), and whether
@@ -299,6 +335,21 @@ export function SelectionToolbar({
    * the writer means or a new selection they have just made, and stamping the
    * remembered range over that would be this bar overruling them.
    */
+  /** Hold the bar where it is; see `pinnedRect`. Idempotent, so the second
+   *  reason to pin (a list opening over a pointer already on the bar) does not
+   *  re-capture a rect that has since moved. */
+  const pinPosition = () => {
+    if (pinnedRect.current) return;
+    const { from, to } = editor.state.selection;
+    pinnedRect.current = posToDOMRect(editor.view, from, to);
+  };
+
+  /** Let it follow the selection again, once neither reason to hold it stands. */
+  const releasePosition = () => {
+    if (pointerOnBar.current || menuOpen.current) return;
+    pinnedRect.current = null;
+  };
+
   const apply = (run: (chain: ReturnType<Editor["chain"]>) => unknown) => {
     const chain = editor.chain().focus();
     const at = range.current;
@@ -324,6 +375,7 @@ export function SelectionToolbar({
       // selection, and a selection of nothing but whitespace. (Memoised above.)
       shouldShow={shouldShow}
       options={options}
+      getReferencedVirtualElement={getReferencedVirtualElement}
       // Two rows in a box rather than one long bar. Eighteen controls in a line
       // ran wider than the page they float over, so the bar reached past the
       // paper on both sides and the thing it was formatting was the smaller of
@@ -337,9 +389,11 @@ export function SelectionToolbar({
       // bar, and so is one moving between two of its buttons.
       onMouseEnter={() => {
         pointerOnBar.current = true;
+        pinPosition();
       }}
       onMouseLeave={() => {
         pointerOnBar.current = false;
+        releasePosition();
       }}
     >
       {/* The selected words: their face, their weight and slant, their size.
@@ -349,7 +403,11 @@ export function SelectionToolbar({
         <FontPicker
           editor={editor}
           range={range}
-          onOpenChange={(v) => (menuOpen.current = v)}
+          onOpenChange={(v) => {
+            menuOpen.current = v;
+            if (v) pinPosition();
+            else releasePosition();
+          }}
         />
 
         <Sep />
@@ -399,7 +457,11 @@ export function SelectionToolbar({
           bodyPt={bodyPt}
           size={size}
           apply={apply}
-          onOpenChange={(v) => (menuOpen.current = v)}
+          onOpenChange={(v) => {
+            menuOpen.current = v;
+            if (v) pinPosition();
+            else releasePosition();
+          }}
         />
         <Btn
           label="Normal size"
