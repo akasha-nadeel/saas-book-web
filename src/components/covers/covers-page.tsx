@@ -1822,6 +1822,17 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
   const shelfSearches = gate.allowance;
 
   const wall = useMemo(() => coversOf(books), [books]);
+
+  /**
+   * Covers whose URL did not load.
+   *
+   * **A dead link here drew an empty box**, which on a wall of sixteen reads as
+   * a book with a blank cover rather than as a picture that did not arrive —
+   * exactly the wrong lesson on the screen asking "does yours hold up beside
+   * these?". The two catalogues are third-party hosts we do not control, so
+   * some proportion of these URLs will always be stale.
+   */
+  const [missing, setMissing] = useState<ReadonlySet<string>>(new Set());
   const width = SIZES.find((s) => s.id === size)!.width;
 
   /* `useCallback` so the arrival effect below can depend on it honestly rather
@@ -2263,13 +2274,37 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                           {/* A plain img: two third-party hosts whose URLs we do
                           not control, and next/image would mean a config file
                           listing them that goes stale. */}
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={comp.coverUrl}
-                            alt={`Cover of ${comp.title}`}
-                            style={{ width }}
-                            className="rounded shadow-sm"
-                          />
+                          {missing.has(comp.key) ? (
+                            /* The title, set in the space the picture would
+                               have taken, so the row keeps its rhythm and the
+                               tile says what it is instead of saying nothing. */
+                            <div
+                              style={{ width }}
+                              className="flex aspect-[2/3] items-center justify-center
+                                         rounded border border-line bg-raised p-2
+                                         text-center text-[11px] leading-tight text-muted
+                                         shadow-sm"
+                            >
+                              <span className="line-clamp-4">{comp.title}</span>
+                            </div>
+                          ) : (
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={comp.coverUrl}
+                                alt={`Cover of ${comp.title}`}
+                                style={{ width }}
+                                className="rounded shadow-sm"
+                                onError={() =>
+                                  setMissing((was) =>
+                                    was.has(comp.key)
+                                      ? was
+                                      : new Set(was).add(comp.key),
+                                  )
+                                }
+                              />
+                            </>
+                          )}
                           {size !== "thumb" && (
                             <p className="mt-1.5 line-clamp-2 text-xs text-muted">
                               {comp.title}
