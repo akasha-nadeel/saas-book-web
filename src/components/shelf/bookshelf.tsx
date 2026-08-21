@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CollabArea } from "@/components/collab/collab-area";
@@ -23,6 +23,7 @@ import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
 import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
+import { ConfirmDialog } from "@/components/ui/dialog";
 import { LoadingScreen } from "@/components/loading-screen";
 import { type Account } from "@/lib/account";
 import {
@@ -262,6 +263,7 @@ export function Bookshelf({
    * time. This hook is fed by the router and is correct during the navigation
    * that sets it.
    */
+  const router = useRouter();
   const params = useSearchParams();
   const asked = params.get("area");
   const [picked, setPicked] = useState<Area | null>(null);
@@ -291,6 +293,20 @@ export function Bookshelf({
    */
   const goToArea = (next: Area) => {
     setArea(next);
+    /**
+     * **Written back with `replace`, which is what makes both halves work.**
+     *
+     * The area was read from `?area=` and never written, so the URL stayed `/`:
+     * a refresh landed on Overview however deep the writer had gone, and no
+     * area could be linked or bookmarked. The note above is right that `push`
+     * would be worse — it stacks a history entry per tab and turns Back into a
+     * walk through them instead of a way out of the dashboard. `replace` does
+     * neither: one entry, edited in place, so Back still leaves and a reload
+     * comes back to where they were.
+     */
+    router.replace(next === "overview" ? "/" : `/?area=${next}`, {
+      scroll: false,
+    });
     document.getElementById(AREA_SCROLLER)?.scrollTo({ top: 0 });
   };
   /**
@@ -406,19 +422,14 @@ export function Bookshelf({
     );
   }, [active, shelf.lastOpenedBookId]);
 
-  const handleTrash = (book: Book) => {
-    if (window.confirm(`Move “${book.title}” to the trash?`))
-      trashBook(book.id);
-  };
+  /* Both were `window.confirm`, which the browser can be told to stop showing —
+     see `ui/dialog.tsx`. Two questions about a whole book, so the book waits in
+     state and the answer arrives through a callback. */
+  const [trashing, setTrashing] = useState<Book | null>(null);
+  const [erasing, setErasing] = useState<Book | null>(null);
 
-  const handleDeleteForever = (book: Book) => {
-    const words = bookWordCount(book);
-    const warning =
-      words > 0
-        ? `Permanently delete “${book.title}” and all ${words.toLocaleString()} words in it? This cannot be undone.`
-        : `Permanently delete “${book.title}”? This cannot be undone.`;
-    if (window.confirm(warning)) deleteBook(book.id);
-  };
+  const handleTrash = (book: Book) => setTrashing(book);
+  const handleDeleteForever = (book: Book) => setErasing(book);
 
   if (!hydrated) return <LoadingScreen />;
 
@@ -830,6 +841,46 @@ export function Bookshelf({
             it is named here rather than offered — you are not missing a button
             somewhere.
           </ComingSoonDialog>
+        )}
+
+        {trashing && (
+          <ConfirmDialog
+            title="Move this book to the trash?"
+            body={
+              <>
+                <span className="text-fg">{trashing.title}</span> leaves your
+                shelf. You can restore it from the trash.
+              </>
+            }
+            confirmLabel="Move to trash"
+            onConfirm={() => trashBook(trashing.id)}
+            onClose={() => setTrashing(null)}
+          />
+        )}
+
+        {erasing && (
+          <ConfirmDialog
+            title="Delete this book for good?"
+            body={
+              <>
+                <span className="text-fg">{erasing.title}</span>
+                {bookWordCount(erasing) > 0 ? (
+                  <>
+                    {" "}
+                    and all{" "}
+                    <span className="text-fg">
+                      {bookWordCount(erasing).toLocaleString()} words
+                    </span>{" "}
+                    in it
+                  </>
+                ) : null}{" "}
+                would be gone. This cannot be undone.
+              </>
+            }
+            confirmLabel="Delete for good"
+            onConfirm={() => deleteBook(erasing.id)}
+            onClose={() => setErasing(null)}
+          />
         )}
       </div>
     </EditCoverContext.Provider>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -101,6 +101,70 @@ const SECONDARY_ACTION =
 /** Which question the screen is on. */
 type Step = "source" | "details" | "front" | "back";
 
+/**
+ * What the wizard remembers across a reload.
+ *
+ * **A refresh on step two used to give back an empty step one.** Title,
+ * subtitle, author, genre, target and every ticked page, gone — three screens
+ * of answers for one stray Ctrl+R, on the form somebody fills in once and cares
+ * about most.
+ *
+ * `sessionStorage` rather than the store: this is a form in progress, not a
+ * book. It belongs to the tab, dies with it, and must never outlive a Cancel —
+ * three properties `localStorage` would get wrong. The store is also the wrong
+ * home on principle: nothing here is a book until Create is pressed.
+ *
+ * **The cover and a parsed import are deliberately left out.** A cover is a
+ * data URL and an import is a whole manuscript; either would blow the quota for
+ * a form that may be abandoned. So a reload keeps the words and asks for the
+ * picture again — and the screen says so rather than letting somebody wonder
+ * where it went.
+ */
+const DRAFT_KEY = "openchapter:new-book";
+
+interface Draft {
+  step?: Step;
+  title?: string;
+  subtitle?: string;
+  author?: string;
+  genre?: string;
+  ownTarget?: string | null;
+  bare?: boolean;
+  picked?: string[];
+}
+
+function readDraft(): Draft {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return {};
+    const held: unknown = JSON.parse(raw);
+    return held && typeof held === "object" ? (held as Draft) : {};
+  } catch {
+    /* A draft that will not parse is one nobody misses. */
+    return {};
+  }
+}
+
+function writeDraft(draft: Draft) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    /* Out of room: the form still works, it just stops remembering. */
+  }
+}
+
+function clearDraft() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(DRAFT_KEY);
+  } catch {
+    /* Nothing to do, and nothing depends on it. */
+  }
+}
+
+
 /** The name of each step, for the indicator under the heading. */
 const STEP_NAMES: Record<Step, string> = {
   source: "Your manuscript",
@@ -143,7 +207,31 @@ const MATTER_HEADINGS: Record<MatterPart, string> = {
   back: "What goes after your story?",
 };
 
+/**
+ * The form, and the one-line shell that decides when it may read a draft.
+ *
+ * **The draft cannot be read on the server**, which has no session storage —
+ * seeding the fields from it directly made the two renders disagree (step one
+ * on the server, step two in the browser), so React threw the tree away and
+ * rebuilt it, logging a hydration error every time the page opened. Caught
+ * while testing this very fix.
+ *
+ * `useSyncExternalStore` with a server snapshot of `false` is how this codebase
+ * already answers "has the browser taken over" (`useHydrated`). The `key` then
+ * does the rest: the form mounts once with nothing, and again with the draft,
+ * so every lazy initialiser inside it runs at a moment when reading storage is
+ * safe. One extra mount of an unfilled form, against an error on every load.
+ */
 export function NewBookForm() {
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  return <NewBookFields key={mounted ? "draft" : "blank"} mounted={mounted} />;
+}
+
+function NewBookFields({ mounted }: { mounted: boolean }) {
   const router = useRouter();
 
   /* Which door the writer came through, from `?source=`. Read with
@@ -157,6 +245,37 @@ export function NewBookForm() {
   const source: SourceKind | null = isSourceKind(params.get("source"))
     ? (params.get("source") as SourceKind)
     : null;
+  /**
+   * The saved draft, applied **after** the first paint rather than during it.
+   *
+   * **Seeding the state from `sessionStorage` directly was a hydration
+   * mismatch**, and a real one: the server has no session storage, so it
+   * rendered step one while the browser rendered step two, React threw the
+   * whole tree away and rebuilt it, and the console carried an error on every
+   * load. Caught while testing this very fix.
+   *
+   * So the form starts as the server drew it and the draft is put on in an
+   * effect. The cost is one frame; the alternative is a page that logs an
+   * error every time it opens.
+   */
+  /**
+   * True once the browser has taken over from the server.
+   *
+   * **This is what keeps the draft off the first render.** The server has no
+   * session storage, so seeding the fields from it directly made the two
+   * renders disagree — step one on the server, step two in the browser — and
+   * React threw the tree away and rebuilt it, logging an error every time the
+   * page opened. Caught while testing this very fix.
+   *
+   * `useSyncExternalStore` with a server snapshot of `false` is the pattern
+   * this codebase already uses for exactly this (`useHydrated`): the first
+   * client render matches the server, and the second has the draft.
+   */
+  /* Safe to read now: this component only mounts with `mounted` true after the
+     browser has taken over. See `NewBookForm` above. */
+  const [restored] = useState<Draft>(() => (mounted ? readDraft() : {}));
+  const draftRead = mounted;
+
   const [kind, setKind] = useState<SourceKind>(source ?? "file");
 
   /** The parsed manuscript, once a source step has read one. */
@@ -164,9 +283,11 @@ export function NewBookForm() {
   /** A refused write at the very last press — storage full, most likely. */
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [title, setTitle] = useState("");
-  const [subtitle, setSubtitle] = useState("");
-  const [author, setAuthor] = useState("");
+  /* Seeded from the draft, so a reload keeps the answers. Lazy initialisers:
+     read once, on the first render, never on every keystroke after. */
+  const [title, setTitle] = useState(() => restored.title ?? "");
+  const [subtitle, setSubtitle] = useState(() => restored.subtitle ?? "");
+  const [author, setAuthor] = useState(() => restored.author ?? "");
   const [cover, setCover] = useState<string | null>(null);
   /** The picked file, kept so the full-size copy can be stored once the book
    *  has an id — see the submit handler. */
@@ -177,19 +298,27 @@ export function NewBookForm() {
      designed jacket already knows it has its title on it, and making them
      save, find the book and open a dialog to say so is asking them to fix
      something we let them create wrong. */
-  const [bare, setBare] = useState(false);
+  const [bare, setBare] = useState(() => restored.bare ?? false);
   const coverInput = useRef<HTMLInputElement>(null);
-  const [genre, setGenre] = useState<string>(DEFAULT_GENRE);
+  const [genre, setGenre] = useState<string>(() => restored.genre ?? DEFAULT_GENRE);
 
   // The target follows the genre until the writer types their own, at which
   // point it stops moving. Overwriting a number somebody deliberately entered
   // because they then changed the genre is the kind of thing that makes a form
   // feel like it is arguing with you.
-  const [ownTarget, setOwnTarget] = useState<string | null>(null);
+  const [ownTarget, setOwnTarget] = useState<string | null>(
+    () => restored.ownTarget ?? null,
+  );
   const suggested = suggestTarget(genre);
   const target = ownTarget ?? String(suggested);
 
-  const [step, setStep] = useState<Step>(source ? "source" : "details");
+  /* **The step comes back too — except on an import.** A parsed manuscript is
+     far too big for a draft slot, so a reload has genuinely lost the file; the
+     honest answer is to start at the step that asks for one again rather than
+     drop somebody on "details" for a book with no source. */
+  const [step, setStep] = useState<Step>(() =>
+    source ? "source" : (restored.step ?? "details"),
+  );
 
   /* Whether the file said which pages are its front and back matter. Only an
      EPUB does; everything else leaves this false and keeps both steps. */
@@ -213,7 +342,31 @@ export function NewBookForm() {
   /* The ticked pages, held across both matter steps in one set — keyed
      "part:title", so the two steps write into the same store without being
      able to collide. See `matter-picks.ts`. */
-  const [picked, setPicked] = useState<Set<string>>(defaultPicked);
+  const [picked, setPicked] = useState<Set<string>>(() =>
+    /* `defaultPicked` is itself a lazy initialiser, so it is called rather
+       than handed over once there is a draft to prefer. */
+    /* Copied either way: `defaultPicked()` hands back a set this component
+       then owns, and adopting it directly is what the immutability rule
+       objects to. */
+    new Set(restored.picked ?? defaultPicked()),
+  );
+
+  /* **Kept in step with the form rather than written at each control.** Nine
+     fields set a draft from eleven places; an effect on the values is one
+     place, and cannot be forgotten by whichever control is added next. */
+  useEffect(() => {
+    if (!draftRead) return;
+    writeDraft({
+      step,
+      title,
+      subtitle,
+      author,
+      genre,
+      ownTarget,
+      bare,
+      picked: [...picked],
+    });
+  }, [draftRead, step, title, subtitle, author, genre, ownTarget, bare, picked]);
 
   const toggle = (key: string) =>
     setPicked((was) => {
@@ -323,6 +476,11 @@ export function NewBookForm() {
        that answer. See `importSummary`. */
     if (imported) showImportBanner(bookId, importSummary(imported.chapters));
 
+    /* The form's answers became a book, so the draft has nothing left to
+       protect — and leaving it would greet the *next* new book with the last
+       one's title. */
+    clearDraft();
+
     router.push(`/book/${bookId}/chapter/${chapterId}?new=1`);
   };
 
@@ -379,6 +537,10 @@ export function NewBookForm() {
             beside it. */}
         <Link
           href="/"
+          /* **Cancel means cancel.** A draft that survived it would put the
+             abandoned title into the next new book, which is the one way this
+             slot could do harm. */
+          onClick={clearDraft}
           className="absolute top-0 right-0 z-10 rounded-md border border-stop-line
                      bg-stop-bg px-4 py-2 font-sans text-sm font-medium text-stop-fg
                      outline-none transition-colors hover:border-stop-fg

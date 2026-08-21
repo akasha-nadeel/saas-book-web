@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   FormatMark,
   FormatPreview,
@@ -187,6 +187,21 @@ type StepId =
  */
 const STEP_DEEP_LINKS = new Set<StepId>(["listing", "blurb"]);
 
+/* Every step id and every format value, for reading the URL back. A hand-typed
+   `?step=` or a link from an older release must not put the wizard into a state
+   it has no screen for. */
+const STEP_IDS = new Set<StepId>([
+  "format",
+  "template",
+  "layout",
+  "frontmatter",
+  "listing",
+  "blurb",
+  "preview",
+  "export",
+]);
+const FORMAT_VALUES = new Set<Format>(["markdown", "docx", "epub", "pdf"]);
+
 interface Step {
   id: StepId;
   /** The heading on the rail. Consecutive steps sharing one become a group. */
@@ -362,16 +377,39 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
    * Read once, as an initial value. After that the flow is the writer's: making
    * this reactive would drag them back to the linked step every time they moved.
    */
+  const router = useRouter();
   const params = useSearchParams();
   const initial = params.get("step");
+  /**
+   * The format the URL carries, if any.
+   *
+   * **This is what lets a refresh come back to where the writer was.** The step
+   * was read here and never written, so reloading the wizard dropped everyone
+   * on the format chooser having answered five questions. Writing both back
+   * fixes it — but only *both*: `STEP_DEEP_LINKS` is deliberately narrow
+   * because landing on a late step having skipped what it depends on is worse
+   * than starting over, and a step is only safe to restore once the format
+   * that shaped its road is restored with it.
+   */
+  const askedFormat = params.get("format");
+  const restoredFormat: Format | null = FORMAT_VALUES.has(askedFormat as Format)
+    ? (askedFormat as Format)
+    : null;
+
   const deepLink =
-    initial && STEP_DEEP_LINKS.has(initial as StepId)
+    initial &&
+    (restoredFormat !== null || STEP_DEEP_LINKS.has(initial as StepId)) &&
+    STEP_IDS.has(initial as StepId)
       ? (initial as StepId)
       : null;
   /** Which dashboard area sent the writer here, for the rail's way back. */
   const from = params.get("from");
 
-  const [output, setOutput] = useState<Format | null>(deepLink ? "epub" : null);
+  /* Was `deepLink ? "epub" : null` — a guess, and the only reason one was
+     needed is that the format never reached the URL. It does now. */
+  const [output, setOutput] = useState<Format | null>(
+    restoredFormat ?? (deepLink ? "epub" : null),
+  );
   const [stepId, setStepId] = useState<StepId>(deepLink ?? "format");
   const [manuscript, setManuscript] = useState(true);
   const [typeset, setTypeset] = useState<TypesetOptions>(DEFAULT_TYPESET);
@@ -568,8 +606,27 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
      column or two — is a decision about the whole screen. */
   const showSheet = step.id === "template" || step.id === "layout";
 
+  /**
+   * Put the step and the format in the URL, so a reload comes back here.
+   *
+   * `replace`, never `push`: the wizard's own Back and Continue are how a
+   * writer moves through it, and stacking a history entry per step would make
+   * the browser's Back walk the wizard instead of leaving it — the same
+   * reasoning the dashboard's `goToArea` follows. `from` is carried through
+   * because the rail's way back is built from it.
+   */
+  const remember = (nextStep: StepId, nextFormat: Format | null) => {
+    const query = new URLSearchParams();
+    query.set("step", nextStep);
+    if (nextFormat) query.set("format", nextFormat);
+    if (from) query.set("from", from);
+    router.replace(`?${query.toString()}`, { scroll: false });
+  };
+
   const go = (next: number) => {
-    setStepId(steps[Math.min(steps.length - 1, Math.max(0, next))].id);
+    const id = steps[Math.min(steps.length - 1, Math.max(0, next))].id;
+    setStepId(id);
+    remember(id, output);
     // A step change is a new screen; the old one's scroll position is not it.
     document.getElementById("export-scroll")?.scrollTo({ top: 0 });
   };
@@ -588,6 +645,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     // Standing on "format" already, so the step id stays valid whatever the new
     // format's road looks like.
     setStepId("format");
+    remember("format", value);
   };
 
   const run = async () => {
