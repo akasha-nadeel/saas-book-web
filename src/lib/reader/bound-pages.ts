@@ -1,5 +1,6 @@
 import type { Book } from "@/lib/library-store";
 import { printsHeading } from "@/lib/export/blocks";
+import { printsFolio } from "@/lib/matter";
 import {
   bindBook,
   frontSections,
@@ -85,6 +86,12 @@ export function boundReaderPages(
           // emitting a blank one.
           empty: false,
           heading: false,
+          /* The generated title page is the one of the three that prints no
+             folio; the copyright and contents pages carry theirs. Keyed on the
+             section's own id rather than through `printsFolio`, because a
+             `FrontSection` carries an id and markup and no title to match on —
+             and these three ids are fixed in `frontSections` right beside it. */
+          numbered: page.section.id !== "title",
           generated: true,
           source: null,
         }
@@ -95,6 +102,10 @@ export function boundReaderPages(
           html: page.chapter.html,
           empty: page.chapter.html.trim() === "",
           heading: printsHeading(page.chapter),
+          numbered: printsFolio(
+            page.chapter.matter ?? "body",
+            page.chapter.title,
+          ),
           generated: false,
           /* Its place in the list the contents was built from — never its bound
              position, which is the rule `BoundPage.index` exists for. This is

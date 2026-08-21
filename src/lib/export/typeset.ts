@@ -580,12 +580,32 @@ ${
     color: #555;
   }
 }
-/* The title page takes neither: a folio under a book's title is the mark of a
-   document. Front matter is the first page of the document, so :first is all
-   this needs — the copyright and contents pages that follow do carry a folio,
-   as they do in a printed book. (No backticks in here: this is inside a
-   template literal, and one would end the string.) */
-@page :first { @top-center { content: none; } @bottom-center { content: none; } }
+/* The half-title and the title page take neither: a folio under a book's title
+   is the mark of a document.
+
+   **This was @page :first, and that is a rule about position.** It held only
+   while the title page was the first sheet - put a half-title in front of it,
+   as most novels do, and the title page became page two and printed a number
+   under the title. Worse in the other direction: a book with no front matter at
+   all had the folio dropped from chapter one's opening page, which a printed
+   book does carry.
+
+   So the pages say so themselves. printsFolio in matter.ts is the one rule,
+   print.ts and front-matter.ts put the class on, and the reading view asks the
+   same function - the copyright and contents pages that follow still carry a
+   folio, as they do in a printed book. The page is still counted; only the
+   number is withheld, so chapter one lands on the folio the contents names.
+   (No backticks in here: this is inside a template literal, and one would end
+   the string.) */
+/* Two selectors, because the two kinds of page are marked differently and
+   neither wanted changing to suit this. A written page gets .no-folio from
+   print.ts; the generated title page already says what it is, and adding a
+   second class to its markup broke consistency.test.ts - which was right to
+   complain, since that markup's shape is what the test reads to check the PDF
+   and the EPUB bind alike. */
+section.no-folio,
+section.title-page { page: bare; }
+@page bare { @top-center { content: none; } @bottom-center { content: none; } }
 /* **A chapter opening page carries no running head, and this is what stops it
    printing the chapter title twice.** The head is set from string-set on the
    h1, so on the very page that h1 appears it repeated the words directly above

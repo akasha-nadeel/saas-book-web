@@ -517,6 +517,38 @@ export function isApparatusPage(
 }
 
 /**
+ * Whether this page carries a printed page number.
+ *
+ * **The half-title and the title page do not, wherever they land.** A folio
+ * under a book's title is the mark of a document rather than a book, which
+ * `typesetCss` has always said — but it enforced it with `@page :first`, and
+ * that is a rule about *position*. It holds only while the title page is the
+ * first sheet. Put a half-title in front of it, as most novels do, and the
+ * title page becomes page two and starts printing a number under the title;
+ * the reading view mirrored the same `> 1` test and was wrong in step with it.
+ *
+ * So the question is what kind of page this is, not where it fell.
+ *
+ * **The copyright and contents pages are apparatus too and still carry one**,
+ * which is why this is its own rule rather than `!isApparatusPage`. That was
+ * already the recorded intent — "the copyright and contents pages that follow
+ * do carry a folio, as they do in a printed book" — and a printed contents
+ * really does need its own number to be pointed at. Only the two display pages
+ * at the very front go bare.
+ *
+ * The page is still *counted*: the folio is suppressed, never the counter, so
+ * chapter one lands on the number the contents page names.
+ */
+export function printsFolio(
+  matter: "front" | "body" | "back",
+  title: string,
+): boolean {
+  if (matter !== "front") return true;
+  const wanted = title.trim().toLowerCase();
+  return wanted !== "half-title page" && wanted !== "title page";
+}
+
+/**
  * A `[bracketed]` placeholder — a line the writer has not filled in.
  *
  * Two or more characters inside, so a stray `[]` in prose is not a placeholder,

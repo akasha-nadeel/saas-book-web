@@ -578,7 +578,16 @@ export function chapterSemantics(
      looks for when it offers "go to the start of the book". */
   if (matter === "body") return "bodymatter chapter";
   const part = matter === "front" ? "frontmatter" : "backmatter";
-  const division = MATTER_SEMANTICS[title.trim().toLowerCase()];
+  /* **`hasOwn`, not a bare lookup.** The key is a page title out of somebody's
+     book, and a plain object answers `constructor` and `__proto__` with
+     something inherited — which the template below then stringifies straight
+     into the attribute: `epub:type="frontmatter function Object() { [native
+     code] }"`. Proven on a probe, and it would cost the EPUBCheck-clean
+     guarantee for a page somebody was entitled to name that. */
+  const wanted = title.trim().toLowerCase();
+  const division = Object.hasOwn(MATTER_SEMANTICS, wanted)
+    ? MATTER_SEMANTICS[wanted]
+    : undefined;
   return division ? `${part} ${division}` : part;
 }
 

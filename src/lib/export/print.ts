@@ -1,6 +1,7 @@
 import type { Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
 import { chapterNumeral, printsHeading, toBlocks } from "./blocks";
+import { printsFolio } from "@/lib/matter";
 import { escapeXml, blocksToXhtml } from "./xhtml";
 import { trimById, typesetCss, type Trim, type TypesetOptions } from "./typeset";
 import { bindBook, frontSections } from "./front-matter";
@@ -87,7 +88,15 @@ export function printDocument(
          position — the contents page's `target-counter` hrefs are built from
          the same index, so renumbering here would point every folio at the
          wrong sheet. */
-      return `<section id="${anchorFor(index)}">${number}${heading}
+      /* **A class rather than a position.** The folio used to be dropped by
+         `@page :first`, which is right only while the title page is the first
+         sheet; a half-title in front of it pushed a number under the book's
+         title. `printsFolio` answers for the kind of page instead, and the
+         named page in `typesetCss` hangs off this class. */
+      const bare = printsFolio(chapter.matter ?? "body", chapter.title)
+        ? ""
+        : ` class="no-folio"`;
+      return `<section id="${anchorFor(index)}"${bare}>${number}${heading}
 ${xhtml}
 </section>`;
     })

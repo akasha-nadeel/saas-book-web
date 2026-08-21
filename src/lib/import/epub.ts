@@ -172,7 +172,12 @@ function sectionKind(html: string): { matter?: "front" | "back"; title?: string 
     .split(/\s+/)
     .filter(Boolean);
 
-  const division = types.map((t) => DIVISION_TITLES[t]).find(Boolean);
+  /* Guarded for the reason `chapterSemantics` is: `t` comes out of the file's
+     own `epub:type`, so a document declaring `constructor` otherwise resolved
+     to an inherited function — truthy, and filed as front matter. */
+  const division = types
+    .map((t) => (Object.hasOwn(DIVISION_TITLES, t) ? DIVISION_TITLES[t] : undefined))
+    .find(Boolean);
 
   /* The part when the file names one, and otherwise inferred from the
      division — plenty of files in the wild write a bare `toc` or `titlepage`

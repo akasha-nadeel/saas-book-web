@@ -51,6 +51,17 @@ export interface ReaderChapter {
    */
   heading: boolean;
   /**
+   * Whether this page prints a page number at its foot.
+   *
+   * `printsFolio`'s answer, carried through the same way `heading` above
+   * carries `printsHeading`'s — the half-title and the title page print none,
+   * wherever they land. This view used to test `folio > 1` instead, which is
+   * the same positional mistake `@page :first` made in the PDF: put a
+   * half-title in front of the title page and a number appears under the
+   * book's title on both.
+   */
+  numbered: boolean;
+  /**
    * A page this app built rather than one the writer typed — the generated
    * title page, copyright page or contents.
    *

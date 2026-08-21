@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEpub,
+  chapterSemantics,
   chapterXhtml,
   containerXml,
   contentOpf,
@@ -715,4 +716,18 @@ describe("a book with nothing a contents list would normally name", () => {
       "Chapter One",
     ]);
   });
+});
+
+it("does not let a page title reach epub:type through the prototype", () => {
+  /* `MATTER_SEMANTICS[title]` on a plain object answered `constructor` with an
+     inherited function, which the template then stringified straight into the
+     attribute: `epub:type="frontmatter function Object() { [native code] }"`.
+     A writer is entitled to name a page that, and the file it produced would
+     not have been EPUBCheck-clean. */
+  expect(chapterSemantics("front", "constructor")).toBe("frontmatter");
+  expect(chapterSemantics("front", "__proto__")).toBe("frontmatter");
+  expect(chapterSemantics("back", "valueOf")).toBe("backmatter");
+  // The rule it guards is unchanged: a division we know still names itself.
+  expect(chapterSemantics("front", "Dedication")).toBe("frontmatter dedication");
+  expect(chapterSemantics("front", "Something Of Their Own")).toBe("frontmatter");
 });

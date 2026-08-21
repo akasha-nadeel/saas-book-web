@@ -49,6 +49,8 @@ interface FlatPage {
    * title is the mark of a document.
    */
   folio: number;
+  /** Whether that number is printed — `printsFolio`, carried through. */
+  numbered: boolean;
 }
 
 /**
@@ -160,6 +162,7 @@ export function ReaderFlipbook({
           generated: chapter.generated,
           source: chapter.source,
           folio: out.length + 1,
+          numbered: chapter.numbered,
         }),
       );
     }
@@ -181,9 +184,35 @@ export function ReaderFlipbook({
 
   const pageAt = (i: number): FlatPage | null => flat[i] ?? null;
 
-  const spreadCount = Math.max(1, Math.ceil(flat.length / 2));
+  /**
+   * Which flat page sits on each side of a spread.
+   *
+   * **Page one is a right-hand page, and every odd page after it.** That is not
+   * a preference: in a left-to-right book the recto is always odd and the verso
+   * always even, so a book opens on page 1 *alone*, with the inside of the
+   * cover facing it. Pairing the pages two at a time from the start — which is
+   * what this did until 2026-08-21 — puts page 1 on the left and every leaf
+   * after it on the wrong side of the spine, so a spread that should read 2|3
+   * reads 3|4 and the folios sit on the outer edge on one side and the inner on
+   * the other.
+   *
+   * Hence the offset of one leaf: spread 1 is [nothing | page 1], spread 2 is
+   * [page 2 | page 3]. A negative index falls out of `pageAt` as null and
+   * `renderSheet(null)` draws a blank sheet, which is what faces page one in a
+   * real book.
+   *
+   * Named rather than written out at each of the six sites that need them —
+   * the static pair, both faces of the turning leaf, and the label — because
+   * six copies of `2 * s - 3` is how one of them keeps the old arithmetic.
+   */
+  const leftIndex = (s: number) => 2 * s - 3;
+  const rightIndex = (s: number) => 2 * s - 2;
+
+  /* One page on the first spread and two on every one after, so the last page
+     lands on a spread of its own when the count is even: 1 + 2(S-1) ≥ N. */
+  const spreadCount = Math.max(1, Math.ceil((flat.length + 1) / 2));
   // The target view, 0…spreadCount. 0 is the closed cover; s≥1 is the open
-  // spread with left page flat[2s-2] and right page flat[2s-1].
+  // spread — see `leftIndex`/`rightIndex` above.
   const [spread, setSpread] = useState(0);
   const target = Math.min(Math.max(0, spread), spreadCount);
 
@@ -225,6 +254,19 @@ export function ReaderFlipbook({
     return () => window.removeEventListener("keydown", onKey);
   }, [next, prev]);
 
+  /* **A spread is not always two pages**, so the label cannot always name two.
+     The first holds page one on its own, and when the book has an even number
+     of pages the last holds the final one on its own too. Page *numbers* here,
+     not indices — one more than the index each side resolves to. */
+  const pageLabel = (() => {
+    const l = leftIndex(target) + 1;
+    const r = rightIndex(target) + 1;
+    const total = flat.length;
+    if (l < 1) return `Page ${r} of ${total}`;
+    if (r > total) return `Page ${l} of ${total}`;
+    return `Pages ${l}–${r} of ${total}`;
+  })();
+
   const dark = paper === "slate" || paper === "black";
 
   const from = committed;
@@ -240,25 +282,25 @@ export function ReaderFlipbook({
   let rightPage: FlatPage | null = null;
   if (turning) {
     if (dir === "next") {
-      leftPage = from >= 1 ? pageAt(2 * from - 2) : null;
-      rightPage = pageAt(2 * target - 1);
+      leftPage = from >= 1 ? pageAt(leftIndex(from)) : null;
+      rightPage = pageAt(rightIndex(target));
     } else {
-      leftPage = pageAt(2 * target - 2);
-      rightPage = pageAt(2 * from - 1);
+      leftPage = pageAt(leftIndex(target));
+      rightPage = pageAt(rightIndex(from));
     }
   } else if (target >= 1) {
-    leftPage = pageAt(2 * target - 2);
-    rightPage = pageAt(2 * target - 1);
+    leftPage = pageAt(leftIndex(target));
+    rightPage = pageAt(rightIndex(target));
   }
 
   // The turning leaf's two faces.
   const leafFront: FlatPage | null = coverFront
     ? null
     : dir === "next"
-      ? pageAt(2 * from - 1)
-      : pageAt(2 * from - 2);
+      ? pageAt(rightIndex(from))
+      : pageAt(leftIndex(from));
   const leafBack: FlatPage | null =
-    dir === "next" ? pageAt(2 * target - 2) : pageAt(2 * target - 1);
+    dir === "next" ? pageAt(leftIndex(target)) : pageAt(rightIndex(target));
 
   // The closed cover, drawn as a real book object at the page size.
   const renderCover = () => (
@@ -385,7 +427,7 @@ export function ReaderFlipbook({
               PDF opens on the first bound page too. It sits in the margin, not
               in the text block: the box is the sheet's own bottom padding, so a
               wider margin moves the number rather than the prose. */}
-          {p.folio > 1 && (
+          {p.numbered && (
             <div
               aria-hidden="true"
               className="reader-folio"
@@ -475,9 +517,7 @@ export function ReaderFlipbook({
         <FlipArrow side="right" onClick={next} disabled={target >= spreadCount} />
 
         <p className="mt-4 text-center font-sans text-xs text-muted">
-          {target === 0
-            ? "Cover"
-            : `Pages ${target * 2 - 1}–${target * 2} of ${flat.length}`}
+          {target === 0 ? "Cover" : pageLabel}
         </p>
       </div>
 

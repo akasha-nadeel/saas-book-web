@@ -253,7 +253,10 @@ export function writtenPages(chapters: readonly MatterPage[]): Set<string> {
   const out = new Set<string>();
   for (const chapter of chapters) {
     if (chapter.matter !== "front") continue;
-    const id = GENERATED_BY_TITLE[chapter.title.trim().toLowerCase()];
+    const key = chapter.title.trim().toLowerCase();
+    const id = Object.hasOwn(GENERATED_BY_TITLE, key)
+      ? GENERATED_BY_TITLE[key]
+      : undefined;
     if (id) out.add(id);
   }
   return out;
@@ -287,7 +290,10 @@ export function withoutReplaced<T extends MatterPage>(
   const drop = new Set(replace);
   return chapters.filter((chapter) => {
     if (chapter.matter !== "front") return true;
-    const id = GENERATED_BY_TITLE[chapter.title.trim().toLowerCase()];
+    const key = chapter.title.trim().toLowerCase();
+    const id = Object.hasOwn(GENERATED_BY_TITLE, key)
+      ? GENERATED_BY_TITLE[key]
+      : undefined;
     return !id || !drop.has(id);
   });
 }

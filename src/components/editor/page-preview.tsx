@@ -23,6 +23,7 @@ import {
 import { pageMetrics } from "@/lib/page-setup";
 import { typographyVars } from "@/lib/typography";
 import { printsHeading, toBlocks } from "@/lib/export/blocks";
+import { printsFolio } from "@/lib/matter";
 import { blocksToXhtml } from "@/lib/export/xhtml";
 import { paginate, type ReaderChapter } from "@/components/reader/reader-pages";
 import { needsSecondPass, picturesSettled } from "@/lib/reader/page-flow";
@@ -114,6 +115,9 @@ export function PagePreview({
             title: chapter.title,
             matter: chapterMatterOf(chapter),
           }),
+          /* Same rule the reading view and both exporters ask — a half-title
+             or a title page carries no folio wherever it falls. */
+          numbered: printsFolio(chapterMatterOf(chapter), chapter.title),
           /* The manuscript as written. This is the *editor's* Book View, a
              preview of the pages the writer is typing, not of a file — the
              generated title page and contents belong to an export and are bound

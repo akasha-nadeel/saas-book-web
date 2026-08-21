@@ -388,9 +388,26 @@ describe("the chapter opener", () => {
 
   it("keeps the folio there", () => {
     // Only the head is silenced — the bottom-center box is untouched, unlike
-    // the title page's rule which silences both.
+    // the bare page's rule which silences both.
     expect(css).not.toMatch(/@page chapter:first \{[^}]*@bottom-center/);
-    expect(css).toMatch(/@page :first \{ @top-center[^\n]*@bottom-center/);
+    /* This named @page :first until 2026-08-21. What it checks is unchanged —
+       that *some* rule silences both boxes, so the contrast with the chapter
+       opener above is real — but the rule it names is no longer positional: a
+       half-title in front of the title page made :first the wrong sheet. See
+       printsFolio. */
+    expect(css).toMatch(/@page bare \{ @top-center[^\n]*@bottom-center/);
+  });
+
+  it("silences the folio by what the page is, not where it fell", () => {
+    // Both kinds of page reach the same named page: a written half-title or
+    // title page carries .no-folio from print.ts, and the generated title
+    // page is already .title-page. A positional rule missed whichever of them
+    // was not the first sheet.
+    expect(css).toMatch(/section\.no-folio/);
+    expect(css).toMatch(/section\.title-page \{ page: bare; \}/);
+    // The brace matters: the sheet still *explains* the rule it replaced, and
+    // that comment travels into the emitted CSS. What must be gone is the rule.
+    expect(css).not.toMatch(/@page :first \{/);
   });
 
   it("says none of it to the EPUB, which has no pages", () => {
