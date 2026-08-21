@@ -75,3 +75,7 @@ supabase/.temp/
 # one, noise in the history: a second, stale copy of CLAUDE.md that nothing
 # reads and that goes out of date the moment the real one changes.
 CLAUDE.md.backup-*
+
+# Local upstream source checkouts used to verify editor behavior. These are
+# reference material only and are never part of the application bundle.
+/.reference/
