@@ -442,8 +442,17 @@ export function ReaderFlipbook({
   );
 
   return (
-    <div className="flex h-full items-center justify-center p-4">
-      <div className="relative">
+    /* **The book is a fixed size and the window is not.** `sheetH` comes from
+       the trim and the zoom rather than from this container, so at 100% on a
+       short window the sheet is taller than the space — and the page counter
+       under it went off the bottom with three pixels showing. Centring alone
+       cannot help: there is genuinely more content than room.
+
+       `overflow-y-auto` with `my-auto` on the child is the pattern that serves
+       both — it centres while it fits and scrolls once it does not, where
+       `items-center` on its own would clip the top of anything too tall. */
+    <div className="flex h-full flex-col overflow-y-auto p-4">
+      <div className="relative my-auto shrink-0 self-center">
         {coverClosed ? (
           renderCover()
         ) : (

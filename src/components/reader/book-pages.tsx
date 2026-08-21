@@ -2,11 +2,9 @@
 
 import { useMemo, type CSSProperties } from "react";
 import {
-  chapterLabel,
   chapterMatterOf,
   chapterNumberOf,
   getBody,
-  isGenericChapterTitle,
   orderedChapters,
   pageSetupOf,
   typographyOf,
@@ -14,7 +12,7 @@ import {
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
 import { typographyVars } from "@/lib/typography";
-import { isDraftMatter, toBlocks } from "@/lib/export/blocks";
+import { isDraftMatter, toBlocks, chapterNumeral } from "@/lib/export/blocks";
 import { blocksToXhtml } from "@/lib/export/xhtml";
 import {
   DEFAULT_TYPESET,
@@ -91,13 +89,16 @@ function loadForReading(book: Book): LoadedPage[] {
             html = "";
           }
         }
-        // A spelled "Chapter Five" label sits above the title, but only when the
-        // title is a real name — a chapter still called "Chapter 5" is its own label.
+        /* **The numeral the *file* prints, not a spelled label.**
+           This read `chapterLabel(number)` — "Chapter Three" — while the EPUB,
+           the PDF and the Word file all print a bare numeral above the title.
+           Same rule, two renderings, so a writer met one opener on the screen
+           that claims to show their file and a different one in the file.
+           `chapterNumeral` is the rule those renderers already share, so
+           asking it is what keeps the two from drifting again. */
         const number = chapterNumberOf(book, chapter.id);
-        const label =
-          number !== null && !isGenericChapterTitle(chapter.title)
-            ? chapterLabel(number)
-            : null;
+        const numeral = chapterNumeral({ title: chapter.title, number });
+        const label = numeral === null ? null : String(numeral);
         return {
           id: chapter.id,
           title: chapter.title,

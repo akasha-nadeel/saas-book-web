@@ -281,8 +281,12 @@ whole reason the model steps are separate routes rather than flags on them.
 
 ### The editor — `docs/architecture/editor.md`
 
-`src/components/editor/chapter-editor.tsx` is Tiptap. The surface is keyed on
-`${chapterId}:${storedText}` so a save from another tab reloads it. Autosave is
+`src/components/editor/chapter-editor.tsx` is Tiptap. **The surface is keyed on
+`${chapterId}:${reload}` — a counter, never the stored text** — and the counter
+is bumped only by a write from *another* tab. That is what lets a save from
+elsewhere reload the surface while this tab's own autosaves never remount it
+mid-keystroke; keying on the text would remount on every save and eat the
+caret. Autosave is
 `use-autosave.ts`; **the body is written before the word count** (a stale count
 is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
 
@@ -642,8 +646,12 @@ The sixteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
 `/api/comps/categories` · `/api/comps/keywords` · `/api/comps/keywords/chat` ·
 `/api/blurb/critique` · `/api/blurb/workshop` · `/api/export/pdf` ·
-`/api/billing/*`. All except `/api/comps` and `/api/comps/subjects` are metered
-and gated by `requirePro()`; those two are free, keyless and stay that way —
+`/api/billing/*`. All except `/api/comps`, `/api/comps/subjects` and
+`/api/export/pdf` are metered and gated by `requirePro()`. The first two are
+free, keyless and stay that way; the third is free **on purpose and for good** —
+export must never move behind the plan — but it is not anonymous, since it
+launches a browser on markup a caller supplied: it takes `requireSignedIn`
+instead. The two comps routes are free, keyless and stay that way —
 which is the whole reason the model steps around the comps search (query, rank,
 categories, keywords and the keyword chat) are routes of their own rather than
 flags on it.

@@ -40,6 +40,7 @@ import { FontFamily } from "@/lib/editor/font-family";
 import { FontPreview } from "@/lib/editor/font-preview";
 import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
+import { SmartQuotes } from "@/lib/editor/smart-quotes";
 import {
   useDictation,
   useDictationLive,
@@ -937,6 +938,9 @@ function EditorSurface({
       // The flush-at-the-margin mark a click-placed line carries, so it begins
       // where the caret was shown rather than a first-line indent in from it.
       NoIndent,
+      /* Curly quotes, the em dash and the ellipsis, as a book prints them.
+         Input rules, so nothing already written is touched. */
+      SmartQuotes,
       // Print layout: measures the prose and lays it out on real page sheets.
       // The closures are held by the plugin and only ever run later, from its
       // measure loop — never during render — so reading the ref here is safe.

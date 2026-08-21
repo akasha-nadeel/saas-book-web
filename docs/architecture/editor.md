@@ -7,9 +7,12 @@ Read before touching `src/components/editor/`, `src/lib/editor/`, the workspace 
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
-**The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. The surface
-is keyed on `${chapterId}:${storedText}` so a save from another tab reloads it
-instead of leaving it stale. Autosave is `src/lib/use-autosave.ts`; body is
+**The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. **The
+surface is keyed on `${chapterId}:${reload}`, a counter rather than the stored
+text**, and that counter moves only for a write from *another* tab — so a save
+elsewhere reloads the surface while this tab's own autosaves never remount it
+mid-keystroke. Keying it on the text, which this once said, remounts on every
+save and takes the caret with it. Autosave is `src/lib/use-autosave.ts`; body is
 written before word count (a stale count is cosmetic, lost prose is not). Custom
 Tiptap extensions live in `src/lib/editor/`: font size, font family, text align,
 blockquote, resizable images, and `no-indent.ts`. That last one is a mark, not a

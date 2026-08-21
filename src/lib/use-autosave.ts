@@ -58,6 +58,21 @@ export function createAutosaveController<T>({
   let maxWaitTimer: ReturnType<typeof setTimeout> | null = null;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let inFlight = false;
+  /**
+   * The value a running save is carrying, held until it resolves.
+   *
+   * **`pending` is cleared before the await, and that is what lost the text.**
+   * `flush` takes the value, sets `pending = null`, and only then starts an
+   * IndexedDB write; if the page died in that window the unload handler asked
+   * `peek()`, was told there was nothing outstanding, and rescued nothing —
+   * while the write it was waiting on was abandoned. Measured six times: the
+   * status read "Unsaved" a moment before navigating and "Saved" at
+   * `pagehide`, and the sentence was gone.
+   *
+   * So the value stays reachable for exactly as long as it is genuinely at
+   * risk: from the moment it leaves `pending` to the moment `save()` resolves.
+   */
+  let inFlightValue: { value: T } | null = null;
   let lastSavedAt: Date | null = null;
   let disposed = false;
   /** Failures since the last save that worked, so a stuck one is reported once
@@ -88,6 +103,7 @@ export function createAutosaveController<T>({
     pending = null;
 
     inFlight = true;
+    inFlightValue = { value };
     emit("saving");
     let failed = false;
     try {
@@ -107,6 +123,10 @@ export function createAutosaveController<T>({
       emit("error");
     } finally {
       inFlight = false;
+      /* Out of danger: either it landed, or the catch above put it back in
+         `pending` for the retry. Holding it past this point would let a stale
+         value be rescued over a newer one. */
+      inFlightValue = null;
       // Straight on after a save that worked — that is the newer keystrokes
       // arriving mid-save, and they should land at once. After one that did
       // not, wait: see RETRY_MS.
@@ -139,8 +159,14 @@ export function createAutosaveController<T>({
      * synchronous before the page goes. `flush` is a promise and the page does
      * not wait for promises — which is exactly how five seconds of typing used
      * to disappear on a reload while the corner still read "Saved".
+     *
+     * **Both halves, and `pending` first.** A value can be waiting *and* one
+     * before it still in the air; the newer of the two is the one worth
+     * keeping. Answering only from `pending` — which is what this did at
+     * first — misses the window the whole mechanism exists for, because
+     * `flush` empties `pending` before it starts writing.
      */
-    peek: () => (pending ? pending.value : null),
+    peek: () => pending?.value ?? inFlightValue?.value ?? null,
     flush,
     /**
      * Take the controller back out of its disposed state.

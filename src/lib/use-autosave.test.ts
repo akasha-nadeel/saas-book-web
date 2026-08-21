@@ -154,3 +154,60 @@ it("saves on the ceiling timer even while the typing never stops", async () => {
 
   expect(save).toHaveBeenCalled();
 });
+
+/**
+ * **The window a page dying actually falls into.**
+ *
+ * `flush` empties `pending` before it starts writing, so for as long as the
+ * write is in the air there is nothing "pending" — and the unload handler,
+ * which asks `peek()` and rescues whatever it is told, was told nothing. The
+ * manuscript is on IndexedDB, so that write is genuinely abandoned when the
+ * page goes: measured six times in the running app as a sentence typed, a
+ * navigation 150ms later, and the sentence gone.
+ *
+ * These are the tests that fail if `peek()` goes back to reading `pending`
+ * alone.
+ */
+describe("what is still at risk", () => {
+  it("offers the value a running save is carrying", async () => {
+    let release!: () => void;
+    const { controller } = controllerWith(
+      () => new Promise<void>((r) => (release = r)),
+    );
+
+    controller.schedule("in the air");
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10);
+
+    // The save has started, so `pending` is empty — and this is exactly the
+    // moment the page is most likely to be torn down.
+    expect(controller.peek()).toBe("in the air");
+
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(controller.peek()).toBeNull();
+  });
+
+  it("prefers the newer value when one is waiting behind another", async () => {
+    let release!: () => void;
+    const { controller } = controllerWith(
+      () => new Promise<void>((r) => (release = r)),
+    );
+
+    controller.schedule("older");
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10);
+    // Typed while the first save is still going.
+    controller.schedule("newer");
+
+    // Rescuing the older one would put stale prose back over fresher.
+    expect(controller.peek()).toBe("newer");
+    release();
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10);
+  });
+
+  it("has nothing to offer once everything has settled", async () => {
+    const { controller } = controllerWith(() => {});
+    controller.schedule("done");
+    await vi.advanceTimersByTimeAsync(DEBOUNCE + 10);
+    expect(controller.peek()).toBeNull();
+  });
+});
