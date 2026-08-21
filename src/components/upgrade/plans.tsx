@@ -1018,18 +1018,24 @@ function PlanCard({
    * say *who the plan is for*, where "Popular" is a claim about other people
    * rather than about the reader.
    *
-   * The fill is `bg-accent` and the writing on it is `text-accent-ink`, which
-   * is the pair that inverts correctly: the accent is the brand indigo by day
-   * and white at night, and its ink is the opposite of whichever it is. A
-   * fixed white here would be invisible in daylight — the half nobody tests.
+   * The fill is `bg-brand-fill` and the writing on it is `text-brand-ink`.
+   *
+   * **It was `bg-accent`/`text-accent-ink` until 2026-08-21**, on the reasoning
+   * that the pair inverts correctly — the accent is the brand indigo by day and
+   * white at night, its ink the opposite of whichever it is — and that a fixed
+   * white would be invisible in daylight. Both halves of that still hold; what
+   * changed is that a white slab at night is the loudest thing on a black page,
+   * for a strip whose job is to say who the plan is for. `--color-brand-fill`
+   * is the brand blue in both blocks with white on it at 4.59:1, so the shell
+   * now reads as the brand rather than as the brightest available value.
    *
    * `p-1.5 pt-0` is the whole geometry: no padding above, so the strip's own
    * line-height sets the band's depth, and a hairline of colour on the other
    * three sides.
    */
   return (
-    <div className="rounded-2xl bg-accent p-1.5 pt-0 shadow-md">
-      <p className="py-2.5 text-center font-sans text-xs font-medium text-accent-ink">
+    <div className="rounded-2xl bg-brand-fill p-1.5 pt-0 shadow-md">
+      <p className="py-2.5 text-center font-sans text-xs font-medium text-brand-ink">
         {badge}
       </p>
       {card}

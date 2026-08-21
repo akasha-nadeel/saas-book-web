@@ -273,10 +273,47 @@
      same strict limit on where it may appear. Never reach for this to colour a
      control.
 
-     White here, because on black the wordmark's two halves are told apart by
-     value and there is no ground for a hue to sit on. The light block carries
-     the indigo — see the note there. */
-  --color-wordmark: #ffffff;
+     **Blue in both blocks since 2026-08-21, where this one was white.** The
+     note that stood here said the mark's two halves are told apart by value
+     because a hue has no ground to sit on. That is true of the *action*
+     colour, which has to carry text on a fill at 4.5:1; it is not true of
+     this, which is `text-2xl font-bold` — 24px bold, large text by WCAG, and
+     so asks 3:1.
+
+     **One step lighter than the light set's `#146ef5`, and only one.** The
+     brand blue itself clears 4.32:1 on the sidebar and was legible, but a
+     saturated mid-blue on near-black reads as a darker thing than the same
+     value on white — the ground is doing the opposite job in each. `#3b82f6`
+     puts it back at 5.38:1 without leaving the brand: go further and the mark
+     turns sky-blue and stops being the same wordmark twice.
+
+     The two are therefore near neighbours rather than identical, and are kept
+     in step by hand — change one, look at the other. */
+  --color-wordmark: #3b82f6;
+
+  /* ------------------------------------------------------------------------
+     Blue, and the one thing it is allowed to mean: *this is a chapter*.
+
+     **This is a hue in the chrome, which the rule above forbids, and it is
+     added deliberately rather than by drift.** The argument for the rule is
+     that a second hue competes with the accent for "the way forward"; the
+     argument for this one is that the app is named for the thing it counts,
+     and the panel says "chapter" more often than any other word in it. It is
+     never a control — nothing blue here can be pressed — so it cannot be
+     mistaken for the accent.
+
+     **Two blues, because a fill and a letterform are not the same problem.**
+     `--color-chapter-fg` is text and has to clear 4.5:1 on the *raised* ground,
+     where the brand blue manages only 3.72 — which is the whole reason the
+     accent goes white at night. `--color-brand-fill` is a block with its own
+     ink on it, so the brand blue stands unaltered, and like `--color-upgrade-*`
+     it keeps its hue in both themes: a fill follows the block it is, not the
+     page behind it. White on it clears 4.59:1.
+
+     Stated in both blocks, as everything here must be. */
+  --color-chapter-fg: #7dd3fc; /* 12.6:1 on the page, 10.2:1 on raised */
+  --color-brand-fill: #146ef5; /* a block: the featured plan's shell */
+  --color-brand-ink: #ffffff; /* the writing on that block */
 
   /* The alarm, and one of the two places this palette keeps a hue in the dark
      set — the other is the status badges. (The light set has a third: the
@@ -788,6 +825,14 @@
      while the landing page is pinned to daylight and keeps the indigo always.
      The two are kept in step by hand: change one, change the other. */
   --color-wordmark: #146ef5;
+
+  /* The dark set's three, in daylight. `chapter-fg` darkens rather than
+     lightens — #7dd3fc on white is 1.4:1 and would be a rumour — while the
+     fill and its ink are stated identically in both blocks, for the reason
+     given over there. */
+  --color-chapter-fg: #0369a1; /* 5.9:1 on white */
+  --color-brand-fill: #146ef5;
+  --color-brand-ink: #ffffff;
 
   /* Chosen to sit on white; the dark set's #f87171 goes pale and sugary here. */
   --color-danger: #c0362c;
