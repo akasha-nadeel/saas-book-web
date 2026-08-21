@@ -42,6 +42,7 @@ import {
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
+import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 
 /**
  * Moving a page between the parts, and why it is back.
@@ -591,15 +592,17 @@ export function BookPanel({
    * — and it showed up much more often once front and back matter became lists
    * of pages a writer deletes the ones they do not want from.
    */
-  const handleDelete = (id: string, title: string) => {
-    if (
-      !window.confirm(
-        `Move “${title}” to this book's trash? You can restore it from there.`,
-      )
-    ) {
-      return;
-    }
+  /* Was `window.confirm`, which the browser can be told to stop showing — see
+     `ui/dialog.tsx`. The row to delete waits in state until the question is
+     answered; `handleDelete` below is unchanged and simply runs afterwards. */
+  const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(
+    null,
+  );
+  const [renaming, setRenaming] = useState<{ id: string; title: string } | null>(
+    null,
+  );
 
+  const handleDelete = (id: string) => {
     const part = pagesOf(openPart ?? "body");
     const within = part.findIndex((c) => c.id === id);
     const siblings = part.filter((c) => c.id !== id);
@@ -733,7 +736,9 @@ export function BookPanel({
               <span className="font-medium text-fg">
                 {bodyChapters.length.toLocaleString()}
               </span>{" "}
-              {bodyChapters.length === 1 ? "chapter" : "chapters"}
+              <span className="text-chapter-fg">
+                {bodyChapters.length === 1 ? "chapter" : "chapters"}
+              </span>
               <span aria-hidden="true" className="px-1.5 text-line">
                 |
               </span>
@@ -864,7 +869,7 @@ export function BookPanel({
               onStart={() => handleStartMatter("front")}
               onAdd={(title) => handleAddMatterPage("front", title)}
               onOpenPage={open}
-              onDelete={handleDelete}
+              onDelete={(id, title) => setDeleting({ id, title })}
               canWrite={canWrite}
             />
 
@@ -876,9 +881,14 @@ export function BookPanel({
                   ? undefined
                   : "The story itself, chapter by chapter, in reading order."
               }
-              meta={`${bodyChapters.length} ${
-                bodyChapters.length === 1 ? "chapter" : "chapters"
-              }`}
+              meta={
+                <>
+                  {bodyChapters.length}{" "}
+                  <span className="text-chapter-fg">
+                    {bodyChapters.length === 1 ? "chapter" : "chapters"}
+                  </span>
+                </>
+              }
               action={body.open === "body" ? "Hide chapters" : "Chapters"}
               // Open counts as selected, as well as being in a chapter. The
               // page's edge is driven from the same expression upstream, so
@@ -921,15 +931,13 @@ export function BookPanel({
                       {
                         label: "Rename",
                         icon: menuIcons.rename,
-                        onSelect: () => {
-                          // A prompt rather than the sidebar's edit-in-place:
-                          // the same three actions, without a second copy of
-                          // the rename state to keep in step with it.
-                          const next = window.prompt("Chapter title", c.title);
-                          if (next === null) return;
-                          const trimmed = next.trim();
-                          if (trimmed) renameChapter(bookId, c.id, trimmed);
-                        },
+                        // A dialog rather than the sidebar's edit-in-place:
+                        // the same three actions, without a second copy of the
+                        // rename state to keep in step with it. It was
+                        // `window.prompt` until the browser's own "stop showing
+                        // these" made renaming fail silently — see `ui/dialog`.
+                        onSelect: () =>
+                          setRenaming({ id: c.id, title: c.title }),
                       },
                       /* **Only on the body's list, and only one item.** The
                          three Move-to-part entries came off this menu the same
@@ -950,7 +958,7 @@ export function BookPanel({
                         label: "Delete",
                         icon: menuIcons.trash,
                         danger: true,
-                        onSelect: () => handleDelete(c.id, c.title),
+                        onSelect: () => setDeleting({ id: c.id, title: c.title }),
                       },
                     ]}
                   />
@@ -979,7 +987,7 @@ export function BookPanel({
               onStart={() => handleStartMatter("back")}
               onAdd={(title) => handleAddMatterPage("back", title)}
               onOpenPage={open}
-              onDelete={handleDelete}
+              onDelete={(id, title) => setDeleting({ id, title })}
               canWrite={canWrite}
             />
           </div>
@@ -1006,6 +1014,30 @@ export function BookPanel({
         />
       )}
 
+      {renaming && (
+        <PromptDialog
+          title="Rename this chapter"
+          label="Chapter title"
+          initial={renaming.title}
+          onSubmit={(next) => renameChapter(bookId, renaming.id, next)}
+          onClose={() => setRenaming(null)}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="Move this to the trash?"
+          body={
+            <>
+              <span className="text-fg">{deleting.title}</span> goes to this
+              book&rsquo;s trash. You can restore it from there.
+            </>
+          }
+          confirmLabel="Move to trash"
+          onConfirm={() => handleDelete(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </aside>
   );
 }
@@ -1192,7 +1224,9 @@ function MatterCard({
    *  room it was using is room the list can have. */
   description?: string;
   /** A figure under the description — the body's chapter count. */
-  meta?: string;
+  /** A ReactNode rather than a string: the body card colours the word
+   *  "chapter" and leaves the count in the panel's own ink. */
+  meta?: React.ReactNode;
   /** The button's words. It is the only control on the card, so this is the
    *  whole of what the card offers and is worth saying exactly. */
   /** Undefined removes the button entirely — a reader's empty matter part has
@@ -1584,6 +1618,15 @@ function MatterPagesCard({
   /** False for a book somebody let this writer read: no controls that write. */
   canWrite: boolean;
 }) {
+  /* Both were `window.prompt`, which the browser can be told to stop showing —
+     see `ui/dialog.tsx`. Two questions, so two slots: naming a page that does
+     not exist yet, and renaming one that does. */
+  const [naming, setNaming] = useState(false);
+  const [renamingPage, setRenamingPage] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+
   const started = pages.length > 0;
 
   /**
@@ -1706,11 +1749,7 @@ function MatterPagesCard({
                 <MenuButton
                   onClick={() => {
                     close();
-                    const name = window.prompt(
-                      `What is this ${part === "front" ? "front" : "back"}-matter page called?`,
-                    );
-                    const trimmed = name?.trim();
-                    if (trimmed) onAdd(trimmed);
+                    setNaming(true);
                   }}
                   hint="A page of your own, named by you."
                 >
@@ -1739,10 +1778,7 @@ function MatterPagesCard({
                 label: "Rename",
                 icon: menuIcons.rename,
                 onSelect: () => {
-                  const next = window.prompt("Page title", page.title);
-                  if (next === null) return;
-                  const trimmed = next.trim();
-                  if (trimmed) renameChapter(bookId, page.id, trimmed);
+                  setRenamingPage({ id: page.id, title: page.title });
                 },
               },
               /* The direction that matters most for an import: a page the
@@ -1761,6 +1797,27 @@ function MatterPagesCard({
         <li className="px-1 py-2 font-sans text-xs text-muted italic">
           No pages yet.
         </li>
+      )}
+
+      {naming && (
+        <PromptDialog
+          title={`Add a ${part === "front" ? "front" : "back"}-matter page`}
+          label="What is this page called?"
+          confirmLabel="Add page"
+          placeholder={part === "front" ? "Author's note" : "A note on the text"}
+          onSubmit={onAdd}
+          onClose={() => setNaming(false)}
+        />
+      )}
+
+      {renamingPage && (
+        <PromptDialog
+          title="Rename this page"
+          label="Page title"
+          initial={renamingPage.title}
+          onSubmit={(next) => renameChapter(bookId, renamingPage.id, next)}
+          onClose={() => setRenamingPage(null)}
+        />
       )}
     </MatterCard>
   );

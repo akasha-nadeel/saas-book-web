@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   deleteChapterForever,
@@ -10,6 +11,7 @@ import {
 import { useShelf } from "@/lib/use-library";
 import { plural } from "@/lib/plural";
 import { relativeTime } from "@/lib/relative-time";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 /**
  * Deleted chapters for this book, and the way back.
@@ -29,15 +31,13 @@ export function TrashPanel({ bookId }: { bookId: string }) {
     router.push(`/book/${bookId}/chapter/${chapterId}`);
   };
 
-  const deleteForever = (chapter: { id: string; title: string }) => {
-    if (
-      !window.confirm(
-        `Permanently delete “${chapter.title}”? This cannot be undone.`,
-      )
-    )
-      return;
-    deleteChapterForever(bookId, chapter.id);
-  };
+  /* Was `window.confirm`, which the browser can be told to stop showing — see
+     `ui/dialog.tsx`. The question is state now, so the answer arrives through a
+     callback rather than from a blocking call. */
+  const [confirming, setConfirming] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
   return (
     // No heading of its own: the panel's shared header already carries
@@ -96,7 +96,7 @@ export function TrashPanel({ bookId }: { bookId: string }) {
 
               <button
                 type="button"
-                onClick={() => deleteForever(item)}
+                onClick={() => setConfirming(item)}
                 aria-label={`Delete ${item.title} forever`}
                 title="Delete forever"
                 className="shrink-0 rounded-md p-1.5 text-muted outline-none
@@ -118,6 +118,21 @@ export function TrashPanel({ bookId }: { bookId: string }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {confirming && (
+        <ConfirmDialog
+          title="Delete this permanently?"
+          body={
+            <>
+              <span className="text-fg">{confirming.title}</span> would be gone
+              for good. This cannot be undone.
+            </>
+          }
+          confirmLabel="Delete for good"
+          onConfirm={() => deleteChapterForever(bookId, confirming.id)}
+          onClose={() => setConfirming(null)}
+        />
       )}
     </div>
   );

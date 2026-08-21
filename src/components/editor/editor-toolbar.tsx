@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { PromptDialog } from "@/components/ui/dialog";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 
@@ -346,6 +347,14 @@ export function ToolRail({
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  /* Was `window.prompt`, which the browser can be told to stop showing — see
+     `ui/dialog.tsx`. Clearing the field used to be how a link was removed,
+     which nothing said out loud; the dialog offers Remove as its own answer.
+
+     Declared up here with the other hooks rather than beside the handler that
+     uses it: there is an early return below, and a hook after one is a hook
+     that runs on some renders and not others. */
+  const [linkAsked, setLinkAsked] = useState<string | null>(null);
 
   // The book's body typography — changed live from the Aa flyout below.
   const type = typographyOf(book);
@@ -358,17 +367,9 @@ export function ToolRail({
     editor.getAttributes("heading").textAlign) as TextAlignValue | undefined;
   const activeAlign: TextAlignValue = blockAlign ?? type.align;
 
-  const promptForLink = () => {
-    const previous = editor.getAttributes("link").href as string | undefined;
-    const href = window.prompt("Link address", previous ?? "https://");
-    if (href === null) return;
+  const existingLink = editor.getAttributes("link").href as string | undefined;
 
-    if (href.trim() === "") {
-      editor.chain().focus().unsetLink().run();
-      return;
-    }
-    editor.chain().focus().setLink({ href: href.trim() }).run();
-  };
+  const promptForLink = () => setLinkAsked(existingLink ?? "https://");
 
   return (
     <div
@@ -794,6 +795,27 @@ export function ToolRail({
           Too large
         </p>
       )}
+
+      {linkAsked !== null && (
+        <PromptDialog
+          title={existingLink ? "Edit this link" : "Add a link"}
+          label="Link address"
+          initial={linkAsked}
+          confirmLabel={existingLink ? "Update" : "Add link"}
+          placeholder="https://"
+          onRemove={
+            existingLink
+              ? () => editor.chain().focus().unsetLink().run()
+              : undefined
+          }
+          removeLabel="Remove link"
+          onSubmit={(href) =>
+            editor.chain().focus().setLink({ href }).run()
+          }
+          onClose={() => setLinkAsked(null)}
+        />
+      )}
+
     </div>
   );
 }

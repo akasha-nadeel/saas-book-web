@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { MAX_SNAPSHOTS, passesOf } from "@/lib/history";
 import { saveBody } from "@/lib/library-store";
 import { plural } from "@/lib/plural";
 import { relativeTime } from "@/lib/relative-time";
 import { useHistory } from "@/lib/use-library";
+import { ConfirmDialog } from "@/components/ui/dialog";
 
 /**
  * A chapter's saved versions, and how many sittings it has had.
@@ -36,14 +38,15 @@ export function HistoryPanel({
   const history = useHistory(chapterId);
   const passes = passesOf(history);
 
+  /* Was `window.confirm`, which the browser can be told to stop showing — see
+     `ui/dialog.tsx`. The version to put back is held until the question is
+     answered rather than being read out of a blocking call. */
+  const [asking, setAsking] = useState<{
+    body: string;
+    words: number;
+  } | null>(null);
+
   function restore(body: string, words: number) {
-    if (
-      !window.confirm(
-        "Put this version back? What is in the chapter now becomes the newest saved version, so this can be undone.",
-      )
-    ) {
-      return;
-    }
     // Through `saveBody`, which is what makes the promise in that sentence
     // true: the current text was snapshotted on its own last autosave and is
     // still in the list, so restoring is reversible by restoring again.
@@ -107,7 +110,9 @@ export function HistoryPanel({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => restore(version.body, version.words)}
+                    onClick={() =>
+                      setAsking({ body: version.body, words: version.words })
+                    }
                     className="mt-2 font-sans text-[11px] font-semibold text-accent"
                   >
                     Put this version back
@@ -118,6 +123,17 @@ export function HistoryPanel({
           </ul>
         )}
       </div>
+
+      {asking && (
+        <ConfirmDialog
+          title="Put this version back?"
+          body="What is in the chapter now becomes the newest saved version, so this can be undone."
+          confirmLabel="Restore"
+          danger={false}
+          onConfirm={() => restore(asking.body, asking.words)}
+          onClose={() => setAsking(null)}
+        />
+      )}
     </div>
   );
 }
