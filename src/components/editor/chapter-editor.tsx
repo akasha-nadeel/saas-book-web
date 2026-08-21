@@ -68,6 +68,8 @@ import {
   isSharedBook,
   pageSetupOf,
   renameChapter,
+  clearRescue,
+  rescueBody,
   saveBody,
   setPref,
   touchLastOpened,
@@ -882,7 +884,16 @@ function EditorSurface({
        screen. */
     save: async ({ doc, words }) => {
       await saveBody(bookId, chapterId, doc, words);
+      /* The rescue slot has done its job the moment the real write lands.
+         Left behind, it would be replayed over a *newer* body on the next
+         load — the one case where putting writing back would take some away. */
+      clearRescue(chapterId);
     },
+    /* **The page is closing and there is no time to await anything.** The
+       flush below starts an IndexedDB write the browser will not wait for, so
+       the pending doc goes to `localStorage` synchronously first and is
+       replayed by `loadFromDisk` next time. See `rescueBody`. */
+    rescue: ({ doc, words }) => rescueBody(chapterId, doc, words),
   });
 
   const editor = useEditor({

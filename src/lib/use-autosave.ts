@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export type SaveStatus = "saved" | "unsaved" | "saving" | "error";
 
@@ -131,6 +131,16 @@ export function createAutosaveController<T>({
       // otherwise continuous typing would keep pushing it back too.
       maxWaitTimer ??= setTimeout(() => void flush(), maxWaitMs);
     },
+    /**
+     * The value waiting to be saved, or null.
+     *
+     * **For the one caller that has no time to await anything**: the unload
+     * handler in the hook below, which has to put unsaved work somewhere
+     * synchronous before the page goes. `flush` is a promise and the page does
+     * not wait for promises — which is exactly how five seconds of typing used
+     * to disappear on a reload while the corner still read "Saved".
+     */
+    peek: () => (pending ? pending.value : null),
     flush,
     /**
      * Take the controller back out of its disposed state.
@@ -164,12 +174,22 @@ export function createAutosaveController<T>({
 interface AutosaveOptions<T> {
   /** Persist the value. May be async; calls are serialised so none overlap. */
   save: (value: T) => void | Promise<void>;
+  /**
+   * Put the pending value somewhere synchronous, because the page is closing.
+   *
+   * **Must not be async, and must not throw.** It is called from `pagehide`,
+   * where a promise is not waited for and there is nobody left to tell. It runs
+   * only when something is actually unsaved, and `save` still runs after it —
+   * this is the belt, not a replacement for the braces.
+   */
+  rescue?: (value: T) => void;
   debounceMs?: number;
   maxWaitMs?: number;
 }
 
 export function useAutosave<T>({
   save,
+  rescue,
   debounceMs = 800,
   maxWaitMs = 5000,
 }: AutosaveOptions<T>) {
@@ -193,6 +213,14 @@ export function useAutosave<T>({
     controller.setSave(save);
   }, [controller, save]);
 
+  /* Through a ref so the unload effect below can stay mounted once. A caller
+     that rebuilt this function every render would otherwise tear the listeners
+     down and put them back on every keystroke. */
+  const rescueRef = useRef(rescue);
+  useEffect(() => {
+    rescueRef.current = rescue;
+  }, [rescue]);
+
   // Flush on tab hide and on unmount. `visibilitychange` is the reliable
   // signal here; `beforeunload` is ignored on mobile Safari and friends.
   useEffect(() => {
@@ -201,10 +229,31 @@ export function useAutosave<T>({
     // development — can still report. See `activate`.
     controller.activate();
 
-    const onHide = () => {
-      if (document.visibilityState === "hidden") void controller.flush();
+    /**
+     * **Synchronous first, then the real save.**
+     *
+     * `flush` returns a promise and the page does not wait for one, so on a
+     * reload or a tab close the IndexedDB write it starts can be abandoned
+     * half-done. Measured: a sentence typed and the tab reloaded at once was
+     * gone, with "Saved" still in the corner. `rescue` is handed the pending
+     * value while there is still a synchronous call to make with it; the flush
+     * still runs, and wins whenever it gets the time.
+     */
+    const rescuePending = () => {
+      if (!rescueRef.current) return;
+      const waiting = controller.peek();
+      if (waiting !== null) rescueRef.current(waiting);
     };
-    const onPageHide = () => void controller.flush();
+
+    const onHide = () => {
+      if (document.visibilityState !== "hidden") return;
+      rescuePending();
+      void controller.flush();
+    };
+    const onPageHide = () => {
+      rescuePending();
+      void controller.flush();
+    };
 
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", onPageHide);

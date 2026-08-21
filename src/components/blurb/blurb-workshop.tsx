@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { saveChat } from "@/lib/library-store";
+import { useChat } from "@/lib/use-library";
+
+/* One transcript per book, namespaced so it cannot collide with the
+   chapter assistant's (which files under a chapter id). */
+const chatKeyFor = (bookId: string) => `blurb:${bookId}`;
 import { ReaderMark } from "@/components/blurb/reader-mark";
 import { AssistantReply } from "@/components/ui/assistant-reply";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -66,6 +72,7 @@ function clockOf(at: number): string {
 }
 
 export function BlurbWorkshop({
+  bookId,
   title,
   genre,
   draft,
@@ -73,6 +80,8 @@ export function BlurbWorkshop({
   onUseDraft,
   narrow = false,
 }: {
+  /** What the conversation is filed under — one transcript per book. */
+  bookId: string;
   title?: string;
   genre?: string;
   /** The blurb as it stands, so the model can work on it rather than restart. */
@@ -84,7 +93,23 @@ export function BlurbWorkshop({
   /** The roadmap panel's ~300px column, where the wide banner does not fit. */
   narrow?: boolean;
 }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
+  /**
+   * **The transcript lives in the store, not in this component.**
+   *
+   * It was `useState([])`, and this screen unmounts whenever the tool is left
+   * or the roadmap sheet is closed — so a conversation a writer had paid one of
+   * their three for good disappeared the moment they looked at anything else.
+   *
+   * Written straight through rather than kept alongside a live copy, unlike the
+   * chapter assistant: that one streams a reply a token at a time and cannot
+   * write every frame, while this route answers once. So there is one source
+   * here and nothing to hold in step.
+   */
+  const turns = useChat<Turn>(chatKeyFor(bookId));
+  const setTurns = useCallback(
+    (next: Turn[]) => saveChat(chatKeyFor(bookId), next),
+    [bookId],
+  );
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -433,8 +458,14 @@ export function BlurbWorkshop({
             third. `truncate` rather than a wrap: in the roadmap's narrow panel
             it would otherwise take two lines back, and a footnote that changes
             height moves the input above it. */}
+        {/* **"Can make mistakes" gave up its slot.** The line is `truncate` and
+            has to stay one line, so there is room for two clauses and no more.
+            The keyword workshop already dropped that clause on the reasoning
+            that a "can make mistakes" note under a chat box is one every reader
+            has learned to skip; where the transcript is now kept, saying so is
+            the clause that is actually load-bearing. */}
         <p className="mt-2 truncate text-xs text-muted">
-          Reads your opening chapter. Can make mistakes.
+          Reads your opening chapter. Stays in this browser.
         </p>
       </div>
 

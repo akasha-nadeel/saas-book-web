@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { saveChat } from "@/lib/library-store";
+import { useChat } from "@/lib/use-library";
+
+/* One transcript per book, namespaced away from the blurb workshop's. */
+const chatKeyFor = (bookId: string) => `keywords:${bookId}`;
 import { AssistantReply } from "@/components/ui/assistant-reply";
 import { CopyButton } from "@/components/ui/copy-button";
 import { Spinner } from "@/components/ui/spinner";
@@ -69,7 +74,10 @@ export function KeywordWorkshop({
   onUndo,
   canUndo,
   onOpenGuide,
+  bookId,
 }: {
+  /** What the conversation is filed under — one transcript per book. */
+  bookId: string;
   /** The description. Nearly all of the signal, and what the press needs. */
   blurb: string;
   genre?: string;
@@ -88,7 +96,14 @@ export function KeywordWorkshop({
   /** The way out when nothing here answers: the method, written down. */
   onOpenGuide: () => void;
 }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
+  /* The transcript lives in the store — see the note in `BlurbWorkshop`. This
+     screen unmounts whenever the tool is left, and a conversation metered at
+     three for good should not be spent by looking at something else. */
+  const turns = useChat<Turn>(chatKeyFor(bookId));
+  const setTurns = useCallback(
+    (next: Turn[]) => saveChat(chatKeyFor(bookId), next),
+    [bookId],
+  );
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -429,7 +444,8 @@ export function KeywordWorkshop({
             `/privacy` carries the long version. Add a field to what is sent
             and name it here. */}
         <p className="mt-2 text-[11px] text-muted">
-          Reads this screen and your blurb — never the manuscript.
+          Reads this screen and your blurb — never the manuscript. The
+          conversation stays in this browser.
         </p>
       </div>
 

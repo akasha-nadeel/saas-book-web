@@ -702,6 +702,115 @@ function settleStorage(): void {
   refreshEverything();
 }
 
+
+// ---------------------------------------------------------------------------
+// The rescue slot
+//
+// **What is written when the page is closing and there is no time to be async.**
+//
+// `writeStored` sets the memory mirror synchronously and *queues* the disk
+// write, which is right for every ordinary save and wrong for the last one: the
+// autosave's `pagehide` handler could only call `void flush()`, so an IndexedDB
+// write was started and the page died before it landed. Measured on the running
+// app — a sentence typed and the tab reloaded at once was gone, while the corner
+// still read "Saved". The debounce is 800ms with a five-second ceiling, so that
+// is how much writing was at risk on every reload, tab close and closed lid.
+//
+// It is a regression from the move off `localStorage` rather than an old bug:
+// those writes were synchronous and always completed.
+//
+// So the last write goes somewhere synchronous. `localStorage.setItem` returns
+// when the bytes are in, which is the one property needed here — it does not
+// need to be the *store*, only to survive until the next load, where `hydrate`
+// replays it through the ordinary path and clears it.
+// ---------------------------------------------------------------------------
+
+const RESCUE_PREFIX = "openchapter:rescue:";
+const rescueKey = (chapterId: string) => `${RESCUE_PREFIX}${chapterId}`;
+
+/**
+ * Keep a chapter's unsaved prose across the page closing.
+ *
+ * Synchronous on purpose, and **swallowed on failure**: this runs while the
+ * page is going away, so there is nobody to tell and nothing to retry. A quota
+ * error here costs the rescue, which is the same outcome as not having tried.
+ */
+export function rescueBody(chapterId: string, doc: unknown, words: number) {
+  try {
+    window.localStorage.setItem(
+      rescueKey(chapterId),
+      JSON.stringify({ doc, words }),
+    );
+  } catch {
+    /* Out of room with the page closing: nothing useful left to do. */
+  }
+}
+
+/** Drop the slot once the real write has landed. */
+export function clearRescue(chapterId: string) {
+  try {
+    window.localStorage.removeItem(rescueKey(chapterId));
+  } catch {
+    /* Same reasoning as above. */
+  }
+}
+
+/**
+ * Put any rescued prose back, and forget it.
+ *
+ * **Silent, and it has to be.** The writing is the writer's own, seconds old,
+ * on their own machine; a dialog asking whether to keep it would put a decision
+ * in front of somebody who just wanted to carry on typing, about two versions
+ * they cannot tell apart.
+ *
+ * Written through `writeStored` rather than straight into the mirror, so the
+ * rescued text lands on the disk the same way any other save does — the slot is
+ * a life raft, not a second store, and nothing may still be relying on it after
+ * this runs. Identical text is dropped rather than rewritten: the common case
+ * is a clean close where the queued write *did* land, and rewriting it would
+ * bump the reload counter and remount the editor for nothing.
+ *
+ * A slot that will not parse is discarded. It is a convenience, and a corrupt
+ * one must not stop the library loading.
+ */
+function replayRescued(): void {
+  for (const key of Object.keys(window.localStorage)) {
+    if (!key.startsWith(RESCUE_PREFIX)) continue;
+    const chapterId = key.slice(RESCUE_PREFIX.length);
+    const raw = readRaw(key);
+    window.localStorage.removeItem(key);
+    if (!raw) continue;
+
+    try {
+      const held = JSON.parse(raw) as { doc?: unknown; words?: unknown };
+      if (held.doc === undefined) continue;
+      const rescued = JSON.stringify(held.doc);
+      if (rescued === readStored(BODIES, chapterId)) continue;
+
+      void writeStored(BODIES, chapterId, rescued);
+
+      /* The count on the shelf, so the figure in the corner matches the prose
+         that was just put back. Found by walking the shelf rather than stored
+         in the slot: the book a chapter belongs to is the shelf's answer, and
+         a second copy in a rescue slot is a second thing that can be wrong. */
+      if (typeof held.words !== "number" || !Number.isFinite(held.words)) continue;
+      const words = Math.max(0, Math.round(held.words));
+      const owner = getShelf().books.find((b) =>
+        b.chapters.some((c) => c.id === chapterId),
+      );
+      if (!owner) continue;
+      commitBook(owner.id, (b) => ({
+        ...b,
+        chapters: b.chapters.map((c) =>
+          c.id === chapterId ? { ...c, words } : c,
+        ),
+      }));
+    } catch {
+      /* A slot that will not parse is one the writer never sees. */
+    }
+  }
+}
+
 let loading: Promise<void> | null = null;
 
 /** True for exactly as long as the read is in flight. See `pending`. */
@@ -738,6 +847,14 @@ export function loadFromDisk(): Promise<void> {
       console.error("[store] could not read the library from disk", err);
     } finally {
       readingDisk = false;
+      /* **After the disk, and whatever the disk did.** The rescued text is
+         newer than anything hydration can produce — it was typed after the last
+         save that landed — so replaying it before would have it overwritten a
+         moment later. It runs even when `hydrate` gave up early, because a
+         browser with no IndexedDB still closed a tab mid-sentence. Before
+         `settleStorage`, so the screens that were waiting see the prose in the
+         first paint rather than a beat after it. */
+      replayRescued();
       settleStorage();
     }
   })();
@@ -3563,6 +3680,88 @@ export function subscribeToBibles(
     bibleListeners.delete(onStoreChange);
     window.removeEventListener("storage", onStorage);
   };
+}
+
+
+// ---------------------------------------------------------------------------
+// Conversations
+//
+// One key per conversation, like the bible: unbounded text that belongs to one
+// chapter or one book and must not ride along in a shelf write.
+//
+// **Every chat in the app kept its transcript in component state**, and all
+// three panels unmount when they close — `LeftPanel` owns its own mounting so
+// it can animate out, and the two workshops sit inside tool screens that come
+// and go. So a writer who closed the assistant to look at their chapter came
+// back to an empty panel, having lost the reading they had just asked for. It
+// read as the app forgetting on purpose.
+//
+// **It does not sync, and each of the three screens says so.** A transcript
+// carries the prose that was sent with the question, and every tool store here
+// is local for that reason. It is wiped with the rest by `clearLocalLibrary()`
+// when a different account signs in, which is what makes a shared browser safe.
+// ---------------------------------------------------------------------------
+
+const CHAT_PREFIX = "openchapter:chat:";
+const chatKey = (id: string) => `${CHAT_PREFIX}${id}`;
+const chatListeners = new Set<() => void>();
+
+/**
+ * How many messages a conversation keeps.
+ *
+ * **Stated once, here, beside the store it bounds.** A transcript grows without
+ * limit and competes with the manuscript for room — the store already raises a
+ * storage alarm when the origin fills — so the oldest turns are dropped rather
+ * than allowed to accumulate. Forty is roughly twenty exchanges, far more than
+ * any of these three conversations is shaped for: the assistant answers about
+ * one chapter, and both workshops are metered at three conversations for good.
+ */
+export const CHAT_KEEP = 40;
+
+export function subscribeToChat(id: string, onStoreChange: () => void) {
+  chatListeners.add(onStoreChange);
+  const key = chatKey(id);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    chatListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getChatRaw(id: string): string | null {
+  return readRaw(chatKey(id));
+}
+
+export function getServerChatRaw(): string | null {
+  return null;
+}
+
+/**
+ * Write a conversation back, keeping only the last `CHAT_KEEP` messages.
+ *
+ * **Swallowed on failure, unlike the bible.** This is not what the writer
+ * typed — it is a record of an exchange they can have again — so a full disk
+ * should cost the transcript rather than the answer on screen. The panel holds
+ * the messages in its own state either way; this is only what survives it
+ * closing.
+ */
+export function saveChat(id: string, messages: readonly unknown[]) {
+  const kept = messages.slice(-CHAT_KEEP);
+  try {
+    window.localStorage.setItem(chatKey(id), JSON.stringify(kept));
+  } catch {
+    return;
+  }
+  for (const listener of chatListeners) listener();
+}
+
+/** Empty a conversation — what a panel's Clear button presses. */
+export function clearChat(id: string) {
+  window.localStorage.removeItem(chatKey(id));
+  for (const listener of chatListeners) listener();
 }
 
 // ---------------------------------------------------------------------------

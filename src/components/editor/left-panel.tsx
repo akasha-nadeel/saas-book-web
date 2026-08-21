@@ -320,6 +320,7 @@ export function LeftPanel({
           {tab === "trash" && <TrashPanel bookId={bookId} />}
           {tab === "assistant" && (
             <ChatPanel
+              chapterId={chapterId}
               chapterTitle={chapterTitle}
               getChapterText={getChapterText}
             />

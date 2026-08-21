@@ -24,6 +24,9 @@ import {
   getServerBibleRaw,
   getServerBiblesRaw,
   subscribeToBible,
+  subscribeToChat,
+  getChatRaw,
+  getServerChatRaw,
   subscribeToBibles,
   getArcRaw,
   getServerArcRaw,
@@ -209,6 +212,39 @@ export function useBible(bookId: string): BibleEntry[] {
   const snapshot = useCallback(() => getBibleRaw(bookId), [bookId]);
   const raw = useSyncExternalStore(subscribe, snapshot, getServerBibleRaw);
   return useMemo(() => parseBible(raw), [raw]);
+}
+
+/**
+ * A stored conversation, parsed.
+ *
+ * The same shape as `useBible` above and for the same reasons: the snapshot is
+ * the raw string, so `useSyncExternalStore` can compare it with `Object.is` and
+ * settle, and the parse is memoised off that string rather than re-read.
+ *
+ * Generic in the message type because the three chats do not share one — the
+ * assistant keeps `{ role, text }`, the two workshops keep a turn with its own
+ * fields. What they share is the store, not the shape.
+ *
+ * A conversation that will not parse comes back empty rather than throwing: a
+ * transcript is a convenience, and a panel that cannot open because of one is
+ * worse than a panel that opens without its history.
+ */
+export function useChat<T>(id: string): T[] {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToChat(id, onStoreChange),
+    [id],
+  );
+  const snapshot = useCallback(() => getChatRaw(id), [id]);
+  const raw = useSyncExternalStore(subscribe, snapshot, getServerChatRaw);
+  return useMemo(() => {
+    if (!raw) return [];
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as T[]) : [];
+    } catch {
+      return [];
+    }
+  }, [raw]);
 }
 
 /**

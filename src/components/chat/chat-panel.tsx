@@ -7,6 +7,8 @@ import {
 } from "@/components/ui/assistant-reply";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useChatScroll } from "@/lib/use-chat-scroll";
+import { clearChat, saveChat } from "@/lib/library-store";
+import { useChat } from "@/lib/use-library";
 
 /**
  * The assistant panel.
@@ -28,14 +30,33 @@ const SUGGESTIONS = [
 ];
 
 export function ChatPanel({
+  chapterId,
   chapterTitle,
   getChapterText,
 }: {
+  /** What the conversation is filed under — one transcript per chapter. */
+  chapterId: string;
   chapterTitle: string;
   /** Read lazily: the chapter is only sent when something is actually asked. */
   getChapterText: () => string;
 }) {
-  const [messages, setMessages] = useState<Message[]>([]);
+  /**
+   * **The transcript is read from the store, not held here.**
+   *
+   * It was `useState([])`, and this panel unmounts every time it is closed —
+   * `LeftPanel` owns its own mounting so it can animate out — so a writer who
+   * shut the assistant to look at their chapter came back to an empty panel and
+   * had lost the reading they just asked for.
+   *
+   * `stored` is the conversation as saved; `live` is the one being streamed
+   * into, which exists because a reply arrives a token at a time and writing
+   * every token to disk would be a write per frame. The live copy wins while it
+   * is set and is flushed to the store when the reply finishes.
+   */
+  const stored = useChat<Message>(chapterId);
+  const [live, setLive] = useState<Message[] | null>(null);
+  const messages = live ?? stored;
+  const setMessages = setLive;
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +109,18 @@ export function ChatPanel({
         reply += decoder.decode(value, { stream: true });
         setMessages([...history, { role: "assistant", content: reply }]);
       }
+
+      /* **Written once the reply is whole, not while it streams.** A token
+         arrives every frame or two and each would be a `localStorage` write and
+         a listener fan-out; the live copy carries the conversation until then.
+         Handing the store the finished pair and dropping the live copy is what
+         puts the two back in step. */
+      const finished: Message[] = [
+        ...history,
+        { role: "assistant", content: reply },
+      ];
+      saveChat(chapterId, finished);
+      setLive(null);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       console.error("[chat] failed", err);
@@ -107,6 +140,14 @@ export function ChatPanel({
             <p className="font-sans text-sm text-muted">
               Ask about “{chapterTitle}”. The chapter text is sent with your
               question.
+            </p>
+            {/* **Said here because the transcript is now kept.** Every store in
+                the app that does not sync says so on the screen that owns it —
+                and this one holds prose that was sent with a question, which is
+                the last thing to leave a machine quietly. */}
+            <p className="mt-2 font-sans text-xs text-muted">
+              The conversation stays in this browser. It is not saved to your
+              account.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               {SUGGESTIONS.map((s) => (
@@ -210,7 +251,8 @@ export function ChatPanel({
             type="button"
             onClick={() => {
               abortRef.current?.abort();
-              setMessages([]);
+              setLive(null);
+              clearChat(chapterId);
               setError(null);
             }}
             disabled={messages.length === 0}

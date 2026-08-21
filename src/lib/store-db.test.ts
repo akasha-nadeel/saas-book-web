@@ -468,3 +468,78 @@ it("keeps the library within its history budget on the disk too", async () => {
   expect(next.getHistoryRaw("recent")).not.toBeNull();
   expect(next.getHistoryRaw(chapterId)).not.toBeNull();
 });
+
+// --- the rescue slot -------------------------------------------------------
+
+/**
+ * The bug these guard, said once: `writeStored` sets the memory mirror
+ * synchronously and only *queues* the IndexedDB write, and the autosave's
+ * unload handler could only call `void flush()`. A page that closed inside that
+ * window lost the write — measured on the running app as a sentence typed and
+ * the tab reloaded, gone, with "Saved" still in the corner. It is a regression
+ * from the move off `localStorage`, where writes were synchronous.
+ */
+it("puts back writing the page closed before it could save", async () => {
+  const { store } = await freshStore();
+  await store.loadFromDisk();
+
+  const { bookId, chapterId } = store.createBook("Rescue");
+  await store.saveBody(bookId, chapterId, { text: "saved" }, 1);
+
+  // What the unload handler does: synchronous, and all it has time for.
+  store.rescueBody(chapterId, { text: "typed at the last moment" }, 5);
+
+  const next = await reopen();
+  expect(JSON.parse(next.getBody(chapterId)!)).toEqual({
+    text: "typed at the last moment",
+  });
+  // And it is spent — a slot replayed twice would put stale prose over newer.
+  expect(localStorage.getItem(`openchapter:rescue:${chapterId}`)).toBeNull();
+});
+
+it("leaves the chapter alone when the queued write did land", async () => {
+  const { store } = await freshStore();
+  await store.loadFromDisk();
+
+  const { bookId, chapterId } = store.createBook("Clean close");
+  await store.saveBody(bookId, chapterId, { text: "identical" }, 1);
+  // The common case: the flush won the race, so the slot holds what is already
+  // on the disk. Rewriting it would bump the reload counter and remount the
+  // editor for nothing.
+  store.rescueBody(chapterId, { text: "identical" }, 1);
+
+  const next = await reopen();
+  expect(JSON.parse(next.getBody(chapterId)!)).toEqual({ text: "identical" });
+  expect(localStorage.getItem(`openchapter:rescue:${chapterId}`)).toBeNull();
+});
+
+it("ignores a rescue slot that will not parse", async () => {
+  const { store } = await freshStore();
+  await store.loadFromDisk();
+
+  const { bookId, chapterId } = store.createBook("Corrupt slot");
+  await store.saveBody(bookId, chapterId, { text: "the real prose" }, 3);
+  localStorage.setItem(`openchapter:rescue:${chapterId}`, "{ not json");
+
+  // A convenience must never stop the library loading.
+  const next = await reopen();
+  expect(next.getStoragePhase()).toBe("ready");
+  expect(JSON.parse(next.getBody(chapterId)!)).toEqual({
+    text: "the real prose",
+  });
+});
+
+it("clears the slot once the real write lands", async () => {
+  const { store } = await freshStore();
+  await store.loadFromDisk();
+
+  const { bookId, chapterId } = store.createBook("Cleared");
+  store.rescueBody(chapterId, { text: "held" }, 2);
+  expect(localStorage.getItem(`openchapter:rescue:${chapterId}`)).not.toBeNull();
+
+  // What the editor does in `save`: the slot has done its job, and left behind
+  // it would be replayed over a newer body on the next load.
+  await store.saveBody(bookId, chapterId, { text: "newer" }, 4);
+  store.clearRescue(chapterId);
+  expect(localStorage.getItem(`openchapter:rescue:${chapterId}`)).toBeNull();
+});

@@ -522,6 +522,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
                 `COMPOSER_HEIGHT` is the one place that number lives. */}
             <div className={`flex ${COMPOSER_HEIGHT} flex-col`}>
               <KeywordWorkshop
+                bookId={book.id}
                 blurb={blurb}
                 genre={book.genre}
                 categories={chosen}

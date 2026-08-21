@@ -463,6 +463,7 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
                   only overflow a box that has a size. */}
               <div className={`flex ${COMPOSER_HEIGHT} flex-col`}>
                 <BlurbWorkshop
+                  bookId={book.id}
                   title={book.title}
                   genre={book.genre}
                   draft={text}
