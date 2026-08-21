@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { requireSignedIn } from "@/lib/billing/server";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
 import { printHtml } from "@/lib/export/pdf-html";
@@ -130,7 +131,28 @@ function pageSize(body: Body): { width: string; height: string } {
   };
 }
 
+/**
+ * The most markup this will render, in characters.
+ *
+ * **A ceiling on what a stranger can make the server chew on**, and a generous
+ * one: the import cap is 8MB for a whole manuscript file, and this is that
+ * manuscript again as XHTML with its pictures inline as data URLs. Twenty
+ * million characters is far past any real novel and far short of a payload
+ * chosen to keep a browser busy.
+ */
+const MAX_MARKUP = 20_000_000;
+
 export async function POST(request: Request) {
+  /* **Free, but not anonymous.** Export never moves behind the plan — hence a
+     session check rather than `requirePro` — but this route launches a browser,
+     renders markup the caller wrote, and may run for five minutes. Left open it
+     was somebody else's CPU for the asking. Unconfigured Supabase skips it, so
+     a self-hosted copy is unchanged. */
+  const denied = await requireSignedIn(
+    "Sign in to export a PDF. The file is built on the server.",
+  );
+  if (denied) return denied;
+
   let body: Body;
   try {
     body = (await request.json()) as Body;
@@ -143,6 +165,13 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "A book needs markup and a stylesheet." },
       { status: 400 },
+    );
+  }
+
+  if (content.length + css.length > MAX_MARKUP) {
+    return NextResponse.json(
+      { error: "That book is too large to render here. See MAX_MARKUP." },
+      { status: 413 },
     );
   }
 
@@ -171,6 +200,31 @@ export async function POST(request: Request) {
     });
 
     const page = await browser.newPage();
+
+    /**
+     * **Nothing this page asks for may leave the machine.**
+     *
+     * `setContent` renders markup the caller supplied, and a browser that will
+     * fetch is a browser that will fetch anything it is pointed at — including
+     * a cloud provider's metadata endpoint or a service reachable only from
+     * inside the network. That is the whole of an SSRF, and an HTML-to-PDF
+     * route is its classic home.
+     *
+     * **Nothing legitimate is lost.** Pictures ride in as data URLs
+     * (`image-recode.ts`), the stylesheet is inline, `typeset.ts` names no
+     * remote font, and the Paged.js polyfill is injected as *source text*
+     * rather than fetched. `data:` and `about:` are what the page is built
+     * from; everything else is refused rather than fetched and ignored, so a
+     * book that somehow needs the network fails loudly here instead of
+     * silently reaching for it.
+     */
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      const url = req.url();
+      if (url.startsWith("data:") || url.startsWith("about:")) void req.continue();
+      else void req.abort();
+    });
+
     await page.setContent(
       printHtml({
         content,

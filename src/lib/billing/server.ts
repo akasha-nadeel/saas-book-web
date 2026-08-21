@@ -106,6 +106,29 @@ export async function currentSubscription(): Promise<{
  * own API keys works exactly as it did before any of this existed. Billing is
  * optional in the same way accounts and the assistant's key are optional.
  */
+/**
+ * A session, and nothing more — for a route that is free but must not be open.
+ *
+ * **`/api/export/pdf` is the one caller, and export must never move behind the
+ * plan**, so `requirePro` is the wrong tool: that route is free for every
+ * writer and will stay so. It also must not be *anonymous*. It launches a
+ * headless browser, renders markup the caller supplied, and may run for five
+ * minutes — with no session check a stranger could spend that, repeatedly, on
+ * somebody else's server.
+ *
+ * The same escape as `requirePro`: with no Supabase project there are no
+ * accounts to check, so a self-hosted copy is unchanged.
+ */
+export async function requireSignedIn(message: string): Promise<Response | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+  const userId = typeof data?.claims?.sub === "string" ? data.claims.sub : null;
+
+  return userId ? null : Response.json({ error: message }, { status: 401 });
+}
+
 export async function requirePro(messages: {
   /** Shown to a visitor with no session. */
   signIn: string;
