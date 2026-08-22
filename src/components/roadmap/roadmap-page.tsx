@@ -217,7 +217,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <div>
           <p className="text-lg font-bold text-fg">That book is not here.</p>
           <Link href="/" className="mt-3 inline-block text-accent">
@@ -257,7 +257,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
      * issue peek, Notion's page preview — and for this reason rather than for
      * fashion: a layer costs the thing underneath nothing.
      */
-    <div className="h-dvh overflow-hidden bg-surface">
+    <div className="h-[var(--oc-layout-height)] overflow-hidden bg-surface">
       {/* **One width, always.** The road no longer knows whether a tool is open,
           which is the point: nothing it draws can move when one arrives. The
           transition that used to ease this column between two widths is gone
@@ -278,7 +278,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
             which book they are in, and the breadcrumb says so anyway. The
             counts survive as text, which is all they ever were: "5 of 18" and
             "28%" are two numbers, and they had a card each. */}
-        <header className="sticky top-0 z-10 border-b border-line bg-panel/95 px-6 py-2.5 backdrop-blur">
+        <header className="sticky top-0 z-10 border-b border-line bg-panel/95 px-4 py-2.5 backdrop-blur sm:px-6">
           <div className="mx-auto flex max-w-7xl items-center gap-3">
             <Link
               href={`/book/${book.id}`}
@@ -317,7 +317,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
         </header>
 
         <div
-          className="mx-auto max-w-7xl px-6 pt-5 pb-16"
+          className="mx-auto max-w-7xl px-4 pt-5 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 sm:pb-16"
         >
         {/* ---- The road, as a stepper -------------------------------------
 
@@ -337,7 +337,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
             The mark carries the state for anyone who cannot see the fill: a
             tick for done, a filled ring for where you are, an empty one for
             what is ahead. */}
-        <nav aria-label="Phases" className="flex gap-2">
+        <nav aria-label="Phases" className="flex gap-1 sm:gap-2">
           {phases.map((phase) => {
             const isOpen = phase.id === open;
             const share =
@@ -517,7 +517,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
           `z-40` sits under the app's dialogs (50) — a tool that opens one of its
           own, and several do, must appear over this rather than under it.
         */
-        <div className="fixed inset-0 z-40">
+        <div className="fixed inset-x-0 top-[var(--oc-visual-offset-top)] z-40 h-[var(--oc-visual-height)]">
           {/* **The backdrop is a button, not a div with an onClick.**
 
               It is the largest dismiss target on the screen and the one most
@@ -565,7 +565,7 @@ export function RoadmapPage({ bookId }: { bookId: string }) {
               The bar stays, thin, because Close cannot go with it: a control
               that scrolls out of reach is one a writer has to hunt for to get
               back to the road. */}
-          <header className="flex shrink-0 items-center justify-end border-b border-line bg-panel px-5 py-2.5">
+          <header className="flex shrink-0 items-center justify-end border-b border-line bg-panel px-4 pt-[max(0.625rem,var(--oc-safe-top))] pb-2.5 sm:px-5">
             {/* **Not `danger`, which is what this was.**
 
                 Red is one of the four meanings this app's palette spends a hue

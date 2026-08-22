@@ -99,7 +99,7 @@ export function ImportBook() {
     // overflow-hidden for the editor's fixed shell, so a page that merely grows
     // past the viewport has no way to reach what is below the fold. This also
     // gives the sticky action bar a real scrollport to pin itself to.
-    <main className="scroll-slim h-dvh overflow-y-auto bg-surface px-4 py-12">
+    <main className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface px-4 pt-[max(1.5rem,var(--oc-safe-top))] pb-[max(2rem,var(--oc-safe-bottom))] sm:py-12">
       <div className="mx-auto w-full max-w-[34rem]">
         <h1 className="text-center font-serif text-3xl text-fg">
           Import a manuscript
@@ -292,9 +292,10 @@ export function ImportBook() {
                 this below the fold, which left the one action the whole screen
                 exists for out of sight at exactly the moment it was needed. */}
             <div
-              className="sticky bottom-0 z-10 -mx-4 mt-8 flex items-center
-                         justify-end gap-2 border-t border-line bg-surface
-                         px-4 py-4"
+              className="sticky bottom-0 z-10 -mx-4 mt-8 flex flex-col-reverse
+                         items-stretch justify-end gap-2 border-t border-line
+                         bg-surface px-4 pt-4 pb-[max(1rem,var(--oc-safe-bottom))]
+                         sm:flex-row sm:items-center"
             >
               <button
                 type="button"

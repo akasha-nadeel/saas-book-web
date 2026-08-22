@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
 import type { CompTitle } from "@/lib/comps/comps";
@@ -73,6 +74,7 @@ interface Incoming {
 }
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Ranked comp titles");
   if (!modelProvider()) {
     return Response.json(
       {

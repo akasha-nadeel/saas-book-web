@@ -201,7 +201,7 @@ export function AcceptInvite({
   }
 
   return (
-    <main className="h-dvh overflow-y-auto bg-surface">
+    <main className="h-[var(--oc-layout-height)] overflow-y-auto bg-surface pb-(--oc-safe-bottom)">
       <div className="mx-auto flex min-h-full max-w-lg items-center px-6 py-12">
         <div className="w-full rounded-2xl border border-line bg-panel p-6 sm:p-8">
           {/* Drawn from the first render rather than when the effect fires, so

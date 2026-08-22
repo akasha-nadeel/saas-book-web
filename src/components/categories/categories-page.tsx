@@ -257,7 +257,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <div>
           <p className="text-lg font-bold text-fg">That book is not here.</p>
           <Link href="/" className="mt-3 inline-block text-accent">
@@ -318,7 +318,7 @@ export function CategoriesPage({ bookId, embedded, heading }: ToolPageProps) {
           panel this page is a ~700px column inside a full-width viewport, so a
           `lg:` breakpoint reading the window would put a 24rem sidebar beside
           a 200px one. */}
-      <div className="@container mx-auto max-w-7xl px-6 pt-6 pb-16">
+      <div className="@container mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
         {heading}
 
         {/* ---- The seven boxes --------------------------------------------

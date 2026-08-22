@@ -54,6 +54,8 @@ import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { storeReadiness } from "@/lib/publishing";
 import { type ToolPageProps } from "@/lib/tool-page";
 import { areaLabel } from "@/lib/areas";
+import { exportAllowed } from "@/lib/launch";
+import { usePlan } from "@/lib/use-plan";
 
 /**
  * Getting the book out, as a sequence rather than a wall.
@@ -110,7 +112,7 @@ const FORMATS: FormatOption[] = [
   {
     value: "epub",
     label: "EPUB",
-    hint: "For e-readers and every ebook shop — the only one a store will take",
+    hint: "Pro export for e-readers and ebook shops",
     produces: "One .epub file",
   },
   {
@@ -121,44 +123,14 @@ const FORMATS: FormatOption[] = [
        finished file comes back. A card telling a writer to choose "Save as PDF"
        from a dialog that never opens is the plainest kind of claim the code
        cannot back. */
-    hint: "Typeset to your trim size, as a finished file",
+    hint: "Pro export, typeset to your trim size",
     produces: "One .pdf file",
   },
   {
     value: "docx",
     label: "Word",
-    hint: "What agents and editors ask for",
+    hint: "Free export for agents, editors and backup",
     produces: "One .docx file",
-  },
-  {
-    value: "markdown",
-    label: "Markdown",
-    hint: "Plain text that reads anywhere",
-    produces: "One .md file",
-    /*
-     * **Held back on 2026-08-16 over pictures, and only over pictures.**
-     *
-     * The text half is done and correct. What is not done is what happens to a
-     * book with an image in it: `blocksToMarkdown` writes the picture into the
-     * file as a base64 `data:` URL, which makes a small book a very large file
-     * and does not reliably display — GitHub and a good many parsers refuse a
-     * `data:` image outright, so the writer gets a wall of code where a
-     * picture should be.
-     *
-     * Every tool that does this properly ships a *folder*, not a file: Notion
-     * exports a zip of the markdown plus an `assets/` directory, Bear and
-     * Ulysses use TextBundle, which is the same idea standardised. Obsidian's
-     * most-installed export plugin exists to add exactly this. Scrivener is
-     * the counter-example and the reason not to ship the third option — its
-     * markdown export silently drops images altogether.
-     *
-     * So this comes back as: a plain `.md` when the book has no pictures, a
-     * zip of `book.md` plus `images/` when it has. `epub-images.ts` already
-     * lifts `data:` URLs into real files for the EPUB, so the hard half
-     * exists. Nothing here is deleted — the builder, its tests and its review
-     * pane are all whole and still exercised.
-     */
-    soon: true,
   },
 ];
 
@@ -415,6 +387,10 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const [typeset, setTypeset] = useState<TypesetOptions>(DEFAULT_TYPESET);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const plan = usePlan();
+  const hasFullExport = !plan.loading && (!plan.billing || plan.pro);
+  const needsExportUpgrade = (format: Format) =>
+    (plan.loading || plan.billing) && !exportAllowed(format, hasFullExport);
 
   /*
    * The file that just left, or null.
@@ -523,7 +499,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const book = findBook(shelf, bookId);
   if (!book) {
     return (
-      <main className="flex h-dvh items-center justify-center px-6">
+      <main className="flex h-[var(--oc-layout-height)] items-center justify-center px-6">
         <div className="text-center">
           <p className="font-serif text-xl text-fg">This book isn’t here.</p>
           <Link
@@ -633,7 +609,11 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
   const pick = (value: Format) => {
     setOutput(value);
-    setError(null);
+    setError(
+      needsExportUpgrade(value)
+        ? "EPUB and PDF export are part of Pro. The Free plan includes Word export."
+        : null,
+    );
     /* **The template has to survive the format changing, and Manuscript does
        not.** It is offered for print and withheld from an e-reader
        (`templatesFor`), so a writer who set it for a PDF and then switched to
@@ -650,6 +630,12 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
   const run = async () => {
     if (output === null) return;
+    if (needsExportUpgrade(output)) {
+      setError(
+        "EPUB and PDF export are part of Pro. The Free plan includes Word export.",
+      );
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -700,7 +686,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     // with a band of its own rather than a page with a heading. Only the
     // height claim changes.
     <main
-      className={`flex ${embedded ? "h-full" : "h-dvh"} flex-col overflow-hidden bg-surface`}
+      className={`flex ${embedded ? "h-full" : "h-[var(--oc-layout-height)]"} flex-col overflow-hidden bg-surface`}
     >
       {/* **The rail is gone and this band replaces it.**
 
@@ -751,13 +737,13 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
         {/* The step name belongs to the whole export flow rather than to the
             question below it, so it sits between the band and the body. */}
-        {heading && <div className="px-5 pt-5 md:px-12 md:pt-4">{heading}</div>}
+        {heading && <div className="px-(--oc-page-gutter) pt-5 md:px-12 md:pt-4">{heading}</div>}
 
         {/* The body's own padding. It is here rather than on the scroller so
             the band above can run full-bleed to the window's edges — its
             warning strip is a full-width bar and would otherwise be inset by
             the body's margin. */}
-        <div className="px-5 py-8 md:px-12 md:py-10">
+        <div className="px-(--oc-page-gutter) py-8 md:px-12 md:py-10">
           {/* **Two columns on the steps that set a page, one on the rest.**
 
               `showSheet` is the whole condition, and it is what the band above
@@ -994,8 +980,8 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
             reaching for; the form's own end is not a place, because it moves
             with the form. */}
       {/* `bg-surface`, matching the band above — see the note there. */}
-      <footer className="shrink-0 border-t border-line bg-surface px-5 py-4 md:px-12">
-        <div className="mx-auto flex w-full max-w-2xl items-center gap-3">
+      <footer className="shrink-0 border-t border-line bg-surface px-(--oc-page-gutter) pt-3 pb-[calc(0.75rem+var(--oc-safe-bottom))] md:px-12 md:py-4">
+        <div className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-3">
           {/* **The roadmap's tick, moved down here from the band.** It was
                 top right, opposite nothing, on a band that is now only
                 context — and it is an *action*, which is what this row is
@@ -2799,7 +2785,7 @@ function PrimaryAction({
                     disabled
                       ? "cursor-not-allowed bg-raised text-muted"
                       : "bg-accent text-accent-ink hover:bg-accent-strong"
-                  } ${busy ? "opacity-90" : ""}`}
+                  } ${busy ? "opacity-90" : ""} max-sm:order-first max-sm:ml-0 max-sm:w-full`}
     >
       {busy ? (
         <>

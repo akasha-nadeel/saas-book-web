@@ -57,5 +57,5 @@ export interface ToolPageProps {
  * nobody noticing until it is opened in the panel.
  */
 export function toolShell(embedded: boolean | undefined, extra = "bg-surface") {
-  return `${embedded ? "h-full" : "h-dvh"} overflow-y-auto ${extra}`;
+  return `${embedded ? "h-full" : "h-[var(--oc-visual-height)]"} min-w-0 overflow-y-auto overscroll-contain ${extra}`;
 }

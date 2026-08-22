@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { NextResponse } from "next/server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
@@ -52,6 +53,7 @@ function text(value: unknown, max: number): string | undefined {
 }
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Keyword suggestions");
   const gate = await requirePro({
     signIn: "Sign in to have keywords suggested for your book.",
     upgrade:

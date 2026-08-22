@@ -4,7 +4,7 @@ import {
   streamModel,
   type ChatMessage,
 } from "@/lib/ai";
-import { requirePro } from "@/lib/billing/server";
+import { claimAssistantReplyAllowance } from "@/lib/billing/launch-entitlements";
 
 /**
  * The assistant behind the editor's right-hand panel.
@@ -25,6 +25,11 @@ import { requirePro } from "@/lib/billing/server";
  */
 
 export const maxDuration = 300;
+
+const MAX_CHAPTER_CHARS = 60_000;
+const MAX_MESSAGES = 20;
+const MAX_MESSAGE_CHARS = 4_000;
+const MAX_OUTPUT_TOKENS = 2_000;
 
 const SYSTEM = `You are a writing assistant inside a novel-drafting app, helping
 with the chapter the writer currently has open.
@@ -64,12 +69,6 @@ export async function POST(request: Request) {
   //
   // With no accounts or no payment gateway configured this passes everyone, so
   // a self-hosted copy running on its owner's key works as it always did.
-  const denied = await requirePro({
-    signIn: "Sign in to use the assistant.",
-    upgrade: "The assistant is part of Pro. Upgrade to switch it on.",
-  });
-  if (denied) return denied;
-
   let body: { messages?: ChatMessage[]; chapter?: string };
   try {
     body = await request.json();
@@ -77,17 +76,29 @@ export async function POST(request: Request) {
     return Response.json({ error: "Malformed request." }, { status: 400 });
   }
 
-  const messages = (body.messages ?? []).filter(
-    (m) => typeof m?.content === "string" && m.content.trim(),
-  );
+  const messages = (body.messages ?? [])
+    .filter(
+      (m) =>
+        (m?.role === "user" || m?.role === "assistant") &&
+        typeof m?.content === "string" &&
+        m.content.trim(),
+    )
+    .slice(-MAX_MESSAGES)
+    .map((m) => ({
+      role: m.role,
+      content: m.content.trim().slice(0, MAX_MESSAGE_CHARS),
+    }));
   if (messages.length === 0) {
     return Response.json({ error: "No message to answer." }, { status: 400 });
   }
 
+  const allowance = await claimAssistantReplyAllowance();
+  if (!allowance.ok) return allowance.response;
+
   // The chapter is `context` rather than part of the conversation so it stays
   // put as the prefix while the exchange grows, which is what lets it be cached
   // across turns. See `StreamAsk` for what each provider does with it.
-  const chapter = (body.chapter ?? "").slice(0, 200_000);
+  const chapter = (body.chapter ?? "").slice(0, MAX_CHAPTER_CHARS);
   const context = chapter
     ? `The chapter as it currently stands:\n\n${chapter}`
     : "The chapter is currently empty.";
@@ -100,7 +111,7 @@ export async function POST(request: Request) {
     system: SYSTEM,
     context,
     messages,
-    maxTokens: 8000,
+    maxTokens: MAX_OUTPUT_TOKENS,
     signal: abort.signal,
   })[Symbol.asyncIterator]();
 
@@ -119,6 +130,7 @@ export async function POST(request: Request) {
   try {
     first = await pieces.next();
   } catch (err) {
+    await allowance.refund();
     if (err instanceof ModelError) {
       const status =
         err.kind === "auth" ? 401 : err.kind === "rate" ? 429 : 502;
@@ -170,6 +182,9 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
+      ...(allowance.usage.remaining !== null
+        ? { "X-OpenChapter-AI-Remaining": String(allowance.usage.remaining) }
+        : {}),
     },
   });
 }

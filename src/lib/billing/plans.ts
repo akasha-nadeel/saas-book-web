@@ -41,55 +41,17 @@ export const CURRENCY: Currency =
   process.env.NEXT_PUBLIC_PAYHERE_CURRENCY === "LKR" ? "LKR" : "USD";
 
 /**
- * The prices. `total` is what PayHere charges on each cycle; `perMonth` is what
- * the card shows, because a reader compares plans by the month whatever the
- * cycle.
+ * The launch-MVP prices. `total` is what the payment provider charges on each
+ * cycle; `perMonth` is what the pricing card shows for comparison.
  *
- * **`total` is exactly twelve times `perMonth`, and that is a rule rather than a
- * coincidence** — the card shows both, and two figures disagreeing would make
- * one of them a lie. A test asserts it, so a future price change cannot quietly
- * break the pair.
- *
- * **Which is why `perMonth` on the annual row is divided rather than typed.**
- * $89.99 does not go into twelve — it is $7.4991666… — so a hand-written 7.50
- * would claim a year costs $90.00 when the card charges $89.99. Dividing keeps
- * the stored pair exact and moves the rounding to the one place it is
- * survivable: `displayPrice`, which shows $7.50. That figure is therefore an
- * *approximation to the nearest cent*, and it is only honest because the exact
- * total is printed directly beneath it ("$89.99 billed annually"). Anyone
- * changing that card must keep the two together — a per-month rate shown alone,
- * with no total beside it, would be a claim this table cannot back.
- *
- * **The USD pair has moved twice, and the discount is what drives the annual
- * figure each time.** It was $10.99 / $87 — 34% off, roughly double what this
- * trade does. The convention is "two months free", twelve for the price of ten,
- * which is 16.7%; 15–20% is the usual band and 20–25% is already the aggressive
- * end. Dabble, the nearest subscription competitor, uses 20%. So $87 was not
- * cheap for the market, it was *discounted* far past it, by arithmetic rather
- * than by a decision. It became $10.99 / $99 on 2026-08-09: 25% off, still
- * visibly generous, and divisible by twelve into $8.25 exactly.
- *
- * **Monthly is $9.99 as of 2026-08-10, and the annual followed it rather than
- * standing still.** Holding $99 against the lower monthly would have quietly
- * cut the saving to 17% — a different offer, arrived at by leaving a number
- * alone. $89.99 keeps the 25% that was decided on, and puts the annual in the
- * same charm-priced shape as the monthly rather than beside it at a round $90.
- * Both changes were made while there were no subscribers; after that a price
- * change is an announcement rather than an edit, and Paddle would leave an
- * existing subscription on the price it was bought at in any case.
- *
- * The comparison worth keeping in view is not the other subscriptions, though.
- * Atticus is $147 **once**, Vellum $199–$250 once, Scrivener $60 once: this
- * market is used to buying a tool rather than renting one. See TODO.md on the
- * lifetime tier that was built and removed on 2026-08-03 — that is the real
- * pricing question, and it is a business decision rather than a number here.
+ * The annual USD price is 25% below paying monthly for twelve months:
+ * $5.98/month versus $53.99/year, displayed as about $4.50/month.
  */
 const PRICES: Record<Currency, Record<Period, { total: number; perMonth: number }>> = {
   USD: {
-    monthly: { total: 9.99, perMonth: 9.99 },
-    // Divided rather than typed: $89.99 does not go into twelve, and a typed
-    // 7.5 would make the total a cent more than the charge. See the note above.
-    annual: { total: 89.99, perMonth: 89.99 / 12 },
+    monthly: { total: 5.98, perMonth: 5.98 },
+    // Divided rather than typed so display rounding cannot drift from the charge.
+    annual: { total: 53.99, perMonth: 53.99 / 12 },
   },
   LKR: {
     monthly: { total: 2900, perMonth: 2900 },

@@ -27,7 +27,7 @@ export function LoadingScreen() {
     <div
       role="status"
       aria-label="Loading"
-      className="flex h-dvh w-full items-center justify-center bg-surface"
+      className="flex h-[var(--oc-layout-height)] w-full items-center justify-center bg-surface"
     >
       {/* `text-muted` rather than the accent: this is furniture a reader is
           waiting behind, not something to look at. The spinner takes its

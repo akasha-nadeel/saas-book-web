@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { gateway, generateSpeech } from "ai";
 import { MAX_SPEECH_CHARS } from "@/lib/export/narrate";
 import { requirePro } from "@/lib/billing/server";
@@ -31,6 +32,7 @@ const VOICES = new Set([
 const DEFAULT_VOICE = "onyx";
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Narration");
   if (!process.env.AI_GATEWAY_API_KEY) {
     return Response.json(
       {

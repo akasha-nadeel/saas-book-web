@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { NextResponse } from "next/server";
 import { parseSubjectIndex, rankHeadings } from "@/lib/comps/subjects";
 
@@ -29,6 +30,7 @@ const CACHE_SECONDS = 60 * 60 * 24 * 7;
 const LIMIT = 8;
 
 export async function GET(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Subject search");
   const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
 
   /*

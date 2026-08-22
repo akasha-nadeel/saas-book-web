@@ -24,7 +24,13 @@ import { bookWordCount, importIntoBook, type Book } from "@/lib/library-store";
  * button in one component and its dialog in another is how a control ends up
  * offered in a place that cannot answer for it.
  */
-export function ImportChapterButton({ book }: { book: Book }) {
+export function ImportChapterButton({
+  book,
+  presentation = "rail",
+}: {
+  book: Book;
+  presentation?: "rail" | "list";
+}) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -71,14 +77,26 @@ export function ImportChapterButton({ book }: { book: Book }) {
 
   return (
     <>
-      <RailButton
-        label={importing ? "Reading file…" : "Import a file"}
-        onClick={() => fileRef.current?.click()}
-        disabled={importing}
-      >
-        <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
-        <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
-      </RailButton>
+      {presentation === "rail" ? (
+        <RailButton
+          label={importing ? "Reading file…" : "Import a file"}
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+        >
+          <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
+          <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
+        </RailButton>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-line px-3 py-2.5 text-left text-sm text-fg outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-45"
+        >
+          <span>{importing ? "Reading file…" : "Import a file"}</span>
+          <span aria-hidden="true" className="text-muted">↑</span>
+        </button>
+      )}
 
       <input
         ref={fileRef}

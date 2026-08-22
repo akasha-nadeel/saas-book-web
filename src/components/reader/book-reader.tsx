@@ -104,14 +104,14 @@ export function BookReader({
       : "Back to editing";
 
   return (
-    <div className="flex h-dvh flex-col bg-surface">
+    <div className="flex h-[var(--oc-layout-height)] flex-col bg-surface">
       {/* App chrome above the page: the way back to editing, and the title. */}
-      <header className="flex shrink-0 items-center gap-3 px-4 py-3 md:px-6">
+      <header className="flex shrink-0 items-center gap-2 border-b border-line px-[max(0.75rem,var(--oc-safe-left))] pt-[max(0.5rem,var(--oc-safe-top))] pr-[max(0.75rem,var(--oc-safe-right))] pb-2 sm:gap-3 md:px-6 md:py-3">
         <Link
           href={backHref}
           aria-label={backLabel}
           title={backLabel}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md
                      text-muted outline-none transition-colors hover:bg-raised
                      hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
         >
@@ -143,7 +143,7 @@ export function BookReader({
             disabled={zoom <= ZOOM_MIN}
             aria-label="Zoom out"
             title="Zoom out"
-            className="flex h-9 w-9 items-center justify-center rounded-md
+            className="flex h-11 w-11 items-center justify-center rounded-md
                        text-muted outline-none transition-colors hover:bg-raised
                        hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60
                        disabled:opacity-40 disabled:hover:bg-transparent"
@@ -166,7 +166,7 @@ export function BookReader({
             onClick={() => setZoom(1)}
             aria-label="Reset zoom"
             title="Reset zoom"
-            className="w-12 rounded-md py-1.5 text-center font-sans text-xs
+            className="h-11 w-12 rounded-md py-1.5 text-center font-sans text-xs
                        tabular-nums text-muted outline-none transition-colors
                        hover:bg-raised hover:text-fg focus-visible:ring-2
                        focus-visible:ring-accent/60"
@@ -180,7 +180,7 @@ export function BookReader({
             disabled={zoom >= ZOOM_MAX}
             aria-label="Zoom in"
             title="Zoom in"
-            className="flex h-9 w-9 items-center justify-center rounded-md
+            className="flex h-11 w-11 items-center justify-center rounded-md
                        text-muted outline-none transition-colors hover:bg-raised
                        hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60
                        disabled:opacity-40 disabled:hover:bg-transparent"
@@ -215,7 +215,7 @@ export function BookReader({
 
 function MissingBook() {
   return (
-    <main className="flex h-dvh items-center justify-center px-6">
+    <main className="flex h-[var(--oc-layout-height)] items-center justify-center px-6">
       <div className="text-center">
         <p className="font-serif text-xl text-fg">This book isn’t here.</p>
         <p className="mt-2 font-sans text-sm text-muted">

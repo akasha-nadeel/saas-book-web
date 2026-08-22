@@ -7,6 +7,7 @@ import {
 } from "@/lib/supabase/config";
 import { safeNext } from "@/lib/auth-redirect";
 import { LEGAL_PAGES } from "@/lib/legal";
+import { hiddenLaunchRoute } from "@/lib/launch";
 
 /**
  * Session refresh, and the sign-in wall.
@@ -40,9 +41,8 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
  *
  * "/upgrade" is public because a price is read before an account is made. It
  * holds no manuscript and no account detail — only what each plan costs.
- * "/tools" is public for the same reason and a stronger one: it is the page
- * that describes the product, read by somebody deciding whether to sign up, and
- * a description of the software behind the sign-in wall describes it to nobody.
+ * The old `/tools` catalogue is deliberately not public in the launch MVP: the
+ * landing page now explains the smaller product, and `/tools` redirects home.
  *
  * The four policy pages are public for a harder reason than convenience: a
  * payment provider reviews this site before it will let anybody take a card,
@@ -54,7 +54,6 @@ const PUBLIC_PREFIXES = ["/signin", "/signup", "/forgot-password", "/auth"];
 const PUBLIC_EXACT = [
   "/",
   "/upgrade",
-  "/tools",
   ...LEGAL_PAGES.map((page) => page.href),
 ];
 
@@ -66,6 +65,15 @@ function isPublic(pathname: string): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (hiddenLaunchRoute(pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   // No project configured means no accounts: the app runs as it always has,
   // entirely local, and nothing is gated. See lib/supabase/config.ts.
   if (!isSupabaseConfigured()) return NextResponse.next();
@@ -104,8 +112,6 @@ export async function proxy(request: NextRequest) {
   // the cookie, which is why it — not getSession — is what the gate reads.
   const { data } = await supabase.auth.getClaims();
   const signedIn = Boolean(data?.claims);
-
-  const { pathname } = request.nextUrl;
 
   if (!signedIn && !isPublic(pathname)) {
     const url = request.nextUrl.clone();

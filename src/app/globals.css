@@ -1023,6 +1023,28 @@
   --rail-width: 3.25rem;
   --sidebar-width: 15rem;
 
+  /* ----------------------------------------------------------------------
+     Responsive application geometry.
+
+     The `oc-visual-*` values are replaced by ViewportController in one RAF
+     write. Their fallbacks keep the server-rendered shell correct before that
+     first frame and on browsers without VisualViewport. */
+  --oc-safe-top: env(safe-area-inset-top, 0px);
+  --oc-safe-right: env(safe-area-inset-right, 0px);
+  --oc-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --oc-safe-left: env(safe-area-inset-left, 0px);
+  --oc-visual-width: 100vw;
+  --oc-visual-height: 100dvh;
+  --oc-visual-offset-top: 0px;
+  --oc-layout-height: 100dvh;
+  --oc-keyboard-inset: 0px;
+  --oc-page-gutter: clamp(1rem, 3vw, 2.5rem);
+  --oc-touch-target: 2.75rem;
+  --oc-mobile-header-height: 3.5rem;
+  --oc-writing-dock-height: 4rem;
+  --oc-sheet-radius: 1.25rem;
+  --oc-sheet-max-height: min(82dvh, calc(var(--oc-visual-height) - 1rem));
+
   /* ------------------------------------------------------------------------
      The landing hero's backdrop, one image per theme.
 
@@ -1178,6 +1200,46 @@ body {
   background: var(--color-surface);
   color: var(--color-fg);
   font-family: var(--font-sans);
+  min-width: 0;
+}
+
+/* A flex/grid child is allowed to be narrower than its contents. Source-level
+   scrollers still decide where overflow belongs; this is not a page-wide
+   overflow-hiding patch. */
+:where(main, section, article, header, footer, nav, aside, form, fieldset) {
+  min-width: 0;
+}
+
+/* iOS zooms the whole page when a focused field is set below 16px. Keep the
+   compact desktop sizes and lift only the touch layout. */
+@media (max-width: 47.999rem) {
+  :where(
+      input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+      textarea,
+      select
+    ) {
+    font-size: 1rem;
+  }
+}
+
+/* Coarse pointers cannot reveal a control by hovering and need a finger-sized
+   hit box. Links inside prose are intentionally excluded; navigation links opt
+   in through their existing padding or `oc-touch-target`. */
+@media (pointer: coarse) {
+  :where(button, [role="button"], [role="menuitem"], .oc-touch-target) {
+    min-height: var(--oc-touch-target);
+    min-width: var(--oc-touch-target);
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: color-mix(
+      in srgb,
+      var(--color-accent) 20%,
+      transparent
+    );
+  }
+
+  :where(.group) :where(button, [role="button"])[class*="opacity-0"] {
+    opacity: 1;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -1700,6 +1762,16 @@ body {
 
   --color-selected: color-mix(in srgb, #17171a 8%, transparent);
   --color-selected-fg: #17171a;
+}
+
+/* The dashboard rail should be quieter than its white cards without becoming
+   the same grey desk they sit on. A near-white neutral gives the navigation a
+   deliberate surface and, because the inner scroller inherits it, replaces
+   the browser's dark scrollbar gutter with the rail's own background. */
+:root[data-theme="light"] .shelf-sidebar {
+  background: #fafafd;
+  --color-surface: #fafafd;
+  --color-panel: #fafafd;
 }
 
 /* The panel's fields lift *down* into the page on white — a lighter box on a
@@ -3135,6 +3207,310 @@ body {
 }
 .image-nv-handle.right {
   right: -6px;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive dialogs.
+
+   Questions remain compact on a desktop and become reachable bottom sheets on
+   a phone. Every other native dialog is a complex workspace and takes the
+   small screen instead of compressing a desktop modal into it. */
+.oc-dialog-scroll {
+  max-height: min(78dvh, calc(var(--oc-visual-height) - 2rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 47.999rem) {
+  dialog[data-dialog-presentation="sheet"] {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: var(--oc-sheet-max-height);
+    margin: auto 0 0;
+    border-radius: var(--oc-sheet-radius) var(--oc-sheet-radius) 0 0 !important;
+    padding-bottom: var(--oc-safe-bottom);
+  }
+
+  dialog[data-dialog-presentation="sheet"] .oc-dialog-scroll {
+    max-height: var(--oc-sheet-max-height);
+    padding: 1.25rem max(1rem, var(--oc-safe-right)) 1rem
+      max(1rem, var(--oc-safe-left));
+  }
+
+  dialog[data-dialog-presentation="sheet"] .oc-dialog-actions {
+    position: sticky;
+    bottom: calc(-1rem - var(--oc-safe-bottom));
+    z-index: 1;
+    margin-right: -1rem;
+    margin-left: -1rem;
+    padding: 0.75rem 1rem calc(0.75rem + var(--oc-safe-bottom));
+    background: var(--color-panel);
+    border-top: 1px solid var(--color-line);
+    flex-wrap: wrap;
+  }
+
+  dialog:not([data-dialog-presentation="sheet"]):not(
+      [data-dialog-presentation^="editor-"]
+    ):not([data-dialog-presentation="navigation"]) {
+    width: 100vw !important;
+    max-width: none !important;
+    height: var(--oc-visual-height) !important;
+    max-height: none !important;
+    margin: var(--oc-visual-offset-top) 0 0 !important;
+    border-radius: 0 !important;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: var(--oc-safe-top);
+    padding-bottom: var(--oc-safe-bottom);
+  }
+
+  dialog[data-dialog-presentation="navigation"] {
+    width: 100vw !important;
+    max-width: none !important;
+    height: var(--oc-visual-height) !important;
+    max-height: none !important;
+    margin: var(--oc-visual-offset-top) 0 0 !important;
+    border-radius: 0 !important;
+    padding-bottom: 0;
+  }
+}
+
+.oc-responsive-panel {
+  border: 1px solid var(--color-line);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.35);
+}
+
+.oc-responsive-panel-header {
+  padding-top: max(0.625rem, var(--oc-safe-top));
+  padding-right: max(1rem, var(--oc-safe-right));
+  padding-left: max(1rem, var(--oc-safe-left));
+}
+
+.oc-responsive-panel-actions {
+  padding-right: max(1rem, var(--oc-safe-right));
+  padding-bottom: max(0.75rem, var(--oc-safe-bottom));
+  padding-left: max(1rem, var(--oc-safe-left));
+}
+
+.oc-responsive-panel > section > .scroll-slim {
+  padding-bottom: max(1rem, var(--oc-safe-bottom));
+}
+
+/* The chapter title on a phone opens the real book-parts navigator as a modal,
+   while the live Tiptap surface stays mounted behind it. BookPanel normally
+   protects manuscript width and appears only on wide screens; inside this
+   deliberately full-screen layer it owns the available viewport instead. */
+.oc-mobile-book-navigation {
+  padding-top: var(--oc-safe-top);
+  padding-right: var(--oc-safe-right);
+  padding-bottom: var(--oc-safe-bottom);
+  padding-left: var(--oc-safe-left);
+}
+
+.oc-mobile-book-navigation .book-panel {
+  display: flex !important;
+  width: 100% !important;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Phone/short-landscape chrome is driven by the same classifier that disables
+   pagination, so the canvas and its controls can never disagree about mode. */
+:root[data-editor-layout="continuous"] .oc-editor-mobile-header,
+:root[data-editor-tools="overlay"] .oc-writing-dock {
+  display: flex;
+}
+
+/* On a phone an accordion's heading is the expected target. The full desktop
+   cards retain their explicit Pages/Chapters buttons; compact cards already
+   have their own whole-card control. */
+:root[data-editor-layout="continuous"] .oc-matter-card-mobile-toggle {
+  display: block;
+}
+
+.editor-shell {
+  height: var(--oc-layout-height);
+  max-height: var(--oc-layout-height);
+}
+
+.oc-editor-mobile-header {
+  min-height: calc(var(--oc-mobile-header-height) + var(--oc-safe-top));
+  padding-right: max(0.5rem, var(--oc-safe-right));
+  padding-bottom: 0.375rem;
+}
+
+:root[data-editor-layout="continuous"] .editor-workspace-rail,
+:root[data-editor-layout="continuous"] [data-rail="left"],
+:root[data-editor-layout="continuous"] [data-rail="right"] {
+  display: none !important;
+}
+
+:root[data-editor-layout="continuous"]
+  :is(.editor-shell[data-panel-mode="book"], .book-overview-shell) {
+  flex-direction: column;
+}
+
+:root[data-editor-layout="continuous"]
+  :is(.editor-shell[data-panel-mode="book"], .book-overview-shell)
+  .book-overview-back {
+  width: 100%;
+  min-height: calc(var(--oc-mobile-header-height) + var(--oc-safe-top));
+  justify-content: flex-start;
+  padding-top: var(--oc-safe-top);
+  padding-right: max(0.5rem, var(--oc-safe-right));
+  padding-left: max(0.5rem, var(--oc-safe-left));
+  border-bottom: 1px solid var(--color-line);
+  background: color-mix(in srgb, var(--color-panel) 95%, transparent);
+}
+
+:root[data-editor-layout="continuous"]
+  :is(.editor-shell[data-panel-mode="book"], .book-overview-shell)
+  .book-panel {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+:root[data-editor-layout="continuous"]
+  .editor-shell[data-panel-mode="book"]
+  .editor-main,
+:root[data-editor-layout="continuous"] .book-overview-shell .book-guide-shell {
+  display: none;
+}
+
+:root[data-editor-navigator="persistent"] [data-panel-tab="chapters"] {
+  display: none !important;
+}
+
+:root[data-editor-navigator="persistent"]
+  .oc-editor-panel[data-panel-tab="chapters"] {
+  display: none !important;
+}
+
+:root[data-editor-layout="continuous"] .oc-editor-panel-scrim {
+  display: none;
+}
+
+:root[data-editor-layout="continuous"] .oc-editor-panel {
+  top: var(--oc-visual-offset-top) !important;
+  right: 0;
+  bottom: auto !important;
+  left: 0 !important;
+  width: 100vw !important;
+  max-width: none !important;
+  height: var(--oc-visual-height) !important;
+  border-right: 0;
+}
+
+:root[data-editor-layout="continuous"] .oc-editor-panel > header {
+  min-height: calc(var(--oc-mobile-header-height) + var(--oc-safe-top));
+  height: auto;
+  padding-top: var(--oc-safe-top);
+  padding-right: max(0.375rem, var(--oc-safe-right));
+  padding-left: max(1rem, var(--oc-safe-left));
+}
+
+/* The phone is one calm writing canvas. Inline page geometry remains present
+   for the paged mode, but these rules remove it visually without remounting
+   Tiptap; the pagination extension clears its own gaps at the same boundary. */
+:root[data-editor-layout="continuous"] .editor-desk-strip {
+  display: none;
+}
+
+:root[data-editor-layout="continuous"] .scroll-paper {
+  overflow-x: hidden;
+  padding: calc(var(--oc-mobile-header-height) + var(--oc-safe-top) + 0.75rem)
+    max(var(--oc-page-gutter), var(--oc-safe-right))
+    calc(var(--oc-writing-dock-height) + var(--oc-safe-bottom) + 1.25rem)
+    max(var(--oc-page-gutter), var(--oc-safe-left)) !important;
+  scrollbar-gutter: auto !important;
+  overscroll-behavior: contain;
+}
+
+:root[data-editor-tools="overlay"] .scroll-paper {
+  padding-bottom: calc(
+    var(--oc-writing-dock-height) + var(--oc-safe-bottom) + 1.25rem
+  );
+}
+
+:root[data-editor-layout="continuous"] .pageflow {
+  width: min(100%, 46rem) !important;
+  height: auto !important;
+  min-height: calc(
+    var(--oc-visual-height) - var(--oc-mobile-header-height) -
+      var(--oc-writing-dock-height) - var(--oc-safe-top) - var(--oc-safe-bottom) -
+      1.5rem
+  );
+  zoom: 1 !important;
+  background: var(--paper-bg);
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 1px var(--paper-rule);
+}
+
+:root[data-editor-layout="continuous"] .pageflow-sheets {
+  display: none;
+}
+
+:root[data-editor-layout="continuous"] .pageflow-paper {
+  min-height: inherit;
+  padding: clamp(1.25rem, 5vw, 2rem) clamp(1rem, 5vw, 2rem) 5rem !important;
+}
+
+:root[data-editor-layout="continuous"] .manuscript .tiptap {
+  min-height: 55dvh;
+  column-count: 1 !important;
+}
+
+:root[data-editor-layout="continuous"] .image-nv[data-wrap],
+:root[data-editor-layout="continuous"]
+  .manuscript
+  .tiptap
+  p.figure[data-wrap] {
+  float: none;
+  width: auto !important;
+  margin: 1.5em 0;
+  text-align: center;
+}
+
+@media (pointer: coarse) {
+  :root[data-editor-layout="continuous"] .selection-toolbar {
+    display: none !important;
+  }
+}
+
+:root[data-editor-layout="continuous"]
+  dialog[data-dialog-presentation="editor-full"] {
+  width: 100vw !important;
+  max-width: none !important;
+  height: var(--oc-visual-height) !important;
+  max-height: none !important;
+  margin: var(--oc-visual-offset-top) 0 0 !important;
+  border: 0;
+  border-radius: 0 !important;
+}
+
+:root[data-editor-layout="continuous"]
+  dialog[data-dialog-presentation="editor-sheet"] {
+  width: 100% !important;
+  max-width: none !important;
+  height: auto !important;
+  max-height: var(--oc-sheet-max-height) !important;
+  margin: auto 0 0 !important;
+  border-radius: var(--oc-sheet-radius) var(--oc-sheet-radius) 0 0 !important;
+}
+
+/* Tablets retain pages while the tools become right drawers. */
+:root[data-editor-layout="paged"]
+  dialog[data-dialog-presentation^="editor-"] {
+  width: min(28rem, 100vw) !important;
+  max-width: none !important;
+  height: var(--oc-visual-height) !important;
+  max-height: none !important;
+  margin: var(--oc-visual-offset-top) 0 0 auto !important;
+  border-radius: var(--oc-sheet-radius) 0 0 var(--oc-sheet-radius) !important;
 }
 
 .manuscript .tiptap em { font-style: italic; }

@@ -382,7 +382,7 @@ export function SelectionToolbar({
       // the two. Split by what each row acts on — the selected words above, the
       // paragraphs they sit in below — it is about a third the width and the
       // grouping does some of the explaining.
-      className="flex w-max max-w-[min(21rem,calc(100vw-2rem))] flex-col gap-px
+      className="selection-toolbar flex w-max max-w-[min(21rem,calc(100vw-2rem))] flex-col gap-px
                  rounded-lg border border-line bg-panel p-0.5 shadow-xl"
       // Entering and leaving, rather than pressing and releasing: a writer who
       // presses a button and drags a little before letting go is still on the

@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { LandingPage } from "@/components/landing/landing-page";
+import { MvpLandingPage } from "@/components/landing/mvp-landing-page";
 import { Bookshelf } from "@/components/shelf/bookshelf";
 import { accountFromClaims } from "@/lib/account";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -38,7 +38,7 @@ export default async function Home() {
   const supabase = await createClient();
   const { data } = await supabase.auth.getClaims();
 
-  if (!data?.claims) return <LandingPage />;
+  if (!data?.claims) return <MvpLandingPage />;
 
   // Name and photo ride in the verified token itself, so the header can be
   // right on the first paint rather than filling in after a round trip.

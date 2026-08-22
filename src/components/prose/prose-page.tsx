@@ -158,7 +158,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <div>
           <p className="text-lg font-bold text-fg">That book is not here.</p>
           <Link href="/" className="mt-3 inline-block text-accent">
@@ -170,7 +170,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
   }
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
+    <div className="h-[var(--oc-layout-height)] overflow-y-auto bg-surface">
       {/* **The pain, not the mechanism.** "What is in the chapter, counted"
           describes what the code does, and the thing a writer arrives with is
           that they cannot read their own draft cold — the complaint every
@@ -183,7 +183,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
         beside the rest of your book — no score, and nothing here changes a word.
       </ToolHeader>
 
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
         {chapters.length === 0 ? (
           <p className="rounded-xl border border-line bg-panel p-5 text-muted">
             Nothing written yet. There is nothing to count.

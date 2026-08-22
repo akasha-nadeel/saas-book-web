@@ -57,7 +57,7 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <div>
           <p className="text-lg font-bold text-fg">That book is not here.</p>
           <Link href="/" className="mt-3 inline-block text-accent">
@@ -76,13 +76,13 @@ export function PaperbackPage({ bookId }: { bookId: string }) {
   const spec = paperbackSpec(using, size.width, size.height, stock);
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
+    <div className="h-[var(--oc-layout-height)] overflow-y-auto bg-surface">
       <ToolHeader book={book} tool="Paperback setup">
         Spine width, inside margin and the full cover wrap — four numbers that
         all depend on the page count, which is why this takes people an evening.
       </ToolHeader>
 
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
         {/* ---- The two things it needs ---------------------------------- */}
         <section className="grid gap-4 rounded-xl border border-line bg-panel p-5 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">

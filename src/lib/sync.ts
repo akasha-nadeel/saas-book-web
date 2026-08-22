@@ -628,10 +628,11 @@ export async function hasClaimed(): Promise<boolean> {
   const { data, error } = await createClient()
     .from("library_claims")
     .select("owner")
+    .eq("owner", owner)
     .maybeSingle();
 
   if (error) {
-    console.error("[sync] could not read claim", error);
+    console.error(`[sync] could not read claim:${describe(error)}`);
     // Fail closed. A failed read must not be taken as "never claimed" — that
     // is exactly the case that resurrects deleted books.
     return true;

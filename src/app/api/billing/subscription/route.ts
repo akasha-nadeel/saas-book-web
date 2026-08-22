@@ -1,8 +1,10 @@
 import { isPaddleConfigured } from "@/lib/billing/paddle";
 import { canManageSubscriptions } from "@/lib/billing/payhere";
 import { billingConfigured } from "@/lib/billing/provider";
+import { assistantUsageFor } from "@/lib/billing/launch-entitlements";
 import { currentSubscription } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
+import { LAUNCH_LIMITS } from "@/lib/launch";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -36,10 +38,14 @@ export async function GET(request: Request) {
       currentPeriodEnd: null,
       canCancel: false,
       order: null,
+      assistant: { used: 0, limit: null, remaining: null, resetAt: null },
+      books: { limit: null },
+      exports: { free: LAUNCH_LIMITS.freeExports, pro: LAUNCH_LIMITS.proExports },
     });
   }
 
   const { userId, subscription } = await currentSubscription();
+  const supabase = userId ? await createClient() : null;
 
   // The page a writer lands on after paying asks about one particular order as
   // well as the plan, because the two answer different questions: the plan says
@@ -48,8 +54,7 @@ export async function GET(request: Request) {
   const wanted = new URL(request.url).searchParams.get("order");
   let order: { id: string; status: string } | null = null;
 
-  if (wanted && userId) {
-    const supabase = await createClient();
+  if (wanted && supabase) {
     const { data } = await supabase
       .from("payment_orders")
       .select("order_id, status")
@@ -59,10 +64,21 @@ export async function GET(request: Request) {
     if (data) order = { id: String(data.order_id), status: String(data.status) };
   }
 
+  const pro = isPro(subscription);
+  const assistant =
+    supabase && userId
+      ? await assistantUsageFor(supabase, userId, subscription)
+      : {
+          used: 0,
+          limit: LAUNCH_LIMITS.freeAssistantRepliesPerMonth,
+          remaining: LAUNCH_LIMITS.freeAssistantRepliesPerMonth,
+          resetAt: null,
+        };
+
   return Response.json({
     billing: true,
     signedIn: Boolean(userId),
-    pro: isPro(subscription),
+    pro,
     order,
     status: subscription?.status ?? null,
     period: subscription?.period ?? null,
@@ -82,7 +98,10 @@ export async function GET(request: Request) {
         subscription.status !== "cancelled" &&
         (subscription.provider === "paddle"
           ? subscription.paddleSubscriptionId && isPaddleConfigured()
-          : subscription.payhereSubscriptionId && canManageSubscriptions()),
+            : subscription.payhereSubscriptionId && canManageSubscriptions()),
     ),
+    assistant,
+    books: { limit: pro ? null : LAUNCH_LIMITS.freeBooks },
+    exports: { free: LAUNCH_LIMITS.freeExports, pro: LAUNCH_LIMITS.proExports },
   });
 }

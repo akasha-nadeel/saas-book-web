@@ -35,7 +35,7 @@ export function LegalPage({
   children: ReactNode;
 }) {
   return (
-    <div className="h-dvh overflow-y-auto bg-lp-ground text-lp-body">
+    <div className="h-[var(--oc-layout-height)] overflow-y-auto bg-lp-ground text-lp-body">
       <header className="border-b border-lp-line">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
           <Link

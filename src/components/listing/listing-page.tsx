@@ -78,7 +78,7 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <p className="text-lg font-bold text-fg">That book is not here.</p>
       </div>
     );
@@ -104,7 +104,7 @@ export function ListingPage({ bookId, embedded, heading }: ToolPageProps) {
         </ToolHeader>
       )}
 
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
         {heading}
         {/* **The page is as wide as every other tool; the form is not.** The
             margins have to match the screen next door, but a two-column layout

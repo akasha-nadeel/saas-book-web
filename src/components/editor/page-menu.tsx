@@ -5,6 +5,7 @@ import { pageSetupOf, setPageSetup, type Book } from "@/lib/library-store";
 import {
   MARGIN_PRESETS,
   PAGE_SIZES,
+  type ColumnCount,
   type MarginPreset,
   type Orientation,
   type PageSize,
@@ -168,6 +169,20 @@ export function PageMenu({ book }: { book: Book }) {
                       {MARGIN_PRESETS[value].left}&quot;
                     </span>
                   </span>
+                </Choice>
+              ))}
+            </div>
+          </Section>
+
+          <Section title="Columns">
+            <div className="grid grid-cols-3 gap-1">
+              {([1, 2, 3] as ColumnCount[]).map((value) => (
+                <Choice
+                  key={value}
+                  selected={page.columns === value}
+                  onClick={() => setPageSetup(book.id, { columns: value })}
+                >
+                  {value}
                 </Choice>
               ))}
             </div>

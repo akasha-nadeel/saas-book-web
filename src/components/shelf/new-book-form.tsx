@@ -38,6 +38,9 @@ import {
 } from "@/lib/matter-picks";
 import { MatterPartRows } from "@/components/editor/matter-rows";
 import { BookCover } from "@/components/shelf/book-cover";
+import { LAUNCH_LIMITS } from "@/lib/launch";
+import { usePlan } from "@/lib/use-plan";
+import { useShelf } from "@/lib/use-library";
 
 /**
  * The three steps between "New book" and the blank page.
@@ -233,6 +236,13 @@ export function NewBookForm() {
 
 function NewBookFields({ mounted }: { mounted: boolean }) {
   const router = useRouter();
+  const shelf = useShelf();
+  const plan = usePlan();
+  const storedBookCount = shelf.books.length;
+  const freeBookLimitReached =
+    (plan.loading || plan.billing) &&
+    !plan.pro &&
+    storedBookCount >= LAUNCH_LIMITS.freeBooks;
 
   /* Which door the writer came through, from `?source=`. Read with
      `useSearchParams` for the reason the dashboard's `?area=` is: a lazy
@@ -391,6 +401,13 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   }, [step]);
 
   const create = () => {
+    if (freeBookLimitReached) {
+      setSaveError(
+        "The Free plan includes one book. Upgrade to Pro for unlimited books.",
+      );
+      return;
+    }
+
     const words = Number.parseInt(target.replace(/[^0-9]/g, ""), 10);
 
     /* **One set of answers, whichever door was used.** What the writer typed on
@@ -507,7 +524,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   return (
     <main
       ref={scrollRef}
-      className="scroll-slim h-dvh overflow-y-auto bg-surface px-4 py-12"
+      className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface px-4 pt-[max(1.5rem,var(--oc-safe-top))] pb-[max(2rem,var(--oc-safe-bottom))] sm:py-12"
     >
       {/* `pt-14` below `sm` is the room the absolute Cancel needs. The heading
           is centred and the button is out of the flow, so on a phone the two
@@ -903,7 +920,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
               on step one, and two Cancels would be two controls for one
               action. Step one therefore has nothing on the left, which is
               correct rather than empty: there is no previous question. */}
-          <div className="mt-8 flex items-center justify-between gap-4">
+          <div className="sticky bottom-0 z-10 mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line bg-surface/95 py-3 pb-[max(0.75rem,var(--oc-safe-bottom))] backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:py-0 sm:backdrop-blur-none">
             {/* `gap-3`, not the `gap-1` a bare text button wanted: the control
                 has an edge now, and a caption tucked against it reads as part
                 of the button. */}

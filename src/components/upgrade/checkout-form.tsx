@@ -41,7 +41,7 @@ export function CheckoutForm({
   return (
     // <body> is overflow-hidden for the editor shell, so a standalone page owns
     // its own scrolling. min-h-dvh would put the button out of reach.
-    <main className="scroll-slim h-dvh overflow-y-auto bg-surface">
+    <main className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface pb-(--oc-safe-bottom)">
       <div className="px-5 pt-5">
         <Link
           href="/upgrade"

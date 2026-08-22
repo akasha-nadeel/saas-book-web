@@ -98,14 +98,17 @@ export function CoverDialog({
       className="m-auto w-[34rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
                  p-0 text-fg backdrop:bg-black/70"
     >
-      <form onSubmit={save} className="p-7">
+      <form
+        onSubmit={save}
+        className="scroll-slim h-full overflow-y-auto p-4 pb-[max(1rem,var(--oc-safe-bottom))] sm:p-7"
+      >
         <h2 className="font-serif text-xl">Edit book details</h2>
         <p className="mt-1 font-sans text-sm text-muted">
           What this book is, and how it appears on your shelf.
         </p>
 
-        <div className="mt-6 flex items-start gap-5">
-          <div className="w-28 shrink-0">
+        <div className="mt-6 flex flex-col items-start gap-5 sm:flex-row">
+          <div className="w-28 shrink-0 self-center sm:self-start">
             <BookCover
               title={title.trim() || "Untitled Book"}
               subtitle={subtitle.trim() || undefined}
@@ -330,7 +333,7 @@ export function CoverDialog({
           </p>
         )}
 
-        <div className="mt-7 flex items-center justify-end gap-2">
+        <div className="sticky bottom-0 -mx-4 mt-7 flex items-center justify-end gap-2 border-t border-line bg-panel/95 px-4 pt-3 pb-[max(0.5rem,var(--oc-safe-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
           <button
             type="button"
             onClick={onClose}

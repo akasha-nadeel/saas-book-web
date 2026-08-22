@@ -13,11 +13,8 @@ import { PANEL_TITLES, type PanelTab } from "@/components/editor/left-panel";
  * Picking a panel, from whichever control is asking.
  *
  * Clicking the tab you are already on closes the panel — one control, never
- * two. Exported because the right rail's Assistant button has to obey the
- * same rule as this rail's Assistant tab: they are two controls over one piece
- * of state, and if they disagreed about what a second click does, a writer
- * would learn that the same button behaves differently depending on which edge
- * of the screen they pressed it from.
+ * two. Exported because any other surface that opens a panel must obey the
+ * same rule as this rail: one panel state, one second-press behavior.
  */
 export function selectPanel(
   value: PanelTab,
@@ -60,8 +57,8 @@ export function selectPanel(
  * tooltip on the button and the heading on the panel it opens cannot drift.
  */
 const GROUPS: readonly (readonly PanelTab[])[] = [
-  ["chapters", "search", "bookmarks"],
-  ["notes", "ideas", "bible", "assistant"],
+  ["chapters", "search"],
+  ["notes", "assistant"],
 ];
 
 /** Below the rest, always. See the note above. */
@@ -104,7 +101,7 @@ const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
  */
 export function BackToBooks() {
   return (
-    <div className="flex w-(--rail-width) shrink-0 justify-center pt-4">
+    <div className="book-overview-back flex w-(--rail-width) shrink-0 justify-center pt-4">
       <Link
         href="/"
         aria-label="All books"
@@ -123,7 +120,7 @@ export function BackToBooks() {
           strokeLinejoin="round"
           className="h-5 w-5"
         >
-          <path d="M12 5l-5 5 5 5" />
+          {icons.home}
         </svg>
       </Link>
     </div>
@@ -140,15 +137,15 @@ export function BackToBooks() {
  * in the editor's own Book View — and `BackToBooks` above takes its place. See
  * the note there.
  *
- * Two tabs are left out where something else already carries them, and both
- * for the same reason — one control, never two:
+ * One tab is left out where something else already carries it, for the same
+ * reason — one control, never two:
  *
  * - **Chapters.** The editor draws the book panel, which already is a chapter
  *   list, so the tab would be the same list twice.
- * - **Assistant.** The manuscript's own right rail carries it, next to the tools
- *   that act on the page it talks about. Both flags stay props rather than being
- *   assumed here, so a screen that has neither of those things can still ask for
- *   the full set.
+ *
+ * The assistant belongs here because it opens the left panel. Keeping the
+ * button on the same side as the panel removes the old cross-screen jump from
+ * the right rail.
  */
 export function WorkspaceRail({
   bookId,
@@ -158,6 +155,7 @@ export function WorkspaceRail({
   onPanel,
   chapters = true,
   assistant = true,
+  className = "",
 }: {
   bookId: string;
   tab: PanelTab;
@@ -167,25 +165,30 @@ export function WorkspaceRail({
   onPanel: (open: boolean) => void;
   /** Offer the chapter-list tab. False where a book panel already shows one. */
   chapters?: boolean;
-  /** Offer the assistant tab. False where the right rail already carries it. */
+  /** Offer the assistant tab. False only on screens that intentionally omit AI. */
   assistant?: boolean;
+  /** Responsive visibility supplied by the editor shell. */
+  className?: string;
 }) {
+  void bookId;
+
   const allowed = (value: PanelTab) =>
     (chapters || value !== "chapters") && (assistant || value !== "assistant");
 
   const tabButton = (value: PanelTab) => (
-    <RailButton
-      key={value}
-      label={PANEL_TITLES[value]}
-      // Clicking the panel you are already on closes it, so the rail
-      // doubles as the way to get the width back.
-      active={leftPanel && tab === value}
-      onClick={() =>
-        selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel })
-      }
-    >
-      {TAB_ICONS[value]}
-    </RailButton>
+    <span key={value} data-panel-tab={value} className="contents">
+      <RailButton
+        label={PANEL_TITLES[value]}
+        // Clicking the panel you are already on closes it, so the rail
+        // doubles as the way to get the width back.
+        active={leftPanel && tab === value}
+        onClick={() =>
+          selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel })
+        }
+      >
+        {TAB_ICONS[value]}
+      </RailButton>
+    </span>
   );
 
   const groups = GROUPS.map((group) => group.filter(allowed)).filter(
@@ -195,6 +198,7 @@ export function WorkspaceRail({
   return (
     <Rail
       side="left"
+      className={className}
       footer={
         <>
           <RailDivider />
@@ -229,12 +233,6 @@ export function WorkspaceRail({
 
       <RailButton label="All books" href="/">
         {icons.home}
-      </RailButton>
-
-      {/* Read the whole book — every chapter, top to bottom, on one scrolling
-          page, as against the single-chapter editor. */}
-      <RailButton label="Read the book" href={`/book/${bookId}/read`}>
-        {icons.read}
       </RailButton>
 
       {groups.map((group, i) => (

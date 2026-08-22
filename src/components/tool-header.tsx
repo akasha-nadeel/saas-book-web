@@ -153,8 +153,8 @@ export function ToolHeader({
        The band survives as the ground the card sits on, which is what keeps
        the top of the page distinct from the working area without a rule. */
     <header className="bg-surface">
-      <div className={`mx-auto ${WIDTHS[width]} px-6 pt-6`}>
-        <div className="rounded-2xl border border-line bg-panel p-5 @2xl:p-6">
+      <div className={`mx-auto ${WIDTHS[width]} px-(--oc-page-gutter) pt-4 sm:pt-6`}>
+        <div className="rounded-2xl border border-line bg-panel p-4 sm:p-5 @2xl:p-6">
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <nav
               aria-label="Breadcrumb"
@@ -203,7 +203,7 @@ export function ToolHeader({
             different weights, and centring it against the cover would leave
             the heading floating at whatever height the description happened to
             make. The top edges agree instead. */}
-          <div className="mt-4 flex items-start gap-4">
+          <div className="mt-4 flex flex-wrap items-start gap-4">
             {/* **It opens "Edit book details" now, and it used to open the
               book.** The old note is worth keeping because the need it named
               is real: the cover is what a writer reaches for the moment they
@@ -292,7 +292,11 @@ export function ToolHeader({
               )}
             </div>
 
-            {action}
+            {action && (
+              <div className="w-full min-w-0 sm:w-auto sm:shrink-0">
+                {action}
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -94,6 +94,23 @@ function settled(a: Spacer[], b: Spacer[]): boolean {
   return true;
 }
 
+/**
+ * The visible pagination frame for the current geometry.
+ *
+ * Keeping the disabled state pure makes the nullable contract explicit: a
+ * continuous editor has no decoration gaps and is always reported as one
+ * page. Restoring geometry feeds the freshly measured spacers back through
+ * the same path.
+ */
+export function paginationFrame(
+  geometry: PageGeometry | null,
+  spacers: Spacer[],
+): { spacers: Spacer[]; pageCount: number } {
+  return geometry
+    ? { spacers, pageCount: spacers.length + 1 }
+    : { spacers: [], pageCount: 1 };
+}
+
 class PaginationView {
   private view: EditorView;
   private opts: PaginationOptions;
@@ -245,9 +262,17 @@ class PaginationView {
     // Mid-composition (IME) the DOM is in flux; wait for it to settle.
     if (view.composing) return;
 
-    const paper = view.dom.closest(".pageflow-paper") as HTMLElement | null;
     const g = this.opts.getGeometry();
-    if (!paper || !g) return;
+    if (!g) {
+      const frame = paginationFrame(null, this.applied);
+      this.opts.onPages(frame.pageCount);
+      if (!settled(frame.spacers, this.applied)) this.apply(frame.spacers);
+      this.lastHeight = this.height();
+      return;
+    }
+
+    const paper = view.dom.closest(".pageflow-paper") as HTMLElement | null;
+    if (!paper) return;
 
     // Every gap already on screen is hidden for the duration of the measure, so
     // what is read back is the document's *natural* flow — the shape it would
@@ -299,9 +324,10 @@ class PaginationView {
       for (const gap of gaps) gap.style.display = "";
     }
 
-    this.opts.onPages(spacers.length + 1);
+    const frame = paginationFrame(g, spacers);
+    this.opts.onPages(frame.pageCount);
 
-    if (!settled(spacers, this.applied)) this.apply(spacers);
+    if (!settled(frame.spacers, this.applied)) this.apply(frame.spacers);
 
     // The page the writer was looking at goes back exactly where it was, after
     // every change this pass made. Word's own behaviour: repagination does not

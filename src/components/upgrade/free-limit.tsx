@@ -530,7 +530,7 @@ export function LimitDialog({
          inside the rounded corners; the height cap is a floor under a very
          short window rather than something the layout relies on. */
       className="m-auto max-h-[calc(100dvh-2rem)] w-[46rem]
-                 max-w-[calc(100vw-2rem)] overflow-hidden rounded-3xl
+                 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-3xl sm:overflow-hidden
                  bg-[#050a18] p-0 text-fg shadow-2xl backdrop:bg-black/70"
     >
       {/* The picture sits behind everything rather than inside the left half,

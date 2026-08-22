@@ -1234,7 +1234,7 @@ export function LandingPage() {
     // including the consequence that `font-serif` here no longer means a serif.
     <div
       data-theme="light"
-      className="lp-type h-dvh overflow-y-auto bg-lp-ground text-lp-body [scroll-behavior:smooth]"
+      className="lp-type h-[var(--oc-layout-height)] overflow-y-auto bg-lp-ground text-lp-body [scroll-behavior:smooth]"
     >
       <LandingHeader ink={INK} />
 

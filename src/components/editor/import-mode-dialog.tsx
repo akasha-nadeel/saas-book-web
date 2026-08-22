@@ -35,6 +35,7 @@ export function ImportModeDialog({
   return (
     <dialog
       ref={dialogRef}
+      data-dialog-presentation="sheet"
       onClose={onClose}
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
@@ -42,7 +43,7 @@ export function ImportModeDialog({
       className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
                  p-0 text-fg backdrop:bg-black/70"
     >
-      <div className="p-6">
+      <div className="oc-dialog-scroll p-6">
         <h2 className="font-serif text-xl">This book already has writing</h2>
         <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
           You have <span className="text-fg">{existing}</span> in this book, and

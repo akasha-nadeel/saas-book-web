@@ -42,7 +42,7 @@ export default function RefundsPage() {
             "The renewal stops. Your card is not charged again.",
             "Your plan keeps running to the end of the period you have already paid for. The account menu shows that date.",
             "When the date passes, the account goes back to the free plan. Nothing is deleted — every book, chapter and word stays exactly where it was.",
-            "Exports stay free and unlimited on the free plan, so you can always take everything with you.",
+            "Word export remains available on the free plan, so you can always take the manuscript with you.",
           ]}
         />
         <Note>
@@ -114,7 +114,7 @@ export default function RefundsPage() {
         <p>
           It does not delete your books. Refunding a subscription returns the
           money and returns the account to the free plan; everything you have
-          written stays, and you can go on writing, importing and exporting on
+          written stays, and you can go on writing and exporting Word files on
           the free plan for as long as you like.
         </p>
       </Section>

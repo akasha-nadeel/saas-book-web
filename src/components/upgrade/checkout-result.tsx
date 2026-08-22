@@ -50,7 +50,7 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
   }, [waiting, tries, refresh]);
 
   return (
-    <main className="scroll-slim h-dvh overflow-y-auto bg-surface">
+    <main className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface pb-(--oc-safe-bottom)">
       <div className="mx-auto flex min-h-full max-w-md flex-col justify-center px-5 py-16 text-center">
         {plan.loading && tries === 0 ? (
           <Result title="Checking with PayHere…" tone="wait" />
@@ -58,7 +58,7 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
           <Result
             tone="good"
             title="You're on Pro"
-            body="The assistant, the bookmarks and the research tools are switched on. PayHere has emailed your receipt."
+            body="Unlimited books, more assistant replies, and EPUB/PDF export are switched on. PayHere has emailed your receipt."
             action={{ href: "/", label: "Back to writing" }}
           />
         ) : refused ? (

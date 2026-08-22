@@ -7,9 +7,10 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
 } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import type { PageMetrics } from "@/lib/page-setup";
 import type { Book } from "@/lib/library-store";
 import { BookCover } from "@/components/shelf/book-cover";
@@ -25,6 +26,20 @@ const PX_PER_IN = 96;
 const BASE_PAGE_W = 340;
 /** How long a turn takes; the CSS leaf/opening animations match it. */
 const TURN_MS = 660;
+
+function subscribeToSinglePage(onChange: () => void) {
+  const query = window.matchMedia("(max-width: 47.999rem)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function singlePageSnapshot() {
+  return window.matchMedia("(max-width: 47.999rem)").matches;
+}
+
+function useSinglePageReader() {
+  return useSyncExternalStore(subscribeToSinglePage, singlePageSnapshot, () => false);
+}
 
 /** One page of the flowed book — its content HTML and whether it opens a chapter. */
 interface FlatPage {
@@ -85,14 +100,14 @@ export function ReaderFlipbook({
   bookId: string;
   typographyKey: string;
 }) {
-  const router = useRouter();
+  const singlePage = useSinglePageReader();
 
   const trueW = metrics.width * PX_PER_IN;
   const trueH = metrics.height * PX_PER_IN;
   const contentW = (metrics.width - metrics.left - metrics.right) * PX_PER_IN;
   const contentH = (metrics.height - metrics.top - metrics.bottom) * PX_PER_IN;
 
-  const pageW = BASE_PAGE_W * zoom;
+  const pageW = (singlePage ? 280 : BASE_PAGE_W) * zoom;
   const openScale = pageW / trueW;
   const sheetH = trueH * openScale;
 
@@ -214,6 +229,7 @@ export function ReaderFlipbook({
   // The target view, 0…spreadCount. 0 is the closed cover; s≥1 is the open
   // spread — see `leftIndex`/`rightIndex` above.
   const [spread, setSpread] = useState(0);
+  const [singleIndex, setSingleIndex] = useState(0);
   const target = Math.min(Math.max(0, spread), spreadCount);
 
   // The settled view. It lags `target` for one turn's length, so during a turn
@@ -238,11 +254,20 @@ export function ReaderFlipbook({
     return () => clearTimeout(t);
   }, [target, committed]);
 
-  const next = useCallback(
-    () => setSpread((s) => Math.min(spreadCount, s + 1)),
-    [spreadCount],
-  );
-  const prev = useCallback(() => setSpread((s) => Math.max(0, s - 1)), []);
+  const next = useCallback(() => {
+    if (singlePage) {
+      setSingleIndex((index) => Math.min(flat.length, index + 1));
+      return;
+    }
+    setSpread((s) => Math.min(spreadCount, s + 1));
+  }, [flat.length, singlePage, spreadCount]);
+  const prev = useCallback(() => {
+    if (singlePage) {
+      setSingleIndex((index) => Math.max(0, index - 1));
+      return;
+    }
+    setSpread((s) => Math.max(0, s - 1));
+  }, [singlePage]);
 
   // Arrow keys turn the pages.
   useEffect(() => {
@@ -387,19 +412,17 @@ export function ReaderFlipbook({
               because that is the exporters' own answer and this screen exists
               to agree with them. */}
           {p.first && p.heading && !p.empty && (
-            <div
+            <Link
+              href={`/book/${bookId}/chapter/${p.chapterId}`}
               className="chapter-opener reader-opener-link"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/book/${bookId}/chapter/${p.chapterId}`);
               }}
-              role="link"
-              tabIndex={0}
               title="Edit this chapter"
             >
               {p.label && <p className="chapter-label">{p.label}</p>}
               <h2 className="reader-title">{p.title}</h2>
-            </div>
+            </Link>
           )}
           {p.empty ? (
             <p className="reader-empty">This chapter is empty.</p>
@@ -440,6 +463,62 @@ export function ReaderFlipbook({
       )}
     </div>
   );
+
+  if (singlePage) {
+    const index = Math.min(singleIndex, flat.length);
+    const currentPage = index > 0 ? pageAt(index - 1) : null;
+
+    return (
+      <div className="flex h-full min-w-0 flex-col overflow-y-auto px-3 pt-3 pb-[max(0.75rem,var(--oc-safe-bottom))] sm:p-4">
+        <div className="my-auto max-w-full shrink-0 self-center overflow-x-auto rounded-sm">
+          {index === 0 ? renderCover() : renderSheet(currentPage)}
+        </div>
+
+        <nav
+          aria-label="Page navigation"
+          className="sticky bottom-0 mt-3 flex shrink-0 items-center justify-center gap-3 border-t border-line bg-surface/95 pt-3 backdrop-blur"
+        >
+          <button
+            type="button"
+            onClick={prev}
+            disabled={index === 0}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel text-fg outline-none disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/60"
+            aria-label="Previous page"
+          >
+            ←
+          </button>
+          <p className="min-w-28 text-center text-xs tabular-nums text-muted">
+            {index === 0 ? "Cover" : `Page ${index} of ${flat.length}`}
+          </p>
+          <button
+            type="button"
+            onClick={next}
+            disabled={index >= flat.length}
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-panel text-fg outline-none disabled:opacity-30 focus-visible:ring-2 focus-visible:ring-accent/60"
+            aria-label="Next page"
+          >
+            →
+          </button>
+        </nav>
+
+        <div
+          ref={measureRef}
+          aria-hidden="true"
+          className="manuscript"
+          data-paper={paper}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: "-99999px",
+            visibility: "hidden",
+            pointerEvents: "none",
+          }}
+        >
+          <div />
+        </div>
+      </div>
+    );
+  }
 
   return (
     /* **The book is a fixed size and the window is not.** `sheetH` comes from

@@ -27,6 +27,7 @@ import {
 } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 import type { Dictation } from "@/lib/editor/use-dictation";
+import { applyFormattingCommand } from "@/lib/editor/formatting-commands";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /** The four alignments, each with a small icon of ruled lines. */
@@ -393,7 +394,9 @@ export function ToolRail({
             <ToolButton
               label="Normal text"
               active={editor.isActive("paragraph")}
-              onClick={() => editor.chain().focus().setParagraph().run()}
+              onClick={() =>
+                applyFormattingCommand(editor, { type: "paragraph" })
+              }
             >
               <span className="font-serif text-sm">¶</span>
             </ToolButton>
@@ -403,7 +406,7 @@ export function ToolRail({
                 label={`Heading ${level}`}
                 active={editor.isActive("heading", { level })}
                 onClick={() =>
-                  editor.chain().focus().toggleHeading({ level }).run()
+                  applyFormattingCommand(editor, { type: "heading", level })
                 }
               >
                 <span className="font-serif text-sm">H{level}</span>
@@ -416,7 +419,7 @@ export function ToolRail({
               label="Bold"
               shortcut="Ctrl+B"
               active={editor.isActive("bold")}
-              onClick={() => editor.chain().focus().toggleBold().run()}
+              onClick={() => applyFormattingCommand(editor, { type: "bold" })}
             >
               <span className="font-bold">B</span>
             </ToolButton>
@@ -424,7 +427,9 @@ export function ToolRail({
               label="Italic"
               shortcut="Ctrl+I"
               active={editor.isActive("italic")}
-              onClick={() => editor.chain().focus().toggleItalic().run()}
+              onClick={() =>
+                applyFormattingCommand(editor, { type: "italic" })
+              }
             >
               <span className="font-serif italic">I</span>
             </ToolButton>
@@ -432,21 +437,25 @@ export function ToolRail({
               label="Underline"
               shortcut="Ctrl+U"
               active={editor.isActive("underline")}
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              onClick={() =>
+                applyFormattingCommand(editor, { type: "underline" })
+              }
             >
               <span className="underline">U</span>
             </ToolButton>
             <ToolButton
               label="Strikethrough"
               active={editor.isActive("strike")}
-              onClick={() => editor.chain().focus().toggleStrike().run()}
+              onClick={() =>
+                applyFormattingCommand(editor, { type: "strike" })
+              }
             >
               <span className="line-through">S</span>
             </ToolButton>
             <ToolButton
               label="Inline code"
               active={editor.isActive("code")}
-              onClick={() => editor.chain().focus().toggleCode().run()}
+              onClick={() => applyFormattingCommand(editor, { type: "code" })}
             >
               <span className="font-mono text-xs">{"</>"}</span>
             </ToolButton>
@@ -516,7 +525,10 @@ export function ToolRail({
                     aria-pressed={activeAlign === option.value}
                     title={option.label}
                     onClick={() =>
-                      editor.chain().focus().setTextAlign(option.value).run()
+                      applyFormattingCommand(editor, {
+                        type: "align",
+                        value: option.value,
+                      })
                     }
                     className={`flex h-8 flex-1 items-center justify-center
                                 rounded-md outline-none transition-colors

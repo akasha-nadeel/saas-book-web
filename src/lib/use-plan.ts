@@ -34,6 +34,17 @@ export interface PlanState {
   canCancel: boolean;
   /** Present only when an order id was asked about. */
   order: { id: string; status: string } | null;
+  /** Monthly writing-assistant allowance reported by the backend. */
+  assistant: {
+    used: number;
+    limit: number | null;
+    remaining: number | null;
+    resetAt: string | null;
+  } | null;
+  /** Book allowance. `null` means unlimited. */
+  books: { limit: number | null } | null;
+  /** Export formats by plan. */
+  exports: { free: readonly string[]; pro: readonly string[] } | null;
 }
 
 const UNKNOWN: PlanState = {
@@ -46,6 +57,9 @@ const UNKNOWN: PlanState = {
   currentPeriodEnd: null,
   canCancel: false,
   order: null,
+  assistant: null,
+  books: null,
+  exports: null,
 };
 
 export function usePlan(orderId?: string): PlanState & { refresh: () => void } {

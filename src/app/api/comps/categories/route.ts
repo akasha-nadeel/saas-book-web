@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
 import { KDP_CATEGORIES, MAX_PATHS, parseShelves } from "@/lib/comps/shelves";
@@ -66,6 +67,7 @@ interface Incoming {
 }
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Category suggestions");
   if (!modelProvider()) {
     return Response.json(
       {

@@ -201,7 +201,7 @@ export function ToolSaveBar({ state }: { state: ToolSaveState }) {
              `pointer-events-none` on the positioner with the card taking them
              back, so the empty width either side of a narrow bar does not
              swallow clicks on the page underneath. */
-          className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
+          className="pointer-events-none fixed inset-x-0 bottom-[calc(1rem+var(--oc-safe-bottom))] z-40 flex justify-center px-[max(1rem,var(--oc-safe-left))]"
           role="status"
           aria-live="polite"
         >

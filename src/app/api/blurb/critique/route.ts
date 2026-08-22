@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
 import {
@@ -40,6 +41,7 @@ const text = (value: unknown, cap: number) =>
   typeof value === "string" ? value.slice(0, cap).trim() : "";
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Blurb critique");
   if (!modelProvider()) {
     return Response.json(
       {

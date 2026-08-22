@@ -107,9 +107,15 @@ export function Menu({
     // every menu decide it fits perfectly wherever it happens to be.
     const height = menu.scrollHeight;
 
+    const visual = window.visualViewport;
+    const viewportTop = visual?.offsetTop ?? 0;
+    const viewportLeft = visual?.offsetLeft ?? 0;
+    const viewportHeight = visual?.height ?? window.innerHeight;
+    const viewportWidth = visual?.width ?? window.innerWidth;
+    const viewportBottom = viewportTop + viewportHeight;
     const below = rect.bottom + 6;
-    const roomBelow = window.innerHeight - below - EDGE;
-    const roomAbove = rect.top - 6 - EDGE;
+    const roomBelow = viewportBottom - below - EDGE;
+    const roomAbove = rect.top - 6 - viewportTop - EDGE;
 
     // Below by default; above when below would run off the fold and above has
     // more room. Not simply "above if it does not fit", or a menu on a short
@@ -138,11 +144,14 @@ export function Menu({
 
     setAt({
       top: wantsAbove
-        ? Math.max(EDGE, rect.top - shown - 6)
-        : Math.min(below, Math.max(EDGE, window.innerHeight - shown - EDGE)),
+        ? Math.max(viewportTop + EDGE, rect.top - shown - 6)
+        : Math.min(
+            below,
+            Math.max(viewportTop + EDGE, viewportBottom - shown - EDGE),
+          ),
       left: Math.min(
-        Math.max(EDGE, left),
-        Math.max(EDGE, window.innerWidth - width - EDGE),
+        Math.max(viewportLeft + EDGE, left),
+        Math.max(viewportLeft + EDGE, viewportLeft + viewportWidth - width - EDGE),
       ),
       maxHeight,
     });
@@ -170,9 +179,13 @@ export function Menu({
     };
     window.addEventListener("scroll", onDismiss, true);
     window.addEventListener("resize", onDismiss);
+    window.visualViewport?.addEventListener("resize", onDismiss);
+    window.visualViewport?.addEventListener("scroll", onDismiss);
     return () => {
       window.removeEventListener("scroll", onDismiss, true);
       window.removeEventListener("resize", onDismiss);
+      window.visualViewport?.removeEventListener("resize", onDismiss);
+      window.visualViewport?.removeEventListener("scroll", onDismiss);
     };
   }, [open]);
 

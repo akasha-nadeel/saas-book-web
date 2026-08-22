@@ -10,6 +10,7 @@ import "./globals.css";
 import { LibrarySync } from "@/components/library-sync";
 import { StorageAlert } from "@/components/storage-alert";
 import { ThemeSync } from "@/components/theme/theme-sync";
+import { ViewportController } from "@/components/viewport-controller";
 
 /**
  * Sets the theme on `<html>` before the first paint, so a writer who is on the
@@ -91,6 +92,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
   // The mobile browser's own chrome. Answered per scheme rather than once,
   // because this is read from the markup before any of our script runs — it
   // cannot know what the writer chose, only what their machine prefers, and
@@ -134,6 +137,7 @@ export default function RootLayout({
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}
       <body className="h-full overflow-hidden bg-surface text-fg">
+        <ViewportController />
         <ThemeSync />
         <LibrarySync />
         {/* Renders nothing until a write runs out of room. Here rather than in

@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
 import {
@@ -70,6 +71,7 @@ function turnsIn(value: unknown): WorkshopMessage[] {
 }
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Blurb workshop");
   if (!modelProvider()) {
     return Response.json(
       {

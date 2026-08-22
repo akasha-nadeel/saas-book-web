@@ -1944,7 +1944,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <div>
           <p className="text-lg font-bold text-fg">That book is not here.</p>
           <Link href="/" className="mt-3 inline-block text-accent">
@@ -1999,7 +1999,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
           stayed stacked and the artwork panel — which sizes itself by aspect
           ratio — grew to the full width of a `7xl` page and stood about 1,300
           pixels tall. */}
-      <div className="@container mx-auto max-w-7xl px-6 pt-6 pb-16">
+      <div className="@container mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
         {heading}
 
         {/* The line the header carries when this screen owns the window.

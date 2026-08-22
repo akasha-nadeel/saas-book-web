@@ -22,6 +22,9 @@ const eslintConfig = defineConfig([
     // this `npm run lint` reports seven thousand problems from bundled
     // vendor code — which is how the three real ones in `src/` went unread.
     ".shot-app/**",
+    // Local, gitignored upstream source checkouts used only as implementation
+    // references. They keep their own lint configuration and are not app code.
+    ".reference/**",
   ]),
 ]);
 

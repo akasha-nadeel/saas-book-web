@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { NextResponse } from "next/server";
 import {
   mergeComps,
@@ -200,6 +201,7 @@ async function fetchSource(
 }
 
 export async function GET(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Comp title search");
   const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
 
   if (query.length < 2) {

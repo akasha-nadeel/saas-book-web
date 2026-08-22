@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { gateway, transcribe } from "ai";
 import { transcriptToProse } from "@/lib/import/transcript";
 import { requirePro } from "@/lib/billing/server";
@@ -29,6 +30,7 @@ const MAX_AUDIO_BYTES = 25_000_000;
 const MODEL = "openai/gpt-4o-transcribe";
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Audio transcription");
   if (!process.env.AI_GATEWAY_API_KEY) {
     return Response.json(
       {

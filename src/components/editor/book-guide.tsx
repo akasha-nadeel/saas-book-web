@@ -30,7 +30,7 @@ export function BookGuide({
        page comes in from the side, which is the same movement the Chapters view
        makes — the two faces differ in what they show, not in how they land. */
     <div
-      className={`scroll-slim h-full overflow-y-auto px-4 py-8 md:py-10 ${
+      className={`book-guide scroll-slim h-full overflow-y-auto px-4 py-8 md:py-10 ${
         entering ? "page-enter" : ""
       }`}
     >

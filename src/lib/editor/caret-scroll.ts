@@ -23,6 +23,30 @@ import type { EditorView } from "@tiptap/pm/view";
  */
 const EDGE_PAD = 2;
 
+interface VerticalBounds {
+  top: number;
+  bottom: number;
+}
+
+/**
+ * The part of the editor that is genuinely visible between browser chrome,
+ * the mobile editor header, and the writing dock.
+ */
+export function visibleEditingPort(
+  container: VerticalBounds,
+  viewport: VerticalBounds,
+  headerBottom?: number,
+  dockTop?: number,
+): VerticalBounds {
+  const top = Math.max(container.top, viewport.top, headerBottom ?? -Infinity);
+  const bottom = Math.min(
+    container.bottom,
+    viewport.bottom,
+    dockTop ?? Infinity,
+  );
+  return { top, bottom: Math.max(top, bottom) };
+}
+
 /**
  * How far to scroll so the caret is visible: positive to scroll down, negative
  * up, zero when it is already comfortably inside the port.
@@ -78,11 +102,31 @@ export function keepCaretInView(view: EditorView): void {
   const caret = caretBox(view);
   if (!caret) return;
 
-  const delta = caretScrollDelta(
-    caret,
+  const owner = container.ownerDocument;
+  const target = owner.defaultView;
+  const visual = target?.visualViewport;
+  const viewportTop = visual?.offsetTop ?? 0;
+  const viewport = {
+    top: viewportTop,
+    bottom: viewportTop + (visual?.height ?? target?.innerHeight ?? 0),
+  };
+  const edgeOf = (
+    selector: string,
+    edge: "top" | "bottom",
+  ): number | undefined => {
+    const element = owner.querySelector<HTMLElement>(selector);
+    if (!element || target?.getComputedStyle(element).display === "none") {
+      return undefined;
+    }
+    return element.getBoundingClientRect()[edge];
+  };
+  const port = visibleEditingPort(
     container.getBoundingClientRect(),
-    EDGE_PAD,
+    viewport,
+    edgeOf(".oc-editor-mobile-header", "bottom"),
+    edgeOf(".oc-writing-dock", "top"),
   );
+  const delta = caretScrollDelta(caret, port, EDGE_PAD);
   // Instant, not smooth: a smooth scroll queued on every keystroke lags behind
   // the typing and feels like the page is chasing the caret.
   if (delta !== 0) container.scrollTop += delta;

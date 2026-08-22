@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { caretScrollDelta } from "./caret-scroll";
+import { caretScrollDelta, visibleEditingPort } from "./caret-scroll";
 
 // A window on the text 600px tall, with a line of room kept at each edge.
 const PORT = { top: 100, bottom: 700 };
@@ -48,6 +48,16 @@ describe("caretScrollDelta", () => {
     expect(caretScrollDelta({ top: 640, bottom: 670 }, PORT, PAD)).toBe(0);
   });
 
+  it("keeps the caret visible when a mobile keyboard reduces the editor height", () => {
+    const keyboardPort = { top: 56, bottom: 356 };
+    expect(
+      caretScrollDelta({ top: 342, bottom: 374 }, keyboardPort, 2),
+    ).toBe(20);
+    expect(
+      caretScrollDelta({ top: 250, bottom: 282 }, keyboardPort, 2),
+    ).toBe(0);
+  });
+
   it("holds still until the caret has actually run out of room", () => {
     // The pad the editor really uses is 2px, not a line's height. Padding by a
     // line moves the page while the caret is still plainly visible, which is
@@ -59,5 +69,27 @@ describe("caretScrollDelta", () => {
     expect(caretScrollDelta({ top: 668, bottom: 698 }, PORT, EDGE)).toBe(0);
     // Only once it would be cut off does the page give way, by the overshoot.
     expect(caretScrollDelta({ top: 670, bottom: 700 }, PORT, EDGE)).toBe(2);
+  });
+});
+
+describe("visibleEditingPort", () => {
+  it("clips the scroll container to the visual viewport and mobile chrome", () => {
+    expect(
+      visibleEditingPort(
+        { top: 0, bottom: 800 },
+        { top: 12, bottom: 412 },
+        68,
+        348,
+      ),
+    ).toEqual({ top: 68, bottom: 348 });
+  });
+
+  it("uses the container edges when no overlay chrome is present", () => {
+    expect(
+      visibleEditingPort(
+        { top: 80, bottom: 720 },
+        { top: 0, bottom: 900 },
+      ),
+    ).toEqual({ top: 80, bottom: 720 });
   });
 });

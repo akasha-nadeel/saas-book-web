@@ -15,9 +15,7 @@ import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CollabArea } from "@/components/collab/collab-area";
 import { SharedBadge } from "@/components/collab/shared-badge";
-import { InviteWatch } from "@/components/collab/invite-watch";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
-import { BookToolsDialog } from "@/components/shelf/book-tools-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
 import { SupportDialog } from "@/components/shelf/support-dialog";
@@ -38,7 +36,6 @@ import {
   hasCover,
   migrateLegacy,
   restoreBook,
-  setRoadmapStep,
   trashBook,
   type Book,
   type BookView,
@@ -67,10 +64,9 @@ import { totals, type Entry, type Ledger } from "@/lib/ledger";
 import { curveOf, MIN_WINDOW_DAYS, type LeftOut } from "@/lib/curve";
 import { ProGate, useEntitled } from "@/components/upgrade/pro-gate";
 import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
-import { PHASES, progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
+import { progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
-import { ToolGrid, ToolGroupBlock } from "@/components/shelf/tool-grid";
-import { GET_IT_OUT } from "@/lib/book-tools";
+import { ToolGrid } from "@/components/shelf/tool-grid";
 import {
   Menu,
   MenuButton,
@@ -154,21 +150,13 @@ const AREAS: {
   live: boolean;
   blurb: string;
   icon: React.ReactNode;
-  /**
-   * A stage in the book's life rather than something you consult.
-   *
-   * Overview, Write, Prepare and Track happen in that order; Tools is open at
-   * any point. The rail draws the two apart on this, so the order in this array
-   * stays the order on screen and the flag is the only thing to change if an
-   * area ever moves between them.
-   */
   stage: boolean;
 }[] = [
   {
     id: "overview",
     label: "Overview",
     live: true,
-    blurb: "What stands between your book and a shop, and what to do about it.",
+    blurb: "See your books and continue writing.",
     icon: shelfIcons.overview,
     stage: true,
   },
@@ -176,42 +164,9 @@ const AREAS: {
     id: "write",
     label: "Write",
     live: true,
-    blurb: "Draft it, and keep it safe. One part of the job.",
+    blurb: "Create books, manage chapters and write safely.",
     icon: shelfIcons.write,
     stage: true,
-  },
-  {
-    id: "prepare",
-    label: "Prepare",
-    live: true,
-    blurb: "Get it out without paying to find out what was wrong.",
-    icon: shelfIcons.prepare,
-    stage: true,
-  },
-  {
-    id: "track",
-    label: "Track",
-    live: true,
-    blurb: "What the book cost against what it earned.",
-    icon: shelfIcons.track,
-    stage: true,
-  },
-  {
-    id: "tools",
-    label: "Tools",
-    live: true,
-    blurb: "The small jobs that cost a fortune elsewhere.",
-    icon: shelfIcons.tools,
-    stage: false,
-  },
-  {
-    id: "collab",
-    label: "Collaborators",
-    live: true,
-    blurb: "Some books have two writers. Say who, and what they may do.",
-    icon: shelfIcons.collab,
-    // Not a stage in a book's life — it is something you consult, like Tools.
-    stage: false,
   },
 ];
 
@@ -267,6 +222,7 @@ export function Bookshelf({
   const params = useSearchParams();
   const asked = params.get("area");
   const [picked, setPicked] = useState<Area | null>(null);
+  const [navigationOpen, setNavigationOpen] = useState(false);
 
   // What the URL says, until the writer clicks something. After that their
   // click wins — retyping the URL on every tab change would stack history
@@ -292,6 +248,7 @@ export function Bookshelf({
    * and quietly undo it. Only the navigation controls call this.
    */
   const goToArea = (next: Area) => {
+    setNavigationOpen(false);
     setArea(next);
     /**
      * **Written back with `replace`, which is what makes both halves work.**
@@ -328,7 +285,6 @@ export function Bookshelf({
 
   const [editing, setEditing] = useState<Book | null>(null);
   const [covering, setCovering] = useState<Book | null>(null);
-  const [tooling, setTooling] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
   const [view, setView] = useState<BookView>("active");
@@ -440,121 +396,127 @@ export function Bookshelf({
        `EditCoverContext`. The value is `setCovering` itself, so the dialog a
        cover opens is the same one the ⋯ menu opens; two ways in, one dialog. */
     <EditCoverContext.Provider value={setCovering}>
-      <div className="flex h-dvh bg-surface">
+      <div className="flex h-[var(--oc-layout-height)] bg-surface">
         {/* ---- The six areas ------------------------------------------- */}
-        {/* The rail is three groups rather than one list with everything else
-          shoved to the bottom by `mt-auto`. That arrangement left a hand's
-          width of empty panel between Tools and Help on any normal screen,
-          which reads as an unfinished sidebar; and it filed Templates and
-          Background sound — two extras — beside Help and Pricing, which are
-          chrome. Grouping says which is which and closes the hole. */}
+        {/* The rail is compact: primary workflow first, secondary account/help
+          actions directly underneath, and only the signed-in account pinned to
+          the foot. A mostly empty sidebar reads like unfinished space. */}
         {/* pb-3, not the pb-14 this used to carry. That padding existed to keep
           the last item clear of Next's dev-tools badge, which sits in this
           exact corner — and it left a hand's width of empty rail at the bottom
           of the shipped product to dodge something only a developer ever sees.
           The badge is moved to bottom-right in next.config.ts instead. */}
-        <aside className="hidden w-60 shrink-0 flex-col overflow-y-auto border-r border-line bg-panel px-3 pt-4 pb-3 md:flex">
-          <Link
-            href="/"
-            className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
-          >
-            Open<span className="text-wordmark">Chapter</span>
-          </Link>
-
-          {/* Two groups, because there are two kinds of item here and the flat
-            list said so nowhere. Overview, Write, Prepare and Track are the
-            arc of a book's life, in the order it happens. Tools is not a
-            stage — you open it at any point — so a rule separates it rather
-            than letting the eye read five equal steps and expect Tools to come
-            after Track. */}
-          <nav className="flex flex-col gap-0.5">
-            {AREAS.filter((a) => a.stage).map((a) => (
-              <SideItem
-                key={a.id}
-                icon={a.icon}
-                active={area === a.id}
-                onClick={() => goToArea(a.id)}
+        <aside className="shelf-sidebar hidden min-h-0 w-56 shrink-0 flex-col border-r border-line md:flex">
+          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-3 pt-4 pb-2">
+            <div className="flex min-h-full flex-col">
+              <Link
+                href="/"
+                className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
               >
-                {a.label}
-              </SideItem>
-            ))}
-          </nav>
+                Open<span className="text-wordmark">Chapter</span>
+              </Link>
 
-          <div className="my-3 h-px bg-line" />
+              <nav className="flex flex-col gap-0.5">
+                {AREAS.filter((a) => a.stage).map((a) => (
+                  <SideItem
+                    key={a.id}
+                    icon={a.icon}
+                    active={area === a.id}
+                    onClick={() => goToArea(a.id)}
+                  >
+                    {a.label}
+                  </SideItem>
+                ))}
+              </nav>
 
-          <nav className="flex flex-col gap-0.5">
-            {AREAS.filter((a) => !a.stage).map((a) => (
-              <SideItem
-                key={a.id}
-                icon={a.icon}
-                active={area === a.id}
-                onClick={() => goToArea(a.id)}
-              >
-                {a.label}
-              </SideItem>
-            ))}
+              {AREAS.some((a) => !a.stage) && (
+                <>
+                  <div className="my-3 h-px bg-line" />
+                  <nav className="flex flex-col gap-0.5">
+                    {AREAS.filter((a) => !a.stage).map((a) => (
+                      <SideItem
+                        key={a.id}
+                        icon={a.icon}
+                        active={area === a.id}
+                        onClick={() => goToArea(a.id)}
+                      >
+                        {a.label}
+                      </SideItem>
+                    ))}
+                  </nav>
+                </>
+              )}
 
-            {/* Not built, and sitting where it will be built.
-
-              It goes beside Tools rather than among the four stages because
-              that is what it is — somewhere you go at any point, not a step in
-              a book's life — and putting it in its eventual home now means
-              nothing moves under a writer on the day it ships.
-
-              The badge is the house rule, not decoration: a control either
-              works or plainly says it is not built. Pressing it explains
-              itself rather than doing nothing, which is the difference between
-              a promise and a dead button. */}
-            <SideItem
-              icon={shelfIcons.community}
-              badge={<Badge>Soon</Badge>}
-              onClick={() => setDialog("community")}
-            >
-              Community
-            </SideItem>
-          </nav>
-
-          {/* Getting help, then giving it back, then the account. Help before
-            Support because Support's own first line points at the guide, and
-            Feedback after both because it is the other direction: nothing
-            comes back, and a writer reaching for it is not stuck. */}
-          <div className="mt-auto flex flex-col gap-0.5 pt-6">
-            <SideItem icon={shelfIcons.help} onClick={() => setDialog("help")}>
-              Help
-            </SideItem>
-            <SideItem
-              icon={shelfIcons.support}
-              onClick={() => setDialog("support")}
-            >
-              Support
-            </SideItem>
-            <SideItem
-              icon={shelfIcons.feedback}
-              onClick={() => setDialog("feedback")}
-            >
-              Send feedback
-            </SideItem>
-            <SideItem icon={shelfIcons.pricing} href="/upgrade">
-              Pricing
-            </SideItem>
-
-            {/* Below the rule: who you are, and everything that is a setting
-              rather than a place.
-
-              The four above go somewhere; this one opens the menu that holds
-              the account, the plan and the theme. It sits at the very foot,
-              where every tool built in the last five years puts it — it used
-              to be a chip in the top-right corner, which is the other
-              convention and the one this product was not otherwise following.
-
-              One row rather than two. Theme had a row of its own here and has
-              moved inside the menu, because it is a setting about the app and
-              that menu is now where the app's settings are. */}
-            <div className="mt-2 border-t border-line pt-2">
-              <AccountMenu account={account} variant="bar" />
+              {/* Getting help, then giving it back. Help before Support because
+                Support's own first line points at the guide, and Feedback after
+                both because it is the other direction: nothing comes back, and
+                a writer reaching for it is not stuck. */}
+              <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
+                <SideItem
+                  icon={shelfIcons.support}
+                  onClick={() => setDialog("support")}
+                >
+                  Support
+                </SideItem>
+                <SideItem
+                  icon={shelfIcons.feedback}
+                  onClick={() => setDialog("feedback")}
+                >
+                  Send feedback
+                </SideItem>
+                <SideItem icon={shelfIcons.pricing} href="/upgrade">
+                  Pricing
+                </SideItem>
+              </div>
             </div>
           </div>
+
+          {/* Outside the scroller: who you are remains reachable at every
+            navigation scroll position, and everything that is a setting rather
+            than a place stays anchored to the foot of the rail.
+
+            This row opens the menu that holds the account, the plan and the
+            theme. It sits at the very foot, where every tool built in the last
+            five years puts it — it used to be a chip in the top-right corner,
+            which is the other convention and the one this product was not
+            otherwise following.
+
+            One row rather than two. Theme had a row of its own here and has
+            moved inside the menu, because it is a setting about the app and
+            that menu is now where the app's settings are. */}
+          <footer className="shrink-0 border-t border-line bg-panel px-3 pt-2 pb-3">
+            <AccountMenu account={account} variant="bar" />
+          </footer>
         </aside>
+
+        {navigationOpen && (
+          <MobileDashboardNavigation
+            account={account}
+            area={area}
+            onArea={goToArea}
+            onClose={() => setNavigationOpen(false)}
+            onDialog={setDialog}
+          />
+        )}
+
+        {/* On a phone the area switcher belongs where a thumb can reach it,
+          not in the most valuable line of the header. It remains mounted while
+          its modal is open so the browser can return focus to the trigger when
+          the drawer closes. The modal top layer makes the page behind it inert. */}
+        <button
+          type="button"
+          onClick={() => setNavigationOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={navigationOpen}
+          aria-controls="mobile-dashboard-navigation"
+          className="fixed bottom-[calc(0.75rem+var(--oc-safe-bottom))] left-1/2 z-40 flex h-12 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-fg/15 bg-fg px-4 text-sm font-semibold text-surface shadow-[0_12px_32px_rgb(0_0_0/0.24)] outline-none transition-[transform,background-color] hover:bg-fg/90 active:translate-y-px focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface md:hidden"
+        >
+          <span className="text-surface/80">{meta.icon}</span>
+          <span className="min-w-0 max-w-40 truncate">{meta.label}</span>
+          <span aria-hidden="true" className="ml-1 text-base leading-none text-surface/70">
+            ☰
+          </span>
+        </button>
 
         {/* ---- The area ------------------------------------------------ */}
         {/* Named so `goToArea` can put it back to the top on a switch. */}
@@ -565,30 +527,25 @@ export function Bookshelf({
             column as the page, so the search lines up with the heading below
             and the account chip lines up with the right edge of the cards. */}
           <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-6 py-3">
-              {/* The area picker again, for the widths where the rail is hidden. */}
-              <select
-                value={area}
-                onChange={(e) => goToArea(e.target.value as Area)}
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg md:hidden"
+            <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 md:flex md:flex-wrap">
+              <Link
+                href="/"
+                className="col-start-1 row-start-1 flex h-11 min-w-0 items-center text-xl font-bold tracking-tight text-fg outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
               >
-                {AREAS.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.label}
-                    {a.live ? "" : " (planned)"}
-                  </option>
-                ))}
-              </select>
+                Open<span className="text-wordmark">Chapter</span>
+              </Link>
 
               {/* Capped rather than `flex-1`. At full width it was the loudest
               thing on the screen, and it is a filter for one list, not the
               product's main verb. */}
-              <div className="relative min-w-[8rem] max-w-sm flex-1">
+              <div className="relative col-start-1 row-start-2 min-w-0 md:min-w-[8rem] md:max-w-sm md:flex-1">
                 <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
                   {shelfIcons.search}
                 </span>
                 <input
                   ref={searchRef}
+                  name="book-search"
+                  autoComplete="off"
                   value={query}
                   onChange={(e) => {
                     setQuery(e.target.value);
@@ -596,17 +553,17 @@ export function Bookshelf({
                     // filter a list nobody could see, so the box appeared broken.
                     if (e.target.value.trim()) setArea("write");
                   }}
-                  placeholder="Search your books"
+                  placeholder="Search your books…"
                   aria-label="Search your books"
-                  className="w-full rounded-lg border border-line bg-surface py-2 pr-12 pl-9
+                  className="min-h-11 w-full rounded-lg border border-line bg-surface py-2 pr-4 pl-9
                          text-sm text-fg outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/50"
+                         focus-visible:ring-accent/50 sm:pr-12"
                 />
                 <kbd
                   aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 right-2.5 my-auto flex h-5
+                  className="pointer-events-none absolute inset-y-0 right-2.5 my-auto hidden h-5
                          items-center rounded border border-line bg-raised px-1.5
-                         text-[11px] font-medium text-muted"
+                         text-[11px] font-medium text-muted sm:flex"
                 >
                   /
                 </kbd>
@@ -627,24 +584,27 @@ export function Bookshelf({
 
               The divider went with it. A hairline down a button says there are
               two controls here; there is one. */}
-              <div className="ml-auto flex items-center gap-3">
-                <div className="flex items-stretch">
-                  <Menu
-                    label="New book"
-                    align="end"
-                    width={248}
-                    triggerClassName="flex items-center gap-1.5 rounded-lg bg-accent py-2 pr-2.5 pl-3.5 text-sm font-semibold text-accent-ink"
-                    trigger={
-                      <>
-                        {shelfIcons.plus}
-                        New book
-                        {/* Kept, and it is the whole of what tells a writer
+              <div className="col-start-2 row-start-2 flex items-stretch justify-self-end md:ml-auto">
+                <Menu
+                  label="New book"
+                  align="end"
+                  width={248}
+                  triggerClassName="flex h-11 w-11 items-center justify-center gap-1.5 whitespace-nowrap
+                                    rounded-lg bg-accent text-sm font-semibold text-accent-ink
+                                    transition-colors hover:bg-accent-strong active:bg-accent-strong
+                                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
+                                    sm:w-auto sm:py-2 sm:pr-2.5 sm:pl-3.5"
+                  trigger={
+                    <>
+                      {shelfIcons.plus}
+                      <span className="hidden sm:inline">New book</span>
+                      {/* Kept, and it is the whole of what tells a writer
                             this opens rather than acts. */}
-                        {shelfIcons.chevron}
-                      </>
-                    }
-                  >
-                    {/* **Four ways in, and all four are the same road.**
+                      <span className="hidden sm:block">{shelfIcons.chevron}</span>
+                    </>
+                  }
+                >
+                  {/* **Four ways in, and all four are the same road.**
                         "Import a file…" used to open a dialog that parsed the
                         manuscript, asked for a title and made the book there
                         and then — a second, shorter creation path, so an
@@ -655,62 +615,42 @@ export function Bookshelf({
                         cannot discover that this app takes recordings from a
                         menu item that says "file", and each carries the writer
                         into `/book/new` with the source it names. */}
-                    {(close) => (
-                      <>
-                        <MenuLabel>Start a book</MenuLabel>
-                        <MenuLink
-                          href="/book/new"
-                          icon={shelfIcons.plus}
-                          onNavigate={close}
-                        >
-                          Blank book
-                        </MenuLink>
-                        <MenuLink
-                          href="/book/new?source=file"
-                          icon={shelfIcons.upload}
-                          onNavigate={close}
-                        >
-                          Local file
-                        </MenuLink>
-                        <MenuLink
-                          href="/book/new?source=paste"
-                          icon={shelfIcons.paste}
-                          onNavigate={close}
-                        >
-                          Paste text
-                        </MenuLink>
-                        {/* **Announced, not offered.** The transcriber works
-                            and the chaptering after it works, but the route in
-                            has never been finished to the standard of the
-                            other two — so it says "Soon" *before* it is
-                            pressed and explains itself when it is, rather than
-                            sitting in the list looking identical to the two
-                            that do work. `/book/import` has said the same
-                            thing about it in the same words for a while; this
-                            is the menu catching up with the page. */}
-                        <MenuButton
-                          icon={shelfIcons.audio}
-                          badge={<Badge>Soon</Badge>}
-                          onClick={() => {
-                            setDialog("audiobook");
-                            close();
-                          }}
-                        >
-                          Audiobook
-                        </MenuButton>
-                      </>
-                    )}
-                  </Menu>
-                </div>
+                  {(close) => (
+                    <>
+                      <MenuLabel>Start a book</MenuLabel>
+                      <MenuLink
+                        href="/book/new"
+                        icon={shelfIcons.plus}
+                        onNavigate={close}
+                      >
+                        Blank book
+                      </MenuLink>
+                      <MenuLink
+                        href="/book/new?source=file"
+                        icon={shelfIcons.upload}
+                        onNavigate={close}
+                      >
+                        Local file
+                      </MenuLink>
+                      <MenuLink
+                        href="/book/new?source=paste"
+                        icon={shelfIcons.paste}
+                        onNavigate={close}
+                      >
+                        Paste text
+                      </MenuLink>
+                    </>
+                  )}
+                </Menu>
+              </div>
 
-                {/* Only where there is no sidebar to hold it. The account moved
-                  to the foot of the rail, and the rail is `hidden md:flex` —
-                  so on a phone this is the one way to reach sign-out, and
-                  removing it outright would have stranded exactly the writers
-                  least able to work around it. */}
-                <div className="md:hidden">
-                  <AccountMenu account={account} />
-                </div>
+              {/* Only where there is no sidebar to hold it. The account moved
+                to the foot of the rail, and the rail is `hidden md:flex` —
+                so on a phone this is the one way to reach sign-out, and
+                removing it outright would have stranded exactly the writers
+                least able to work around it. */}
+              <div className="col-start-2 row-start-1 justify-self-end md:hidden">
+                <AccountMenu account={account} />
               </div>
             </div>
           </header>
@@ -718,7 +658,7 @@ export function Bookshelf({
           {/* Capped, so the cards do not stretch to a metre wide on a desktop
             monitor and leave the eye travelling between a number and its
             label. */}
-          <main className="mx-auto max-w-6xl px-6 pb-16">
+          <main className="mx-auto max-w-6xl px-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 md:pb-16">
             {/* One block. The heading and its line used to be two siblings with
               `mb-8` and `-mt-6` cancelling each other out — a spacing bug
               waiting to be inherited by the next area added. */}
@@ -759,7 +699,6 @@ export function Bookshelf({
                 onCover={setCovering}
                 onTrash={handleTrash}
                 onDeleteForever={handleDeleteForever}
-                onTools={setTooling}
               />
             )}
 
@@ -778,14 +717,6 @@ export function Bookshelf({
               every pile paints with the first frame instead of waiting on a
               round trip for something we were already holding. */}
             {area === "collab" && <CollabArea account={account} />}
-
-            {/* **The one collaboration request the dashboard always makes**, and it
-              earns its place: an invitation whose email was filtered or sent to a
-              mistyped address would otherwise be found only by somebody who
-              thought to open Collaborators — the one screen a writer who has never
-              collaborated has no reason to visit. It interrupts once per browser
-              session and never again; see the dialog's own note. */}
-            <InviteWatch onSee={() => setArea("collab")} />
           </main>
         </div>
 
@@ -801,9 +732,6 @@ export function Bookshelf({
         )}
         {covering && (
           <CoverDialog book={covering} onClose={() => setCovering(null)} />
-        )}
-        {tooling && (
-          <BookToolsDialog book={tooling} onClose={() => setTooling(null)} />
         )}
         {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
         {dialog === "support" && (
@@ -887,6 +815,116 @@ export function Bookshelf({
   );
 }
 
+function MobileDashboardNavigation({
+  account,
+  area,
+  onArea,
+  onClose,
+  onDialog,
+}: {
+  account: Account | null;
+  area: Area;
+  onArea: (area: Area) => void;
+  onClose: () => void;
+  onDialog: (
+    dialog: "help" | "support" | "feedback" | "community" | "audiobook",
+  ) => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    const dialog = ref.current;
+    if (!dialog) return;
+    /* Do not call `close()` from this effect's cleanup. React Strict Mode runs
+       mount effects through a setup/cleanup/setup cycle in development; a
+       cleanup close fires the dialog's `onClose`, clears `navigationOpen`, and
+       makes the drawer disappear the instant it is opened on localhost. An
+       unmounted dialog leaves the top layer automatically, so cleanup has no
+       browser resource to release. The guard also makes the second Strict Mode
+       setup harmless. */
+    if (!dialog.open) dialog.showModal();
+  }, []);
+
+  const showDialog = (
+    value: "help" | "support" | "feedback" | "community",
+  ) => {
+    onClose();
+    requestAnimationFrame(() => onDialog(value));
+  };
+
+  return (
+    <dialog
+      id="mobile-dashboard-navigation"
+      ref={ref}
+      aria-label="Dashboard navigation"
+      data-dialog-presentation="navigation"
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === ref.current) ref.current?.close();
+      }}
+      className="oc-mobile-navigation fixed inset-0 m-0 h-[var(--oc-visual-height)] max-h-none w-full max-w-none bg-panel p-0 text-fg backdrop:bg-black/65 md:hidden"
+    >
+      <section className="flex h-full min-h-0 flex-col">
+        <header className="flex min-h-14 shrink-0 items-center gap-3 border-b border-line pt-(--oc-safe-top) pr-[max(0.5rem,var(--oc-safe-right))] pl-[max(1rem,var(--oc-safe-left))]">
+          <Link
+            href="/"
+            onClick={onClose}
+            className="min-w-0 flex-1 truncate text-xl font-bold tracking-tight text-fg"
+          >
+            Open<span className="text-wordmark">Chapter</span>
+          </Link>
+          <button
+            type="button"
+            autoFocus
+            onClick={() => ref.current?.close()}
+            aria-label="Close navigation"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <span aria-hidden="true" className="text-2xl leading-none">×</span>
+          </button>
+        </header>
+
+        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto py-4 pr-[max(0.75rem,var(--oc-safe-right))] pl-[max(0.75rem,var(--oc-safe-left))]">
+          <nav aria-label="Book workflow" className="flex flex-col gap-1">
+            {AREAS.filter((item) => item.stage).map((item) => (
+              <SideItem
+                key={item.id}
+                icon={item.icon}
+                active={area === item.id}
+                onClick={() => onArea(item.id)}
+              >
+                {item.label}
+              </SideItem>
+            ))}
+          </nav>
+
+          <div className="mt-4 border-t border-line pt-3 pb-3">
+            <SideItem
+              icon={shelfIcons.support}
+              onClick={() => showDialog("support")}
+            >
+              Support
+            </SideItem>
+            <SideItem
+              icon={shelfIcons.feedback}
+              onClick={() => showDialog("feedback")}
+            >
+              Send feedback
+            </SideItem>
+            <SideItem icon={shelfIcons.pricing} href="/upgrade">
+              Pricing
+            </SideItem>
+          </div>
+        </div>
+
+        <footer className="shrink-0 border-t border-line bg-panel pt-2 pr-[max(0.75rem,var(--oc-safe-right))] pb-[max(0.75rem,var(--oc-safe-bottom))] pl-[max(0.75rem,var(--oc-safe-left))]">
+          <AccountMenu account={account} variant="bar" />
+        </footer>
+      </section>
+    </dialog>
+  );
+}
+
 /* ---- Areas --------------------------------------------------------------- */
 
 /*
@@ -937,6 +975,8 @@ function Overview({
    */
   onPrepare: (bookId: string) => void;
 }) {
+  void onPrepare;
+
   const activity = useActivity();
   // Only the *empty* half of this screen waits on it — see `useLibrarySettled`.
   // A book that is already readable is drawn at once.
@@ -1076,41 +1116,12 @@ function Overview({
     [steps],
   );
 
-  /**
-   * The last step ticked by hand, so it can be un-ticked.
-   *
-   * "Already done" is the one control on this screen that changes the book and
-   * then *removes itself* — ticking a step advances `progress.next`, so the
-   * step you pressed is no longer on the bar and there is nothing left to
-   * press again. A writer who hit it by mistake, or ticked "Revise" meaning
-   * the step below it, had no way back short of finding the roadmap page and
-   * working out what had happened.
-   *
-   * **Derived, not remembered.** This was session state at first — "the step
-   * ticked a moment ago" — and that is the wrong model for the thing it is
-   * protecting against. A mis-tick is usually noticed *later*: on the next
-   * visit, when the phase dials are further along than the book is. State held
-   * in a component dies on reload, so the escape hatch was gone at exactly the
-   * point somebody would look for it. `!automatic && done` is what a hand-tick
-   * *is*, so reading it back off the book gives an undo that is still there
-   * tomorrow.
-   *
-   * The last one in road order rather than a list: undo it and the one before
-   * it appears, so a writer can walk back as far as they need without the
-   * strip turning into a second checklist.
-   */
-  const handTicked = useMemo(
-    () => steps.filter((s) => !s.automatic && s.done),
-    [steps],
-  );
-  const undoable =
-    handTicked.length > 0 ? handTicked[handTicked.length - 1] : null;
 
   return (
     <div className="flex flex-col gap-5">
       {book ? (
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
-          <div className="flex flex-wrap items-start gap-5 p-5">
+          <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 p-4 sm:flex sm:flex-wrap sm:gap-5 sm:p-5">
             {/* **The cover edits the book, it no longer opens it.** It was a
                 `<Link>` to `/book/<id>`, and the two cannot both live on one
                 picture. Nothing is stranded by the change: "Open book" and
@@ -1119,12 +1130,12 @@ function Overview({
                 *only* way to something, it kept its link. What it buys is the
                 thing a writer reaches for when they look at a cover and find
                 their title printed twice, or the wrong name under it. */}
-            <span className="w-[92px] shrink-0">
+            <span className="col-start-1 row-start-1 w-20 shrink-0 sm:w-[92px]">
               <CoverOf book={book} editable />
             </span>
 
-            <div className="min-w-[16rem] flex-1">
-              <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+            <div className="contents sm:block sm:min-w-[16rem] sm:flex-1 sm:basis-auto">
+              <div className="col-start-2 row-start-1 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-x-4">
                 <div className="min-w-0">
                   {/* The state of the book, not a greeting. This was "Pick up
                       where you left off", which made the largest block on the
@@ -1144,13 +1155,18 @@ function Overview({
                     </p>
                     <SharedBadge book={book} />
                   </div>
-                  <p className="mt-1.5 text-xl font-bold text-fg">
+                  <h2 className="mt-1.5 line-clamp-2 text-pretty break-words text-xl font-bold text-fg">
                     {book.title}
-                  </p>
-                  <p className="mt-1 text-sm text-muted">
-                    {plural(bookChapterCount(book), "chapter")} ·{" "}
-                    {plural(bookWordCount(book), "word")} · opened{" "}
-                    {relativeTime(book.lastOpenedAt)}
+                  </h2>
+                  <p className="mt-1 text-sm leading-snug text-muted">
+                    <span>
+                      {plural(bookChapterCount(book), "chapter")} ·{" "}
+                      {plural(bookWordCount(book), "word")}
+                    </span>
+                    <span className="block sm:inline">
+                      <span className="hidden sm:inline"> · </span>
+                      Opened {relativeTime(book.lastOpenedAt)}
+                    </span>
                   </p>
                 </div>
 
@@ -1165,9 +1181,10 @@ function Overview({
                     label="Choose which book this is about"
                     align="end"
                     width={260}
-                    triggerClassName="flex shrink-0 items-center gap-1.5 rounded-lg border
-                                      border-line bg-surface px-3 py-1.5 text-xs
-                                      font-semibold text-fg"
+                    triggerClassName="flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border
+                                      border-line bg-surface px-3 py-2 text-xs
+                                      font-semibold text-fg hover:bg-raised active:bg-raised focus-visible:outline-none
+                                      focus-visible:ring-2 focus-visible:ring-accent/50"
                     trigger={
                       <>
                         Change book
@@ -1209,10 +1226,12 @@ function Overview({
                   invented would be the made-up number this app keeps
                   refusing to print. */}
               {book.targetWords ? (
-                <TargetBar
-                  words={bookWordCount(book)}
-                  target={book.targetWords}
-                />
+                <div className="col-span-2 min-w-0">
+                  <TargetBar
+                    words={bookWordCount(book)}
+                    target={book.targetWords}
+                  />
+                </div>
               ) : null}
 
               {/* ---- The diagnosis, as one line -------------------------
@@ -1242,7 +1261,7 @@ function Overview({
                   claim less. */}
               {!waved.includes(`${book.id}:${counts.fix}:${counts.note}`) && (
                 <div
-                  className={`mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
+                  className={`col-span-2 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
                             border px-3.5 py-3 ${
                               counts.fix > 0
                                 ? "border-stop-line bg-stop-bg"
@@ -1300,26 +1319,6 @@ function Overview({
                     )}
                   </p>
 
-                  {/* Prepare rather than a tool, because what a writer wants
-                    after reading a count is the *list*, and that is the screen
-                    that holds it. An area change rather than a link: both are
-                    the dashboard, and a navigation here would throw away the
-                    scroll position and the book they had chosen. */}
-                  {counts.fix + counts.note > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => onPrepare(book.id)}
-                      className={`shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold
-                                text-white transition-opacity hover:opacity-90 ${
-                                  counts.fix > 0
-                                    ? "bg-stop-solid"
-                                    : "bg-note-solid"
-                                }`}
-                    >
-                      See them in Prepare →
-                    </button>
-                  )}
-
                   {/* Waving it away, and only here.
                 
                     The Prepare rows keep theirs: that screen *is* the list, and
@@ -1372,36 +1371,36 @@ function Overview({
                   secondary, and a hidden copy of a control sitting visible on
                   the same card is dead weight that has to be maintained
                   anyway. */}
-              <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              <div className="col-span-2 mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-sm sm:flex sm:flex-wrap">
                 <Link
                   href={`/book/${book.id}`}
-                  className="flex items-center gap-1.5 rounded-lg border border-line
-                             bg-surface px-4 py-2 font-semibold text-fg"
+                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border
+                             border-accent bg-accent px-4 py-2 font-semibold text-accent-ink
+                             transition-colors hover:bg-accent-strong active:bg-accent-strong focus-visible:outline-none
+                             focus-visible:ring-2 focus-visible:ring-accent/50 sm:border-line
+                             sm:bg-surface sm:text-fg sm:hover:bg-raised"
                 >
                   {shelfIcons.write}
                   Open book
                 </Link>
                 <Link
-                  href={`/book/${book.id}/read`}
-                  className="flex items-center gap-1.5 rounded-lg border border-line
-                             bg-surface px-4 py-2 font-semibold text-fg"
+                  href={`/book/${book.id}/export`}
+                  aria-label="Export this book"
+                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border
+                             border-line bg-surface px-4 py-2 font-semibold text-fg
+                             transition-colors hover:bg-raised active:bg-raised focus-visible:outline-none
+                             focus-visible:ring-2 focus-visible:ring-accent/50"
                 >
-                  {shelfIcons.read}
-                  Read
-                </Link>
-                <Link
-                  href={`/book/${book.id}/roadmap`}
-                  className="flex items-center gap-1.5 rounded-lg border border-line
-                             bg-surface px-4 py-2 font-semibold text-fg"
-                >
-                  {shelfIcons.compass}
-                  What to do next
+                  {shelfIcons.prepare}
+                  Export
                 </Link>
                 <Menu
                   label={`More for ${book.title}`}
                   width={232}
-                  triggerClassName="flex items-center rounded-lg border border-line
-                                    bg-surface px-2.5 py-2 text-fg"
+                  triggerClassName="flex h-11 w-11 items-center justify-center justify-self-end
+                                    rounded-lg border border-line bg-surface text-fg transition-colors
+                                    hover:bg-raised active:bg-raised focus-visible:outline-none focus-visible:ring-2
+                                    focus-visible:ring-accent/50 sm:h-auto sm:w-auto sm:px-2.5 sm:py-2"
                   trigger={shelfIcons.more}
                 >
                   {(close) => (
@@ -1450,204 +1449,6 @@ function Overview({
               </div>
             </div>
           </div>
-
-          {/* Where this book is across the whole job, and the next thing to
-              do — both the roadmap's own answers rather than second opinions.
-
-              The phases are the point, and they are this product's argument
-              rendered: writing is one of five, and a writer who has finished
-              drafting can see they are a fifth of the way rather than done.
-              "2 of 18" said the same thing in a way nobody can picture. */}
-          {progress && steps.length > 0 && (
-            <div className="border-t border-line bg-surface px-5 py-3.5">
-              <Link
-                href={`/book/${book.id}/roadmap`}
-                className="block"
-                aria-label="The whole road, and what each step is for"
-              >
-                <div className="flex">
-                  {PHASES.map((phase, i) => {
-                    const inPhase = steps.filter((st) => st.phase === phase.id);
-                    const done = inPhase.filter((st) => st.done).length;
-                    return (
-                      <div
-                        key={phase.id}
-                        className="relative flex min-w-0 flex-1 flex-col items-center"
-                      >
-                        {/* The line between the rings, drawn from the left edge
-                            to this one's centre. It is what makes five dials
-                            read as a sequence rather than as five gauges — and
-                            the sequence is the thing this strip is for. */}
-                        {i > 0 && (
-                          <span
-                            aria-hidden="true"
-                            className="absolute top-[15px] right-1/2 left-0 h-px bg-line"
-                          />
-                        )}
-                        <PhaseRing done={done} total={inPhase.length} />
-                        <p
-                          className={`mt-1.5 text-center text-[10px] leading-tight ${
-                            // The phase the book is standing in, named twice on
-                            // one card — as the eyebrow above and as the lit
-                            // dial here. Two views of one fact rather than two
-                            // facts: the eyebrow says where you are, the strip
-                            // says how far along that is.
-                            progress.next?.phase === phase.id
-                              ? "font-semibold text-fg"
-                              : "text-muted"
-                          }`}
-                        >
-                          {phase.label}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Link>
-
-              {/* The roadmap's own next step, under the dials rather than above
-                  the findings.
-
-                  Both are "what to do next" and they are not the same question:
-                  the findings are what is *wrong with the book*, the step is
-                  where you are *on the road*. Stacked, the card reads as one
-                  thought — here is the state of it, here is the position. Side
-                  by side they competed, and the writer had to work out which
-                  one to obey. */}
-              {/* What the writer has asserted rather than earned, with the way
-                  back. Sits above the strip because it is behind you and the
-                  strip is ahead of you, and the card reads top to bottom.
-
-                  Deliberately quiet — a hairline row, not the green alert this
-                  started as. It is permanent, so it has to be able to sit
-                  there for weeks without shouting; the tick carries the good
-                  news and the rest is a footnote. It also doubles as the
-                  acknowledgement for the press itself, which previously had
-                  none: the bar just silently changed to a different step. */}
-              {undoable && (
-                <div
-                  className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
-                             border border-line bg-surface px-3.5 py-2"
-                >
-                  <span aria-hidden="true" className="shrink-0 text-ok-fg">
-                    {shelfIcons.check}
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm text-muted">
-                    <strong className="font-semibold text-fg">
-                      {undoable.title}
-                    </strong>{" "}
-                    — you marked this done.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setRoadmapStep(book.id, undoable.id, false)}
-                    className="shrink-0 rounded-lg border border-line bg-panel px-3 py-1.5
-                               text-xs font-semibold text-fg hover:border-accent"
-                  >
-                    Undo
-                  </button>
-                </div>
-              )}
-
-              {/* The way on, and the one strip on this card that is not a
-                  problem — so it takes the accent rather than the status
-                  family. Red is blocked, amber is worth doing, indigo is the
-                  road: three meanings the writer learns once and reads
-                  everywhere after.
-
-                  A tinted panel rather than the hairline rule it used to be.
-                  Under four red and amber cards a plain rule read as the
-                  bottom edge of the list rather than as its own answer, which
-                  is the opposite of what it is for.
-
-                  Its own `step` tokens rather than the accent at low alpha:
-                  the accent is white at night, so a wash of it gave a grey bar
-                  in the one theme where the strip most needed to be findable.
-                  A ground has no legibility problem with a hue — nothing sits
-                  on it but its own ink — so this one is indigo in both. */}
-              <div
-                className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl
-                           border border-step-line bg-step-bg px-3.5 py-2.5"
-              >
-                {progress.next ? (
-                  <>
-                    <span className="text-xs font-bold tracking-widest text-step-fg uppercase">
-                      Next
-                    </span>
-                    <span className="min-w-0 flex-1 text-sm font-semibold text-fg">
-                      {progress.next.title}
-                    </span>
-
-                    {/* "Finish the first draft" and "Revise" have no detector on
-                        purpose — finishing is a decision, not a word count. But
-                        somebody who *imported* a finished manuscript arrives
-                        already past both, and with no way to say so they stay
-                        at Drafting forever, never reach the publishing phases,
-                        and never get told what a shop would refuse. The tick
-                        lives on the roadmap page; the writer is standing here. */}
-                    {!progress.next.automatic && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setRoadmapStep(book.id, progress.next!.id, true)
-                        }
-                        className="rounded-lg border border-step-line bg-panel px-3 py-1.5
-                                   text-xs font-semibold text-fg hover:border-accent"
-                      >
-                        Already done
-                      </button>
-                    )}
-                    <Link
-                      href={progress.next.href?.(book.id) ?? `/book/${book.id}`}
-                      className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold
-                                 text-accent-ink hover:bg-accent-strong"
-                    >
-                      Do this →
-                    </Link>
-                  </>
-                ) : (
-                  <span className="min-w-0 flex-1 text-sm font-semibold text-fg">
-                    Every step done. That is the whole list.
-                  </span>
-                )}
-                <span className="text-xs font-medium text-step-fg">
-                  {progress.done} of {progress.total}
-                </span>
-              </div>
-
-              {/* ---- The way out ------------------------------------------
-
-                  The three tools that get a finished book out, on the screen
-                  whose stated job is "what stands between your book and a
-                  shop, and what to do about it". Everything above answers the
-                  first half; until now the second half was a fix button per
-                  finding and one next step, and the standing destinations —
-                  the export itself, the whole road, the paperback — were
-                  reachable only from behind a ⋯ or by leaving for the Tools
-                  area.
-
-                  Last in the card on purpose. The order down this column is
-                  urgency: what is *wrong* with the book, then where you *are*
-                  on the road, then where you can *go* whenever you like. Put
-                  above the findings it would compete with them, and a shortcut
-                  that competes with a diagnosis wins for the wrong reason —
-                  it is the more pleasant thing to press.
-
-                  Rendered from `TOOL_GROUPS` through the same block the Tools
-                  area uses, so the names and the one-line claims are still
-                  written in exactly one place. `columns="three"` because this
-                  group has three tools and the catalogue's five-wide grid
-                  would leave two empty ruled cells, which read as tools that
-                  failed to load rather than as spacing. */}
-              <div className="mt-5 border-t border-line pt-4">
-                <ToolGroupBlock
-                  group={GET_IT_OUT}
-                  bookId={book.id}
-                  columns="three"
-                />
-              </div>
-            </div>
-          )}
         </section>
       ) : settled ? (
         <EmptyState
@@ -1971,72 +1772,6 @@ function FixLink({
 }
 
 /**
- * One phase of the job, as a dial.
- *
- * A ring rather than a bar because these are five *stations*, not five
- * measurements: a row of bars reads as a chart to compare across, where dials
- * on a line read as a route with a position on it. The arc still carries the
- * fraction, so nothing is lost in the change — a phase three-quarters done
- * looks three-quarters done.
- *
- * A finished phase takes a tick instead of a full ring. A complete circle and a
- * nearly-complete one are two arcs a couple of degrees apart, and "done" is the
- * one state on this strip that should never be mistaken for "almost".
- */
-function PhaseRing({ done, total }: { done: number; total: number }) {
-  const share = total > 0 ? done / total : 0;
-  const complete = total > 0 && done === total;
-
-  // Circumference of r=13 on the 32 box below, so the dash can be set as a
-  // length rather than a percentage — SVG has no percentage dash.
-  const circumference = 2 * Math.PI * 13;
-
-  return (
-    <span className="relative rounded-full bg-surface">
-      <svg
-        viewBox="0 0 32 32"
-        aria-hidden="true"
-        className="block h-[30px] w-[30px]"
-      >
-        <circle
-          cx="16"
-          cy="16"
-          r="13"
-          fill="none"
-          strokeWidth="3.5"
-          className="stroke-raised"
-        />
-        {share > 0 && (
-          <circle
-            cx="16"
-            cy="16"
-            r="13"
-            fill="none"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeDasharray={`${share * circumference} ${circumference}`}
-            // From the top rather than from three o'clock, which is where a
-            // dial is read from and where SVG starts.
-            transform="rotate(-90 16 16)"
-            className="stroke-accent"
-          />
-        )}
-        {complete && (
-          <path
-            d="m11 16.2 3.2 3.2 6.4-6.8"
-            fill="none"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="stroke-accent"
-          />
-        )}
-      </svg>
-    </span>
-  );
-}
-
-/**
  * Words against the goal the writer set.
  *
  * Capped at 100% so a book that overshoots does not draw a bar out of its own
@@ -2074,7 +1809,7 @@ function TargetBar({ words, target }: { words: number; target: number }) {
   // you set yourself is the rarest good news on this screen and it should not
   // look like 94%.
   return (
-    <div className="mt-3.5 max-w-sm">
+    <div className="mt-4 w-full max-w-none sm:mt-3.5 sm:max-w-sm">
       <div className="flex items-baseline justify-between text-xs">
         <span className={`font-semibold ${met ? "text-ok-fg" : "text-fg"}`}>
           {label} of target
@@ -2083,7 +1818,14 @@ function TargetBar({ words, target }: { words: number; target: number }) {
           {words.toLocaleString()} of {target.toLocaleString()}
         </span>
       </div>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised">
+      <div
+        role="progressbar"
+        aria-label="Word target progress"
+        aria-valuemin={0}
+        aria-valuemax={target}
+        aria-valuenow={Math.min(words, target)}
+        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised"
+      >
         <div
           className={`h-full rounded-full ${met ? "bg-ok-fg" : "bg-accent"}`}
           style={{ width: `${share}%` }}
@@ -2106,7 +1848,6 @@ function Write({
   onCover,
   onTrash,
   onDeleteForever,
-  onTools,
 }: {
   visible: Book[];
   view: BookView;
@@ -2122,7 +1863,6 @@ function Write({
   onTrash: (b: Book) => void;
   onDeleteForever: (b: Book) => void;
   /** Opens the sheet holding every per-book tool. */
-  onTools: (b: Book) => void;
 }) {
   const settled = useLibrarySettled();
 
@@ -2276,14 +2016,6 @@ function Write({
                       {shelfIcons.write}
                       Write
                     </Link>
-                    <Link
-                      href={`/book/${book.id}/read`}
-                      className="flex items-center gap-1.5 rounded-lg border border-line
-                                 bg-surface px-3.5 py-1.5 text-sm font-semibold text-fg"
-                    >
-                      {shelfIcons.read}
-                      Read
-                    </Link>
                     <Menu
                       label={`More for ${book.title}`}
                       align="end"
@@ -2301,25 +2033,6 @@ function Write({
                           >
                             Export and publish
                           </MenuLink>
-                          <MenuLink
-                            href={`/book/${book.id}/roadmap`}
-                            icon={shelfIcons.compass}
-                            onNavigate={close}
-                          >
-                            What to do next
-                          </MenuLink>
-                          {/* The other thirteen live behind this rather than
-                              on the card, where they were a wall of names with
-                              nothing to say what any of them did. */}
-                          <MenuButton
-                            icon={shelfIcons.tools}
-                            onClick={() => {
-                              onTools(book);
-                              close();
-                            }}
-                          >
-                            All tools for this book…
-                          </MenuButton>
 
                           <MenuSeparator />
                           <MenuButton
@@ -3346,7 +3059,7 @@ function SideItem({
   badge?: ReactNode;
   children: ReactNode;
 }) {
-  const className = `flex items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm
+  const className = `flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm
      font-medium transition-colors ${
        active
          ? "bg-accent/10 text-accent"

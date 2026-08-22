@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { NextResponse } from "next/server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
@@ -49,6 +50,7 @@ const MAX_TOKENS = 400;
 const MAX_WORDS = 300;
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Comp title query");
   const gate = await requirePro({
     signIn: "Sign in to have your words turned into a catalogue search.",
     upgrade: "Turning your words into a catalogue search is part of Pro.",

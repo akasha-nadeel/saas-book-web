@@ -59,28 +59,20 @@ signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
 
-**Two cycles, and both renew.** $9.99 monthly, $89.99 a year — 25% off, and the
-annual total is exactly twelve times the per-month figure the card prints,
-which is a rule with a test on it rather than a coincidence. **The USD pair has
-moved twice and the discount is what set the annual each time.** It was $10.99 /
-$87 — 34% off, roughly double what this trade does. The convention is "two
-months free" (16.7%), the usual band is 15–20%, and 20–25% is the aggressive
-end, so $87 was not cheap for the market, it was discounted past it by
-arithmetic rather than by a decision. On 2026-08-09 it became $10.99 / $99, 25%
-off and divisible by twelve into $8.25. On **2026-08-10 monthly became $9.99 and
-the annual followed it to $89.99** rather than standing still: holding $99
-against the lower monthly would have cut the saving to 17% by leaving a number
-alone, where $89.99 keeps the 25% that was decided on and matches the monthly's
-charm-priced shape. Both changes were made while there were no subscribers;
-after that a price change is an announcement rather than an edit, and Paddle
-leaves an existing subscription on the price it was bought at regardless.
-**$89.99 does not divide by twelve**, so `perMonth` on that row is written as
-`89.99 / 12` rather than typed: the stored pair stays exact and the rounding
-happens once, in `displayPrice`, which shows $7.50. That per-month figure is an
-approximation and is only honest with the real total printed beneath it — a card
-showing the rate alone would be a claim the table cannot back. **A price change is three edits, not one:** this table, two *new*
+**Two cycles, and both renew.** The launch MVP is $5.98 monthly and $53.99 a
+year. The annual plan is about 25% off the monthly plan and displays as about
+$4.50/month. The exact total is stored in `plans.ts`; the displayed monthly
+equivalent is derived from that total so rounding happens once.
+
+This lower first-launch price is deliberate: the public MVP now sells a focused
+book-writing workspace, a monthly writing-assistant allowance, one Free book,
+unlimited Pro books, and Pro EPUB/PDF export. It is priced below mature author
+software while still protecting AI costs with hard usage limits. After there
+are paying subscribers, a price change is an announcement rather than an edit,
+and Paddle leaves an existing subscription on the price it was bought at
+regardless. **A price change is three edits, not one:** this table, two *new*
 prices in Paddle's catalog (never an edit of the live ones), and the resulting
-`PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` ids in the environment — and
+`PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` ids in the environment � and
 Paddle checks that the site's prices match the live catalog, so the two must
 not sit out of step across a review.
 The LKR table is priced for its own market and is not the USD one converted. A lifetime tier was
@@ -92,20 +84,13 @@ PayHere must be sent **no `recurrence` and no `duration`** or it bills the
 one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
-**What is free is what a book needs to exist and leave.** Unlimited books,
-words, chapters and **imports**, every export that ships, sync, the pre-upload check and
-the roadmap, structure, progress, categories and typing in its keyword boxes
-yourself — having those boxes *suggested* is the one part of that screen with a
-number on it, five for the life of the account — the writing
-record, and the story bible **across a whole series**. Pro is the metered routes
-plus two things a writer only wants once there are real sales: reading a shop's
-sales export into the ledger, and the book-three curve. Note the two names that
-read backwards: the tool called `money` is free and unmetered ("Before you
-spend", the planning tool) while the tool called `track` is limited to two books.
-**One screen still mounts `GatedTool` — `track` — and one section mounts
-`ProGate`: the sales-report import inside it.** That list is the check. Every
-competitor charges for formatting, which is why export is the one thing that must
-never move.
+**What is free is enough to understand the product.** Free includes one book,
+unlimited chapters and words, autosave/sync where accounts are configured, Word
+export, and five writing-assistant replies each calendar month. Pro unlocks
+unlimited books, sixty assistant replies each calendar month, and EPUB/PDF
+export. The backend enforces expensive or paid limits: the book limit is in the
+database trigger, assistant usage is claimed through a Supabase RPC, and PDF
+export checks launch entitlements before rendering.
 
 **Writing a blurb is free; having one *read* is not.** `/api/blurb/critique` is
 the newest metered route and the one that most needed the refusal spelled out,

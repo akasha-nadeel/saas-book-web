@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -48,6 +48,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  const filterId = useId();
   // The chapter whose title is being edited in place, and the text so far.
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
@@ -69,6 +71,11 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     : null;
 
   if (!book) return null;
+
+  const normalisedQuery = query.trim().toLocaleLowerCase();
+  const matchesQuery = (chapter: ChapterMeta) =>
+    !normalisedQuery ||
+    chapter.title.toLocaleLowerCase().includes(normalisedQuery);
 
   const handleCreate = () => {
     const id = createChapter(bookId);
@@ -207,6 +214,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     const index = book.chapters.findIndex((c) => c.id === chapter.id);
     const isActive = chapter.id === activeId;
     const number = chapterNumberOf(book, chapter.id);
+    const previous = book.chapters[index - 1];
+    const next = book.chapters[index + 1];
 
     return (
       <li
@@ -312,6 +321,24 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
                   icon: menuIcons.rename,
                   onSelect: () => startRename(chapter),
                 },
+                ...(previous && chapterMatterOf(previous) === "body"
+                  ? [
+                      {
+                        label: "Move up",
+                        icon: menuIcons.movePart,
+                        onSelect: () => moveChapter(bookId, index, index - 1),
+                      },
+                    ]
+                  : []),
+                ...(next && chapterMatterOf(next) === "body"
+                  ? [
+                      {
+                        label: "Move down",
+                        icon: menuIcons.movePart,
+                        onSelect: () => moveChapter(bookId, index, index + 1),
+                      },
+                    ]
+                  : []),
                 {
                   label: "Delete",
                   hint: "D",
@@ -327,9 +354,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     );
   };
 
-  const bodyChapters = book.chapters.filter(
+  const allBodyChapters = book.chapters.filter(
     (c) => chapterMatterOf(c) === "body",
   );
+  const bodyChapters = allBodyChapters.filter(matchesQuery);
 
   /**
    * One matter part, bracketing the body — front above the chapters, back
@@ -347,7 +375,10 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
    * with nothing to tell them what one is.
    */
   const renderMatterPart = (matter: "front" | "back") => {
-    const pages = book.chapters.filter((c) => chapterMatterOf(c) === matter);
+    const allPages = book.chapters.filter(
+      (c) => chapterMatterOf(c) === matter,
+    );
+    const pages = allPages.filter(matchesQuery);
     const label = matter === "front" ? "Front matter" : "Back matter";
 
     // The book icon — front matter opens the book, back matter closes it, so the
@@ -368,7 +399,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </svg>
     );
 
-    if (pages.length === 0) {
+    if (allPages.length === 0) {
       // "Start the front matter" creates a dozen pages, which is the owner's
       // decision about the shape of their book. Nothing at all for a reader: an
       // empty part they cannot fill has nothing to say to them.
@@ -393,6 +424,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
         </button>
       );
     }
+
+    if (pages.length === 0) return null;
 
     return (
       <>
@@ -592,6 +625,19 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
       </div>
 
       <div className="scroll-slim min-h-0 flex-1 overflow-y-auto pb-3">
+        <div className="sticky top-0 z-10 border-b border-line bg-panel px-3 py-2">
+          <label className="sr-only" htmlFor={filterId}>
+            Filter chapters
+          </label>
+          <input
+            id={filterId}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Filter chapters…"
+            className="h-11 w-full rounded-lg border border-line bg-surface px-3 text-base text-fg outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-accent/60"
+          />
+        </div>
         {/* A book, top to bottom: front matter opens it, the body is the story,
             back matter closes it. All three are lists of pages; a part with
             nothing in it is one button that makes its standard set. */}
@@ -601,7 +647,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
           <ol>{bodyChapters.map(renderChapter)}</ol>
         ) : (
           <p className="px-4 py-3 font-sans text-xs text-muted italic">
-            No chapters yet.
+            {normalisedQuery ? "No matching chapters." : "No chapters yet."}
           </p>
         )}
 
@@ -610,7 +656,7 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
       {pending && (
         <ImportModeDialog
-          existingCount={bodyChapters.length}
+          existingCount={allBodyChapters.length}
           importCount={pending.length}
           onAdd={() => runImport(pending, "add")}
           onReplace={() => runImport(pending, "replace")}

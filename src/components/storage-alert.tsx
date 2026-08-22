@@ -95,7 +95,7 @@ export function StorageAlert() {
     return (
       <div
         role="status"
-        className="oc-panel-in fixed right-4 bottom-4 z-40 flex max-w-sm items-start
+        className="oc-panel-in fixed right-[max(1rem,var(--oc-safe-right))] bottom-[max(1rem,var(--oc-safe-bottom))] z-40 flex max-w-sm items-start
                    gap-3 rounded-xl border border-note-line bg-note-bg px-4 py-3
                    shadow-lg"
       >

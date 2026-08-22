@@ -233,7 +233,7 @@ export function ShareDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto max-h-[calc(100dvh-2rem)] w-[34rem] max-w-[calc(100vw-2rem)]
+      className="m-auto max-h-[calc(var(--oc-visual-height)-2rem)] w-[34rem] max-w-[calc(100vw-2rem)]
                  overflow-y-auto rounded-2xl border border-line bg-panel p-0
                  text-fg backdrop:bg-black/50"
     >
@@ -311,7 +311,7 @@ export function ShareDialog({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="their@email.com"
                 autoComplete="off"
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3
+                className="min-w-0 basis-full rounded-lg border border-line bg-surface px-3 sm:flex-1 sm:basis-auto
                            py-2 text-sm text-fg outline-none placeholder:text-muted
                            focus-visible:ring-2 focus-visible:ring-accent/50"
               />
@@ -319,7 +319,7 @@ export function ShareDialog({
                 value={role}
                 onChange={(e) => setRole(e.target.value as CollabRole)}
                 aria-label="What they may do"
-                className="rounded-lg border border-line bg-surface px-3 py-2 text-sm
+                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm
                            text-fg outline-none focus-visible:ring-2
                            focus-visible:ring-accent/50"
               >

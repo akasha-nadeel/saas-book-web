@@ -48,9 +48,9 @@ export function BookDetailsDialog({
       className="m-auto w-[32rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
                  p-0 text-fg backdrop:bg-black/70"
     >
-      <div className="p-7">
-        <div className="flex items-start gap-5">
-          <div className="w-28 shrink-0">
+      <div className="scroll-slim h-full overflow-y-auto p-4 pb-[max(1rem,var(--oc-safe-bottom))] sm:p-7">
+        <div className="flex flex-col items-start gap-5 sm:flex-row">
+          <div className="w-28 shrink-0 self-center sm:self-start">
             <BookCover
               title={book.title}
               subtitle={book.subtitle}
@@ -108,7 +108,7 @@ export function BookDetailsDialog({
           </div>
         </div>
 
-        <div className="mt-7 flex items-center justify-between gap-2">
+        <div className="mt-7 flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={onEditCover}
@@ -120,7 +120,7 @@ export function BookDetailsDialog({
             Edit details
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center">
             <button
               type="button"
               onClick={onClose}

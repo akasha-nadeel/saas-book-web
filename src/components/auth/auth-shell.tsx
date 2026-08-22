@@ -88,7 +88,7 @@ export function AuthShell({
     // The dark ground runs edge to edge; the form sits on it as an inset card.
     // h-dvh and inner scrolling because <body> is overflow-hidden for the editor
     // shell, so min-h-dvh would put the foot of this page out of reach.
-    <div className="auth-ground flex h-dvh overflow-hidden">
+    <div className="auth-ground flex h-[var(--oc-layout-height)] overflow-hidden">
       {/* Copy only, no controls — so below lg it simply goes: on a phone the
           form wants the width, and a pitch above it pushes the fields off. */}
       <aside
@@ -111,23 +111,23 @@ export function AuthShell({
       {/* The card. Inset all round so the ground shows as a border, and rounded
           on every corner — including the two that meet the navy column. */}
       <div
-        className="m-3 flex min-w-0 flex-1 flex-col overflow-hidden rounded-2xl
-                   border border-line bg-panel lg:my-4 lg:mr-4 lg:ml-0"
+        className="flex min-w-0 flex-1 flex-col overflow-hidden border border-line
+                   bg-panel sm:m-3 sm:rounded-2xl lg:my-4 lg:mr-4 lg:ml-0"
       >
-        <header className="flex shrink-0 items-center justify-between gap-4 px-6 py-6 sm:px-10">
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 pt-[max(1rem,var(--oc-safe-top))] pb-4 sm:px-10 sm:py-6">
           <Wordmark />
           {headerAction}
         </header>
 
         {/* my-auto rather than items-center: centres the form when there is
             room, and lets it scroll from the top when there is not. */}
-        <main className="scroll-slim flex flex-1 flex-col overflow-y-auto px-6 sm:px-10">
+        <main className="scroll-slim flex min-h-0 flex-1 flex-col overflow-y-auto px-5 sm:px-10">
           <div className="mx-auto my-auto w-full max-w-sm py-6">{children}</div>
         </main>
 
         <footer
           className="flex shrink-0 flex-wrap items-center justify-between gap-x-6
-                     gap-y-1 px-6 py-6 font-sans text-xs text-muted sm:px-10"
+                     gap-y-1 px-5 pt-4 pb-[max(1rem,var(--oc-safe-bottom))] font-sans text-xs text-muted sm:px-10 sm:py-6"
         >
           <span>© {new Date().getFullYear()} OpenChapter</span>
           <span>

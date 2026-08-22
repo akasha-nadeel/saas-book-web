@@ -35,8 +35,14 @@ describe("displayPrice", () => {
   it("writes dollars with cents", () => {
     // Cents shown even when they are zero: "$9" beside "$0" on the other card
     // is two different shapes of number for one comparison.
-    expect(displayPrice(9, "USD")).toBe("$9.00");
-    expect(displayPrice(72, "USD")).toBe("$72.00");
+    expect(displayPrice(5.98, "USD")).toBe("$5.98");
+    expect(displayPrice(53.99, "USD")).toBe("$53.99");
+  });
+
+  it("uses the launch MVP USD prices", () => {
+    expect(priceOf("monthly", "USD")).toBe(5.98);
+    expect(priceOf("annual", "USD")).toBe(53.99);
+    expect(displayPrice(perMonthOf("annual", "USD"), "USD")).toBe("$4.50");
   });
 
   it("writes rupees whole, with a separator", () => {

@@ -62,7 +62,7 @@ export function ProgressPage({ bookId }: { bookId: string }) {
 
   if (!book) {
     return (
-      <div className="grid h-dvh place-items-center bg-surface p-8 text-center">
+      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
         <div>
           <p className="text-lg font-bold text-fg">That book is not here.</p>
           <Link href="/" className="mt-3 inline-block text-accent">
@@ -77,13 +77,13 @@ export function ProgressPage({ bookId }: { bookId: string }) {
   const finish = finishesOn(words, book.targetWords, stats.month.perDay);
 
   return (
-    <div className="h-dvh overflow-y-auto bg-surface">
+    <div className="h-[var(--oc-layout-height)] overflow-y-auto bg-surface">
       <ToolHeader book={book} tool="Progress">
         Whether the writing is moving. Counted across every book, because the
         question is about you rather than about one manuscript.
       </ToolHeader>
 
-      <div className="mx-auto max-w-7xl px-6 pt-6 pb-16">
+      <div className="mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
         {/* ---- The three figures ---------------------------------------
             A stat tile is the right form for a single current value, and the
             middle one was a *ratio* — "1/30" set as though it were a quantity.

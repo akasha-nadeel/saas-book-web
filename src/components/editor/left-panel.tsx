@@ -11,6 +11,7 @@ import { NotesPanel } from "@/components/editor/notes-panel";
 import { TrashPanel } from "@/components/editor/trash-panel";
 import { SearchPanel } from "@/components/editor/search-panel";
 import { icons } from "@/components/editor/icon-rail";
+import { EDITOR_LAYOUT_EVENT } from "@/lib/use-visual-viewport";
 
 /**
  * Whatever the left rail currently points at.
@@ -162,6 +163,7 @@ export function LeftPanel({
    * every render of the editor, which is every keystroke.
    */
   const panelRef = useRef<HTMLElement>(null);
+  const dismissRef = useRef<HTMLButtonElement>(null);
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
@@ -184,6 +186,29 @@ export function LeftPanel({
     return () =>
       document.removeEventListener("pointerdown", onPointerDown, true);
   }, [open]);
+
+  // A full-screen phone panel owns keyboard focus. Moving to a wide layout
+  // closes a chapter overlay once the persistent book navigator takes over.
+  useEffect(() => {
+    if (!open) return;
+    let frame = 0;
+    const respondToLayout = () => {
+      const root = document.documentElement;
+      if (tab === "chapters" && root.dataset.editorNavigator === "persistent") {
+        close.current();
+        return;
+      }
+      if (root.dataset.editorLayout !== "continuous") return;
+      frame = requestAnimationFrame(() => dismissRef.current?.focus());
+    };
+    respondToLayout();
+    const root = document.documentElement;
+    root.addEventListener(EDITOR_LAYOUT_EVENT, respondToLayout);
+    return () => {
+      root.removeEventListener(EDITOR_LAYOUT_EVENT, respondToLayout);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, [open, tab]);
 
   /*
    * Mounted a beat longer than it is open, so it has time to leave.
@@ -218,12 +243,13 @@ export function LeftPanel({
       <div
         aria-hidden="true"
         onClick={onClose}
-        className={`fixed inset-0 z-30 bg-black/50 md:hidden ${
+        className={`oc-editor-panel-scrim fixed inset-0 z-30 bg-black/50 md:hidden ${
           open ? "oc-scrim-in" : "oc-scrim-out"
         }`}
       />
       <aside
         ref={panelRef}
+        data-panel-tab={tab}
         // Floating at every width — see the note above. `fixed` rather than
         // absolute because the rail is against the window's own left edge, so
         // `left-(--rail-width)` is measured from the same origin at any scroll
@@ -232,7 +258,7 @@ export function LeftPanel({
         // `pointer-events-none` on the way out: it is still on screen for the
         // length of the slide, and a press that lands on a panel already
         // leaving is a press on something the writer has dismissed.
-        className={`panel-chrome fixed top-0 bottom-0 left-(--rail-width) z-40
+        className={`oc-editor-panel panel-chrome fixed top-0 bottom-0 left-(--rail-width) z-40
                     flex w-(--sidebar-width) max-w-[80vw] flex-col border-r
                     border-line shadow-2xl md:max-w-none ${
                       open
@@ -248,6 +274,27 @@ export function LeftPanel({
           if (e.key === "Escape") {
             e.stopPropagation();
             onClose();
+            return;
+          }
+          if (
+            e.key === "Tab" &&
+            document.documentElement.dataset.editorLayout === "continuous"
+          ) {
+            const focusable = Array.from(
+              panelRef.current?.querySelectorAll<HTMLElement>(
+                'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+              ) ?? [],
+            ).filter((element) => element.getClientRects().length > 0);
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (!first || !last) return;
+            if (e.shiftKey && document.activeElement === first) {
+              e.preventDefault();
+              last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+              e.preventDefault();
+              first.focus();
+            }
           }
         }}
       >
@@ -279,6 +326,7 @@ export function LeftPanel({
             )}
           </h2>
           <button
+            ref={dismissRef}
             type="button"
             onClick={onClose}
             aria-label="Hide panel"

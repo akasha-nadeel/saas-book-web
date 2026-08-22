@@ -145,7 +145,7 @@ export function ExportDoneDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="oc-done-in m-auto w-[34rem] max-w-[calc(100vw-2rem)]
+      className="oc-done-in m-auto w-[34rem] max-w-[calc(100vw-2rem)] overflow-y-auto
                  rounded-2xl border border-line bg-panel p-0 text-fg shadow-2xl
                  backdrop:bg-black/60"
     >

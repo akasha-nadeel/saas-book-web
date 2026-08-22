@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { requireSignedIn } from "@/lib/billing/server";
 import { join } from "node:path";
 import { NextResponse } from "next/server";
+import { requireLaunchExport } from "@/lib/billing/launch-entitlements";
 import { printHtml } from "@/lib/export/pdf-html";
 
 /**
@@ -148,9 +148,7 @@ export async function POST(request: Request) {
      renders markup the caller wrote, and may run for five minutes. Left open it
      was somebody else's CPU for the asking. Unconfigured Supabase skips it, so
      a self-hosted copy is unchanged. */
-  const denied = await requireSignedIn(
-    "Sign in to export a PDF. The file is built on the server.",
-  );
+  const denied = await requireLaunchExport("pdf");
   if (denied) return denied;
 
   let body: Body;

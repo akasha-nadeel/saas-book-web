@@ -84,7 +84,7 @@ export function BookOverview({ bookId }: { bookId: string }) {
   if (!book) return <MissingBook />;
 
   return (
-    <div className="flex h-full">
+    <div className="book-overview-shell flex h-[var(--oc-layout-height)] min-w-0">
       {/* The way out, in the corner the rail used to fill — the same control
           the editor puts there in Book View, so the two screens that show a
           book with no page on it cannot drift. See BackToBooks. */}
@@ -118,7 +118,7 @@ export function BookOverview({ bookId }: { bookId: string }) {
           name. Two controls for one intention on one screen, and the wrong one
           looked like the way in. The button now carries on where the writer
           left off and says which chapter that is; see `openBook`. */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="book-guide-shell flex min-w-0 flex-1 flex-col overflow-y-auto">
         <BookGuide title={book.title} book={book} entering={entering} />
       </div>
     </div>

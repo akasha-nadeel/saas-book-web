@@ -347,6 +347,8 @@ export function BookPanel({
   body,
   entering = false,
   always = false,
+  connectToPage = true,
+  onNavigate,
 }: {
   book: Book;
   chapterId: string | null;
@@ -367,6 +369,14 @@ export function BookPanel({
   entering?: boolean;
   /** Show at every width. Set by the overview, where this is the only way in. */
   always?: boolean;
+  /**
+   * Draw the selected-card rule toward the live manuscript. A full-screen
+   * mobile navigator deliberately has no visible page to connect to, even
+   * though the preserved editor remains mounted behind its modal layer.
+   */
+  connectToPage?: boolean;
+  /** Called before a chapter/page route is opened, so an overlay can dismiss. */
+  onNavigate?: () => void;
 }) {
   const router = useRouter();
   const bookId = book.id;
@@ -398,7 +408,7 @@ export function BookPanel({
   const [gapToPage, setGapToPage] = useState(0);
 
   useEffect(() => {
-    if (mode !== "chapters") return;
+    if (mode !== "chapters" || !connectToPage) return;
 
     let frame = 0;
     let last = -1;
@@ -446,7 +456,7 @@ export function BookPanel({
     // runs only on this face of the panel — Book View has no page to reach.
     frame = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(frame);
-  }, [mode]);
+  }, [connectToPage, mode]);
 
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
@@ -484,7 +494,10 @@ export function BookPanel({
   const prevPage = () => setPreviewIndex((i) => Math.max(0, i - 1));
   const nextPage = () => setPreviewIndex((i) => Math.min(pageCount, i + 1));
 
-  const open = (id: string) => router.push(`/book/${bookId}/chapter/${id}`);
+  const open = (id: string) => {
+    onNavigate?.();
+    router.push(`/book/${bookId}/chapter/${id}`);
+  };
 
   const handleCreate = () => open(createChapter(bookId));
 
@@ -630,6 +643,7 @@ export function BookPanel({
   return (
     <aside
       aria-label="Book"
+      data-book-panel-mode={mode}
       // Transparent, with no divider: the gradient wash and the seamless blend
       // into the paper come from the shared row in the editor layout, so the
       // book panel and the manuscript read as one surface.
@@ -643,8 +657,8 @@ export function BookPanel({
       // no manuscript to protect and this panel is the only way into the book,
       // so it is always shown — hiding it there would leave that screen a guide
       // with no navigation at all.
-      className={`w-80 shrink-0 flex-col xl:w-[22rem] 2xl:w-96 ${
-        always ? "flex" : "hidden lg:flex"
+      className={`book-panel w-80 shrink-0 flex-col xl:w-[22rem] 2xl:w-96 ${
+        always ? "flex" : "hidden xl:flex"
       }`}
     >
       {/* **Outside both modes' scroll containers, so it cannot be scrolled
@@ -1373,7 +1387,7 @@ function MatterCard({
           replaced: the title steps down a size and takes the fill's ink, and
           the verb the button was carrying fades in beside it. */}
       <div
-        className={`flex shrink-0 items-center gap-2.5 px-3.5
+        className={`relative flex shrink-0 items-center gap-2.5 px-3.5
                     transition-[padding] duration-500 ease-out ${
                       compact ? "py-2" : "pt-3"
                     }`}
@@ -1400,6 +1414,16 @@ function MatterCard({
         >
           {action}
         </span>
+
+        {!compact && action && (
+          <button
+            type="button"
+            onClick={onAction}
+            aria-label={`${label} — ${action}`}
+            aria-expanded={children ? listOpen : undefined}
+            className="oc-matter-card-mobile-toggle absolute inset-0 hidden rounded-t-xl outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
+          />
+        )}
       </div>
 
       {/* Everything the strip drops.

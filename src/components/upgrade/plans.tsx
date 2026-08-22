@@ -11,7 +11,7 @@ import {
   priceOf,
 } from "@/lib/billing/plans";
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
-import { FREE_LIMITS, SEATS_PER_BOOK } from "@/lib/free-limits";
+import { LAUNCH_LIMITS } from "@/lib/launch";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -138,239 +138,46 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
  * same claim the landing page makes: nobody tells you the order. A reader who
  * has only written should be able to see where they are on this card.
  */
-const GROUPS = ["Writing the book", "Getting it ready", "Selling it"] as const;
+const GROUPS = ["Core workspace", "AI and export"] as const;
 
 type Group = (typeof GROUPS)[number];
 
-/**
- * Two rules order the rows inside a group, and both are about scanning.
- *
- * **What everyone gets comes first, what Pro alone gives comes last.** A reader
- * on the free card meets the strength of the free plan before its edges; a
- * reader on the Pro card reaches the reason to pay at the end of each block,
- * where it is the thing they are looking at when the block finishes. Scattering
- * the crosses through the middle — which is what this list used to do — hides
- * the differences among the twenty rows that are identical on both cards.
- *
- * **Rows that answer one question stay together.** The three daily searches read
- * as a block down the column, which is what makes "a day" legible as a shape
- * rather than three separate numbers, so "Ranked comps" sits after them rather
- * than next to the comp search it belongs to topically.
- */
 const ROWS: {
   group: Group;
   label: string;
-  /**
-   * A quieter aside after the label, set in parentheses and a size down.
-   *
-   * Its own field rather than part of `label`, because a detail baked into the
-   * string cannot be styled apart from the thing it qualifies — and it should
-   * be: "which four" is a footnote to "Exports", not a second half of the name.
-   * Keeping them separate also means `STARTER_HIGHLIGHT` still matches on a
-   * short, stable label.
-   */
   detail?: string;
   starter: string;
   pro: string;
 }[] = [
-  /* ---- Writing the book ------------------------------------------------- */
-  { group: "Writing the book", label: "Books and words", starter: "Unlimited", pro: "Unlimited" },
-  { group: "Writing the book", label: "Imports", starter: "Unlimited", pro: "Unlimited" },
-  { group: "Writing the book", label: "Sync", starter: "Every device", pro: "Every device" },
-  // Free on both because it costs nothing to run: dictation is the browser's
-  // own SpeechRecognition, not the paid transcriber. The value says which
-  // browsers rather than "Included" — it is a Chrome and Edge feature, the
-  // button hides itself elsewhere, and a plan row is the wrong place to find
-  // that out later.
   {
-    group: "Writing the book",
-    label: "Voice typing",
-    starter: "Chrome & Edge",
-    pro: "Chrome & Edge",
-  },
-  /*
-   * **Both numbers, because Pro raises this rather than lifting it.**
-   *
-   * Every other metered row reads "Unlimited" on the right; a book's seats do
-   * not, and printing "Unlimited" here would be the one false cell on the page.
-   * Read from `SEATS_PER_BOOK` for the same reason the four below are read from
-   * `FREE_LIMITS` — one number, one place — and counting the owner, so the figure
-   * a reader sees is the number of faces on the book.
-   */
-  {
-    group: "Writing the book",
-    label: "People per book",
-    starter: `${SEATS_PER_BOOK.free} incl. you`,
-    pro: `${SEATS_PER_BOOK.pro} incl. you`,
-  },
-  {
-    group: "Writing the book",
-    label: "Story bible",
-    starter: "Across a series",
-    pro: "Across a series",
-  },
-  {
-    group: "Writing the book",
-    label: "Structure & progress",
-    starter: "Included",
-    pro: "Included",
-  },
-  { group: "Writing the book", label: "Writing record", starter: "Included", pro: "Included" },
-  {
-    group: "Writing the book",
-    label: "Prose report",
-    starter: `${FREE_LIMITS.prose.free} books`,
+    group: "Core workspace",
+    label: "Books",
+    starter: `${LAUNCH_LIMITS.freeBooks} book`,
     pro: "Unlimited",
   },
-  { group: "Writing the book", label: "Assistant", starter: NOT_INCLUDED, pro: "Included" },
-
-  /* ---- Getting it ready -------------------------------------------------- */
-  /*
-   * **Named in the label, counted in the badge.**
-   *
-   * "All four" alone asked the reader to take our word for how many and which —
-   * on the row that is this page's whole argument, since every competitor
-   * charges for formatting. Naming them costs one line and answers it.
-   *
-   * They sit in the *label* rather than the badge because the badge column is a
-   * column of short answers, and "All three (EPUB, DOCX, PDF)" in a
-   * pill would be twice the width of every other one and break the alignment
-   * that makes the column scannable.
-   *
-   * Written out rather than imported from `export/index.ts`: that module pulls
-   * in `cover-store` and the export pipeline at the top level, which is a great
-   * deal of code to drag into a pricing page for four words. `Format` there is a
-   * type and cannot be counted at runtime anyway. If a fifth format ever ships,
-   * this line is part of shipping it.
-   *
-   * It opens this group because it is the row the whole page rests on, and the
-   * first line under a heading is the one that gets read.
-   */
   {
-    group: "Getting it ready",
-    label: "Exports",
-    // Markdown is off this row until it ships properly — see `FORMATS` in
-    // `export-page.tsx`. A pricing page is where a claim costs the most.
-    detail: "EPUB, DOCX, PDF",
-    starter: "All three",
-    pro: "All three",
+    group: "Core workspace",
+    label: "Chapters and words",
+    starter: "Unlimited",
+    pro: "Unlimited",
   },
   {
-    group: "Getting it ready",
-    label: "Pre-upload check & roadmap",
+    group: "Core workspace",
+    label: "Autosave and sync",
     starter: "Included",
     pro: "Included",
   },
   {
-    group: "Getting it ready",
-    label: "Blurb",
-    starter: `${FREE_LIMITS.blurb.free} books`,
-    pro: "Unlimited",
-  },
-  // Its own row rather than folded into the one above, because the two are
-  // gated differently and a reader comparing columns would otherwise see
-  // "5 books" and assume it covered both. Writing the blurb, the counts and
-  // the findings are free on any book; only the reading is metered, and it is
-  // metered on the server by `requirePro()` rather than in the browser.
-  {
-    group: "Getting it ready",
-    label: "A reader on your blurb",
-    starter: NOT_INCLUDED,
-    pro: "Included",
+    group: "AI and export",
+    label: "Writing assistant",
+    starter: `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies / month`,
+    pro: `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} replies / month`,
   },
   {
-    group: "Getting it ready",
-    label: "Categories & keywords",
-    starter: "Included",
-    pro: "Included",
-  },
-  /*
-   * **Each tool metered in its own unit, and every number read out of
-   * `FREE_LIMITS`** so the page and the gate cannot drift — the same rule the
-   * prices follow.
-   *
-   * A table rather than a paragraph, deliberately: six numbers in three shapes
-   * is more than a sentence can carry, and the version of this page that tried
-   * ("ten of each of four things") was the reason the whole policy was rewritten
-   * once already. Read down a column and each row answers one question.
-   *
-   * The three searches say "a day" because they come back — the only limits
-   * here that do, and a row reading "2" would look like a lifetime allowance.
-   * They are kept adjacent for that reason: three of them running together is
-   * what makes "a day" read as the shape of this plan rather than as a footnote
-   * on one line.
-   */
-  {
-    group: "Getting it ready",
-    label: "Comp searches",
-    starter: `${FREE_LIMITS.comps.free} a day`,
-    pro: "Unlimited",
-  },
-  {
-    group: "Getting it ready",
-    label: "Cover searches",
-    starter: `${FREE_LIMITS.covers.free} a day`,
-    pro: "Unlimited",
-  },
-  {
-    group: "Getting it ready",
-    label: "Title checks",
-    starter: `${FREE_LIMITS.titleCheck.free} a day`,
-    pro: "Unlimited",
-  },
-  /*
-   * **The one row here counted for the life of the account**, so it says "in
-   * total" and must never say "a day". It sits directly under the three daily
-   * rows on purpose: read against them the difference in wording is the whole
-   * of the difference in meaning, and a reader comparing the column can see at
-   * a glance which numbers come back and which do not.
-   */
-  {
-    group: "Getting it ready",
-    label: "Keyword suggestions",
-    starter: `${FREE_LIMITS.keywordsAi.free} in total`,
-    pro: "Unlimited",
-  },
-  {
-    group: "Getting it ready",
-    label: "Blurb conversations",
-    // Counted in conversations, so the cell has to say so — beside a chat
-    // feature, a bare "3 in total" reads as three messages.
-    starter: `${FREE_LIMITS.blurbChat.free} conversations`,
-    pro: "Unlimited",
-  },
-  { group: "Getting it ready", label: "Ranked comps", starter: NOT_INCLUDED, pro: "Included" },
-  {
-    // **Import only, since 2026-08-14.** This row read "Audiobook & audio
-    // import" while the export step could also read a book aloud; that half was
-    // taken off to be put back later, and a pricing row is the last place a
-    // feature is allowed to outlive its way in. Half a row is still a true row:
-    // `/api/transcribe` is there, gated and paid for.
-    group: "Getting it ready",
-    label: "Audiobook import",
-    detail: "An audiobook becomes a manuscript, chaptered.",
-    starter: NOT_INCLUDED,
-    pro: "Included",
-  },
-
-  /* ---- Selling it -------------------------------------------------------- */
-  {
-    group: "Selling it",
-    label: "Advance copies",
-    starter: `${FREE_LIMITS.arcReaders.free} a book`,
-    pro: "Unlimited",
-  },
-  {
-    group: "Selling it",
-    label: "Money tracking",
-    starter: `${FREE_LIMITS.track.free} books`,
-    pro: "Unlimited",
-  },
-  {
-    group: "Selling it",
-    label: "Sales report import & the curve",
-    starter: NOT_INCLUDED,
-    pro: "Included",
+    group: "AI and export",
+    label: "Export",
+    starter: "Word",
+    pro: "Word, EPUB, PDF",
   },
 ];
 
@@ -422,7 +229,7 @@ export function Plans({
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
     // scrolling. min-h-dvh would put the last card out of reach.
-    <main className="scroll-slim h-dvh overflow-y-auto bg-surface">
+    <main className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface pb-(--oc-safe-bottom)">
       {/* No header bar: the section is the page, the way a pricing section is.
           The way back is one quiet link in the corner rather than a chrome bar
           competing with the headline. */}
@@ -447,7 +254,7 @@ export function Plans({
         </p>
 
         <h1 className="mt-6 font-display text-4xl font-bold tracking-tight text-fg sm:text-5xl">
-          Plans for your writing
+          Simple pricing for writing your book
         </h1>
         {/* Not `text-muted`: this is the sentence the headline is asking to be
             read, so it takes the page's own ink held slightly back rather than
@@ -457,8 +264,8 @@ export function Plans({
           className="mx-auto mt-4 max-w-2xl font-sans text-lg leading-relaxed
                      font-medium text-fg/80"
         >
-          Writing a book is free, and stays free. The parts that spend a
-          model&rsquo;s time are what the paid plan pays for.
+          Start with one complete book for free. Upgrade when you need more
+          books, more assistant help, or professional export formats.
         </p>
 
         <PeriodToggle period={period} onChange={setPeriod} />
@@ -481,8 +288,8 @@ export function Plans({
         <div className="mt-12 grid gap-6 text-left sm:grid-cols-2 sm:items-start">
           <PlanCard
             mark={<PenIcon className="h-6 w-6" />}
-            name="Starter"
-            blurb="For everything it takes to write a book — on your own or with one other — and get it out."
+            name="Free"
+            blurb="For trying OpenChapter with one complete book and a small assistant allowance."
             price="$0"
             rows={ROWS.map((r) => ({
               group: r.group,
@@ -508,10 +315,10 @@ export function Plans({
 
           <PlanCard
             featured
-            badge="Ideal once the book is going out"
+            badge="Best for serious writers"
             mark={<StackIcon className="h-6 w-6" />}
             name="Pro"
-            blurb="For the assistant, the money, the readers and the research."
+            blurb="For unlimited books, more assistant help, and full export."
             price={headline}
             note={note}
             rows={ROWS.map((r) => ({
@@ -582,10 +389,9 @@ export function Plans({
       {soon && (
         <ComingSoonDialog title="Pro" onClose={() => setSoon(false)}>
           There is no payment gateway configured on this copy of OpenChapter, so
-          there is nothing to buy — and nothing is held back either. The
-          assistant, the research tools and the audiobook import all work here
-          for anyone running their own API keys; Pro is those same three without
-          a key to keep.
+          there is nothing to buy and nothing is held back. Once billing is
+          configured, Pro unlocks unlimited books, more assistant replies, and
+          EPUB/PDF export.
         </ComingSoonDialog>
       )}
     </main>
@@ -708,7 +514,7 @@ type Tone = "gold" | "purple" | "blue";
  * the highlight. It lives directly under `ROWS` for that reason — the two are
  * meant to be read together.
  */
-const STARTER_HIGHLIGHT = new Set(["Exports", "Sync"]);
+const STARTER_HIGHLIGHT = new Set(["Autosave and sync", "Export"]);
 
 /**
  * Which fill a value wears.

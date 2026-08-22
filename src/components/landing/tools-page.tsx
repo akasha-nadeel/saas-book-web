@@ -95,7 +95,7 @@ export function ToolsPage() {
     // on `LandingPage` — every reason there applies unchanged here.
     <div
       data-theme="light"
-      className="lp-type h-dvh overflow-y-auto bg-lp-ground text-lp-body [scroll-behavior:smooth]"
+      className="lp-type h-[var(--oc-layout-height)] overflow-y-auto bg-lp-ground text-lp-body [scroll-behavior:smooth]"
     >
       {/* `home={false}` roots the bar's two in-page anchors at `/`, for the
           reason the note on that prop gives. */}

@@ -43,16 +43,17 @@ function Shell({
   return (
     <dialog
       ref={ref}
+      data-dialog-presentation="sheet"
       onClose={onClose}
       /* The backdrop is the dialog's own box, so a click that lands on the
          element itself rather than on anything inside it is a click outside. */
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      className="m-auto w-[26rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="oc-dialog m-auto w-[26rem] max-w-[calc(100vw-2rem)] rounded-lg
+                 bg-panel p-0 text-fg backdrop:bg-black/70"
     >
-      <div className="p-6">{children}</div>
+      <div className="oc-dialog-scroll p-6">{children}</div>
     </dialog>
   );
 }
@@ -94,7 +95,7 @@ export function ConfirmDialog({
         </div>
       )}
 
-      <div className="mt-6 flex justify-end gap-2">
+      <div className="oc-dialog-actions mt-6 flex justify-end gap-2">
         <button type="button" onClick={onClose} className={CANCEL}>
           Cancel
         </button>
@@ -197,7 +198,7 @@ export function PromptDialog({
           />
         </label>
 
-        <div className="mt-6 flex items-center justify-end gap-2">
+        <div className="oc-dialog-actions mt-6 flex items-center justify-end gap-2">
           {onRemove && (
             /* Left of the pair, and set apart: it is a third answer rather than
                a second cancel, and putting it beside Save would make the two

@@ -1,3 +1,4 @@
+import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { askModel, ModelError, modelProvider } from "@/lib/ai";
 import { requirePro } from "@/lib/billing/server";
 import { SLOTS, type Listing } from "@/lib/keywords";
@@ -81,6 +82,7 @@ function turnsIn(value: unknown): KeywordMessage[] {
 }
 
 export async function POST(request: Request) {
+  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Keyword chat");
   if (!modelProvider()) {
     return Response.json(
       {

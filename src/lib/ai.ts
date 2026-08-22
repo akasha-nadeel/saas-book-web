@@ -61,7 +61,7 @@ const DEFAULTS: Record<Tier, Record<Provider, string>> = {
     google: "gemini-3.6-flash",
   },
   chat: {
-    anthropic: "claude-opus-4-8",
+    anthropic: "claude-sonnet-5",
     google: "gemini-3.6-flash",
   },
 };
