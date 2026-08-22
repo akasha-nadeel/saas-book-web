@@ -45,10 +45,10 @@ export function MobileEditorHeader({
             viewBox="0 0 20 20"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1.6"
+            strokeWidth="1.7"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-[18px] w-[18px]"
+            className="h-5 w-5"
           >
             {icons.chapters}
           </svg>

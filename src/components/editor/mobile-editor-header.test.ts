@@ -35,11 +35,16 @@ describe("MobileEditorHeader", () => {
     const chaptersGlyph = markup.indexOf(
       'd="M10 6.4c0-1.1-1.4-1.9-3.8-1.9h-3v9.6h3c2.4 0 3.8.9 3.8 2"',
     );
+    const chaptersButton = markup.match(
+      /<button[^>]*aria-label="Choose a chapter\. Current chapter: Chapter Three"[^>]*>.*?<\/button>/,
+    )?.[0];
     const displayedTitle = markup.lastIndexOf("Chapter Three");
 
     expect(homeControl).toBeLessThan(chaptersControl);
     expect(chaptersControl).toBeLessThan(chaptersGlyph);
     expect(chaptersGlyph).toBeLessThan(displayedTitle);
+    expect(chaptersButton).toContain('stroke-width="1.7"');
+    expect(chaptersButton).toContain('class="h-5 w-5"');
     expect(markup).not.toContain('d="m6 8 4 4 4-4"');
   });
 });
