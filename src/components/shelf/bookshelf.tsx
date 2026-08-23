@@ -750,6 +750,7 @@ export function Bookshelf({
             {area === "overview" && (
               <Overview
                 account={account}
+                onSeeBooks={() => showShelf("active")}
                 current={current}
                 all={active}
                 books={active.length}
@@ -1031,6 +1032,7 @@ function Overview({
   chapters,
   onDetails,
   onCover,
+  onSeeBooks,
   onPrepare,
 }: {
   /** For the greeting, and only that. Null signed out or with no accounts. */
@@ -1043,6 +1045,8 @@ function Overview({
   chapters: number;
   onDetails: (b: Book) => void;
   onCover: (b: Book) => void;
+  /** Opens the shelf's own list — the three counts are counting it. */
+  onSeeBooks: () => void;
   /**
    * Goes to Prepare with this book's row already open.
    *
@@ -1656,13 +1660,36 @@ function Overview({
       )}
         </div>
 
-        {/* The right column: what is true across the shelf, quietly. */}
+        {/* The right column: what is true across the shelf, quietly.
+
+            Both panels carry a hairline *and* a shadow, which is one thing in
+            two themes rather than two decisions. In daylight the shadow is the
+            lift and the line barely shows; at night a shadow on a near-black
+            ground is invisible and the hairline is the whole of it. That is
+            the elevation rule this app already follows — see docs/styling.md
+            — and it is why neither is conditional. */}
         <aside className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-line bg-panel p-5">
-            <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
-              Your shelf
-            </h3>
-            <dl className="mt-4 flex flex-col gap-3.5">
+          <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
+            {/* A heading with its own way out, the pattern the reference uses
+                for "View Report". It goes to Write, which is the list these
+                three numbers are counting — a live destination, not an
+                ornament, which is the only kind of control this house ships. */}
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
+                Your shelf
+              </h3>
+              <button
+                type="button"
+                onClick={onSeeBooks}
+                className="shrink-0 rounded-full border border-line bg-surface px-3 py-1
+                           text-xs font-semibold text-fg transition-colors
+                           hover:bg-raised focus-visible:ring-2
+                           focus-visible:ring-accent/50 focus-visible:outline-none"
+              >
+                See all
+              </button>
+            </div>
+            <dl className="mt-4 flex flex-col gap-4">
               <Figure
                 icon={shelfIcons.overview}
                 label={books === 1 ? "book" : "books"}
@@ -1686,15 +1713,22 @@ function Overview({
               so. "—" rather than 0 — the log started when it shipped, so a
               shelf written before it has nothing in here and a zero would be
               a lie by arithmetic. */}
-          <div className="rounded-2xl border border-line bg-panel p-5">
-            <div className="flex items-center gap-2 text-muted">
-              {shelfIcons.calendar}
-              <h3 className="text-sm font-medium">This week</h3>
+          <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <span
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl
+                           bg-accent/10 text-accent"
+              >
+                {shelfIcons.calendar}
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-xs font-medium text-muted">This week</h3>
+                <p className="text-xl leading-tight font-extrabold tabular-nums text-fg">
+                  {logged ? week.words.toLocaleString() : "—"}
+                </p>
+              </div>
             </div>
-            <p className="mt-2 text-3xl font-extrabold text-fg">
-              {logged ? week.words.toLocaleString() : "—"}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
+            <p className="mt-3.5 text-xs leading-relaxed text-muted">
               {logged
                 ? week.daysWritten > 0
                   ? `${nounFor(week.words, "word")} across ${plural(
@@ -1740,10 +1774,19 @@ function Overview({
 /**
  * One line of the shelf's summary: a word, and the number of them.
  *
- * A `<dl>` row rather than a card, and that is the point of it. Four counts as
- * four cards gave "25 books" the same weight on the screen as the manuscript
- * beside it; as three lines in one panel they read as what they are — the
- * margin note to the book, not a rival for it.
+ * Rows in one panel rather than a card each. Four counts as four cards gave
+ * "25 books" the same weight on the screen as the manuscript beside it; here
+ * they read as what they are — the margin note to the book, not a rival.
+ *
+ * **The glyph sits in a tinted square, and every one of them is the same
+ * tint.** The reference this follows gives each figure its own pastel, which
+ * is four hues carrying no information; one accent wash reads as a set, keeps
+ * the rule that a hue means something, and still does the job the bubble is
+ * there for — giving the eye a fixed left edge to run down.
+ *
+ * Label above the number, not beside it. A label and a figure on one line make
+ * the eye choose between them; stacked, the word is read once and the column
+ * of numbers can then be scanned on its own.
  */
 function Figure({
   icon,
@@ -1755,10 +1798,19 @@ function Figure({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-muted">{icon}</span>
-      <dt className="mr-auto text-sm text-muted">{label}</dt>
-      <dd className="text-lg font-bold tabular-nums text-fg">{value}</dd>
+    <div className="flex items-center gap-3.5">
+      <span
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl
+                   bg-accent/10 text-accent"
+      >
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <dt className="text-xs font-medium text-muted">{label}</dt>
+        <dd className="text-xl leading-tight font-extrabold tabular-nums text-fg">
+          {value}
+        </dd>
+      </div>
     </div>
   );
 }
