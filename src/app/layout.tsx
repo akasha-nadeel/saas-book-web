@@ -117,26 +117,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${fraunces.variable} ${inter.variable} ${poppins.variable} ${jakarta.variable} ${plexMono.variable} h-full antialiased`}
     >
-      {/*
-        Stays a bare <script> in <head>, deliberately.
-
-        React 19 logs "Encountered a script tag while rendering React component"
-        for this in development. That warning is about client-rendered scripts
-        never executing, which is true and irrelevant here: this one runs from
-        the server's HTML during parse, which is the only moment it is any use,
-        and it is the whole reason nobody sees the wrong theme flash.
-
-        `next/script` at beforeInteractive was tried and is wrong: it cannot be
-        a direct child of <html>, and moving it into <body> gives up the one
-        guarantee that matters — running before the first paint. The dev console
-        message is cosmetic; the flash would not be.
-      */}
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
-      </head>
       {/* Only the shell. The chapter sidebar lives in the book layout, so the
           shelf can render full-width without one. */}
       <body className="h-full overflow-hidden bg-surface text-fg">
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <ViewportController />
         <ThemeSync />
         <LibrarySync />
