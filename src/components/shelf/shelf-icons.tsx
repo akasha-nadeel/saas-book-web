@@ -256,4 +256,22 @@ export const shelfIcons = {
       <path d="M10 11v6M14 11v6" />
     </Svg>
   ),
+  /* Outline, on the 24-grid with the rest. The filled twin below is the same
+     path with no stroke, so a starred book and an unstarred one are the same
+     shape at the same weight — only solid. */
+  heart: (
+    <Svg>
+      <path d="M12 20.2 4.6 12.9a4.7 4.7 0 0 1 0-6.7 4.7 4.7 0 0 1 6.7 0l.7.7.7-.7a4.7 4.7 0 0 1 6.7 0 4.7 4.7 0 0 1 0 6.7Z" />
+    </Svg>
+  ),
+  heartFilled: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      className="h-[18px] w-[18px] shrink-0"
+    >
+      <path d="M12 20.2 4.6 12.9a4.7 4.7 0 0 1 0-6.7 4.7 4.7 0 0 1 6.7 0l.7.7.7-.7a4.7 4.7 0 0 1 6.7 0 4.7 4.7 0 0 1 0 6.7Z" />
+    </svg>
+  ),
 } as const;

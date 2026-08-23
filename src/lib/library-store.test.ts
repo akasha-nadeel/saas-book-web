@@ -60,6 +60,7 @@ import {
   setTypography,
   typographyOf,
   setPref,
+  setFavourite,
   setRoadmapStep,
   setTheme,
   themeUnset,
@@ -2126,6 +2127,48 @@ it("keeps a hand-ticked roadmap step when the server has no column for it", () =
   });
 
   expect(findBook(getShelf(), bookId)!.roadmapDone).toEqual(["draft"]);
+});
+
+/**
+ * A star is the second local-only field, and it fails the same way if left out.
+ *
+ * `favourite` has no column either, so without the merge a writer starring
+ * three books would find them all unstarred the next time a download landed —
+ * the exact bug `roadmapDone` had, on a field a writer touches far more often.
+ */
+it("keeps a starred book starred when the server has no column for it", () => {
+  const { bookId } = createBook();
+  setFavourite(bookId, true);
+  expect(findBook(getShelf(), bookId)!.favourite).toBe(true);
+
+  const remote = getShelf();
+  applyRemoteForTest({
+    ...remote,
+    books: remote.books.map((b) => {
+      const copy = { ...b };
+      delete copy.favourite;
+      return copy;
+    }),
+  });
+
+  expect(findBook(getShelf(), bookId)!.favourite).toBe(true);
+});
+
+/**
+ * Absent, not false.
+ *
+ * The shelf is one document rewritten on every change, so a boolean nobody set
+ * is dead weight in every write — and `favourite === false` would also be a
+ * second way of saying what absence already says.
+ */
+it("removes the star rather than storing it as false", () => {
+  const { bookId } = createBook();
+  setFavourite(bookId, true);
+  setFavourite(bookId, false);
+
+  const book = findBook(getShelf(), bookId)!;
+  expect(book.favourite).toBeUndefined();
+  expect("favourite" in book).toBe(false);
 });
 
 /**

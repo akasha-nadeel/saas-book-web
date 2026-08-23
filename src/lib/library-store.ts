@@ -384,6 +384,12 @@ export interface Book {
    * see lib/export/publishing.ts.
    */
   publishing?: PublishingMeta;
+  /**
+   * Starred by the writer, so a shelf of twenty-five has a short list at the
+   * top of it. Absent until the first star, and **local-only** — see
+   * `setFavourite`.
+   */
+  favourite?: boolean;
   /** Set aside but kept. Epoch ms. */
   archivedAt?: number;
   /** Deleted but recoverable. Epoch ms. Wins over archivedAt. */
@@ -2888,6 +2894,32 @@ export function setRoadmapStep(bookId: string, stepId: string, done: boolean) {
 }
 
 /**
+ * Star a book, or take the star off.
+ *
+ * A filter over the shelf rather than a place on it: a favourite is still an
+ * active book and still counted as one, which is why this is a flag and not a
+ * fourth value of `BookView`. Starring a book does not move it.
+ *
+ * **Absent rather than `false`.** The shelf is one JSON document written on
+ * every change, and a boolean nobody set on twenty-five books is twenty-five
+ * fields of nothing in every write — the same reasoning as `roadmapDone`,
+ * `archivedAt` and every other optional field here.
+ *
+ * **Not synced**, for the same reason as `setRoadmapStep`: `sync.ts` maps a
+ * book's columns by name and there is no column for this. `keepLocalOnly`
+ * carries it across a download so a sync cannot erase it, but a writer on two
+ * machines stars twice. A column is the better answer and is a migration.
+ */
+export function setFavourite(bookId: string, favourite: boolean) {
+  commitBook(bookId, (book) => {
+    const out = { ...book };
+    if (favourite) out.favourite = true;
+    else delete out.favourite;
+    return out;
+  });
+}
+
+/**
  * The word count a book is aiming at.
  *
  * Zero or less removes it rather than storing a goal of nothing: absent means
@@ -4504,6 +4536,11 @@ function keepLocalOnly(local: Shelf, remote: Shelf): Shelf {
 
       const ticked = was?.roadmapDone;
       if (ticked?.length) kept = { ...kept, roadmapDone: ticked };
+
+      // The other local-only field, and carried for the same reason: no
+      // column, so the download would come back without it and unstar
+      // everything on every load.
+      if (was?.favourite) kept = { ...kept, favourite: true };
 
       /*
        * **On a shared book, four more fields are local-only — and that follows

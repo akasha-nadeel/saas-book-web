@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  Fragment,
   useContext,
   useEffect,
   useMemo,
@@ -36,6 +37,7 @@ import {
   hasCover,
   migrateLegacy,
   restoreBook,
+  setFavourite,
   trashBook,
   type Book,
   type BookView,
@@ -181,10 +183,36 @@ const AREAS: {
 // and an unbuilt feature belongs on the screen saying so rather than hidden.
 // `Badge` is still here for it.
 
-const VIEW_LABEL: Record<BookView, string> = {
+/**
+ * The four lists the shelf can show, which is one more than the store has.
+ *
+ * `BookView` is where a book *is* — active, archived, trashed, and never two
+ * of them. A favourite is not a place: it is an active book with a star on it,
+ * counted among the active ones and still there when the star comes off. So it
+ * is a filter laid over `active` here rather than a fourth state in the store,
+ * and `booksIn` never has to answer for it.
+ */
+type ShelfView = BookView | "favourite";
+
+const SHELF_VIEWS: readonly ShelfView[] = [
+  "active",
+  "favourite",
+  "archived",
+  "trashed",
+];
+
+const VIEW_LABEL: Record<ShelfView, string> = {
   active: "Books",
+  favourite: "Favourites",
   archived: "Archived",
   trashed: "Trash",
+};
+
+const VIEW_ICON: Record<ShelfView, ReactNode> = {
+  active: shelfIcons.write,
+  favourite: shelfIcons.heart,
+  archived: shelfIcons.archive,
+  trashed: shelfIcons.trash,
 };
 
 type Sort = "recent" | "title" | "words";
@@ -247,6 +275,18 @@ export function Bookshelf({
    * before parent ones, so the reset would land after the card had scrolled
    * and quietly undo it. Only the navigation controls call this.
    */
+  /**
+   * Open one of the shelf's four lists.
+   *
+   * Both halves, always: the rail can be pressed from Overview or Track, where
+   * setting the view alone would change a list nobody is looking at and leave
+   * the press doing nothing visible.
+   */
+  const showShelf = (next: ShelfView) => {
+    setView(next);
+    goToArea("write");
+  };
+
   const goToArea = (next: Area) => {
     setNavigationOpen(false);
     setArea(next);
@@ -287,7 +327,7 @@ export function Bookshelf({
   const [covering, setCovering] = useState<Book | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
-  const [view, setView] = useState<BookView>("active");
+  const [view, setView] = useState<ShelfView>("active");
   const [dialog, setDialog] = useState<
     "help" | "support" | "feedback" | "community" | "audiobook" | null
   >(null);
@@ -329,7 +369,13 @@ export function Bookshelf({
   const active = useMemo(() => booksIn(shelf, "active"), [shelf]);
 
   const books = useMemo(() => {
-    const list = booksIn(shelf, view);
+    // Favourites read from the active shelf and then filter, so a starred book
+    // that is later archived leaves this list with it rather than lingering in
+    // a fifth place of its own.
+    const list =
+      view === "favourite"
+        ? booksIn(shelf, "active").filter((b) => b.favourite)
+        : booksIn(shelf, view);
     const by: Record<Sort, (a: Book, b: Book) => number> = {
       recent: (a, b) => b.lastOpenedAt - a.lastOpenedAt,
       title: (a, b) => a.title.localeCompare(b.title),
@@ -347,10 +393,11 @@ export function Bookshelf({
   const counts = useMemo(
     () => ({
       active: active.length,
+      favourite: active.filter((b) => b.favourite).length,
       archived: booksIn(shelf, "archived").length,
       trashed: booksIn(shelf, "trashed").length,
     }),
-    [shelf, active.length],
+    [shelf, active],
   );
 
   const totals = useMemo(
@@ -418,14 +465,42 @@ export function Bookshelf({
 
               <nav className="flex flex-col gap-0.5">
                 {AREAS.filter((a) => a.stage).map((a) => (
-                  <SideItem
-                    key={a.id}
-                    icon={a.icon}
-                    active={area === a.id}
-                    onClick={() => goToArea(a.id)}
-                  >
-                    {a.label}
-                  </SideItem>
+                  <Fragment key={a.id}>
+                    <SideItem
+                      icon={a.icon}
+                      active={area === a.id}
+                      onClick={() => goToArea(a.id)}
+                    >
+                      {a.label}
+                    </SideItem>
+
+                    {/* The four lists, under the area that shows them.
+                        Indented and unpaired with the rail's own icons on
+                        purpose: they are scopes of Write, not places beside
+                        it, and a flat list of seven would have read as seven
+                        equal destinations.
+
+                        Always present, never conditional on being in Write.
+                        A rail whose rows appear and disappear as you move
+                        through it is a rail nobody learns the shape of, and
+                        "Trash 26" is a destination a writer goes looking for
+                        from wherever they happen to be. */}
+                    {a.id === "write" && (
+                      <div className="mt-0.5 mb-1 flex flex-col gap-0.5">
+                        {SHELF_VIEWS.map((v) => (
+                          <SideShelfView
+                            key={v}
+                            icon={VIEW_ICON[v]}
+                            count={counts[v]}
+                            active={area === "write" && view === v}
+                            onClick={() => showShelf(v)}
+                          >
+                            {VIEW_LABEL[v]}
+                          </SideShelfView>
+                        ))}
+                      </div>
+                    )}
+                  </Fragment>
                 ))}
               </nav>
 
@@ -1850,11 +1925,11 @@ function Write({
   onDeleteForever,
 }: {
   visible: Book[];
-  view: BookView;
-  counts: Record<BookView, number>;
+  view: ShelfView;
+  counts: Record<ShelfView, number>;
   sort: Sort;
   searching: boolean;
-  onView: (v: BookView) => void;
+  onView: (v: ShelfView) => void;
   /** Empties the box in the header, which lives on the screen above this. */
   onClearSearch: () => void;
   onSort: (s: Sort) => void;
@@ -1868,14 +1943,22 @@ function Write({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex gap-1 rounded-lg border border-line bg-panel p-1">
-          {(["active", "archived", "trashed"] as const).map((v) => (
+      <div className="flex flex-wrap items-center justify-between gap-4 md:justify-end">
+        {/* One question, one control. The rail carries these four from `md` up,
+            where it is on screen; below that there is no rail, so the segmented
+            control is the only way to reach the archive and it stays. Two live
+            copies of the same state on one screen is two things to keep in step
+            and two answers when they drift. */}
+        <div
+          className="scroll-slim flex max-w-full gap-1 overflow-x-auto rounded-lg
+                     border border-line bg-panel p-1 md:hidden"
+        >
+          {SHELF_VIEWS.map((v) => (
             <button
               key={v}
               type="button"
               onClick={() => onView(v)}
-              className={`rounded-md px-3.5 py-1.5 text-sm font-medium ${
+              className={`shrink-0 rounded-md px-3.5 py-1.5 text-sm font-medium ${
                 view === v ? "bg-accent text-accent-ink" : "text-muted"
               }`}
             >
@@ -1925,6 +2008,17 @@ function Write({
             >
               This searches titles. To look inside a book, open it and use the
               search tab — that one reads the prose.
+            </EmptyState>
+          ) : view === "favourite" ? (
+            <EmptyState
+              title="No favourites yet"
+              primary={{
+                label: "Back to your books",
+                onClick: () => onView("active"),
+              }}
+            >
+              Star a book from its ⋯ menu and it shows up here. Nothing moves —
+              a favourite is still on the shelf with the rest.
             </EmptyState>
           ) : view === "archived" ? (
             <EmptyState
@@ -1994,7 +2088,7 @@ function Write({
                   size and colour, and a pill has room for a name but not for
                   what the thing is. */}
               <div className="mt-3.5 flex flex-wrap items-center gap-2">
-                {view === "active" ? (
+                {view === "active" || view === "favourite" ? (
                   <>
                     {/* **Outlined, like Read beside it**, at the owner's
                         request. It was the filled accent — the card's one
@@ -2035,6 +2129,21 @@ function Write({
                           </MenuLink>
 
                           <MenuSeparator />
+                          <MenuButton
+                            icon={
+                              book.favourite
+                                ? shelfIcons.heartFilled
+                                : shelfIcons.heart
+                            }
+                            onClick={() => {
+                              setFavourite(book.id, !book.favourite);
+                              close();
+                            }}
+                          >
+                            {book.favourite
+                              ? "Remove from favourites"
+                              : "Add to favourites"}
+                          </MenuButton>
                           <MenuButton
                             icon={shelfIcons.info}
                             onClick={() => {
@@ -3091,6 +3200,58 @@ function SideItem({
       className={className}
     >
       {body}
+    </button>
+  );
+}
+
+/**
+ * One of the shelf's four lists, in the rail under Write.
+ *
+ * A quieter row than `SideItem` by design — smaller, indented, and its count
+ * set in the muted colour — because these are scopes of the area above rather
+ * than areas themselves, and a rail where everything shouts has no hierarchy
+ * at all. The indent lines the label up with the icons above it, so the four
+ * read as a list hanging off Write rather than four more top-level rows.
+ *
+ * **The count is always shown, zero included.** "Archived 0" is an answer;
+ * hiding the row until something is archived would mean the rail changes shape
+ * as a writer works, and the one time they go looking for the archive is the
+ * time it would not be there.
+ */
+function SideShelfView({
+  icon,
+  count,
+  active,
+  onClick,
+  children,
+}: {
+  icon: ReactNode;
+  count: number;
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`flex min-h-9 items-center gap-2.5 rounded-lg py-1.5 pr-2.5 pl-[1.375rem]
+         text-left text-[0.8125rem] transition-colors ${
+           active
+             ? "bg-accent/10 font-medium text-accent"
+             : "text-muted hover:bg-raised hover:text-fg"
+         }`}
+    >
+      <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      <span className="mr-auto truncate">{children}</span>
+      {/* Tabular figures so 0, 25 and 26 sit on one right edge rather than
+          shuffling as the shelf changes. */}
+      <span
+        className={`text-xs tabular-nums ${active ? "text-accent/80" : "text-muted/70"}`}
+      >
+        {count}
+      </span>
     </button>
   );
 }
