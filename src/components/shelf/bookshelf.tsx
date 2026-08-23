@@ -1233,88 +1233,67 @@ function Overview({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* ---- The band ----------------------------------------------------
+      {/* ---- The welcome band --------------------------------------------
 
-          One filled strip at the top, and the only place on this screen that
-          spends the accent. That is the whole argument for it: the rule is
-          that a hue means "this is the way forward", so a coloured band is
-          allowed exactly where the way forward is — starting a book, or
-          bringing one in — and nowhere else. The tiles below stay on panel
-          and a hairline, because four differently tinted cards would be four
-          hues meaning nothing.
+          A **tinted** band, not a filled one. The saturated version put the
+          loudest thing on the screen above the quietest, and the accent is
+          spent on actions here — so the ground is the accent at a tenth and
+          the two buttons inside it keep the full strength. The writer's name
+          takes the highlight, which is the one thing in the band that is
+          theirs.
 
-          No illustration. The reference this follows carries a stock drawing
-          of an office, and the house rule for figures is that they are drawn
-          in markup and true of the code; a picture of strangers at a desk is
-          neither. The greeting and the writer's own name are the warmth. */}
-      <section className="rounded-2xl bg-accent px-5 py-6 text-accent-ink sm:px-7 sm:py-8">
-        <p className="text-pretty text-2xl font-bold tracking-tight sm:text-3xl">
-          {greeting}
-          {firstName ? `, ${firstName}` : ""}
-        </p>
-        <p className="mt-1.5 max-w-prose text-sm leading-relaxed opacity-90">
-          {standing}
-        </p>
-        <div className="mt-5 flex flex-wrap gap-2.5">
-          <Link
-            href={START.href}
-            className="rounded-lg bg-accent-ink px-4 py-2 text-sm font-semibold text-accent"
-          >
-            {START.label}
-          </Link>
-          <Link
-            href={IMPORT.href}
-            className="rounded-lg border border-current/35 px-4 py-2 text-sm font-semibold"
-          >
-            {IMPORT.label}
-          </Link>
+          The figure is drawn, on the same 24-grid as the rail's icons. The
+          reference carries a stock illustration of somebody at a desk; the
+          house rule is that figures are drawn in markup and true of the
+          product, so this is a book, its pages and a stack beside it — the
+          thing the app is actually about. It is decoration and marked
+          `aria-hidden`, and it goes at `sm` where there is no room. */}
+      <section
+        className="relative overflow-hidden rounded-3xl bg-accent/10 px-6 py-8
+                   sm:px-9 sm:py-10"
+      >
+        <div className="relative z-10 max-w-xl">
+          <h2 className="text-pretty text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+            {greeting}
+            {firstName ? (
+              <>
+                {" "}
+                <span className="rounded-lg bg-accent/20 px-2 py-0.5 text-accent">
+                  {firstName}
+                </span>
+              </>
+            ) : null}
+          </h2>
+          <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-muted">
+            {standing}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2.5">
+            <Link
+              href={START.href}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
+            >
+              {START.label}
+            </Link>
+            <Link
+              href={IMPORT.href}
+              className="rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg"
+            >
+              {IMPORT.label}
+            </Link>
+          </div>
         </div>
+        <DeskFigure />
       </section>
 
-      {/* ---- The two columns ---------------------------------------------
+      {/* ---- The book, and the figures beside it --------------------------
 
-          Tiles left, the book right, on one row from `lg` up — the figures a
-          writer glances at beside the one thing this screen is actually for.
-          The book keeps the larger share: a diagnosis is the point of the
-          screen and four counts are the margin note. Below `lg` they stack in
-          the same order, so the phone reads the same sentence. */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start">
-        <div className="grid grid-cols-2 gap-3">
-          <Stat
-            icon={shelfIcons.overview}
-            value={books.toLocaleString()}
-            label={books === 1 ? "book" : "books"}
-          />
-          <Stat
-            icon={shelfIcons.write}
-            value={words.toLocaleString()}
-            label={nounFor(words, "word")}
-          />
-          <Stat
-            icon={shelfIcons.prepare}
-            value={chapters.toLocaleString()}
-            label={nounFor(chapters, "chapter")}
-          />
-          {/* The fourth is the only one that can be unknown, and it says so
-              rather than printing a zero it has not earned — the log started
-              when it shipped, so a shelf written before it has nothing in
-              here. The dashed card under the row is where that is explained. */}
-          <Stat
-            icon={shelfIcons.calendar}
-            value={logged ? week.words.toLocaleString() : "—"}
-            label="this week"
-            note={
-              logged
-                ? week.daysWritten > 0
-                  ? `${plural(week.daysWritten, "day")}${
-                      run > 0 ? ` · ${plural(run, "day")} running` : ""
-                    }`
-                  : "nothing yet — that is allowed"
-                : "no log yet"
-            }
-          />
-        </div>
-
+          The book takes the wide column because it is what the screen is for:
+          a diagnosis, with the controls that answer it. The four counts are a
+          margin note and read as one — stacked in a single panel rather than
+          scattered as four cards, which is what they were, and which gave a
+          rounding error the same weight as the manuscript. */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)] lg:items-start">
+        <div className="flex flex-col gap-5">
       {book ? (
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 p-4 sm:flex sm:flex-wrap sm:gap-5 sm:p-5">
@@ -1675,7 +1654,60 @@ function Overview({
           className="h-64 animate-pulse rounded-2xl border border-line bg-panel"
         />
       )}
+        </div>
+
+        {/* The right column: what is true across the shelf, quietly. */}
+        <aside className="flex flex-col gap-4">
+          <div className="rounded-2xl border border-line bg-panel p-5">
+            <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
+              Your shelf
+            </h3>
+            <dl className="mt-4 flex flex-col gap-3.5">
+              <Figure
+                icon={shelfIcons.overview}
+                label={books === 1 ? "book" : "books"}
+                value={books.toLocaleString()}
+              />
+              <Figure
+                icon={shelfIcons.write}
+                label={nounFor(words, "word")}
+                value={words.toLocaleString()}
+              />
+              <Figure
+                icon={shelfIcons.prepare}
+                label={nounFor(chapters, "chapter")}
+                value={chapters.toLocaleString()}
+              />
+            </dl>
+          </div>
+
+          {/* Movement, kept apart from the totals: they answer different
+              questions, and the one that can be unknown is the one that says
+              so. "—" rather than 0 — the log started when it shipped, so a
+              shelf written before it has nothing in here and a zero would be
+              a lie by arithmetic. */}
+          <div className="rounded-2xl border border-line bg-panel p-5">
+            <div className="flex items-center gap-2 text-muted">
+              {shelfIcons.calendar}
+              <h3 className="text-sm font-medium">This week</h3>
+            </div>
+            <p className="mt-2 text-3xl font-extrabold text-fg">
+              {logged ? week.words.toLocaleString() : "—"}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              {logged
+                ? week.daysWritten > 0
+                  ? `${nounFor(week.words, "word")} across ${plural(
+                      week.daysWritten,
+                      "day",
+                    )}${run > 0 ? ` · ${plural(run, "day")} running` : ""}`
+                  : "nothing yet this week — that is allowed"
+                : "The log starts the first time you write here, and counts net words a day — so a day of cutting counts too. Anything already on your shelf came before it."}
+            </p>
+          </div>
+        </aside>
       </div>
+
 
       {/* An amber panel counting advance readers past their date stood here
           until 2026-08-13 — the one *urgent* thing this screen ever raised —
@@ -1701,30 +1733,88 @@ function Overview({
           the day log only started when it shipped, so a writer with 6,000 words
           behind them would read that they had written nothing. Until there is a
           single logged day, this is one card that says why it is empty. */}
-      {/* The one card that only exists to explain a dash.
-
-          Three zeros beside a shelf of finished books is a lie by arithmetic:
-          the day log only started when it shipped, so a writer with 6,000
-          words behind them would read that they had written nothing. The tile
-          above says "—" rather than "0" for that reason, and this says why —
-          then goes away for good the first day something is recorded. */}
-      {!logged && (
-        <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4">
-          <div className="flex items-center gap-2 text-muted">
-            {shelfIcons.calendar}
-            <p className="text-sm font-medium">No writing log yet</p>
-          </div>
-          <p className="mt-1.5 text-sm text-fg">
-            It starts the first time you write here and counts net words a day —
-            so a day of cutting counts too.
-          </p>
-          <p className="mt-1 text-xs text-muted">
-            Anything already on your shelf was written before the log existed,
-            which is why it is not in here.
-          </p>
-        </div>
-      )}
     </div>
+  );
+}
+
+/**
+ * One line of the shelf's summary: a word, and the number of them.
+ *
+ * A `<dl>` row rather than a card, and that is the point of it. Four counts as
+ * four cards gave "25 books" the same weight on the screen as the manuscript
+ * beside it; as three lines in one panel they read as what they are — the
+ * margin note to the book, not a rival for it.
+ */
+function Figure({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-muted">{icon}</span>
+      <dt className="mr-auto text-sm text-muted">{label}</dt>
+      <dd className="text-lg font-bold tabular-nums text-fg">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * The band's decoration: a book, its pages, and one more behind it.
+ *
+ * Drawn here rather than fetched, for the reason every other figure in this
+ * product is drawn — a stock illustration of somebody at a desk is a picture
+ * of nothing this app does, and it is one more asset to keep. Two flat tones
+ * of the accent and a hairline, so it reads at any theme without a second
+ * palette.
+ *
+ * Decoration and nothing else: `aria-hidden`, and gone below `lg` where the
+ * words need the whole width.
+ */
+function DeskFigure() {
+  return (
+    <svg
+      viewBox="0 0 240 160"
+      aria-hidden="true"
+      className="pointer-events-none absolute right-6 bottom-0 hidden h-[88%] w-auto lg:block"
+    >
+      {/* The page block behind, set back and paler. */}
+      <rect
+        x="34"
+        y="34"
+        width="150"
+        height="96"
+        rx="6"
+        className="fill-accent/10"
+      />
+      {/* The open book: two leaves meeting at the spine. */}
+      <path
+        d="M32 118V50c22-9 44-9 66 0v68c-22-9-44-9-66 0Z"
+        className="fill-surface stroke-accent/35"
+        strokeWidth="2.5"
+      />
+      <path
+        d="M164 118V50c-22-9-44-9-66 0v68c22-9 44-9 66 0Z"
+        className="fill-surface stroke-accent/35"
+        strokeWidth="2.5"
+      />
+      <path d="M98 50v68" className="stroke-accent/45" strokeWidth="2.5" />
+      {/* Lines of type, shorter as they fall — a paragraph, not a barcode. */}
+      {[66, 78, 90].map((y, i) => (
+        <g key={y} className="stroke-accent/25" strokeWidth="3.5" strokeLinecap="round">
+          <path d={`M46 ${y}h${44 - i * 8}`} />
+          <path d={`M110 ${y}h${44 - i * 8}`} />
+        </g>
+      ))}
+      {/* A closed one, stacked at the edge, so the shelf is implied. */}
+      <rect x="176" y="86" width="44" height="12" rx="3" className="fill-accent/30" />
+      <rect x="182" y="102" width="44" height="12" rx="3" className="fill-accent/20" />
+      <rect x="176" y="118" width="44" height="12" rx="3" className="fill-accent/30" />
+    </svg>
   );
 }
 
