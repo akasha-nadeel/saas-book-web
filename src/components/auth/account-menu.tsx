@@ -318,6 +318,15 @@ function MenuBody({
     );
   }
 
+  /*
+   * Whether the band between the address and the menu rows has anything to say.
+   *
+   * A free writer's plan needs no describing — the rows below name where to go
+   * — so the band, its padding and its rule come off together rather than
+   * leaving an empty stripe behind.
+   */
+  const planSection = plan.loading || !plan.billing || plan.pro;
+
   const until = plan.currentPeriodEnd
     ? new Date(plan.currentPeriodEnd).toLocaleDateString(undefined, {
         day: "numeric",
@@ -342,57 +351,47 @@ function MenuBody({
         <p className="truncate font-sans text-xs text-muted">{account.email}</p>
       </div>
 
-      <Rule />
+      {planSection && (
+        <>
+          <Rule />
 
-      <div className="px-4 py-3">
-        {plan.loading ? (
-          <p className="font-sans text-xs text-muted">Checking your plan…</p>
-        ) : !plan.billing ? (
-          <p className="font-sans text-xs leading-relaxed text-muted">
-            No payment gateway is configured here, so there are no plans and
-            nothing is held back.
-          </p>
-        ) : plan.pro ? (
-          <>
-            <div className="flex items-center gap-2">
-              <span
-                className="rounded-full bg-accent/15 px-2 py-0.5 font-sans
-                           text-[0.6875rem] font-semibold text-accent"
-              >
-                Pro
-              </span>
-              <span className="font-sans text-xs text-muted">
-                {plan.period === "annual" ? "Annual" : "Monthly"}
-              </span>
-            </div>
-            <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
-              {plan.status === "cancelled" ? (
-                <>Cancelled{until ? <> — runs until {until}</> : null}.</>
-              ) : plan.status === "past_due" ? (
-                // Not "expired". PayHere retries a failed renewal on its own
-                // schedule, and a plan about to charge again is not a dead one.
-                <>The last renewal didn&rsquo;t go through — PayHere will retry.</>
-              ) : until ? (
-                <>Renews {until}.</>
+          <div className="px-4 py-3">
+            {plan.loading ? (
+              <p className="font-sans text-xs text-muted">Checking your plan…</p>
+            ) : !plan.billing ? (
+              <p className="font-sans text-xs leading-relaxed text-muted">
+                No payment gateway is configured here, so there are no plans and
+                nothing is held back.
+              </p>
+            ) : plan.pro ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span
+                    className="rounded-full bg-accent/15 px-2 py-0.5 font-sans
+                               text-[0.6875rem] font-semibold text-accent"
+                  >
+                    Pro
+                  </span>
+                  <span className="font-sans text-xs text-muted">
+                    {plan.period === "annual" ? "Annual" : "Monthly"}
+                  </span>
+                </div>
+                <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
+                  {plan.status === "cancelled" ? (
+                    <>Cancelled{until ? <> — runs until {until}</> : null}.</>
+                  ) : plan.status === "past_due" ? (
+                    // Not "expired". PayHere retries a failed renewal on its own
+                    // schedule, and a plan about to charge again is not a dead one.
+                    <>The last renewal didn&rsquo;t go through — PayHere will retry.</>
+                  ) : until ? (
+                    <>Renews {until}.</>
               ) : null}
             </p>
           </>
-        ) : (
-          <>
-            <p className="font-sans text-xs text-muted">You are on the free plan.</p>
-            <Link
-              href="/upgrade"
-              onClick={() => onClose(false)}
-              className="mt-1.5 inline-block font-sans text-xs font-semibold
-                         text-accent underline underline-offset-2 outline-none
-                         hover:text-accent-strong focus-visible:ring-2
-                         focus-visible:ring-accent/50"
-            >
-              See what Pro adds
-            </Link>
-          </>
-        )}
-      </div>
+            ) : null}
+          </div>
+        </>
+      )}
 
       <Rule />
 
