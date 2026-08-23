@@ -1,57 +1,45 @@
 "use client";
 
-import { initializePaddle, type Paddle } from "@paddle/paddle-js";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Period } from "@/lib/billing/plans";
 
 /**
  * The Upgrade button, when Paddle is the gateway.
  *
  * PayHere's version is a form that POSTs the browser away to a payment page.
- * Paddle's is an overlay that opens over this one, which changes two things
- * worth knowing.
+ * Paddle's asks our own route for a transaction and hands the id to the page,
+ * which sets the checkout into a section of its own — see
+ * `paddle-inline-checkout.tsx` for why it is not an overlay.
  *
- * **The transaction is made before the overlay opens, by our own route.** So
+ * **The transaction is made before any form appears, by our own route.** So
  * this component never sees a price id and never sends one — it asks for a
- * transaction and opens whatever comes back. That is what stops the price and
- * the buyer's identity being editable by anybody reading the page source; see
- * `/api/billing/paddle/checkout`.
+ * transaction and passes on whatever comes back. That is what stops the price
+ * and the buyer's identity being editable by anybody reading the page source;
+ * see `/api/billing/paddle/checkout`.
  *
- * **Paddle.js is loaded on the first press, not on mount.** The pricing page is
- * read far more often than it is bought from, and a script from a payment
- * network on every visit is a third party watching people who are only looking.
- * It costs a few hundred milliseconds on the press, which is inside the time
- * the transaction call takes anyway.
+ * **Paddle.js is not loaded here at all.** The pricing page is read far more
+ * often than it is bought from, and a script from a payment network on every
+ * visit is a third party watching people who are only looking. It loads with
+ * the checkout section, which exists only once somebody has pressed this.
  *
- * There is no success handler. The overlay closing proves nothing — the writer
- * may have closed it themselves — so the grant comes from Paddle's webhook and
- * the page waits for the plan to change, exactly as `/upgrade/done` polls
- * rather than trusting PayHere's return URL.
+ * There is no success handler. A closed form proves nothing — the writer may
+ * have closed it themselves — so the grant comes from Paddle's webhook and the
+ * page waits for the plan to change, exactly as `/upgrade/done` polls rather
+ * than trusting PayHere's return URL.
  */
 
 export function PaddleUpgradeButton({
   period,
-  environment,
-  token,
+  onTransaction,
   className,
 }: {
   period: Period;
-  environment: "sandbox" | "production";
-  /** Paddle's client-side token. Public by design — it can only open a checkout. */
-  token: string;
+  /** Handed the transaction to check out. The page decides where to show it. */
+  onTransaction: (transactionId: string) => void;
   className: string;
 }) {
-  const paddle = useRef<Paddle | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Nothing is loaded on mount; this only tears down a checkout left open if
-  // the writer navigates away mid-press.
-  useEffect(() => {
-    return () => {
-      paddle.current?.Checkout.close();
-    };
-  }, []);
 
   async function upgrade() {
     setBusy(true);
@@ -74,16 +62,7 @@ export function PaddleUpgradeButton({
         return;
       }
 
-      // Loaded once and kept: initializePaddle returns the same instance on a
-      // second call, but holding the reference saves the round trip.
-      paddle.current ??= (await initializePaddle({ environment, token })) ?? null;
-
-      if (!paddle.current) {
-        setError("The payment window would not load. Check your connection.");
-        return;
-      }
-
-      paddle.current.Checkout.open({ transactionId: data.transactionId });
+      onTransaction(data.transactionId);
     } catch {
       setError("Could not reach the server. Try again shortly.");
     } finally {

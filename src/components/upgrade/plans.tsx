@@ -11,6 +11,7 @@ import {
   priceOf,
 } from "@/lib/billing/plans";
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
+import { PaddleInlineCheckout } from "@/components/upgrade/paddle-inline-checkout";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 
 /**
@@ -208,6 +209,18 @@ export function Plans({
 }) {
   const [period, setPeriod] = useState<Period>("monthly");
 
+  /*
+   * The transaction being paid for, once there is one.
+   *
+   * Held here rather than in the button because it decides what the *page* is:
+   * plans, or a checkout. Paddle's overlay used to make that decision for us by
+   * floating over whatever happened to be underneath, which is how the pricing
+   * cards ended up dimmed behind a form they had nothing to do with.
+   */
+  const [checkoutTransaction, setCheckoutTransaction] = useState<string | null>(
+    null,
+  );
+
   // With no merchant configured there is nothing to sell. The house rule is
   // that a control either works or plainly says it does not, so the button
   // stays where it will always be and pressing it explains itself.
@@ -225,6 +238,19 @@ export function Plans({
     period === "annual"
       ? `${displayPrice(priceOf("annual"))} billed annually`
       : undefined;
+
+  if (checkoutTransaction && paddle) {
+    return (
+      <main className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface pb-(--oc-safe-bottom)">
+        <PaddleInlineCheckout
+          transactionId={checkoutTransaction}
+          token={paddle.token}
+          environment={paddle.environment}
+          onBack={() => setCheckoutTransaction(null)}
+        />
+      </main>
+    );
+  }
 
   return (
     // <body> is overflow-hidden for the editor shell, so this page owns its own
@@ -338,8 +364,7 @@ export function Plans({
               ) : provider === "paddle" && paddle ? (
                 <PaddleUpgradeButton
                   period={period}
-                  token={paddle.token}
-                  environment={paddle.environment}
+                  onTransaction={setCheckoutTransaction}
                   className={PRO_BUTTON}
                 />
               ) : provider === "payhere" ? (
