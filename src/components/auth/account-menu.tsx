@@ -330,19 +330,16 @@ function MenuBody({
 
   return (
     <>
-      {/* Who you are: the face, the whole name, the address. The address is
-          quiet but present — it is what a writer with two accounts checks, and
-          what they would quote to support. */}
-      <div className="flex items-center gap-3 p-4">
-        <Avatar url={account.avatarUrl} name={name} size={40} />
-        <div className="min-w-0">
-          <p className="truncate font-sans text-sm font-semibold text-fg">
-            {name}
-          </p>
-          <p className="truncate font-sans text-xs text-muted">
-            {account.email}
-          </p>
-        </div>
+      {/* Who you are: the whole name and the address. The address is quiet but
+          present — it is what a writer with two accounts checks, and what they
+          would quote to support.
+
+          No face here. The trigger this menu hangs from already carries the
+          avatar a few pixels away, so a second copy said nothing the first had
+          not, and cost the header its whole left margin. */}
+      <div className="min-w-0 p-4">
+        <p className="truncate font-sans text-sm font-semibold text-fg">{name}</p>
+        <p className="truncate font-sans text-xs text-muted">{account.email}</p>
       </div>
 
       <Rule />
