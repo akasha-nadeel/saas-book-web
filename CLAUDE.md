@@ -92,7 +92,7 @@ policies. Read the relevant one before reworking any of them.
   product shots from raw captures kept outside the repo. A one-shot tool, not
   part of the build.
 
-The suite is 99 files / ~1,887 tests and takes about two minutes; jsdom prints
+The suite is 100 files / ~1,893 tests and takes about two minutes; jsdom prints
 `HTMLCanvasElement's getContext()` warnings from the image recoder and they are
 expected, not failures. Tests live beside their subjects as `*.test.ts` and
 cover the pure logic only — components are not tested, and jsdom is there for

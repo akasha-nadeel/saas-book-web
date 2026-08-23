@@ -56,7 +56,16 @@ import {
   usePrefs,
   useShelf,
 } from "@/lib/use-library";
-import { pace, streak } from "@/lib/activity";
+import {
+  pace,
+  recentDays,
+  streak,
+  type Activity,
+  type Pace,
+} from "@/lib/activity";
+import { targetShare } from "@/lib/target";
+import { LAUNCH_LIMITS } from "@/lib/launch";
+import { usePlan } from "@/lib/use-plan";
 import {
   parseArc,
   summarise as summariseArc,
@@ -200,6 +209,17 @@ const SHELF_VIEWS: readonly ShelfView[] = [
   "archived",
   "trashed",
 ];
+
+/**
+ * The three the rail lists under Write, which is `SHELF_VIEWS` without
+ * `active`.
+ *
+ * Write *is* the active list — pressing it opens exactly what a "Books" row
+ * would have — so naming it twice in one column was two doors into one room.
+ * The segmented control below `md` keeps all four, because there is no rail
+ * there and it is the only way to reach any of them.
+ */
+const RAIL_VIEWS: readonly ShelfView[] = ["favourite", "archived", "trashed"];
 
 const VIEW_LABEL: Record<ShelfView, string> = {
   active: "Books",
@@ -468,38 +488,54 @@ export function Bookshelf({
                   <Fragment key={a.id}>
                     <SideItem
                       icon={a.icon}
-                      active={area === a.id}
-                      onClick={() => goToArea(a.id)}
+                      /* Write is the *active list*, not merely the area.
+                         Asking `area === "write"` alone lit Write and Trash at
+                         once, which is a rail claiming the writer is in two
+                         places. Everywhere else the area is the whole of it. */
+                      active={
+                        a.id === "write"
+                          ? area === "write" && view === "active"
+                          : area === a.id
+                      }
+                      onClick={() =>
+                        a.id === "write" ? showShelf("active") : goToArea(a.id)
+                      }
                     >
                       {a.label}
                     </SideItem>
 
-                    {/* The four lists, under the area that shows them.
-                        Indented and unpaired with the rail's own icons on
-                        purpose: they are scopes of Write, not places beside
-                        it, and a flat list of seven would have read as seven
-                        equal destinations.
+                    {/* The other three lists, as rows exactly like the one
+                        above them.
 
-                        Always present, never conditional on being in Write.
-                        A rail whose rows appear and disappear as you move
+                        They were nested and half a size smaller, which was
+                        wrong twice over. *Books* and *Write* were one
+                        destination wearing two names — the row above already
+                        goes there, so it is gone. And the three that remain
+                        are destinations in the same sense Overview is: a
+                        smaller type and an indent said they were something
+                        lesser, which nothing about them supports.
+
+                        Always present, never conditional on being in Write. A
+                        rail whose rows appear and disappear as you move
                         through it is a rail nobody learns the shape of, and
-                        "Trash 26" is a destination a writer goes looking for
-                        from wherever they happen to be. */}
-                    {a.id === "write" && (
-                      <div className="mt-0.5 mb-1 flex flex-col gap-0.5">
-                        {SHELF_VIEWS.map((v) => (
-                          <SideShelfView
-                            key={v}
-                            icon={VIEW_ICON[v]}
-                            count={counts[v]}
-                            active={area === "write" && view === v}
-                            onClick={() => showShelf(v)}
-                          >
-                            {VIEW_LABEL[v]}
-                          </SideShelfView>
-                        ))}
-                      </div>
-                    )}
+                        the trash is a place writers go looking for from
+                        wherever they happen to be standing. */}
+                    {a.id === "write" &&
+                      RAIL_VIEWS.map((v) => (
+                        <SideItem
+                          key={v}
+                          icon={VIEW_ICON[v]}
+                          active={area === "write" && view === v}
+                          onClick={() => showShelf(v)}
+                          badge={
+                            <span className="text-xs tabular-nums text-muted">
+                              {counts[v]}
+                            </span>
+                          }
+                        >
+                          {VIEW_LABEL[v]}
+                        </SideItem>
+                      ))}
                   </Fragment>
                 ))}
               </nav>
@@ -750,7 +786,6 @@ export function Bookshelf({
             {area === "overview" && (
               <Overview
                 account={account}
-                onSeeBooks={() => showShelf("active")}
                 current={current}
                 all={active}
                 books={active.length}
@@ -1032,7 +1067,6 @@ function Overview({
   chapters,
   onDetails,
   onCover,
-  onSeeBooks,
   onPrepare,
 }: {
   /** For the greeting, and only that. Null signed out or with no accounts. */
@@ -1045,8 +1079,6 @@ function Overview({
   chapters: number;
   onDetails: (b: Book) => void;
   onCover: (b: Book) => void;
-  /** Opens the shelf's own list — the three counts are counting it. */
-  onSeeBooks: () => void;
   /**
    * Goes to Prepare with this book's row already open.
    *
@@ -1132,6 +1164,20 @@ function Overview({
    * when there is nothing to put after it.
    */
   const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
+
+  /**
+   * The two shelves, and why one of them is capped and the other is not.
+   *
+   * *Recently opened* is a glance, so eight is enough — past that the row is a
+   * scroll nobody finishes and the Write area is where a full list belongs.
+   * *Favourites* is a list the writer built by hand, and truncating somebody's
+   * own shortlist is the app deciding which of their choices counted.
+   */
+  const recent = useMemo(
+    () => [...all].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 8),
+    [all],
+  );
+  const starred = useMemo(() => all.filter((b) => b.favourite), [all]);
 
   const [picked, setPicked] = useState<string | null>(null);
   const book = useMemo(
@@ -1289,6 +1335,38 @@ function Overview({
         <DeskFigure />
       </section>
 
+      {/* ---- What is on the shelf ----------------------------------------
+
+          Three cards rather than three rows in one panel. As rows they read as
+          a footnote to the book; as cards they are the row every dashboard of
+          this kind opens with, and they are the only figures on this screen
+          that are true of the whole library rather than of one manuscript. */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Figure
+          icon={shelfIcons.overview}
+          label={books === 1 ? "book" : "books"}
+          value={books.toLocaleString()}
+        />
+        <Figure
+          icon={shelfIcons.write}
+          label={nounFor(words, "word")}
+          value={words.toLocaleString()}
+        />
+        <Figure
+          icon={shelfIcons.prepare}
+          label={nounFor(chapters, "chapter")}
+          value={chapters.toLocaleString()}
+        />
+      </div>
+
+      {/* ---- The shelves --------------------------------------------------
+
+          Covers, which is the one thing on this screen a writer recognises
+          before they have read a word of it. Two rows, and the second exists
+          only when it has something in it. */}
+      <CoverShelf label="Recently opened" books={recent} />
+      <CoverShelf label="Favourites" books={starred} />
+
       {/* ---- The book, and the figures beside it --------------------------
 
           The book takes the wide column because it is what the screen is for:
@@ -1404,14 +1482,9 @@ function Overview({
               {/* Only when the writer set a goal. A bar against a target we
                   invented would be the made-up number this app keeps
                   refusing to print. */}
-              {book.targetWords ? (
-                <div className="col-span-2 min-w-0">
-                  <TargetBar
-                    words={bookWordCount(book)}
-                    target={book.targetWords}
-                  />
-                </div>
-              ) : null}
+              {/* The target used to draw a bar here. It is a gauge in the
+                  column beside this card now — one figure in one place, rather
+                  than the same percentage twice on one screen. */}
 
               {/* ---- The diagnosis, as one line -------------------------
 
@@ -1660,85 +1733,18 @@ function Overview({
       )}
         </div>
 
-        {/* The right column: what is true across the shelf, quietly.
-
-            Both panels carry a hairline *and* a shadow, which is one thing in
-            two themes rather than two decisions. In daylight the shadow is the
-            lift and the line barely shows; at night a shadow on a near-black
-            ground is invisible and the hairline is the whole of it. That is
-            the elevation rule this app already follows — see docs/styling.md
-            — and it is why neither is conditional. */}
+        {/* The right column: the book's target, the week, and the plan. */}
         <aside className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
-            {/* A heading with its own way out, the pattern the reference uses
-                for "View Report". It goes to Write, which is the list these
-                three numbers are counting — a live destination, not an
-                ornament, which is the only kind of control this house ships. */}
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
-                Your shelf
-              </h3>
-              <button
-                type="button"
-                onClick={onSeeBooks}
-                className="shrink-0 rounded-full border border-line bg-surface px-3 py-1
-                           text-xs font-semibold text-fg transition-colors
-                           hover:bg-raised focus-visible:ring-2
-                           focus-visible:ring-accent/50 focus-visible:outline-none"
-              >
-                See all
-              </button>
-            </div>
-            <dl className="mt-4 flex flex-col gap-4">
-              <Figure
-                icon={shelfIcons.overview}
-                label={books === 1 ? "book" : "books"}
-                value={books.toLocaleString()}
-              />
-              <Figure
-                icon={shelfIcons.write}
-                label={nounFor(words, "word")}
-                value={words.toLocaleString()}
-              />
-              <Figure
-                icon={shelfIcons.prepare}
-                label={nounFor(chapters, "chapter")}
-                value={chapters.toLocaleString()}
-              />
-            </dl>
-          </div>
+          {book?.targetWords ? (
+            <TargetGauge
+              words={bookWordCount(book)}
+              target={book.targetWords}
+            />
+          ) : null}
 
-          {/* Movement, kept apart from the totals: they answer different
-              questions, and the one that can be unknown is the one that says
-              so. "—" rather than 0 — the log started when it shipped, so a
-              shelf written before it has nothing in here and a zero would be
-              a lie by arithmetic. */}
-          <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
-            <div className="flex items-center gap-3.5">
-              <span
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl
-                           bg-accent/10 text-accent"
-              >
-                {shelfIcons.calendar}
-              </span>
-              <div className="min-w-0">
-                <h3 className="text-xs font-medium text-muted">This week</h3>
-                <p className="text-xl leading-tight font-extrabold tabular-nums text-fg">
-                  {logged ? week.words.toLocaleString() : "—"}
-                </p>
-              </div>
-            </div>
-            <p className="mt-3.5 text-xs leading-relaxed text-muted">
-              {logged
-                ? week.daysWritten > 0
-                  ? `${nounFor(week.words, "word")} across ${plural(
-                      week.daysWritten,
-                      "day",
-                    )}${run > 0 ? ` · ${plural(run, "day")} running` : ""}`
-                  : "nothing yet this week — that is allowed"
-                : "The log starts the first time you write here, and counts net words a day — so a day of cutting counts too. Anything already on your shelf came before it."}
-            </p>
-          </div>
+          <WeekCard activity={activity} week={week} run={run} logged={logged} />
+
+          <ProCard />
         </aside>
       </div>
 
@@ -1768,6 +1774,295 @@ function Overview({
           behind them would read that they had written nothing. Until there is a
           single logged day, this is one card that says why it is empty. */}
     </div>
+  );
+}
+
+/**
+ * A row of covers under a label, scrolling off the right edge.
+ *
+ * The one part of this dashboard that is native to the product rather than
+ * borrowed from one: a shelf of books, which is the thing a writer recognises
+ * before they have read a word of the screen.
+ *
+ * **It scrolls rather than wraps.** The clipped right edge *is* the affordance
+ * — it says there is more without spending a row saying so — and a wrapping
+ * grid of twenty-five covers would take the whole page for a glance.
+ *
+ * **Nothing at all when there is nothing in it.** A labelled band over an empty
+ * track is the dead UI this house does not ship, and it is why Favourites can
+ * be rendered unconditionally by the caller.
+ *
+ * The reference under this puts a star rating below each cover. There is no
+ * rating in this app and there will not be an invented one; the slot carries
+ * the chapter count, which is a fact.
+ */
+function CoverShelf({ label, books }: { label: string; books: Book[] }) {
+  if (books.length === 0) return null;
+
+  return (
+    <section>
+      <h2 className="text-xs font-bold tracking-widest text-muted uppercase">
+        {label}
+      </h2>
+      {/* The negative margin and matching padding keep a focus ring from being
+          clipped by the scroller it lives inside. */}
+      <ul
+        className="scroll-slim -mx-1 mt-3.5 flex snap-x snap-mandatory gap-4
+                   overflow-x-auto px-1 pb-1"
+      >
+        {books.map((book) => (
+          <li key={book.id} className="w-[104px] shrink-0 snap-start">
+            <Link
+              href={`/book/${book.id}`}
+              className="group block rounded-lg outline-none focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+            >
+              <span className="block transition-transform group-hover:-translate-y-0.5">
+                <CoverOf book={book} />
+              </span>
+              <span className="mt-2.5 line-clamp-2 block text-sm leading-snug font-medium text-fg">
+                {book.title}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted">
+                {plural(bookChapterCount(book), "chapter")}
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * The word target as a half-dial.
+ *
+ * The same figure the book card used to draw as a bar, and now the only place
+ * it appears — two readings of one percentage on one screen is two things to
+ * keep in step.
+ *
+ * All three judgements come from `lib/target.ts` and none are re-derived here:
+ * the share is floored so nothing rounds up into a claim, a non-zero count
+ * under one per cent says so in words, and `met` is asked of the words
+ * themselves. The arc turns green only on `met`, which is the house rule that
+ * green is the verdict for having arrived rather than a colour for 94%.
+ */
+function TargetGauge({ words, target }: { words: number; target: number }) {
+  const { share, label, met } = targetShare(words, target);
+
+  /* A half circle of radius 60 centred at (70, 70): the arc runs left to right
+     over the top, so its length is pi times r, and the dash is the part
+     written. Stroke-based rather than a filled wedge, because a stroke can be
+     rounded at both ends and a wedge cannot. */
+  const length = Math.PI * 60;
+  const drawn = (share / 100) * length;
+  const remaining = Math.max(0, target - words);
+
+  return (
+    <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
+      <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
+        Target
+      </h3>
+
+      <div className="relative mx-auto mt-3 w-[140px]">
+        <svg viewBox="0 0 140 78" className="w-full" aria-hidden="true">
+          <path
+            d="M10 70a60 60 0 0 1 120 0"
+            fill="none"
+            strokeWidth="12"
+            strokeLinecap="round"
+            className="stroke-raised"
+          />
+          <path
+            d="M10 70a60 60 0 0 1 120 0"
+            fill="none"
+            strokeWidth="12"
+            strokeLinecap="round"
+            strokeDasharray={`${drawn} ${length}`}
+            className={met ? "stroke-ok-fg" : "stroke-accent"}
+          />
+        </svg>
+        {/* The figure sits in the dial's mouth rather than on the arc, so a
+            long label has the full width and never rides the stroke. */}
+        <p
+          className={`absolute inset-x-0 bottom-0 text-center text-2xl font-extrabold ${
+            met ? "text-ok-fg" : "text-fg"
+          }`}
+        >
+          {label}
+        </p>
+      </div>
+
+      <p
+        role="progressbar"
+        aria-label="Word target progress"
+        aria-valuemin={0}
+        aria-valuemax={target}
+        aria-valuenow={Math.min(words, target)}
+        className="mt-3 flex items-baseline justify-between text-xs"
+      >
+        <span className="font-semibold tabular-nums text-fg">
+          {words.toLocaleString()}
+        </span>
+        <span className="tabular-nums text-muted">
+          {met ? "target met" : `${remaining.toLocaleString()} to go`}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The week, with the fortnight behind it.
+ *
+ * The figure alone answered "how much"; the line under it answers "how
+ * steadily", which is the question a writer with seventeen minutes a day
+ * cannot answer from the inside. `recentDays` hands back fourteen entries with
+ * the days off included as zeroes, which is what makes the gaps in the line
+ * mean something.
+ *
+ * **Scaled to its own busiest day, not to a fixed ceiling.** A writer of three
+ * hundred words a day and one of three thousand should both see shape —
+ * `heatLevel` in `activity.ts` takes the same view of the month grid, and for
+ * the same reason.
+ *
+ * **A day of cutting is real work and the page says so**, but it cannot sit on
+ * a scale that runs upward for more, so the line is drawn off the positive days
+ * and a negative one reads as a trough at the floor rather than off the bottom.
+ *
+ * **"—" rather than 0 when nothing is logged.** The day log started when it
+ * shipped, so a shelf written before it has nothing in here and a zero would be
+ * a lie by arithmetic. The card says why in place of the chart.
+ */
+function WeekCard({
+  activity,
+  week,
+  run,
+  logged,
+}: {
+  activity: Activity;
+  week: Pace;
+  run: number;
+  logged: boolean;
+}) {
+  const days = useMemo(() => recentDays(activity, 14), [activity]);
+  const busiest = useMemo(
+    () => days.reduce((most, d) => Math.max(most, d.words), 0),
+    [days],
+  );
+
+  const points = useMemo(
+    () =>
+      days
+        .map((d, i) => {
+          const x = (i / (days.length - 1)) * 100;
+          const y = busiest > 0 ? 30 - (Math.max(0, d.words) / busiest) * 26 : 30;
+          return `${x.toFixed(2)},${y.toFixed(2)}`;
+        })
+        .join(" "),
+    [days, busiest],
+  );
+
+  return (
+    <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3.5">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
+            {shelfIcons.calendar}
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-xs font-medium text-muted">This week</h3>
+            <p className="text-xl leading-tight font-extrabold tabular-nums text-fg">
+              {logged ? week.words.toLocaleString() : "—"}
+            </p>
+          </div>
+        </div>
+        {/* The reference puts a month picker here. There is no month to pick:
+            the log holds what it holds, so the window is stated rather than
+            offered. */}
+        {logged && (
+          <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-muted">
+            14 days
+          </span>
+        )}
+      </div>
+
+      {logged ? (
+        <>
+          <svg
+            viewBox="0 0 100 32"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            className="mt-4 h-16 w-full"
+          >
+            <polygon points={`0,32 ${points} 100,32`} className="fill-accent/10" />
+            <polyline
+              points={points}
+              fill="none"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              vectorEffect="non-scaling-stroke"
+              className="stroke-accent"
+            />
+          </svg>
+          <p className="mt-2 text-xs leading-relaxed text-muted">
+            {week.daysWritten > 0
+              ? `${nounFor(week.words, "word")} across ${plural(
+                  week.daysWritten,
+                  "day",
+                )}${run > 0 ? ` · ${plural(run, "day")} running` : ""}`
+              : "nothing yet this week — that is allowed"}
+          </p>
+        </>
+      ) : (
+        <p className="mt-3.5 text-xs leading-relaxed text-muted">
+          The log starts the first time you write here, and counts net words a
+          day — so a day of cutting counts too. Anything already on your shelf
+          came before it.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * What Pro adds, for somebody who is not on it.
+ *
+ * **Shown to nobody who is already paying, and nobody who cannot pay** — no
+ * gateway configured means nothing is for sale and nothing is held back, which
+ * is the rule the whole billing layer follows.
+ *
+ * The gradient is the documented exception to the one-hue rule (`upgrade-from`
+ * / `upgrade-to`, declared identically in both themes because this is a *fill*:
+ * following the chrome would put a white slab across a black screen at night).
+ * It is the same block `LimitBanner` uses, so the app has one shape for this
+ * and not two.
+ *
+ * Every number is read from `LAUNCH_LIMITS` rather than written out, so the
+ * card cannot drift from what the plan actually sells.
+ */
+function ProCard() {
+  const plan = usePlan();
+  if (plan.loading || !plan.billing || plan.pro) return null;
+
+  return (
+    <section className="rounded-2xl bg-linear-to-r from-upgrade-from to-upgrade-to p-5">
+      <h3 className="text-base font-bold text-white">Room for the next book</h3>
+      <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+        Pro takes the shelf from {plural(LAUNCH_LIMITS.freeBooks, "book")} to
+        unlimited, the assistant from{" "}
+        {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies a month to{" "}
+        {LAUNCH_LIMITS.proAssistantRepliesPerMonth}, and adds EPUB and PDF
+        export.
+      </p>
+      <Link
+        href="/upgrade"
+        className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-upgrade-ink"
+      >
+        See what Pro adds
+      </Link>
+    </section>
   );
 }
 
@@ -2113,69 +2408,11 @@ function FixLink({
   );
 }
 
-/**
- * Words against the goal the writer set.
- *
- * Capped at 100% so a book that overshoots does not draw a bar out of its own
- * box, and it says the raw pair as well as the percentage — a writer past their
- * target wants to see by how much, not a full bar that stops telling them
- * anything.
- */
-function TargetBar({ words, target }: { words: number; target: number }) {
-  /* **Rounded down, and the verdict read off the words rather than the
-     percentage.** This was `Math.round`, which is wrong at both ends of the
-     bar. At the bottom it turned every early session into "0% of target" — 215
-     words into a 110,000-word novel is 0.195%, and a writer who has just
-     written a page being told they are at nought is the app failing to count
-     what it asked them to do. At the top it was worse: 99.6% rounds to 100, so
-     a book *short* of its target printed "100% of target" in the green that is
-     kept for having got there. A number that rounds up into a claim is the one
-     kind this screen must not print.
-
-     So the figure only ever understates, and `met` asks the question directly
-     — the words against the target, not the percentage they were flattened
-     into. Guarded against a target of nought, which would divide to Infinity. */
-  const exact = target > 0 ? (words / target) * 100 : 0;
-  const share = Math.max(0, Math.min(100, Math.floor(exact)));
-  const met = target > 0 && words >= target;
-
-  /* Under one per cent is said in words. Rounding down is honest and "0%" is
-     not: it reads as *nothing counted*, which is a different fact from *a
-     little counted*, and the writer it is shown to has just written the
-     little. */
-  const label = words > 0 && share === 0 ? "under 1%" : `${share}%`;
-
-  // The bar is the accent while it is a *measure* and turns green once the
-  // target is met, because at that point it stops measuring and becomes a
-  // verdict — which is the one thing green is kept for here. Reaching a target
-  // you set yourself is the rarest good news on this screen and it should not
-  // look like 94%.
-  return (
-    <div className="mt-4 w-full max-w-none sm:mt-3.5 sm:max-w-sm">
-      <div className="flex items-baseline justify-between text-xs">
-        <span className={`font-semibold ${met ? "text-ok-fg" : "text-fg"}`}>
-          {label} of target
-        </span>
-        <span className="text-muted">
-          {words.toLocaleString()} of {target.toLocaleString()}
-        </span>
-      </div>
-      <div
-        role="progressbar"
-        aria-label="Word target progress"
-        aria-valuemin={0}
-        aria-valuemax={target}
-        aria-valuenow={Math.min(words, target)}
-        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-raised"
-      >
-        <div
-          className={`h-full rounded-full ${met ? "bg-ok-fg" : "bg-accent"}`}
-          style={{ width: `${share}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+// `TargetBar` is gone, and its arithmetic is not: the flooring, the "under 1%"
+// and the verdict read off the words rather than the percentage all moved to
+// `lib/target.ts`, where they are tested and where `TargetGauge` reads them.
+// The bar had one caller — the book card on this screen — and the gauge in the
+// column beside it replaced that. The Progress tool draws its own.
 
 function Write({
   visible,
@@ -3471,57 +3708,10 @@ function SideItem({
   );
 }
 
-/**
- * One of the shelf's four lists, in the rail under Write.
- *
- * A quieter row than `SideItem` by design — smaller, indented, and its count
- * set in the muted colour — because these are scopes of the area above rather
- * than areas themselves, and a rail where everything shouts has no hierarchy
- * at all. The indent lines the label up with the icons above it, so the four
- * read as a list hanging off Write rather than four more top-level rows.
- *
- * **The count is always shown, zero included.** "Archived 0" is an answer;
- * hiding the row until something is archived would mean the rail changes shape
- * as a writer works, and the one time they go looking for the archive is the
- * time it would not be there.
- */
-function SideShelfView({
-  icon,
-  count,
-  active,
-  onClick,
-  children,
-}: {
-  icon: ReactNode;
-  count: number;
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={`flex min-h-9 items-center gap-2.5 rounded-lg py-1.5 pr-2.5 pl-[1.375rem]
-         text-left text-[0.8125rem] transition-colors ${
-           active
-             ? "bg-accent/10 font-medium text-accent"
-             : "text-muted hover:bg-raised hover:text-fg"
-         }`}
-    >
-      <span className="[&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-      <span className="mr-auto truncate">{children}</span>
-      {/* Tabular figures so 0, 25 and 26 sit on one right edge rather than
-          shuffling as the shelf changes. */}
-      <span
-        className={`text-xs tabular-nums ${active ? "text-accent/80" : "text-muted/70"}`}
-      >
-        {count}
-      </span>
-    </button>
-  );
-}
+// `SideShelfView` is gone. It was a second, quieter rail row for the shelf's
+// lists, and the lists turned out to be rows like any other — `SideItem` with
+// its `badge` slot carrying the count. One component for every row in the rail
+// again.
 
 // `SideGroup` is gone with the Extras group it labelled. The rail is one list
 // and a footer again, so nothing needs naming.
