@@ -209,6 +209,12 @@ export const shelfIcons = {
       <path d="M7.5 7.5v.01" />
     </Svg>
   ),
+  billing: (
+    <Svg>
+      <rect x="2" y="5" width="20" height="14" rx="2" />
+      <path d="M2 10h20" />
+    </Svg>
+  ),
   target: (
     <Svg>
       <circle cx="12" cy="12" r="9" />

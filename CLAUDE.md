@@ -19,6 +19,32 @@ why, what each feature deliberately refuses to do, and what was ruled out
 (marketplaces, AI covers, AI editing) so it is not re-proposed. Read it before
 proposing a feature or rebuilding something that looks missing.
 
+## The launch MVP is smaller than this file — read `src/lib/launch.ts` first
+
+**As of 2026-08-22 the shipped product is a gate over the codebase this file
+describes.** Most of what follows is built, tested and *currently unreachable*.
+Nothing below is stale as a description of the code; it is stale as a
+description of what a writer can open. Check `src/lib/launch.ts` before
+assuming a screen or a route is live.
+
+- **`src/lib/launch.ts` is the one statement of what the MVP sells** — prices,
+  free/Pro limits, and `HIDDEN_BOOK_TOOL_PATHS`, the sixteen segments the proxy
+  redirects home. `/tools` and `/invite/*` go home with them. Its sibling
+  `launch-server.ts` is the API half: `launchFeatureEnabled()` gates a route and
+  `hiddenLaunchApiResponse()` answers **404** rather than 501 or 402.
+- **The flag is off by default and inverted.** `launchFeatureEnabled()` is
+  `process.env.OPENCHAPTER_LAUNCH_MVP === "0"` — unset means the full product is
+  hidden. It is **not in `.env.local.example`**, which is the one exception to
+  that file being the canonical env list.
+- **What is live**: the shelf, `/book/new`, `/book/import`, the editor,
+  `/book/[bookId]/export`, the assistant, upgrade/billing and the legal pages.
+  **What is gated**: every model route including the two comps routes this file
+  calls free and keyless, `/api/narrate`, `/api/transcribe`, and the fifteen
+  other tool screens.
+- **`LAUNCH_POST_BACKLOG` is the list of what comes back**, in the order it is
+  meant to. Adding a feature to the MVP means taking it off both that list and
+  `HIDDEN_BOOK_TOOL_PATHS`, not deleting the gate.
+
 ## Where the detail lives
 
 This file is the map and the rules. The reasoning behind each area — what was
@@ -39,6 +65,7 @@ is the thing to read **before changing that area**, not after.
 | Sharing a book, roles, RLS, seats, invitations, email | `docs/architecture/collaboration.md` |
 | Paddle/PayHere, plans, free limits, upgrade UI, legal pages | `docs/architecture/billing.md` |
 | Landing page, `/tools` guide, any public claim | `docs/architecture/landing.md` |
+| Phone/tablet layout, the writing dock, visual-viewport variables | `docs/plans/2026-08-22-responsive-application-design.md` |
 | Colours, themes, tokens, `src/components/ui/` | `docs/styling.md` |
 | Tests — what is covered, and which ones must not be "fixed" | `docs/testing.md` |
 | `next.config.ts` | `docs/architecture/build-config.md` |
@@ -65,7 +92,7 @@ policies. Read the relevant one before reworking any of them.
   product shots from raw captures kept outside the repo. A one-shot tool, not
   part of the build.
 
-The suite is 91 files / ~1,803 tests and takes about a minute; jsdom prints
+The suite is 99 files / ~1,885 tests and takes about two minutes; jsdom prints
 `HTMLCanvasElement's getContext()` warnings from the image recoder and they are
 expected, not failures. Tests live beside their subjects as `*.test.ts` and
 cover the pure logic only — components are not tested, and jsdom is there for
@@ -88,9 +115,10 @@ things it used to cost, worth knowing if one reappears: `git add .` commits
 thousands of bundled files, and `npm run lint` reports thousands of problems —
 `src/` lints clean, so a large number is noise rather than news.
 
-Every environment variable is optional and every one of them is documented, with
-its failure mode, in `.env.local.example`. That file is the canonical list —
-read it rather than grepping for `process.env`.
+Every environment variable is optional and all but one are documented, with
+their failure modes, in `.env.local.example`. That file is the canonical list —
+read it rather than grepping for `process.env`. The exception is
+`OPENCHAPTER_LAUNCH_MVP`, which is missing from it and should be added.
 
 ## Stack
 
@@ -243,8 +271,10 @@ empty result is never rendered as a good one** unless the search actually ran.
 server-side for a shared cache and to keep a reader's browser off two third
 parties. Records merge **field by field** on ISBN, or title-plus-author.
 **The manuscript never goes** — what leaves is a query. `/api/comps` and
-`/api/comps/subjects` are **free, keyless, and stay that way**; that is the
-whole reason the model steps are separate routes rather than flags on them.
+`/api/comps/subjects` are **free, keyless, and stay that way** by design; that
+is the whole reason the model steps are separate routes rather than flags on
+them. (Both are behind the launch flag today and answer 404 — a temporary gate
+over the design, not a change to it.)
 
 - `openLibraryQuery()` translates dialects: Google wants `intitle:`, Open
   Library wants `title:`, and **Open Library answers an unknown prefix with zero
@@ -320,6 +350,23 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   question and must leave the book's first-line indent alone. `caret-scroll.ts`
   is the other pure one — move the view only when the caret would leave it, and
   then only as far as the edge.
+- **One editor, two presentations, and the surface never remounts between
+  them.** `lib/editor/editor-layout.ts` is the pure classifier: `continuous`
+  below 768px wide *or* below 560px high while narrower than 1024px, `paged`
+  everywhere else; the tool rail is persistent from 1024px and the book
+  navigator from 1280px. **The mode is never part of the surface key** — it
+  classifies the space, not the device, and a resize must not cost a keystroke.
+  `mobile-editor-header.tsx`, `mobile-writing-dock.tsx` and
+  `mobile-more-controls.tsx` are the continuous chrome, and they reuse the same
+  Tiptap command components as the desktop rail rather than a second copy.
+- **`use-visual-viewport.ts` publishes the keyboard, `ViewportController`
+  mounts it.** It watches `window.visualViewport`, falls back to the layout
+  viewport, and writes visual height/offset/keyboard-inset CSS variables in one
+  animation-frame DOM write — **no React state per keyboard frame**. It sits in
+  the root layout with `ThemeSync` and `LibrarySync` for the same reason they
+  do. `ui/responsive-panel.tsx` is the one overlay primitive over native
+  `<dialog>` (sheet or full-screen when continuous, right drawer when paged),
+  so focus trap, Escape and focus restoration are the platform's job.
 - **The editor and the book overview mount the *same three parts*** — rail, tool
   panel, book panel — so a change lands on both screens at once. The overview
   differs only in having no manuscript. **The panes live in the pages rather
@@ -471,7 +518,11 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. **All seven are applied live** as of 2026-08-20 —
+  dashboard. There are **eight**; the first seven were applied live as of
+  2026-08-20 and the eighth
+  (`20260822071735_launch_mvp_entitlements.sql` — `ai_usage`, the assistant
+  claim/refund RPCs and the free-book trigger) has not been confirmed here, so
+  check before blaming a 502 from the assistant on the route —
   `20260801000000_feedback.sql` had been outstanding since it was written and
   the feedback dialog failed for every writer until it went in, and
   `20260820000000_chapter_unnumbered.sql` landed the same day. Check rather than
@@ -521,6 +572,23 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 - **Only the webhook grants Pro.** `authenticated` has no insert or update grant
   on `subscriptions`; both notify routes use the secret key. A return_url proves
   nothing, so `/upgrade/done` polls and Paddle's button has no success handler.
+- **`/billing` is the account seen from the money side** — plan, card, assistant
+  usage, invoices, and cancellation last so nobody lands on it by accident. It
+  is display only. Two rules hold it together: the **status column is read from
+  the gateway's own words** (`billing/history.ts`, pure and tested — an
+  unrecognised status is shown as itself and **never as "Paid"**), and the
+  **View link is a redirect** (`/api/billing/invoice/[id]` checks the row is the
+  caller's, then 302s to Paddle's short-lived PDF) so no signed document URL is
+  ever in the page source.
+- **Paddle's client config is read on the server and passed down**, on `/billing`
+  as on `/upgrade`. Read inside a client component `PADDLE_ENV` is `undefined` —
+  it carries no NEXT_PUBLIC_ prefix — so the config there always answered
+  `sandbox`, and Paddle.js will not start with a live token against the sandbox:
+  the Update button opened nothing, in production as much as locally. The second
+  half of that fix is `paddleSandboxFrom()`, which falls back to what the
+  credentials say about themselves (`pdl_live_…`, `live_…`) when `PADDLE_ENV`
+  says nothing. **An explicit `PADDLE_ENV` still decides**, so a machine that
+  wants sandbox against live keys sets it.
 - **The notification is verified before it is believed**, and Paddle's check
   reads the **raw text, not the parsed body**.
 - **A cancel goes to the gateway first and our table second**, and Paddle is sent
@@ -530,15 +598,34 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 - **Neither checkout lets the browser say what it is buying** — the transaction
   is created server-side, so the price comes from `plans.ts` and the buyer's id
   from their own session.
-- Prices live once in `plans.ts` ($9.99 monthly, $89.99 a year — 25% off, and the
-  annual is twelve times the printed per-month figure, with a test on it). **A
-  price change is three edits**: this table, two *new* prices in Paddle's
-  catalog, and the resulting env ids.
-- **What is free is what a book needs to exist and leave** — unlimited books,
-  words, chapters and imports, every export that ships, sync, the pre-upload
-  check, and the roadmap. **Export must never move behind the plan**; every
-  competitor charges for formatting.
-- **`free-limits.ts` is the whole of the metering policy**, in four shapes:
+- Prices live once in `plans.ts` (**$5.98 monthly, $53.99 a year** at the launch
+  MVP — 25% off, displayed as about $4.50/month, and the per-month figure is
+  divided from the total rather than typed, with a test on it). `launch.ts`
+  carries the same two figures for the marketing copy. **A price change is three
+  edits**: this table, two *new* prices in Paddle's catalog (never an edit of a
+  live one), and the resulting env ids.
+- **The launch MVP charges for what the earlier plan gave away, and the two
+  policies are both in the tree.** What is free now is **one book**, unlimited
+  words and chapters, imports, sync, and **Word export only**; Pro buys
+  unlimited books, EPUB and PDF, and sixty assistant replies a month against
+  five. The old rule — *export must never move behind the plan* — is the one
+  this reversed deliberately, so do not "restore" it from this file; if it is
+  revisited, `LAUNCH_LIMITS.freeExports` is the single edit.
+- **What the launch MVP meters, it meters on the server**, because it costs
+  model time: `billing/launch-entitlements.ts` claims an assistant reply through
+  the `claim_assistant_reply` RPC against the `ai_usage` table (UTC calendar
+  month, **402** unpaid / **429** Pro, and a `refund()` if the reply never
+  lands), `requireLaunchExport()` gates EPUB and PDF, and the free book limit is
+  a **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
+  count. `new-book-form.tsx` mirrors it in the UI; the trigger is what enforces
+  it.
+- **`free-limits.ts` is the earlier metering policy and most of it is asleep** —
+  every tool it gates is one the launch MVP hides, so the seats row is the only
+  one on a live path (`ShareDialog` still opens from the editor and the
+  Collaborators area, while **`/invite/[token]` redirects home**, which is worth
+  knowing before debugging an invite that cannot be accepted). It stays because
+  it is the design to return to, and its four shapes are still the house rule
+  for anything metered in the browser:
 
   | Shape | Tools | Free |
   |---|---|---|
@@ -559,8 +646,9 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   limit with no book.
 - **These are browser gates and are honest about it** — the routes that cost
   money are gated by `requirePro()` on the server (401 signed out, **402** signed
-  in and unpaid, three different messages). Do not add a Pro row whose value
-  depends on a browser gate being unbreakable.
+  in and unpaid, three different messages), and under the launch MVP by
+  `launchFeatureEnabled()` ahead of it. Do not add a Pro row whose value depends
+  on a browser gate being unbreakable.
 - **Four legal pages exist because a gateway reviews the site signed out** — they
   are in `PUBLIC_EXACT` in `src/proxy.ts`, and `src/lib/legal.ts` states each
   fact once. **The privacy page names every route that sends anything**, so
@@ -568,9 +656,14 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 
 ### The landing page — `docs/architecture/landing.md`
 
-`src/components/landing/landing-page.tsx` is a Server Component; `/tools` is the
+**`mvp-landing-page.tsx` is what a signed-out visitor actually gets**; it sells
+the smaller product and reads `LAUNCH_LIMITS` so the copy cannot drift from the
+gate. `landing-page.tsx` is the fuller sixteen-tool page beside it, still built
+and tested and currently mounted by nothing — the same standing as the other
+finished-but-unreachable code below. Both are Server Components. `/tools` is the
 second marketing page, over the pure `tool-guide.ts`, and a test walks
-`ALL_TOOLS` so a tool cannot ship as a heading over an empty column.
+`ALL_TOOLS` so a tool cannot ship as a heading over an empty column — **the
+proxy redirects it home under the launch flag**.
 
 - **Every claim has to be true of the code**, and everything countable is
   imported and counted (`STEPS`, `PHASES`, `ALL_TOOLS`, `DESTINATIONS`, prices
@@ -596,13 +689,18 @@ second marketing page, over the pure `tool-guide.ts`, and a test walks
 
 ### The app shell and the small pure modules — `docs/architecture/app-shell-and-modules.md`
 
-**The root layout carries three things no screen owns**, because all three are
-facts about the app rather than about whichever screen noticed them: `ThemeSync`
+**The root layout carries four things no screen owns**, because all of them are
+facts about the app rather than about whichever screen noticed them:
+`ViewportController` (the visual-viewport CSS variables, see the editor
+section), `ThemeSync`
 (applies `[data-theme]`, listens to `prefers-color-scheme` while the pref is
 "system", runs the one-time theme migration), `LibrarySync` (runs
 `syncWithServer()` once per mount, flushes queued pushes on `visibilitychange`,
-and calls `askToPersist()`), and `StorageAlert`. There is no splash screen and
-one must not be reintroduced to cover a load that is already instant.
+and calls `askToPersist()`), and `StorageAlert`. **There is no splash screen and
+one must not be reintroduced** to cover a load that is already instant —
+`AppLoader` held every route but `/` for a second so a logo animation could
+play, and it is gone. `loading-screen.tsx` survives it and is a plain spinner:
+fine where a screen genuinely has nothing yet, never on a timer.
 
 **The small pure modules are where the conventions of the trade live**, kept out
 of components so they can be tested and changed in one place: `book-kinds.ts`,
@@ -630,7 +728,10 @@ other's screen first; with no Supabase configured everyone gets the dashboard ·
 `/auth/confirm` (the far end of any emailed link) · `/tools` the tool guide
 (public, and public is the point) · `/upgrade` plans (public — a price is read
 before an account exists) · `/upgrade/checkout/[orderId]` → a form POST straight
-to PayHere · `/upgrade/done` PayHere's return_url, which polls · `/privacy` ·
+to PayHere · `/upgrade/done` PayHere's return_url, which polls · `/billing` the
+plan, payment method, assistant usage and invoice list (signed in only; display
+only — the subscription row is written by the webhook and nothing else) ·
+`/privacy` ·
 `/terms` · `/refunds` · `/contact` (public, and public is the point) ·
 `/book/new` · `/book/import` · `/book/[bookId]` book overview (lands here, not
 on a chapter) · `/book/[bookId]/chapter/[chapterId]` editor ·
@@ -640,14 +741,21 @@ makes the link a pointer rather than a credential).
 The sixteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`,
 `title-check` · `structure`, `prose`, `progress`, `provenance` · `money`,
-`track`, `arc` — grouped there the way `book-tools.ts` groups them.
+`track`, `arc` — grouped there the way `book-tools.ts` groups them. **Under the
+launch flag the proxy redirects all of them home but `export`**, along with
+`/book/[bookId]/read`, `/tools` and `/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS`
+in `launch.ts` is the list.
 
 **API routes:** `/api/chat` · `/api/narrate` · `/api/transcribe` · `/api/comps` ·
 `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
 `/api/comps/categories` · `/api/comps/keywords` · `/api/comps/keywords/chat` ·
 `/api/blurb/critique` · `/api/blurb/workshop` · `/api/export/pdf` ·
-`/api/billing/*`. All except `/api/comps`, `/api/comps/subjects` and
-`/api/export/pdf` are metered and gated by `requirePro()`. The first two are
+`/api/billing/*` (`subscription`, `cancel`, `resume`, `history`, `notify`,
+`paddle/checkout`, `paddle/notify`, `paddle/update-payment-method`). All except
+`/api/comps`, `/api/comps/subjects` and `/api/export/pdf` are metered and gated
+by `requirePro()`. **Under the launch flag every model route answers 404
+first**, the two free comps routes included — the paragraph below describes the
+design, not what is currently reachable. The first two are
 free, keyless and stay that way; the third is free **on purpose and for good** —
 export must never move behind the plan — but it is not anonymous, since it
 launches a browser on markup a caller supplied: it takes `requireSignedIn`

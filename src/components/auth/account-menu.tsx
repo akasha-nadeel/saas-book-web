@@ -425,6 +425,12 @@ function MenuBody({
           Plans &amp; pricing
         </MenuLink>
 
+        {plan.signedIn && (
+          <MenuLink href="/billing" onSelect={() => onClose(false)} icon={icons.billing}>
+            Billing
+          </MenuLink>
+        )}
+
         {plan.canCancel &&
           (confirming ? (
             <div className="px-2.5 py-2">
@@ -619,6 +625,13 @@ const icons = {
         strokeLinejoin="round"
       />
       <circle cx="6.6" cy="6.6" r="1.1" />
+    </svg>
+  ),
+  billing: (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2.5" y="4" width="15" height="12" rx="2" strokeLinejoin="round" />
+      <path d="M2.5 8.5h15" strokeLinecap="round" />
+      <path d="M6 12.5h3" strokeLinecap="round" />
     </svg>
   ),
   cancel: (

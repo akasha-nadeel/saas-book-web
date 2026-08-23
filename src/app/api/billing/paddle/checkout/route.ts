@@ -3,9 +3,12 @@ import {
   PADDLE_API_KEY,
   PADDLE_SANDBOX,
   isPaddleConfigured,
+  isPaddleSetupFault,
+  paddleErrorCode,
   paddlePriceId,
 } from "@/lib/billing/paddle";
 import { asPeriod, priceOf } from "@/lib/billing/plans";
+import { CONTACT_EMAIL } from "@/lib/legal";
 import { currentSubscription } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -73,7 +76,33 @@ export async function POST(request: Request) {
       customData: { userId, period },
     });
   } catch (error) {
-    console.error("[billing] paddle would not create a transaction", error);
+    // The code is logged next to the error because it is the part an operator
+    // acts on, and Paddle's `detail` says exactly what to go and change.
+    console.error("[billing] paddle would not create a transaction", {
+      code: paddleErrorCode(error),
+      error,
+    });
+
+    /*
+     * Two different failures, and they must not share a sentence.
+     *
+     * A live account with valid keys and active prices still refuses every
+     * transaction until a default payment link is set in the Paddle dashboard
+     * — `transaction_default_checkout_url_not_set`. Answering that with "try
+     * again shortly" is a claim the code cannot back: it will fail the same way
+     * for as long as the setting is missing, and a writer pressing Upgrade
+     * again is being sent nowhere. Nothing about the account's configuration
+     * goes back to them, only the fact that it is not theirs to retry.
+     */
+    if (isPaddleSetupFault(error)) {
+      return Response.json(
+        {
+          error: `Checkout isn't available yet. Nothing was charged — please let us know at ${CONTACT_EMAIL}.`,
+        },
+        { status: 503 },
+      );
+    }
+
     return Response.json(
       { error: "Could not start the checkout. Try again shortly." },
       { status: 502 },
