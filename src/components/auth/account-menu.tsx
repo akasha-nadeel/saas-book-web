@@ -292,37 +292,16 @@ function MenuBody({
   plan: ReturnType<typeof usePlan>;
   onClose: (returnFocus?: boolean) => void;
 }) {
-  const { refresh } = plan;
-
-  // One press from irreversible, so it is two: the item turns into its own
-  // confirmation in place rather than opening a dialog over the menu.
-  const [confirming, setConfirming] = useState(false);
-  const [working, setWorking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function cancel() {
-    setWorking(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/api/billing/cancel", { method: "POST" });
-      const data = (await response.json().catch(() => null)) as {
-        error?: string;
-      } | null;
-
-      if (!response.ok) {
-        setError(data?.error ?? "Could not cancel. Try again in a moment.");
-        return;
-      }
-
-      setConfirming(false);
-      refresh();
-    } catch {
-      setError("Could not reach the server. Try again in a moment.");
-    } finally {
-      setWorking(false);
-    }
-  }
+  /*
+   * Cancelling is not offered here.
+   *
+   * It lived in this menu when there was nowhere else to put it, and a menu is
+   * the wrong place for it: it sits one slip away from Sign out, and the two
+   * presses that guard it happened inside a popover with the shelf still
+   * running behind. `/billing` is where the plan, the card and the invoices
+   * already are, so the way out belongs at the foot of that page, under
+   * everything it undoes. The Billing row below is the whole of the path.
+   */
 
   if (!account?.email) {
     return (
@@ -431,48 +410,6 @@ function MenuBody({
           </MenuLink>
         )}
 
-        {plan.canCancel &&
-          (confirming ? (
-            <div className="px-2.5 py-2">
-              <p className="font-sans text-xs leading-relaxed text-muted">
-                You keep Pro until {until ?? "the end of the paid period"}.
-                Nothing is deleted.
-              </p>
-              <div className="mt-2 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={cancel}
-                  disabled={working}
-                  className="rounded-md border border-line px-2.5 py-1 font-sans
-                             text-xs font-medium text-fg outline-none
-                             transition-colors hover:bg-raised
-                             focus-visible:ring-2 focus-visible:ring-accent/50
-                             disabled:opacity-60"
-                >
-                  {working ? "Cancelling…" : "Yes, cancel"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConfirming(false)}
-                  className="font-sans text-xs text-muted underline
-                             underline-offset-2 outline-none hover:text-fg
-                             focus-visible:ring-2 focus-visible:ring-accent/50"
-                >
-                  Keep it
-                </button>
-              </div>
-              {error && (
-                <p role="alert" className="mt-2 font-sans text-xs text-muted">
-                  {error}
-                </p>
-              )}
-            </div>
-          ) : (
-            <MenuButton onSelect={() => setConfirming(true)} icon={icons.cancel}>
-              Cancel subscription
-            </MenuButton>
-          ))}
-
         <Rule className="my-1.5" />
 
         {/* Theme, here rather than as a row of its own in the sidebar.
@@ -538,23 +475,6 @@ function MenuLink({
       <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
       {children}
     </Link>
-  );
-}
-
-function MenuButton({
-  onSelect,
-  icon,
-  children,
-}: {
-  onSelect: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <button type="button" role="menuitem" onClick={onSelect} className={ITEM}>
-      <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
-      {children}
-    </button>
   );
 }
 
@@ -632,12 +552,6 @@ const icons = {
       <rect x="2.5" y="4" width="15" height="12" rx="2" strokeLinejoin="round" />
       <path d="M2.5 8.5h15" strokeLinecap="round" />
       <path d="M6 12.5h3" strokeLinecap="round" />
-    </svg>
-  ),
-  cancel: (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="10" cy="10" r="7.2" />
-      <path d="m5.4 5.4 9.2 9.2" strokeLinecap="round" />
     </svg>
   ),
   signOut: (
