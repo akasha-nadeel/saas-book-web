@@ -749,6 +749,7 @@ export function Bookshelf({
 
             {area === "overview" && (
               <Overview
+                account={account}
                 current={current}
                 all={active}
                 books={active.length}
@@ -1022,6 +1023,7 @@ const PHASE_STATE: Record<Phase, string> = {
 };
 
 function Overview({
+  account,
   current,
   all,
   books,
@@ -1031,6 +1033,8 @@ function Overview({
   onCover,
   onPrepare,
 }: {
+  /** For the greeting, and only that. Null signed out or with no accounts. */
+  account: Account | null;
   current: Book | null;
   /** Every active book, for the things that are only true across the shelf. */
   all: Book[];
@@ -1104,11 +1108,46 @@ function Overview({
    * and with seven books on the shelf the one most recently opened is often
    * not the one with the problem.
    */
+  /**
+   * Morning, afternoon or evening — and not until the browser can say.
+   *
+   * The server has no idea what o'clock it is where the writer is, so a clock
+   * read during the server render is a guess that React then swaps out from
+   * under them on hydration. `useHydrated` is the flag this file already keeps
+   * for exactly that shape of question, so the greeting is neutral in the
+   * server's markup and specific the moment the client owns the page.
+   */
+  const greeting = useGreeting();
+
+  /**
+   * The first name, and only if a provider gave us one.
+   *
+   * An email address is not a name — greeting somebody as
+   * "kha.akashanadeel@gmail.com" is worse than greeting them as nobody — so
+   * `account.name` is the only source, and the band simply drops the comma
+   * when there is nothing to put after it.
+   */
+  const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
+
   const [picked, setPicked] = useState<string | null>(null);
   const book = useMemo(
     () => all.find((b) => b.id === picked) ?? current,
     [all, picked, current],
   );
+
+  /**
+   * The one line under the greeting, and it reports rather than cheers.
+   *
+   * A band like this usually carries a slogan. What a writer opening the app
+   * wants from it is where they left off, so that is what it says — the book
+   * and when it was last open, or, on an empty shelf, the plain fact of that.
+   * Nothing here is computed to sound encouraging.
+   */
+  const standing = current
+    ? `Last open: ${current.title}, ${relativeTime(current.lastOpenedAt)}.`
+    : settled
+      ? "Nothing on the shelf yet. Start one, or bring in a manuscript you already have."
+      : "Fetching your shelf…";
 
   /**
    * What Prepare will actually show for this book.
@@ -1194,6 +1233,88 @@ function Overview({
 
   return (
     <div className="flex flex-col gap-5">
+      {/* ---- The band ----------------------------------------------------
+
+          One filled strip at the top, and the only place on this screen that
+          spends the accent. That is the whole argument for it: the rule is
+          that a hue means "this is the way forward", so a coloured band is
+          allowed exactly where the way forward is — starting a book, or
+          bringing one in — and nowhere else. The tiles below stay on panel
+          and a hairline, because four differently tinted cards would be four
+          hues meaning nothing.
+
+          No illustration. The reference this follows carries a stock drawing
+          of an office, and the house rule for figures is that they are drawn
+          in markup and true of the code; a picture of strangers at a desk is
+          neither. The greeting and the writer's own name are the warmth. */}
+      <section className="rounded-2xl bg-accent px-5 py-6 text-accent-ink sm:px-7 sm:py-8">
+        <p className="text-pretty text-2xl font-bold tracking-tight sm:text-3xl">
+          {greeting}
+          {firstName ? `, ${firstName}` : ""}
+        </p>
+        <p className="mt-1.5 max-w-prose text-sm leading-relaxed opacity-90">
+          {standing}
+        </p>
+        <div className="mt-5 flex flex-wrap gap-2.5">
+          <Link
+            href={START.href}
+            className="rounded-lg bg-accent-ink px-4 py-2 text-sm font-semibold text-accent"
+          >
+            {START.label}
+          </Link>
+          <Link
+            href={IMPORT.href}
+            className="rounded-lg border border-current/35 px-4 py-2 text-sm font-semibold"
+          >
+            {IMPORT.label}
+          </Link>
+        </div>
+      </section>
+
+      {/* ---- The two columns ---------------------------------------------
+
+          Tiles left, the book right, on one row from `lg` up — the figures a
+          writer glances at beside the one thing this screen is actually for.
+          The book keeps the larger share: a diagnosis is the point of the
+          screen and four counts are the margin note. Below `lg` they stack in
+          the same order, so the phone reads the same sentence. */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:items-start">
+        <div className="grid grid-cols-2 gap-3">
+          <Stat
+            icon={shelfIcons.overview}
+            value={books.toLocaleString()}
+            label={books === 1 ? "book" : "books"}
+          />
+          <Stat
+            icon={shelfIcons.write}
+            value={words.toLocaleString()}
+            label={nounFor(words, "word")}
+          />
+          <Stat
+            icon={shelfIcons.prepare}
+            value={chapters.toLocaleString()}
+            label={nounFor(chapters, "chapter")}
+          />
+          {/* The fourth is the only one that can be unknown, and it says so
+              rather than printing a zero it has not earned — the log started
+              when it shipped, so a shelf written before it has nothing in
+              here. The dashed card under the row is where that is explained. */}
+          <Stat
+            icon={shelfIcons.calendar}
+            value={logged ? week.words.toLocaleString() : "—"}
+            label="this week"
+            note={
+              logged
+                ? week.daysWritten > 0
+                  ? `${plural(week.daysWritten, "day")}${
+                      run > 0 ? ` · ${plural(run, "day")} running` : ""
+                    }`
+                  : "nothing yet — that is allowed"
+                : "no log yet"
+            }
+          />
+        </div>
+
       {book ? (
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 p-4 sm:flex sm:flex-wrap sm:gap-5 sm:p-5">
@@ -1554,6 +1675,7 @@ function Overview({
           className="h-64 animate-pulse rounded-2xl border border-line bg-panel"
         />
       )}
+      </div>
 
       {/* An amber panel counting advance readers past their date stood here
           until 2026-08-13 — the one *urgent* thing this screen ever raised —
@@ -1579,51 +1701,51 @@ function Overview({
           the day log only started when it shipped, so a writer with 6,000 words
           behind them would read that they had written nothing. Until there is a
           single logged day, this is one card that says why it is empty. */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {logged ? (
-          <Stat
-            icon={shelfIcons.write}
-            value={week.words.toLocaleString()}
-            label={`${nounFor(week.words, "word")} this week`}
-            note={
-              week.daysWritten > 0
-                ? // The streak, folded in rather than given a tile of its own.
-                  // Stated, never scolded: the research was explicit about how
-                  // this audience feels about apps that turn a streak into a
-                  // stick, and a number that large on a screen this size was
-                  // doing the scolding by size alone.
-                  `across ${plural(week.daysWritten, "day")}${
-                    run > 0 ? ` · ${plural(run, "day")} running` : ""
-                  }`
-                : "nothing yet this week — that is allowed"
-            }
-          />
-        ) : (
-          <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4">
-            <div className="flex items-center gap-2 text-muted">
-              {shelfIcons.calendar}
-              <p className="text-sm font-medium">No writing log yet</p>
-            </div>
-            <p className="mt-1.5 text-sm text-fg">
-              It starts the first time you write here and counts net words a day
-              — so a day of cutting counts too.
-            </p>
-            <p className="mt-1 text-xs text-muted">
-              Anything already on your shelf was written before the log existed,
-              which is why it is not in here.
-            </p>
-          </div>
-        )}
+      {/* The one card that only exists to explain a dash.
 
-        <Stat
-          icon={shelfIcons.overview}
-          value={String(books)}
-          label={books === 1 ? "book" : "books"}
-          note={`${plural(words, "word")} · ${plural(chapters, "chapter")}`}
-        />
-      </div>
+          Three zeros beside a shelf of finished books is a lie by arithmetic:
+          the day log only started when it shipped, so a writer with 6,000
+          words behind them would read that they had written nothing. The tile
+          above says "—" rather than "0" for that reason, and this says why —
+          then goes away for good the first day something is recorded. */}
+      {!logged && (
+        <div className="rounded-xl border border-dashed border-line bg-panel px-5 py-4">
+          <div className="flex items-center gap-2 text-muted">
+            {shelfIcons.calendar}
+            <p className="text-sm font-medium">No writing log yet</p>
+          </div>
+          <p className="mt-1.5 text-sm text-fg">
+            It starts the first time you write here and counts net words a day —
+            so a day of cutting counts too.
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            Anything already on your shelf was written before the log existed,
+            which is why it is not in here.
+          </p>
+        </div>
+      )}
     </div>
   );
+}
+
+/**
+ * "Good morning", once the browser can say what morning is.
+ *
+ * Kept out of the component because the reasoning is the whole of it: the
+ * server has no idea what o'clock it is where the writer is, so a clock read
+ * during the server render is a guess React then swaps out from under them on
+ * hydration. `useHydrated` is the flag this file already keeps for that shape
+ * of question — neutral in the server's markup, specific the moment the client
+ * owns the page.
+ */
+function useGreeting(): string {
+  const hydrated = useHydrated();
+  if (!hydrated) return "Welcome back";
+
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
 }
 
 /** Somewhere to go, or something to do. Empty states take one of each. */
@@ -1720,15 +1842,18 @@ function EmptyState({
  * exists — and the person who lands on them with an empty shelf is far more
  * likely to have a manuscript in a file than to be about to type one.
  */
-const START: EmptyAction = { label: "Start a book", href: "/book/new" };
+const START = {
+  label: "Start a book",
+  href: "/book/new",
+} as const satisfies EmptyAction;
 /* Into the same wizard the menu's three sources use, rather than the older
    `/book/import` page — an imported book should be asked the same questions a
    blank one is, and there is no reason for the empty state to be the one door
    that skips them. */
-const IMPORT: EmptyAction = {
+const IMPORT = {
   label: "Import a manuscript",
   href: "/book/new?source=file",
-};
+} as const satisfies EmptyAction;
 
 /**
  * The way out of a finding.
