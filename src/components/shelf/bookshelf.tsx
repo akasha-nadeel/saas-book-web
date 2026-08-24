@@ -5,9 +5,11 @@ import {
   Fragment,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -64,6 +66,7 @@ import {
   type Pace,
 } from "@/lib/activity";
 import { targetShare } from "@/lib/target";
+import { smoothArea, smoothPath } from "@/lib/spark";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { usePlan } from "@/lib/use-plan";
 import {
@@ -246,6 +249,9 @@ export function Bookshelf({
   account?: Account | null;
 }) {
   const hydrated = useHydrated();
+  /* The band's line distinguishes an empty shelf from one still arriving, and
+     only `useLibrarySettled` can tell those apart — see the note on it. */
+  const settled = useLibrarySettled();
   const shelf = useShelf();
 
   /**
@@ -767,6 +773,17 @@ export function Bookshelf({
             monitor and leave the eye travelling between a number and its
             label. */}
           <main className="mx-auto max-w-6xl px-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 md:pb-16">
+            {/* The band, above the title rather than under it: it is about
+              the writer and the session, and the heading below is about the
+              screen. Overview only — the other areas open on their own work. */}
+            {area === "overview" && (
+              <WelcomeBand
+                account={account}
+                current={current}
+                settled={settled}
+              />
+            )}
+
             {/* One block. The heading and its line used to be two siblings with
               `mb-8` and `-mt-6` cancelling each other out — a spacing bug
               waiting to be inherited by the next area added. */}
@@ -790,7 +807,6 @@ export function Bookshelf({
 
             {area === "overview" && (
               <Overview
-                account={account}
                 current={current}
                 books={active.length}
                 words={totals.words}
@@ -1072,6 +1088,222 @@ const PHASE_STATE: Record<Phase, string> = {
   launch: "Before you publish",
   publish: "Publishing",
 };
+
+/**
+ * The pictures behind the band, and the order they come round in.
+ *
+ * Two, both of somebody reading or writing at the edge of a day. They are
+ * decoration and carry no information, so they are `aria-hidden` and their
+ * `alt` is empty — a screen reader that read "a person sitting above the
+ * clouds" here would be reading out the wallpaper.
+ */
+const BAND_SLIDES = [
+  /* `position` is the crop, and it is per picture because the subject is not
+     in the same place in both. Centred, `object-cover` framed the sky: the
+     band is short and wide, the pictures are tall, so the middle of the file
+     is the empty half. Pulling the window down the image brings the reader,
+     the books and the horizon into the strip — which is the half worth
+     showing. */
+  { src: "/banner-dawn.webp", position: "50% 74%" },
+  { src: "/banner-night.webp", position: "50% 78%" },
+] as const;
+
+/** How long each one holds before the next fades up. */
+const BAND_DWELL_MS = 7000;
+
+/**
+ * Whether the writer has asked their system to keep still.
+ *
+ * `useSyncExternalStore` rather than an effect that sets state: the query is an
+ * external source with a subscription of its own, which is exactly what the
+ * hook is for, and it avoids a first paint that animates before being told not
+ * to. `ThemeSync` listens to `prefers-color-scheme` the same way.
+ */
+function subscribeToMotionPreference(onChange: () => void) {
+  const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(
+    subscribeToMotionPreference,
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    // On the server there is nobody to ask, and "still" is the safe answer:
+    // markup that arrives already animating cannot be un-animated politely.
+    () => true,
+  );
+}
+
+/**
+ * The band across the top of the dashboard, and the only full-bleed thing on it.
+ *
+ * It sits **above** the page's own title rather than inside the area, which is
+ * the arrangement the reference uses and the one that reads correctly: the band
+ * is about the writer and the session, the title underneath is about the screen
+ * they are looking at.
+ *
+ * **No gutter.** It runs the full width of the content column — the negative
+ * margin cancels `main`'s padding — and takes square corners with it, because a
+ * rounded rectangle inset from both edges is a *card*, and a card is a thing on
+ * the page rather than the top of it.
+ *
+ * The trail names where the writer is. Two levels and no links: the rail beside
+ * it is how you move, so a clickable "Dashboard" here would be a second door to
+ * the room you are already standing in.
+ *
+ * **The type is white whatever the theme is**, and that is not the theme being
+ * ignored. It sits on a photograph, so it follows the photograph — the same
+ * reasoning the landing page's `lp-*` set is built on, and why the scrim under
+ * it is part of the picture rather than a colour token. Everything below the
+ * band goes back to the writer's chosen theme at once.
+ */
+function WelcomeBand({
+  account,
+  current,
+  settled,
+}: {
+  account: Account | null;
+  current: Book | null;
+  settled: boolean;
+}) {
+  const greeting = useGreeting();
+  const still = usePrefersReducedMotion();
+  const [slide, setSlide] = useState(0);
+
+  /*
+   * The pictures come round on their own, and stop when asked to.
+   *
+   * Nothing here is a control a writer is waiting on, so a system that has said
+   * "reduce motion" gets the first picture and no interval at all — not a
+   * slower one. The dots below still work, so the second picture is reachable
+   * by choice rather than only by waiting.
+   */
+  useEffect(() => {
+    if (still) return;
+    const id = window.setInterval(
+      () => setSlide((n) => (n + 1) % BAND_SLIDES.length),
+      BAND_DWELL_MS,
+    );
+    return () => window.clearInterval(id);
+  }, [still]);
+
+  /**
+   * The first name, and only if a provider gave us one.
+   *
+   * An email address is not a name — greeting somebody as
+   * "kha.akashanadeel@gmail.com" is worse than greeting them as nobody — so
+   * `account.name` is the only source, and the band simply drops the comma when
+   * there is nothing to put after it.
+   */
+  const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
+
+  /**
+   * The one line under the greeting, and it reports rather than cheers.
+   *
+   * A band like this usually carries a slogan. What a writer opening the app
+   * wants from it is where they left off, so that is what it says — the book
+   * and when it was last open, or, on an empty shelf, the plain fact of that.
+   */
+  const standing = current
+    ? `Last open: ${current.title}, ${relativeTime(current.lastOpenedAt)}.`
+    : settled
+      ? "Nothing on the shelf yet. Start one, or bring in a manuscript you already have."
+      : "Fetching your shelf…";
+
+  return (
+    <section className="relative -mx-4 overflow-hidden px-4 py-10 sm:-mx-6 sm:px-6 sm:py-12">
+      {/* The pictures, stacked and crossfaded. Both are in the markup from the
+          first paint so the second does not arrive as a white flash seven
+          seconds in; only the opacity moves. */}
+      {BAND_SLIDES.map((picture, i) => (
+        // A plain <img>, like the covers and the account photo: these are two
+        // fixed decorations already sized for the strip, so next/image would
+        // add a loader and a config entry for no gain a writer could see.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={picture.src}
+          src={picture.src}
+          alt=""
+          aria-hidden="true"
+          fetchPriority={i === 0 ? "high" : "low"}
+          style={{ objectPosition: picture.position }}
+          className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-1000 ease-in-out ${
+            i === slide ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ))}
+
+      {/* The scrim, and it is doing real work: both pictures are dark on one
+          side and bright on the other, so type laid straight on them would be
+          legible in the evening and gone at dawn. Left-weighted, because that
+          is the side the words are on. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-linear-to-r from-black/80 via-black/55 to-black/20"
+      />
+
+      <div className="relative z-10 max-w-xl">
+        <nav aria-label="Breadcrumb" className="text-xs font-medium text-white/70">
+          <ol className="flex items-center gap-1.5">
+            <li>Dashboard</li>
+            <li aria-hidden="true">›</li>
+            <li className="text-white" aria-current="page">
+              Overview
+            </li>
+          </ol>
+        </nav>
+
+        <h2 className="mt-3 text-2xl font-bold tracking-tight text-pretty text-white sm:text-3xl">
+          {greeting}
+          {firstName ? (
+            <>
+              ,{" "}
+              <span className="rounded-lg bg-accent px-2 py-0.5 text-accent-ink">
+                {firstName}
+              </span>
+            </>
+          ) : null}
+        </h2>
+        <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-white/85">
+          {standing}
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2.5">
+          <Link
+            href={START.href}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
+          >
+            {START.label}
+          </Link>
+          <Link
+            href={IMPORT.href}
+            className="rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur-sm"
+          >
+            {IMPORT.label}
+          </Link>
+        </div>
+      </div>
+
+      {/* Dots, and they are buttons rather than pips. Something that moves on
+          its own has to be steerable, or a writer who wants the other picture
+          can only wait for it. */}
+      <div className="absolute right-4 bottom-4 z-10 flex gap-1.5 sm:right-6 sm:bottom-5">
+        {BAND_SLIDES.map((picture, i) => (
+          <button
+            key={picture.src}
+            type="button"
+            onClick={() => setSlide(i)}
+            aria-label={`Show picture ${i + 1} of ${BAND_SLIDES.length}`}
+            aria-current={i === slide}
+            className={`h-1.5 rounded-full transition-all ${
+              i === slide ? "w-6 bg-white" : "w-1.5 bg-white/50 hover:bg-white/75"
+            }`}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
 
 /**
  * The book a writer is in the middle of, and what is standing in its way.
@@ -1519,24 +1751,21 @@ function CurrentBookCard({
 }
 
 function Overview({
-  account,
   current,
   books,
   words,
   chapters,
 }: {
-  /** For the greeting, and only that. Null signed out or with no accounts. */
-  account: Account | null;
-  /** The last book opened, for the greeting's line and the target dial. */
+  /** The last book opened — the target dial is about it. */
   current: Book | null;
   books: number;
   words: number;
   chapters: number;
 }) {
   const activity = useActivity();
-  // Only the *empty* half of this screen waits on it — see `useLibrarySettled`.
-  // A book that is already readable is drawn at once.
-  const settled = useLibrarySettled();
+  /* `useLibrarySettled` used to be read here for the empty state. The empty
+     state moved out with the book card, and the band above the title reads it
+     from the shell now — one caller, at the top. */
 
   /*
    * **Advance readers past their date are not counted here any more.**
@@ -1577,139 +1806,8 @@ function Overview({
     [activity],
   );
 
-  /**
-   * Morning, afternoon or evening — and not until the browser can say.
-   *
-   * The server has no idea what o'clock it is where the writer is, so a clock
-   * read during the server render is a guess that React then swaps out from
-   * under them on hydration. `useHydrated` is the flag this file already keeps
-   * for exactly that shape of question, so the greeting is neutral in the
-   * server's markup and specific the moment the client owns the page.
-   */
-  const greeting = useGreeting();
-
-  /**
-   * The first name, and only if a provider gave us one.
-   *
-   * An email address is not a name — greeting somebody as
-   * "kha.akashanadeel@gmail.com" is worse than greeting them as nobody — so
-   * `account.name` is the only source, and the band simply drops the comma
-   * when there is nothing to put after it.
-   */
-  const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
-
-  /**
-   * The one line under the greeting, and it reports rather than cheers.
-   *
-   * A band like this usually carries a slogan. What a writer opening the app
-   * wants from it is where they left off, so that is what it says — the book
-   * and when it was last open, or, on an empty shelf, the plain fact of that.
-   * Nothing here is computed to sound encouraging.
-   */
-  const standing = current
-    ? `Last open: ${current.title}, ${relativeTime(current.lastOpenedAt)}.`
-    : settled
-      ? "Nothing on the shelf yet. Start one, or bring in a manuscript you already have."
-      : "Fetching your shelf…";
-
-  /**
-   * What Prepare will actually show for this book.
-   *
-   * The banner counts *this* and not `checkup()`, because the button under it
-   * says "See them in Prepare" — and a count that does not match the list it
-   * promises is a broken promise the moment somebody presses it.
-   *
-   * The two differ for a good reason. `checkup` withholds advisory findings
-   * until the book reaches a selling phase, so a writer on chapter three is
-   * not scolded about an ISBN; `Prepare` runs `storeReadiness()` raw. That
-   * gate is worth keeping — but it was making this card claim *"the listing
-   * details are in order"* about a book Prepare listed two outstanding things
-   * for. The gate may decide what to *raise*; it may not make the screen say
-   * something untrue.
-   *
-   * So the all-clear is now earned rather than assumed: green means nothing is
-   * outstanding at all, and anything withheld shows as a count without being
-   * spelled out — which is the quiet version of the same fact, and the reason
-   * the gate existed.
-   */
-  /**
-   * The banner the writer has waved away, and exactly which one.
-   *
-   * A dismissal here is not "hide this box forever" — this is the first screen
-   * a writer sees and the one place the app says a shop would refuse their
-   * book, so a permanent hide would let a *new* blocking problem arrive
-   * silently behind an X pressed weeks ago. The signature is the book and its
-   * two counts, so waving away "1 to fix · 4 worth doing" hides exactly that,
-   * and the moment the situation changes the banner returns with the new
-   * figures.
-   *
-   * **Persisted now, where it used to live only in component state.** The
-   * argument for memory was that coming back on a fresh visit is the safe
-   * direction for a diagnosis to fail in. That is true of a *changed*
-   * diagnosis and false of an unchanged one: pressing × and finding the same
-   * red row on the next visit is not a safe failure, it is the app not
-   * listening — and a banner that ignores its own dismiss control teaches a
-   * writer to ignore the banner. The signature keeps the safety where it was
-   * doing the work, so a new blocking problem still speaks up.
-   *
-   * `prefs.dismissed` rather than a field on the book, for the reason
-   * `matterAsked` is there: it records something about the reader, not the
-   * manuscript.
-   */
   return (
     <div className="flex flex-col gap-5">
-      {/* ---- The welcome band --------------------------------------------
-
-          A **tinted** band, not a filled one. The saturated version put the
-          loudest thing on the screen above the quietest, and the accent is
-          spent on actions here — so the ground is the accent at a tenth and
-          the two buttons inside it keep the full strength. The writer's name
-          takes the highlight, which is the one thing in the band that is
-          theirs.
-
-          The figure is drawn, on the same 24-grid as the rail's icons. The
-          reference carries a stock illustration of somebody at a desk; the
-          house rule is that figures are drawn in markup and true of the
-          product, so this is a book, its pages and a stack beside it — the
-          thing the app is actually about. It is decoration and marked
-          `aria-hidden`, and it goes at `sm` where there is no room. */}
-      <section
-        className="relative overflow-hidden rounded-3xl bg-accent/10 px-6 py-8
-                   sm:px-9 sm:py-10"
-      >
-        <div className="relative z-10 max-w-xl">
-          <h2 className="text-pretty text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-            {greeting}
-            {firstName ? (
-              <>
-                {" "}
-                <span className="rounded-lg bg-accent/20 px-2 py-0.5 text-accent">
-                  {firstName}
-                </span>
-              </>
-            ) : null}
-          </h2>
-          <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-muted">
-            {standing}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2.5">
-            <Link
-              href={START.href}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
-            >
-              {START.label}
-            </Link>
-            <Link
-              href={IMPORT.href}
-              className="rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg"
-            >
-              {IMPORT.label}
-            </Link>
-          </div>
-        </div>
-        <DeskFigure />
-      </section>
-
       {/* ---- What is on the shelf ----------------------------------------
 
           Three cards rather than three rows in one panel. As rows they read as
@@ -1750,7 +1848,12 @@ function Overview({
 
           The book card that stood on the left is at the top of Write, where a
           card about one book belongs among the books. */}
-      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+      {/* No `items-start`: the two columns run to the same floor, which is
+          what the reference does and what stops a short card leaving a step
+          across the middle of the screen. The week card is the one that
+          stretches — its chart has somewhere to grow into, where the dial and
+          the plan card are the size they are. */}
+      <div className="grid gap-5 lg:grid-cols-2">
         <WeekCard activity={activity} week={week} run={run} logged={logged} />
 
         <div className="flex flex-col gap-5">
@@ -1816,12 +1919,12 @@ function Overview({
  * the cover and the picker — is in Write now, so a dial captioned only "Target"
  * would be a percentage of nothing a reader could see.
  *
- * Two things the first draft of this got wrong, both worth keeping written
- * down. The figure was positioned in HTML over the SVG and landed on the arc
- * itself; it is a `<text>` inside the drawing now, so it sits in the dial's
- * mouth at any width. And a round line-cap on an arc of *zero* length draws a
- * dot — so a book at "under 1%" wore a blue bead at the left end of an empty
- * track. The value arc is not drawn at all until there is something to draw.
+ * Two things the first draft got wrong, both worth keeping written down. The
+ * figure was positioned in HTML over the SVG and landed on the arc itself; it
+ * is a `<text>` inside the drawing now, so it sits in the dial's mouth at any
+ * width. And a round line-cap on an arc of *zero* length draws a dot — so a
+ * book at "under 1%" wore a bead at the left end of an empty track. The value
+ * arc is not drawn at all until there is something to draw.
  */
 function TargetGauge({
   title,
@@ -1833,49 +1936,87 @@ function TargetGauge({
   target: number;
 }) {
   const { share, label, met } = targetShare(words, target);
+  /* One id per instance. Two dials on a page would otherwise share a gradient
+     definition, and the second would silently paint with the first one's. */
+  const fillId = useId();
 
-  /* A half circle of radius 60: the arc runs left to right over the top, so
-     its length is pi times r and the dash is the part written. Stroke rather
-     than a filled wedge, because a stroke can be rounded at both ends. */
-  const length = Math.PI * 60;
+  /* A half circle of radius 58 centred at (70, 72): the arc runs left to right
+     over the top, so its length is pi times r and the dash is the part
+     written. Stroke rather than a filled wedge, because a stroke can be
+     rounded at both ends. */
+  const radius = 58;
+  const length = Math.PI * radius;
   const drawn = (share / 100) * length;
   const remaining = Math.max(0, target - words);
 
+  /* Where the drawn arc ends, for the pointer. The sweep runs from pi (left)
+     to 0 (right), so the angle falls as the share rises. */
+  const angle = Math.PI * (1 - share / 100);
+  const tip = {
+    x: 70 + Math.cos(angle) * radius,
+    y: 72 - Math.sin(angle) * radius,
+  };
+
   return (
-    <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
+    <div className="flex flex-col rounded-2xl border border-line bg-panel p-5 shadow-sm">
       <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
-          Target
-        </h3>
+        <h3 className="text-sm font-bold text-fg">Target</h3>
         <p className="min-w-0 truncate text-xs font-medium text-muted">{title}</p>
       </div>
 
       <svg
-        viewBox="0 0 140 86"
-        className="mx-auto mt-4 block w-[180px] max-w-full"
+        viewBox="0 0 140 88"
+        className="mx-auto mt-4 block w-[210px] max-w-full"
         role="img"
         aria-label={`${label} of a ${target.toLocaleString()} word target`}
       >
+        <defs>
+          {/* Two stops of one hue, not two hues. The rule this house keeps is
+              that a colour means something; a wash from pale to full is the
+              same colour saying "more of it", which is what the dial is for. */}
+          <linearGradient id={fillId} x1="0" y1="1" x2="1" y2="0">
+            <stop
+              offset="0%"
+              stopColor="currentColor"
+              stopOpacity={met ? 0.45 : 0.35}
+            />
+            <stop offset="100%" stopColor="currentColor" stopOpacity="1" />
+          </linearGradient>
+        </defs>
+
         <path
           d="M12 72a58 58 0 0 1 116 0"
           fill="none"
-          strokeWidth="11"
+          strokeWidth="14"
           strokeLinecap="round"
           className="stroke-raised"
         />
+
         {share > 0 && (
-          <path
-            d="M12 72a58 58 0 0 1 116 0"
-            fill="none"
-            strokeWidth="11"
-            strokeLinecap="round"
-            strokeDasharray={`${drawn} ${length}`}
-            className={met ? "stroke-ok-fg" : "stroke-accent"}
-          />
+          <g className={met ? "text-ok-fg" : "text-accent"}>
+            <path
+              d="M12 72a58 58 0 0 1 116 0"
+              fill="none"
+              strokeWidth="14"
+              strokeLinecap="round"
+              strokeDasharray={`${drawn} ${length}`}
+              stroke={`url(#${fillId})`}
+            />
+            {/* The pointer, at the head of the drawn arc. Drawn only when there
+                is an arc to point at the end of — at nought it would sit on the
+                left cap and read as a value nobody has reached. */}
+            <circle
+              cx={tip.x}
+              cy={tip.y}
+              r="5.5"
+              className="fill-panel stroke-current"
+              strokeWidth="3.5"
+            />
+          </g>
         )}
+
         {/* In the drawing rather than over it, so the figure keeps the mouth of
-            the dial at every width. `textLength` is deliberately absent: a long
-            label ("under 1%") is allowed to be smaller rather than squashed. */}
+            the dial at every width. */}
         <text
           x="70"
           y="68"
@@ -1888,14 +2029,31 @@ function TargetGauge({
         </text>
       </svg>
 
-      <div className="mt-1 flex items-baseline justify-between text-xs">
-        <span className="font-semibold tabular-nums text-fg">
-          {words.toLocaleString()}
-        </span>
-        <span className="tabular-nums text-muted">
-          {met ? "target met" : `${remaining.toLocaleString()} to go`}
-        </span>
-      </div>
+      {/* Two labelled figures, the shape the reference closes on. Named rather
+          than left as a bare pair: "24" and "29,976" on one line are two
+          numbers a reader has to guess the relationship between. */}
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4">
+        <div className="flex items-center gap-2">
+          <span className="text-accent">{shelfIcons.write}</span>
+          <div className="min-w-0">
+            <dt className="text-xs text-muted">written</dt>
+            <dd className="text-sm font-bold tabular-nums text-fg">
+              {words.toLocaleString()}
+            </dd>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-muted">{shelfIcons.prepare}</span>
+          <div className="min-w-0">
+            <dt className="text-xs text-muted">{met ? "over by" : "to go"}</dt>
+            <dd className="text-sm font-bold tabular-nums text-fg">
+              {met
+                ? (words - target).toLocaleString()
+                : remaining.toLocaleString()}
+            </dd>
+          </div>
+        </div>
+      </dl>
     </div>
   );
 }
@@ -1912,7 +2070,8 @@ function TargetGauge({
  * **Scaled to its own busiest day, not to a fixed ceiling.** A writer of three
  * hundred words a day and one of three thousand should both see shape —
  * `heatLevel` in `activity.ts` takes the same view of the month grid, and for
- * the same reason.
+ * the same reason. The scale is printed, so the shape can be read as a
+ * quantity rather than admired as a squiggle.
  *
  * **A day of cutting is real work and the page says so**, but it cannot sit on
  * a scale that runs upward for more, so the line is drawn off the positive days
@@ -1933,68 +2092,50 @@ function WeekCard({
   run: number;
   logged: boolean;
 }) {
+  const fillId = useId();
   const days = useMemo(() => recentDays(activity, 14), [activity]);
   const busiest = useMemo(
     () => days.reduce((most, d) => Math.max(most, d.words), 0),
     [days],
   );
 
+  /* The drawing is 100 across and 32 down with a two-unit head-room, so a peak
+     at the busiest day is not clipped by its own stroke. */
   const points = useMemo(
     () =>
-      days
-        .map((d, i) => {
-          const x = (i / (days.length - 1)) * 100;
-          const y = busiest > 0 ? 30 - (Math.max(0, d.words) / busiest) * 26 : 30;
-          return `${x.toFixed(2)},${y.toFixed(2)}`;
-        })
-        .join(" "),
+      days.map((d, i) => ({
+        x: (i / (days.length - 1)) * 100,
+        y: busiest > 0 ? 30 - (Math.max(0, d.words) / busiest) * 26 : 30,
+      })),
     [days, busiest],
   );
 
   return (
-    <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-accent/10 text-accent">
-            {shelfIcons.calendar}
-          </span>
-          <div className="min-w-0">
-            <h3 className="text-xs font-medium text-muted">This week</h3>
-            <p className="text-xl leading-tight font-extrabold tabular-nums text-fg">
-              {logged ? week.words.toLocaleString() : "—"}
-            </p>
-          </div>
-        </div>
-        {/* The reference puts a month picker here. There is no month to pick:
-            the log holds what it holds, so the window is stated rather than
-            offered. */}
+    <div className="flex h-full flex-col rounded-2xl border border-line bg-panel p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-fg">Writing</h3>
         {logged && (
-          <span className="shrink-0 rounded-full border border-line px-2.5 py-1 text-xs font-medium text-muted">
-            14 days
+          <span className="shrink-0 rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">
+            Last 14 days
           </span>
         )}
       </div>
 
+      <div className="mt-4 flex items-center gap-3.5">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-accent/10 text-accent">
+          {shelfIcons.calendar}
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-medium text-muted">This week</p>
+          <p className="text-2xl leading-tight font-extrabold tabular-nums text-fg">
+            {logged ? week.words.toLocaleString() : "—"}
+          </p>
+        </div>
+      </div>
+
       {logged ? (
         <>
-          <svg
-            viewBox="0 0 100 32"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-            className="mt-4 h-16 w-full"
-          >
-            <polygon points={`0,32 ${points} 100,32`} className="fill-accent/10" />
-            <polyline
-              points={points}
-              fill="none"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              vectorEffect="non-scaling-stroke"
-              className="stroke-accent"
-            />
-          </svg>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
+          <p className="mt-1.5 text-xs leading-relaxed text-muted">
             {week.daysWritten > 0
               ? `${nounFor(week.words, "word")} across ${plural(
                   week.daysWritten,
@@ -2002,6 +2143,61 @@ function WeekCard({
                 )}${run > 0 ? ` · ${plural(run, "day")} running` : ""}`
               : "nothing yet this week — that is allowed"}
           </p>
+
+          {/* A rule between the figure and the chart, because they answer two
+              questions: how much this week, and how it has gone since. */}
+          <div className="mt-4 border-t border-line pt-4">
+            <p className="text-xs font-medium text-muted">Net words a day</p>
+          </div>
+
+          {/* `flex-1` and a floor: the chart is what grows when the column
+              beside it is taller, and the scale is drawn in the same units as
+              the line so the two cannot drift. */}
+          <div className="mt-3 flex min-h-24 flex-1 gap-2">
+            <div className="flex shrink-0 flex-col justify-between py-[2px] text-[10px] tabular-nums text-muted">
+              <span>{busiest.toLocaleString()}</span>
+              <span>0</span>
+            </div>
+            <svg
+              viewBox="0 0 100 32"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+              className="h-full w-full text-accent"
+            >
+              <defs>
+                <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="currentColor" stopOpacity="0.22" />
+                  <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              {/* Two rules and a floor, at the busiest day, its half, and
+                  nothing. The scale beside them says what they are. */}
+              {[4, 17, 30].map((y) => (
+                <line
+                  key={y}
+                  x1="0"
+                  x2="100"
+                  y1={y}
+                  y2={y}
+                  strokeWidth="1"
+                  vectorEffect="non-scaling-stroke"
+                  className="stroke-line"
+                />
+              ))}
+
+              <path d={smoothArea(points, 32)} fill={`url(#${fillId})`} />
+              <path
+                d={smoothPath(points)}
+                fill="none"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+                className="stroke-accent"
+              />
+            </svg>
+          </div>
         </>
       ) : (
         <p className="mt-3.5 text-xs leading-relaxed text-muted">
@@ -2110,60 +2306,15 @@ function Figure({
   );
 }
 
-/**
- * The band's decoration: a book, its pages, and one more behind it.
- *
- * Drawn here rather than fetched, for the reason every other figure in this
- * product is drawn — a stock illustration of somebody at a desk is a picture
- * of nothing this app does, and it is one more asset to keep. Two flat tones
- * of the accent and a hairline, so it reads at any theme without a second
- * palette.
- *
- * Decoration and nothing else: `aria-hidden`, and gone below `lg` where the
- * words need the whole width.
- */
-function DeskFigure() {
-  return (
-    <svg
-      viewBox="0 0 240 160"
-      aria-hidden="true"
-      className="pointer-events-none absolute right-6 bottom-0 hidden h-[88%] w-auto lg:block"
-    >
-      {/* The page block behind, set back and paler. */}
-      <rect
-        x="34"
-        y="34"
-        width="150"
-        height="96"
-        rx="6"
-        className="fill-accent/10"
-      />
-      {/* The open book: two leaves meeting at the spine. */}
-      <path
-        d="M32 118V50c22-9 44-9 66 0v68c-22-9-44-9-66 0Z"
-        className="fill-surface stroke-accent/35"
-        strokeWidth="2.5"
-      />
-      <path
-        d="M164 118V50c-22-9-44-9-66 0v68c22-9 44-9 66 0Z"
-        className="fill-surface stroke-accent/35"
-        strokeWidth="2.5"
-      />
-      <path d="M98 50v68" className="stroke-accent/45" strokeWidth="2.5" />
-      {/* Lines of type, shorter as they fall — a paragraph, not a barcode. */}
-      {[66, 78, 90].map((y, i) => (
-        <g key={y} className="stroke-accent/25" strokeWidth="3.5" strokeLinecap="round">
-          <path d={`M46 ${y}h${44 - i * 8}`} />
-          <path d={`M110 ${y}h${44 - i * 8}`} />
-        </g>
-      ))}
-      {/* A closed one, stacked at the edge, so the shelf is implied. */}
-      <rect x="176" y="86" width="44" height="12" rx="3" className="fill-accent/30" />
-      <rect x="182" y="102" width="44" height="12" rx="3" className="fill-accent/20" />
-      <rect x="176" y="118" width="44" height="12" rx="3" className="fill-accent/30" />
-    </svg>
-  );
-}
+// `DeskFigure` is gone. It was a drawn book and a stack behind it, standing in
+// the band while the band was a flat tint — and a line drawing over a
+// photograph is two illustrations arguing.
+//
+// The rule it was built on stands and is worth keeping written down: a *figure*
+// in this app is drawn in markup and true of the product, because a figure
+// makes a claim. The two pictures that replaced it make none — they are
+// wallpaper, and they say so by being `aria-hidden` with no alt text and by
+// carrying nothing a reader would lose if they never loaded.
 
 /**
  * "Good morning", once the browser can say what morning is.
