@@ -1102,7 +1102,20 @@ const PHASE_STATE: Record<Phase, string> = {
  * `alt` is empty — a screen reader that read "a person sitting above the
  * clouds" here would be reading out the wallpaper.
  */
-const BAND_SLIDES = [
+const BAND_SLIDES: readonly {
+  src: string;
+  position: string;
+  /**
+   * A thin wash, for a picture bright enough to swallow white type.
+   *
+   * Per picture rather than over all six, which is the whole point of it. A
+   * scrim across every slide was here once and came off: five of these are
+   * dark where the words sit and were being dimmed to protect type that was
+   * already legible. The ringed planet is the exception — a pale sky behind
+   * the greeting — so it is the one that carries one.
+   */
+  scrim?: boolean;
+}[] = [
   /* `position` is the crop, and every picture carries its own because the
      subject is never in the same place twice.
 
@@ -1118,7 +1131,7 @@ const BAND_SLIDES = [
   /* These two were re-shot at full size, so their crops are re-set with them:
      the earlier files were 735px wide and the band stretched them. */
   { src: "/banner-swirl.webp", position: "64% 52%" },
-  { src: "/banner-planet.webp", position: "60% 74%" },
+  { src: "/banner-planet.webp", position: "60% 74%", scrim: true },
   { src: "/banner-lantern.webp", position: "50% 92%" },
   { src: "/banner-lamplight.webp", position: "45% 86%" },
 ] as const;
@@ -1249,18 +1262,22 @@ function WelcomeBand({
         />
       ))}
 
-      {/* **Nothing between the type and the picture** — no scrim, and no
-          shadow on the glyphs either. Both were here and both came off at the
-          owner's request: the pictures are the point, and anything laid over
-          them or trailing off the letters is the interface apologising for
-          them.
+      {/* **Nothing between the type and the picture, on five of the six.** A
+          scrim across all of them was the first answer and came off: the
+          pictures are the point, and dimming five dark ones to protect type
+          that was already legible is the interface apologising for them.
 
-          What it costs is worth writing down rather than discovering. White
-          type on the pale half of the ringed-planet picture is the thin case,
-          and it is thin at one size on one slide. The lever if it ever needs
-          pulling is the *picture*, not the page: a crop that puts the words
-          over the dark third of the frame fixes it without putting a rectangle
-          of black back over somebody's sky. */}
+          The sixth earns one. The ringed planet is pale exactly where the
+          greeting sits, and white on that sky is not readable at any weight.
+          It fades in and out with its own picture rather than being switched
+          on, so the change between slides stays one movement. */}
+      <div
+        aria-hidden="true"
+        className={`absolute inset-0 bg-black transition-opacity duration-1000 ease-in-out ${
+          BAND_SLIDES[slide].scrim ? "opacity-35" : "opacity-0"
+        }`}
+      />
+
       <div className="relative z-10 max-w-xl">
         <nav aria-label="Breadcrumb" className="text-xs font-medium text-white/70">
           <ol className="flex items-center gap-1.5">
