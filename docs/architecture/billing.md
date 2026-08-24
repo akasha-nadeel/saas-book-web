@@ -84,12 +84,14 @@ PayHere must be sent **no `recurrence` and no `duration`** or it bills the
 one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
-**What is free is enough to understand the product.** Free includes one book,
+**What is free is enough to understand the product.** Free includes five books,
 unlimited chapters and words, autosave/sync where accounts are configured, Word
 export, and five writing-assistant replies each calendar month. Pro unlocks
 unlimited books, sixty assistant replies each calendar month, and EPUB/PDF
 export. The backend enforces expensive or paid limits: the book limit is in the
-database trigger, assistant usage is claimed through a Supabase RPC, and PDF
+database trigger (which counts the active shelf only, and fires on the
+restore as well as the insert so archive-and-restore cannot walk past it),
+assistant usage is claimed through a Supabase RPC, and PDF
 export checks launch entitlements before rendering.
 
 **Writing a blurb is free; having one *read* is not.** `/api/blurb/critique` is

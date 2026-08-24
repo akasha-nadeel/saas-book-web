@@ -1,9 +1,26 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import { MvpLandingPage } from "@/components/landing/mvp-landing-page";
 import { Bookshelf } from "@/components/shelf/bookshelf";
 import { accountFromClaims } from "@/lib/account";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+
+/**
+ * What a link to this domain says it is.
+ *
+ * The root layout's description is about the app a writer is already
+ * inside; this is about the product a stranger is deciding on, which is
+ * what a shared link, a search result and a payment provider's reviewer all
+ * read first. It sits on the route rather than in the layout so the two do
+ * not have to be one sentence, and it is true of both halves of this page:
+ * the shelf a writer lands on is where that same book lives.
+ */
+export const metadata: Metadata = {
+  title: "OpenChapter · Write your book and leave with the file",
+  description:
+    "A quiet editor for a whole manuscript — chapters, notes, versions and front matter. Written to your own browser, exported as Word, EPUB or PDF.",
+};
 
 /**
  * One route, two pages: the shelf for a writer who is in, the landing page for

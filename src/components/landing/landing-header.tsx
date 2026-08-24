@@ -59,6 +59,50 @@ const LIFT = 8;
  */
 const SETTLE = 240;
 
+/**
+ * One entry in the bar's middle group.
+ *
+ * A union rather than a plain `{ href, label }[]` because **Tools is a menu
+ * rather than a link** and it has to keep its *place* in the row — a boolean
+ * prop beside the array could say whether it is drawn but not where, and the
+ * order of these entries is the page's own order, which is the whole of what
+ * they are for.
+ *
+ * An `href` beginning with `#` is an in-page anchor and is rooted through `at`
+ * below; anything else is an ordinary route.
+ */
+export type HeaderNavItem =
+  | { kind: "link"; href: string; label: string }
+  | { kind: "tools" };
+
+/**
+ * The bar for the full sixteen-tool page.
+ *
+ * **Every entry here points at something that exists, and that rule has already
+ * cost one of them.** "What it does" pointed at `#does`, the three-phase
+ * section, and that section came off the page — so the link went with it in the
+ * same commit. A nav entry whose target is not on the page is worse than a
+ * missing one: it scrolls nowhere, says nothing, and is the one kind of broken
+ * a visitor blames on the product rather than on the page.
+ *
+ * **The order is the page's own order**, which is what these are for — the
+ * road, then what the app looks like, then the sixteen tools, then the answers,
+ * then what it costs.
+ *
+ * Pricing is the one item that leaves the page, and it belongs with the anchors
+ * anyway — a price is information, the same kind of thing as Tools, rather than
+ * an account action. It is not optional furniture either: Paddle reviews this
+ * domain before it will let anybody take a card, and "pricing details or a
+ * pricing page" is on the list it checks.
+ */
+export const FULL_NAV: HeaderNavItem[] = [
+  { kind: "link", href: "#order", label: "The order" },
+  { kind: "link", href: "#inside", label: "Inside the app" },
+  { kind: "tools" },
+  { kind: "link", href: "#faq", label: "FAQ" },
+  { kind: "link", href: "/upgrade", label: "Pricing" },
+];
+
 export function LandingHeader({
   ink,
   /**
@@ -76,11 +120,23 @@ export function LandingHeader({
    * on first paint.
    */
   home = true,
+  /**
+   * What sits in the bar's middle group.
+   *
+   * A prop rather than a constant because there are two products on this
+   * domain: the full sixteen-tool page and the launch MVP, whose sections are
+   * different ones and whose Tools menu would link to a `/tools` the proxy
+   * redirects home. Defaulting to `FULL_NAV` keeps the two existing callers
+   * unchanged.
+   */
+  items = FULL_NAV,
 }: {
   ink: string;
   home?: boolean;
+  items?: HeaderNavItem[];
 }) {
-  /* Rooted once, used twice. `#order` from `/tools` is a link to nothing. */
+  /* Rooted once, used for every anchor. `#order` from `/tools` is a link to
+     nothing, so away from home the anchors navigate there and *then* scroll. */
   const at = (hash: string) => (home ? hash : `/${hash}`);
 
   const ref = useRef<HTMLElement>(null);
@@ -230,50 +286,32 @@ export function LandingHeader({
             navigation and the pair at the end is the offer, and a row where
             all six things are the same size has no offer in it. */}
         <nav className="hidden items-center gap-8 font-sans text-[0.9375rem] font-medium text-lp-body md:flex">
-          {/* **Every entry here points at something that exists, and that rule
-              has already cost one of them.** "What it does" pointed at
-              `#does`, the three-phase section, and that section came off the
-              page — so the link went with it in the same commit. A nav entry
-              whose target is not on the page is worse than a missing one: it
-              scrolls nowhere, says nothing, and is the one kind of broken a
-              visitor blames on the product rather than on the page.
-
-              **The order is the page's own order**, which is what these are
-              for — the road, then what the app looks like, then the sixteen
-              tools, then the answers, then what it costs. Rebuilt on
-              2026-08-15 against the current page: two of these sections are
-              new since the last time this bar was looked at, and the page had
-              grown three screens that the nav did not admit existed. */}
-          <a href={at("#order")} className="hover:text-lp-ink">
-            The order
-          </a>
-          <a href={at("#inside")} className="hover:text-lp-ink">
-            Inside the app
-          </a>
-          {/* **Tools is a menu rather than an anchor, and it is the one entry
-              that earns the extra machinery.** The section it used to point at
-              is a cloud of marks around a count — right as a section and
-              useless as a destination, since it names none of the sixteen. The
-              menu names all of them and goes to each one's own row on
-              `/tools`. See `tools-menu.tsx`; the bar is told when it is open so
-              it does not slide away underneath it. */}
-          <ToolsMenu onOpenChange={setMenuOpen} />
-          <a href={at("#faq")} className="hover:text-lp-ink">
-            FAQ
-          </a>
-          {/* **The one item here that leaves the page, and it belongs with the
-              anchors anyway** — a price is information, the same kind of thing
-              as Tools, rather than an account action.
-
-              It is not optional furniture: Paddle reviews this domain before
-              it will let anybody take a card, and "pricing details or a
-              pricing page" is on the list it checks. This page states no
-              figure of its own by design — every number is read from the
-              modules that enforce it — so without this link the prices live at
-              a URL a visitor is never told about. */}
-          <Link href="/upgrade" className="hover:text-lp-ink">
-            Pricing
-          </Link>
+          {/* Nothing is written out here any more — see `HeaderNavItem` above
+              for the rule these are held to, and `FULL_NAV` for the default
+              row. Tools keeps its place in the order because it is an entry in
+              the same array rather than a flag beside it; the bar is told when
+              it is open so it does not slide away underneath it. */}
+          {items.map((item, i) =>
+            item.kind === "tools" ? (
+              <ToolsMenu key="tools" onOpenChange={setMenuOpen} />
+            ) : item.href.startsWith("#") ? (
+              <a
+                key={`${item.label}-${i}`}
+                href={at(item.href)}
+                className="hover:text-lp-ink"
+              >
+                {item.label}
+              </a>
+            ) : (
+              <Link
+                key={`${item.label}-${i}`}
+                href={item.href}
+                className="hover:text-lp-ink"
+              >
+                {item.label}
+              </Link>
+            ),
+          )}
         </nav>
 
         {/* ---- The pair -------------------------------------------------

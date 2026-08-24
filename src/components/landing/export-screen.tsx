@@ -29,8 +29,12 @@ import { DEFAULT_TYPESET, templateById } from "@/lib/export/typeset";
  * Server Component importing a value from a client module gets a client
  * *reference* rather than the value, which is the `sections.ts` lesson and a
  * 500 rather than a wrong word. So this is the list to walk when that screen
- * moves: the five rail groups, "Step 7 of 7", the step's title and deck, the
+ * moves: the rail groups, the step counter, the step's title and deck, the
  * four summary rows, the readiness panel's two lines, and the two buttons.
+ * **It has already gone stale once and nothing warned**, which is the standing
+ * cost of quoting a client module by hand: the Preview step ("Read it before
+ * you send it") was added to every format and this drawing went on saying
+ * "Step 7 of 7" over five groups. Walk `stepsFor("epub")` when you touch it.
  *
  * **The frame is `AppWindow` with the bezel**, not a device of its own — the
  * same frame and the same volume the prepare row's demo two rows above uses,
@@ -51,20 +55,31 @@ const W = 1000;
 const H = 660;
 
 /**
- * The wizard's five groups for an EPUB, in order, with Export standing last
+ * The wizard's six groups for an EPUB, in order, with Export standing last
  * and current.
  *
- * Seven steps in five groups is what `stepsFor("epub")` builds — Formatting
- * and Store listing hold two apiece — which is where the rail's "Step 7 of 7"
- * comes from. Quoted rather than imported; see the note above.
+ * Eight steps in six groups is what `stepsFor("epub")` builds — Formatting and
+ * Store listing hold two apiece, the rest one each — which is where the rail's
+ * step counter comes from. Quoted rather than imported; see the note above.
  */
 const GROUPS = [
   "Format",
   "Formatting",
   "Front matter",
   "Store listing",
+  "Preview",
   "Export",
 ] as const;
+
+/**
+ * How many steps the rail is counting, which is not how many groups it draws.
+ *
+ * Formatting and Store listing are two steps apiece, so the counter runs ahead
+ * of the circles. Written out rather than derived from `GROUPS`, because the
+ * two genuinely are different numbers and an arithmetic that made them agree
+ * would be wrong.
+ */
+const STEP_COUNT = 8;
 
 /**
  * What the file will contain, as the real step says it back.
@@ -111,7 +126,7 @@ export function ExportScreen() {
         </div>
 
         <p className="mt-[2cqw] text-[1cqw] font-semibold tracking-[0.14em] text-lp-faint uppercase">
-          Step 7 of 7
+          Step {STEP_COUNT} of {STEP_COUNT}
         </p>
 
         <ol className="mt-[2.6cqw] space-y-[2.2cqw]">

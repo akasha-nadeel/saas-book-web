@@ -13,6 +13,8 @@ interface VisualViewportLike extends EventTarget {
   width: number;
   height: number;
   offsetTop: number;
+  /** 1 unless the reader has pinched. Absent on the fakes in the tests. */
+  scale?: number;
 }
 
 export interface VisualViewportSnapshot extends EditorViewportMetrics {
@@ -40,7 +42,23 @@ interface ViewportWindow {
   ): void;
 }
 
-/** Read one internally consistent viewport snapshot. */
+/**
+ * Read one internally consistent viewport snapshot.
+ *
+ * **A pinch is not a keyboard, and the difference is `scale`.** The visual
+ * viewport shrinks for two unrelated reasons: a software keyboard has covered
+ * part of the window, or the reader has zoomed in and is looking at a slice of
+ * the page. This module exists for the first — the app shell is sized to the
+ * visible height so a sticky bar cannot end up under the keyboard — and taking
+ * the second the same way is how a zoomed-in dashboard ends up as a short strip
+ * of application with the page's background under it: the shell was told to be
+ * a third of the window tall, and it obeyed.
+ *
+ * Zoomed in, the layout viewport is the honest answer, so that is what is
+ * published; `scale` is 1 for a keyboard and greater than 1 for a pinch. Page
+ * zoom (Ctrl and +) never reaches here at all, because it scales the CSS pixel
+ * itself and both viewports shrink together.
+ */
 export function visualViewportSnapshot(
   target: Pick<
     ViewportWindow,
@@ -48,9 +66,18 @@ export function visualViewportSnapshot(
   >,
 ): VisualViewportSnapshot {
   const visual = target.visualViewport;
-  const width = Math.max(0, visual?.width ?? target.innerWidth);
-  const height = Math.max(0, visual?.height ?? target.innerHeight);
-  const offsetTop = Math.max(0, visual?.offsetTop ?? 0);
+  // A hair over 1, because the scale is a float and a trackpad leaves it at
+  // 1.0000001 after a pinch that ended where it started.
+  const pinched = (visual?.scale ?? 1) > 1.01;
+  const width = Math.max(
+    0,
+    pinched ? target.innerWidth : (visual?.width ?? target.innerWidth),
+  );
+  const height = Math.max(
+    0,
+    pinched ? target.innerHeight : (visual?.height ?? target.innerHeight),
+  );
+  const offsetTop = pinched ? 0 : Math.max(0, visual?.offsetTop ?? 0);
 
   return {
     width,

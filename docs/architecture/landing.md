@@ -7,6 +7,81 @@ Read before touching `src/components/landing/`, `tools-page.tsx`, `tool-guide.ts
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
+## The launch-MVP page is the one that ships — `mvp-landing-page.tsx`
+
+**Read this before the rest of the file.** Everything below describes
+`landing-page.tsx`, the sixteen-tool page, which is still built, still tested
+and **mounted by nothing**. What `/` actually serves a signed-out visitor is
+`mvp-landing-page.tsx`, and it was built out from a four-section placeholder to
+a whole page on 2026-08-24. Most of the reasoning below transfers unchanged —
+the light pinning, the `lp-*` palette, the one type scale, the drawn-not-
+photographed rule, the ban on invented numbers — and the differences are here.
+
+**Its sections, in order**: hero (headline, two actions, the drawn editor);
+the programs a finished file opens in, grouped by the export that reaches each;
+`#inside`, four `FeatureRow`s over drawn screens; `#formats`, the export wizard
+drawn with the three formats under it; `#private`, three cards about where the
+writing is; `#pricing`, the two plans; `#faq`; `CtaBanner`; `LandingFooter`.
+
+**It may only name what the launch flag leaves reachable, and that cost three
+claims while it was being written.** `HIDDEN_BOOK_TOOL_PATHS` in `launch.ts` is
+the list to check before adding a sentence:
+
+- **Collaboration came off.** `ShareDialog` still opens inside the app, but
+  `/invite/[token]` redirects home, so an invitation cannot be *accepted* — a
+  co-writer row on the page would have sold a flow that dead-ends. It went from
+  a feature row's disclosure and from the FAQ, and "to share a book" came out of
+  the answer to *Do I need an account?*
+- **The reading view came off**, which is also why the drawn shelf card carries
+  a Write button and not the Read one beside it in the real app.
+- **The sixteen tools came off**, which is why there is no tool cloud, no
+  `ToolsMenu` in the bar, and no `ToolMarquee` under the closing ask.
+
+**Four shared components took props rather than being copied**, because two
+products now share one design: `LandingHeader` takes `items` (a
+`HeaderNavItem[]`; `{ kind: "tools" }` is how the menu keeps its *place* in the
+row rather than a boolean beside the array), `LandingFooter` takes `columns`,
+`CtaBanner` takes its `title`, `lead`, `note` and a `marquee` switch. Each
+defaults to what the sixteen-tool page already passed, so that page and `/tools`
+are untouched. A second copy of any of them is how two pages meant to look
+identical end up a step apart — the same argument `feature-row.tsx` was
+extracted on.
+
+**Its figures are five drawn screens plus the export's**, and the measurement
+that governs all of them is in the note on `W` in `mvp-screens.tsx`. The short
+version: a drawn screen is its *design width* scaled to whatever column it lands
+in, so **the slot's measure is the zoom**. `export-screen.tsx` designs at 1000px
+and lands at about 8.5px of body text in this page's figure column, which is
+where a browser's subpixel antialiasing starts putting colour on the letters —
+so these are designed at about 770px, the hero is capped at `max-w-4xl` and the
+export window at `max-w-5xl`. If a figure ever moves into a different slot, the
+thing to change is the slot, not one font size inside the drawing.
+
+**What is read rather than typed**: `LAUNCH_LIMITS` (books, assistant replies),
+`plans.ts` (both prices, the per-month figure and the saving), `IMPORT_FORMATS`,
+`MAX_SNAPSHOTS`, `DESTINATIONS`, `LEGAL_PAGES`, `REFUND_DAYS` and
+`CONTACT_EMAIL`. The limits matter most: the same `LAUNCH_LIMITS` is read by the
+shelf, the Postgres trigger and the export check, so the copy and the
+enforcement cannot say different things.
+
+**The Legal footer column is not housekeeping.** The MVP page passes its own
+five columns and the first draft dropped Legal, which would have left the
+privacy, terms, refunds and contact pages linked from nowhere on the only page
+a payment provider reviews signed out — reported as missing rather than as
+unlinked. It reads `LEGAL_PAGES`, so a fifth page cannot forget it.
+
+**Two claims elsewhere were wrong and were fixed with it**, both of the kind
+this site exists not to make. The footer's last line read *"Your manuscript
+stays in your browser"* — signing in syncs the library to our database, which
+`/privacy` states plainly, so the last sentence on the site was the one claim on
+it the code could not back; it is now *"Your writing is yours. It is never used
+to train models."* And `ExportScreen` drew **"Step 7 of 7" over five groups**
+after the Preview step ("Read it before you send it") was added to every format,
+which is exactly the failure mode its own note warns about when a client
+module's strings are quoted by hand. Walk `stepsFor("epub")` before touching it.
+
+---
+
 **The landing page is one Server Component** —
 `src/components/landing/landing-page.tsx`, what a signed-out visitor sees at
 `/` — **plus four client pieces it cannot hold itself**: `landing-header.tsx`,

@@ -51,7 +51,6 @@ import {
 import { chapterMatterOf, findBook, type Book } from "@/lib/library-store";
 import { chapterNumeral } from "@/lib/export/blocks";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
-import { storeReadiness } from "@/lib/publishing";
 import { type ToolPageProps } from "@/lib/tool-page";
 import { areaLabel } from "@/lib/areas";
 import { exportAllowed } from "@/lib/launch";
@@ -454,31 +453,11 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
     return b ? writtenPages(loadChapters(b)) : new Set<string>();
   }, [shelf, bookId]);
 
-  /**
-   * What a shop would refuse, for the rail to show from step one.
-   *
-   * The listing half only — `storeReadiness` is pure and reads the book's own
-   * fields, so this costs nothing per render. The half that needs the
-   * manuscript (`checkStoreReadiness`, which walks every chapter for broken or
-   * undescribed images) stays on the export step where it already runs, because
-   * parsing the whole book to draw a sidebar badge would be a real cost for a
-   * number that is only a prompt.
-   *
-   * `findBook` is called here rather than reusing the one below, because every
-   * hook has to run before the early returns — a book that is not there must
-   * not change how many hooks this component runs.
-   */
-  const blocking = useMemo(() => {
-    const b = findBook(shelf, bookId);
-    if (!b) return 0;
-    return storeReadiness({
-      book: b,
-      ...(b.publishing ? { meta: b.publishing } : {}),
-      hasCover: cover !== null,
-      chapterCount: b.chapters.filter((c) => c.words > 0).length,
-      brokenImages: 0,
-    }).filter((issue) => issue.level === "blocking").length;
-  }, [shelf, bookId, cover]);
+  /* The readiness count went with the red band in the header and the note
+     in the done dialog — the two things that read it. Every finding it
+     produced is fixed on a tool the launch flag hides, so counting them
+     here only ever produced a number with nowhere to go.
+     `storeReadiness` is untouched and comes back with those tools. */
 
   /*
    * Two road steps end here — "Run the pre-upload check" and "Export the
@@ -725,7 +704,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
         className="scroll-slim min-h-0 min-w-0 flex-1 overflow-y-auto"
       >
         <TopBar
-          blocking={blocking}
           groups={groups}
           currentId={step.id}
           currentIndex={index}
@@ -1050,9 +1028,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
       {done && (
         <ExportDoneDialog
           done={done}
-          book={book}
-          save={save}
-          blocking={blocking}
           onClose={() => setDone(null)}
         />
       )}
@@ -1104,7 +1079,6 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 /* No `book` prop any more — the line naming it came off with the step count,
    and nothing else here reads the manuscript. */
 function TopBar({
-  blocking,
   groups,
   steps,
   currentId,
@@ -1116,7 +1090,6 @@ function TopBar({
   /** The dashboard area this was opened from, if the link said so. */
   from: string | null;
   /** How many listing problems a shop would refuse today. */
-  blocking: number;
   groups: { name: string; steps: Step[] }[];
   steps: Step[];
   currentId: StepId;
@@ -1300,39 +1273,26 @@ function TopBar({
         )}
       </div>
 
-      {/* **What a shop would refuse, from step one rather than step five.**
+      {/* **The red band came off this header on 2026-08-25.**
 
-          This is the product's whole argument and it was invisible until the
-          last screen of the wizard — a writer answered four steps' worth of
-          questions before anything told them the book had no author name. The
-          count is pure and cheap (`storeReadiness` reads the listing details
-          only; `hasCover` tests for a key rather than fetching a data URL), so
-          there is no reason to withhold it.
+          It said "N things a shop would refuse" from step one, and the argument
+          for putting it there was a good one: a writer used to answer four
+          steps' worth of questions before anything told them the book had no
+          author name.
 
-          A full-width strip rather than the rail's card, which is the shape
-          that matches a horizontal band. It keeps the `stop` tint it always
-          had and it still never blocks — the second sentence says the export
-          runs anyway, which is the standing promise of this screen: the file
-          is yours whether or not a shop would take it. */}
-      {blocking > 0 && (
-        <button
-          type="button"
-          onClick={() => onGo("export")}
-          className="flex w-full items-center gap-3 border-t border-stop-line
-                     bg-stop-bg px-5 py-2.5 text-left outline-none
-                     transition-colors hover:bg-stop-bg/70
-                     focus-visible:ring-2 focus-visible:ring-inset
-                     focus-visible:ring-accent/60 md:px-12"
-        >
-          <span className="font-sans text-sm font-semibold text-stop-fg">
-            {blocking} {blocking === 1 ? "thing" : "things"} a shop would refuse
-          </span>
-          <span className="hidden font-sans text-xs text-muted sm:block">
-            The export still runs. Fixing them first saves the upload.
-          </span>
-          <Arrow className="ml-auto shrink-0 text-stop-fg" />
-        </button>
-      )}
+          What changed is where the fixing happens. Every one of those findings
+          is put right on a tool the launch flag hides — listing, covers,
+          categories, paperback are all in `HIDDEN_BOOK_TOOL_PATHS` — so the
+          band announced four problems and had nowhere to send anybody. A
+          count a writer cannot act on is not information, it is a red bar over
+          the screen they came here to use, and this screen's standing promise
+          is that the file is theirs either way.
+
+          The count itself is untouched: `blocking` still comes from
+          `storeReadiness` and the listing step still shows every finding in
+          full, which is the one place on this screen where the fix is a field
+          the writer can actually type into. This band comes back with the
+          Prepare tools. */}
     </header>
   );
 }

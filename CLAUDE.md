@@ -605,7 +605,7 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   edits**: this table, two *new* prices in Paddle's catalog (never an edit of a
   live one), and the resulting env ids.
 - **The launch MVP charges for what the earlier plan gave away, and the two
-  policies are both in the tree.** What is free now is **one book**, unlimited
+  policies are both in the tree.** What is free now is **five books**, unlimited
   words and chapters, imports, sync, and **Word export only**; Pro buys
   unlimited books, EPUB and PDF, and sixty assistant replies a month against
   five. The old rule — *export must never move behind the plan* — is the one
@@ -618,7 +618,19 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   lands), `requireLaunchExport()` gates EPUB and PDF, and the free book limit is
   a **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
   count. `new-book-form.tsx` mirrors it in the UI; the trigger is what enforces
-  it.
+  it. **The count is stated twice and both have to move** — `freeBooks` in
+  `launch.ts` and the trigger body, whose current value is set by the ninth
+  migration (`20260824000000_free_book_limit_five.sql`) rather than by the
+  eighth, because the eighth may already have been applied.
+- **The book limit counts the active shelf and nothing else**, and the way back
+  out of the archive and the trash is gated instead. `booksAgainstPlan` in
+  `library-store.ts` is the browser's copy of that rule and the trigger is the
+  real one; it fires on **update as well as insert**, because a restore is an
+  update and archiving five books then restoring them all would otherwise walk
+  straight past the limit. This is how a limit counted in *things* is counted
+  everywhere else — Trello's boards, Figma's files — as against a limit counted
+  in bytes, where trash holds its space until it is emptied. Counting the trash
+  is what the shipped version did, and a shelf of three books refused a fourth.
 - **`free-limits.ts` is the earlier metering policy and most of it is asleep** —
   every tool it gates is one the launch MVP hides, so the seats row is the only
   one on a live path (`ShareDialog` still opens from the editor and the
@@ -656,18 +668,40 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 
 ### The landing page — `docs/architecture/landing.md`
 
-**`mvp-landing-page.tsx` is what a signed-out visitor actually gets**; it sells
-the smaller product and reads `LAUNCH_LIMITS` so the copy cannot drift from the
-gate. `landing-page.tsx` is the fuller sixteen-tool page beside it, still built
-and tested and currently mounted by nothing — the same standing as the other
-finished-but-unreachable code below. Both are Server Components. `/tools` is the
-second marketing page, over the pure `tool-guide.ts`, and a test walks
-`ALL_TOOLS` so a tool cannot ship as a heading over an empty column — **the
-proxy redirects it home under the launch flag**.
+**`mvp-landing-page.tsx` is what a signed-out visitor actually gets**, and as
+of 2026-08-24 it is a whole page rather than a placeholder: hero, the programs
+a finished file opens in, four feature rows, the export, what leaves the
+browser, the two plans, a FAQ, the closing ask and the footer. It sells the
+smaller product and reads `LAUNCH_LIMITS`, `plans.ts`, `IMPORT_FORMATS`,
+`MAX_SNAPSHOTS`, `DESTINATIONS` and `legal.ts` so no figure on it can drift
+from the thing that enforces it. `landing-page.tsx` is the fuller sixteen-tool
+page beside it, still built and tested and currently mounted by nothing — the
+same standing as the other finished-but-unreachable code below. Both are Server
+Components. `/tools` is the second marketing page, over the pure
+`tool-guide.ts`, and a test walks `ALL_TOOLS` so a tool cannot ship as a heading
+over an empty column — **the proxy redirects it home under the launch flag**.
+
+- **The MVP page may only name what the launch flag leaves reachable**, which is
+  a harder rule than it sounds: three claims had to come off it while it was
+  being written. Collaboration is gated (`/invite/[token]` goes home, so an
+  invitation cannot be accepted), the reading view is gated, and the sixteen
+  tools are gated. **`HIDDEN_BOOK_TOOL_PATHS` is the list to check before adding
+  a sentence to this page.**
+- **Its figures are five drawn screens** in `mvp-screens.tsx` — shelf, editor,
+  versions, import, assistant — plus the export wizard's own `ExportScreen`. All
+  six are markup at a fixed design mapped onto `cqw`, so the page ships no
+  script beyond the header. **The drawn design is ~770px wide, not the 1000px
+  `export-screen.tsx` uses**, and the note on `W` in that file records why: a
+  1000px design in this page's figure column renders its body text at 8.5px.
+  The hero is capped at `max-w-4xl` and the export at `max-w-5xl` for the same
+  reason — the slot's measure *is* the zoom.
 
 - **Every claim has to be true of the code**, and everything countable is
   imported and counted (`STEPS`, `PHASES`, `ALL_TOOLS`, `DESTINATIONS`, prices
-  from `plans.ts`).
+  from `plans.ts`). Two long-standing claims failed that test and were fixed on
+  2026-08-24: the footer's last line said *"Your manuscript stays in your
+  browser"*, which signing in makes false, and `export-screen.tsx` drew "Step 7
+  of 7" over five groups after the Preview step was added to every format.
 - **No number a SaaS page would invent** — no user count, no rating, no
   testimonial, until there is a real one.
 - **The figures are drawn in markup, never screenshotted**, and three are

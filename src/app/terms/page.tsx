@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
 import { LAUNCH_LIMITS } from "@/lib/launch";
+import { plural } from "@/lib/plural";
 import {
   CONTACT_EMAIL,
   COUNTRY,
@@ -67,8 +68,9 @@ export default function TermsPage() {
 
       <Section title="5. Free and Pro">
         <p>
-          The Free plan includes {LAUNCH_LIMITS.freeBooks} book, unlimited
-          chapters and words, autosave and sync where accounts are configured,{" "}
+          The Free plan includes {plural(LAUNCH_LIMITS.freeBooks, "book")},
+          unlimited chapters and words, autosave and sync where accounts are
+          configured,{" "}
           {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} writing-assistant
           replies per month, and Word export.
         </p>

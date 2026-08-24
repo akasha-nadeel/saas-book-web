@@ -2,11 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { DESTINATIONS } from "@/components/landing/works-with";
-import { ToolStepDone } from "@/components/ui/tool-save";
 import { download, fileSize, type Format } from "@/lib/export";
-import type { Book } from "@/lib/library-store";
-import { roadmapFor, type StepState } from "@/lib/roadmap";
-import type { ToolSaveState } from "@/lib/use-tool-save";
 
 /**
  * The moment after the file leaves.
@@ -31,7 +27,10 @@ import type { ToolSaveState } from "@/lib/use-tool-save";
  * - **Where it opens**, from `DESTINATIONS` — the same list the landing page
  *   makes its claim from, so the two cannot disagree and neither can name a shop
  *   the export does not actually reach.
- * - **What is next on the road**, and the tick for the step just finished.
+ *
+ * It used to carry a fourth thing — the next roadmap step and a tick for the
+ * one just finished — and that came off with the rest of the publishing half;
+ * see the note where it stood.
  *
  * What it does *not* do is congratulate. No confetti, no "well done": a writer
  * exporting for the fourth time this afternoon is fixing something.
@@ -88,17 +87,9 @@ const CATALOGUE_FORMAT: Partial<Record<DoneFormat, string>> = {
 
 export function ExportDoneDialog({
   done,
-  book,
-  save,
-  blocking,
   onClose,
 }: {
   done: ExportDone;
-  book: Book;
-  /** The road, so the step just finished can be ticked from here. */
-  save: ToolSaveState;
-  /** Listing problems a shop would refuse, counted by the screen already. */
-  blocking: number;
   onClose: () => void;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -121,21 +112,6 @@ export function ExportDoneDialog({
   const opens = DESTINATIONS.filter(
     (d) => d.format === CATALOGUE_FORMAT[done.format],
   );
-
-  /*
-   * What follows this on the road.
-   *
-   * Not `progressOf(...).next`, which would answer with the export step itself:
-   * it is hand-ticked, and at this moment it is un-ticked by definition — the
-   * writer has this second finished the thing it stands for. So the search
-   * starts *after* it, and skips anything already done. Steps are read live
-   * rather than named here, because "Open the files yourself" following "Export
-   * the files" is a fact about `roadmap.ts` and not about this dialog.
-   */
-  const steps = roadmapFor(book, book.roadmapDone ?? []);
-  const from = steps.findIndex((s) => s.id === "export");
-  const next: StepState | null =
-    from === -1 ? null : (steps.slice(from + 1).find((s) => !s.done) ?? null);
 
   return (
     <dialog
@@ -266,41 +242,20 @@ export function ExportDoneDialog({
           </div>
         )}
 
-        {/* ---- What a shop would still refuse ----------------------------
-            Quiet, and only where it is true. The full list is on the screen
-            behind this dialog, which is where the fixing happens — repeating it
-            here would be a second copy of the readiness check to keep in step.
-            It is said at all because this is the moment before an upload. */}
-        {done.format === "epub" && blocking > 0 && (
-          <p className="mt-4 rounded-lg border border-stop-line bg-stop-bg px-3.5 py-2.5 font-sans text-xs leading-relaxed text-stop-fg">
-            {blocking} {blocking === 1 ? "thing" : "things"} on the listing
-            {blocking === 1 ? " is" : " are"} still what a shop would refuse —
-            they are listed under this button. The file is yours either way.
-          </p>
-        )}
+        {/* **The shop-readiness note and the roadmap card came off on
+            2026-08-25.** Both belonged to the publishing half of the
+            product, and under the launch flag that half is not there:
+            `roadmap` and `listing` are both in `HIDDEN_BOOK_TOOL_PATHS`, so
+            the note pointed at a list nobody could open and the card named
+            the next step on a road with no way onto it. The tick button went
+            with them — it marked a roadmap step done on a roadmap that
+            redirects home.
 
-        {/* ---- The road --------------------------------------------------- */}
-        {next && (
-          <div className="mt-5 rounded-xl border border-line px-4 py-3.5">
-            <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
-              Next on your roadmap
-            </p>
-            <p className="mt-1.5 font-sans text-sm font-semibold text-fg">
-              {next.title}
-            </p>
-            <p className="mt-1 font-sans text-xs leading-relaxed text-muted">
-              {next.note}
-            </p>
-          </div>
-        )}
+            What is left is what this MVP actually is: the file is written,
+            and here is where it went. `roadmapFor` and `storeReadiness` are
+            untouched, and all three come back with the tools. */}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          {/* The same control the header carries, not a second implementation
-              of it: what it ticks is worked out from the step's own `href`, and
-              two buttons deciding that separately would eventually disagree. It
-              is here as well because this is the moment the step is true. */}
-          <ToolStepDone state={save} />
-
           <button
             type="button"
             onClick={onClose}

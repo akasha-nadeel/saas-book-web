@@ -16,6 +16,7 @@ import {
 } from "@/lib/image-import";
 import { saveCover } from "@/lib/cover-save";
 import {
+  booksAgainstPlan,
   createBook,
   createBookFromImport,
   createMatterPages,
@@ -39,6 +40,9 @@ import {
 import { MatterPartRows } from "@/components/editor/matter-rows";
 import { BookCover } from "@/components/shelf/book-cover";
 import { LAUNCH_LIMITS } from "@/lib/launch";
+import {
+  UpgradeDialog,
+} from "@/components/upgrade/upgrade-dialog";
 import { usePlan } from "@/lib/use-plan";
 import { useShelf } from "@/lib/use-library";
 
@@ -238,7 +242,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   const router = useRouter();
   const shelf = useShelf();
   const plan = usePlan();
-  const storedBookCount = shelf.books.length;
+  const storedBookCount = booksAgainstPlan(shelf).length;
   const freeBookLimitReached =
     (plan.loading || plan.billing) &&
     !plan.pro &&
@@ -292,6 +296,11 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   const [imported, setImported] = useState<ImportedBook | null>(null);
   /** A refused write at the very last press — storage full, most likely. */
   const [saveError, setSaveError] = useState<string | null>(null);
+  /* The plan running out is not one of those, and used to be printed as one:
+     the same red line in the footer, next to a button that still looked
+     pressable. It is a comparison now, and `saveError` is left to mean what it
+     says — something went wrong. */
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   /* Seeded from the draft, so a reload keeps the answers. Lazy initialisers:
      read once, on the first render, never on every keystroke after. */
@@ -402,9 +411,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
 
   const create = () => {
     if (freeBookLimitReached) {
-      setSaveError(
-        "The Free plan includes one book. Upgrade to Pro for unlimited books.",
-      );
+      setShowUpgrade(true);
       return;
     }
 
@@ -969,6 +976,10 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
         </form>
         )}
       </div>
+
+      {showUpgrade && (
+        <UpgradeDialog reason="books" onClose={() => setShowUpgrade(false)} />
+      )}
     </main>
   );
 }

@@ -70,7 +70,18 @@ const HEADING =
 /** One row of links, shared by every column so they cannot drift apart. */
 const LINK = "text-[0.875rem] hover:text-lp-ink";
 
-type Column = { heading: string; links: { href: string; label: string }[] };
+/**
+ * One column of the footer's top row.
+ *
+ * Exported so the launch-MVP page can hand in its own five: half of the
+ * default set below points at sections that page does not have, and one of
+ * them at `/tools`, which the proxy redirects home. A link to nothing is the
+ * dead UI this app refuses everywhere else.
+ */
+export type FooterColumn = {
+  heading: string;
+  links: { href: string; label: string }[];
+};
 
 /**
  * The five columns across the top.
@@ -81,7 +92,7 @@ type Column = { heading: string; links: { href: string; label: string }[] };
  * reader who presses "Money and reviews" lands on the part of the page that
  * describes it. Nothing here is a link to a page that does not exist.
  */
-const COLUMNS: Column[] = [
+export const FULL_COLUMNS: FooterColumn[] = [
   {
     heading: "Product",
     /* **Mirrors the bar, and one of these was pointing at nothing.**
@@ -141,7 +152,15 @@ export function LandingFooter({
    * footer.
    */
   home = true,
-}: { home?: boolean } = {}) {
+  /**
+   * The five columns across the top.
+   *
+   * A prop for the reason `LandingHeader.items` is one: two products share
+   * this footer, and the default set names the order, the sixteen tools and
+   * the tool guide — none of which the launch MVP has a page for.
+   */
+  columns = FULL_COLUMNS,
+}: { home?: boolean; columns?: FooterColumn[] } = {}) {
   return (
     /* `.oc-closing` paints the landscape across the whole of this element and
        reserves the reveal above the card with its own top padding. No ground
@@ -160,7 +179,7 @@ export function LandingFooter({
           <div className="mx-auto max-w-6xl">
             {/* ---- Row one: the five columns --------------------------- */}
             <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6">
-              {COLUMNS.map((column) => (
+              {columns.map((column) => (
                 <nav key={column.heading}>
                   <h2 className={HEADING}>{column.heading}</h2>
                   <ul className="mt-4 space-y-2.5">
@@ -269,8 +288,14 @@ export function LandingFooter({
               </Link>
 
               <div className="text-[0.8125rem] leading-relaxed sm:text-center">
+                {/* **It said "Your manuscript stays in your browser", and it
+                    does not.** Signing in syncs the library to our database,
+                    which `/privacy` states plainly — so the last line of the
+                    site was the one claim on it the code could not back. What
+                    is left is the strongest thing that is true everywhere:
+                    the policy says it in the same words. */}
                 <p className="font-semibold text-lp-ink">
-                  Your manuscript stays in your browser.
+                  Your writing is yours. It is never used to train models.
                 </p>
                 <p className="mt-0.5 text-lp-faint">
                   © {new Date().getFullYear()} {TRADING_NAME}. All rights

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { ToolMarquee } from "@/components/landing/tool-marquee";
 import { SECTION_TITLE } from "@/components/landing/type";
 
@@ -55,7 +56,38 @@ import { SECTION_TITLE } from "@/components/landing/type";
  * is read rather than squinted at.
  */
 
-export function CtaBanner() {
+export function CtaBanner({
+  /**
+   * The ask itself, and the reason these are props.
+   *
+   * **Two products share this closing section.** The default words are the
+   * sixteen-tool page's positioning — the *order* nobody tells you — and the
+   * marquee under them is the sixteen tools going past. Neither is true of the
+   * launch MVP, whose tool screens the proxy redirects home, so it hands in its
+   * own sentence and switches the row off. Everything else about the section is
+   * shared on purpose: one closing image, one pair of buttons, one measure.
+   *
+   * The line break in the default heading is kept: at this measure the sentence
+   * would otherwise turn after "Take", which puts the break inside the clause
+   * rather than between the two.
+   */
+  title = (
+    <>
+      You have the book.
+      <br />
+      Take the order for free.
+    </>
+  ),
+  lead = "Import the manuscript you already have. The first screen tells you what stands between it and a shop.",
+  note = "No card needed. Already have an account? Log in below.",
+  /** The sixteen tools going past, under the ask. Off where there are none. */
+  marquee = true,
+}: {
+  title?: ReactNode;
+  lead?: string;
+  note?: string;
+  marquee?: boolean;
+} = {}) {
   return (
     /* No `isolate` and no `overflow-hidden`, and both absences are
        load-bearing. The footer is a *later sibling* that lifts up onto this
@@ -78,9 +110,7 @@ export function CtaBanner() {
               which puts the break inside the clause rather than between the
               two. */}
           <h2 className={`oc-display font-serif text-lp-ink ${SECTION_TITLE}`}>
-            You have the book.
-            <br />
-            Take the order for free.
+            {title}
           </h2>
 
           {/* `lp-ink` rather than the `lp-soft` a lead takes elsewhere on the
@@ -88,13 +118,10 @@ export function CtaBanner() {
               chosen to sit quietly under a heading is the wrong weight for a
               closing sentence with a button under it. */}
           <p className="oc-lead mx-auto mt-5 max-w-xl font-serif text-lg leading-relaxed text-lp-ink sm:mt-6 sm:text-xl">
-            Import the manuscript you already have. The first screen tells you
-            what stands between it and a shop.
+            {lead}
           </p>
 
-          <p className="mt-6 text-[0.875rem] font-medium text-lp-ink">
-            No card needed. Already have an account? Log in below.
-          </p>
+          <p className="mt-6 text-[0.875rem] font-medium text-lp-ink">{note}</p>
 
           {/* Both filled — see the note at the top of the file. */}
           <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -119,9 +146,15 @@ export function CtaBanner() {
           purpose: a marquee that stops at the page's measure reads as a
           widget in a box, where one running the full width reads as the row
           carrying on past the screen, which is what it is. */}
-      <div className="pb-14 sm:pb-16">
-        <ToolMarquee />
-      </div>
+      {marquee ? (
+        <div className="pb-14 sm:pb-16">
+          <ToolMarquee />
+        </div>
+      ) : (
+        /* The marquee's own bottom padding, kept, so the ask ends the same
+           distance above the landscape either way. */
+        <div className="pb-14 sm:pb-16" />
+      )}
     </section>
   );
 }

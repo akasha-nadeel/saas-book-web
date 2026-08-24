@@ -9,7 +9,7 @@ export const LAUNCH_PRICING = {
 } as const;
 
 export const LAUNCH_LIMITS = {
-  freeBooks: 1,
+  freeBooks: 5,
   freeAssistantRepliesPerMonth: 5,
   proAssistantRepliesPerMonth: 60,
   freeExports: ["docx"],

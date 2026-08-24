@@ -3221,6 +3221,25 @@ body {
   overscroll-behavior: contain;
 }
 
+/* A dialog that is read at a glance or not at all.
+
+   `.oc-dialog-scroll` caps every question at 78dvh, which is right for a
+   question: it keeps a long body from filling the screen, and scrolling to the
+   answer is no loss. The upgrade comparison is the one dialog where that cap
+   works against the design — two columns to be *compared* stop comparing the
+   moment half of one is below the fold, and at 78dvh on a laptop the last row
+   and the button sat just past it, so the whole thing arrived wearing a
+   scrollbar for the sake of a few pixels.
+
+   So it takes the window instead, less a margin. Still capped, so it can never
+   be taller than the screen; the phone rule below is untouched, because there
+   the two columns are one and a sheet is the right shape. */
+@media (min-width: 48rem) {
+  .oc-dialog-whole .oc-dialog-scroll {
+    max-height: calc(var(--oc-visual-height) - 3rem);
+  }
+}
+
 @media (max-width: 47.999rem) {
   dialog[data-dialog-presentation="sheet"] {
     width: 100% !important;

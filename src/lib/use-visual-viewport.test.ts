@@ -10,6 +10,7 @@ class FakeVisualViewport extends EventTarget {
     public width: number,
     public height: number,
     public offsetTop = 0,
+    public scale = 1,
   ) {
     super();
   }
@@ -109,5 +110,49 @@ describe("visual viewport variables", () => {
     expect(h.target.cancelAnimationFrame).toHaveBeenCalledTimes(1);
     h.visualViewport.dispatchEvent(new Event("resize"));
     expect(h.frames.size).toBe(0);
+  });
+});
+
+describe("a pinch is not a keyboard", () => {
+  /**
+   * The bug this was written for: zoomed in on the dashboard, the application
+   * shell drew as a short strip with the page background below it. The shell is
+   * `h-[var(--oc-layout-height)]`, that variable was the *visual* height, and a
+   * reader looking at a third of the page had told it to be a third as tall.
+   */
+  it("publishes the layout viewport while the reader is zoomed in", () => {
+    const snapshot = visualViewportSnapshot({
+      innerWidth: 1440,
+      innerHeight: 900,
+      visualViewport: new FakeVisualViewport(480, 300, 120, 3),
+    });
+
+    expect(snapshot.height).toBe(900);
+    expect(snapshot.width).toBe(1440);
+    expect(snapshot.offsetTop).toBe(0);
+    // And nothing is mistaken for a keyboard, so no inset is reserved.
+    expect(snapshot.keyboardInset).toBe(0);
+  });
+
+  it("still follows the visual viewport for a keyboard, which leaves scale at 1", () => {
+    const snapshot = visualViewportSnapshot({
+      innerWidth: 390,
+      innerHeight: 844,
+      visualViewport: new FakeVisualViewport(390, 504, 0, 1),
+    });
+
+    expect(snapshot.height).toBe(504);
+    expect(snapshot.keyboardInset).toBe(340);
+  });
+
+  /** A pinch that ends where it started leaves a float a hair off 1. */
+  it("treats a scale of almost exactly one as no pinch at all", () => {
+    const snapshot = visualViewportSnapshot({
+      innerWidth: 390,
+      innerHeight: 844,
+      visualViewport: new FakeVisualViewport(390, 504, 0, 1.000001),
+    });
+
+    expect(snapshot.height).toBe(504);
   });
 });

@@ -4355,6 +4355,29 @@ export function booksIn(shelf: Shelf, view: BookView): Book[] {
 }
 
 /**
+ * The books that count against a plan's book limit: the active shelf only.
+ *
+ * **Neither trash nor archive counts, and the way out of both is gated
+ * instead.** This is the settled convention for a limit counted in *things*
+ * rather than in bytes — Trello's ten boards and Figma's three files both
+ * work this way, and archiving there opens a slot. A quota counted in bytes
+ * goes the other way (Google Drive's trash holds your storage until it is
+ * emptied), but this limit is a count of books, not of megabytes.
+ *
+ * Counting either was the bug this came from: a shelf showing three books
+ * refused a fourth, because two more sat in the trash.
+ *
+ * The half that keeps it honest is that **`restoreBook` is refused at the
+ * limit** — otherwise archiving five and restoring them all walks straight
+ * past it. Figma does the same thing, and its help page says so: restoring
+ * needs a free slot. `enforce_launch_book_limit` in Postgres counts the same
+ * way and fires on the restore as well as on the insert.
+ */
+export function booksAgainstPlan(shelf: Shelf): Book[] {
+  return booksIn(shelf, "active");
+}
+
+/**
  * Keeps lastOpenedBookId pointing at something still on the shelf, so
  * "Continue writing" never offers a book the writer just put away.
  */

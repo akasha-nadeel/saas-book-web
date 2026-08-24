@@ -31,9 +31,9 @@ import {
   archiveBook,
   bookChapterCount,
   bookWordCount,
+  booksAgainstPlan,
   booksIn,
   deleteBook,
-  dismissBanner,
   getArcRaw,
   getCoverFacts,
   hasCover,
@@ -55,7 +55,6 @@ import {
   useLedger,
   useLibrarySettled,
   useCoverEpoch,
-  usePrefs,
   useShelf,
 } from "@/lib/use-library";
 import {
@@ -68,7 +67,8 @@ import {
 import { targetShare } from "@/lib/target";
 import { smoothArea, smoothPath } from "@/lib/spark";
 import { LAUNCH_LIMITS } from "@/lib/launch";
-import { usePlan } from "@/lib/use-plan";
+import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
+import { usePlan, type PlanState } from "@/lib/use-plan";
 import {
   parseArc,
   summarise as summariseArc,
@@ -451,11 +451,34 @@ export function Bookshelf({
   /* Both were `window.confirm`, which the browser can be told to stop showing —
      see `ui/dialog.tsx`. Two questions about a whole book, so the book waits in
      state and the answer arrives through a callback. */
+  /* One `usePlan()` for the whole dashboard. It fetches per mount, and both
+     the restore gate below and `ProCard` need the answer, so the card takes it
+     as a prop rather than asking again. */
+  const plan = usePlan();
+
   const [trashing, setTrashing] = useState<Book | null>(null);
   const [erasing, setErasing] = useState<Book | null>(null);
+  /* The third question, and the one that is not a confirmation: a restore the
+     free plan has no room for. Coming back out of the archive or the trash is
+     what makes "neither of them counts" honest — see `booksAgainstPlan`. */
+  const [noRoomFor, setNoRoomFor] = useState<Book | null>(null);
 
   const handleTrash = (book: Book) => setTrashing(book);
   const handleDeleteForever = (book: Book) => setErasing(book);
+  const handleRestore = (book: Book) => {
+    /* The same three-part test `new-book-form.tsx` makes, and it has to stay
+       the same: with no gateway configured there are no plans and nothing is
+       held back, so `plan.billing` is half of the question. */
+    const gated =
+      (plan.loading || plan.billing) &&
+      !plan.pro &&
+      booksAgainstPlan(shelf).length >= LAUNCH_LIMITS.freeBooks;
+    if (gated) {
+      setNoRoomFor(book);
+      return;
+    }
+    restoreBook(book.id);
+  };
 
   if (!hydrated) return <LoadingScreen />;
 
@@ -789,6 +812,18 @@ export function Bookshelf({
               />
             )}
 
+            {/* Write gets one too, and only over the *active* list. Archived,
+                Trash and Favourites are lists somebody came to manage, and a
+                strip inviting them to start a book sits badly over a trash
+                can — the same rule the current-book card follows below. */}
+            {area === "write" && view === "active" && (
+              <WriteBand books={counts.active} settled={settled} />
+            )}
+
+            {area === "write" && view === "favourite" && (
+              <FavouritesBand books={counts.favourite} settled={settled} />
+            )}
+
             {/* One block. The heading and its line used to be two siblings with
               `mb-8` and `-mt-6` cancelling each other out — a spacing bug
               waiting to be inherited by the next area added. */}
@@ -812,6 +847,7 @@ export function Bookshelf({
 
             {area === "overview" && (
               <Overview
+                plan={plan}
                 current={current}
                 books={active.length}
                 words={totals.words}
@@ -847,6 +883,7 @@ export function Bookshelf({
                 onCover={setCovering}
                 onTrash={handleTrash}
                 onDeleteForever={handleDeleteForever}
+                onRestore={handleRestore}
               />
             )}
 
@@ -932,6 +969,14 @@ export function Bookshelf({
             onConfirm={() => trashBook(trashing.id)}
             onClose={() => setTrashing(null)}
           />
+        )}
+
+        {noRoomFor && (
+          /* The same comparison the new-book form shows, because it is the same
+             limit — two screens wording one refusal differently is how a plan
+             stops being legible. `restore` only changes the line above the
+             headline. */
+          <UpgradeDialog reason="restore" onClose={() => setNoRoomFor(null)} />
         )}
 
         {erasing && (
@@ -1383,33 +1428,11 @@ function CurrentBookCard({
     [all, picked, current],
   );
 
-  const waved = usePrefs().dismissed;
-
-  /* Same staleness as the list below: the badge counts a missing cover, and a
-     cover written after this ran leaves `book` unchanged. */
-  const coverEpoch = useCoverEpoch();
-  const counts = useMemo(() => {
-    if (!book) return { fix: 0, note: 0 };
-    const issues = storeReadiness({
-      book,
-      ...(book.publishing ? { meta: book.publishing } : {}),
-      hasCover: hasCover(book.id),
-      coverFacts: getCoverFacts(book.id),
-      chapterCount: book.chapters.filter((c) => c.words > 0).length,
-      // The two that need the manuscript are the export screen's job.
-      brokenImages: 0,
-    });
-    return {
-      fix: issues.filter((i) => i.level === "blocking").length,
-      note: issues.filter((i) => i.level === "advisory").length,
-    };
-    /* eslint-disable-next-line react-hooks/exhaustive-deps --
-       `coverEpoch` is not read in the body and the rule is right about that.
-       It is here because `hasCover` reads `localStorage`, which the rule
-       cannot see: the epoch is the only value that changes when a cover is
-       written, so removing it as "unnecessary" is precisely what left the
-       "No cover" finding on screen after the cover arrived. */
-  }, [book, coverEpoch]);
+  /* `waved`, `coverEpoch` and the `counts` memo went with the readiness
+     banner below — see the note at its old site. `storeReadiness` is still
+     the one source of these findings and the export screen still reads it;
+     what is gone is this screen counting them for a banner that had nowhere
+     to send anybody. */
 
   const steps = useMemo(
     () => (book ? roadmapFor(book, book.roadmapDone ?? []) : []),
@@ -1535,127 +1558,27 @@ function CurrentBookCard({
                   column beside this card now — one figure in one place, rather
                   than the same percentage twice on one screen. */}
 
-              {/* ---- The diagnosis, as one line -------------------------
+              {/* ---- The diagnosis, and why it is not here ---------------
 
-                  A summary and a way to the list, not the list.
+                  **The readiness banner came off this card on 2026-08-25.**
+                  It counted what a shop would refuse, and it offered a way
+                  to the list that puts those right — and under the launch
+                  flag there is no such list. Every destination in
+                  `DESTINATIONS` is a tool `HIDDEN_BOOK_TOOL_PATHS`
+                  redirects home: listing, covers, categories, paperback. So
+                  the first screen a writer saw named four problems with
+                  their book and led nowhere at all.
 
-                  Everything here still comes from `checkup`, which is pure and
-                  tested and decides severity, order and where each thing is
-                  put right. What changed is how much of it belongs on *this*
-                  screen. Seven full-width banners, each with its own button,
-                  turned the first thing a writer sees into a wall of things
-                  wrong with their book — and pushed the book's own controls,
-                  the phase dials and the next step below the fold. Overview is
-                  meant to be the state of the book at a glance; it had become
-                  a worklist.
+                  A finding nobody can act on is worse than no finding: it is
+                  the invented-verdict failure this app refuses everywhere
+                  else, arriving by the back door. The export screen keeps
+                  its own readiness step, because the thing it points at —
+                  the export — is reachable.
 
-                  So the counts stay and the work moves. Prepare is the screen
-                  built for exactly this — one row per book, opened to show
-                  every finding with its fix — and sending a writer there costs
-                  one press and gains them the version that can actually be
-                  worked through.
-
-                  There is still no score. A percentage or a grade would be the
-                  invented number this app refuses everywhere else, and on the
-                  first screen a writer sees it would be the most damaging place
-                  to print one. Two counts and a way to the detail say more and
-                  claim less. */}
-              {!waved.includes(`${book.id}:${counts.fix}:${counts.note}`) && (
-                <div
-                  className={`col-span-2 mt-4 flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl
-                            border px-3.5 py-3 ${
-                              counts.fix > 0
-                                ? "border-stop-line bg-stop-bg"
-                                : counts.note > 0
-                                  ? "border-note-line bg-note-bg"
-                                  : "border-ok-line bg-ok-bg"
-                            }`}
-                >
-                  {counts.fix + counts.note > 0 ? (
-                    <AlertMark level={counts.fix > 0 ? "fix" : "note"} />
-                  ) : (
-                    <span aria-hidden="true" className="shrink-0 text-ok-fg">
-                      {shelfIcons.check}
-                    </span>
-                  )}
-
-                  <p className="min-w-[12rem] flex-1 text-sm">
-                    {counts.fix > 0 ? (
-                      <>
-                        <strong className="text-stop-fg">
-                          {plural(counts.fix, "thing")}
-                        </strong>{" "}
-                        <span className="text-stop-fg/80">
-                          would stop a shop taking this
-                        </span>
-                      </>
-                    ) : counts.note > 0 ? (
-                      /* True and incomplete on purpose: nothing is *blocking*,
-                       and there is still work. Saying only the first half is
-                       how this card came to claim a book was in order while
-                       Prepare listed two things for it. */
-                      <span className="text-note-fg">
-                        <strong>Nothing would stop a shop</strong> taking it,
-                        but there is more to do.
-                      </span>
-                    ) : (
-                      /* The one verdict on this screen worth colouring, and it is
-                       the *good* one. A clear book used to get the same neutral
-                       sentence a blocked one got, so the best news the screen
-                       can carry looked like no news. */
-                      <span className="text-ok-fg">
-                        <strong>Nothing here would stop a shop</strong> taking
-                        it. The listing details are in order.
-                      </span>
-                    )}
-                    {counts.note > 0 && (
-                      <span
-                        className={
-                          counts.fix > 0 ? "text-stop-fg/80" : "text-note-fg"
-                        }
-                      >
-                        {counts.fix > 0 ? " · " : " "}
-                        {counts.note} worth doing
-                      </span>
-                    )}
-                  </p>
-
-                  {/* Waving it away, and only here.
-                
-                    The Prepare rows keep theirs: that screen *is* the list, and
-                    a dismissable row on it would be a way to lose work rather
-                    than a way to stop being told. This one is a summary on a
-                    dashboard, and a writer who has read it should be able to
-                    put it down. */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      dismissBanner(book.id, counts.fix, counts.note)
-                    }
-                    aria-label="Dismiss until this changes"
-                    title="Dismiss until this changes"
-                    className={`shrink-0 rounded-md p-1 transition-opacity hover:opacity-70 ${
-                      counts.fix > 0
-                        ? "text-stop-fg"
-                        : counts.note > 0
-                          ? "text-note-fg"
-                          : "text-ok-fg"
-                    }`}
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      className="h-[15px] w-[15px]"
-                    >
-                      <path d="M6 6l12 12M18 6L6 18" />
-                    </svg>
-                  </button>
-                </div>
-              )}
+                  `checkup.ts`, `findingsFrom` and `storeReadiness` are
+                  untouched and still tested. This is a gate over them, not
+                  their removal, and it lifts when the Prepare tools do. See
+                  TODO.md under "Taken out on purpose". */}
 
               {/* The three verbs for a book, then ⋯.
 
@@ -1785,12 +1708,15 @@ function CurrentBookCard({
 }
 
 function Overview({
+  plan,
   current,
   books,
   words,
   chapters,
 }: {
-  /** The last book opened — the target dial is about it. */
+  /** Read once at the root, because the restore gate reads it too. */
+  plan: PlanState;
+  /** The book the shelf is on — the dial is about this one, and follows it. */
   current: Book | null;
   books: number;
   words: number;
@@ -1891,13 +1817,12 @@ function Overview({
         <WeekCard activity={activity} week={week} run={run} logged={logged} />
 
         <div className="flex flex-col gap-5">
-          <ProCard />
+          <ProCard plan={plan} />
+          {/* Nothing at all until this book carries a target — an empty dial
+              is a nought per cent nobody asked for. The place to set one is
+              the book card in Write, which is where the picker lives. */}
           {current?.targetWords ? (
-            <TargetGauge
-              title={current.title}
-              words={bookWordCount(current)}
-              target={current.targetWords}
-            />
+            <TargetGauge book={current} target={current.targetWords} />
           ) : null}
         </div>
       </div>
@@ -1937,21 +1862,209 @@ function Overview({
 // Nothing was lost with it: Write lists every book, with a cover each.
 
 /**
- * The word target as a half-dial.
+ * The band over the Write area.
+ *
+ * The same strip as `WelcomeBand` in every way that shows — full bleed to the
+ * window's own margin, a breadcrumb, a statement, and the two doors onto a new
+ * book — and a different thing underneath, because the picture is a drawing
+ * rather than a photograph. A flat illustration cannot be a *ground*: white
+ * type on it is unreadable and stretching a square across a wide strip crops it
+ * to a shoulder. So the ground is the app's own accent at a wash, the type is
+ * the ordinary ink, and the drawing stands on the floor of the band at its own
+ * aspect. `scripts/cut-illustration.cjs` is what took its white background off.
+ *
+ * **It reports rather than cheers**, which is the rule the other band was
+ * argued into: what it says is how many books are on the shelf, and the line
+ * under it is what the two buttons do. A slogan here would be the one thing
+ * this screen has no room for.
+ *
+ * `settled` is the reconcile gate, not the storage one — until the library has
+ * finished reconciling, a count of nought is a fact about the *loading* and not
+ * about the writer, and a band that opens with "nothing on the shelf yet" over
+ * a shelf of six books is the screen lying for a beat.
+ */
+function WriteBand({ books, settled }: { books: number; settled: boolean }) {
+  const empty = settled && books === 0;
+
+  return (
+    <section
+      className="relative -mx-4 overflow-hidden bg-accent/8 px-4 sm:-mx-6 sm:px-6"
+    >
+      <div className="flex items-end gap-6">
+        <div className="max-w-xl py-9 sm:py-10">
+          <nav aria-label="Breadcrumb" className="text-xs font-medium text-muted">
+            <ol className="flex items-center gap-1.5">
+              <li>Dashboard</li>
+              <li aria-hidden="true">›</li>
+              <li className="text-fg" aria-current="page">
+                Books
+              </li>
+            </ol>
+          </nav>
+
+          <h2 className="mt-3 text-2xl font-bold tracking-tight text-pretty text-fg sm:text-3xl">
+            {empty
+              ? "Nothing on the shelf yet"
+              : `${plural(books, "book")} on the shelf`}
+          </h2>
+          <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-muted">
+            {empty
+              ? "Start one, or bring in a manuscript you already have."
+              : "Open one to carry on, start the next, or bring in a manuscript you already have."}
+          </p>
+
+          <div className="mt-6 flex flex-wrap gap-2.5">
+            <Link
+              href={START.href}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
+            >
+              {START.label}
+            </Link>
+            <Link
+              href={IMPORT.href}
+              className="rounded-lg border border-line bg-panel px-4 py-2 text-sm font-semibold text-fg"
+            >
+              {IMPORT.label}
+            </Link>
+          </div>
+        </div>
+
+        {/* A plain <img>, like the other band's slides: a fixed decoration
+            already sized for its slot. It stands on the band's floor — no
+            bottom padding under it — because the drawing has a desk along its
+            own bottom edge, and a gap under a desk reads as a mistake. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/write-band.webp"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none ml-auto hidden w-[40%] max-w-80 shrink-0
+                     self-end select-none sm:block"
+        />
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The band over the Favourites list.
+ *
+ * `WriteBand`'s shape — full bleed, breadcrumb, a statement, a drawing at the
+ * right — with two deliberate differences.
+ *
+ * **The picture keeps its own background, and the band takes that colour.**
+ * The other two illustrations were cut out and set on the app's own ground;
+ * this one is a wide frame of flat grey with the figure standing at the right
+ * of it, and cutting her out would throw away the thing that makes it work. So
+ * the band is painted the picture's own `#e7e1e3` and the drawing stands on it,
+ * which makes the seam between the two invisible at any width. What *was*
+ * trimmed is only the empty grey the figure is not standing in — the frame is
+ * a quarter figure and three quarters air, and at the band's height that left
+ * her about the size of a postage stamp.
+ *
+ * **The type is pinned dark rather than tokened**, and the band is light in
+ * both themes. That is the same rule `WelcomeBand` follows in the other
+ * direction: type over a picture takes its colour from the picture, which does
+ * not know what theme it is in, and `text-fg` would turn white at night over a
+ * grey that stays grey. Three literals, all of them the picture's, and they
+ * live nowhere else.
+ *
+ * **No buttons.** The other band offers the two doors onto a new book because
+ * Write is where books are made; Favourites is a *filter over* that list and
+ * there is nothing here to start. What the line does instead is answer the
+ * question the screen raises — a star moves nothing, and it does not travel.
+ */
+function FavouritesBand({
+  books,
+  settled,
+}: {
+  books: number;
+  settled: boolean;
+}) {
+  /* Settled, not hydrated: a count of nought before the library has finished
+     reconciling is a fact about the loading, and "nothing starred yet" over
+     three starred books is the screen lying for a beat. */
+  const empty = settled && books === 0;
+
+  return (
+    <section
+      className="relative -mx-4 overflow-hidden bg-[#e7e1e3] px-4
+                 sm:-mx-6 sm:min-h-68 sm:px-6"
+    >
+      {/* A plain <img>, like the other two bands: a fixed decoration already
+          sized for its slot. Hidden below `sm`, where the band is the width of
+          a phone and the figure would be standing on the sentence.
+
+          **Half again the height of the band, and anchored near its top.** At
+          the band's own height the whole figure fits and every part of her is
+          small; run tall and clipped, the band holds the heart, the arms and
+          the head at a size worth looking at, and her legs run off the bottom
+          edge — which is what `overflow-hidden` on the section is for. The
+          small top offset is so the heart clears the band's top edge rather
+          than being shaved by it. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/favourites-band.webp"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute top-3.5 right-4 hidden h-[150%]
+                   w-auto select-none sm:right-6 sm:block"
+      />
+
+      <div className="relative z-10 max-w-xl py-9 sm:py-10">
+        <nav aria-label="Breadcrumb" className="text-xs font-medium text-[#6b6873]">
+          <ol className="flex items-center gap-1.5">
+            <li>Dashboard</li>
+            <li aria-hidden="true">›</li>
+            <li className="text-[#1c1b22]" aria-current="page">
+              Favourites
+            </li>
+          </ol>
+        </nav>
+
+        <h2 className="mt-3 text-2xl font-bold tracking-tight text-pretty text-[#1c1b22] sm:text-3xl">
+          {empty ? "Nothing starred yet" : `${plural(books, "book")} starred`}
+        </h2>
+        <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-[#4a4750]">
+          {empty
+            ? "Star a book from its ⋯ menu and it shows up here."
+            : "A star is a filter rather than a folder: the book stays on the shelf with the rest."}{" "}
+          Stars stay in this browser.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The word target of the book the writer is in, as a half-dial.
  *
  * The same figure the book card used to draw as a bar, and now the only place
  * it appears — two readings of one percentage on one screen is two things to
  * keep in step.
+ *
+ * **It follows the shelf's own idea of "the book you are in"** — `current` in
+ * the screen above, which is the remembered book and failing that the most
+ * recently opened one. So the dial moves to whatever was last worked on rather
+ * than being pinned to a book chosen once.
+ *
+ * A shelf-wide version of this — every target added up, with the words capped
+ * per book so one novel could not lend its overshoot to another — was built and
+ * taken out again on 2026-08-24. It was a truer figure about the *library* and
+ * a worse one to open the day with: a writer wants to know where the book they
+ * are in stands, and the three counts across the top of this screen are already
+ * the whole shelf.
+ *
+ * **It names its book, and it opens it.** The card that used to sit beside it —
+ * with the title, the cover and the picker — is in Write now, so a dial
+ * captioned only "Target" would be a percentage of nothing a reader could see,
+ * and a percentage with no way into the book it is about is a dead end.
  *
  * All three judgements come from `lib/target.ts` and none are re-derived here:
  * the share is floored so nothing rounds up into a claim, a non-zero count
  * under one per cent says so in words, and `met` is asked of the words
  * themselves. The arc turns green only on `met`, which is the house rule that
  * green is the verdict for having arrived rather than a colour for 94%.
- *
- * **It names its book.** The card that used to sit beside it — with the title,
- * the cover and the picker — is in Write now, so a dial captioned only "Target"
- * would be a percentage of nothing a reader could see.
  *
  * Two things the first draft got wrong, both worth keeping written down. The
  * figure was positioned in HTML over the SVG and landed on the arc itself; it
@@ -1960,15 +2073,10 @@ function Overview({
  * book at "under 1%" wore a bead at the left end of an empty track. The value
  * arc is not drawn at all until there is something to draw.
  */
-function TargetGauge({
-  title,
-  words,
-  target,
-}: {
-  title: string;
-  words: number;
-  target: number;
-}) {
+function TargetGauge({ book, target }: { book: Book; target: number }) {
+  /* Summed on read like everywhere else — no count is stored, so this is the
+     same number the shelf card and the editor's own footer show. */
+  const words = bookWordCount(book);
   const { share, label, met } = targetShare(words, target);
   /* One id per instance. Two dials on a page would otherwise share a gradient
      definition, and the second would silently paint with the first one's. */
@@ -1995,7 +2103,9 @@ function TargetGauge({
     <div className="flex flex-col rounded-2xl border border-line bg-panel p-5 shadow-sm">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-bold text-fg">Target</h3>
-        <p className="min-w-0 truncate text-xs font-medium text-muted">{title}</p>
+        <p className="min-w-0 truncate text-xs font-medium text-muted">
+          {book.title}
+        </p>
       </div>
 
       <svg
@@ -2088,6 +2198,21 @@ function TargetGauge({
           </div>
         </div>
       </dl>
+
+      {/* The way into the book the figure is about. Bordered rather than
+          filled: the plan card directly above it holds the one filled action
+          in this column, and two of them side by side is two things claiming
+          to be the way forward. It lands on the book's own screen — the
+          overview, where the chapters and the tools are — rather than in a
+          chapter, because the writer may be coming here to look rather than
+          to type. */}
+      <Link
+        href={`/book/${book.id}`}
+        className="mt-4 block rounded-lg border border-line bg-surface px-4 py-2.5
+                   text-center text-sm font-semibold text-fg transition-colors hover:bg-raised"
+      >
+        Open book
+      </Link>
     </div>
   );
 }
@@ -2259,27 +2384,65 @@ function WeekCard({
  *
  * Every number is read from `LAUNCH_LIMITS` rather than written out, so the
  * card cannot drift from what the plan actually sells.
+ *
+ * **The drawing has no background of its own.** It arrived as a flat grey
+ * rectangle behind a figure, and a grey rectangle on a purple card is a
+ * sticker: the fill was flood-filled away from the frame's edge — a colour key
+ * would have punched holes in the phone screen and the speech bubble, which are
+ * white too — so what sits on the gradient is the figure alone. `.webp` with an
+ * alpha channel, 26KB. `scripts/cut-illustration.cjs` is how it was cut, kept
+ * for the next time the picture changes.
+ *
+ * It is **decoration and says so** — `alt=""` and `aria-hidden` — because
+ * everything it depicts is already in the words beside it. It is also hidden
+ * below `sm`, where the card is the full width of a phone and there is no room
+ * for a figure without squeezing the sentence into a column.
  */
-function ProCard() {
-  const plan = usePlan();
+function ProCard({ plan }: { plan: PlanState }) {
   if (plan.loading || !plan.billing || plan.pro) return null;
 
   return (
-    <section className="rounded-2xl bg-linear-to-r from-upgrade-from to-upgrade-to p-5">
-      <h3 className="text-base font-bold text-white">Room for the next book</h3>
-      <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-        Pro takes the shelf from {plural(LAUNCH_LIMITS.freeBooks, "book")} to
-        unlimited, the assistant from{" "}
-        {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies a month to{" "}
-        {LAUNCH_LIMITS.proAssistantRepliesPerMonth}, and adds EPUB and PDF
-        export.
-      </p>
-      <Link
-        href="/upgrade"
-        className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-upgrade-ink"
-      >
-        See what Pro adds
-      </Link>
+    /* A row rather than a picture positioned over the words. The figure is a
+       flex item, so the sentence beside it can never end up under a yellow
+       sleeve at some width nobody tested — which is exactly what an absolutely
+       placed drawing and a hand-tuned measure would do on the one column this
+       card is narrowest in. */
+    <section
+      className="flex gap-4 overflow-hidden rounded-2xl bg-linear-to-r
+                 from-upgrade-from to-upgrade-to p-5 sm:min-h-52"
+    >
+      <div className="min-w-0 flex-1">
+        <h3 className="text-base font-bold text-white">Room for the next book</h3>
+        <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+          Pro takes the shelf from {plural(LAUNCH_LIMITS.freeBooks, "book")} to
+          unlimited, the assistant from{" "}
+          {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies a month to{" "}
+          {LAUNCH_LIMITS.proAssistantRepliesPerMonth}, and adds EPUB and PDF
+          export.
+        </p>
+        <Link
+          href="/upgrade"
+          className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-upgrade-ink"
+        >
+          See what Pro adds
+        </Link>
+      </div>
+
+      {/* A plain <img>, like the band's slides and the covers: a fixed
+          decoration already sized for its slot, where next/image would add a
+          loader and a config entry for no gain a reader could see.
+
+          `-mb-5` cancels the card's own padding so the figure stands on the
+          bottom edge rather than floating above it, and the cap stops it
+          growing into a poster on a wide screen. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/upgrade-card.webp"
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none -mb-5 hidden w-[44%] max-w-72 shrink-0
+                   self-end select-none sm:block"
+      />
     </section>
   );
 }
@@ -2613,6 +2776,7 @@ function Write({
   onCover,
   onTrash,
   onDeleteForever,
+  onRestore,
 }: {
   /** The current book's card, over the active list. Null on the other three. */
   banner: ReactNode;
@@ -2629,6 +2793,8 @@ function Write({
   onCover: (b: Book) => void;
   onTrash: (b: Book) => void;
   onDeleteForever: (b: Book) => void;
+  /** Not `restoreBook` itself: the free plan may have no room for the book. */
+  onRestore: (b: Book) => void;
   /** Opens the sheet holding every per-book tool. */
 }) {
   const settled = useLibrarySettled();
@@ -2752,165 +2918,243 @@ function Write({
           )}
         </div>
       ) : (
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        /* **Covers first, and as many across as the column allows.**
+
+            This was a row card: a 64px thumbnail on the left with three lines
+            of text beside it, three to a row. It read as a file listing of
+            books rather than as a shelf of them, and it spent nothing on the
+            one thing a writer recognises their own work by from across a room.
+            The cover is the card now — full width, at the 2:3 of a 6×9 novel,
+            which is the trim the whole app is built around — and the words sit
+            under it, centred, the way every shelf of jackets from a bookshop
+            table to a storefront grid arranges them.
+
+            Narrow cards fit more across, so the grid runs to four and five
+            where it used to stop at three. */
+        <ul
+          className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4
+                     2xl:grid-cols-5"
+        >
           {visible.map((book) => (
             <li
               key={book.id}
-              className="rounded-xl border border-line bg-panel p-4"
+              /* `relative` anchors the floating heart, which has to sit over
+                 the cover without being *inside* the link that wraps it.
+
+                 **The card itself does not react to hover, only the book on
+                 it.** `BookCover` already lifts and deepens its shadow on
+                 `group-hover`, which is why this is a `group` — a second
+                 shadow on the card underneath made two things move for one
+                 pointer, and the jacket is the thing the writer is reaching
+                 for. */
+              className="group relative flex flex-col rounded-xl border
+                         border-line bg-panel p-3"
             >
-              <div className="flex gap-4">
-                {/* Edits rather than opens, as on the Overview card. The
-                    title beside it is still a link to the book, and the two
-                    buttons under the card are Write and Read. */}
-                <span className="w-[64px] shrink-0">
-                  <CoverOf book={book} editable />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <Link
-                    href={`/book/${book.id}`}
-                    className="block truncate font-bold text-fg"
-                  >
+              {/* **One link over the cover and the words together**, rather
+                  than a link on the title and a separate one on the jacket.
+                  A shelf of covers promises that the cover opens the book, and
+                  the alternative — a pseudo-element stretched over the card —
+                  needs `after:content-['']`, which Tailwind v4 silently drops
+                  here. Wrapping is what the markup wanted anyway: one tab stop
+                  per book instead of two, and one focus ring around the part
+                  that actually opens something. */}
+              <Link
+                href={`/book/${book.id}`}
+                className="flex flex-1 flex-col rounded-lg outline-none
+                           focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                {/* Not `editable`. The cover used to open "Edit title, author
+                    and cover", which was right for a 64px thumbnail beside a
+                    title — nothing else could have wanted that press. At full
+                    card width it is the book's own face and the largest target
+                    on the screen, so it opens the book, and editing stays one
+                    press away in the ⋯ menu where it already lived. */}
+                <CoverOf book={book} />
+
+                <div className="pt-3 text-center">
+                  <span className="block text-sm leading-snug font-bold text-balance text-fg">
                     {book.title}
-                  </Link>
-                  <p className="mt-1 text-xs text-muted">
+                  </span>
+
+                  {/* Small, letterspaced and quiet, which is the slot a shop
+                      grid gives its genre line. Nothing goes under it where
+                      that grid puts a star rating — see the house rule about
+                      invented numbers. `span`, not `p`: this is inside an
+                      anchor, and a paragraph there is invalid markup. */}
+                  <span className="mt-1.5 block font-sans text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
                     {plural(bookChapterCount(book), "chapter")} ·{" "}
                     {plural(bookWordCount(book), "word")}
-                  </p>
-                  <p className="text-xs text-muted">
+                  </span>
+                  <span className="mt-0.5 block font-sans text-xs text-muted">
                     Opened {relativeTime(book.lastOpenedAt)}
-                  </p>
+                  </span>
                 </div>
-              </div>
-              {/* Two verbs and a menu, where there were twenty-one chips.
-                  Nothing had weight before: Write and Trash were the same
-                  size and colour, and a pill has room for a name but not for
-                  what the thing is. */}
-              <div className="mt-3.5 flex flex-wrap items-center gap-2">
-                {view === "active" || view === "favourite" ? (
-                  <>
-                    {/* **Outlined, like Read beside it**, at the owner's
-                        request. It was the filled accent — the card's one
-                        primary — and the argument for that was that writing is
-                        what a writer came for. Against a wall of cards the
-                        cost showed: twelve books put twelve filled blue
-                        buttons on one screen, which is a grid of primaries,
-                        and a colour that means "the way forward" everywhere
-                        else stops meaning anything when it is the wallpaper.
-                        Matched to Read, the pair reads as two ways into the
-                        same book and the accent goes back to being spent on
-                        New book, which is the one action on this screen that
-                        is not per-card. */}
-                    <Link
-                      href={`/book/${book.id}`}
-                      className="flex items-center gap-1.5 rounded-lg border border-line
-                                 bg-surface px-3.5 py-1.5 text-sm font-semibold text-fg"
-                    >
-                      {shelfIcons.write}
-                      Write
-                    </Link>
-                    <Menu
-                      label={`More for ${book.title}`}
-                      align="end"
-                      width={244}
-                      triggerClassName="ml-auto flex items-center rounded-lg border
-                                        border-line bg-surface px-2 py-1.5 text-fg"
-                      trigger={shelfIcons.more}
-                    >
-                      {(close) => (
-                        <>
-                          <MenuLink
-                            href={`/book/${book.id}/export`}
-                            icon={shelfIcons.prepare}
-                            onNavigate={close}
-                          >
-                            Export and publish
-                          </MenuLink>
+              </Link>
 
-                          <MenuSeparator />
-                          <MenuButton
-                            icon={
-                              book.favourite
-                                ? shelfIcons.heartFilled
-                                : shelfIcons.heart
-                            }
-                            onClick={() => {
-                              setFavourite(book.id, !book.favourite);
-                              close();
-                            }}
-                          >
-                            {book.favourite
-                              ? "Remove from favourites"
-                              : "Add to favourites"}
-                          </MenuButton>
-                          <MenuButton
-                            icon={shelfIcons.info}
-                            onClick={() => {
-                              onDetails(book);
-                              close();
-                            }}
-                          >
-                            Details
-                          </MenuButton>
-                          <MenuButton
-                            icon={shelfIcons.write}
-                            onClick={() => {
-                              onCover(book);
-                              close();
-                            }}
-                          >
-                            Edit title, author and cover
-                          </MenuButton>
+              {(view === "active" || view === "favourite") && (
+                /* **Out of the menu and onto the jacket**, which is where a
+                   shelf of covers puts it. Favouriting was three presses behind
+                   ⋯ and invisible until you went looking, while the state it
+                   toggles was already a fact about the card with nowhere to
+                   show itself.
 
-                          {/* Below the line, and the destructive one is
-                              coloured — both of these sat in the same grey as
-                              Write, one pill away from it. */}
-                          <MenuSeparator />
-                          <MenuButton
-                            icon={shelfIcons.archive}
-                            onClick={() => {
-                              archiveBook(book.id);
-                              close();
-                            }}
-                          >
-                            Archive
-                          </MenuButton>
-                          <MenuButton
-                            danger
-                            icon={shelfIcons.trash}
-                            onClick={() => {
-                              onTrash(book);
-                              close();
-                            }}
-                          >
-                            Move to trash
-                          </MenuButton>
-                        </>
-                      )}
-                    </Menu>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => restoreBook(book.id)}
-                      className="rounded-lg border border-line bg-surface px-3.5 py-1.5
-                                 text-sm font-semibold text-fg"
-                    >
-                      Restore
-                    </button>
-                    {view === "trashed" && (
+                   A sibling of the link rather than a child of it: a button
+                   inside an anchor is invalid markup and swallows the press on
+                   half the browsers that accept it. It is positioned against
+                   the `li`, and `z-10` lifts it over the link it overlaps. */
+                <button
+                  type="button"
+                  onClick={() => setFavourite(book.id, !book.favourite)}
+                  aria-pressed={book.favourite}
+                  aria-label={
+                    book.favourite
+                      ? `Remove ${book.title} from favourites`
+                      : `Add ${book.title} to favourites`
+                  }
+                  /* **A set heart stays; an unset one waits to be asked for.**
+                     An empty outline on every jacket is a control repeated as
+                     many times as there are books, and it competes with the
+                     covers for exactly the attention this layout was rebuilt
+                     to give them. Once it is filled it stops being a control
+                     and becomes a fact about the book, which is worth its
+                     place — that is the difference between the two states.
+
+                     Hidden with opacity rather than removed, so it keeps its
+                     size in the layout, stays in the tab order, and appears on
+                     `focus-visible` for anyone arriving by keyboard, who has
+                     no hover to reveal it with. */
+                  className={`absolute top-5 right-5 z-10 flex h-8 w-8 items-center
+                             justify-center rounded-lg border border-line/60
+                             bg-panel/85 shadow-sm outline-none transition
+                             hover:bg-panel focus-visible:opacity-100
+                             focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                               book.favourite
+                                 ? "text-danger"
+                                 : "opacity-0 text-muted group-hover:opacity-100"
+                             }`}
+                >
+                  {book.favourite ? shelfIcons.heartFilled : shelfIcons.heart}
+                </button>
+              )}
+
+              {/* The link above is `flex-1`, so this row sits on the floor of
+                  every card and a two-line title never pushes one card's
+                  buttons below its neighbour's. */}
+              <div className="mt-3 flex items-center gap-2">
+                  {view === "active" || view === "favourite" ? (
+                    <>
+                      {/* **Outlined, and now full width.** The argument against
+                          a filled accent here only got stronger with more cards
+                          on screen: twenty filled blue buttons is a grid of
+                          primaries, and the accent goes back to meaning New
+                          book. Width rather than colour is what gives this its
+                          weight in a narrow card. */}
+                      <Link
+                        href={`/book/${book.id}`}
+                        className="flex flex-1 items-center justify-center gap-1.5
+                                   rounded-lg border border-line bg-surface px-3 py-1.5
+                                   text-sm font-semibold text-fg transition-colors
+                                   hover:bg-raised"
+                      >
+                        {shelfIcons.write}
+                        Write
+                      </Link>
+                      <Menu
+                        label={`More for ${book.title}`}
+                        align="end"
+                        width={244}
+                        triggerClassName="flex shrink-0 items-center rounded-lg border
+                                          border-line bg-surface px-2 py-1.5 text-fg
+                                          transition-colors hover:bg-raised"
+                        trigger={shelfIcons.more}
+                      >
+                        {(close) => (
+                          <>
+                            <MenuLink
+                              href={`/book/${book.id}/export`}
+                              icon={shelfIcons.prepare}
+                              onNavigate={close}
+                            >
+                              Export and publish
+                            </MenuLink>
+
+                            <MenuSeparator />
+                            <MenuButton
+                              icon={shelfIcons.info}
+                              onClick={() => {
+                                onDetails(book);
+                                close();
+                              }}
+                            >
+                              Details
+                            </MenuButton>
+                            <MenuButton
+                              icon={shelfIcons.write}
+                              onClick={() => {
+                                onCover(book);
+                                close();
+                              }}
+                            >
+                              Edit title, author and cover
+                            </MenuButton>
+
+                            {/* Below the line, and the destructive one is
+                                coloured — both of these sat in the same grey as
+                                Write, one pill away from it. */}
+                            <MenuSeparator />
+                            <MenuButton
+                              icon={shelfIcons.archive}
+                              onClick={() => {
+                                archiveBook(book.id);
+                                close();
+                              }}
+                            >
+                              Archive
+                            </MenuButton>
+                            <MenuButton
+                              danger
+                              icon={shelfIcons.trash}
+                              onClick={() => {
+                                onTrash(book);
+                                close();
+                              }}
+                            >
+                              Move to trash
+                            </MenuButton>
+                          </>
+                        )}
+                      </Menu>
+                    </>
+                  ) : (
+                    <>
                       <button
                         type="button"
-                        onClick={() => onDeleteForever(book)}
-                        className="rounded-lg px-3.5 py-1.5 text-sm font-semibold
-                                   text-danger underline underline-offset-4"
+                        onClick={() => onRestore(book)}
+                        className="flex-1 rounded-lg border border-line bg-surface
+                                   px-3 py-1.5 text-sm font-semibold text-fg
+                                   transition-colors hover:bg-raised"
                       >
-                        Delete for good
+                        Restore
                       </button>
-                    )}
-                  </>
-                )}
-              </div>
+                      {view === "trashed" && (
+                        /* An icon rather than "Delete for good" spelled out.
+                           The words do not fit beside Restore at this width and
+                           wrapped to a second line under it, where a permanent
+                           delete sat looking like a footnote. */
+                        <button
+                          type="button"
+                          onClick={() => onDeleteForever(book)}
+                          aria-label={`Delete ${book.title} for good`}
+                          title="Delete for good"
+                          className="flex shrink-0 items-center rounded-lg px-2 py-1.5
+                                     text-danger transition-colors hover:bg-raised"
+                        >
+                          {shelfIcons.trash}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
             </li>
           ))}
         </ul>

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { PaymentTone } from "@/lib/billing/history";
+import { LAUNCH_LIMITS } from "@/lib/launch";
+import { plural } from "@/lib/plural";
 import { usePlan } from "@/lib/use-plan";
 import { PaddleUpdatePaymentButton } from "./paddle-update-button";
 
@@ -189,7 +191,9 @@ export function BillingPage({
                 )}
                 {!plan.pro && (
                   <p className="mt-0.5 font-sans text-xs text-muted">
-                    1 book, 5 assistant replies/month, Word export
+                    {plural(LAUNCH_LIMITS.freeBooks, "book")},{" "}
+                    {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant
+                    replies/month, Word export
                   </p>
                 )}
               </div>
@@ -484,7 +488,10 @@ export function BillingPage({
                 You&rsquo;ll go back to the free plan
               </h3>
               <ul className="mt-3 space-y-2 rounded-xl border border-line bg-surface p-4 font-sans text-sm text-muted">
-                <li>One book, and the rest kept safe but read-only above it.</li>
+                <li>
+                  {plural(LAUNCH_LIMITS.freeBooks, "book")}, and the rest kept safe
+                  but read-only above that.
+                </li>
                 <li>Five assistant replies a month instead of sixty.</li>
                 <li>Word export. EPUB and PDF stop.</li>
               </ul>

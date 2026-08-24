@@ -57,10 +57,6 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Add, rename, reorder by dragging, and delete chapters. Star one to keep it in Bookmarks.",
       },
       {
-        name: "Read the whole book",
-        desc: "The open-book button on the editor rail opens a reading view: every chapter, in order, on one page you can scroll end to end — front matter, body, and back matter, the way the book reads. Click a chapter’s title there to jump back into editing it.",
-      },
-      {
         name: "Search this book",
         desc: "The Search tab on the editor rail (or ⌘K / Ctrl+K) finds a word anywhere in the book — every chapter’s text, not just titles — with a snippet, and jumps you to the chapter.",
       },
@@ -126,62 +122,6 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       { name: "Notes", desc: "Keep private notes beside each chapter." },
       {
-        name: "Cover checker",
-        desc: "The covers screen has two halves and a switch above them: the shelf, and this. Drop in the artwork you are about to upload and it reports every rule it knows, with a tick against the ones it passed as well as a mark against the ones it did not, so you can see what was examined rather than only what was wrong. The rules are Amazon's own published figures: at least 1,000 pixels tall and 625 wide, no more than 10,000 on either side, at least 1.6:1 (taller than that is fine by Amazon — it is only letterboxed in a thumbnail), under 50MB, and saved as a JPEG or TIFF. That last one catches the commonest avoidable rejection there is: PNG is what most design tools and image generators hand you, Amazon does not take it for an ebook cover, and re-saving costs you thirty seconds against days of a delayed launch. It also reports two things Amazon asks for rather than requires — whether the image is very flat, and whether its edges are nearly white, which Amazon warns makes a cover seem to disappear against the shop's own white page unless you put a narrow grey border on it. Where a fix can be made honestly it is offered: re-saving a PNG as a JPEG with every pixel where it was, crop or pad to the shape shops use — both drawn at the artwork's own resolution so nothing is invented — and an enlarge that says on the button that it adds no detail. You choose what shows before anything is written, nothing is uploaded, and you get a copy rather than a change to your file. Every file it writes is a JPEG, which is the format the check itself asks for. Measured in your browser and never counted against anything — it is the other half, where you search for the covers your book has to sit beside, that spends one of the free plan's three a day. Whether the cover is any good is that half's job, not a number's.",
-      },
-      {
-        name: "Blurb",
-        desc: "The two hundred words that decide whether anybody opens the book. It writes nothing — writers in this research describe an AI-written blurb as the thing that hurt their sales — so instead it counts what you have written against the shops’ limits and tells you where it is unusual: the length, whether it opens with the title the shop has already printed above it, whether it is one wall of text on a phone, the longest sentence, and a shouted word. Only two things on the screen are rules: an empty blurb, and one over 4,000 characters, which shops refuse. Everything else is a measurement. “Ask a reader” is the one part that uses a model, and it still writes nothing: it answers with what somebody in a bookshop would still be wondering after reading your description — who wants what, what stands in the way, what it costs — and there is no suggested wording anywhere on the card to paste back in. It is sent your description, your title and your genre, never the manuscript, and it is part of Pro. “Work it out loud” is the other half, for the empty box rather than a finished blurb: it asks about your book — who it is about, what they want, what stands in the way, what failure costs — and puts a draft together from your answers. It never states anything you did not tell it, and it is not told your ending. This one does send prose: your conversation, your draft, title and genre, and the opening of your first chapter, so the words sound like the book; the panel names all of that above the box before you send anything. A draft appears with a button and goes nowhere until you press it, and nothing is stored until you press Save. Three conversations are free in total rather than per day — they do not come back — and Pro has no limit. The five example blurbs from published books were removed on 2026-08-04 — the catalogue returned classics rather than recent comparable titles, and the median length it computed was drawn from one-line catalogue summaries rather than real blurbs, so the screen was telling writers a normal blurb was too long.",
-      },
-      {
-        name: "Listing details",
-        desc: "The handful of facts every shop asks for before it will list a book: an ISBN with its check digit verified, the language, the publisher, the publication date and the series. Answered once and stored on the book, so they travel into every export rather than being asked again each time. Until 2026-08-05 these lived only inside the export flow's fourth step, reachable by starting an export and choosing EPUB; they have their own tool now, and the dashboard's findings link straight to it.",
-      },
-      {
-        name: "Categories & keywords",
-        desc: "The seven keyword boxes a shop's form asks you for. Seven boxes of 50 characters is Amazon's shape rather than a standard — Kobo has one keywords field, Apple Books none, IngramSpark works from BISAC codes — and this screen is built to the strictest of them, so a set of phrases that fits here fits anywhere. None of it goes into the book file: keywords live on the shop's own listing form, filled in when you upload and changeable afterwards without touching the manuscript — so each keyword has a copy button beside it to save you retyping. The keyword half counts what you have typed and says what it is costing you — boxes over the 50-character limit, quotation marks, which Amazon refuses outright, words your title or your chosen categories already own so the shop indexes them anyway, the same word spent in two boxes, and phrases shops reject like “bestseller” or “new”. Beside the boxes is a chat that does two jobs: it answers questions about the seven — what they are, where they go, what a shop refuses — and it works out which seven this book should spend. It can offer phrases, and a button puts them in the empty boxes; nothing overwrites a box you typed in, nothing is saved until you press Save, and Undo puts the previous seven back. Three conversations are free in total, and they do not come back. The button above it, Suggest seven from my blurb, does the common case in one press instead — five of those are free, also in total. Both send your description, genre, categories and listing names, never the manuscript. One thing worth knowing that the three categories cannot do: a few of Amazon’s subcategories are reached only through these boxes, when a keyword carries the word they are gated on, and Amazon publishes which genre by genre. How these work, beside the count, opens a guide to all of it — what the seven are, where they go on Amazon’s form, the step-by-step method for writing them yourself, and what a shop refuses, each checked against Amazon’s own help pages. It needs no plan, no key and no connection, which is the point of it: the checking half of this screen works when nothing is suggesting anything. Check each suggestion is true of your book: shops ask that the keywords, title and description describe the same one. There is no search volume and no ranking anywhere: Amazon publishes none, its data API closed in 2026, and the tools that quote a figure buy scraped data. Two halves of this screen are out and both are meant to return: the subject search — which read where comparable books are actually filed, and the Pro step that matched those subjects to a shop’s own category paths — went on 2026-08-04 to get a release out, and the list of chosen categories itself went on 2026-08-11 to be rebuilt. Until it is back, categories are set on the Listing details screen, in the box that takes them separated by commas; the keyword checker still reads them from there, so it still tells you when a box repeats one.",
-      },
-      {
-        name: "Comp titles",
-        desc: "The published books yours sits beside — what every listing form and query letter asks for, and what most writers guess at. A search built from your genre and blurb goes to Google Books and Open Library, and what comes back is what those catalogues hold for those words, in their order. Then Rank these asks a model which of them are genuinely like your book: at most five, best first, each with a reason in a sentence. There is no score and no percentage — it is a judgement worth disagreeing with, not a measurement. Ranking is the one part of the screen that sends anything you have written (your blurb and the opening of your first chapter), it only goes when you press the button, and the card lists exactly what leaves before you do. The search itself sends only the words in the box and works with no account and no key. The free plan runs two of these searches a day and Pro has no limit; the shelf this screen opens on is not one of them, and neither is looking at what is already there. Whatever you have found stays where it is when the day's two are gone, and there are two more tomorrow.",
-      },
-      {
-        name: "Track",
-        desc: "What a book cost against what it earned. Add what you spent on covers, editing and ads, then import a sales report as CSV — you say which column is which, so it works whatever the shop calls things. It tells you how many more copies get you level, using the per-copy figure your own rows show rather than a royalty rate we made up. Amazon has no public API, so nothing is fetched and nothing is sent.",
-      },
-      {
-        name: "Book over book",
-        desc: "On the Track area of your dashboard, once there is money recorded: what each book earned in the same stretch of its own life — the first so many months on sale — so that a book out for three years is not compared against one out for three months. It answers the thing writers repeat to each other, that there is no traction until a third book, with your own figures rather than a forecast. It refuses more often than it answers, and says why: a book with no publication date has no day one to count from, a book out for less than a month would only be telling you it is new, and a book with no sales rows is a gap in the record rather than a zero. Every book left off is named.",
-      },
-      {
-        name: "Writing record",
-        desc: "For when somebody accuses you of not having written your own book. It gathers what the app has been keeping anyway — which days you wrote on, how the count moved, and every draft saved along the way — into a plain-text document you can send, with a SHA-256 fingerprint of the manuscript. The limits are in the document as well as on the screen: it is evidence rather than proof, it is not tamper-evident, it starts when you started here, and an imported manuscript lands as one large day. The fingerprint is only worth something once you timestamp it somewhere we do not control, so the page tells you to do that and never offers to keep it.",
-      },
-      {
-        name: "Advance copies",
-        desc: "Who holds an advance copy and who read it — one list instead of six sites and a spreadsheet. Record where you found each reader and what they actually read, since the review everybody remembers comes from someone who does not read your genre. The list is ordered by whose review is wanted soonest, and if the book has a publication date the page works back to when copies need to go out. It does not yet tell you who is overdue; that part is being rebuilt. It finds nobody for you and sends nothing.",
-      },
-      {
-        name: "Before you spend",
-        desc: "What a book usually earns, what covers, editing, promotion and courses cost, and what to establish before the money moves — plus how many copies a given spend has to sell to get back to nothing. Every figure says where it came from and how much weight it can carry. No company is named: the checks describe the shape of the thing, which is more use, because next year it will have a different name.",
-      },
-      {
-        name: "Progress",
-        desc: "Whether the writing is moving: days written in the last month, words on a day you write, and — if the book has a target — roughly when it finishes at that pace. Counted across every book, because the question is about you rather than one manuscript. A day of cutting counts as a day of writing, and nothing here is a target you have missed.",
-      },
-      {
-        name: "Prose report",
-        desc: "What is in a chapter, counted: dialogue tags that are not “said”, words ending in -ly, filter words, runs of sentences that start the same way, and very long sentences. There is no score and it never changes a word — none of these is a fault, and the only useful service is showing you where yours are.",
-      },
-      {
-        name: "Paperback setup",
-        desc: "Spine width, inside margin and the full cover wrap, worked out from your page count and trim size — four numbers that all depend on the page count, which is why setting a paperback up takes people an evening. Type in the page count from your exported PDF; an estimate from your word count stands in until you have one. These are Amazon KDP's published figures and they do not replace the shop's own template.",
-      },
-      {
-        name: "Structure",
-        desc: "The shape most novels share, in plain words, with your own word count placed on it — for when the middle has run out of road. It needs a target length, because every position is a share of a finished book, and it will not guess one. A convention, not a rule.",
-      },
-      {
         name: "Versions",
         desc: "A version of the open chapter is kept about every ten minutes you are editing, and the last eight are kept — so a bad afternoon is not permanent. The panel also counts how many sittings the chapter has had. It is a safety net rather than an archive: it can give you this chapter as it was before lunch, not as it was last March.",
       },
@@ -235,14 +175,6 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     title: "The publishing tools",
     items: [
       {
-        name: "Saving your work",
-        desc: "A tool that holds something you typed — the blurb, the categories and keywords, the listing details, a new advance reader — keeps it on screen until you press Save. A bar appears at the foot of the window the moment you change anything and stays there until you do, with Discard beside it to put the form back. Try leaving with it up and you are asked first.",
-      },
-      {
-        name: "Ticking the roadmap from the tool",
-        desc: "Saving also ticks the roadmap step the tool finishes, so you do not have to go to the road and say you did it. Most steps work themselves out from the book — write the blurb and “Write the blurb” ticks itself — and the few nothing can detect, like getting a cover made or settling on a title, have a “Mark step done” button at the top of the screen where the work happens.",
-      },
-      {
         name: "Formats",
         desc: "Export to Word (.docx) or EPUB, or print to PDF. Markdown is marked Soon on the format step: the text half works, but a book with pictures in it would carry them as code rather than as pictures, so it comes back as a text file with an images folder beside it.",
       },
@@ -273,35 +205,6 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       {
         name: "Scope",
         desc: "Export a whole book, or just the chapter you are in.",
-      },
-    ],
-  },
-  {
-    title: "Writing with someone else",
-    items: [
-      {
-        name: "Two writers, one book",
-        desc: "Some books have two writers. Open Collaborators in the sidebar, or press Share on a book, and invite somebody by the email address their account uses. A free book holds 2 people including you; Pro holds 10. Whoever owns the book pays for its seats — the person you invite needs an account, but not a plan.",
-      },
-      {
-        name: "Can edit, or can view",
-        desc: "Two levels and no more. Can edit writes the chapters and can add, rename and reorder them. Can view reads the book and can export it, and changes nothing. Either way the book's own details — its title, cover, page setup and shop listing — stay with whoever owns it, because the panel remembers where each of you left off and a shared setting could only remember one.",
-      },
-      {
-        name: "Sending an invitation",
-        desc: "We email them an invitation, and you also get a link to pass on however you like — the screen tells you whether the email actually went. The link only works for the address you invited, so forwarding it gives nobody access, and it lasts 14 days. It also appears under Collaborators when they next sign in, so a lost email is not the end of it. Cancelling an invitation tells them nothing.",
-      },
-      {
-        name: "Two people in one chapter",
-        desc: "This is not live co-editing: you will not see each other type. Changes travel when they are saved, and a chapter is one document — so if you both write the same one at once, the second save is refused rather than quietly replacing the first, and you are asked what to keep. Working in different chapters, which is what usually happens, needs no thought at all.",
-      },
-      {
-        name: "What does not travel",
-        desc: "The chapters, their notes and the book's settings sync. The story bible, advance readers, the ledger, your writing record and your roadmap ticks do not — none of those sync between machines for anybody, so a co-writer sees none of yours. Full-size cover artwork stays on the machine it was uploaded from, so if they export the book they get the thumbnail.",
-      },
-      {
-        name: "Taking somebody off",
-        desc: "Press Share, then Remove. They lose access from that moment. It cannot reach into a copy their browser has already downloaded, which is what local-first means — so remove somebody you have stopped trusting rather than relying on it afterwards.",
       },
     ],
   },

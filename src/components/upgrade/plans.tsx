@@ -13,6 +13,7 @@ import {
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
 import { PaddleInlineCheckout } from "@/components/upgrade/paddle-inline-checkout";
 import { LAUNCH_LIMITS } from "@/lib/launch";
+import { plural } from "@/lib/plural";
 
 /**
  * The two plans, presented as a pricing section rather than a settings screen:
@@ -153,7 +154,7 @@ const ROWS: {
   {
     group: "Core workspace",
     label: "Books",
-    starter: `${LAUNCH_LIMITS.freeBooks} book`,
+    starter: plural(LAUNCH_LIMITS.freeBooks, "book"),
     pro: "Unlimited",
   },
   {
