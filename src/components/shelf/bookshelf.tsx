@@ -641,7 +641,12 @@ export function Bookshelf({
             column as the page, so the search lines up with the heading below
             and the account chip lines up with the right edge of the cards. */}
           <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur">
-            <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 md:flex md:flex-wrap">
+            {/* Tighter from `md` up, and only from `md` up. The 44px minimum
+              is a *touch* target — it exists so a thumb can hit the search box
+              and the New book button — so it stays wherever there is no mouse.
+              On a pointer it is 40px, which takes a fifth off the bar and gives
+              the line back to the page. */}
+            <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 md:flex md:flex-wrap md:py-2">
               <Link
                 href="/"
                 className="col-start-1 row-start-1 flex h-11 min-w-0 items-center text-xl font-bold tracking-tight text-fg outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
@@ -671,7 +676,7 @@ export function Bookshelf({
                   aria-label="Search your books"
                   className="min-h-11 w-full rounded-lg border border-line bg-surface py-2 pr-4 pl-9
                          text-sm text-fg outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/50 sm:pr-12"
+                         focus-visible:ring-accent/50 sm:pr-12 md:min-h-10"
                 />
                 <kbd
                   aria-hidden="true"
@@ -707,7 +712,7 @@ export function Bookshelf({
                                     rounded-lg bg-accent text-sm font-semibold text-accent-ink
                                     transition-colors hover:bg-accent-strong active:bg-accent-strong
                                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
-                                    sm:w-auto sm:py-2 sm:pr-2.5 sm:pl-3.5"
+                                    sm:w-auto sm:py-2 sm:pr-2.5 sm:pl-3.5 md:h-10"
                   trigger={
                     <>
                       {shelfIcons.plus}
@@ -1098,14 +1103,24 @@ const PHASE_STATE: Record<Phase, string> = {
  * clouds" here would be reading out the wallpaper.
  */
 const BAND_SLIDES = [
-  /* `position` is the crop, and it is per picture because the subject is not
-     in the same place in both. Centred, `object-cover` framed the sky: the
-     band is short and wide, the pictures are tall, so the middle of the file
-     is the empty half. Pulling the window down the image brings the reader,
-     the books and the horizon into the strip — which is the half worth
-     showing. */
+  /* `position` is the crop, and every picture carries its own because the
+     subject is never in the same place twice.
+
+     The numbers run high — 86%, 88%, 92% — and that is arithmetic rather than
+     taste. The band is about four times as wide as it is tall; these files are
+     16:9 or squarer. `object-cover` scales to fill the width, so most of the
+     height is cropped away, and a centred crop keeps the middle: which in a
+     picture of somebody sitting under a big sky is the sky. The figure is
+     almost always in the bottom third, so the window has to be pulled most of
+     the way down the frame to hold it. */
   { src: "/banner-dawn.webp", position: "50% 74%" },
   { src: "/banner-night.webp", position: "50% 78%" },
+  /* These two were re-shot at full size, so their crops are re-set with them:
+     the earlier files were 735px wide and the band stretched them. */
+  { src: "/banner-swirl.webp", position: "64% 52%" },
+  { src: "/banner-planet.webp", position: "60% 74%" },
+  { src: "/banner-lantern.webp", position: "50% 92%" },
+  { src: "/banner-lamplight.webp", position: "45% 86%" },
 ] as const;
 
 /** How long each one holds before the next fades up. */
@@ -1234,15 +1249,18 @@ function WelcomeBand({
         />
       ))}
 
-      {/* The scrim, and it is doing real work: both pictures are dark on one
-          side and bright on the other, so type laid straight on them would be
-          legible in the evening and gone at dawn. Left-weighted, because that
-          is the side the words are on. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-0 bg-linear-to-r from-black/80 via-black/55 to-black/20"
-      />
+      {/* **Nothing between the type and the picture** — no scrim, and no
+          shadow on the glyphs either. Both were here and both came off at the
+          owner's request: the pictures are the point, and anything laid over
+          them or trailing off the letters is the interface apologising for
+          them.
 
+          What it costs is worth writing down rather than discovering. White
+          type on the pale half of the ringed-planet picture is the thin case,
+          and it is thin at one size on one slide. The lever if it ever needs
+          pulling is the *picture*, not the page: a crop that puts the words
+          over the dark third of the frame fixes it without putting a rectangle
+          of black back over somebody's sky. */}
       <div className="relative z-10 max-w-xl">
         <nav aria-label="Breadcrumb" className="text-xs font-medium text-white/70">
           <ol className="flex items-center gap-1.5">
