@@ -1274,14 +1274,13 @@ function WelcomeBand({
 
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-pretty text-white sm:text-3xl">
           {greeting}
-          {firstName ? (
-            <>
-              ,{" "}
-              <span className="rounded-lg bg-accent px-2 py-0.5 text-accent-ink">
-                {firstName}
-              </span>
-            </>
-          ) : null}
+          {/* The name, in the same white as the rest of the line. It wore an
+              accent pill, which was the reference's highlight copied across
+              without the reason: on that page the band is a flat colour and the
+              pill is the only thing lifting the name off it. Here the band is a
+              photograph, the greeting already stands out against it, and the
+              pill was a blue rectangle stamped over the picture. */}
+          {firstName ? `, ${firstName}` : null}
         </h2>
         <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-white/85">
           {standing}
