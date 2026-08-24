@@ -792,18 +792,28 @@ export function Bookshelf({
               <Overview
                 account={account}
                 current={current}
-                all={active}
                 books={active.length}
                 words={totals.words}
                 chapters={totals.chapters}
-                onDetails={setEditing}
-                onCover={setCovering}
-                onPrepare={showInPrepare}
               />
             )}
 
             {area === "write" && (
               <Write
+                /* Only over the active list. Archived, Trash and Favourites
+                   are lists a writer came to *manage*, and a card about the
+                   book they are drafting is an interruption on all three. */
+                banner={
+                  view === "active" ? (
+                    <CurrentBookCard
+                      current={current}
+                      all={active}
+                      onDetails={setEditing}
+                      onCover={setCovering}
+                      onPrepare={showInPrepare}
+                    />
+                  ) : null
+                }
                 visible={visible}
                 view={view}
                 counts={counts}
@@ -1063,83 +1073,35 @@ const PHASE_STATE: Record<Phase, string> = {
   publish: "Publishing",
 };
 
-function Overview({
-  account,
+/**
+ * The book a writer is in the middle of, and what is standing in its way.
+ *
+ * It opened the dashboard until the owner moved it here, and here is the better
+ * place for it: a card about *one* book among a list of books, rather than
+ * above three figures about the whole shelf. Overview keeps what is true of the
+ * writer — the week, the plan, the target — and Write keeps what is true of a
+ * manuscript.
+ *
+ * Everything it carries came with it unchanged: the picker, the phase, the
+ * findings banner and its dismissal, and the three controls. The state lives
+ * here now rather than in `Overview`, which is the whole of what the move cost.
+ */
+function CurrentBookCard({
   current,
   all,
-  books,
-  words,
-  chapters,
   onDetails,
   onCover,
   onPrepare,
 }: {
-  /** For the greeting, and only that. Null signed out or with no accounts. */
-  account: Account | null;
   current: Book | null;
-  /** Every active book, for the things that are only true across the shelf. */
   all: Book[];
-  books: number;
-  words: number;
-  chapters: number;
   onDetails: (b: Book) => void;
   onCover: (b: Book) => void;
-  /**
-   * Goes to Prepare with this book's row already open.
-   *
-   * One callback rather than "change area" plus "expand that row", because
-   * from here they are one intention: *show me those findings*. Splitting them
-   * would let a caller do half of it and land the writer on a list of books
-   * with nothing opened, which is the version of this that reads as a dead
-   * button.
-   */
   onPrepare: (bookId: string) => void;
 }) {
   void onPrepare;
 
-  const activity = useActivity();
-  // Only the *empty* half of this screen waits on it — see `useLibrarySettled`.
-  // A book that is already readable is drawn at once.
   const settled = useLibrarySettled();
-
-  /*
-   * **Advance readers past their date are not counted here any more.**
-   *
-   * Every book's list was read at this point, filtered through `isOverdue`,
-   * and drawn as the amber panel below — the one thing on this screen that was
-   * *urgent* rather than merely true. The whole of it came out on 2026-08-13
-   * with the rest of the chasing, so the read, the frozen clock it needed and
-   * the panel are all gone rather than left computing something nothing draws.
-   * The rule survives in `arc.ts`; see TODO.md under "Taken out on purpose".
-   */
-
-  /**
-   * Momentum, not totals.
-   *
-   * The three numbers here were books, words and chapters — facts about the
-   * library that change by a rounding error in a week and answer no question a
-   * writer actually has on opening the app. `activity.ts` has been recording
-   * net words per day all along, and "did I write this week" is the question
-   * the screen is being asked.
-   */
-  // The thirty-day figure went with the tile that carried it. The Progress
-  // tool has the full picture, per book and with a finish date; this screen
-  // needs one line about whether there is movement.
-  const week = useMemo(() => pace(activity, 7), [activity]);
-  const run = useMemo(() => streak(activity), [activity]);
-
-  /**
-   * Whether the day log has anything in it at all.
-   *
-   * Not "did they write this month" — a writer back after a fallow summer has
-   * a log worth showing and a zero week is a true fact about them. This is the
-   * narrower question of whether the log has ever recorded a day, which is the
-   * only case where three zeros would misrepresent the shelf behind them.
-   */
-  const logged = useMemo(
-    () => Object.values(activity).some((n) => n !== 0),
-    [activity],
-  );
 
   /**
    * Which book this screen is about.
@@ -1149,91 +1111,12 @@ function Overview({
    * and with seven books on the shelf the one most recently opened is often
    * not the one with the problem.
    */
-  /**
-   * Morning, afternoon or evening — and not until the browser can say.
-   *
-   * The server has no idea what o'clock it is where the writer is, so a clock
-   * read during the server render is a guess that React then swaps out from
-   * under them on hydration. `useHydrated` is the flag this file already keeps
-   * for exactly that shape of question, so the greeting is neutral in the
-   * server's markup and specific the moment the client owns the page.
-   */
-  const greeting = useGreeting();
-
-  /**
-   * The first name, and only if a provider gave us one.
-   *
-   * An email address is not a name — greeting somebody as
-   * "kha.akashanadeel@gmail.com" is worse than greeting them as nobody — so
-   * `account.name` is the only source, and the band simply drops the comma
-   * when there is nothing to put after it.
-   */
-  const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
-
   const [picked, setPicked] = useState<string | null>(null);
   const book = useMemo(
     () => all.find((b) => b.id === picked) ?? current,
     [all, picked, current],
   );
 
-  /**
-   * The one line under the greeting, and it reports rather than cheers.
-   *
-   * A band like this usually carries a slogan. What a writer opening the app
-   * wants from it is where they left off, so that is what it says — the book
-   * and when it was last open, or, on an empty shelf, the plain fact of that.
-   * Nothing here is computed to sound encouraging.
-   */
-  const standing = current
-    ? `Last open: ${current.title}, ${relativeTime(current.lastOpenedAt)}.`
-    : settled
-      ? "Nothing on the shelf yet. Start one, or bring in a manuscript you already have."
-      : "Fetching your shelf…";
-
-  /**
-   * What Prepare will actually show for this book.
-   *
-   * The banner counts *this* and not `checkup()`, because the button under it
-   * says "See them in Prepare" — and a count that does not match the list it
-   * promises is a broken promise the moment somebody presses it.
-   *
-   * The two differ for a good reason. `checkup` withholds advisory findings
-   * until the book reaches a selling phase, so a writer on chapter three is
-   * not scolded about an ISBN; `Prepare` runs `storeReadiness()` raw. That
-   * gate is worth keeping — but it was making this card claim *"the listing
-   * details are in order"* about a book Prepare listed two outstanding things
-   * for. The gate may decide what to *raise*; it may not make the screen say
-   * something untrue.
-   *
-   * So the all-clear is now earned rather than assumed: green means nothing is
-   * outstanding at all, and anything withheld shows as a count without being
-   * spelled out — which is the quiet version of the same fact, and the reason
-   * the gate existed.
-   */
-  /**
-   * The banner the writer has waved away, and exactly which one.
-   *
-   * A dismissal here is not "hide this box forever" — this is the first screen
-   * a writer sees and the one place the app says a shop would refuse their
-   * book, so a permanent hide would let a *new* blocking problem arrive
-   * silently behind an X pressed weeks ago. The signature is the book and its
-   * two counts, so waving away "1 to fix · 4 worth doing" hides exactly that,
-   * and the moment the situation changes the banner returns with the new
-   * figures.
-   *
-   * **Persisted now, where it used to live only in component state.** The
-   * argument for memory was that coming back on a fresh visit is the safe
-   * direction for a diagnosis to fail in. That is true of a *changed*
-   * diagnosis and false of an unchanged one: pressing × and finding the same
-   * red row on the next visit is not a safe failure, it is the app not
-   * listening — and a banner that ignores its own dismiss control teaches a
-   * writer to ignore the banner. The signature keeps the safety where it was
-   * doing the work, so a new blocking problem still speaks up.
-   *
-   * `prefs.dismissed` rather than a field on the book, for the reason
-   * `matterAsked` is there: it records something about the reader, not the
-   * manuscript.
-   */
   const waved = usePrefs().dismissed;
 
   /* Same staleness as the list below: the badge counts a missing cover, and a
@@ -1272,93 +1155,10 @@ function Overview({
   );
 
 
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* ---- The welcome band --------------------------------------------
+    <>
 
-          A **tinted** band, not a filled one. The saturated version put the
-          loudest thing on the screen above the quietest, and the accent is
-          spent on actions here — so the ground is the accent at a tenth and
-          the two buttons inside it keep the full strength. The writer's name
-          takes the highlight, which is the one thing in the band that is
-          theirs.
-
-          The figure is drawn, on the same 24-grid as the rail's icons. The
-          reference carries a stock illustration of somebody at a desk; the
-          house rule is that figures are drawn in markup and true of the
-          product, so this is a book, its pages and a stack beside it — the
-          thing the app is actually about. It is decoration and marked
-          `aria-hidden`, and it goes at `sm` where there is no room. */}
-      <section
-        className="relative overflow-hidden rounded-3xl bg-accent/10 px-6 py-8
-                   sm:px-9 sm:py-10"
-      >
-        <div className="relative z-10 max-w-xl">
-          <h2 className="text-pretty text-2xl font-bold tracking-tight text-fg sm:text-3xl">
-            {greeting}
-            {firstName ? (
-              <>
-                {" "}
-                <span className="rounded-lg bg-accent/20 px-2 py-0.5 text-accent">
-                  {firstName}
-                </span>
-              </>
-            ) : null}
-          </h2>
-          <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-muted">
-            {standing}
-          </p>
-          <div className="mt-6 flex flex-wrap gap-2.5">
-            <Link
-              href={START.href}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
-            >
-              {START.label}
-            </Link>
-            <Link
-              href={IMPORT.href}
-              className="rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg"
-            >
-              {IMPORT.label}
-            </Link>
-          </div>
-        </div>
-        <DeskFigure />
-      </section>
-
-      {/* ---- What is on the shelf ----------------------------------------
-
-          Three cards rather than three rows in one panel. As rows they read as
-          a footnote to the book; as cards they are the row every dashboard of
-          this kind opens with, and they are the only figures on this screen
-          that are true of the whole library rather than of one manuscript. */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Figure
-          icon={shelfIcons.overview}
-          label={books === 1 ? "book" : "books"}
-          value={books.toLocaleString()}
-        />
-        <Figure
-          icon={shelfIcons.write}
-          label={nounFor(words, "word")}
-          value={words.toLocaleString()}
-        />
-        <Figure
-          icon={shelfIcons.prepare}
-          label={nounFor(chapters, "chapter")}
-          value={chapters.toLocaleString()}
-        />
-      </div>
-
-      {/* ---- The book, and the figures beside it --------------------------
-
-          The book takes the wide column because it is what the screen is for:
-          a diagnosis, with the controls that answer it. The four counts are a
-          margin note and read as one — stacked in a single panel rather than
-          scattered as four cards, which is what they were, and which gave a
-          rounding error the same weight as the manuscript. */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,19rem)] lg:items-start">
-        <div className="flex flex-col gap-5">
       {book ? (
         <section className="overflow-hidden rounded-2xl border border-line bg-panel">
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 p-4 sm:flex sm:flex-wrap sm:gap-5 sm:p-5">
@@ -1714,21 +1514,255 @@ function Overview({
           className="h-64 animate-pulse rounded-2xl border border-line bg-panel"
         />
       )}
-        </div>
+    </>
+  );
+}
 
-        {/* The right column: the book's target, the week, and the plan. */}
-        <aside className="flex flex-col gap-4">
-          {book?.targetWords ? (
+function Overview({
+  account,
+  current,
+  books,
+  words,
+  chapters,
+}: {
+  /** For the greeting, and only that. Null signed out or with no accounts. */
+  account: Account | null;
+  /** The last book opened, for the greeting's line and the target dial. */
+  current: Book | null;
+  books: number;
+  words: number;
+  chapters: number;
+}) {
+  const activity = useActivity();
+  // Only the *empty* half of this screen waits on it — see `useLibrarySettled`.
+  // A book that is already readable is drawn at once.
+  const settled = useLibrarySettled();
+
+  /*
+   * **Advance readers past their date are not counted here any more.**
+   *
+   * Every book's list was read at this point, filtered through `isOverdue`,
+   * and drawn as the amber panel below — the one thing on this screen that was
+   * *urgent* rather than merely true. The whole of it came out on 2026-08-13
+   * with the rest of the chasing, so the read, the frozen clock it needed and
+   * the panel are all gone rather than left computing something nothing draws.
+   * The rule survives in `arc.ts`; see TODO.md under "Taken out on purpose".
+   */
+
+  /**
+   * Momentum, not totals.
+   *
+   * The three numbers here were books, words and chapters — facts about the
+   * library that change by a rounding error in a week and answer no question a
+   * writer actually has on opening the app. `activity.ts` has been recording
+   * net words per day all along, and "did I write this week" is the question
+   * the screen is being asked.
+   */
+  // The thirty-day figure went with the tile that carried it. The Progress
+  // tool has the full picture, per book and with a finish date; this screen
+  // needs one line about whether there is movement.
+  const week = useMemo(() => pace(activity, 7), [activity]);
+  const run = useMemo(() => streak(activity), [activity]);
+
+  /**
+   * Whether the day log has anything in it at all.
+   *
+   * Not "did they write this month" — a writer back after a fallow summer has
+   * a log worth showing and a zero week is a true fact about them. This is the
+   * narrower question of whether the log has ever recorded a day, which is the
+   * only case where three zeros would misrepresent the shelf behind them.
+   */
+  const logged = useMemo(
+    () => Object.values(activity).some((n) => n !== 0),
+    [activity],
+  );
+
+  /**
+   * Morning, afternoon or evening — and not until the browser can say.
+   *
+   * The server has no idea what o'clock it is where the writer is, so a clock
+   * read during the server render is a guess that React then swaps out from
+   * under them on hydration. `useHydrated` is the flag this file already keeps
+   * for exactly that shape of question, so the greeting is neutral in the
+   * server's markup and specific the moment the client owns the page.
+   */
+  const greeting = useGreeting();
+
+  /**
+   * The first name, and only if a provider gave us one.
+   *
+   * An email address is not a name — greeting somebody as
+   * "kha.akashanadeel@gmail.com" is worse than greeting them as nobody — so
+   * `account.name` is the only source, and the band simply drops the comma
+   * when there is nothing to put after it.
+   */
+  const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
+
+  /**
+   * The one line under the greeting, and it reports rather than cheers.
+   *
+   * A band like this usually carries a slogan. What a writer opening the app
+   * wants from it is where they left off, so that is what it says — the book
+   * and when it was last open, or, on an empty shelf, the plain fact of that.
+   * Nothing here is computed to sound encouraging.
+   */
+  const standing = current
+    ? `Last open: ${current.title}, ${relativeTime(current.lastOpenedAt)}.`
+    : settled
+      ? "Nothing on the shelf yet. Start one, or bring in a manuscript you already have."
+      : "Fetching your shelf…";
+
+  /**
+   * What Prepare will actually show for this book.
+   *
+   * The banner counts *this* and not `checkup()`, because the button under it
+   * says "See them in Prepare" — and a count that does not match the list it
+   * promises is a broken promise the moment somebody presses it.
+   *
+   * The two differ for a good reason. `checkup` withholds advisory findings
+   * until the book reaches a selling phase, so a writer on chapter three is
+   * not scolded about an ISBN; `Prepare` runs `storeReadiness()` raw. That
+   * gate is worth keeping — but it was making this card claim *"the listing
+   * details are in order"* about a book Prepare listed two outstanding things
+   * for. The gate may decide what to *raise*; it may not make the screen say
+   * something untrue.
+   *
+   * So the all-clear is now earned rather than assumed: green means nothing is
+   * outstanding at all, and anything withheld shows as a count without being
+   * spelled out — which is the quiet version of the same fact, and the reason
+   * the gate existed.
+   */
+  /**
+   * The banner the writer has waved away, and exactly which one.
+   *
+   * A dismissal here is not "hide this box forever" — this is the first screen
+   * a writer sees and the one place the app says a shop would refuse their
+   * book, so a permanent hide would let a *new* blocking problem arrive
+   * silently behind an X pressed weeks ago. The signature is the book and its
+   * two counts, so waving away "1 to fix · 4 worth doing" hides exactly that,
+   * and the moment the situation changes the banner returns with the new
+   * figures.
+   *
+   * **Persisted now, where it used to live only in component state.** The
+   * argument for memory was that coming back on a fresh visit is the safe
+   * direction for a diagnosis to fail in. That is true of a *changed*
+   * diagnosis and false of an unchanged one: pressing × and finding the same
+   * red row on the next visit is not a safe failure, it is the app not
+   * listening — and a banner that ignores its own dismiss control teaches a
+   * writer to ignore the banner. The signature keeps the safety where it was
+   * doing the work, so a new blocking problem still speaks up.
+   *
+   * `prefs.dismissed` rather than a field on the book, for the reason
+   * `matterAsked` is there: it records something about the reader, not the
+   * manuscript.
+   */
+  return (
+    <div className="flex flex-col gap-5">
+      {/* ---- The welcome band --------------------------------------------
+
+          A **tinted** band, not a filled one. The saturated version put the
+          loudest thing on the screen above the quietest, and the accent is
+          spent on actions here — so the ground is the accent at a tenth and
+          the two buttons inside it keep the full strength. The writer's name
+          takes the highlight, which is the one thing in the band that is
+          theirs.
+
+          The figure is drawn, on the same 24-grid as the rail's icons. The
+          reference carries a stock illustration of somebody at a desk; the
+          house rule is that figures are drawn in markup and true of the
+          product, so this is a book, its pages and a stack beside it — the
+          thing the app is actually about. It is decoration and marked
+          `aria-hidden`, and it goes at `sm` where there is no room. */}
+      <section
+        className="relative overflow-hidden rounded-3xl bg-accent/10 px-6 py-8
+                   sm:px-9 sm:py-10"
+      >
+        <div className="relative z-10 max-w-xl">
+          <h2 className="text-pretty text-2xl font-bold tracking-tight text-fg sm:text-3xl">
+            {greeting}
+            {firstName ? (
+              <>
+                {" "}
+                <span className="rounded-lg bg-accent/20 px-2 py-0.5 text-accent">
+                  {firstName}
+                </span>
+              </>
+            ) : null}
+          </h2>
+          <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-muted">
+            {standing}
+          </p>
+          <div className="mt-6 flex flex-wrap gap-2.5">
+            <Link
+              href={START.href}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-ink"
+            >
+              {START.label}
+            </Link>
+            <Link
+              href={IMPORT.href}
+              className="rounded-lg border border-line bg-surface px-4 py-2 text-sm font-semibold text-fg"
+            >
+              {IMPORT.label}
+            </Link>
+          </div>
+        </div>
+        <DeskFigure />
+      </section>
+
+      {/* ---- What is on the shelf ----------------------------------------
+
+          Three cards rather than three rows in one panel. As rows they read as
+          a footnote to the book; as cards they are the row every dashboard of
+          this kind opens with, and they are the only figures on this screen
+          that are true of the whole library rather than of one manuscript. */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Figure
+          icon={shelfIcons.overview}
+          label={books === 1 ? "book" : "books"}
+          value={books.toLocaleString()}
+        />
+        <Figure
+          icon={shelfIcons.write}
+          label={nounFor(words, "word")}
+          value={words.toLocaleString()}
+        />
+        <Figure
+          icon={shelfIcons.prepare}
+          label={nounFor(chapters, "chapter")}
+          value={chapters.toLocaleString()}
+        />
+      </div>
+
+      {/* ---- The book, and the figures beside it --------------------------
+
+          The book takes the wide column because it is what the screen is for:
+          a diagnosis, with the controls that answer it. The four counts are a
+          margin note and read as one — stacked in a single panel rather than
+          scattered as four cards, which is what they were, and which gave a
+          rounding error the same weight as the manuscript. */}
+      {/* ---- The week, the plan, and the target ---------------------------
+
+          Two columns of equal weight, which is the shape the reference uses
+          and the right one here now that the book has moved: what is left are
+          three cards about the *writer* rather than about one manuscript, and
+          none of them outranks the others enough to take the wide side.
+
+          The book card that stood on the left is at the top of Write, where a
+          card about one book belongs among the books. */}
+      <div className="grid gap-5 lg:grid-cols-2 lg:items-start">
+        <WeekCard activity={activity} week={week} run={run} logged={logged} />
+
+        <div className="flex flex-col gap-5">
+          <ProCard />
+          {current?.targetWords ? (
             <TargetGauge
-              words={bookWordCount(book)}
-              target={book.targetWords}
+              title={current.title}
+              words={bookWordCount(current)}
+              target={current.targetWords}
             />
           ) : null}
-
-          <WeekCard activity={activity} week={week} run={run} logged={logged} />
-
-          <ProCard />
-        </aside>
+        </div>
       </div>
 
 
@@ -1777,68 +1811,91 @@ function Overview({
  * under one per cent says so in words, and `met` is asked of the words
  * themselves. The arc turns green only on `met`, which is the house rule that
  * green is the verdict for having arrived rather than a colour for 94%.
+ *
+ * **It names its book.** The card that used to sit beside it — with the title,
+ * the cover and the picker — is in Write now, so a dial captioned only "Target"
+ * would be a percentage of nothing a reader could see.
+ *
+ * Two things the first draft of this got wrong, both worth keeping written
+ * down. The figure was positioned in HTML over the SVG and landed on the arc
+ * itself; it is a `<text>` inside the drawing now, so it sits in the dial's
+ * mouth at any width. And a round line-cap on an arc of *zero* length draws a
+ * dot — so a book at "under 1%" wore a blue bead at the left end of an empty
+ * track. The value arc is not drawn at all until there is something to draw.
  */
-function TargetGauge({ words, target }: { words: number; target: number }) {
+function TargetGauge({
+  title,
+  words,
+  target,
+}: {
+  title: string;
+  words: number;
+  target: number;
+}) {
   const { share, label, met } = targetShare(words, target);
 
-  /* A half circle of radius 60 centred at (70, 70): the arc runs left to right
-     over the top, so its length is pi times r, and the dash is the part
-     written. Stroke-based rather than a filled wedge, because a stroke can be
-     rounded at both ends and a wedge cannot. */
+  /* A half circle of radius 60: the arc runs left to right over the top, so
+     its length is pi times r and the dash is the part written. Stroke rather
+     than a filled wedge, because a stroke can be rounded at both ends. */
   const length = Math.PI * 60;
   const drawn = (share / 100) * length;
   const remaining = Math.max(0, target - words);
 
   return (
     <div className="rounded-2xl border border-line bg-panel p-5 shadow-sm">
-      <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
-        Target
-      </h3>
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
+          Target
+        </h3>
+        <p className="min-w-0 truncate text-xs font-medium text-muted">{title}</p>
+      </div>
 
-      <div className="relative mx-auto mt-3 w-[140px]">
-        <svg viewBox="0 0 140 78" className="w-full" aria-hidden="true">
+      <svg
+        viewBox="0 0 140 86"
+        className="mx-auto mt-4 block w-[180px] max-w-full"
+        role="img"
+        aria-label={`${label} of a ${target.toLocaleString()} word target`}
+      >
+        <path
+          d="M12 72a58 58 0 0 1 116 0"
+          fill="none"
+          strokeWidth="11"
+          strokeLinecap="round"
+          className="stroke-raised"
+        />
+        {share > 0 && (
           <path
-            d="M10 70a60 60 0 0 1 120 0"
+            d="M12 72a58 58 0 0 1 116 0"
             fill="none"
-            strokeWidth="12"
-            strokeLinecap="round"
-            className="stroke-raised"
-          />
-          <path
-            d="M10 70a60 60 0 0 1 120 0"
-            fill="none"
-            strokeWidth="12"
+            strokeWidth="11"
             strokeLinecap="round"
             strokeDasharray={`${drawn} ${length}`}
             className={met ? "stroke-ok-fg" : "stroke-accent"}
           />
-        </svg>
-        {/* The figure sits in the dial's mouth rather than on the arc, so a
-            long label has the full width and never rides the stroke. */}
-        <p
-          className={`absolute inset-x-0 bottom-0 text-center text-2xl font-extrabold ${
+        )}
+        {/* In the drawing rather than over it, so the figure keeps the mouth of
+            the dial at every width. `textLength` is deliberately absent: a long
+            label ("under 1%") is allowed to be smaller rather than squashed. */}
+        <text
+          x="70"
+          y="68"
+          textAnchor="middle"
+          className={`fill-current text-[19px] font-extrabold ${
             met ? "text-ok-fg" : "text-fg"
           }`}
         >
           {label}
-        </p>
-      </div>
+        </text>
+      </svg>
 
-      <p
-        role="progressbar"
-        aria-label="Word target progress"
-        aria-valuemin={0}
-        aria-valuemax={target}
-        aria-valuenow={Math.min(words, target)}
-        className="mt-3 flex items-baseline justify-between text-xs"
-      >
+      <div className="mt-1 flex items-baseline justify-between text-xs">
         <span className="font-semibold tabular-nums text-fg">
           {words.toLocaleString()}
         </span>
         <span className="tabular-nums text-muted">
           {met ? "target met" : `${remaining.toLocaleString()} to go`}
         </span>
-      </p>
+      </div>
     </div>
   );
 }
@@ -2024,20 +2081,32 @@ function Figure({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3.5">
+    /* A `<dl>` per card, not one list split across three. Each of these is a
+       single name and its value, and a description list with one pair in it is
+       exactly that — where three cards sharing one `<dl>` would tell a screen
+       reader they were three parts of one thing. */
+    <dl
+      className="flex items-center gap-4 rounded-2xl border border-line bg-panel
+                 px-6 py-5 shadow-sm"
+    >
+      {/* A circle, and the same accent wash on all three. The reference gives
+          each card its own pastel; four hues carrying no information is a
+          palette pretending to be a legend. What the bubble is actually for is
+          giving the eye a fixed left edge to run down, and one tint does that
+          as well as four. */}
       <span
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl
+        className="grid h-12 w-12 shrink-0 place-items-center rounded-full
                    bg-accent/10 text-accent"
       >
         {icon}
       </span>
       <div className="min-w-0">
-        <dt className="text-xs font-medium text-muted">{label}</dt>
-        <dd className="text-xl leading-tight font-extrabold tabular-nums text-fg">
+        <dt className="truncate text-xs font-medium text-muted">{label}</dt>
+        <dd className="text-2xl leading-tight font-extrabold tabular-nums text-fg">
           {value}
         </dd>
       </div>
-    </div>
+    </dl>
   );
 }
 
@@ -2346,6 +2415,7 @@ function FixLink({
 // column beside it replaced that. The Progress tool draws its own.
 
 function Write({
+  banner,
   visible,
   view,
   counts,
@@ -2359,6 +2429,8 @@ function Write({
   onTrash,
   onDeleteForever,
 }: {
+  /** The current book's card, over the active list. Null on the other three. */
+  banner: ReactNode;
   visible: Book[];
   view: ShelfView;
   counts: Record<ShelfView, number>;
@@ -2378,6 +2450,12 @@ function Write({
 
   return (
     <div>
+      {/* The book in hand, above the shelf it came off. It opened the dashboard
+          until the owner moved it here — a card about one manuscript reads as an
+          answer among a list of books, and as an interruption above three
+          figures about the whole library. */}
+      {banner && <div className="mb-6">{banner}</div>}
+
       <div className="flex flex-wrap items-center justify-between gap-4 md:justify-end">
         {/* One question, one control. The rail carries these four from `md` up,
             where it is on screen; below that there is no rail, so the segmented
