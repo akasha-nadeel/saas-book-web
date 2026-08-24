@@ -159,7 +159,6 @@ const AREAS: {
   id: Area;
   label: string;
   live: boolean;
-  blurb: string;
   icon: React.ReactNode;
   stage: boolean;
 }[] = [
@@ -167,7 +166,6 @@ const AREAS: {
     id: "overview",
     label: "Overview",
     live: true,
-    blurb: "See your books and continue writing.",
     icon: shelfIcons.overview,
     stage: true,
   },
@@ -175,7 +173,6 @@ const AREAS: {
     id: "write",
     label: "Write",
     live: true,
-    blurb: "Create books, manage chapters and write safely.",
     icon: shelfIcons.write,
     stage: true,
   },
@@ -773,14 +770,22 @@ export function Bookshelf({
             {/* One block. The heading and its line used to be two siblings with
               `mb-8` and `-mt-6` cancelling each other out — a spacing bug
               waiting to be inherited by the next area added. */}
-            <div className="mt-8 mb-7">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-extrabold text-fg">
-                  {meta.label}
-                </h1>
-                {!meta.live && <Badge>Not built yet</Badge>}
-              </div>
-              <p className="mt-1.5 text-muted">{meta.blurb}</p>
+            {/* The title, and nothing under it.
+
+                Each area carried a line of prose — "See your books and continue
+                writing." — which said what the area beneath it was already
+                showing. A deck earns its place when the screen would be
+                ambiguous without it, and none of these were.
+
+                Write titles itself after the list it is showing. The rail's
+                four rows all land in the same area, so a page headed "Write"
+                over a trash can was the screen disagreeing with the row that
+                opened it. */}
+            <div className="mt-8 mb-7 flex items-center gap-3">
+              <h1 className="text-2xl font-extrabold text-fg">
+                {area === "write" ? VIEW_LABEL[view] : meta.label}
+              </h1>
+              {!meta.live && <Badge>Not built yet</Badge>}
             </div>
 
             {area === "overview" && (
@@ -1165,20 +1170,6 @@ function Overview({
    */
   const firstName = account?.name?.trim().split(/\s+/)[0] ?? null;
 
-  /**
-   * The two shelves, and why one of them is capped and the other is not.
-   *
-   * *Recently opened* is a glance, so eight is enough — past that the row is a
-   * scroll nobody finishes and the Write area is where a full list belongs.
-   * *Favourites* is a list the writer built by hand, and truncating somebody's
-   * own shortlist is the app deciding which of their choices counted.
-   */
-  const recent = useMemo(
-    () => [...all].sort((a, b) => b.lastOpenedAt - a.lastOpenedAt).slice(0, 8),
-    [all],
-  );
-  const starred = useMemo(() => all.filter((b) => b.favourite), [all]);
-
   const [picked, setPicked] = useState<string | null>(null);
   const book = useMemo(
     () => all.find((b) => b.id === picked) ?? current,
@@ -1358,14 +1349,6 @@ function Overview({
           value={chapters.toLocaleString()}
         />
       </div>
-
-      {/* ---- The shelves --------------------------------------------------
-
-          Covers, which is the one thing on this screen a writer recognises
-          before they have read a word of it. Two rows, and the second exists
-          only when it has something in it. */}
-      <CoverShelf label="Recently opened" books={recent} />
-      <CoverShelf label="Favourites" books={starred} />
 
       {/* ---- The book, and the figures beside it --------------------------
 
@@ -1777,62 +1760,10 @@ function Overview({
   );
 }
 
-/**
- * A row of covers under a label, scrolling off the right edge.
- *
- * The one part of this dashboard that is native to the product rather than
- * borrowed from one: a shelf of books, which is the thing a writer recognises
- * before they have read a word of the screen.
- *
- * **It scrolls rather than wraps.** The clipped right edge *is* the affordance
- * — it says there is more without spending a row saying so — and a wrapping
- * grid of twenty-five covers would take the whole page for a glance.
- *
- * **Nothing at all when there is nothing in it.** A labelled band over an empty
- * track is the dead UI this house does not ship, and it is why Favourites can
- * be rendered unconditionally by the caller.
- *
- * The reference under this puts a star rating below each cover. There is no
- * rating in this app and there will not be an invented one; the slot carries
- * the chapter count, which is a fact.
- */
-function CoverShelf({ label, books }: { label: string; books: Book[] }) {
-  if (books.length === 0) return null;
-
-  return (
-    <section>
-      <h2 className="text-xs font-bold tracking-widest text-muted uppercase">
-        {label}
-      </h2>
-      {/* The negative margin and matching padding keep a focus ring from being
-          clipped by the scroller it lives inside. */}
-      <ul
-        className="scroll-slim -mx-1 mt-3.5 flex snap-x snap-mandatory gap-4
-                   overflow-x-auto px-1 pb-1"
-      >
-        {books.map((book) => (
-          <li key={book.id} className="w-[104px] shrink-0 snap-start">
-            <Link
-              href={`/book/${book.id}`}
-              className="group block rounded-lg outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/60"
-            >
-              <span className="block transition-transform group-hover:-translate-y-0.5">
-                <CoverOf book={book} />
-              </span>
-              <span className="mt-2.5 line-clamp-2 block text-sm leading-snug font-medium text-fg">
-                {book.title}
-              </span>
-              <span className="mt-0.5 block text-xs text-muted">
-                {plural(bookChapterCount(book), "chapter")}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
+// `CoverShelf` is gone. Two rows of covers stood between the band and the book
+// for an afternoon, and they pushed the diagnosis — the thing this screen is
+// for — below the fold on a laptop to show a shelf the rail already opens.
+// Nothing was lost with it: Write lists every book, with a cover each.
 
 /**
  * The word target as a half-dial.
