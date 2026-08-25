@@ -1,5 +1,12 @@
 import type { ReactNode } from "react";
-import { ROW_BODY, ROW_TITLE } from "@/components/landing/type";
+import Link from "next/link";
+import {
+  FEATURE_EYEBROW,
+  FEATURE_LEAD,
+  FEATURE_TITLE,
+  ROW_BODY,
+  ROW_TITLE,
+} from "@/components/landing/type";
 
 /**
  * One feature row: a screen on one side, what it is for on the other.
@@ -79,7 +86,27 @@ export interface FeatureRowProps {
   figure: ReactNode;
   /** The tinted ground the window floats on. Whole class names — see below. */
   ground: string;
-  points: RowPoint[];
+  /**
+   * The folded specifics under the sentence.
+   *
+   * **Optional, and the MVP page no longer passes any.** That page's rows were
+   * a heading, a sentence and three or four disclosures each, and the
+   * disclosures were carrying most of the words on the page — true ones, but a
+   * band that asks to be unfolded before it says anything is a band most
+   * visitors scroll past. `tools-page.tsx` and `feature-shots.tsx` still pass
+   * them, which is why the prop stays rather than going.
+   */
+  points?: RowPoint[];
+  /**
+   * A small pill over the heading, naming the part of the app the row is about.
+   *
+   * It does the job the disclosures used to do at a tenth of the length: tells
+   * a visitor scanning the page which of four bands they are looking at,
+   * without them having to read the heading to find out.
+   */
+  badge?: string;
+  /** The press under the sentence. Both fields or neither. */
+  cta?: { href: string; label: string };
   /** Swap the sides. Set by the caller from the row's index. */
   flip: boolean;
 }
@@ -92,6 +119,8 @@ export function FeatureRow({
   figure,
   ground,
   points,
+  badge,
+  cta,
   flip,
 }: FeatureRowProps) {
   return (
@@ -124,16 +153,52 @@ export function FeatureRow({
           about. */}
       <div className={flip ? "lg:order-2" : ""}>
         {eyebrow && <div className="mb-4">{eyebrow}</div>}
-        <h3 className={`oc-heading font-serif text-lp-ink ${ROW_TITLE}`}>
+        {badge && <p className={`mb-3 ${FEATURE_EYEBROW}`}>{badge}</p>}
+        <h3
+          className={`oc-heading font-serif text-lp-ink ${
+            points?.length ? ROW_TITLE : FEATURE_TITLE
+          }`}
+        >
           {title}
         </h3>
-        <p className={`mt-4 max-w-prose font-sans ${ROW_BODY}`}>{lead}</p>
+        <p
+          className={`mt-4 max-w-prose font-sans ${
+            points?.length ? ROW_BODY : FEATURE_LEAD
+          }`}
+        >
+          {lead}
+        </p>
 
-        <div className="mt-7 border-t border-lp-line">
-          {points.map((point) => (
-            <Point key={point.term} term={point.term} detail={point.detail} />
-          ))}
-        </div>
+        {/* The disclosures, for the callers that still have them. A row given
+            none renders nothing here rather than an empty rule. */}
+        {points && points.length > 0 && (
+          <div className="mt-7 border-t border-lp-line">
+            {points.map((point) => (
+              <Point key={point.term} term={point.term} detail={point.detail} />
+            ))}
+          </div>
+        )}
+
+        {cta && (
+          <Link
+            href={cta.href}
+            className="mt-7 inline-flex items-center gap-2 rounded-full bg-lp-accent px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink transition-opacity hover:opacity-90"
+          >
+            {cta.label}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M7 17 17 7M9 7h8v8" />
+            </svg>
+          </Link>
+        )}
       </div>
 
       {/* The tinted card, and the window floating on it. The padding is what

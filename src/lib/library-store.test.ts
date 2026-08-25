@@ -6,6 +6,7 @@ import {
   bookChapterCount,
   bookWordCount,
   bookmarks,
+  booksAgainstPlan,
   booksIn,
   createBook,
   chapterNumberOf,
@@ -1180,6 +1181,54 @@ it("starts a book active, in neither archive nor trash", () => {
   expect(booksIn(shelf, "active").map((b) => b.id)).toEqual([bookId]);
   expect(booksIn(shelf, "archived")).toEqual([]);
   expect(booksIn(shelf, "trashed")).toEqual([]);
+});
+
+/*
+ * **What spends a slot on the free plan.**
+ *
+ * Archived books count and trashed ones do not, and the pair of rules is only
+ * coherent together — see the long note on `booksAgainstPlan`. These are here
+ * because the rule is stated in three places (this function, the number in
+ * `launch.ts`, and `enforce_launch_book_limit` in Postgres) and only one of
+ * them can be tested from here: if this drifts, the browser starts offering
+ * restores the database then refuses.
+ */
+it("counts an archived book against the plan, because the archive is not a way round the limit", () => {
+  const { bookId } = createBook("A");
+  archiveBook(bookId);
+
+  expect(booksIn(getShelf(), "active")).toEqual([]);
+  expect(booksAgainstPlan(getShelf()).map((b) => b.id)).toEqual([bookId]);
+});
+
+it("does not count a trashed book, which is the bug this rule was written for", () => {
+  // A shelf of three refusing a fourth because two sat in a forgotten trash.
+  const { bookId } = createBook("A");
+  trashBook(bookId);
+
+  expect(booksAgainstPlan(getShelf())).toEqual([]);
+});
+
+it("counts a book that is both archived and trashed once, as trashed", () => {
+  // `booksIn` reads trash as winning over archive; anything counting the two
+  // lists separately would spend two slots on one book.
+  const { bookId } = createBook("A");
+  archiveBook(bookId);
+  trashBook(bookId);
+
+  expect(booksAgainstPlan(getShelf())).toEqual([]);
+});
+
+it("counts the active shelf and the archive together", () => {
+  const active = createBook("A").bookId;
+  const filed = createBook("B").bookId;
+  const gone = createBook("C").bookId;
+  archiveBook(filed);
+  trashBook(gone);
+
+  expect(booksAgainstPlan(getShelf()).map((b) => b.id).sort()).toEqual(
+    [active, filed].sort(),
+  );
 });
 
 it("archives and unarchives a book", () => {

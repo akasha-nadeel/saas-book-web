@@ -243,8 +243,14 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
   const shelf = useShelf();
   const plan = usePlan();
   const storedBookCount = booksAgainstPlan(shelf).length;
+  /* `!plan.loading` rather than `plan.loading ||`, which is the fix the
+     dashboard's restore gate carries the long note on: `usePlan()` starts at
+     UNKNOWN with `pro: false`, so gating while it loads refuses a Pro writer
+     for the width of one request. Not knowing yet is not a reason to refuse,
+     and the Postgres trigger is what actually enforces this. */
   const freeBookLimitReached =
-    (plan.loading || plan.billing) &&
+    !plan.loading &&
+    plan.billing &&
     !plan.pro &&
     storedBookCount >= LAUNCH_LIMITS.freeBooks;
 

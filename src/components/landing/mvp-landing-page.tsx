@@ -247,147 +247,55 @@ const FOOTER_COLUMNS: FooterColumn[] = [
    -------------------------------------------------------------------------- */
 
 interface Row {
+  /**
+   * The part of the app the row is about, for the pill over the heading.
+   *
+   * It exists because the disclosures came off. A visitor scanning four bands
+   * needed some way to tell which was which without reading each heading; two
+   * words in a pill do that, where three folded paragraphs did not — most
+   * people never opened them.
+   */
+  badge: string;
   /** The outcome, in the writer's terms — never the feature's name. */
   title: string;
   lead: ReactNode;
   figure: ReactNode;
-  points: { term: string; detail: ReactNode }[];
 }
 
 const ROWS: Row[] = [
   {
+    badge: "Your shelf",
+    /* **No `LEAD_EM` clause in these four.** Every other deck on the page opens
+       plain and lands on a near-black half, which is what tells a section deck
+       apart from body copy. A row's sentence is not a deck — it sits under its
+       own heading with the eyebrow already carrying the colour, and a third
+       weight in three lines is one more than the band can hold. The reference
+       sets it as one even paragraph and it is right to. */
+    lead: "The covers, the counts, and where you left off — the library on the screen you land on, and the counts are summed from the manuscript rather than stored, so a card cannot drift from its book.",
     title: "Every book you have, on one shelf",
-    lead: (
-      <>
-        <strong className={LEAD_EM}>
-          The covers, the counts, and where you left off
-        </strong>{" "}
-        — the library on the screen you land on, rather than a folder whose name
-        you have to remember.
-      </>
-    ),
-    figure: <ShelfScreen />,
-    points: [
-      {
-        term: "Counted, never estimated",
-        detail:
-          "Chapters and words are summed from the manuscript every time the shelf is read rather than stored anywhere, so the number on a card cannot drift away from the book it is about.",
-      },
-      {
-        term: "Archiving and deleting are both reversible",
-        detail:
-          "A deleted chapter keeps its text and its notes until you empty the trash, so putting it back loses nothing. An archived book leaves the shelf without leaving the library.",
-      },
-      {
-        term: `${plural(
-          LAUNCH_LIMITS.freeBooks,
-          "book",
-        )} on Free, as many as you like on Pro`,
-        detail: `Free carries ${plural(
-          LAUNCH_LIMITS.freeBooks,
-          "book",
-        )} with no cap on chapters or words. The limit is enforced in the database rather than by the button, so it is the same answer whichever way you arrive at it.`,
-      },
-    ],
+    figure: <ShelfScreen chrome={{ url: "openchapter.app/" }} />,
   },
   {
+    badge: "The editor",
     title: "A chapter at a time, and nothing else on the screen",
-    lead: (
-      <>
-        <strong className={LEAD_EM}>
-          Prose set on a real page, saved as you type
-        </strong>{" "}
-        — with the manuscript, a search, your notes, earlier versions and the
-        deleted chapters all one press away and none of them in the way.
-      </>
+    lead: `Prose set on a real page, saved as you type — with the manuscript, your notes and the last ${MAX_SNAPSHOTS} versions of every chapter one press away, and none of them in the way.`,
+    figure: (
+      <VersionsScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
     ),
-    /* The hero already shows the writing surface, so this row shows one of the
-       panels the lead says is a press away rather than the same window twice.
-       Two drawings of one screen on one page reads as a page that ran out of
-       things to show. */
-    figure: <VersionsScreen />,
-    points: [
-      {
-        term: "It says “Saved” only once it is saved",
-        detail:
-          "The word in the corner waits for the write to land rather than for the keystroke that started it, and the body is written before the word count — a stale count is cosmetic, lost prose is not.",
-      },
-      {
-        term: "The page is a page",
-        detail:
-          "Chapters are laid out on sheets at the book's own trim size and typeface, and the breaks are drawn over the text rather than pushed into it, so undo, autosave and the export all see the same manuscript.",
-      },
-      {
-        term: "Front and back matter are pages, not settings",
-        detail:
-          "A title page, a copyright page, a dedication, an acknowledgements page — written and reordered like any chapter, and left out of the export until you have actually written them.",
-      },
-      {
-        term: `The last ${MAX_SNAPSHOTS} versions of every chapter, kept for you`,
-        detail:
-          "Snapshots taken as you work, so a bad afternoon is not permanent. It is a safety net rather than an archive — and it never costs you the chapter, because the manuscript is saved before the snapshot is even attempted.",
-      },
-    ],
   },
   {
+    badge: "Import",
     title: "Bring the manuscript you already have",
-    lead: (
-      <>
-        <strong className={LEAD_EM}>
-          {IMPORT_FORMATS.length} formats in, split into chapters
-        </strong>{" "}
-        — read in your own browser, with what did and did not survive the trip
-        named before anything is added to your library.
-      </>
-    ),
-    figure: <ImportScreen />,
-    points: [
-      {
-        term: `Reads ${IMPORT_FORMATS.map((f) => f.label).join(", ")}`,
-        detail:
-          "Text, headings, bold and italic come through; styling, images, footnotes and comments do not. PDF and old .doc files are refused by name with what to do instead, rather than half-read into something you would have to notice was wrong.",
-      },
-      {
-        term: "Chapters are found, not guessed at",
-        detail:
-          "A flat file is split at its headings, and a title page or an acknowledgements page is recognised by name against a table rather than by where it happens to sit. An EPUB says which page is which and the importer believes it.",
-      },
-      {
-        term: "The file's own details are kept",
-        detail:
-          "Title, author, language, publisher, an ISBN found by its check digit, and the cover if the file carries one — read out of the file rather than asked for again.",
-      },
-    ],
+    lead: `${IMPORT_FORMATS.length} formats in, split into chapters — read in your own browser, with what did and did not survive the trip named before anything is added to your library.`,
+    figure: <ImportScreen chrome={{ url: "openchapter.app/book/import" }} />,
   },
   {
+    badge: "The assistant",
     title: "Ask about the chapter you are on",
-    lead: (
-      <>
-        <strong className={LEAD_EM}>
-          It reads the chapter and answers about it
-        </strong>{" "}
-        — what is not landing, a tighter opening, what might happen next. It
-        never writes into your book.
-      </>
+    lead: "It reads the chapter and answers about it — what is not landing, a tighter opening, what might happen next. It offers you text and never writes into your book.",
+    figure: (
+      <AssistantScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
     ),
-    figure: <AssistantScreen />,
-    points: [
-      {
-        term: "Nothing is sent until you ask",
-        detail:
-          "The chapter goes with your question and only with your question, the panel says so above the first message, and the conversation is kept in this browser rather than on your account.",
-      },
-      {
-        term: "It offers text; you decide",
-        detail:
-          "The assistant cannot edit the document. It hands you words to use, which is the same rule that keeps this app out of AI-generated covers and AI editing — the writing stays yours.",
-      },
-      {
-        term: `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies a month free, ${LAUNCH_LIMITS.proAssistantRepliesPerMonth} on Pro`,
-        detail:
-          "Counted per calendar month on the server, because it costs model time. A reply that never arrives is not counted against you.",
-      },
-    ],
   },
 ];
 
@@ -715,10 +623,11 @@ export function MvpLandingPage() {
                   key={row.title}
                   flip={i % 2 === 1}
                   ground={ROW_GROUNDS[i % ROW_GROUNDS.length]!}
+                  badge={row.badge}
                   title={row.title}
                   lead={row.lead}
                   figure={row.figure}
-                  points={row.points}
+                  cta={{ href: "/signup", label: "Start free" }}
                 />
               ))}
             </div>

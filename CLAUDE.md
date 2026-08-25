@@ -639,16 +639,31 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   it. **The count is stated twice and both have to move** — `freeBooks` in
   `launch.ts` and the trigger body, whose current value is set by the ninth
   migration (`20260824000000_free_book_limit_five.sql`) rather than by the
-  eighth, because the eighth may already have been applied.
-- **The book limit counts the active shelf and nothing else**, and the way back
-  out of the archive and the trash is gated instead. `booksAgainstPlan` in
-  `library-store.ts` is the browser's copy of that rule and the trigger is the
-  real one; it fires on **update as well as insert**, because a restore is an
-  update and archiving five books then restoring them all would otherwise walk
-  straight past the limit. This is how a limit counted in *things* is counted
-  everywhere else — Trello's boards, Figma's files — as against a limit counted
-  in bytes, where trash holds its space until it is emptied. Counting the trash
-  is what the shipped version did, and a shelf of three books refused a fourth.
+  eighth, because the eighth may already have been applied. The tenth
+  (`20260826000000_free_book_limit_counts_archived.sql`) changes *what* is
+  counted, not how many.
+- **The book limit counts everything but the trash**, so the archive is not a
+  way round it and **unarchiving is never gated**. It was the active shelf alone
+  until 2026-08-26, on the Trello/Figma convention where archiving opens a slot
+  and coming back out is gated instead — a fair rule for tools whose archive
+  holds *finished* things, and the wrong one here, where a writer archives a
+  book they mean to return to and was met with a paywall at their own
+  manuscript. **The trash still does not count**, which is not an inconsistency
+  but the bug the rule was written for: counting deleted books made a shelf of
+  three refuse a fourth because two sat in a forgotten trash. So restoring *from
+  the trash* is still gated and the trigger still fires on **update as well as
+  insert**; unarchiving is no longer a crossing at all. `booksAgainstPlan` in
+  `library-store.ts` is the browser's copy and the trigger is the real one —
+  they are two statements of one rule and must agree, or the browser offers
+  restores Postgres then refuses.
+- **A limit gate must never fire while the plan is still unknown.** `usePlan()`
+  starts at `UNKNOWN` (`loading: true`, `pro: false`) and asks the server on
+  mount, so for the width of one request a Pro account looks exactly like a free
+  one. Both gates read `(plan.loading || plan.billing) && !plan.pro && …`, which
+  *gated during that window*: landing on `/?area=write` and pressing Restore
+  before the answer arrived told a writer with unlimited books there was no
+  room. It is `!plan.loading && plan.billing && …` in both places now. Not
+  knowing yet is not a reason to refuse, and the server is the real enforcement.
 - **`free-limits.ts` is the earlier metering policy and most of it is asleep** —
   every tool it gates is one the launch MVP hides, so the seats row is the only
   one on a live path (`ShareDialog` still opens from the editor and the

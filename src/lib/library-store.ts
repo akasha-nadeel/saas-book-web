@@ -4355,26 +4355,34 @@ export function booksIn(shelf: Shelf, view: BookView): Book[] {
 }
 
 /**
- * The books that count against a plan's book limit: the active shelf only.
+ * The books that count against a plan's book limit: everything but the trash.
  *
- * **Neither trash nor archive counts, and the way out of both is gated
- * instead.** This is the settled convention for a limit counted in *things*
- * rather than in bytes — Trello's ten boards and Figma's three files both
- * work this way, and archiving there opens a slot. A quota counted in bytes
- * goes the other way (Google Drive's trash holds your storage until it is
- * emptied), but this limit is a count of books, not of megabytes.
+ * **Archived books count, and the archive is therefore not a way round the
+ * limit.** It did not use to: the rule was the Trello/Figma one, where
+ * archiving opens a slot and coming back out is gated instead. That is a
+ * defensible convention and it was the wrong one here, for a reason particular
+ * to this product. Those tools archive *finished* things — a board nobody is
+ * using, a file that shipped. A writer archives a book they intend to come
+ * back to, and being stopped at the door on the way back is being stopped from
+ * opening their own manuscript. Counting it up front costs the same slot and
+ * never refuses anybody their work.
  *
- * Counting either was the bug this came from: a shelf showing three books
- * refused a fourth, because two more sat in the trash.
+ * **The trash still does not count**, and that is not an inconsistency — it is
+ * the bug this function was written for. Counting deleted books is what made a
+ * shelf of three refuse a fourth, because two more sat in a trash the writer
+ * had forgotten. A trashed book is on its way out; an archived one is not.
  *
- * The half that keeps it honest is that **`restoreBook` is refused at the
- * limit** — otherwise archiving five and restoring them all walks straight
- * past it. Figma does the same thing, and its help page says so: restoring
- * needs a free slot. `enforce_launch_book_limit` in Postgres counts the same
- * way and fires on the restore as well as on the insert.
+ * The half that keeps *that* honest is that **restoring from the trash is
+ * still gated** — otherwise trashing five books and restoring them all walks
+ * past the limit. Coming back out of the *archive* is not gated any more and
+ * must not be: the slot was never given up.
+ *
+ * `enforce_launch_book_limit` in Postgres counts the same way and is the half
+ * that enforces it; this one only decides what the browser offers. Change one
+ * and change the other.
  */
 export function booksAgainstPlan(shelf: Shelf): Book[] {
-  return booksIn(shelf, "active");
+  return [...booksIn(shelf, "active"), ...booksIn(shelf, "archived")];
 }
 
 /**

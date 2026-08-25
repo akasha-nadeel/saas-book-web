@@ -459,18 +459,42 @@ export function Bookshelf({
   const [trashing, setTrashing] = useState<Book | null>(null);
   const [erasing, setErasing] = useState<Book | null>(null);
   /* The third question, and the one that is not a confirmation: a restore the
-     free plan has no room for. Coming back out of the archive or the trash is
-     what makes "neither of them counts" honest — see `booksAgainstPlan`. */
+     free plan has no room for. Only ever a book coming out of the *trash* —
+     the archive stopped being a way round the limit when archived books
+     started counting against it. See `booksAgainstPlan`. */
   const [noRoomFor, setNoRoomFor] = useState<Book | null>(null);
 
   const handleTrash = (book: Book) => setTrashing(book);
   const handleDeleteForever = (book: Book) => setErasing(book);
   const handleRestore = (book: Book) => {
-    /* The same three-part test `new-book-form.tsx` makes, and it has to stay
-       the same: with no gateway configured there are no plans and nothing is
-       held back, so `plan.billing` is half of the question. */
+    /* **Only a book coming out of the trash can be refused.** An archived book
+       already spends its slot — see `booksAgainstPlan` — so unarchiving gives
+       the writer back something the plan was already counting, and stopping
+       them at that door would be stopping them from opening their own
+       manuscript. Trash wins over archive on a book that is both, exactly as
+       `booksIn` reads it, so the trash flag is the one tested. */
+    if (!book.trashedAt) {
+      restoreBook(book.id);
+      return;
+    }
+
+    /* The same test `new-book-form.tsx` makes, and it has to stay the same.
+       With no gateway configured there are no plans and nothing is held back,
+       so `plan.billing` is half of the question.
+
+       **`!plan.loading` is the other half, and leaving it out was a bug.**
+       `usePlan()` starts at UNKNOWN — `loading: true, pro: false` — and asks
+       the server on mount, so for the width of that request a Pro account is
+       indistinguishable from a free one. Gating on `plan.loading` meant
+       *gating during it*: land straight on `/?area=write`, press Restore
+       before the answer arrives, and a writer with unlimited books is told
+       there is no room. Not knowing yet is not a reason to refuse. The server
+       is the real enforcement — `enforce_launch_book_limit` exempts Pro — so
+       the cost of waving through a restore we would have refused is that
+       Postgres refuses it instead, which is the right way round. */
     const gated =
-      (plan.loading || plan.billing) &&
+      !plan.loading &&
+      plan.billing &&
       !plan.pro &&
       booksAgainstPlan(shelf).length >= LAUNCH_LIMITS.freeBooks;
     if (gated) {
