@@ -30,9 +30,12 @@ import type { CSSProperties, ReactNode, Ref } from "react";
  * picture of one. Getting that backwards would make the only working thing on
  * the page invisible to the people who most need it announced.
  */
+export type AppWindowChrome = { url: string; nav?: ReactNode };
+
 export function AppWindow({
   title,
   badge,
+  chrome,
   label,
   bezel = false,
   fill = false,
@@ -53,6 +56,22 @@ export function AppWindow({
    */
   title?: string;
   badge?: ReactNode;
+  /**
+   * Draw the window as a *browser* window rather than a bare pane: the three
+   * lights, the navigation glyphs, and an address on the right.
+   *
+   * **It is a different claim from `title`, not a dressier version of it.** A
+   * title strip says "this pane is called X". This says "what you are looking
+   * at is our application, at that address, in a browser" — which is the one
+   * thing a visitor who has not signed in cannot check for themselves. The
+   * address is therefore a real route on this domain and must stay one; a
+   * plausible-looking URL that goes nowhere is the invented detail this page
+   * refuses everywhere else.
+   *
+   * `nav` is whatever the caller wants in the middle of the bar — the hero
+   * puts the demo's own tabs there, which is where a browser keeps them.
+   */
+  chrome?: AppWindowChrome;
   /** Present when the contents are a drawn picture rather than a control. */
   label?: string;
   /**
@@ -117,7 +136,7 @@ export function AppWindow({
     <div
       ref={hostRef}
       {...(picture ? { role: "img", "aria-label": label } : {})}
-      className={`rounded-[1.4rem] shadow-[0_28px_70px_-28px_rgba(15,15,16,0.45),0_8px_24px_-12px_rgba(15,15,16,0.25)] ${
+      className={`rounded-[0.9rem] shadow-[0_28px_70px_-28px_rgba(15,15,16,0.45),0_8px_24px_-12px_rgba(15,15,16,0.25)] ${
         fill ? "flex h-full flex-col" : ""
       } ${
         bezel
@@ -126,7 +145,7 @@ export function AppWindow({
                borrowed grey, and no border of its own — the value *is* the
                edge, and a hairline round a dark bezel reads as a seam. */
             "bg-lp-stage p-2 sm:p-3"
-          : "border border-lp-edge bg-lp-ground p-1.5 sm:p-2"
+          : "border border-lp-line bg-lp-ground p-1.5 sm:p-2"
       } ${picture ? "select-none" : ""}`}
     >
       {/* The glass carries the hairline and the rounding, so whatever is
@@ -134,10 +153,35 @@ export function AppWindow({
           glass are both pale in daylight, and without that line between them
           the frame flattens back into a card. */}
       <div
-        className={`overflow-hidden rounded-[1.05rem] border border-lp-line bg-lp-ground ${
+        className={`overflow-hidden rounded-[0.55rem] border border-lp-line bg-lp-ground ${
           fill ? "min-h-0 flex-1" : ""
         }`}
       >
+        {chrome && (
+          /* The bar. Its height is the lights plus the padding, and the lights
+             are the one thing here drawn at a literal size rather than a
+             token: they are a picture of a control belonging to somebody
+             else's software, so they take that software's colours and do not
+             move with our palette. */
+          <div className="flex min-h-11 items-center gap-3 border-b border-lp-line bg-lp-well px-3 sm:px-4">
+            <span aria-hidden="true" className="flex shrink-0 items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+            </span>
+            {chrome.nav && (
+              <span className="min-w-0 flex-1 overflow-hidden">{chrome.nav}</span>
+            )}
+            <span
+              className={`shrink-0 truncate font-code text-[0.6875rem] text-lp-faint ${
+                chrome.nav ? "hidden lg:block" : "ml-auto"
+              }`}
+            >
+              {chrome.url}
+            </span>
+          </div>
+        )}
+
         {(title || badge) && (
           <div className="flex min-h-11 items-center gap-3 border-b border-lp-line bg-lp-well px-4 sm:px-5">
             {title && (

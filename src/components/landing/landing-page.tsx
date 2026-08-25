@@ -2585,18 +2585,16 @@ export function LandingPage() {
 
         {/* ---- Close ----------------------------------------------------
 
-            The last ask, and the top half of one closing composition: a
-            landscape running full-bleed under both this and the footer, with
-            the ask centred on its sky and the footer riding up onto its foot
-            as a card. The two are separate elements — this one closes `<main>`
-            and the footer follows it — but they are one picture, joined by a
-            negative margin rather than by a wrapper, so `<main>` keeps the
-            content that belongs in it.
+            The last ask, and a section of its own. It closes `<main>`; the
+            footer is the next section down and there is a hairline between
+            them. They were one composition twice over — an indigo banner whose
+            gradient landed on the footer's ground, then a landscape running
+            full-bleed under both with the footer riding up onto it as a card —
+            and neither joint is here any more.
 
-            Read `cta-banner.tsx` for what the picture cost (the drawn app
-            window, and why nothing it said was lost) and `globals.css` beside
-            `.oc-closing-field` for the contrast measurement that decides what
-            may sit on the sky at all. */}
+            Read `cta-banner.tsx` for what the two pictures cost (the drawn app
+            window, and why nothing it said was lost) and for the contrast
+            probe worth re-reading before anyone puts artwork back. */}
         <CtaBanner />
       </main>
 

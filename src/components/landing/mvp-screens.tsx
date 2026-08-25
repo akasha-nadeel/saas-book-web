@@ -1,4 +1,7 @@
-import { AppWindow } from "@/components/landing/app-window";
+import {
+  AppWindow,
+  type AppWindowChrome,
+} from "@/components/landing/app-window";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
 import { LAUNCH_LIMITS } from "@/lib/launch";
@@ -61,6 +64,18 @@ import { plural } from "@/lib/plural";
  */
 const W = 1000;
 
+/**
+ * What every drawn screen takes, and the only prop any of them has.
+ *
+ * The screens are pictures: they draw themselves and answer to nothing. The
+ * one exception is the *frame* — the hero shows them inside a browser window
+ * with the demo's own tabs in its bar, and the frame belongs to `AppWindow`
+ * rather than to the picture. So each screen forwards this and touches
+ * nothing else; passing it is what turns a figure into the hero's demo, and
+ * leaving it off gives the plain pane every other section wants.
+ */
+type ScreenProps = { chrome?: AppWindowChrome };
+
 /** The sample book, shared by all five so they read as one library. */
 const BOOK = {
   title: "Breathe Again",
@@ -118,9 +133,10 @@ const SHELF = [
   },
 ] as const;
 
-export function ShelfScreen() {
+export function ShelfScreen({ chrome }: ScreenProps = {}) {
   return (
     <AppWindow
+      chrome={chrome}
       label="The shelf: three books on a grid, each with its cover, its chapter and word counts, when it was last opened and a Write button — above them the Import a manuscript and New book buttons, and tabs counting the books, the archived ones and the trash."
       /* Taller than the other three: a row of 2:3 covers is the one thing here
          with a fixed proportion of its own, so the frame has to be cut to the
@@ -314,9 +330,10 @@ const VERSIONS = [
   { when: "Yesterday", words: 966, delta: "", newest: false },
 ] as const;
 
-export function VersionsScreen() {
+export function VersionsScreen({ chrome }: ScreenProps = {}) {
   return (
     <AppWindow
+      chrome={chrome}
       label={`The Versions panel: four sittings on one chapter, each with when it was saved, its word count and the change against the one before it, over a note saying a version is kept about every ten minutes and the last ${MAX_SNAPSHOTS} are kept.`}
       screenStyle={{ aspectRatio: `${W} / 600` }}
       screenClassName="@container flex overflow-hidden bg-lp-raised leading-[1.35]"
@@ -391,9 +408,10 @@ export function VersionsScreen() {
   );
 }
 
-export function ManuscriptScreen() {
+export function ManuscriptScreen({ chrome }: ScreenProps = {}) {
   return (
     <AppWindow
+      chrome={chrome}
       bezel
       label="The editor: the Manuscript panel listing a book's front matter and its chapters, beside the chapter itself set on a page with a running head, and a bar at the foot counting 1,204 of 80,000 words with the time of the last save beside it."
       screenStyle={{ aspectRatio: `${W} / 620` }}
@@ -525,11 +543,12 @@ export function ManuscriptScreen() {
  * making a claim the code does not. The format list is `IMPORT_FORMATS`
  * itself, so a sixth format cannot ship without appearing here.
  */
-export function ImportScreen() {
+export function ImportScreen({ chrome }: ScreenProps = {}) {
   const extensions = IMPORT_FORMATS.map((f) => f.extension).join(", ");
 
   return (
     <AppWindow
+      chrome={chrome}
       label={`The import screen: a dashed drop zone reading “Drop your manuscript here” with a Choose a file button, above a line saying it reads ${extensions} and that styling, images, footnotes and comments do not come through.`}
       screenStyle={{ aspectRatio: `${W} / 600` }}
       screenClassName="@container overflow-hidden bg-lp-raised leading-[1.35]"
@@ -590,9 +609,10 @@ const SUGGESTIONS = [
  * that showed the reply without them would be selling the feature without its
  * terms.
  */
-export function AssistantScreen() {
+export function AssistantScreen({ chrome }: ScreenProps = {}) {
   return (
     <AppWindow
+      chrome={chrome}
       label="The assistant panel beside the chapter: a note saying the chapter text is sent with your question and that the conversation stays in this browser, three suggested openers, and a reply underneath them."
       screenStyle={{ aspectRatio: `${W} / 600` }}
       screenClassName="@container flex overflow-hidden bg-lp-raised leading-[1.35]"

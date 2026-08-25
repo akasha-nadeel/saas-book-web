@@ -215,14 +215,20 @@ shipping one. Its figure is drawn in markup and its seat numbers come from
 answers the question the section invites: this is not Google Docs, and you will
 not see each other type.
 
-**It is always light, and it is the only screen that is.** It followed
-`data-theme` for a while, on the argument that a reader on a dark machine has
-not expressed a view about our marketing — they have told their whole screen
-how bright to be, and the one page ignoring them was the first one they ever
-saw. That holds for *the app*, a room somebody works in for hours, and is the
-wrong trade for a shop front: this page is one composition whose grounds,
-marker and closing banner were drawn and measured against white, and the dark
-set was a second design of it nobody could hold in their head at once.
+**Each page pins its own ground, and the two now differ.** `landing-page.tsx`
+is light; `mvp-landing-page.tsx` is **dark**, rebuilt in the quieter idiom on
+2026-08-25 — a gradient hero, a type scale a step down at medium weight, and a
+closing ask on the same artwork the page opened on.
+
+Both *pin*, and neither may simply drop the attribute. Following `data-theme`
+was tried once, on the argument that a reader on a dark machine has not
+expressed a view about our marketing — they have told their whole screen how
+bright to be, and the one page ignoring them was the first one they ever saw.
+That holds for *the app*, a room somebody works in for hours, and is the wrong
+trade for a shop front: a landing page is one composition whose grounds and
+artwork are measured against a known ground. Dropping the pin on the MVP page
+proved it in one build — the visitor's own daylight preference won, and the
+page came out with near-black type on a dark gradient hero.
 
 **The mechanism is one attribute, and it is why the light block's selector is
 `[data-theme="light"]` rather than `:root[data-theme="light"]`.** These tokens
@@ -232,6 +238,12 @@ covering the `lp-*` set *and* the app tokens the page borrows in one place,
 which a per-token override could not. `color-scheme` rides along, so that div's
 scrollbar comes out light too. Nothing else may write that attribute below the
 root: it is the app's own theme everywhere else.
+
+`[data-theme="dark"]` is the mirror of that block and exists for the same
+reason pointed the other way: dark is `@theme`'s default on `:root`, so a
+subtree sitting inside a light tree had no declaration to get back to it with.
+It is generated from `@theme` and states every property the light block states.
+Three blocks now, and a token added to one goes in all three.
 
 **The dark `lp-*` values are still live** — the four legal pages share this
 palette through `legal-shell.tsx`, are opened by writers from inside the app,

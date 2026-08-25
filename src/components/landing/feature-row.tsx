@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ROW_BODY, ROW_TITLE } from "@/components/landing/type";
 
 /**
  * One feature row: a screen on one side, what it is for on the other.
@@ -123,12 +124,10 @@ export function FeatureRow({
           about. */}
       <div className={flip ? "lg:order-2" : ""}>
         {eyebrow && <div className="mb-4">{eyebrow}</div>}
-        <h3 className="oc-heading font-serif text-[1.75rem] leading-[1.15] font-semibold text-lp-ink sm:text-[2rem]">
+        <h3 className={`oc-heading font-serif text-lp-ink ${ROW_TITLE}`}>
           {title}
         </h3>
-        <p className="mt-4 max-w-prose font-sans text-[1.0625rem] leading-relaxed text-lp-deck">
-          {lead}
-        </p>
+        <p className={`mt-4 max-w-prose font-sans ${ROW_BODY}`}>{lead}</p>
 
         <div className="mt-7 border-t border-lp-line">
           {points.map((point) => (
@@ -169,9 +168,9 @@ export function FeatureRow({
  * so a caller with sixteen rows can cycle it without writing that trap itself.
  */
 export const ROW_GROUNDS = [
-  "bg-lp-card-1",
-  "bg-lp-card-2",
-  "bg-lp-card-3",
+  "oc-row-ground-1",
+  "oc-row-ground-2",
+  "oc-row-ground-3",
 ] as const;
 
 /**

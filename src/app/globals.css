@@ -471,6 +471,17 @@
   --color-lp-deck: #8e8e99; /* section decks — see the light value */
   --color-lp-accent: #146ef5; /* the fill: buttons, the closing banner */
   --color-lp-accent-ink: #ffffff; /* what rides on that fill */
+  /* **The accent at a lightness that can carry small type — a shade, not a
+     sixth hue.** `lp-accent` is tuned to be a *fill* with white on it, and at
+     that lightness it is the ceiling rather than a working range: white on it
+     is 4.59:1, which passes and leaves nothing over, and anything dimmer than
+     white fails outright. A plan card needs both — a dimmed sentence on the
+     fill, and an accent-coloured button label on a pale tint, where the bright
+     accent manages only 3.97:1. Same hue, lower lightness: white reaches
+     6.8:1, `lp-accent-pale` 4.8:1, and a label on `lp-tint` 5.9:1. Stated
+     identically in both blocks because it is a saturated fill either way, and
+     white rides on it in daylight and at night alike. */
+  --color-lp-accent-deep: #1355bf;
 
   /* ------------------------------------------------------------------------
      The three refusal cards, and the page's one decorative hue.
@@ -942,6 +953,17 @@
   --color-lp-deck: #75757e;
   --color-lp-accent: #146ef5;
   --color-lp-accent-ink: #ffffff;
+  /* **The accent at a lightness that can carry small type — a shade, not a
+     sixth hue.** `lp-accent` is tuned to be a *fill* with white on it, and at
+     that lightness it is the ceiling rather than a working range: white on it
+     is 4.59:1, which passes and leaves nothing over, and anything dimmer than
+     white fails outright. A plan card needs both — a dimmed sentence on the
+     fill, and an accent-coloured button label on a pale tint, where the bright
+     accent manages only 3.97:1. Same hue, lower lightness: white reaches
+     6.8:1, `lp-accent-pale` 4.8:1, and a label on `lp-tint` 5.9:1. Stated
+     identically in both blocks because it is a saturated fill either way, and
+     white rides on it in daylight and at night alike. */
+  --color-lp-accent-deep: #1355bf;
 
   /* The three refusal cards in daylight — see the long note in the dark block.
      Indigo, peach, violet, all a step off white: `lp-ink` clears 17:1 on every
@@ -1003,6 +1025,142 @@
   --color-lp-stage-accent: #74a9ff;
   --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #b9b9c4;
+}
+
+/* --------------------------------------------------------------------------
+   The dark block — the mirror of the one above, and the reason it exists.
+
+   **Dark is the default and is stated in `@theme` on `:root`, so for most of
+   this file's life there was nothing to write here.** A writer at night gets
+   `<html data-theme="dark">`, that matches no override, and the `@theme`
+   values stand. Light is the exception, and the block above is it.
+
+   That arrangement has one hole, and the launch MVP's landing page fell
+   straight into it. These are *inherited variable re-points*: the block above
+   hands its light values to everything under the element carrying the
+   attribute. So a subtree can pin light inside a dark app — which is what that
+   block was written for — but a subtree could **not** pin dark inside a light
+   one, because there was no declaration to undo the inheritance with. Setting
+   `data-theme="dark"` on a div under `<html data-theme="light">` did exactly
+   nothing, and the page came out with near-black type on a dark gradient.
+
+   So this block is the missing half rather than a new idea, and it is
+   generated from `@theme` rather than typed: **every property the light block
+   states is stated here at its `@theme` value**, which is the same one-to-one
+   rule the file already holds those two to. If you add a token to either of
+   the other blocks, add it to all three.
+
+   Unlayered, like the light block, so it beats `@theme`'s layered `:root`
+   whatever specificity says.
+   -------------------------------------------------------------------------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-surface: #000000;
+  --color-panel: #0a0a0a;
+  --color-raised: #1c1c1c;
+  --color-line: #262626;
+  --color-fg: #ededed;
+  --color-muted: #8f8f8f;
+  --color-accent: #ffffff;
+  --color-accent-strong: #cccccc;
+  --color-accent-deep: #e5e5e5;
+  --color-accent-ink: #000000;
+  --color-upgrade-from: #9333ea;
+  --color-upgrade-to: #4f46e5;
+  --color-upgrade-ink: #7c3aed;
+  --color-guide: #2f7d32;
+  --color-guide-hover: #276b2a;
+  --color-sheet: #fcfbf7;
+  --color-sheet-ink: #1f1d1a;
+  --color-sheet-edge: #d9d7d0;
+  --color-badge-gold-bg: #241a06;
+  --color-badge-gold-line: #6b4e0f;
+  --color-badge-gold-ink: #fcd34d;
+  --color-badge-blue-bg: #10192e;
+  --color-badge-blue-line: #24365f;
+  --color-badge-blue-ink: #93c5fd;
+  --color-badge-blue-soft: #1c2c4d;
+  --color-badge-pro-bg: #1a1130;
+  --color-badge-pro-line: #3b1f6b;
+  --color-badge-pro-ink: #d8b4fe;
+  --color-badge-new-bg: #15803d;
+  --color-badge-new-ink: #ffffff;
+  --color-wordmark: #3b82f6;
+  --color-chapter-fg: #7dd3fc;
+  --color-brand-fill: #146ef5;
+  --color-brand-ink: #ffffff;
+  --color-danger: #f87171;
+  --color-selected: color-mix(in srgb, #ffffff 12%, transparent);
+  --color-selected-fg: #ffffff;
+  --color-nav: #0a0a0a;
+  --color-matter-front: #ffffff;
+  --color-matter-front-strong: #e0e0e0;
+  --color-matter-front-ink: #000000;
+  --color-matter-body: #8f8f8f;
+  --color-matter-body-strong: #a3a3a3;
+  --color-matter-body-ink: #000000;
+  --color-matter-back: #2e2e2e;
+  --color-matter-back-strong: #3d3d3d;
+  --color-matter-back-ink: #ffffff;
+  --color-ok-bg: #022c22;
+  --color-ok-line: #065f46;
+  --color-ok-fg: #34d399;
+  --color-note-bg: #2a1c05;
+  --color-note-line: #78350f;
+  --color-note-fg: #fbbf24;
+  --color-stop-bg: #300a0a;
+  --color-stop-line: #7f1d1d;
+  --color-stop-fg: #f87171;
+  --color-stop-solid: #b91c1c;
+  --color-note-solid: #b45309;
+  --color-ok-solid: #047857;
+  --color-step-bg: #15132e;
+  --color-step-line: #2c2764;
+  --color-step-fg: #a9a4ee;
+  --color-lp-ground: #0b0b0e;
+  --color-lp-tint: #14141b;
+  --color-lp-tint-soft: #101015;
+  --color-lp-well: #16161d;
+  --color-lp-raised: #1e1e26;
+  --color-lp-line: #23232b;
+  --color-lp-edge: #2d2d38;
+  --color-lp-edge-strong: #3b3b48;
+  --color-lp-ink: #f1f1f4;
+  --color-lp-soft: #c6c6d0;
+  --color-lp-body: #a2a2ad;
+  --color-lp-faint: #85858f;
+  --color-lp-deck: #8e8e99;
+  --color-lp-accent: #146ef5;
+  --color-lp-accent-ink: #ffffff;
+  --color-lp-accent-deep: #1355bf;
+  --color-lp-card-1: #14141c;
+  --color-lp-card-2: #1a1512;
+  --color-lp-card-3: #17131c;
+  --color-lp-paper: #14130f;
+  --color-lp-paper-accent: #4ec7de;
+  --color-lp-paper-accent-text: #7ad8e9;
+  --color-lp-card-1-ink: #a9a4ee;
+  --color-lp-card-1-fill: #4a46b5;
+  --color-lp-card-2-ink: #e8a07a;
+  --color-lp-card-2-fill: #b04a1e;
+  --color-lp-card-3-ink: #c9a2ee;
+  --color-lp-card-3-fill: #7c2fbc;
+  --color-lp-road: #121a16;
+  --color-lp-accent-text: #74a9ff;
+  --color-lp-accent-soft: #ffffff;
+  --color-lp-wordmark: #74a9ff;
+  --color-lp-accent-pale: #eae9ff;
+  --color-lp-device: #2a2a33;
+  --color-lp-marker: #e4dc00;
+  --color-lp-marker-ink: #14140f;
+  --color-lp-stage: #14141c;
+  --color-lp-stage-ink: #f5f5f7;
+  --color-lp-stage-body: #a8a8b4;
+  --color-lp-stage-faint: #8a8a99;
+  --color-lp-stage-accent: #74a9ff;
+  --color-lp-stage-line: #2b2b36;
+  --color-lp-device-edge: #14141a;
 }
 
 /* App shell. Layout constants, not part of the design language.
@@ -1991,175 +2149,151 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   The closing landscape — one picture under the last ask *and* the footer.
+   The gradient — the hero's ground, and the closing ask's.
 
-   The page used to end on two separate movements: an indigo banner with a
-   drawn app window cropped by its bottom edge, and under it a white footer
-   with a landscape band inside it. They are one section now, on one
-   photograph, with the footer riding up onto the lower half of it as a card.
-   The shape is borrowed from the reference that does this best; what could
-   not be borrowed is below.
+   One image at both ends of the page, which is what makes the reference read
+   as a single piece rather than a stack of bands. It is the same file twice
+   rather than two crops of it: an abstract blur has no subject to frame, so
+   there is nothing a second crop would buy.
 
-   **No word sits on this picture, and that is a finding rather than a
-   preference.** Two landscapes were tried with the ask centred on the sky and
-   both were measured against the page's near-black ink (#0f0f10). This one is
-   the better of the two by a distance — its sky holds **13.6:1 to 15.7:1
-   through the top 36% of the frame** — but the dark hills begin at exactly
-   that 36% line, and below it the ridge and its reflection run **1.9:1 to
-   4.5:1**. White ink is hopeless on all of it: it peaks at 3.4:1 down in the
-   shadows and sits at 1.2:1 against the sky.
+   **It is a pale band on a white page.** Measured off the asset: the darkest
+   pixel anywhere in it is 0.555 relative luminance and the median is 0.883 —
+   near-white at the head, pale blue at the foot. So the ink is the page's own
+   near-black and nothing here has to fight for it. White type on it would be
+   1.0:1; there is no version of this picture that carries a light hero.
 
-   A short safe zone is not the problem. The problem is that the ask is a
-   *fixed number of pixels* — a heading, two lines, a caveat — while the frame
-   scales with the width, so the fraction of the picture the words cover grows
-   as the window narrows. Probed in an iframe at four widths, the caveat line
-   finished at 41% at 1280, 45% at 1024, and **58% at 390**, which is out over
-   the open water. Padding cannot fix that: every lever available is a
-   proportion of the width, and the text is not.
+   **One token is re-pointed and only one.** `lp-body` is the deck and the
+   small print, and at #5b5b63 it manages 3.9:1 against the blue at the foot —
+   under the line. `lp-soft` (#45454d) is 5.5:1 there and still reads as a step
+   under the heading, so the deck takes that. Everything else on the band uses
+   the page's light values unchanged, because the page *is* light.
 
-   So the words moved off the picture and onto the page's own ground above it,
-   which is what the reference does too — and this image is the one that makes
-   it invisible, because its sky is pale enough (L 0.77) that the join needs
-   only a short veil rather than a gradient pretending to be haze. The band
-   below carries **nothing**: it is scenery, and the footer card is the next
-   thing on it.
+   | ink                  | worst on this band |
+   |----------------------|--------------------|
+   | `#0f0f10` heading    | 11.0:1             |
+   | `#45454d` deck       |  5.5:1             |
+   | `#5b5b63` (rejected) |  3.9:1             |
 
-   The rule that follows is simple and worth keeping if anyone puts something
-   here later. **Anything on this band brings its own ground** — the card does,
-   a filled button would. Bare type does not go back on it without redoing the
-   probe above, at 390 first.
+   **The fade goes to white, and it is short.** It exists so the band has no
+   bottom edge — the page continues out of it rather than starting after it —
+   and it is stated as a literal rather than as `--color-lp-ground` so that a
+   future theme flip cannot silently fade a pale band into a black bar.
 
-   The band is `cover` anchored `top`, so the sky is what survives at every
-   width and the water is what gets cropped — anchoring it `bottom` inverts
-   exactly that and loses the sky the composition opens on.
+   `100% 100%` rather than `cover`, and only because this is a blur: it is
+   stretched to whatever box it is given so the whole gradient is always in
+   frame at any width and any height. Distortion is undetectable on an image
+   with no edges in it. Do not reach for this on a photograph.
    -------------------------------------------------------------------------- */
+.oc-gradient-field {
+  --color-lp-body: #45454d;
+  --color-lp-faint: #45454d;
 
-/* **The picture is the footer's own background, and that is the whole trick.**
-   It was a fixed-height band above the footer with the card lifted onto it by
-   a negative margin, which put landscape down either side of the card for
-   exactly the height of that lift and plain page ground under the rest — so a
-   tall card ran off the bottom of its own picture. The reference does not do
-   that: its artwork is behind the *entire* footer, and the texture runs down
-   both edges all the way to the last line of small print.
-   Painting it here rather than above solves that by construction. The footer
-   is as tall as the footer is; `cover` fills whatever that turns out to be, so
-   the strips beside the card cannot run out.
-
-   **`cover` cannot do this job and the arithmetic says why.** This footer is
-   about 1120px tall against a 3:1 panorama. Under `cover` the scale is
-   height-driven, so the frame's whole height maps onto the footer's — which
-   put the ridge at 36% of 1120, exactly level with the top of the card, and
-   left the reveal showing nothing but empty sky. Buying the scene back means
-   a reveal of roughly 1000px, and covering a box that tall means upscaling a
-   2172px-wide image 2.4× and showing the middle quarter of it. That is not a
-   panorama any more.
-
-   So the picture is laid at its **natural aspect** (`100% auto`) and its
-   bottom row is *extended* downward by a horizontal gradient sampled from that
-   row — thirteen stops across the width, which is why the join is invisible
-   rather than merely close: the gradient starts at the exact colours the last
-   scanline ends on. The scene therefore always renders un-upscaled in the top
-   third-of-the-width, and the strips beside the card go on to the bottom of
-   the document whatever the card's height turns out to be. Re-sample
-   `--lp-closing-floor` if the image is ever swapped; a stale floor shows as a
-   coloured line across both strips.
-
-   `padding-top` is the reveal — the picture with nothing on it before the card
-   starts. At 30% of the width the card's top edge lands just under the
-   monolith, so the whole composition is above it and only the near water is
-   covered. */
-.oc-closing {
-  /* Phones take `cover` instead. At 390px the natural-aspect scene is a 130px
-     ribbon — technically correct and far too small to be a picture of
-     anything. Height-driven scaling there crops to the centre column, which is
-     where the monolith and the ridge are, so a phone gets a tall portrait
-     crop of the same scene rather than a letterbox of it. */
-  padding-top: clamp(11rem, 46vw, 15rem);
   background:
-    var(--lp-closing-veil),
-    url("/closing-field.webp") center top / cover no-repeat;
+    linear-gradient(to bottom, rgb(255 255 255 / 0) 88%, #ffffff 100%),
+    linear-gradient(to bottom, rgb(186 220 248 / 0.45) 0%, rgb(186 220 248 / 0) 70%),
+    url("/hero-gradient.webp") center / 100% 100% no-repeat,
+    #d6ecf9;
 }
 
-@media (min-width: 48rem) {
-  .oc-closing {
-    padding-top: 30%;
-    background:
-      var(--lp-closing-veil),
-      url("/closing-field.webp") center top / 100% auto no-repeat,
-      var(--lp-closing-floor);
-  }
+/* --------------------------------------------------------------------------
+   The grounds a feature row's figure sits on.
+
+   A gradient rather than the flat `--color-lp-card-*` tints, because a wash
+   strong enough to be seen as a colour reads as a coloured box, where one that
+   *moves* reads as a stage. The two rules the card tints were bound to carry
+   over unchanged: **grounds only**, never ink and never a control, and never
+   stronger than this. The figure on top brings its own ground, so nothing here
+   is ever behind type.
+
+   The alphas are set for the white page. They were four times this while the
+   page was dark — a wash that is barely visible on near-black is a bruise on
+   white — so if the page ever changes ground again, these move with it.
+   -------------------------------------------------------------------------- */
+.oc-row-ground-1,
+.oc-row-ground-2,
+.oc-row-ground-3 {
+  border: 1px solid var(--color-lp-line);
 }
 
-/* The fade has to be stated per theme rather than reading `--color-lp-ground`
-   at both ends, and the reason is how gradients interpolate: from opaque white
-   to a *transparent black* the middle of the ramp is translucent grey, which
-   paints a dirty band across the top of the sky. Both stops must be the same
-   colour and only the alpha may move.
-
-   It has one job and it is a small one, which is the point: the ask sits on
-   the page's own ground and the picture starts under it, so all this has to do
-   is stop the step from white to a pale sky reading as an edge. It is short
-   for that reason — the two are close in value (#ffffff against L 0.77), and a
-   longer ramp would be washing out a picture that needs no protecting.
-
-   **The stop is a length, not a percentage**, which matters now that this
-   paints over a whole footer rather than a fixed band: at 20% it would grow
-   with the footer, so adding a link column would deepen the haze over the sky.
-   160px is 160px whatever is underneath it.
-
-   Dark is the default here, as everywhere in this file; the light value is in
-   the `[data-theme="light"]` block, which is what the landing page pins itself
-   to. The landscape itself is left alone in both — it is a photograph of a
-   place rather than a drawing of this app, and the same rule that keeps the
-   book covers and the brand marks literal keeps this literal too. */
-:root {
-  --lp-closing-veil: linear-gradient(
-    to bottom,
-    #0b0b0e 0px,
-    rgba(11, 11, 14, 0) 160px
-  );
+.oc-row-ground-1 {
+  background:
+    radial-gradient(
+      120% 100% at 15% 0%,
+      rgb(38 74 168 / 0.13) 0%,
+      rgb(255 255 255 / 0) 62%
+    ),
+    var(--color-lp-tint);
 }
 
-/* **The floor — the photograph's last scanline, extended downward.** Thirteen
-   stops sampled across the bottom six rows of `closing-field.webp`, which is
-   what makes the join invisible instead of approximately right: the gradient
-   begins on the exact colours the image ends on, so the eye reads the bank and
-   the water carrying on rather than a picture sitting on a coloured block.
-   Only the strips down either side of the card ever show it.
-
-   **Stated once, not per theme, and that is deliberate.** Every other token in
-   this file is declared in both blocks; this one is not a colour choice at all
-   but a continuation of a photograph, and the same rule that keeps the
-   landscape, the book covers and the brand marks literal in both themes keeps
-   this literal too. A dark-mode variant of it would be a different picture.
-
-   Re-sample it whenever the image is swapped — a stale floor shows up as a
-   coloured line ruled across both strips at the point the picture ends. */
-:root {
-  --lp-closing-floor: linear-gradient(
-    to right,
-    #4a7161 0%,
-    #66907d 8%,
-    #8cc1e3 17%,
-    #80bbe1 25%,
-    #7dbae1 33%,
-    #80bbe2 42%,
-    #498186 50%,
-    #2b616c 58%,
-    #285c6f 67%,
-    #225063 75%,
-    #2c6170 83%,
-    #355f7f 92%,
-    #426789 100%
-  );
+.oc-row-ground-2 {
+  background:
+    radial-gradient(
+      120% 100% at 85% 0%,
+      rgb(122 58 152 / 0.11) 0%,
+      rgb(255 255 255 / 0) 62%
+    ),
+    var(--color-lp-tint);
 }
 
-[data-theme="light"] {
-  --lp-closing-veil: linear-gradient(
-    to bottom,
-    #ffffff 0px,
-    rgba(255, 255, 255, 0) 160px
-  );
+.oc-row-ground-3 {
+  background:
+    radial-gradient(
+      120% 100% at 50% 0%,
+      rgb(26 104 128 / 0.12) 0%,
+      rgb(255 255 255 / 0) 62%
+    ),
+    var(--color-lp-tint);
+}
+
+/* --------------------------------------------------------------------------
+   The footer's ground — black, and nothing on it.
+
+   The footer is its own section, and this is all of it: one flat ground behind
+   the whole thing, edge to edge. It carried an illustration for a while — a
+   writer at a desk on the page of a giant open book, under a 62% veil, with
+   the highlights rolled off in the asset so the lamp could not blow out under
+   the small print. That is gone, and `public/footer-page.webp` is left in the
+   tree unreferenced in case it is ever wanted back. So is
+   `public/closing-field.webp`, the landscape before it.
+
+   **What the picture cost was a bespoke palette, and dropping it gives that
+   back.** Every value below is now the `@theme` block's own dark set, read
+   straight off the top of this file rather than solved against a photograph:
+   on `#0b0b0e` the ink is 18.1:1, soft 11.6:1, body 7.8:1 and faint 5.4:1.
+   The one that matters is the last. Over the illustration the copyright line
+   could not be allowed to be fainter than the links — anything below #a8a8b4
+   failed on the lamp — so the two were the same colour and the bottom bar
+   leaned on weight alone for its hierarchy. On a flat ground the faint step is
+   available again and the bar reads the way it does everywhere else.
+
+   The classes in `landing-footer.tsx` do not change and never did: they are
+   named for their jobs, and this block re-points what those jobs are worth on
+   black, the way `[data-theme]` re-points the same names two hundred lines up.
+   -------------------------------------------------------------------------- */
+.oc-footer-dark {
+  --color-lp-ground: #0b0b0e;
+
+  --color-lp-ink: #f5f5f7; /* 18.1:1 */
+  --color-lp-soft: #c6c6d0; /* 11.6:1 */
+  --color-lp-body: #a2a2ad; /* 7.8:1 — links and body copy */
+  --color-lp-faint: #85858f; /* 5.4:1 — the copyright line */
+
+  /* **The mark takes its night value, and the token already had one.**
+     Daylight's "Chapter" is the brand indigo #146ef5, which is 4.0:1 on this
+     ground — the wordmark would have been harder to read than the small print.
+     #74a9ff is the same hue with the lightness lifted, and it is not a new
+     colour: it is what `--color-lp-wordmark` is worth in the dark block, whose
+     comment already says the two marks part company at night. */
+  --color-lp-wordmark: #74a9ff;
+
+  /* Translucent rather than a flat grey, so the rule sits *on* the ground
+     rather than beside it in the palette. */
+  --color-lp-line: rgb(255 255 255 / 0.16);
+  --color-lp-edge: rgb(255 255 255 / 0.24);
+  --color-lp-edge-strong: rgb(255 255 255 / 0.4);
+
+  background: var(--color-lp-ground);
+  color: var(--color-lp-body);
 }
 
 /* --------------------------------------------------------------------------

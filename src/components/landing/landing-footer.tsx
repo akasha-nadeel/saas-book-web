@@ -5,10 +5,10 @@ import { CONTACT_EMAIL, LEGAL_PAGES, TRADING_NAME } from "@/lib/legal";
 import { PHASES } from "@/lib/roadmap";
 
 /**
- * The footer — a card lifted onto the foot of the closing landscape, laid out
- * the way the reference lays its own out: five columns across the top, a
- * second row carrying one group hard left and one hard right, a hairline, and
- * a bottom bar with the mark on the left and the small print centred.
+ * The footer — a section of its own at the foot of the page, laid out the way
+ * the reference lays its own out: five columns across the top, a second row
+ * carrying one group hard left and one hard right, a hairline, and a bottom
+ * bar with the mark on the left and the small print centred.
  *
  * **It is not housekeeping.** A payment provider reviews this domain before it
  * will let anybody take a card, and the first things it looks for are a
@@ -18,25 +18,25 @@ import { PHASES } from "@/lib/roadmap";
  * legal links read from `LEGAL_PAGES` and the address from `legal.ts`, so a
  * page and its link cannot drift apart.
  *
- * **The landscape is this element's own background, and that is what makes the
- * card work.** It was the other way round first — a fixed-height band painted
- * by the banner above, with this footer lifted onto it by a negative margin —
- * and it had a flaw that only shows once the card is tall: the picture ran out.
- * Landscape appeared down either side of the card for exactly the height of
- * the lift and then stopped, leaving the lower two thirds of the card sitting
- * on plain white. The reference runs its artwork behind the *entire* footer,
- * edge texture and all, down to the last line of small print.
+ * **It is a section of its own, on a black ground.** The page used to end on
+ * one image shared by two elements: a landscape painted as this footer's
+ * background with the closing ask sitting on plain white above it, and this
+ * footer riding up onto its foot as an inset card with strips of scenery
+ * showing down either side. The ask and the footer are two separate sections
+ * now, the card is gone with the inset and the reveal that existed to show a
+ * picture around it, and `.oc-footer-dark` is one flat ground behind all of
+ * this — first link to last line of small print.
  *
- * Painting it here fixes that by construction rather than by tuning: the
- * background covers however tall this element turns out to be, so the strips
- * cannot run short whatever gets added to the card. `padding-top` on
- * `.oc-closing` is the reveal — the picture with nothing on it before the card
- * begins. That is also why the ground sits on the card `<div>` rather than on
- * `<footer>`: this element has to keep the picture visible at its edges.
+ * **The type is light because the ground is black.** The classes below are
+ * unchanged and still named for their jobs; `.oc-footer-dark` re-points the
+ * `lp-*` tokens they resolve to, the way `[data-theme]` re-points the same
+ * names. On a flat ground those values are the palette's own dark set rather
+ * than anything solved for this footer — the ratios are noted beside the
+ * class.
  *
- * **Nothing here sits on the picture.** The card brings its own ground, so the
- * contrast note beside `.oc-closing` constrains what may go in the reveal
- * above the card and nothing inside it.
+ * Two illustrations have stood here and both are left in the tree,
+ * unreferenced, in case either is wanted back: `public/footer-page.webp`, the
+ * writer at a desk, and `public/closing-field.webp`, the landscape before it.
  *
  * **The two-row split is the reference's, and it is not arbitrary.** Row one
  * is where somebody goes *next* — what the thing is, how to start, what is in
@@ -162,153 +162,147 @@ export function LandingFooter({
   columns = FULL_COLUMNS,
 }: { home?: boolean; columns?: FooterColumn[] } = {}) {
   return (
-    /* `.oc-closing` paints the landscape across the whole of this element and
-       reserves the reveal above the card with its own top padding. No ground
-       and no border here: the picture *is* the ground, and it has to show down
-       either side of the card inside it. */
-    <footer className="oc-closing">
-      {/* The inset. This is what leaves a strip of landscape either side, so
-          the card reads as lying *on* the picture rather than as the next
-          section down. It is a small inset on a phone, where a card indented
-          by the desktop amount would be a column of links in a gutter. */}
-      <div className="mx-auto w-full max-w-[120rem] px-3 sm:px-5 lg:px-8">
-        {/* Rounded at the top only, and square at the foot: the card runs to
-            the bottom of the document, so a radius down there would lift it
-            off an edge the window is already cutting. */}
-        <div className="rounded-t-3xl bg-lp-ground px-6 pt-14 sm:rounded-t-[2.5rem] sm:px-10 sm:pt-16 lg:px-14">
-          <div className="mx-auto max-w-6xl">
-            {/* ---- Row one: the five columns --------------------------- */}
-            <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6">
-              {columns.map((column) => (
-                <nav key={column.heading}>
-                  <h2 className={HEADING}>{column.heading}</h2>
-                  <ul className="mt-4 space-y-2.5">
-                    {column.links.map((link, i) => (
-                      /* Keyed on the label rather than the href: two of these
-                         columns point every row at one section, so hrefs
-                         repeat and React would drop all but the first. */
-                      <li key={`${link.label}-${i}`}>
-                        {/* On the landing page an in-page anchor stays an
-                            anchor: a `<Link>` to `#order` would be a client
-                            navigation to the same route, which scrolls
-                            nothing. Anywhere else the same href points at a
-                            section that is not on the page, so it is rooted
-                            and becomes an ordinary navigation — see `home`. */}
-                        {link.href.startsWith("#") ? (
-                          home ? (
-                            <a href={link.href} className={LINK}>
-                              {link.label}
-                            </a>
-                          ) : (
-                            <Link href={`/${link.href}`} className={LINK}>
-                              {link.label}
-                            </Link>
-                          )
-                        ) : (
-                          <Link href={link.href} className={LINK}>
-                            {link.label}
-                          </Link>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </nav>
-              ))}
-            </div>
-
-            {/* ---- Row two: hard left, hard right ----------------------
-                Placed into the same five-column grid rather than into a grid
-                of their own, so the left column lines up with Product and the
-                right one with Legal. Two separate grids would agree at one
-                width and part at every other. */}
-            <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-10 sm:mt-16 lg:grid-cols-5 lg:gap-x-6">
-              {/* Names rather than links, and that is deliberate: these are
-                  programs that read our exports, not partners, and a row that
-                  navigated to Amazon would be making a relationship out of a
-                  file format. Nominative use — see `works-with.tsx`. */}
-              {/* **Spans four rather than the Contact block starting at five,
-                  and the difference is a bug that only shows in dev.** Naming
-                  the start line is the direct way to say this, and it was
-                  tried: the class sat on the element, the rule was absent from
-                  the dev stylesheet, and the computed `grid-column-start` came
-                  back `auto` — so Contact auto-placed into column three and
-                  the row read as badly spaced rather than as broken. A
-                  production build *does* emit that utility, so this is
-                  Turbopack failing to rescan for a newly-introduced class
-                  rather than the silent-drop the build note in CLAUDE.md warns
-                  about. Either way a span needs no second class to survive,
-                  and the left block claiming one to four puts the right one in
-                  five by leaving it nowhere else to go.
-
-                  Worth knowing while reading this: Tailwind scans source
-                  *text*, so a class named in a comment is generated whether or
-                  not anything uses it. Grepping the built CSS to prove a
-                  utility shipped will find the mention as readily as the
-                  usage. */}
-              <div className="lg:col-span-4">
-                <h2 className={HEADING}>Your book opens in</h2>
-                <ul className="mt-4 space-y-2.5 text-[0.875rem]">
-                  {DESTINATIONS.map((destination) => (
-                    <li
-                      key={destination.name}
-                      title={`Opens the ${destination.format} export`}
-                    >
-                      {destination.name}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Hard right, under Legal — placed by the span on its left
-                  rather than by a start line. See the note above. */}
-              <div>
-                <h2 className={HEADING}>Contact</h2>
-                <ul className="mt-4 space-y-2.5">
-                  <li>
-                    <a href={`mailto:${CONTACT_EMAIL}`} className={LINK}>
-                      {CONTACT_EMAIL}
-                    </a>
+    /* The ground and the light-on-dark token set arrive together in
+       `.oc-footer-dark` — see `globals.css`. No border is needed to divide
+       this from the ask above: that section ends on a pale field and this one
+       starts on black, which is a harder edge than a hairline could draw. */
+    <footer className="oc-footer-dark">
+      {/* `max-w-6xl px-6` is the page's one measure, the same the ask above
+          and every section before it is set to. It was an inset card at a
+          `120rem` outer width while the artwork had to show at the edges
+          *around* it; now the artwork is behind everything, so the footer goes
+          back to the measure the rest of the page is set to. */}
+      <div className="mx-auto max-w-6xl px-6 pt-16 sm:pt-20">
+        {/* ---- Row one: the five columns --------------------------- */}
+        <div className="grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 lg:grid-cols-5 lg:gap-x-6">
+          {columns.map((column) => (
+            <nav key={column.heading}>
+              <h2 className={HEADING}>{column.heading}</h2>
+              <ul className="mt-4 space-y-2.5">
+                {column.links.map((link, i) => (
+                  /* Keyed on the label rather than the href: two of these
+                     columns point every row at one section, so hrefs
+                     repeat and React would drop all but the first. */
+                  <li key={`${link.label}-${i}`}>
+                    {/* On the landing page an in-page anchor stays an
+                        anchor: a `<Link>` to `#order` would be a client
+                        navigation to the same route, which scrolls
+                        nothing. Anywhere else the same href points at a
+                        section that is not on the page, so it is rooted
+                        and becomes an ordinary navigation — see `home`. */}
+                    {link.href.startsWith("#") ? (
+                      home ? (
+                        <a href={link.href} className={LINK}>
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link href={`/${link.href}`} className={LINK}>
+                          {link.label}
+                        </Link>
+                      )
+                    ) : (
+                      <Link href={link.href} className={LINK}>
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
-                  <li className="text-[0.875rem]">One person answers.</li>
-                </ul>
-              </div>
-            </div>
+                ))}
+              </ul>
+            </nav>
+          ))}
+        </div>
 
-            {/* ---- The bottom bar ---------------------------------------
-                Three cells rather than a flex row with the middle pushed
-                about: the small print is centred on the *card*, not on
-                whatever is left over after the mark, and with an empty right
-                cell that is only true if the two sides are the same width. */}
-            <div className="mt-14 grid grid-cols-1 items-center gap-4 border-t border-lp-line py-8 sm:mt-16 sm:grid-cols-3">
-              <Link
-                href="/"
-                className="text-xl font-bold tracking-tight text-lp-ink"
-              >
-                Open<span className="text-lp-wordmark">Chapter</span>
-              </Link>
+        {/* ---- Row two: hard left, hard right ----------------------
+            Placed into the same five-column grid rather than into a grid
+            of their own, so the left column lines up with Product and the
+            right one with Legal. Two separate grids would agree at one
+            width and part at every other. */}
+        <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-10 sm:mt-16 lg:grid-cols-5 lg:gap-x-6">
+          {/* Names rather than links, and that is deliberate: these are
+              programs that read our exports, not partners, and a row that
+              navigated to Amazon would be making a relationship out of a
+              file format. Nominative use — see `works-with.tsx`. */}
+          {/* **Spans four rather than the Contact block starting at five,
+              and the difference is a bug that only shows in dev.** Naming
+              the start line is the direct way to say this, and it was
+              tried: the class sat on the element, the rule was absent from
+              the dev stylesheet, and the computed `grid-column-start` came
+              back `auto` — so Contact auto-placed into column three and
+              the row read as badly spaced rather than as broken. A
+              production build *does* emit that utility, so this is
+              Turbopack failing to rescan for a newly-introduced class
+              rather than the silent-drop the build note in CLAUDE.md warns
+              about. Either way a span needs no second class to survive,
+              and the left block claiming one to four puts the right one in
+              five by leaving it nowhere else to go.
 
-              <div className="text-[0.8125rem] leading-relaxed sm:text-center">
-                {/* **It said "Your manuscript stays in your browser", and it
-                    does not.** Signing in syncs the library to our database,
-                    which `/privacy` states plainly — so the last line of the
-                    site was the one claim on it the code could not back. What
-                    is left is the strongest thing that is true everywhere:
-                    the policy says it in the same words. */}
-                <p className="font-semibold text-lp-ink">
-                  Your writing is yours. It is never used to train models.
-                </p>
-                <p className="mt-0.5 text-lp-faint">
-                  © {new Date().getFullYear()} {TRADING_NAME}. All rights
-                  reserved.
-                </p>
-              </div>
-
-              {/* The reference's social marks would go here. There are no
-                  accounts to point at, so the cell holds nothing and exists
-                  only to keep the middle one centred. */}
-              <div aria-hidden="true" />
-            </div>
+              Worth knowing while reading this: Tailwind scans source
+              *text*, so a class named in a comment is generated whether or
+              not anything uses it. Grepping the built CSS to prove a
+              utility shipped will find the mention as readily as the
+              usage. */}
+          <div className="lg:col-span-4">
+            <h2 className={HEADING}>Your book opens in</h2>
+            <ul className="mt-4 space-y-2.5 text-[0.875rem]">
+              {DESTINATIONS.map((destination) => (
+                <li
+                  key={destination.name}
+                  title={`Opens the ${destination.format} export`}
+                >
+                  {destination.name}
+                </li>
+              ))}
+            </ul>
           </div>
+
+          {/* Hard right, under Legal — placed by the span on its left
+              rather than by a start line. See the note above. */}
+          <div>
+            <h2 className={HEADING}>Contact</h2>
+            <ul className="mt-4 space-y-2.5">
+              <li>
+                <a href={`mailto:${CONTACT_EMAIL}`} className={LINK}>
+                  {CONTACT_EMAIL}
+                </a>
+              </li>
+              <li className="text-[0.875rem]">One person answers.</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* ---- The bottom bar ---------------------------------------
+            Three cells rather than a flex row with the middle pushed
+            about: the small print is centred on the *card*, not on
+            whatever is left over after the mark, and with an empty right
+            cell that is only true if the two sides are the same width. */}
+        <div className="mt-14 grid grid-cols-1 items-center gap-4 border-t border-lp-line py-8 sm:mt-16 sm:grid-cols-3">
+          <Link
+            href="/"
+            className="text-xl font-bold tracking-tight text-lp-ink"
+          >
+            Open<span className="text-lp-wordmark">Chapter</span>
+          </Link>
+
+          <div className="text-[0.8125rem] leading-relaxed sm:text-center">
+            {/* **It said "Your manuscript stays in your browser", and it
+                does not.** Signing in syncs the library to our database,
+                which `/privacy` states plainly — so the last line of the
+                site was the one claim on it the code could not back. What
+                is left is the strongest thing that is true everywhere:
+                the policy says it in the same words. */}
+            <p className="font-semibold text-lp-ink">
+              Your writing is yours. It is never used to train models.
+            </p>
+            <p className="mt-0.5 text-lp-faint">
+              © {new Date().getFullYear()} {TRADING_NAME}. All rights
+              reserved.
+            </p>
+          </div>
+
+          {/* The reference's social marks would go here. There are no
+              accounts to point at, so the cell holds nothing and exists
+              only to keep the middle one centred. */}
+          <div aria-hidden="true" />
         </div>
       </div>
     </footer>

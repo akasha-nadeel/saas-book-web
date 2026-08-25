@@ -130,10 +130,51 @@ export function LandingHeader({
    * unchanged.
    */
   items = FULL_NAV,
+  /**
+   * Whether the section *behind the un-scrolled bar* is dark.
+   *
+   * The bar is transparent until the page scrolls, so at the top its type is
+   * really sitting on whatever the first section paints.
+   */
+  overDark = false,
+  /**
+   * Whether the page's own ground is dark — which is what the bar sits on
+   * once it has scrolled and faded its `lp-ground` backdrop in.
+   *
+   * **Two booleans rather than one, because the two states are genuinely
+   * independent and the launch MVP proved it.** That page is a *light*
+   * gradient hero on a *dark* page: near-black type at the top, near-white
+   * type the moment the bar has a ground of its own. One flag cannot say that,
+   * and every arrangement so far has needed a different pair — a dark hero on
+   * a light page (white, then near-black), a dark hero on a dark page (white
+   * throughout), and now the inverse of the first. Each time the condition was
+   * a single flag it was right for one page and silently wrong for the other.
+   *
+   * Props rather than a measurement of what is underneath, for the reason
+   * `home` is one: the caller knows both answers statically, and sampling the
+   * section below a sticky element on every frame is a great deal of machinery
+   * for two booleans that never change.
+   */
+  darkPage = false,
+  /**
+   * Whether the bar is a floating capsule rather than a full-width strip.
+   *
+   * The reference the launch MVP follows sets its bar as a white pill inset
+   * from the edges and laid *on* the hero, rather than as a strip the hero
+   * runs under. It is a prop rather than the default because the two shapes
+   * want opposite things from the scroll behaviour: a strip has to grow a
+   * ground when the page moves under it, and a capsule already has one — so
+   * `floating` also turns the fading backdrop off, and there is nothing to
+   * fade.
+   */
+  floating = false,
 }: {
   ink: string;
   home?: boolean;
   items?: HeaderNavItem[];
+  overDark?: boolean;
+  darkPage?: boolean;
+  floating?: boolean;
 }) {
   /* Rooted once, used for every anchor. `#order` from `/tools` is a link to
      nothing, so away from home the anchors navigate there and *then* scroll. */
@@ -141,6 +182,10 @@ export function LandingHeader({
 
   const ref = useRef<HTMLElement>(null);
   const [scrolled, setScrolled] = useState(false);
+  /* Which ground the bar is actually on, which is the only question its six
+     colours care about: the first section while the bar is transparent, the
+     page's own ground once it is not. */
+  const onDark = scrolled ? darkPage : overDark;
   const [hidden, setHidden] = useState(false);
   /**
    * Whether the Tools menu is open.
@@ -227,20 +272,42 @@ export function LandingHeader({
      */
     <header
       ref={ref}
+      /* **The bar pins light whenever it is not on a dark ground**, and that
+         is what makes `onDark`'s *false* branch mean anything on a dark page.
+         Those branches ask for `lp-ink`, `lp-body` and `lp-wordmark` — the
+         right names, but on the launch MVP they resolve near-*white*, because
+         the page they belong to is dark. The bar is a sibling of the hero
+         rather than a child, so it never inherits the light re-points the
+         gradient section makes for itself.
+
+         One attribute settles it: the same subtree pin the landing pages use,
+         documented beside the light block in `globals.css`. When the bar *is*
+         on dark the attribute is absent, so the tokens fall through to the
+         page's own — and the `onDark` branches state their whites literally
+         anyway, for the one case where the ground is a photograph rather than
+         a theme. */
+      data-theme={onDark ? undefined : "light"}
       className={`sticky top-0 z-50 transition-transform duration-[420ms] ease-[cubic-bezier(0.22,0.61,0.36,1)] will-change-transform ${
+        floating ? "px-4 sm:px-6" : ""
+      } ${
         hidden && !menuOpen
           ? "pointer-events-none -translate-y-full"
           : "translate-y-0"
       }`}
     >
-      <div
-        aria-hidden="true"
-        className={`absolute inset-0 border-b transition-opacity duration-200 ${
-          scrolled
-            ? "border-lp-edge bg-lp-ground/85 opacity-100 backdrop-blur"
-            : "border-transparent opacity-0"
-        }`}
-      />
+      {/* The strip's ground, which fades in once the page has moved under it.
+          A capsule brings its own, so this is not rendered for one at all —
+          see the note on `floating`. */}
+      {!floating && (
+        <div
+          aria-hidden="true"
+          className={`absolute inset-0 border-b transition-opacity duration-200 ${
+            scrolled
+              ? "border-lp-edge bg-lp-ground/85 opacity-100 backdrop-blur"
+              : "border-transparent opacity-0"
+          }`}
+        />
+      )}
       {/* `max-w-[88rem] px-6`, which is the page's one measure — the wordmark has
           to start on the same line as every heading below it. It was `px-4` up
           to `sm`, which put the bar's left edge 8px inside every section's on
@@ -252,45 +319,36 @@ export function LandingHeader({
           it: the hero is pulled up by a fixed `-mt-16` and its wall of cards
           is pushed down by the same `top-16`, which lands the wall on the
           header's bottom edge whatever height the header settles at. */}
-      <div className="relative mx-auto flex max-w-[88rem] items-center justify-between gap-3 px-6 py-1.5 sm:gap-6 sm:px-8 sm:py-2 lg:px-10">
-        {/* The same wordmark the dashboard sidebar carries, at the same size:
-            a visitor who signs up should not have to learn a second mark on
-            the other side of the door.
-
-            It takes `lp-wordmark` rather than the app's `--color-wordmark`,
-            which is the one place the two marks are allowed to differ. The
-            app's token goes plain white at night because it sits in a black
-            sidebar with nothing else near it; here the mark sits beside the
-            page's own indigo — every link and every button on the page — and a
-            white "Chapter" next to those would read as a third colour rather
-            than as the brand. So it stays the accent's hue in both, lifted.
-
-            In daylight it is the fill colour with its lightness lifted and
-            nothing else changed: same hue, same saturation. A fill value set
-            as type beside a near-black "Open" reads as more near-black instead
-            of as the second half of a mark. */}
+      <div
+        className={`relative mx-auto flex items-center justify-between gap-3 transition-[background-color,box-shadow,border-color] duration-200 sm:gap-6 ${
+          floating
+            ? `max-w-6xl rounded-full px-5 py-2.5 sm:px-7 sm:py-3 ${
+                scrolled
+                  ? "border border-lp-line bg-white shadow-[0_8px_32px_-8px_rgba(15,15,16,0.18)]"
+                  : "border border-transparent bg-transparent shadow-none"
+              }`
+            : "max-w-[88rem] px-6 py-1.5 sm:px-8 sm:py-2 lg:px-10"
+        }`}
+      >
+        {/* Logo — always far left */}
         <Link
           href="/"
-          className="text-xl font-bold tracking-tight text-lp-ink sm:text-2xl"
+          className={`shrink-0 text-2xl font-bold tracking-tight transition-colors sm:text-3xl ${
+            onDark ? "text-white" : "text-lp-ink"
+          }`}
         >
-          Open<span className="text-lp-wordmark">Chapter</span>
+          Open
+          <span className={onDark ? "text-lp-stage-accent" : "text-lp-wordmark"}>
+            Chapter
+          </span>
         </Link>
-        {/* **Three groups across the bar, not two.** The links used to sit in
-            the same flex row as the buttons, hard against the right edge, so
-            the bar read as a wordmark and then a crowd. Held in the middle
-            with the actions at the far end, each group is one kind of thing:
-            *where you are on the page*, then *what you can do about it*. The
-            seam between them is the whole layout.
 
-            `text-[0.9375rem]`, a shade under the buttons: the links are
-            navigation and the pair at the end is the offer, and a row where
-            all six things are the same size has no offer in it. */}
-        <nav className="hidden items-center gap-8 font-sans text-[0.9375rem] font-medium text-lp-body md:flex">
-          {/* Nothing is written out here any more — see `HeaderNavItem` above
-              for the rule these are held to, and `FULL_NAV` for the default
-              row. Tools keeps its place in the order because it is an entry in
-              the same array rather than a flag beside it; the bar is told when
-              it is open so it does not slide away underneath it. */}
+        {/* Nav — centered absolutely so it doesn't depend on button widths */}
+        <nav
+          className={`hidden flex-1 items-center justify-center gap-7 font-sans text-[1rem] font-semibold transition-colors md:flex ${
+            onDark ? "text-white" : "text-lp-ink"
+          }`}
+        >
           {items.map((item, i) =>
             item.kind === "tools" ? (
               <ToolsMenu key="tools" onOpenChange={setMenuOpen} />
@@ -298,7 +356,7 @@ export function LandingHeader({
               <a
                 key={`${item.label}-${i}`}
                 href={at(item.href)}
-                className="hover:text-lp-ink"
+                className="hover:underline hover:underline-offset-4"
               >
                 {item.label}
               </a>
@@ -306,7 +364,7 @@ export function LandingHeader({
               <Link
                 key={`${item.label}-${i}`}
                 href={item.href}
-                className="hover:text-lp-ink"
+                className="hover:underline hover:underline-offset-4"
               >
                 {item.label}
               </Link>
@@ -314,33 +372,18 @@ export function LandingHeader({
           )}
         </nav>
 
-        {/* ---- The pair -------------------------------------------------
-
-            **Outline, then fill — one shape at two volumes.** Both are the
-            same pill at the same height in the same ink, and the only thing
-            separating them is whether the ink is the ground or the border.
-            That is what makes them read as one control with two answers
-            rather than as two unrelated buttons.
-
-            `border`, one pixel. A previous pair here used `border-2`, on the
-            finding that a hairline outline read as a box drawn round a word —
-            true at the padding it had then. These are wider and taller, and at
-            this size a heavy outline is the thing that looks unresolved.
-
-            **"Log in" is back, and "Check your book" has gone.** The check was
-            a `<label>` bound to the hero's own file input, which is a genuinely
-            nice trick and cost nothing to keep; what it cost to *lose* is the
-            only route from this bar to the check, which now lives in a band of
-            its own below the mosaic under the hero and has to be scrolled to. What it
-            buys is the pairing every visitor already knows how to read: the
-            way in for somebody who has an account, beside the way in for
-            somebody who does not. A returning writer had no way back to their
-            books from this bar at all, which was the older complaint. */}
-        <span className="flex items-center gap-2.5">
+        {/* Buttons — always far right */}
+        <span className="flex shrink-0 items-center gap-2.5">
           <Link
             href="/signin"
-            style={{ borderColor: ink, color: ink }}
-            className="rounded-full border px-5 py-1.5 text-[0.9375rem] font-semibold transition-colors hover:bg-lp-tint sm:px-6 sm:py-2"
+            style={
+              onDark
+                ? { borderColor: "#ffffff", color: "#ffffff" }
+                : { borderColor: ink, color: ink }
+            }
+            className={`rounded-full border px-5 py-1.5 text-[0.9375rem] font-semibold transition-colors sm:px-6 sm:py-2 ${
+              onDark ? "hover:bg-white/15" : "hover:bg-lp-tint"
+            }`}
           >
             Log in
           </Link>

@@ -36,6 +36,12 @@ assuming a screen or a route is live.
   `process.env.OPENCHAPTER_LAUNCH_MVP === "0"` — unset means the full product is
   hidden. It is **not in `.env.local.example`**, which is the one exception to
   that file being the canonical env list.
+- **The flag governs the API half only — the page half has no flag.**
+  `src/proxy.ts` calls `hiddenLaunchRoute()` *unconditionally*, before it looks
+  at anything else; `launch.ts` reads no environment at all. So setting
+  `OPENCHAPTER_LAUNCH_MVP=0` un-404s the model routes and leaves every hidden
+  screen still redirecting home. **To work on a gated tool locally, take its
+  segment out of `HIDDEN_BOOK_TOOL_PATHS`** — the env var will not do it.
 - **What is live**: the shelf, `/book/new`, `/book/import`, the editor,
   `/book/[bookId]/export`, the assistant, upgrade/billing and the legal pages.
   **What is gated**: every model route including the two comps routes this file
@@ -92,9 +98,11 @@ policies. Read the relevant one before reworking any of them.
   product shots from raw captures kept outside the repo. A one-shot tool, not
   part of the build.
 
-The suite is 101 files / ~1,901 tests and takes about two minutes; jsdom prints
-`HTMLCanvasElement's getContext()` warnings from the image recoder and they are
-expected, not failures. Tests live beside their subjects as `*.test.ts` and
+The suite is 101 files / 1,904 tests and takes about ninety seconds (measured
+2026-08-25, all green); jsdom prints `HTMLCanvasElement's getContext()` warnings
+from the image recoder and `Not implemented: navigation to another Document`
+from the routing tests — both are expected, not failures. Tests live beside
+their subjects as `*.test.ts` and
 cover the pure logic only — components are not tested, and jsdom is there for
 `localStorage` rather than for a DOM. **Several tests assert *positions* rather
 than behaviour and must not be "fixed" when they go red** — see
@@ -156,8 +164,11 @@ that touches storage; everything else goes through it. That boundary is what let
 Supabase arrive *behind* the store (`sync.ts`) and the manuscript move onto
 IndexedDB, both without any of the sixty-odd files that read it changing a line.
 **A screen reaching for `localStorage` directly is a bug even when it works.**
-There is **exactly one exception**: the `THEME_BOOTSTRAP` inline `<script>` in
-`src/app/layout.tsx`, which runs before React. Nothing else may follow it.
+There are **exactly two exceptions**, both of which have to reach past the
+store by their nature: the `THEME_BOOTSTRAP` inline `<script>` in
+`src/app/layout.tsx`, which runs before React, and `storage-space.ts`, which
+walks `localStorage.key(i)` to *measure* the origin rather than to read a
+value. Nothing else may follow them.
 
 - **The manuscript is on IndexedDB; the index is in `localStorage`.** Bodies,
   notes, history and cover thumbnails moved to the disk (`store-db.ts`) on
@@ -231,10 +242,17 @@ wrong with this book, worst first, each carrying the control that fixes it).
   a tool's `?from=` are the other three. Read them with `useSearchParams` — a
   lazy initialiser reading `window.location` sees the *previous* URL.
 
-**Sixteen per-book tools are declared once** in `src/lib/book-tools.ts` (path,
-name, one-line description, four groups). Nothing in that list is a preview: a
-tool that is not finished does not go in it. **Each tool is the same three
-pieces** — a pure, tested module in `src/lib/`; a thin
+**The tool catalogue is declared once** in `src/lib/book-tools.ts` (path, name,
+one-line description, grouped). Nothing in that list is a preview: a tool that
+is not finished does not go in it. **Since `1daca70` it holds one entry —
+Export — and one group**, because the list is what the dashboard, the book
+card's ⋯ sheet and the landing page all read, and the MVP may only name what is
+reachable. `src/lib/tool-guide.ts` was cut to match. The sixteen tool *screens*
+are all still in the tree under `src/app/book/[bookId]/` and
+`src/components/`; bringing one back is an entry here, an entry there, and a
+line off `HIDDEN_BOOK_TOOL_PATHS`. Its file comment still says sixteen.
+**Each tool is the same three pieces** — a pure, tested module in `src/lib/`;
+a thin
 `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`; a client component
 in `src/components/<tool>/`.
 
@@ -712,9 +730,19 @@ over an empty column — **the proxy redirects it home under the launch flag**.
   is parsed in their own browser through the ordinary `importFile` path, findings
   go through `fromReadiness()` like every other screen, they are never held back
   for an email, and nothing is written until a press.
-- **It is always light**, pinned by `[data-theme="light"]` on the page's own root
-  div; the `lp-*` dark values stay live for the four legal pages. Nothing else
-  below the root may write that attribute.
+- **Each landing page pins its own ground on its root div**, and the two now
+  differ: the MVP page is `[data-theme="dark"]` and `landing-page.tsx` is still
+  `[data-theme="light"]`. **Neither may be removed rather than swapped** — with
+  no attribute a page inherits whatever the bootstrap wrote on `<html>` from
+  the visitor's `prefers-color-scheme`, so a visitor in daylight would get the
+  light token set under the MVP's dark gradient hero. Both token sets stay live
+  (the four legal pages read the dark one). Nothing else below either root may
+  write that attribute.
+- **`[data-theme="dark"]` exists only because of that**, and it is the mirror of
+  the light block rather than a new idea: dark is `@theme`'s default on `:root`,
+  which a subtree inside a light tree has no way to get back to. It is generated
+  from `@theme`, states every property the light block states, and if you add a
+  token to one of the three blocks you add it to all three.
 - **An unbuilt feature must not be named on this page** — the section that used
   to admit them is gone.
 - A `"use client"` module's exports become client *references*, so a Server
