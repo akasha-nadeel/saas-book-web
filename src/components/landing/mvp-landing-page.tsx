@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { AppWindow } from "@/components/landing/app-window";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CtaBanner } from "@/components/landing/cta-banner";
@@ -13,11 +15,14 @@ import {
 } from "@/components/landing/landing-header";
 import { DashboardDemo } from "@/components/landing/dashboard-demo";
 import { FeatureBento } from "@/components/landing/feature-bento";
+/* The shelf and the editor are photographs now — see `Shot` — so only the two
+   drawn screens the rows still use are imported. `ShelfScreen` and
+   `VersionsScreen` stay in `mvp-screens.tsx`: they are finished, tested and
+   cannot go stale the way a bitmap can, which makes them the thing to come
+   back to rather than to delete. */
 import {
   AssistantScreen,
   ImportScreen,
-  ShelfScreen,
-  VersionsScreen,
 } from "@/components/landing/mvp-screens";
 import {
   LEAD_EM,
@@ -242,11 +247,189 @@ const FOOTER_COLUMNS: FooterColumn[] = [
   },
 ];
 
+/**
+ * A photograph of the product, in the same window the drawn screens use.
+ *
+ * **These two rows are bitmaps and the rest of the page is not**, which is the
+ * standing exception `docs/architecture/landing.md` names rather than a new
+ * idea — and it names the cost too: **a shot starts lying silently the moment
+ * the screen it was taken of moves.** Nothing warns, no test fails, and the
+ * page goes on showing chrome the product no longer has. Re-shoot both when the
+ * shelf card or the editor's rails change, and prefer the drawn screens in
+ * `mvp-screens.tsx` for anything that can be drawn — three of those are
+ * *computed* from the pure modules and cannot go stale at all.
+ *
+ * **The source files are lossless.** They were converted from the original PNG
+ * captures with `webp({ lossless: true })` and verified pixel-identical — zero
+ * differing bytes across every channel — so nothing has been thrown away before
+ * the optimizer even sees them. What reaches a reader is `next/image` at
+ * `quality={95}`, which is the value `next.config.ts` carries **for exactly this
+ * case**: the whole claim of a product shot is that the app's own type can be
+ * read in it, and 75 puts visible ringing on small letters. Note that asking
+ * for a quality outside that config list does not warn — it silently falls back
+ * to 75 — so the call site and the config have to agree.
+ *
+ * `sizes` stops a phone fetching the desktop-width copy of a two-thousand-pixel
+ * capture.
+ */
+function Shot({
+  src,
+  width,
+  height,
+  url,
+  alt,
+}: {
+  src: string;
+  width: number;
+  height: number;
+  /** A real route on this domain — see the note on `chrome` in `AppWindow`. */
+  url: string;
+  alt: string;
+}) {
+  return (
+    /* `label` is what makes the window a picture rather than a control, and it
+       is the alt text's job here: the frame takes `role="img"` and everything
+       inside it hides behind that one description, so the `<Image>` under it is
+       deliberately `alt=""` rather than repeating it. */
+    <AppWindow chrome={{ url }} label={alt}>
+      <Image
+        src={src}
+        alt=""
+        width={width}
+        height={height}
+        sizes="(min-width: 1024px) 46rem, 100vw"
+        quality={95}
+        className="block h-auto w-full"
+      />
+    </AppWindow>
+  );
+}
+
+/**
+ * The three files, stacked under the export row's sentence.
+ *
+ * **One under another rather than three across**, because they live in a row's
+ * text column now instead of in a band of their own. Three cards side by side
+ * in a half-width column would be three slivers.
+ *
+ * **The PDF's caveat may not be shortened away.** The house rule is that every
+ * page naming the print PDF says it is not print-ready in the trade sense — it
+ * is the browser's own print engine — so that clause survives whatever else
+ * goes. The rest of what these used to say (EPUBCheck's version number, what
+ * becomes of a picture an e-reader cannot carry, CMYK) is detail a reader
+ * choosing between three formats does not need at the moment of choosing, and
+ * the FAQ answers two of those outright.
+ *
+ * **Each card is washed in its own mark's colour**, so the card and the logo
+ * beside it are visibly the same file without a reader having to match them by
+ * name. The three tokens are mixed from the marks themselves and are grounds
+ * only — see the note beside them in `globals.css`; the type on them does not
+ * move.
+ *
+ * **No Free/Pro pill.** Which of the three is bought is the pricing section's
+ * question and it answers it in full; here it was a second subject inside a
+ * card about a file format, and three coloured pills fighting three coloured
+ * grounds for the same corner.
+ */
+const FORMATS = [
+  {
+    format: "Word",
+    /* Whole class names, never `bg-lp-format-${…}`. Tailwind reads class names
+       as literals and an interpolated one ships no rule at all — the trap
+       `ROW_GROUNDS` documents at its own card tints. */
+    ground: "bg-lp-format-word",
+    text: "The .docx an agent or an editor asks for. Built in your browser.",
+  },
+  {
+    format: "EPUB",
+    ground: "bg-lp-format-epub",
+    text: "The file the ebook shops take, checked against EPUBCheck at zero errors. Built in your browser.",
+  },
+  {
+    format: "PDF",
+    ground: "bg-lp-format-pdf",
+    text: "Typeset to the trim size you chose. Not print-ready in the trade sense: no bleed, no crop marks.",
+  },
+] as const;
+
+/**
+ * The three marks, in a column beside the cards they belong to.
+ *
+ * **The images carry their own transparency rather than their own ground.**
+ * They arrived as screenshots on a flat #f5f5f5, which would have been a pale
+ * rectangle sitting on whatever this column is over. The background was keyed
+ * out by flooding in from the border — not by thresholding on colour, which
+ * would have taken the white "W" out of the Word mark with it — and the small
+ * islands left behind were dropped, because the Word capture caught the
+ * editor's own selection handles around the logo. So the panel below can take
+ * any token, and does.
+ *
+ * `aria-hidden`, because every one of these names is set in type immediately to
+ * the right of it. A screen reader that read the row would say "Word, Word".
+ *
+ * Nominative use: these are the file types our exports produce. Trademarks
+ * belong to their respective owners and no endorsement is implied.
+ */
+const FORMAT_MARKS = [
+  { src: "/format-word.webp", width: 452, height: 395 },
+  { src: "/format-epub.webp", width: 411, height: 413 },
+  { src: "/format-pdf.webp", width: 439, height: 576 },
+] as const;
+
+function FormatMarks() {
+  return (
+    <div
+      aria-hidden="true"
+      className="flex w-24 shrink-0 flex-col items-center justify-around gap-6 rounded-xl bg-lp-tint py-7 sm:w-28"
+    >
+      {FORMAT_MARKS.map((mark) => (
+        <Image
+          key={mark.src}
+          src={mark.src}
+          alt=""
+          width={mark.width}
+          height={mark.height}
+          quality={95}
+          sizes="96px"
+          className="h-14 w-auto sm:h-16"
+        />
+      ))}
+    </div>
+  );
+}
+
+function FormatCards() {
+  return (
+    <dl className="flex flex-1 flex-col gap-3">
+      {FORMATS.map((entry) => (
+        <div
+          key={entry.format}
+          className={`rounded-xl p-5 ${entry.ground}`}
+        >
+          <dt className="flex items-baseline gap-3">
+            <span className="font-serif text-lg font-semibold text-lp-ink">
+              {entry.format}
+            </span>
+
+          </dt>
+          <dd className="mt-2 text-[0.9375rem] leading-[1.6] text-lp-soft">
+            {entry.text}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /* --------------------------------------------------------------------------
-   The four rows
+   The five rows
    -------------------------------------------------------------------------- */
 
 interface Row {
+  /** An anchor, for the one row something links to. */
+  id?: string;
+  /** Anything under the sentence that is not the press — see `FeatureRow`. */
+  extra?: ReactNode;
   /**
    * The part of the app the row is about, for the pill over the heading.
    *
@@ -271,31 +454,71 @@ const ROWS: Row[] = [
        own heading with the eyebrow already carrying the colour, and a third
        weight in three lines is one more than the band can hold. The reference
        sets it as one even paragraph and it is right to. */
-    lead: "The covers, the counts, and where you left off — the library on the screen you land on, and the counts are summed from the manuscript rather than stored, so a card cannot drift from its book.",
+    lead: "The covers, the counts and where you left off, on the screen you land on.",
     title: "Every book you have, on one shelf",
-    figure: <ShelfScreen chrome={{ url: "openchapter.app/" }} />,
+    figure: (
+      <Shot
+        src="/shot-shelf.webp"
+        width={1999}
+        height={1003}
+        url="openchapter.app/?area=write"
+        alt="The Write area of the shelf: a search field, a New book button, and a grid of book cards, each with its cover, its chapter and word counts, when it was last opened, and a Write button."
+      />
+    ),
   },
   {
     badge: "The editor",
     title: "A chapter at a time, and nothing else on the screen",
-    lead: `Prose set on a real page, saved as you type — with the manuscript, your notes and the last ${MAX_SNAPSHOTS} versions of every chapter one press away, and none of them in the way.`,
+    lead: `Prose set on a real page, saved as you type, with your last ${MAX_SNAPSHOTS} versions one press away.`,
     figure: (
-      <VersionsScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
+      <Shot
+        src="/shot-editor.webp"
+        width={1999}
+        height={989}
+        url="openchapter.app/book/breathe-again/chapter/two"
+        alt="A chapter open in the editor: the book navigator listing front matter, forty-five body chapters and back matter on the left, the running word count and a Saved marker along the top, and the chapter set as a page in the book's own typeface."
+      />
     ),
   },
   {
     badge: "Import",
     title: "Bring the manuscript you already have",
-    lead: `${IMPORT_FORMATS.length} formats in, split into chapters — read in your own browser, with what did and did not survive the trip named before anything is added to your library.`,
+    lead: `${IMPORT_FORMATS.length} formats in, split into chapters, with what survived the trip named before anything is added.`,
     figure: <ImportScreen chrome={{ url: "openchapter.app/book/import" }} />,
   },
   {
     badge: "The assistant",
     title: "Ask about the chapter you are on",
-    lead: "It reads the chapter and answers about it — what is not landing, a tighter opening, what might happen next. It offers you text and never writes into your book.",
+    lead: "It reads the chapter and answers about it. It offers you text and never writes into your book.",
     figure: (
       <AssistantScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
     ),
+  },
+  {
+    /* **The export was a band of its own and is a row now**, which is the
+       whole of what changed: same eyebrow, same heading size, same sentence,
+       same press, and the figure behind the same three lights as the four
+       above it. It was never a different subject — it is the last thing the
+       product does, and the half of the promise the hero made. A section edge
+       between them announced a change of topic where there is none.
+
+       It carries `id="formats"` because four footer links point at it — Word,
+       EPUB, PDF and "Getting your book out" — and a link to an id nothing
+       carries is the dead end this page refuses everywhere else. */
+    id: "formats",
+    badge: "The export",
+    title: "The file is the point",
+    lead: "A wizard that asks what a file needs, then hands you one, bound in a book's own order.",
+    extra: (
+      /* The marks run down the left of the cards, one to a card, which is what
+         keeps the column from being three boxes of grey type. `items-stretch`
+         so the strip is as tall as the stack rather than centred against it. */
+      <div className="flex items-stretch gap-3">
+        <FormatMarks />
+        <FormatCards />
+      </div>
+    ),
+    figure: <ExportScreen chrome={{ url: "openchapter.app/book/breathe-again/export" }} />,
   },
 ];
 
@@ -412,7 +635,7 @@ export function MvpLandingPage() {
        `LandingPage`. */
     <div
       data-theme="light"
-      className="lp-type h-[var(--oc-layout-height)] overflow-y-auto bg-[#d6ecf9] text-lp-body [scroll-behavior:smooth]"
+      className="lp-type oc-scroll-dark h-[var(--oc-layout-height)] overflow-y-auto bg-[#d6ecf9] text-lp-body [scroll-behavior:smooth]"
     >
       {/* The full-width strip rather than the inset capsule. `floating` draws
           the bar as a white pill laid on the hero with a shadow under it; this
@@ -621,118 +844,18 @@ export function MvpLandingPage() {
               {ROWS.map((row, i) => (
                 <FeatureRow
                   key={row.title}
+                  id={row.id}
                   flip={i % 2 === 1}
                   ground={ROW_GROUNDS[i % ROW_GROUNDS.length]!}
                   badge={row.badge}
                   title={row.title}
                   lead={row.lead}
+                  extra={row.extra}
                   figure={row.figure}
-                  cta={{ href: "/signup", label: "Start free" }}
                 />
               ))}
             </div>
-          </div>
-        </section>
 
-        {/* ---- The export --------------------------------------------------
-
-            Its own section rather than a fifth row, because it is the half of
-            the promise the hero made — "leave with the file" — and because the
-            three formats need a table rather than three folded lines. The
-            figure is the export wizard's own last step, drawn. */}
-        <section
-          id="formats"
-          className="scroll-mt-20 border-b border-lp-line bg-lp-tint-soft px-6 py-14 sm:py-20"
-        >
-          <div className="mx-auto max-w-[88rem]">
-            <div className="mx-auto max-w-3xl text-center">
-              <h2
-                className={`oc-display font-serif text-lp-ink ${SECTION_TITLE}`}
-              >
-                The file is the point
-              </h2>
-              <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-                A wizard that asks the questions a file needs and then hands you
-                one.{" "}
-                <strong className={LEAD_EM}>
-                  Contents page, running heads, chapter openers and your own
-                  front matter, bound in the order a book is bound in.
-                </strong>
-              </p>
-            </div>
-
-            {/* **The window over the three formats, not beside them.**
-                `ExportScreen` is drawn at a 1000px design and its type is
-                whatever fraction of that its column comes to — in a 1.25fr
-                half of this row that is around ten pixels, which is the size
-                the drawn screens in `mvp-screens.tsx` were rebuilt to avoid.
-                Given its own centred measure it lands near thirteen, and the
-                table reads better as three columns anyway: three formats side
-                by side is a comparison, three stacked is a list. */}
-            <div className="mx-auto mt-12 max-w-5xl">
-              <ExportScreen />
-            </div>
-
-            <dl className="mt-12 grid gap-5 md:grid-cols-3">
-              {[
-                {
-                  format: "Word",
-                  plan: "Free",
-                  text: "A .docx for an agent, an editor or a backup — the format everyone you send a manuscript to already reads. Built in your browser.",
-                },
-                {
-                  format: "EPUB",
-                  plan: "Pro",
-                  text: "The file the ebook shops take, verified against EPUBCheck 5.3 at zero errors and zero warnings. Pictures an e-reader cannot carry are converted, and any that still cannot travel are dropped and named. Built in your browser.",
-                },
-                {
-                  format: "PDF",
-                  plan: "Pro",
-                  text: "Typeset to the trim size you chose and laid out on our server by a real browser. Not print-ready in the trade sense — no bleed, no crop marks, no CMYK — and it is the one export the whole manuscript travels for.",
-                },
-              ].map((entry) => (
-                <div
-                  key={entry.format}
-                  className="rounded-2xl border border-lp-line bg-lp-ground p-6"
-                >
-                  <dt className="flex items-baseline gap-3">
-                    <span className="font-serif text-xl font-semibold text-lp-ink">
-                      {entry.format}
-                    </span>
-                    {/* The status family's green for what is free and the
-                        page's own indigo for what is bought — the two hues on
-                        this page that carry a fact rather than a decoration.
-
-                        **The indigo pair is inverted from what it was**, and
-                        the page going dark is why. `lp-accent-pale` is a pale
-                        wash in daylight and a *near-white* at night (#eae9ff),
-                        so the lifted `lp-accent-text` on it came out at 2.0:1
-                        — the one pairing on the page a sweep of every text
-                        node caught. It takes a tinted dark pill now, which is
-                        the shape `ok-bg`/`ok-fg` beside it has always had:
-                        7.0:1. */}
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 font-code text-[0.625rem] tracking-[0.12em] uppercase ${
-                        entry.plan === "Free"
-                          ? "bg-ok-bg text-ok-fg"
-                          : "bg-lp-raised text-lp-accent-deep"
-                      }`}
-                    >
-                      {entry.plan}
-                    </span>
-                  </dt>
-                  <dd className="mt-3 text-[0.9375rem] leading-[1.6] text-lp-soft">
-                    {entry.text}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-
-            <p className="mx-auto mt-8 max-w-2xl text-center text-[0.9375rem] leading-[1.6] text-lp-soft">
-              An export with nothing in it is refused rather than handed over
-              empty, and a template page you never wrote on is left out of the
-              file and named on the way past.
-            </p>
           </div>
         </section>
 

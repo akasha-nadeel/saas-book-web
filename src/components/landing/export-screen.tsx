@@ -1,5 +1,8 @@
 import { FormatMark } from "@/components/export/format-previews";
-import { AppWindow } from "@/components/landing/app-window";
+import {
+  AppWindow,
+  type AppWindowChrome,
+} from "@/components/landing/app-window";
 import { DEFAULT_TYPESET, templateById } from "@/lib/export/typeset";
 
 /**
@@ -95,10 +98,18 @@ const SUMMARY: [string, string][] = [
   ["Front matter", "contents"],
 ];
 
-export function ExportScreen() {
+export function ExportScreen({ chrome }: { chrome?: AppWindowChrome } = {}) {
   return (
     <AppWindow
-      bezel
+      /* **The bezel is the default and the browser plate is the opt-in.**
+         `landing-page.tsx` mounts this on a dark stage where a slab reads
+         right; the MVP page's feature rows put every figure behind the same
+         three lights and an address, and one figure in a black bezel among
+         them would read as a different product. Passing `chrome` swaps the
+         two — they are alternative frames, and `AppWindow` refuses to draw
+         both anyway. */
+      bezel={!chrome}
+      chrome={chrome}
       label="The last step of OpenChapter's export: the file breathe-again.epub with what it will contain — three chapters, four pages of front and back matter, the Classic template — and a green panel saying the book is ready for the shops, with the Export EPUB button below."
       screenStyle={{ aspectRatio: `${W} / ${H}` }}
       screenClassName="@container flex overflow-hidden bg-lp-raised leading-[1.35]"

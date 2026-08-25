@@ -657,6 +657,28 @@
   --color-lp-bright-ink: #14140f;
 
   /* ------------------------------------------------------------------------
+     The three file grounds, each mixed from its own mark.
+
+     **These are the one place on this page where a hue is borrowed rather than
+     chosen.** Everything else in the `lp-*` set is ours; these three are
+     Word's blue, the EPUB logo's green and the PDF mark's red, sampled from
+     the marks themselves — #1850b0, #80b010 and #d82028 — and let down to a
+     wash. That is the whole reason they exist: the card and the mark beside it
+     are the same file, and a reader should not have to read the heading to
+     know which is which.
+
+     They are **grounds only, never ink**, exactly like `--color-lp-card-*`
+     above. A twelve-per-cent mix has no contrast to give, and the type on them
+     stays `lp-ink` and `lp-soft` — which is what keeps three tinted cards from
+     becoming three colour schemes.
+
+     The dark values are the same three mixed into the page's own black at a
+     higher fraction, since a wash that reads on white disappears on it. */
+  --color-lp-format-word: #0d1729;
+  --color-lp-format-epub: #20290c;
+  --color-lp-format-pdf: #300f10;
+
+  /* ------------------------------------------------------------------------
      The stage: the one section that goes dark in both themes.
 
      "Before you upload" is where the product is actually shown working, and it
@@ -1042,6 +1064,12 @@
   --color-lp-bright: #c0f400;
   --color-lp-bright-ink: #0f0f10;
 
+  /* The three file grounds in daylight — see the note in the dark block. Each
+     is its own mark's colour at about twelve per cent over white. */
+  --color-lp-format-word: #e4eaf6;
+  --color-lp-format-epub: #f0f6e2;
+  --color-lp-format-pdf: #fae4e5;
+
   /* The stage — see the note in the dark block. Only the ground differs
      between the two: black under a white page, where at night it lifts off a
      near-black one instead. The ink on it is identical in both, because what
@@ -1184,6 +1212,9 @@
   --color-lp-marker-ink: #14140f;
   --color-lp-bright: #b0e000;
   --color-lp-bright-ink: #14140f;
+  --color-lp-format-word: #0d1729;
+  --color-lp-format-epub: #20290c;
+  --color-lp-format-pdf: #300f10;
   --color-lp-stage: #14141c;
   --color-lp-stage-ink: #f5f5f7;
   --color-lp-stage-body: #a8a8b4;
@@ -1649,6 +1680,57 @@ body {
    delay the product invented. `LoadingScreen` is the shared `Spinner` now and
    needs no CSS of its own.
    -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   A dark scrollbar on a page pinned light.
+
+   **The landing page pins `data-theme="light"` on its own root, and
+   `color-scheme: light` rides along with it** — which is what makes the browser
+   paint that div's scrollbar pale. That is right for the four legal pages and
+   wrong for this one: the bar runs the full height of a page that opens on a
+   saturated gradient and closes on a dark footer, and a white gutter beside
+   both reads as a seam in the window rather than as part of the page.
+
+   **Only the bar is restyled, not the colour scheme.** Setting
+   `color-scheme: dark` here would do it in one line and would also re-paint
+   every native control in the subtree — the hero's file input among them — on
+   a page whose whole palette is the light set. `scrollbar-color` and the
+   `::-webkit-` pseudo-elements touch the scrollbar and nothing else.
+
+   **The values are literals, and that is the one honest option.** The element
+   carrying this class also carries `data-theme="light"`, so a `var(--color-lp-…)`
+   on it resolves to the *light* value — the opposite of what is wanted. They
+   are the dark block's `lp-tint` and `lp-edge-strong`, copied; if either moves
+   there, move it here.
+
+   The thumb's border is drawn in the track colour rather than left transparent:
+   a transparent border shows the page through it, so the thumb appears to
+   change colour as it travels over a gradient.
+   -------------------------------------------------------------------------- */
+.oc-scroll-dark {
+  --oc-scroll-track: #14141b;
+  --oc-scroll-thumb: #3b3b48;
+  scrollbar-color: var(--oc-scroll-thumb) var(--oc-scroll-track);
+}
+
+.oc-scroll-dark::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.oc-scroll-dark::-webkit-scrollbar-track {
+  background: var(--oc-scroll-track);
+}
+
+.oc-scroll-dark::-webkit-scrollbar-thumb {
+  background: var(--oc-scroll-thumb);
+  border: 3px solid var(--oc-scroll-track);
+  border-radius: 999px;
+}
+
+.oc-scroll-dark::-webkit-scrollbar-thumb:hover {
+  background: #4b4b5a;
+}
 
 /* --------------------------------------------------------------------------
    The logo strip's swap.

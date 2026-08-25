@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import {
   FEATURE_EYEBROW,
   FEATURE_LEAD,
@@ -105,8 +104,16 @@ export interface FeatureRowProps {
    * without them having to read the heading to find out.
    */
   badge?: string;
-  /** The press under the sentence. Both fields or neither. */
-  cta?: { href: string; label: string };
+  /**
+   * Anything that belongs to the row but is neither its sentence nor its
+   * press — the export row's three format cards, stacked under the words.
+   *
+   * A slot rather than a shape, because there is exactly one row using it and
+   * a `formats?: Format[]` prop would put that row's table in this file. It
+   * sits between the lead and the press, which is where the disclosures used
+   * to be: the same position, doing the job they did, without the folding.
+   */
+  extra?: ReactNode;
   /** Swap the sides. Set by the caller from the row's index. */
   flip: boolean;
 }
@@ -120,7 +127,7 @@ export function FeatureRow({
   ground,
   points,
   badge,
-  cta,
+  extra,
   flip,
 }: FeatureRowProps) {
   return (
@@ -179,26 +186,8 @@ export function FeatureRow({
           </div>
         )}
 
-        {cta && (
-          <Link
-            href={cta.href}
-            className="mt-7 inline-flex items-center gap-2 rounded-full bg-lp-accent px-6 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink transition-opacity hover:opacity-90"
-          >
-            {cta.label}
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-3.5 w-3.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M7 17 17 7M9 7h8v8" />
-            </svg>
-          </Link>
-        )}
+        {extra && <div className="mt-8">{extra}</div>}
+
       </div>
 
       {/* The tinted card, and the window floating on it. The padding is what

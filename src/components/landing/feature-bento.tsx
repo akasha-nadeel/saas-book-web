@@ -375,9 +375,9 @@ export function FeatureBento() {
             Everything the book needs
           </h2>
           <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-            From the first line to the last —{" "}
+            From the first line{" "}
             <strong className="font-semibold text-lp-ink">
-              and the file to hand over when you are done.
+              to the file you hand over at the end.
             </strong>
           </p>
         </div>
@@ -388,7 +388,7 @@ export function FeatureBento() {
               tone="light"
               span="lg:col-span-3"
               title="Write without the clutter"
-              body="One chapter on screen at a time, laid out at your book's own trim size, with the word count in the corner and nothing else asking for your attention."
+              body="One chapter on screen at a time, set at your book's own trim size, with nothing else asking for your attention."
             >
               <WriteVisual />
             </Card>
@@ -397,7 +397,7 @@ export function FeatureBento() {
               tone="light"
               span="lg:col-span-3"
               title="Every chapter in its place"
-              body="Reorder chapters, keep a title page and a dedication alongside them, and put a deleted one back with its notes intact."
+              body="Reorder chapters, keep a title page and a dedication beside them, and put a deleted one back with its notes intact."
             >
               <OrganiseVisual />
             </Card>
@@ -406,7 +406,7 @@ export function FeatureBento() {
               tone="bright"
               span="sm:col-span-1 lg:col-span-2"
               title="Watch the book add up"
-              body="Words and chapters are counted from the manuscript itself every time the shelf is read, so a card's number cannot drift from the book."
+              body="Words and chapters are counted from the manuscript every time the shelf is read, so a card cannot drift from its book."
             >
               <CountsVisual />
             </Card>
@@ -415,7 +415,7 @@ export function FeatureBento() {
               tone="dark"
               span="order-4 sm:order-5 sm:col-span-2 lg:order-4 lg:col-span-2"
               title="A space made for writing"
-              body="Choose the paper and the type, turn the light down, and write. The setting follows the book rather than the app."
+              body="Choose the paper and the type, turn the light down, and write. The setting follows the book, not the app."
             >
               <FocusVisual />
             </Card>
@@ -424,7 +424,7 @@ export function FeatureBento() {
               tone="neutral"
               span="order-5 sm:order-4 sm:col-span-1 lg:order-5 lg:col-span-2"
               title="Everything for your book, together"
-              body="The shelf, the import, the editor, your saved versions, the assistant and the export — one workspace, no second account."
+              body="Shelf, import, editor, saved versions, assistant and export. One workspace, and no second account."
             >
               <TogetherVisual />
             </Card>
