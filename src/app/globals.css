@@ -635,6 +635,28 @@
   --color-lp-marker-ink: #14140f;
 
   /* ------------------------------------------------------------------------
+     The bright ground: the one loud card in the feature grid.
+
+     A second saturated fill beside the marker, and it earns its place the same
+     way — it is a *ground* that carries its own ink rather than a hue spent on
+     chrome. The grid it sits in is four quiet cards and this one, which is the
+     whole shape of the reference it is built from: take the loud card out and
+     five equal boxes is a table.
+
+     **The ink is literal and stated identically in both themes**, for the
+     reason the marker's is: `lp-ink` goes near-white at night and near-white
+     on lime is unreadable. Dark ink clears 15:1 on both values.
+
+     The lime moves between the blocks the way the marker does — #c0f400 is
+     right on a white page and glares on #0b0b0e, so the dark value is deepened
+     enough to sit on black without becoming the brightest thing in the room.
+
+     It is the value the testimonial cards already carry as a literal hex; they
+     are not retargeted here, but this is the token they should read. */
+  --color-lp-bright: #b0e000;
+  --color-lp-bright-ink: #14140f;
+
+  /* ------------------------------------------------------------------------
      The stage: the one section that goes dark in both themes.
 
      "Before you upload" is where the product is actually shown working, and it
@@ -1014,6 +1036,12 @@
   --color-lp-marker: #f7f000;
   --color-lp-marker-ink: #14140f;
 
+  /* The bright ground in daylight — see the note in the dark block. This is
+     the lime itself, the value the page already uses; the dark block deepens
+     it so it does not glare on a black page. */
+  --color-lp-bright: #c0f400;
+  --color-lp-bright-ink: #0f0f10;
+
   /* The stage — see the note in the dark block. Only the ground differs
      between the two: black under a white page, where at night it lifts off a
      near-black one instead. The ink on it is identical in both, because what
@@ -1154,6 +1182,8 @@
   --color-lp-device: #2a2a33;
   --color-lp-marker: #e4dc00;
   --color-lp-marker-ink: #14140f;
+  --color-lp-bright: #b0e000;
+  --color-lp-bright-ink: #14140f;
   --color-lp-stage: #14141c;
   --color-lp-stage-ink: #f5f5f7;
   --color-lp-stage-body: #a8a8b4;
@@ -1619,6 +1649,104 @@ body {
    delay the product invented. `LoadingScreen` is the shared `Spinner` now and
    needs no CSS of its own.
    -------------------------------------------------------------------------- */
+
+/* --------------------------------------------------------------------------
+   The logo strip's swap.
+
+   Five marks at a time, each trading places with a sixth-to-tenth one, in
+   sequence from left to right.
+
+   **It is keyframes rather than a component**, which is the whole reason it can
+   exist on this page at all: `mvp-landing-page.tsx` is a Server Component and
+   the page's standing claim is that it ships one script — the header. A
+   rotating strip is the kind of thing that normally arrives as a client island
+   with a timer in it, and it does not have to.
+
+   **Three seconds a set, not six.** The number that matters is not how often
+   the row changes but how long a visitor has to stand still before they see it
+   change *once* — because a strip that has not moved while they were looking at
+   it is, to them, a static strip. Half the cycle is the worst case, so this is
+   the longest anyone waits.
+
+   **The stagger is what makes it read as one movement.** Each column carries
+   its own `animation-delay`, ninety milliseconds apart, so the change runs
+   across the row rather than the whole line blinking at once. A simultaneous
+   swap is read as a glitch — a repaint, a page still loading; a sequenced one
+   is read as an intention, and the eye follows it to the end of the row.
+
+   The two halves are separate keyframes rather than one shared with a negative
+   delay. Same result, but the offset stays in one place: with negative delays
+   the column stagger and the half-cycle offset are added together in the markup
+   and the arithmetic stops being legible.
+
+   `45%`/`50%` is the crossfade — a beat where both are partly present, which is
+   what stops the change reading as a cut.
+
+   **Both marks are in the DOM the whole time**, so a screen reader gets all ten
+   names and the swap is purely visual.
+
+   Honoured motion preference: no swap at all, and the second set stays at its
+   base `opacity: 0`, so a reader who asked for less movement gets a still row
+   of five rather than ten names piled on top of each other.
+   -------------------------------------------------------------------------- */
+/* **Longhands, not the shorthand.** `animation: 6s ease-in-out infinite` is
+   valid CSS — the name simply defaults to `none`, and the two rules below
+   supply it. Lightning CSS does not keep it: with no name in the shorthand it
+   folds the whole declaration to `animation: none` and the duration goes with
+   it, so the strip renders with both sets stacked and nothing moving. It is the
+   silent-drop this build is warned about in CLAUDE.md, and it is why the
+   compiled stylesheet is the thing to check rather than this file. */
+.oc-logo-a,
+.oc-logo-b {
+  animation-duration: 6s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.oc-logo-a {
+  opacity: 1;
+  animation-name: oc-logo-a;
+}
+
+.oc-logo-b {
+  opacity: 0;
+  animation-name: oc-logo-b;
+}
+
+@keyframes oc-logo-a {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes oc-logo-b {
+  0%,
+  45% {
+    opacity: 0;
+  }
+  50%,
+  95% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-logo-a,
+  .oc-logo-b {
+    animation: none;
+  }
+}
 
 /* --------------------------------------------------------------------------
    The tool cloud's idle float.

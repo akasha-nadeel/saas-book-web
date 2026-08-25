@@ -61,7 +61,7 @@ export const HERO_TITLE =
  * hand-written ones honest.
  */
 export const SECTION_TITLE =
-  "text-[2rem] leading-[1.15] font-medium sm:text-[2.25rem] lg:text-[2.5rem]";
+  "text-[2rem] leading-[1.15] font-semibold sm:text-[2.25rem] lg:text-[2.5rem]";
 
 /**
  * Hero subtitle / deck under the hero title.
@@ -71,7 +71,7 @@ export const SECTION_TITLE =
  * `max-w-*` belongs at the call site.
  */
 export const SECTION_LEAD =
-  "text-[1.0625rem] leading-[1.6] font-medium text-lp-body sm:text-[1.125rem]";
+  "text-[1.125rem] leading-[1.6] font-medium text-lp-ink sm:text-[1.25rem]";
 
 /**
  * A feature row's own heading — the second level, under a section title.

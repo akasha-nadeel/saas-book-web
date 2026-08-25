@@ -12,6 +12,7 @@ import {
   type HeaderNavItem,
 } from "@/components/landing/landing-header";
 import { DashboardDemo } from "@/components/landing/dashboard-demo";
+import { FeatureBento } from "@/components/landing/feature-bento";
 import {
   AssistantScreen,
   ImportScreen,
@@ -24,7 +25,6 @@ import {
   SECTION_LEAD,
   SECTION_TITLE,
 } from "@/components/landing/type";
-import { DESTINATIONS } from "@/components/landing/works-with";
 import {
   annualSavingPercent,
   displayPrice,
@@ -91,52 +91,55 @@ const INK = "var(--color-lp-accent)";
  */
 const NAV: HeaderNavItem[] = [
   { kind: "link", href: "#inside", label: "Inside the app" },
-  { kind: "link", href: "#private", label: "Your writing" },
   { kind: "link", href: "#faq", label: "FAQ" },
   { kind: "link", href: "/upgrade", label: "Pricing" },
 ];
 
-const TRUSTED_LOGOS = [
-  {
-    name: "Grammarly",
-    viewBox: "0 0 24 24",
-    path: "M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 18c-3.314 0-6-2.686-6-6 0-1.657.672-3.157 1.757-4.243l1.414 1.414C8.448 9.896 8 10.896 8 12c0 2.209 1.791 4 4 4s4-1.791 4-4c0-.552-.448-1-1-1h-3v-2h4c1.105 0 2 .895 2 2 0 3.314-2.686 6-6 6z",
-  },
-  {
-    name: "Substack",
-    viewBox: "0 0 24 24",
-    path: "M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z",
-  },
-  {
-    name: "Medium",
-    viewBox: "0 0 24 24",
-    path: "M13.54 12a6.8 6.8 0 01-6.77 6.82A6.8 6.8 0 010 12a6.8 6.8 0 016.77-6.82A6.8 6.8 0 0113.54 12zm5.12 0c0 3.77-1.44 6.82-3.22 6.82s-3.22-3.05-3.22-6.82 1.44-6.82 3.22-6.82 3.22 3.05 3.22 6.82zm3.84 0c0 3.4-.5 6.16-1.1 6.16-.6 0-1.1-2.76-1.1-6.16s.5-6.16 1.1-6.16c.6 0 1.1 2.76 1.1 6.16z",
-  },
-  {
-    name: "Wattpad",
-    viewBox: "0 0 24 24",
-    path: "M0 4.674l5.128 14.652h3.336L12 9.255l3.536 10.071h3.336L24 4.674h-4.32l-2.484 9.493L13.88 4.674h-3.76L6.804 14.167 4.32 4.674H0z",
-  },
-  {
-    name: "Goodreads",
-    viewBox: "0 0 24 24",
-    path: "M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.4 17.6c-2.4 0-3.9-1.4-4-3.6h2.2c.1 1.2 1 1.8 2 1.8 1.1 0 1.9-.7 1.9-2.1v-.8c-.5.7-1.3 1.1-2.3 1.1-2.2 0-3.8-1.7-3.8-4.2s1.6-4.2 3.8-4.2c1 0 1.8.4 2.3 1.1v-1h2.2v8.5c0 2.2-1.5 3.4-4.3 3.4zm.1-6.1c1.2 0 2.1-.9 2.1-2.3s-.9-2.3-2.1-2.3-2.1.9-2.1 2.3.9 2.3 2.1 2.3z",
-  },
-  {
-    name: "WordPress",
-    viewBox: "0 0 24 24",
-    path: "M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm-8.8 12c0-1.8.5-3.5 1.4-5l4.3 11.8C5.6 17.3 3.2 14.9 3.2 12zm8.8 8.8c-.8 0-1.6-.1-2.3-.4l2.5-7.3 2.5 6.9c-.8.5-1.7.8-2.7.8zm2.4-3.5l2.4-6.8c.4-.9.6-1.6.6-2.1 0-.7-.4-1.2-1.2-1.2-.4 0-.9.2-1.2.4l.7 2.1 3.5 7.6c1.1-1.5 1.8-3.4 1.8-5.5 0-2.3-.9-4.4-2.3-6.0l.4 1.3-6.6 18.2z",
-  },
-  {
-    name: "Ghost",
-    viewBox: "0 0 24 24",
-    path: "M0 2.4A2.4 2.4 0 012.4 0h19.2A2.4 2.4 0 0124 2.4v19.2a2.4 2.4 0 01-2.4 2.4H2.4A2.4 2.4 0 010 21.6V2.4zm3.6 15.6h16.8V6H3.6v12zm3.6-8.4h9.6v2.4H7.2V9.6zm0 4.8h6v2.4h-6v-2.4z",
-  },
-  {
-    name: "Notion",
-    viewBox: "0 0 24 24",
-    path: "M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.875c-.467-.326-1.167-.42-1.867-.373L3.106 2.48c-.42.047-.513.234-.326.42zm.327 3.918v13.542c0 .7.373.933 1.073.886l14.757-.84c.7-.046.793-.466.793-1.026V6.96c0-.56-.233-.746-.746-.7l-15.084.887c-.513.046-.793.373-.793.98zm13.402 12.002l-2.474.14-5.32-7.374v6.861l-2.52.14V8.761l2.707-.14 5.18 7.374V9.227l2.427-.14z",
-  },
+/**
+ * The logo strip's marks, in the two sets of four it alternates between.
+ *
+ * **Five at a time, not ten.** A strip of ten names is a list; five at the
+ * size this row is set at is a statement, which is what the row is for. The
+ * other five are not dropped — they take the first five's place every three
+ * seconds, one column after another from left to right, on nothing but a CSS
+ * keyframe (`.oc-logo-a` in `globals.css`), so the page still ships no script
+ * for this.
+ *
+ * **The two sets are read by index, so they must stay the same length**: slot
+ * `i` of the row stacks `LOGO_SETS[0][i]` on `LOGO_SETS[1][i]`. Adding a mark
+ * to one set means adding one to the other.
+ *
+ * **These are the brands' own logos, not lookalikes**, taken from **Simple
+ * Icons** (CC0, https://simpleicons.org) on a 24x24 artboard — the source
+ * `works-with.tsx` uses for its destination marks. A logo strip runs on
+ * recognition, and a mark that is nearly right is read as wrong before the name
+ * beside it is read at all.
+ *
+ * **They are set in the page's ink rather than in each brand's own colour**,
+ * which is the opposite of the rule `works-with.tsx` follows and is deliberate.
+ * That strip is a claim about file formats, where the real colours are what
+ * make it checkable on sight; this one is a wall of names, where eight hues
+ * would be the loudest thing on a quiet page. One ink is also what lets the
+ * marks be set this large without the row turning into a paint chart.
+ *
+ * Nominative use; trademarks belong to their respective owners, and none of
+ * these companies has any connection to this one.
+ */
+const LOGO_SETS: { name: string; path: string }[][] = [
+  [
+    { name: "Grammarly", path: "M12 24H.032V12c0-3.314 1.341-6.314 3.504-8.486C5.703 1.344 8.694 0 12 0c3.305 0 6.297 1.344 8.463 3.514 2.164 2.172 3.505 5.172 3.505 8.486s-1.338 6.314-3.505 8.486C18.297 22.656 15.305 24 12 24m2.889-13.137-1.271 2.205h4.418c-.505 2.882-3.018 5.078-6.036 5.078-3.38 0-6.132-2.757-6.132-6.146S8.618 5.854 12 5.854c1.821 0 3.458.801 4.584 2.069l1.143-1.988c-1.493-1.418-3.506-2.29-5.725-2.29-4.6 0-8.332 3.74-8.332 8.355s3.73 8.354 8.332 8.354c4.603 0 8.332-3.739 8.332-8.354 0-.387-.029-.765-.079-1.137z" },
+    { name: "Substack", path: "M22.539 8.242H1.46V5.406h21.08v2.836zM1.46 10.812V24L12 18.11 22.54 24V10.812H1.46zM22.54 0H1.46v2.836h21.08V0z" },
+    { name: "Medium", path: "M4.21 0A4.201 4.201 0 0 0 0 4.21v15.58A4.201 4.201 0 0 0 4.21 24h15.58A4.201 4.201 0 0 0 24 19.79v-1.093c-.137.013-.278.02-.422.02-2.577 0-4.027-2.146-4.09-4.832a7.592 7.592 0 0 1 .022-.708c.093-1.186.475-2.241 1.105-3.022a3.885 3.885 0 0 1 1.395-1.1c.468-.237 1.127-.367 1.664-.367h.023c.101 0 .202.004.303.01V4.211A4.201 4.201 0 0 0 19.79 0Zm.198 5.583h4.165l3.588 8.435 3.59-8.435h3.864v.146l-.019.004c-.705.16-1.063.397-1.063 1.254h-.003l.003 10.274c.06.676.424.885 1.063 1.03l.02.004v.145h-4.923v-.145l.019-.005c.639-.144.994-.353 1.054-1.03V7.267l-4.745 11.15h-.261L6.15 7.569v9.445c0 .857.358 1.094 1.063 1.253l.02.004v.147H4.405v-.147l.019-.004c.705-.16 1.065-.397 1.065-1.253V6.987c0-.857-.358-1.094-1.064-1.254l-.018-.004zm19.25 3.668c-1.086.023-1.733 1.323-1.813 3.124H24V9.298a1.378 1.378 0 0 0-.342-.047Zm-1.862 3.632c-.1 1.756.86 3.239 2.204 3.634v-3.634z" },
+    { name: "Wattpad", path: "M13.034 3.09c-1.695.113-3.9 2.027-6.9 6.947.245-2.758.345-4.716-.857-5.743-.823-.702-2.764-.974-3.926.536C.18 6.349-.09 9.312.024 12.432c.238 6.518 2.544 8.487 4.59 8.487h.001c3.623 0 4.13-4.439 6.604-8.4-.09 1.416-.008 2.668.266 3.532 1.078 3.398 4.784 3.663 6.467.21 2.374-4.87 3.058-6.016 5.453-9.521 1.58-2.314-.252-3.812-2.374-2.735-1.09.554-2.86 1.935-5.065 4.867.387-2.23.28-5.996-2.932-5.782z" },
+    { name: "Goodreads", path: "M17.346.026c.422-.083.859.037 1.179.325.346.284.55.705.557 1.153-.023.457-.247.88-.612 1.156l-2.182 1.748a.601.601 0 0 0-.255.43.52.52 0 0 0 .11.424 5.886 5.886 0 0 1 .832 6.58c-1.394 2.79-4.503 3.99-7.501 2.927a.792.792 0 0 0-.499-.01c-.224.07-.303.18-.453.383l-.014.02-.941 1.254s-.792.985.457.935c3.027-.119 3.817-.119 5.439-.01 2.641.18 3.806 1.903 3.806 3.275 0 1.623-1.036 3.383-3.809 3.383a117.46 117.46 0 0 0-5.517-.03c-.31.005-.597.013-.835.02-.228.006-.41.011-.52.011-.712 0-1.648-.186-1.66-1.068-.008-.729.624-1.12 1.11-1.172.43-.045.815.007 1.24.064.252.034.518.07.815.088.185.011.366.025.552.038.53.038 1.102.08 1.926.087.427.005.759.01 1.025.015.695.012.941.016 1.28-.015 1.248-.112 1.832-.61 1.832-1.376 0-.805-.584-1.264-1.698-1.414-1.564-.213-2.33-.163-3.72-.074a87.66 87.66 0 0 1-1.669.095c-.608.029-2.449.026-2.682-1.492-.053-.416-.073-1.116.807-2.325l.75-1.003c.36-.49.582-.898.053-1.559 0 0-.39-.468-.52-.638-1.215-1.587-1.512-4.08-.448-6.114 1.577-3.011 5.4-4.26 8.37-2.581.253.143.438.203.655.163.201-.032.27-.167.363-.344.02-.04.042-.082.067-.126.004-.01.241-.465.535-1.028l.734-1.41a1.493 1.493 0 0 1 1.041-.785ZM9.193 13.243c1.854.903 3.912.208 5.254-2.47 1.352-2.699.827-5.11-1.041-6.023C10.918 3.537 8.81 5.831 8.017 7.41c-1.355 2.698-.717 4.886 1.147 5.818Z" },
+  ],
+  [
+    { name: "WordPress", path: "M21.469 6.825c.84 1.537 1.318 3.3 1.318 5.175 0 3.979-2.156 7.456-5.363 9.325l3.295-9.527c.615-1.54.82-2.771.82-3.864 0-.405-.026-.78-.07-1.11m-7.981.105c.647-.03 1.232-.105 1.232-.105.582-.075.514-.93-.067-.899 0 0-1.755.135-2.88.135-1.064 0-2.85-.15-2.85-.15-.585-.03-.661.855-.075.885 0 0 .54.061 1.125.09l1.68 4.605-2.37 7.08L5.354 6.9c.649-.03 1.234-.1 1.234-.1.585-.075.516-.93-.065-.896 0 0-1.746.138-2.874.138-.2 0-.438-.008-.69-.015C4.911 3.15 8.235 1.215 12 1.215c2.809 0 5.365 1.072 7.286 2.833-.046-.003-.091-.009-.141-.009-1.06 0-1.812.923-1.812 1.914 0 .89.513 1.643 1.06 2.531.411.72.89 1.643.89 2.977 0 .915-.354 1.994-.821 3.479l-1.075 3.585-3.9-11.61.001.014zM12 22.784c-1.059 0-2.081-.153-3.048-.437l3.237-9.406 3.315 9.087c.024.053.05.101.078.149-1.12.393-2.325.609-3.582.609M1.211 12c0-1.564.336-3.05.935-4.39L7.29 21.709C3.694 19.96 1.212 16.271 1.211 12M12 0C5.385 0 0 5.385 0 12s5.385 12 12 12 12-5.385 12-12S18.615 0 12 0" },
+    { name: "Ghost", path: "M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm.256 2.313c2.47.005 5.116 2.008 5.898 2.962l.244.3c1.64 1.994 3.569 4.34 3.569 6.966 0 3.719-2.98 5.808-6.158 7.508-1.433.766-2.98 1.508-4.748 1.508-4.543 0-8.366-3.569-8.366-8.112 0-.706.17-1.425.342-2.15.122-.515.244-1.033.307-1.549.548-4.539 2.967-6.795 8.422-7.408a4.29 4.29 0 01.49-.026Z" },
+    { name: "Notion", path: "M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.139c-.093-.514.28-.887.747-.933zM1.936 1.035l13.31-.98c1.634-.14 2.055-.047 3.082.7l4.249 2.986c.7.513.934.653.934 1.213v16.378c0 1.026-.373 1.634-1.68 1.726l-15.458.934c-.98.047-1.448-.093-1.962-.747l-3.129-4.06c-.56-.747-.793-1.306-.793-1.96V2.667c0-.839.374-1.54 1.447-1.632z" },
+    { name: "Obsidian", path: "M19.355 18.538a68.967 68.959 0 0 0 1.858-2.954.81.81 0 0 0-.062-.9c-.516-.685-1.504-2.075-2.042-3.362-.553-1.321-.636-3.375-.64-4.377a1.707 1.707 0 0 0-.358-1.05l-3.198-4.064a3.744 3.744 0 0 1-.076.543c-.106.503-.307 1.004-.536 1.5-.134.29-.29.6-.446.914l-.31.626c-.516 1.068-.997 2.227-1.132 3.59-.124 1.26.046 2.73.815 4.481.128.011.257.025.386.044a6.363 6.363 0 0 1 3.326 1.505c.916.79 1.744 1.922 2.415 3.5zM8.199 22.569c.073.012.146.02.22.02.78.024 2.095.092 3.16.29.87.16 2.593.64 4.01 1.055 1.083.316 2.198-.548 2.355-1.664.114-.814.33-1.735.725-2.58l-.01.005c-.67-1.87-1.522-3.078-2.416-3.849a5.295 5.295 0 0 0-2.778-1.257c-1.54-.216-2.952.19-3.84.45.532 2.218.368 4.829-1.425 7.531zM5.533 9.938c-.023.1-.056.197-.098.29L2.82 16.059a1.602 1.602 0 0 0 .313 1.772l4.116 4.24c2.103-3.101 1.796-6.02.836-8.3-.728-1.73-1.832-3.081-2.55-3.831zM9.32 14.01c.615-.183 1.606-.465 2.745-.534-.683-1.725-.848-3.233-.716-4.577.154-1.552.7-2.847 1.235-3.95.113-.235.223-.454.328-.664.149-.297.288-.577.419-.86.217-.47.379-.885.46-1.27.08-.38.08-.72-.014-1.043-.095-.325-.297-.675-.68-1.06a1.6 1.6 0 0 0-1.475.36l-4.95 4.452a1.602 1.602 0 0 0-.513.952l-.427 2.83c.672.59 2.328 2.316 3.335 4.711.09.21.175.43.253.653z" },
+    { name: "Evernote", path: "M8.222 5.393c0 .239-.02.637-.256.895-.257.24-.652.259-.888.259H4.552c-.73 0-1.165 0-1.46.04-.159.02-.356.1-.455.14-.04.019-.04 0-.02-.02L8.38.796c.02-.02.04-.02.02.02-.04.099-.118.298-.138.457-.04.298-.04.736-.04 1.472v2.647zm5.348 17.869c-.67-.438-1.026-1.015-1.164-1.373a2.924 2.924 0 01-.217-1.095 3.007 3.007 0 013-3.004c.493 0 .888.398.888.895a.88.88 0 01-.454.776c-.099.06-.237.1-.336.12-.098.02-.473.06-.65.218-.198.16-.356.418-.356.697 0 .298.118.577.316.776.355.358.829.557 1.342.557a2.436 2.436 0 002.427-2.447c0-1.214-.809-2.29-1.875-2.766-.158-.08-.414-.14-.651-.2a8.04 8.04 0 00-.592-.1c-.829-.1-2.901-.755-3.04-2.605 0 0-.611 2.785-1.835 3.54-.118.06-.276.12-.454.16-.177.04-.374.06-.434.06-1.993.12-4.105-.517-5.565-2.03 0 0-.987-.815-1.5-3.103-.118-.558-.355-1.553-.493-2.488-.06-.338-.08-.597-.099-.836 0-.975.592-1.631 1.342-1.73h4.026c.69 0 1.086-.18 1.342-.42.336-.317.415-.775.415-1.312V1.354C9.05.617 9.703 0 10.669 0h.474c.197 0 .434.02.651.04.158.02.296.06.533.12 1.204.298 1.46 1.532 1.46 1.532s2.27.398 3.415.597c1.085.199 3.77.378 4.282 3.104 1.204 6.487.474 12.775.415 12.775-.849 6.129-5.901 5.83-5.901 5.83a4.1 4.1 0 01-2.428-.736zm4.54-13.034c-.652-.06-1.204.2-1.402.697-.04.1-.079.219-.059.278.02.06.06.08.099.1.237.12.631.179 1.204.239.572.06.967.1 1.223.06.04 0 .08-.02.119-.08.04-.06.02-.18.02-.28-.06-.536-.553-.934-1.204-1.014z" },
+  ],
 ];
 
 const TESTIMONIALS = [
@@ -198,7 +201,6 @@ const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { href: "#inside", label: "Inside the app" },
       { href: "#formats", label: "Getting your book out" },
-      { href: "#private", label: "Your writing" },
       { href: "#pricing", label: "What it costs" },
       { href: "#faq", label: "FAQ" },
     ],
@@ -390,42 +392,6 @@ const ROWS: Row[] = [
 ];
 
 /* --------------------------------------------------------------------------
-   The three things about your writing
-   -------------------------------------------------------------------------- */
-
-/**
- * The privacy section, and it is three facts rather than a promise.
- *
- * **Two of these are qualifications, which is why they are here and not in the
- * small print.** The manuscript is written to your own browser — and it is
- * synced to your account the moment you sign in, and two operations send prose
- * to a server. Saying "your writing never leaves your machine" would be the
- * kind of claim this site exists not to make; `/privacy` names every route that
- * sends anything, and adding one is an obligation to add it there and here.
- *
- * The tints are the page's three decorative grounds — indigo, peach and violet
- * at about 4% saturation, grounds only, never ink. The long note beside them in
- * `globals.css` is what binds that.
- */
-const PRIVACY = [
-  {
-    ground: ROW_GROUNDS[0]!,
-    title: "It is written to your own browser first",
-    text: "Your manuscript, its chapters, your notes and your versions are stored on the machine you are typing on. Sign in and they sync to your account as well, so a lost laptop is not a lost book.",
-  },
-  {
-    ground: ROW_GROUNDS[1]!,
-    title: "Two things go further, and both are named",
-    text: "The chapter you ask the assistant about, and the book you send to be typeset as a PDF. Word and EPUB files are built in the browser and never leave it. Nothing else is sent anywhere.",
-  },
-  {
-    ground: ROW_GROUNDS[2]!,
-    title: "Your writing is not training data",
-    text: "We do not use your book to train models, we do not sell your data, and we run no advertising trackers. The policy says it in the same words, and it is a page you can read before you sign up.",
-  },
-] as const;
-
-/* --------------------------------------------------------------------------
    The FAQ
    -------------------------------------------------------------------------- */
 
@@ -540,7 +506,14 @@ export function MvpLandingPage() {
       data-theme="light"
       className="lp-type h-[var(--oc-layout-height)] overflow-y-auto bg-[#d6ecf9] text-lp-body [scroll-behavior:smooth]"
     >
-      <LandingHeader ink={INK} items={NAV} floating />
+      {/* The full-width strip rather than the inset capsule. `floating` draws
+          the bar as a white pill laid on the hero with a shadow under it; this
+          is the other shape the component already carries — the page's own
+          measure, a ground that spans the window, and a hairline instead of a
+          shadow. Turning the prop off is also what brings the fading backdrop
+          back: a capsule carries its own ground, a strip has to grow one when
+          the page moves under it. */}
+      <LandingHeader ink={INK} items={NAV} />
 
       <main>
         {/* ---- Hero -------------------------------------------------------
@@ -598,10 +571,12 @@ export function MvpLandingPage() {
               </strong>
             </p>
 
-            {/* Two pills side by side, filled and soft — the reference's pair.
-                The soft one takes `lp-accent-deep` on the pale tint rather than
-                `lp-accent`: the brighter blue is 3.9:1 on that ground and the
-                deeper shade of the same hue is 5.8:1. */}
+            {/* Two pills side by side, filled and white — the reference's pair.
+                The white one keeps `lp-accent-deep` for its words rather than
+                `lp-accent`: the deeper shade of the same hue is what clears
+                comfortably on a white ground, and it is Google's own guidance
+                that this button sits on white. The FAQ mounts the identical
+                pair — change one and change both. */}
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 href="/signup"
@@ -614,7 +589,7 @@ export function MvpLandingPage() {
                 action={signInWithGoogle}
                 next="/signup"
                 label="Sign in with Google"
-                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-accent-deep/30 bg-lp-card-1 px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
+                className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge-strong bg-lp-ground px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
               />
             </div>
 
@@ -642,47 +617,71 @@ export function MvpLandingPage() {
           </div>
         </section>
 
-        {/* ---- Where a finished file opens --------------------------------
+        {/* ---- The logo strip ---------------------------------------------
 
-            The slot a landing page fills with customer logos, and there are no
-            customers to name — so it names the programs a finished manuscript
-            *opens in* instead, which is both true of the export pipeline and
-            the thing a writer is actually nervous about. Read from
-            `DESTINATIONS`, so it cannot promise a shop we do not open in.
-            Nominative use — no endorsement is implied and none exists; see the
-            note in `works-with.tsx`.
+            Set the way the reference sets it: five marks on one line, large,
+            all in one ink, with air between them and nothing else in the band.
 
-            **One flat row rather than the two cards this used to be.** The
-            reference sets its logo wall as a single line of grey wordmarks
-            under one small label, and that is the right shape for the claim:
-            these are file formats other people's software reads, not partners,
-            and a carded layout gives them a weight they have not earned. */}
+            **The row is five slots, not two rows of five.** Each slot holds one
+            mark from each set, stacked in the same grid cell, and the pair
+            cross-fades on its own delay — which is what lets the change run
+            left to right across the row instead of the whole line blinking at
+            once. Stacking them in one cell rather than absolutely positioning
+            them is what keeps the slot as wide as the wider of the two names,
+            so nothing shifts sideways as they trade.
+
+            **The swap is a keyframe, not a component** — see `.oc-logo-a` in
+            `globals.css` for the timing and for why that matters on a page
+            whose standing claim is that it ships one script. Both marks stay in
+            the DOM, so all ten names are read out whatever is on screen. */}
         <section className="bg-lp-ground px-6 py-14 sm:py-16">
           <div className="mx-auto flex max-w-[88rem] flex-col items-center">
             <p className="text-center text-[1.125rem] font-semibold text-lp-ink sm:text-[1.25rem]">
-              Trusted by <span className="text-[#f97316]">2,500+</span> authors & writers worldwide
+              Trusted by <span className="text-[#f97316]">2,500+</span>{" "}
+              authors &amp; writers worldwide
             </p>
-            <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-6 sm:gap-x-12">
-              {TRUSTED_LOGOS.map((company) => (
-                <li
-                  key={company.name}
-                  className="flex items-center gap-2.5 opacity-60 transition-opacity duration-200 hover:opacity-100"
-                >
-                  <svg
-                    aria-hidden="true"
-                    viewBox={company.viewBox}
-                    className="h-6 w-6 shrink-0 fill-lp-ink"
-                  >
-                    <path d={company.path} />
-                  </svg>
-                  <span className="text-[1.0625rem] font-semibold tracking-tight text-lp-ink">
-                    {company.name}
-                  </span>
+
+            <ul className="mt-10 grid w-full max-w-6xl grid-cols-2 place-items-center gap-x-8 gap-y-6 max-sm:[&>li:last-child]:col-span-2 sm:grid-cols-3 lg:flex lg:items-center lg:justify-between lg:gap-x-6">
+              {LOGO_SETS[0]!.map((_, slot) => (
+                <li key={slot} className="grid place-items-center">
+                  {LOGO_SETS.map((set, half) => {
+                    const company = set[slot]!;
+                    return (
+                      <span
+                        key={company.name}
+                        /* Both children take the same cell, so the slot sizes
+                           to the wider of the two and neither is out of flow. */
+                        className={`col-start-1 row-start-1 flex items-center gap-2.5 text-lp-ink ${
+                          half === 0 ? "oc-logo-a" : "oc-logo-b"
+                        }`}
+                        style={{ animationDelay: `${slot * 0.09}s` }}
+                      >
+                        <svg
+                          aria-hidden="true"
+                          viewBox="0 0 24 24"
+                          className="h-8 w-8 shrink-0 fill-current sm:h-9 sm:w-9 lg:h-10 lg:w-10"
+                        >
+                          <path d={company.path} />
+                        </svg>
+                        <span className="text-[1.5rem] font-semibold tracking-[-0.02em] whitespace-nowrap sm:text-[1.625rem] lg:text-[1.75rem]">
+                          {company.name}
+                        </span>
+                      </span>
+                    );
+                  })}
                 </li>
               ))}
             </ul>
           </div>
         </section>
+
+        {/* ---- The grid ----------------------------------------------------
+
+            The survey between the hero and the four rows below it: five cards,
+            one sentence each, so a visitor who reads nothing else still knows
+            what the product is. See the long note in `feature-bento.tsx` for
+            why the five are not five of the same card. */}
+        <FeatureBento />
 
         {/* ---- Inside the app --------------------------------------------- */}
         <section
@@ -828,54 +827,6 @@ export function MvpLandingPage() {
           </div>
         </section>
 
-        {/* ---- Your writing ------------------------------------------------ */}
-        <section
-          id="private"
-          className="scroll-mt-20 border-b border-lp-line bg-lp-ground px-6 py-14 sm:py-20"
-        >
-          <div className="mx-auto max-w-[88rem]">
-            <div className="mx-auto max-w-3xl text-center">
-              <h2
-                className={`oc-display font-serif text-lp-ink ${SECTION_TITLE}`}
-              >
-                Where your writing actually is
-              </h2>
-              <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-                Most of this app never talks to a server at all.{" "}
-                <strong className={LEAD_EM}>
-                  Where it does, the page says so before you press anything.
-                </strong>
-              </p>
-            </div>
-
-            <div className="mt-12 grid gap-4 md:grid-cols-3">
-              {PRIVACY.map((card) => (
-                <article
-                  key={card.title}
-                  className={`rounded-[1.75rem] p-6 sm:p-8 ${card.ground}`}
-                >
-                  <h3 className="oc-heading font-serif text-xl leading-[1.2] font-semibold text-lp-ink">
-                    {card.title}
-                  </h3>
-                  <p className="mt-3 text-[0.9375rem] leading-[1.6] text-lp-soft">
-                    {card.text}
-                  </p>
-                </article>
-              ))}
-            </div>
-
-            <p className="mt-8 text-center text-[0.9375rem] text-lp-body">
-              <Link
-                href="/privacy"
-                className="font-semibold text-lp-accent-text underline underline-offset-4"
-              >
-                The privacy policy names every route that sends anything
-              </Link>{" "}
-              — it is a public page, readable before you make an account.
-            </p>
-          </div>
-        </section>
-
         {/* ---- Testimonials ----------------------------------------------- */}
         <section
           id="reviews"
@@ -888,12 +839,6 @@ export function MvpLandingPage() {
               >
                 Loved by authors & writers
               </h2>
-              <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-                From first drafts to finished manuscripts —{" "}
-                <strong className={LEAD_EM}>
-                  here is what authors say about writing on OpenChapter.
-                </strong>
-              </p>
             </div>
 
             <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
@@ -1009,74 +954,117 @@ export function MvpLandingPage() {
 
         {/* ---- FAQ ---------------------------------------------------------
 
-            `<details>`, like every other disclosure on the site, so the section
-            ships no script and the browser's own page search can find a closed
-            answer. Two columns from `lg`, because eight rows in one column is a
-            screenful of chevrons. */}
+            **The reference's arrangement, and it is centred rather than
+            columned.** The two-column version put the heading in a left rail
+            and the rows in a right one, which is the shape the rest of this
+            page uses and the wrong one here: a rail beside a list of questions
+            leaves the questions in a narrow column with a wall of empty space
+            under the heading, and the eight rows are the whole point of the
+            band. Centred, the questions get the full measure and the heading
+            sits over them as a title rather than beside them as a label.
+
+            **The rows live in a card, and the card is what makes the band
+            read.** The section takes the page's next tint down and the card is
+            plain white on it — the same figure/ground move the reference makes.
+            Without it, rules on white on white is a table.
+
+            **Still `<details>`, like every other disclosure on the site**, so
+            the section ships no script, the browser's own page search finds a
+            closed answer, and the whole thing keeps working before hydration
+            would have happened. The plus becomes a cross through `group-open:`
+            rather than through state.
+
+            The presses under the deck are the hero's own pair, unchanged —
+            there is no separate destination for a reader who got this far, and
+            no reason for the same two actions to be drawn twice. */}
         <section
           id="faq"
-          className="scroll-mt-20 border-b border-lp-line bg-lp-ground px-6 py-14 sm:py-20"
+          className="scroll-mt-20 bg-lp-tint-soft px-6 py-16 sm:py-24"
         >
-          <div className="mx-auto grid max-w-[88rem] gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
-            <div>
-              <p className="flex items-center gap-2.5 font-code text-[0.6875rem] tracking-[0.18em] text-lp-body uppercase">
-                <span
-                  aria-hidden="true"
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-faint"
-                />
-                Answers
-              </p>
+          <div className="mx-auto max-w-4xl">
+            <div className="flex flex-col items-center text-center">
               <h2
-                className={`oc-display mt-5 font-serif text-lp-ink ${SECTION_TITLE}`}
+                className={`oc-display font-serif font-semibold text-lp-ink ${SECTION_TITLE}`}
               >
                 The questions worth asking first
               </h2>
-              <p className="mt-6 max-w-md text-[1.0625rem] leading-relaxed text-lp-deck">
-                Including the ones with an inconvenient answer. If something is
-                not here,{" "}
-                <a
-                  href={`mailto:${CONTACT_EMAIL}`}
-                  className="font-medium text-lp-accent-text underline underline-offset-4"
-                >
-                  ask
-                </a>{" "}
-                — one person answers.
+              <p className={`oc-lead mt-6 max-w-2xl ${SECTION_LEAD}`}>
+                Including the ones with an inconvenient answer.{" "}
+                <strong className={LEAD_EM}>
+                  <a
+                    href={`mailto:${CONTACT_EMAIL}`}
+                    className="text-lp-accent-text underline underline-offset-4"
+                  >
+                    Ask
+                  </a>{" "}
+                  if yours is missing.
+                </strong>
               </p>
+              {/* **The hero's pair, copied exactly rather than restyled.** A
+                  second way of drawing the same two presses is how a page ends
+                  up looking assembled: same fills, same radius, same measure,
+                  same words. The soft one takes `lp-accent-deep` on the pale
+                  tint for the contrast reason recorded up there. */}
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <Link
+                  href="/signup"
+                  className="w-full rounded-full bg-lp-accent px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-ink transition-opacity hover:opacity-90 sm:w-auto"
+                >
+                  Start writing free
+                </Link>
+                <GoogleButton
+                  action={signInWithGoogle}
+                  next="/signup"
+                  label="Sign in with Google"
+                  className="flex w-full items-center justify-center gap-2.5 rounded-full border border-lp-edge-strong bg-lp-ground px-7 py-3 text-[0.9375rem] font-semibold text-lp-accent-deep transition-opacity hover:opacity-90 sm:w-auto"
+                />
+              </div>
             </div>
 
-            <div className="border-t border-lp-line">
-              {FAQ.map(([question, answer]) => (
-                <details
-                  key={question}
-                  className="group border-b border-lp-line"
-                >
-                  <summary
-                    className="flex cursor-pointer list-none items-center justify-between gap-6
-                               py-5 font-serif text-lg font-semibold text-lp-ink
-                               outline-none focus-visible:ring-2 focus-visible:ring-lp-accent/60
-                               sm:text-xl [&::-webkit-details-marker]:hidden"
+            <div className="mt-12 rounded-[0.875rem] border border-lp-line bg-lp-ground px-6 py-10 shadow-[0_24px_60px_-45px_rgba(15,15,16,0.5)] sm:mt-14 sm:px-10 sm:py-12">
+              <h3 className="text-center font-serif text-[1.5rem] font-semibold tracking-[-0.02em] text-lp-ink sm:text-[1.75rem]">
+                Most common
+              </h3>
+
+              <div className="mt-8">
+                {FAQ.map(([question, answer], i) => (
+                  <details
+                    key={question}
+                    className={`group border-lp-line ${
+                      i === 0 ? "border-y" : "border-b"
+                    }`}
                   >
-                    {question}
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className="h-5 w-5 shrink-0 text-lp-faint transition-transform duration-200
-                                 group-hover:text-lp-body group-open:-rotate-180
-                                 group-open:text-lp-body"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                    <summary
+                      className="flex cursor-pointer list-none items-center justify-between gap-6
+                                 py-5 text-[0.9375rem] font-semibold text-lp-ink outline-none
+                                 focus-visible:ring-2 focus-visible:ring-lp-accent/60
+                                 sm:text-base [&::-webkit-details-marker]:hidden"
                     >
-                      <path d="m6 9 6 6 6-6" />
-                    </svg>
-                  </summary>
-                  <p className="pr-10 pb-6 text-[1rem] leading-[1.65] text-lp-soft">
-                    {answer}
-                  </p>
-                </details>
-              ))}
+                      {question}
+                      {/* One glyph, rotated — the cross *is* the plus turned
+                          forty-five degrees, so the change is a movement rather
+                          than a swap between two icons of slightly different
+                          weights. */}
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className="h-4 w-4 shrink-0 text-lp-faint transition-transform duration-200
+                                   group-hover:text-lp-body group-open:rotate-45
+                                   group-open:text-lp-body"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                      >
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                    </summary>
+                    <p className="pb-6 text-[0.9375rem] leading-[1.7] text-lp-body">
+                      {answer}
+                    </p>
+                  </details>
+                ))}
+              </div>
             </div>
           </div>
         </section>
