@@ -77,6 +77,75 @@ Read before touching `src/lib/import/`, `split.ts`, `metadata.ts`, `cover.ts`, o
     headings this could not arise, because only an EPUB declared matter pages,
     so re-importing a `.docx` duplicated chapters and nothing else.
 
+    **That rule is `newInImport` in `library-store.ts`, and it is exported
+    because a screen has to ask it before the writer chooses.** It answers the
+    same for `add` and for `replace` — replace spares every matter page, so the
+    set being compared against is identical either way — and *that* is what
+    makes it askable in advance. Three things read it now: the import itself,
+    the add-or-replace dialog, and the banner, so all three describe one set of
+    pages. Inlined, it produced two faults at once. A file whose every page the
+    book already had left `importIntoBook` with nothing to add, fell through its
+    single `null` return beside a real storage failure, and was reported as
+    *"the book may be too large for this browser's storage"* — the wrong cause,
+    blaming the browser, sending a writer to free space they did not need. And
+    the banner counted the pages the writer had handed over rather than the ones
+    that landed, so a re-import of eight duplicate back pages announced all
+    eight.
+
+  **The add-or-replace question counts in the two units the book is made of, and
+  is not always asked.** `ImportModeDialog` took one number per side and called
+  both "chapters": the book's was body chapters — right, but silently so, beside
+  a panel showing eight back-matter pages it did not count — and the file's was
+  everything in the file, matter included. So a file of eight back-matter pages
+  was announced as *"8 chapters"* and offered to be numbered on from Chapter 11,
+  for pages that are named and never numbered. Both sides are an `ImportSummary`
+  now, phrased by `summaryPhrase` in `split.ts` — the same function the banner
+  prints — so the two screens cannot describe one file differently.
+  `importAsksFirst` is the other half: the question needs writing worth
+  protecting **and** body chapters in the file, because Replace can only act on
+  the body. A file carrying no chapters used to raise it anyway and both answers
+  were nonsense. Nothing is lost by not asking — duplicate pages are dropped on
+  the way in and the banner still offers Undo.
+
+  **And "Replace everything" never replaced everything.** It spares all front
+  and back matter by design; the heading was frightening in a way the behaviour
+  was not, which is its own kind of untrue. It reads "Replace my chapters" and
+  says what it keeps.
+
+  **A file can now say which part of the book it is**, because a finished book
+  is often three files rather than one. Each of the panel's three cards carries
+  its own import (`section-import.tsx`, one component mounted three times — the
+  whole flow in one place, because three copies of a decision that must agree is
+  the lesson the two whole-book doors already taught). Four things follow from
+  the writer naming a part, and the fourth is the one worth arguing about:
+
+  - **`importIntoBook` takes `replacing`**, so `replace` clears that part rather
+    than always the body. `startNumber` resets only when the body is what is
+    going, or a back-matter import would renumber the chapters from one.
+  - **`newInImport` takes it too, and its old claim had to be withdrawn.** It
+    used to state that the answer does not depend on add-or-replace — true while
+    replace always spared every matter page, and that is what let
+    `ImportModeDialog` say what would happen before the writer chose. A scoped
+    replace breaks it: the pages of the part being cleared are not duplicates.
+    Only a `replace` passes it through; passing it in `add` would let a section
+    import double every page it was asked to leave alone.
+  - **`partOfImport` decides what is used**, and everything else is *named*
+    rather than dropped. A manuscript aimed at the Back matter card lands
+    nothing and says why — the same rule as the export screen naming the pages
+    it leaves out.
+  - **The divider vocabulary widens, and only for a named part.**
+    `CHAPTER_LINE` is closed — chapter, part, book, prologue, epilogue,
+    interlude — and has to be, because it runs on files nobody has said anything
+    about. The cost shows the moment somebody has: a back-matter document with
+    no heading styles splits *once*, at "Epilogue", and the other seven
+    divisions arrive buried inside it. `looksLikeMatterLine` adds that part's own
+    page names, and `matterDivisionInPart` takes two liberties `matterDivisionOf`
+    must never take — it strips a trailing `: subtitle`, and it answers for one
+    part only. Both are earned by the declaration and neither is safe without
+    it: the subtitle tolerance applied generally is what takes a chapter called
+    "Prologue: the night before" out of somebody's novel, and there is a test
+    asserting `matterDivisionOf` still answers null for exactly that.
+
   The repair for a book imported *before* this is the page ⋯ menu's **Move to
   front matter / the body / back matter**, wired in `book-panel.tsx` on the same
   day over `setChapterMatter` — which had been written and tested with no caller

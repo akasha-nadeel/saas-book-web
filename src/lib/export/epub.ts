@@ -708,8 +708,12 @@ export async function buildEpub(
   /* Through the recoder as well. `cover-save.ts` writes JPEG, so today this
      changes nothing — but a book covered before that rule existed still holds a
      WebP, and the cover is the one picture a shop's converter meets first. */
+  /* `typeset.cover` is the writer's answer on the Front matter step, and it is
+     honoured here as it is in the PDF and the Word file. A shop does expect an
+     EPUB to carry a cover — the switch's own hint says so — but that is a fact
+     to tell them, not a reason to overrule them. */
   const cover = packageCover(
-    options.cover ? await recodeDataUrl(options.cover) : null,
+    typeset.cover && options.cover ? await recodeDataUrl(options.cover) : null,
   );
 
   // Generated title / copyright / contents pages, before the chapters.

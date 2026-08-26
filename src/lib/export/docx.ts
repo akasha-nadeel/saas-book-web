@@ -13,7 +13,7 @@ import {
   type LoadedChapter,
   type Run,
 } from "./blocks";
-import { fitImage, resolveImages } from "./docx-images";
+import { fitCover, fitImage, resolveImages } from "./docx-images";
 import {
   bindBook,
   copyrightLines,
@@ -83,7 +83,19 @@ export async function buildDocx(
   {
     manuscript,
     typeset = DEFAULT_TYPESET,
-  }: { manuscript: boolean; typeset?: TypesetOptions },
+    cover,
+  }: {
+    manuscript: boolean;
+    typeset?: TypesetOptions;
+    /**
+     * The book's cover artwork as a data URL, when it has one.
+     *
+     * Handed in for the reason `print.ts` takes it the same way: covers live at
+     * their own storage key behind an async read, and `runExport` resolves it
+     * once — full size first, the shelf thumbnail as a fallback.
+     */
+    cover?: string | null;
+  },
 ): Promise<Blob> {
   const {
     AlignmentType,
@@ -110,13 +122,20 @@ export async function buildDocx(
      `docx` takes bytes rather than a URL, and decoding is asynchronous while
      the paragraph walk is not — so it happens here, up front, and the walk
      below only ever does a lookup. */
-  const pictures = await resolveImages(
-    chapters.flatMap((chapter) =>
+  const wantsCover = Boolean(typeset.cover && cover);
+  const pictures = await resolveImages([
+    // The cover goes through the same decoder as everything else, so a file
+    // Word cannot package leaves no entry and the cover page is simply not
+    // built — the rule `resolveImages` already applies to a plate that will
+    // not decode. Keyed by its data URL like any other picture.
+    ...(wantsCover ? [cover as string] : []),
+    ...chapters.flatMap((chapter) =>
       toBlocks(chapter.doc)
         .filter((block) => block.kind === "image" && block.src)
         .map((block) => block.src as string),
     ),
-  );
+  ]);
+  const coverImage = wantsCover ? pictures.get(cover as string) : undefined;
 
   /**
    * A run of prose, with everything the writer marked on it.
@@ -448,6 +467,28 @@ export async function buildDocx(
 
   /** Each generated page this Word file builds, by the id `bindBook` sorts on. */
   const generated: Record<string, DocxParagraph[]> = {
+    cover: coverImage
+      ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({
+                type: coverImage.type,
+                data: coverImage.data,
+                // Fitted to the sheet, not the column — see `fitCover`. At the
+                // full column width a 2:3 cover is taller than the page, and
+                // Word answers that by pushing it onto the next one.
+                transformation: fitCover(coverImage),
+                altText: {
+                  name: "Cover",
+                  title: "Cover",
+                  description: `Cover of ${book.title}`,
+                },
+              }),
+            ],
+          }),
+        ]
+      : [],
     title: [
       new Paragraph({
         spacing: { before: convertInchesToTwip(2) },
@@ -492,6 +533,7 @@ export async function buildDocx(
      sheet of its own. */
   const built: FrontSection[] = (
     [
+      [wantsCover, "cover"],
       [typeset.titlePage, "title"],
       [Boolean(typeset.copyright && holder), "copyright"],
       [typeset.contents, "contents"],

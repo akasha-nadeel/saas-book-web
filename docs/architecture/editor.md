@@ -316,9 +316,8 @@ terms stacked on one sheet, could not open one, could not delete the six they
 did not want, and was told nothing about what belongs under any of them. Worse,
 left alone that sheet exported: a reader opening the finished EPUB found a bare
 list of terms between the cover and Chapter One. Now each division is a page:
-`startMatter` makes the standard set, `createMatterPage` adds one, and
-`deleteChapter`/`renameChapter` already did the rest. Three things in there are
-load-bearing:
+`createMatterPage` makes one and `deleteChapter`/`renameChapter` already did
+the rest. Three things in there are load-bearing:
 
 - **Every template line a writer must replace carries a `[bracket]`**, and that
   is the mechanism rather than a house style. It is the only mark the export has
@@ -336,6 +335,8 @@ load-bearing:
 - **A page added later lands where it is bound**, not at the end
   (`matterSectionIndex`), and a page the writer named themselves sorts last —
   `Infinity` rather than -1, or an unknown page jumps to the front of the book.
+  `src/lib/matter-list.ts` reads the same arithmetic back out for the panel, so
+  an off row sits exactly where its page would appear if it were switched on.
 - **None of the sixteen is required by any shop, and the app says so.** What a
   shop wants is a cover, a title page, working navigation, honest metadata and
   content the writer owns; Amazon names "About the author" as an *example* of
@@ -346,11 +347,49 @@ load-bearing:
   afterwards: the dialog states that a page left empty is left out of the
   export, the front column says the export *already builds* a title page, a
   copyright page and a contents list (`isGeneratedPage`), and the few pages
-  most books have are marked `usual` — which is also what splits the panel's
-  Add-page menu into "Most books have" and "If your book needs one". The marker
-  is deliberately a label rather than two groups behind a disclosure: hiding
-  thirteen real choices behind a click to fix a problem of *framing* is the
-  wrong trade on a list this short.
+  most books have are marked `usual`. The marker is deliberately a label
+  rather than two groups behind a disclosure: hiding thirteen real choices
+  behind a click to fix a problem of *framing* is the wrong trade on a list
+  this short. `usual` used to split the panel's Add-page menu the same way; the
+  panel lists all sixteen now and has no menu to split.
+
+**The panel is a list of divisions with a switch on each, not a list of
+pages.** It listed only the pages a book *had* until 2026-08-26, and reached
+the other fourteen through an **Add page** dropdown split by `usual` — so the
+card could not answer the question it exists to answer: a writer looking at
+three rows had no way to tell whether their book was missing a copyright page
+or had never been offered one. Every division is a row now, on when the page
+exists. Three things about it:
+
+- **Switching on is `createMatterPage` and switching off is `deleteChapter`**,
+  which is a soft delete into the book's trash. There is no stored "included"
+  flag and there must not be one — `matter.ts` sets out why a field on the
+  chapter is the wrong mechanism for this family of question, and a flag here
+  would need a Postgres column, a `sync.ts` fallback, and a filter threaded
+  through all four renderers to disagree about. A page either exists or it
+  does not, which is a thing the panel could already say.
+- **Switching off asks only when there is something to lose.** A page
+  `isDraftMatter` calls scaffolding goes without a dialog — the export leaves
+  it out for the same reason and the trash has it either way — and a page the
+  writer has written on gets the row menu's own confirmation. The rule a
+  writer can see on the row (the *Draft* mark) is the rule that decides.
+- **Switching on does not navigate**, where Add page did. A writer sets up the
+  front of a book four or five switches at a time, and opening each new page
+  would remount the editor under them four or five times.
+
+`src/lib/matter-list.ts` is the merge, and it is pure because the ordering is
+the part that is easy to get wrong: **a page the book has is never reordered**.
+Sorting the whole card into catalogue order reads beautifully and is a lie for
+half the book, since `bindBook` sorts the *front* matter by `matterSectionIndex`
+and leaves the back in the writer's stored sequence — so a back-matter page
+that arrived out of order would sit in one place on this card and in another in
+the finished file. Only the off rows are placed, and they are placed by the
+arithmetic `createMatterPages` uses, so a row does not move when it is pressed.
+
+**"Add your own page" survives as the last row.** Nothing on a catalogue can
+express a page nobody has named yet, and it was the Add-page menu's
+"Something else…"; a row rather than a header button, because it is the end of
+the list it adds to rather than a peer of "Hide pages".
 
 **The question is put once per book, on the way in.**
 `matter-setup-dialog.tsx`, mounted by the panel because both screens that draw

@@ -1,5 +1,7 @@
 import type { PrintCover } from "../cover-store";
 import { isGenericChapterTitle } from "../library-store";
+import { matterDivisionInPart, type MatterPart } from "../matter";
+import { nounFor, plural } from "../plural";
 import type { PublishingMeta } from "../publishing";
 import {
   blockText,
@@ -72,6 +74,44 @@ export function looksLikeChapterLine(block: Block): boolean {
   const text = blockText(block).trim();
   if (!text || text.length > 60) return false;
   return CHAPTER_LINE.test(text);
+}
+
+/**
+ * A line that opens a page **of a part the writer has named**.
+ *
+ * `CHAPTER_LINE` above is a closed vocabulary — chapter, part, book, prologue,
+ * epilogue, interlude — and it has to be, because it runs on files nobody has
+ * said anything about. The cost shows up the moment somebody has: a back-matter
+ * document with no heading styles, whose divisions read "Epilogue",
+ * "Afterword", "Acknowledgements", "About the Author", "Glossary", splits
+ * exactly *once*. Only "Epilogue" is in the vocabulary, so all eight sections
+ * arrive as one page called Epilogue with the other seven buried in it, and the
+ * feature looks broken when the file was fine.
+ *
+ * Importing into one card is the writer saying which part the file is, and that
+ * is what makes this safe: the names being added to the vocabulary are the
+ * names of *that part's own pages*, and a file the writer has declared to be
+ * back matter is not a file whose chapters can be stolen. See
+ * `matterDivisionInPart` for the two liberties it takes and why neither belongs
+ * in the general rule.
+ *
+ * Same shape and same guards as `looksLikeChapterLine`: a short paragraph
+ * standing on its own, never a sentence that merely begins with the word.
+ */
+export function looksLikeMatterLine(block: Block, part: MatterPart): boolean {
+  if (block.type !== "paragraph") return false;
+  const text = blockText(block).trim();
+  if (!text || text.length > 60) return false;
+  return matterDivisionInPart(text, part) !== null;
+}
+
+/**
+ * The divider test the no-headings path uses: the standing vocabulary, plus
+ * the named part's own pages when the writer has named one.
+ */
+function opensAPage(block: Block, part: MatterPart | undefined): boolean {
+  if (looksLikeChapterLine(block)) return true;
+  return part !== undefined && looksLikeMatterLine(block, part);
 }
 
 /** Trims blank blocks from both ends without touching the middle. */
@@ -243,6 +283,15 @@ export function splitIntoChapters(
    * `chapterHeadingLevel`.
    */
   declared = false,
+  /**
+   * The part of the book this whole file is, when the writer has said.
+   *
+   * Set only by an import aimed at one of the panel's cards. It widens the
+   * divider vocabulary to that part's own page names (`looksLikeMatterLine`)
+   * and nothing else — **the heading path above is untouched**, because a file
+   * that already says where its divisions are is still believed first.
+   */
+  part?: MatterPart,
 ): ImportedBook {
   const level = chapterHeadingLevel(blocks, declared);
 
@@ -267,8 +316,8 @@ export function splitIntoChapters(
       (b) => b.type === "heading" && (b.level ?? 2) === level,
       (b) => blockText(b),
     );
-  } else if (body.some(looksLikeChapterLine)) {
-    chapters = splitAt(body, looksLikeChapterLine, (b) => blockText(b));
+  } else if (body.some((b) => opensAPage(b, part))) {
+    chapters = splitAt(body, (b) => opensAPage(b, part), (b) => blockText(b));
   } else {
     const only = makeChapter(fallbackTitle, [...body]);
     chapters = only ? [only] : [];
@@ -320,4 +369,141 @@ export function importSummary(
     summary[chapter.matter ?? "body"] += 1;
   }
   return summary;
+}
+
+/**
+ * The same three numbers as English: `["8 front pages", "12 chapters"]`.
+ *
+ * **A part with nothing in it is left out rather than printed as a zero** —
+ * most imports are chapters and nothing else, and "0 front pages" is noise on
+ * the common case.
+ *
+ * `plural` carries the number and `nounFor` does not, because the two matter
+ * parts read "8 front pages" with the word between the figure and the noun.
+ */
+export function summaryParts(summary: ImportSummary): string[] {
+  return [
+    summary.front > 0 &&
+      `${summary.front} front ${nounFor(summary.front, "page")}`,
+    summary.body > 0 && plural(summary.body, "chapter"),
+    summary.back > 0 && `${summary.back} back ${nounFor(summary.back, "page")}`,
+  ].filter((part): part is string => typeof part === "string");
+}
+
+/** What a section import found in a file: what belongs there, and what does not. */
+export interface PartOfImport {
+  /** Tagged with the part and given the catalogue's spelling. */
+  kept: ImportedChapter[];
+  /** The titles of everything else, in the file's own words, to name on screen. */
+  leftOut: string[];
+}
+
+/**
+ * The pieces of a file that belong to one part of the book.
+ *
+ * **Only what the file says belongs there is used.** Importing into the Back
+ * matter card does not force a manuscript into the back of the book: each piece
+ * is read against that part's own page names, what matches goes in, and what
+ * does not is *named* rather than dropped in silence. A whole novel aimed at
+ * the Back matter card therefore lands nothing and says so, which is the right
+ * answer to a mis-drop and the reason `leftOut` carries titles rather than a
+ * count.
+ *
+ * The kept pages take the **catalogue's** spelling — `About the Author` becomes
+ * `About the author` — for the reason `taggedByName` does the same on the
+ * whole-book path: one division showing as two rows is what a book gets
+ * otherwise, and here it would also defeat the duplicate check that decides
+ * whether Add has anything to do.
+ *
+ * Pure, and read by all three of the screens that have an opinion about a
+ * section import — the dialog that asks, the store call that acts, and the
+ * banner that reports — so none of them can describe one file differently.
+ */
+export function partOfImport(
+  chapters: readonly ImportedChapter[],
+  part: MatterPart | "body",
+): PartOfImport {
+  const kept: ImportedChapter[] = [];
+  const leftOut: string[] = [];
+
+  for (const chapter of chapters) {
+    /* The body is everything the catalogue did not claim, which is what
+       `taggedByName` has already decided by the time this runs — so the body's
+       question is the plain inverse rather than a lookup of its own. A chapter
+       keeps its own name here: only the standard divisions are renamed, and a
+       chapter is not one. */
+    if (part === "body") {
+      if (chapter.matter) leftOut.push(chapter.title);
+      else kept.push(chapter);
+      continue;
+    }
+
+    const title = matterDivisionInPart(chapter.title, part);
+    if (title === null) leftOut.push(chapter.title);
+    else kept.push({ ...chapter, title, matter: part });
+  }
+
+  return { kept, leftOut };
+}
+
+/**
+ * Whether an import has to stop and ask before it lands.
+ *
+ * Two things have to be true. The book has to hold writing worth protecting —
+ * an empty book, or one carrying nothing but blank placeholder chapters, simply
+ * takes the file in. And **the file has to bring body chapters**, because those
+ * are the only thing Replace can act on: it clears the body and spares every
+ * front- and back-matter page (`importIntoBook`). A file of eight back-matter
+ * pages used to raise the question anyway, and both answers were nonsense —
+ * Add offered to number named pages on from Chapter 11, and Replace offered to
+ * delete ten chapters in exchange for pages that were never going to fill them.
+ *
+ * Nothing is lost by not asking. Matter pages the book already has are dropped
+ * on the way in rather than doubled (`newInImport`), and the banner still puts
+ * Undo on screen for the whole import.
+ *
+ * Both import screens read this rather than each testing it, because a question
+ * asked on one and skipped on the other is two products.
+ */
+export function importAsksFirst(
+  bookHasWriting: boolean,
+  incoming: ImportSummary,
+): boolean {
+  return bookHasWriting && incoming.body > 0;
+}
+
+/**
+ * Said when a file holds nothing the book has not already got.
+ *
+ * Only reachable for a file that is all front or back matter, since body
+ * chapters are never treated as duplicates — a book may genuinely have two
+ * chapters of the same name. Until this existed the case fell through
+ * `importIntoBook`'s single `null` return and was reported as "the book may be
+ * too large for this browser's storage", which named the wrong cause, blamed
+ * the browser, and told the writer to go and free up space they did not need.
+ */
+export const NOTHING_NEW =
+  "This book already has every page in that file. Front and back matter pages " +
+  "are matched by name — a book has one dedication, not two — so there was " +
+  "nothing new to bring in.";
+
+/**
+ * The same, as one phrase that can sit inside a sentence.
+ *
+ * **Two screens say what an import holds and they must not say it
+ * differently.** The banner reports what landed; the add-or-replace dialog says
+ * what is about to. Until this existed the dialog counted the file's front and
+ * back pages and called all of them "chapters" — so a file of eight back-matter
+ * pages was announced as "8 chapters", offered to be numbered on from Chapter
+ * 11, and then reported by the banner, correctly, as eight back pages. One of
+ * those two screens was always going to be wrong.
+ *
+ * "nothing" rather than an empty string, so a caller can drop it into a
+ * sentence without checking first.
+ */
+export function summaryPhrase(summary: ImportSummary): string {
+  const parts = summaryParts(summary);
+  if (parts.length === 0) return "nothing";
+  if (parts.length === 1) return parts[0];
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }

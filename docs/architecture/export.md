@@ -699,6 +699,52 @@ would refuse and never vetoes the export, because a writer is allowed to want th
 file for their own reader. `checkStoreReadiness()` in `export/index.ts` is the
 half that has to read the manuscript, which is why it is not in the pure module.
 
+**The cover is page one of every format now, and it was page one of the EPUB
+alone until 2026-08-27.** `print.ts` and `docx.ts` held no reference to a cover
+at all and `buildMarkdownFile` builds no front matter of any kind, so a writer
+who exported a PDF got a book that opened on its half-title. Four things hold
+the fix together:
+
+- **`runExport` resolves the artwork once**, above the format dispatch, and
+  hands it to three renderers. It was already doing this inside the EPUB branch
+  and the rule it follows is unchanged: the full-size copy first, the 700px
+  shelf thumbnail only as a fallback. The renderers still touch no storage.
+- **`typeset.cover`, on by default.** The PDF is a print *interior* — no bleed,
+  no crop marks — and a printer wants the cover as its own file, so the switch
+  is what keeps that true for the writer who needs it. Defaulting it *off* was
+  never an option: the copyright note in `typeset.ts` records what happens to a
+  front-matter page nobody switches on. It governs the EPUB too, and the hint
+  names the consequence there rather than overruling the writer.
+- **`coverSection` in `front-matter.ts`, and `bindBook` needed no change.** Its
+  rank lookup already falls back to `-1` for an id it does not know, and every
+  front-matter division ranks 0 or higher, so `id: "cover"` sorts ahead of even
+  a half-title on its own. The EPUB keeps its own `cover.xhtml` path — first in
+  the spine, declared twice in the manifest, plus an `epub:type="cover"`
+  landmark — because routing that through `FrontSection` would mean undoing
+  correct behaviour. Word looks its content up by id and draws an `ImageRun`.
+- **The cover takes a page box of its own**, `@page cover-sheet` with no margin,
+  no folio and no running head. `section.no-folio` and `section.title-page` only
+  withhold the head and the number; the margins come from the main `@page` rule,
+  and an inch of white around a cover is not a cover. Word cannot bleed to the
+  paper edge at all, so `fitCover` fits the artwork to the *sheet* rather than
+  the column — at the full column width a 2:3 cover is taller than the page and
+  Word answers that by pushing it onto the next one, which comes out as a blank
+  cover page followed by a cover.
+
+**It is the artwork and nothing else.** No title or byline composited over it:
+that is what the EPUB has always shipped, what a shop expects of a finished
+cover, and the only version Word can reproduce. The shelf's `BookCover` does
+print the words over its thumbnail — a shelf affordance, not the book — and the
+words belong on the title page, which is the very next sheet. **Markdown is left
+out on purpose**: it generates no front matter of any kind, and a cover there
+could only be a base64 blob pasted into the prose.
+
+**The wizard's Preview shows the cover only when the file will have one.** It
+showed the artwork whatever the format and whatever the switch said, so for
+every PDF and every `.docx` ever exported it opened on a page that was not in
+the file — against a step whose whole claim is "the whole book as this export
+will build it".
+
 **A cover is three things, written together.** `cover-save.ts` is the one place
 that sets one, and `saveCover(bookId, file)` writes all three: a **700px JPEG
 thumbnail** to `localStorage` (what the shelf renders, and the only one small

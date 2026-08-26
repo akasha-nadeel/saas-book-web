@@ -2261,6 +2261,67 @@ export interface ImportUndo {
  * asking. A manuscript file is the story; it is not the writer's dedication,
  * and replacing one with the other was never what anybody meant.
  */
+/**
+ * The pages in an import that this book does not already have.
+ *
+ * **Front and back matter are a set of named pages, not a sequence**: a book
+ * has one dedication and one glossary, and two rows called "Epilogue" say
+ * nothing a reader or an exporter could act on. Body chapters are the
+ * opposite — a book may genuinely have two chapters of the same name, and they
+ * are renumbered on the way in — so this filter is only ever about matter.
+ *
+ * It became necessary the moment the importer learned to read a manuscript's
+ * own headings for its structure. Before that only an EPUB declared matter
+ * pages, so importing a `.docx` twice duplicated chapters and nothing else;
+ * now every re-import carries the whole apparatus with it.
+ *
+ * Keyed on part *and* title, because both parts can hold a page of the same
+ * name — `matterKey`'s own reason for existing.
+ *
+ * **And keyed on the *division*, not the spelling.** A book already holding a
+ * page called `PREFACE` — imported before the importer canonicalised names —
+ * meets an incoming `Preface or introduction`, which is the same page under the
+ * catalogue's name. Comparing the words would let that one through and put both
+ * in the book, which is the exact fault this filter exists to prevent,
+ * surviving in the one case where the two halves disagree about what a page is
+ * called. A page the writer named themselves has no division, and falls back to
+ * its own name.
+ *
+ * **`replacing` names the part that is about to be cleared**, because its pages
+ * are not duplicates — they are what the import is replacing. Absent, or
+ * `"body"`, means every matter page in the book survives and every incoming one
+ * is compared against it, which is the whole-book import and was the only case
+ * that existed until the panel's cards grew imports of their own. Whole-book
+ * replace clears the body and *spares every matter page*, so for that caller
+ * the answer is the same either way — which is what lets `ImportModeDialog`
+ * say what will happen before the writer has chosen. A section import cannot
+ * lean on that, and asks with the answer for each choice instead.
+ *
+ * Exported rather than inlined so the screen and the store read one rule: a
+ * screen that reported one thing while the store did another is how a
+ * re-import of pages a book already had came back as "the book may be too large
+ * for this browser's storage".
+ */
+export function newInImport<
+  T extends { title: string; matter?: "front" | "back" },
+>(book: Book, chapters: readonly T[], replacing?: ChapterMatter): T[] {
+  const divisionKey = (part: MatterPart, title: string) =>
+    matterKey(
+      part,
+      (matterDivisionOf(title)?.title ?? title).trim().toLowerCase(),
+    );
+
+  const alreadyThere = new Set(
+    book.chapters
+      .filter((c) => c.matter && c.matter !== replacing)
+      .map((c) => divisionKey(c.matter as MatterPart, c.title)),
+  );
+
+  return chapters.filter(
+    (c) => !c.matter || !alreadyThere.has(divisionKey(c.matter, c.title)),
+  );
+}
+
 export function importIntoBook(
   bookId: string,
   chapters: readonly {
@@ -2271,6 +2332,17 @@ export function importIntoBook(
     matter?: "front" | "back";
   }[],
   mode: "add" | "replace",
+  /**
+   * Which part `replace` clears.
+   *
+   * The body by default, which is the whole-book import and the only thing this
+   * did until the panel's three cards grew imports of their own: a manuscript
+   * file is the story, and replacing somebody's dedication with it was never
+   * what anybody meant. A section import passes its own part, so replacing the
+   * back matter leaves the chapters and the front matter exactly where they
+   * are.
+   */
+  replacing: ChapterMatter = "body",
 ): { firstId: string; undo: ImportUndo } | null {
   if (!chapters.length) return null;
   const book = findBook(getShelf(), bookId);
@@ -2281,55 +2353,20 @@ export function importIntoBook(
      three chapters into a two-chapter book carrying the standard sixteen matter
      pages produced "Chapter 19, 20, 21" — numbers with nothing before them. The
      banner and the panel both count the body, and so does this. */
-  const startNumber = mode === "replace" ? 0 : bookChapterCount(book);
+  const startNumber =
+    mode === "replace" && replacing === "body" ? 0 : bookChapterCount(book);
 
-  /*
-   * **A division the book already has is not added a second time.**
-   *
-   * Front and back matter are a *set of named pages*, not a sequence: a book
-   * has one dedication and one glossary, and two rows called "Epilogue" say
-   * nothing a reader or an exporter could act on. Body chapters are the
-   * opposite — a book may genuinely have two chapters of the same name, and
-   * they are renumbered on the way in — so this filter is only ever about
-   * matter.
-   *
-   * It became necessary the moment the importer learned to read a manuscript's
-   * own headings for its structure. Before that only an EPUB declared matter
-   * pages, so importing a `.docx` twice duplicated chapters and nothing else;
-   * now every re-import carries the whole apparatus with it. Both modes needed
-   * it and for the same reason — `add` appends everything, and `replace`
-   * deliberately *keeps* the writer's existing matter while clearing the body,
-   * so the incoming pages would have landed on top of the ones it just spared.
-   *
-   * Keyed on part *and* title, because both parts can hold a page of the same
-   * name — `matterKey`'s own reason for existing.
-   *
-   * **And keyed on the *division*, not the spelling.** A book already holding a
-   * page called `PREFACE` — imported before the importer canonicalised names —
-   * meets an incoming `Preface or introduction`, which is the same page under
-   * the catalogue's name. Comparing the words would let that one through and
-   * put both in the book, which is the exact fault this filter exists to
-   * prevent, surviving in the one case where the two halves disagree about what
-   * a page is called. A page the writer named themselves has no division, and
-   * falls back to its own name.
-   */
-  const divisionKey = (part: MatterPart, title: string) =>
-    matterKey(
-      part,
-      (matterDivisionOf(title)?.title ?? title).trim().toLowerCase(),
-    );
-
-  const surviving =
-    mode === "replace"
-      ? book.chapters.filter((c) => chapterMatterOf(c) !== "body")
-      : book.chapters;
-  const alreadyThere = new Set(
-    surviving
-      .filter((c) => c.matter)
-      .map((c) => divisionKey(c.matter as MatterPart, c.title)),
-  );
-  const incoming = chapters.filter(
-    (c) => !c.matter || !alreadyThere.has(divisionKey(c.matter, c.title)),
+  /* **A division the book already has is not added a second time**, in either
+     mode — `newInImport` holds that rule, and the import dialog reads it too so
+     it can say what will happen before the writer chooses. */
+  /* **Only a replace spares the part it is clearing.** In `add` those pages
+     stay, so they are duplicates like any other — passing `replacing` through
+     regardless would let a section import quietly double every page it was
+     asked to leave alone. */
+  const incoming = newInImport(
+    book,
+    chapters,
+    mode === "replace" ? replacing : undefined,
   );
   if (!incoming.length) return null;
 
@@ -2377,10 +2414,16 @@ export function importIntoBook(
   };
 
   if (mode === "replace") {
-    // The body alone. Front and back matter are the writer's own pages and
-    // survive an import of the manuscript — see the note above.
-    const clearing = book.chapters.filter((c) => chapterMatterOf(c) === "body");
-    const keeping = book.chapters.filter((c) => chapterMatterOf(c) !== "body");
+    /* One part, never the book. For a manuscript that part is the body, and
+       front and back matter are the writer's own pages that survive it — see
+       the note above. For an import aimed at one of the panel's cards it is
+       that card's part, and the other two are what survive. */
+    const clearing = book.chapters.filter(
+      (c) => chapterMatterOf(c) === replacing,
+    );
+    const keeping = book.chapters.filter(
+      (c) => chapterMatterOf(c) !== replacing,
+    );
 
     // Snapshot the chapters being cleared — prose and notes — so undo restores
     // them, then remove their stored text.
@@ -2402,7 +2445,16 @@ export function importIntoBook(
   } else {
     commitBook(bookId, (b) => ({
       ...b,
-      chapters: [...b.chapters, ...metas],
+      /* Regrouped front → body → back like the replace branch above, and like
+         every other write to this array. Appending alone was survivable while
+         an import was always a whole book — its matter pages arrived in one
+         run — and stopped being so when a card could import its own part: three
+         front pages added to a finished book landed after the back matter, and
+         the panel filters this array rather than sorting it. */
+      chapters: [...b.chapters, ...metas].sort(
+        (a, x) =>
+          MATTER_RANK[chapterMatterOf(a)] - MATTER_RANK[chapterMatterOf(x)],
+      ),
       lastOpenedId: metas[0].id,
     }));
   }

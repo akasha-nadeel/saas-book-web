@@ -23,6 +23,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "Bring in a .docx, .epub, .md, .txt, or .html file — it is split into chapters for you. Importing is unlimited on either plan.",
       },
       {
+        name: "How a file is split into chapters",
+        desc: "Your file is cut up by what is actually in it, and it is tried in this order. First, headings: if you used Heading 1 in Word or # in Markdown, you have already said where the chapters are, and that is believed. Failing that, a short line on its own that reads like a chapter opener — “Chapter Four”, “Prologue”, “Part Two” — and, when you are importing into one of the three cards, that part’s own page names as well, so a back-matter file with no heading styles still breaks at “Afterword” and “Glossary”. Failing both, the whole file arrives as one chapter, because cutting a manuscript at guessed-at points is worse than leaving it whole. That last case is the common surprise. If your chapter titles run straight into the first sentence — “Chapter 1: The Initialization Julian stared at his monitors…” — then nothing in the file marks where one chapter ends and the next begins, so nothing is cut, however many chapters you meant it to have. Put each title on a line of its own with a paragraph break after it, or better still style those lines Heading 1, and import again. You are told how many chapters were found before anything is added, so you can cancel and fix the file first.",
+      },
+      {
         name: "Templates",
         desc: "Start from a ready-made chapter structure instead of a blank book.",
       },
@@ -61,16 +65,24 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: "The Search tab on the editor rail (or ⌘K / Ctrl+K) finds a word anywhere in the book — every chapter’s text, not just titles — with a snippet, and jumps you to the chapter.",
       },
       {
+        name: "Importing one section on its own",
+        desc: "A finished book is often three files rather than one, so each of the three cards — Front matter, Body matter, Back matter — has its own import button in its header, beside Hide pages. It brings a file into that part alone. Only the pieces of the file that belong there are used: import into Back matter and an epilogue, an afterword and a glossary go in, while anything the file holds that is not back matter is left out and named on screen rather than dropped in silence. If the section already has pages you are asked what to do with them — keep them and add what is new, or replace them with the file’s — and Replace touches that part and nothing else, so your chapters and the other end of the book are safe. Either way you can undo it straight after. An empty section is not worth a question and simply takes the file in. The rail’s own “Import a file” button is still there for a whole book in one file.",
+      },
+      {
+        name: "Importing the same pages twice",
+        desc: "Front and back matter are a set of named pages rather than a sequence — a book has one dedication, not two — so a page arriving in an import that your book already has is left out rather than added beside it. Pages are matched by which division they are, not by how they are spelled, so a file calling it PREFACE does not add a second copy of your “Preface or introduction”. Chapters are the opposite: a book may genuinely have two chapters of the same name, so nothing is ever dropped from the body. If every page in a file turns out to be one you already have, you are told that and nothing is changed.",
+      },
+      {
         name: "Restore a deleted chapter",
         desc: "A deleted chapter is kept in the Deleted chapters tab (the trash icon on the editor rail), where you can restore it whole — or delete it for good.",
       },
       {
         name: "Front & back matter",
-        desc: "The book panel holds a card for each of a book’s three parts, in the order they are bound, each in its own colour — and the page you write on takes the colour of the part it belongs to. All three open into a list. Press Start on Front matter and you get a page for each of a book’s opening sections — half-title, title page, copyright, dedication, epigraph, contents, preface, prologue — and on Back matter one for each of its closing ones: epilogue, afterword, acknowledgements, about the author, also by the author, a word about reviews, an excerpt from the next book, glossary. Click a page to write on it, Add page for one more, ⋯ to rename or delete. These pages are named, never numbered.",
+        desc: "The book panel holds a card for each of a book’s three parts, in the order they are bound, each in its own colour — and the page you write on takes the colour of the part it belongs to. All three open into a list. Where Body matter lists the chapters you wrote, Front matter and Back matter list every section a book can have, with a switch on each: half-title, title page, copyright, dedication, epigraph, contents, preface and prologue at the front; epilogue, afterword, acknowledgements, about the author, also by the author, a word about reviews, an excerpt from the next book and glossary at the back. So the card answers the question it is there for — what this book has, and what it does not. Switch one on and the page is made for you, in the place it belongs in the running order rather than at the end. Switch it off and it goes to the book’s trash, where you can get it back. Click a row to write on that page, ⋯ to rename it or move it to another part, and “Add your own page” at the foot of the list for a page that is on no list. These pages are named, never numbered.",
       },
       {
         name: "Choosing your pages",
-        desc: "The first time you open a book you are asked which of those pages it needs, with a line explaining each one — tick them and they appear in the two cards. Skip for now if you would rather not decide yet; you are only asked once per book, and Start on either card still makes the whole set whenever you want it.",
+        desc: "The first time you open a book you are asked which of those pages it needs, with a line explaining each one — tick them and they appear in the two cards. Skip for now if you would rather not decide yet: you are only asked once per book, and nothing is lost by skipping, because every section is a switch in the two cards whenever you want it.",
       },
       {
         name: "Which of those pages you actually need",
@@ -78,11 +90,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Why a page says Draft",
-        desc: "Each front- and back-matter page arrives with the shape of the real thing and your own details left in [square brackets] — “For [name].” for a dedication. While any brackets are left on a page, or the page is blank, it is marked Draft and is left out of your exports, so a half-filled template can never end up inside your finished book. Fill it in and it joins the book; delete the pages you do not want. The export screen names every page it is leaving out before you press the button.",
+        desc: "Each front- and back-matter page arrives with the shape of the real thing and your own details left in [square brackets] — “For [name].” for a dedication. While any brackets are left on a page, or the page is blank, it is marked Draft and is left out of your exports, so a half-filled template can never end up inside your finished book. Fill it in and it joins the book — and note that any bracket left anywhere on the page keeps it out, so filling in some of a page is not enough. Switch off the pages you do not want. A page still holding its example text switches off without a question, because there is nothing on it you wrote; one you have actually written on asks first. The export screen names every page it is leaving out before you press the button.",
       },
       {
         name: "Import into a book",
-        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here, you are asked whether to add the chapters (numbered on from your last one) or replace what you have — and you can undo it right after. Importing is unlimited on either plan.",
+        desc: "Use the upload button at the top of the book panel to bring a .docx, .epub, .md, .txt, or .html file into the book you have open. If you have already written here and the file brings chapters with it, you are asked whether to add them (numbered on from your last one) or replace the chapters you have — and you can undo either right after. Replace only ever touches chapters: your front and back matter pages are kept, because a manuscript file is the story and not your dedication. A file carrying only front or back matter is not worth a question, so it simply comes in. Chapters are found the same way as on the shelf — see “How a file is split into chapters”, which is also where to look if a file you expected to arrive in ten pieces arrives in one. Importing is unlimited on either plan.",
       },
       {
         name: "Autosave",
@@ -185,6 +197,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       {
         name: "Typeset",
         desc: "Choose how your EPUB and PDF are laid out — template, trim size, drop caps.",
+      },
+      {
+        name: "The cover in your file",
+        desc: "Your artwork goes in as the first page of the file — EPUB, PDF and Word alike — and the Front matter step has a Cover page switch to turn that off. There is one reason to: the PDF is a print interior, set at your trim size with no bleed or crop marks, and a print shop wants the cover as its own separate file rather than bound into the pages. The cover page is your picture exactly as you uploaded it, with no title or author printed over it — that is what shops expect of finished artwork, and it is what your title page is for, which is the very next sheet. The shelf still draws the title over your cover, but that is the shelf showing you which book is which rather than anything that goes in the file.",
       },
       {
         name: "Generated front matter",

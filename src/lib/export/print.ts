@@ -4,7 +4,7 @@ import { chapterNumeral, printsHeading, toBlocks } from "./blocks";
 import { printsFolio } from "@/lib/matter";
 import { escapeXml, blocksToXhtml } from "./xhtml";
 import { trimById, typesetCss, type Trim, type TypesetOptions } from "./typeset";
-import { bindBook, frontSections } from "./front-matter";
+import { bindBook, coverSection, frontSections } from "./front-matter";
 
 /**
  * The anchor a contents entry points at. Positional, like the EPUB's files.
@@ -45,6 +45,18 @@ export function printDocument(
    * left alone. See `typesetCss`, which is where the two exceptions live.
    */
   scope?: string,
+  /**
+   * The book's cover artwork as a data URL, when it has one and
+   * `typeset.cover` is on.
+   *
+   * **Handed in rather than fetched.** This module imports no storage and is
+   * synchronous, and both are worth keeping: the artwork lives at its own key
+   * behind an async read, and `runExport` already resolves it once — full size
+   * first, the shelf thumbnail only as a fallback. It has to be a `data:` URL
+   * whatever happens, because `/api/export/pdf` aborts every other kind of
+   * request the page tries to make.
+   */
+  cover?: string | null,
 ): { content: string; css: string } {
   /* Generated title / copyright / contents pages, then the chapters. Front and
      back matter carry no number — only body chapters do.
@@ -56,13 +68,19 @@ export function printDocument(
      strips the link's colour and underline so it reads as set type. */
   const front = frontSections(book, chapters, typeset, (i) => `#${anchorFor(i)}`);
 
+  /* The cover in front of all of it. `bindBook` needs no telling: its rank
+     lookup falls back to -1 for an id it does not know, and every front-matter
+     page ranks 0 or higher, so "cover" sorts first on its own. */
+  const bound =
+    typeset.cover && cover ? [coverSection(cover, book.title), ...front] : front;
+
   /* **The whole book in one bound order**, generated pages among the writer's
      own rather than in a block at the front — see `bindBook`. This used to emit
      the three generated pages and then every chapter in load order, which put a
      book's own half-title behind the contents page. The EPUB has always bound
      them properly; now the same function answers for both, so a PDF and an
      EPUB of one manuscript are the same book. */
-  const content = bindBook(chapters, front)
+  const content = bindBook(chapters, bound)
     .map((page) => {
       if (page.kind === "generated") return page.section.html;
 
@@ -266,8 +284,9 @@ export async function printBook(
   book: Book,
   chapters: LoadedChapter[],
   typeset: TypesetOptions,
+  cover?: string | null,
 ): Promise<Blob | null> {
-  const doc = printDocument(book, chapters, typeset);
+  const doc = printDocument(book, chapters, typeset, undefined, cover);
 
   /* The rendered file, when there is a browser behind the route. Any failure
      at all — no Chrome configured, a layout that fell over, an offline

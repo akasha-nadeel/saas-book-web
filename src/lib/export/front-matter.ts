@@ -41,6 +41,34 @@ export type MatterPage = Pick<LoadedChapter, "title" | "matter">;
 export type ListedPage = MatterPage & Pick<LoadedChapter, "number">;
 
 /**
+ * The book's artwork as the first page.
+ *
+ * **The artwork and nothing else** — no title, no author drawn over it. That is
+ * what `epub.ts` has always written into `cover.xhtml`, what a shop expects of
+ * a cover (it is a finished piece of art, not a template), and the only version
+ * Word can reproduce, since a `.docx` has no way to lay text over an image. The
+ * shelf's `BookCover` does print the title over a thumbnail, and that is a
+ * shelf affordance rather than the book: the words belong on the title page,
+ * which is the very next sheet.
+ *
+ * `alt` names the book, because a cover carries the title in a form no screen
+ * reader can reach — the same alt `coverXhtml` writes.
+ *
+ * **Not part of `frontSections`**, which is synchronous and reads no storage
+ * while the artwork is async and lives at its own key. The caller fetches it
+ * once (`runExport`) and hands it to whichever renderers want it, so nothing
+ * here learns about IndexedDB.
+ */
+export function coverSection(dataUrl: string, title: string): FrontSection {
+  return {
+    id: "cover",
+    html: `<section class="front-page cover-page">
+    <img src="${escapeXml(dataUrl)}" alt="Cover of ${escapeXml(title)}"/>
+  </section>`,
+  };
+}
+
+/**
  * The title page, set the way a title page is set.
  *
  * **Two blocks with the sheet between them**, which is the shape every printed

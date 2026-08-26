@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COLUMN_PX, fitImage } from "./docx-images";
+import { COLUMN_PX, PAGE_PX, fitCover, fitImage } from "./docx-images";
 
 /**
  * The half of the Word image path that can be tested: the arithmetic. The
@@ -59,4 +59,33 @@ describe("fitImage", () => {
       height: 0,
     });
   });
+});
+
+// --- the cover ---------------------------------------------------------
+
+/**
+ * **A cover is fitted to the sheet, which is the one place `fitImage`'s rule
+ * is wrong.** At the full column width a 2:3 cover stands 936px tall against a
+ * 864px page, and Word answers a picture that will not fit by pushing the whole
+ * thing onto the next sheet — so the cover page comes out blank and the cover
+ * lands on page two.
+ */
+it("keeps a tall cover on one sheet", () => {
+  const fitted = fitCover({ width: 1600, height: 2560 });
+
+  expect(fitted.height).toBeLessThanOrEqual(PAGE_PX);
+  expect(fitted.width).toBeLessThanOrEqual(COLUMN_PX);
+  // The artwork's own ratio, never squashed to fit.
+  expect(fitted.width / fitted.height).toBeCloseTo(1600 / 2560, 2);
+});
+
+it("holds a wide cover to the column instead", () => {
+  // Wider than it is tall: the height is not what binds, so the column does.
+  const fitted = fitCover({ width: 2000, height: 1000 });
+  expect(fitted.width).toBe(COLUMN_PX);
+  expect(fitted.height).toBeLessThanOrEqual(PAGE_PX);
+});
+
+it("answers nothing for a picture with no size", () => {
+  expect(fitCover({ width: 0, height: 0 })).toEqual({ width: 0, height: 0 });
 });

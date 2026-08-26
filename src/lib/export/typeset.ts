@@ -342,6 +342,18 @@ export interface TypesetOptions {
   hideChapterNumbers: boolean;
   /** A raised initial on the first paragraph of each chapter. */
   dropCaps: boolean;
+  /**
+   * Put the book's cover artwork in as the first page.
+   *
+   * **A switch rather than always, because the PDF is a print interior.** It is
+   * laid out at the trim size with no bleed and no crop marks, which is what a
+   * printer wants — and a printer wants the cover as its own file, not bound
+   * into the pages they will print on interior stock. Every other reader of
+   * these files wants the cover exactly where a cover goes.
+   *
+   * Nothing happens when the book has no artwork; there is no blank sheet.
+   */
+  cover: boolean;
   /** Generate a title page from the book's title and author. */
   titlePage: boolean;
   /** Generate a copyright page. */
@@ -417,6 +429,11 @@ export const DEFAULT_TYPESET: TypesetOptions = {
   // page at all, which is the one piece of front matter a shop's reviewers
   // actually look for. The name is handled where it can be handled honestly:
   // `frontSections` leaves the page out when there is no author to put on it.
+  // On for the same reason the three below are, and the copyright note above
+  // is the precedent: a front-matter page defaulted off is a page missing from
+  // every book whose writer never opened that step. A writer sending an
+  // interior to a print shop turns it off; nobody else has to do anything.
+  cover: true,
   titlePage: true,
   copyright: true,
   contents: true,
@@ -605,6 +622,26 @@ ${
    and the EPUB bind alike. */
 section.no-folio,
 section.title-page { page: bare; }
+/* **The cover is the sheet, edge to edge**, so it takes a page box of its own
+   rather than joining the two above. Those only withhold the running head and
+   the folio; the margins come from the main @page rule, and an inch of white
+   around a cover is not a cover. The image is fitted with object-fit: cover, so
+   a file whose proportions are not the trim's fills the sheet rather than
+   leaving bands down two sides - a cover is cropped in print, never
+   letterboxed. (No backticks in here: this is inside a template literal, and
+   one would end the string.) */
+section.cover-page { page: cover-sheet; margin: 0; padding: 0; }
+@page cover-sheet {
+  margin: 0;
+  @top-center { content: none; }
+  @bottom-center { content: none; }
+}
+section.cover-page img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 @page bare { @top-center { content: none; } @bottom-center { content: none; } }
 /* **A chapter opening page carries no running head, and this is what stops it
    printing the chapter title twice.** The head is set from string-set on the

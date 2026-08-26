@@ -89,3 +89,41 @@ it("points every contents entry at an anchor that exists", () => {
   expect(hrefs.length).toBeGreaterThan(0);
   for (const id of hrefs) expect(content).toContain(`id="${id}"`);
 });
+
+// --- the cover ---------------------------------------------------------
+
+const ART = "data:image/jpeg;base64,AAAA";
+
+it("opens the printed book on the cover when there is one", () => {
+  const { content } = printDocument(book, chapters, DEFAULT_TYPESET, undefined, ART);
+
+  expect(content).toContain('class="front-page cover-page"');
+  expect(content).toContain(ART);
+  // First on the sheet, ahead of every generated page.
+  expect(content.indexOf("cover-page")).toBeLessThan(content.indexOf("title-page"));
+});
+
+it("prints no cover when the switch is off, and none when there is no art", () => {
+  /* Two ways to have no cover, and neither may leave a blank first page — the
+     section is simply not built. The switch is what a writer sending a print
+     interior to a shop uses: printers want the cover as its own file. */
+  const off = printDocument(
+    book,
+    chapters,
+    { ...DEFAULT_TYPESET, cover: false },
+    undefined,
+    ART,
+  );
+  expect(off.content).not.toContain("cover-page");
+
+  const bare = printDocument(book, chapters, DEFAULT_TYPESET, undefined, null);
+  expect(bare.content).not.toContain("cover-page");
+});
+
+it("gives the cover a page box with no margin, folio or running head", () => {
+  const { css } = printDocument(book, chapters, DEFAULT_TYPESET, undefined, ART);
+
+  // A cover inset in an inch of white is not a cover.
+  expect(css).toContain("@page cover-sheet");
+  expect(css).toContain("section.cover-page { page: cover-sheet;");
+});

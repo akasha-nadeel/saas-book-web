@@ -3,6 +3,7 @@ import {
   MATTER_SECTIONS,
   hasPlaceholder,
   isGeneratedPage,
+  matterDivisionInPart,
   matterDivisionOf,
   matterPartOf,
   matterSection,
@@ -330,4 +331,66 @@ it("every alias and import-only name lands on a real page", () => {
     // answer, or the panel and a re-import would disagree about one page.
     expect(matterDivisionOf(division!.title)).toEqual(division);
   }
+});
+
+// --- a part the writer has already named ------------------------------------
+
+/**
+ * **The scoped matcher exists so the strict one can stay strict.**
+ *
+ * `matterDivisionOf` reads headings out of a file nobody has said anything
+ * about, so a tolerance that helps here would take somebody's chapter there.
+ * Importing into the Back matter card is the writer saying what the file is,
+ * and these are the two liberties that statement buys.
+ */
+it("reads a back-matter file's own headings, whatever their case", () => {
+  const back = [
+    ["Epilogue", "Epilogue"],
+    ["Afterword", "Afterword"],
+    ["Acknowledgements", "Acknowledgements"],
+    ["About the Author", "About the author"],
+    ["Also by the Author", "Also by the author"],
+    ["A Word About Reviews", "A word about reviews"],
+    ["Glossary", "Glossary"],
+  ] as const;
+
+  for (const [heading, catalogue] of back) {
+    // The catalogue's spelling, so one division cannot show as two rows.
+    expect(matterDivisionInPart(heading, "back")).toBe(catalogue);
+  }
+});
+
+it("drops a subtitle after a colon, but only for a declared part", () => {
+  // The heading a manuscript actually carries. The catalogue title is "An
+  // excerpt from the next book", so this needs the alias *and* the subtitle
+  // stripped — and it is worth both, because the alternative is a page the
+  // writer wrote silently becoming a numbered chapter.
+  expect(
+    matterDivisionInPart("Excerpt from the next book: The Echo Protocol", "back"),
+  ).toBe("An excerpt from the next book");
+
+  /* **And this is the test not to "fix" by making the general rule tolerant.**
+     The same tolerance applied to an undeclared file is what takes a chapter
+     called "Prologue: the night before" out of somebody's novel. */
+  expect(
+    matterDivisionOf("Excerpt from the next book: The Echo Protocol"),
+  ).toBeNull();
+  expect(matterDivisionOf("Prologue: the night before")).toBeNull();
+});
+
+it("never forces a page into a part it does not belong to", () => {
+  // A dedication met while importing back matter is not back matter. It falls
+  // out and is named on screen rather than being filed at the wrong end.
+  expect(matterDivisionInPart("Dedication", "back")).toBeNull();
+  expect(matterDivisionInPart("Dedication", "front")).toBe("Dedication");
+  expect(matterDivisionInPart("Glossary", "front")).toBeNull();
+  // A chapter is a chapter in either direction.
+  expect(matterDivisionInPart("The Initialization", "back")).toBeNull();
+  expect(matterDivisionInPart("Chapter 1", "front")).toBeNull();
+});
+
+it("is not fooled by a bare colon or an empty head", () => {
+  expect(matterDivisionInPart(": Glossary", "back")).toBeNull();
+  expect(matterDivisionInPart(":", "back")).toBeNull();
+  expect(matterDivisionInPart("", "back")).toBeNull();
 });

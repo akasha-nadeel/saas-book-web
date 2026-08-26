@@ -306,6 +306,10 @@ const MATTER_ALIASES: Record<string, string> = {
   "glossary of terms": "Glossary",
   "also by": "Also by the author",
   "also by the same author": "Also by the author",
+  /* The catalogue title carries the article and a manuscript's heading rarely
+     does. Spelled out in full rather than as a bare "excerpt", which is a word
+     a novel may legitimately use for a chapter. */
+  "excerpt from the next book": "An excerpt from the next book",
 };
 
 /**
@@ -433,6 +437,51 @@ export function matterDivisionOf(
      heading of "toString" or "constructor" is otherwise answered with something
      inherited from `Object.prototype` rather than with undefined. */
   return Object.hasOwn(IMPORT_ONLY, wanted) ? IMPORT_ONLY[wanted] : null;
+}
+
+/**
+ * The same question asked about **one part the writer has already named**.
+ *
+ * `matterDivisionOf` reads a heading out of a file nobody has said anything
+ * about, so it has to be strict: a rule loose enough to see that "Prologue: the
+ * night before" is the standard Prologue is loose enough to take a chapter out
+ * of somebody's novel and file it as apparatus. That is why the table is exact
+ * after `trim().toLowerCase()` and why it stays that way.
+ *
+ * Importing a file *into* the Back matter card is a different situation, and
+ * the difference is information. The writer has said what the whole file is,
+ * so two things become safe that are not safe in general:
+ *
+ * - **A trailing `: subtitle` is dropped before matching.** In a file declared
+ *   as back matter, "Excerpt from the next book: The Echo Protocol" is that
+ *   division with a subtitle on it, and reading it as anything else loses the
+ *   page. In an undeclared file the same tolerance is what steals "Prologue: the
+ *   night before", so it lives here and not in `matterDivisionOf`.
+ * - **Only `part` is answered.** A Dedication met while importing back matter is
+ *   not back matter. It falls out and is named on screen, rather than being
+ *   forced into a part it does not belong to.
+ *
+ * Returns the catalogue's own spelling, exactly as `matterDivisionOf` does, so
+ * `HALF-TITLE PAGE` and `Half-title page` cannot end up as two rows.
+ *
+ * **`matterDivisionOf` is deliberately untouched by all of this.** Every import
+ * that does not name a part behaves precisely as it did.
+ */
+export function matterDivisionInPart(
+  title: string,
+  part: MatterPart,
+): string | null {
+  const direct = matterDivisionOf(title);
+  if (direct) return direct.part === part ? direct.title : null;
+
+  /* Only the *last* colon-separated head is tried, and only when something
+     follows it: "Also by the author" has no colon and needs no help, and a
+     heading that is nothing but a colon is not a division. */
+  const at = title.indexOf(":");
+  if (at <= 0) return null;
+  const head = title.slice(0, at);
+  const withoutSubtitle = matterDivisionOf(head);
+  return withoutSubtitle?.part === part ? withoutSubtitle.title : null;
 }
 
 /** Just the part, for a caller that has no use for the name. */

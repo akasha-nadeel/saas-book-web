@@ -997,12 +997,46 @@ function EditorSurface({
    * the pointer leaves the field with the button still down, the field lets go
    * and the prose takes over, selecting from its first character to wherever
    * the pointer has reached, and following it until the button comes up.
+   *
+   * **A `pointerleave` is not proof the pointer moved, and taking it as one
+   * made the title look unclickable.** Boundary events fire whenever the hit
+   * target under the pointer changes — including when the *element* moves and
+   * the pointer does not. Clicking the title focuses it, focusing it can scroll
+   * it into view inside the page flow, and the field then slides out from under
+   * a perfectly still cursor: `pointerleave` with the button still down, and
+   * this handler blurred the field a few milliseconds after the click gave it
+   * focus. From the writer's side the title lit up and went dead again, which
+   * reads as a field that refuses to be edited.
+   *
+   * So a drag now has to be a drag: the press must have started in the field,
+   * and the pointer must have travelled far enough to mean it. Below that the
+   * field keeps the focus the click just gave it, which is the whole of the
+   * common case.
    */
+  const titleDragFrom = useRef<{ x: number; y: number } | null>(null);
+
+  /** Where the press began, so a leave can tell a drag from a shifting page. */
+  const startTitleDrag = (e: React.PointerEvent<HTMLInputElement>) => {
+    titleDragFrom.current =
+      e.button === 0 ? { x: e.clientX, y: e.clientY } : null;
+  };
+
   const dragOutOfTitle = (e: React.PointerEvent<HTMLInputElement>) => {
     // Left button only, and only while it is actually held: a pointer merely
     // passing over the title on its way somewhere else must do nothing.
     if (e.buttons !== 1 || !editor || !editor.isEditable) return;
 
+    /* A press that did not begin in the field is somebody dragging *through*
+       it from elsewhere; the prose already owns that selection. */
+    const from = titleDragFrom.current;
+    if (!from) return;
+
+    /* Far enough to be a hand rather than a repaint. Four pixels is the slop
+       every drag threshold in the trade uses, and it is well under the distance
+       a writer covers on the way to the prose. */
+    if (Math.hypot(e.clientX - from.x, e.clientY - from.y) < 4) return;
+
+    titleDragFrom.current = null;
     e.currentTarget.blur();
 
     const extendTo = (x: number, y: number) => {
@@ -1023,6 +1057,7 @@ function EditorSurface({
 
     const follow = (ev: PointerEvent) => extendTo(ev.clientX, ev.clientY);
     const release = () => {
+      titleDragFrom.current = null;
       window.removeEventListener("pointermove", follow);
       window.removeEventListener("pointerup", release);
       window.removeEventListener("pointercancel", release);
@@ -1247,6 +1282,26 @@ function EditorSurface({
    * the editable is only as tall as its text: the blank tail of a sheet is not
    * part of it, and a click there would otherwise reach nothing at all.
    */
+  /**
+   * Things on the page that answer their own clicks.
+   *
+   * **Two handlers ask this question and they must not answer it differently.**
+   * `handleSheetClick` on the page flow and the click-to-type handler on the
+   * scrolling desk both exist to catch a click that landed on *bare paper* —
+   * the margin beside a line, the blank half of a page, the desk around the
+   * sheet — and put the caret at the nearest text position. Anything a writer
+   * can already put a caret or a press into is not bare paper.
+   *
+   * It was written out on the inner handler and not the outer one, and the
+   * chapter title paid for it: clicking the title focused the input, the click
+   * carried on up past the page flow, and the desk's handler answered it by
+   * pulling the caret into the prose a moment later. The field lit up and went
+   * dead again, which reads as a title that cannot be edited — and the fix is
+   * not a bigger target or a slower blur, it is this list being in one place.
+   */
+  const OWNS_ITS_CLICK =
+    '.chapter-opener, button, input, textarea, select, a, [contenteditable="true"]';
+
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!editor || !editor.isEditable) return;
     if (draggedHere(e)) return;
@@ -1254,13 +1309,7 @@ function EditorSurface({
     // The title, the floating toolbars, and the prose itself all handle their
     // own clicks — the browser has already placed the caret inside the text.
     const target = e.target as HTMLElement;
-    if (
-      target.closest(
-        '.chapter-opener, button, input, a, [contenteditable="true"]',
-      )
-    ) {
-      return;
-    }
+    if (target.closest(OWNS_ITS_CLICK)) return;
 
     const prose = editor.view.dom.getBoundingClientRect();
     if (e.clientY >= prose.bottom) {
@@ -1530,7 +1579,9 @@ function EditorSurface({
               if (
                 !editor ||
                 draggedHere(e) ||
-                (e.target as HTMLElement).closest(".ProseMirror, .tiptap")
+                (e.target as HTMLElement).closest(
+                  `.ProseMirror, .tiptap, ${OWNS_ITS_CLICK}`,
+                )
               ) {
                 return;
               }
@@ -1627,10 +1678,17 @@ function EditorSurface({
                     aria-label="Chapter title"
                     spellCheck={false}
                     // See dragOutOfTitle: a selection cannot leave a form field
-                    // on its own, so the manuscript takes over when it does.
+                    // on its own, so the manuscript takes over when it does —
+                    // but only for a press that began here and actually
+                    // travelled, which is what `onPointerDown` records.
+                    onPointerDown={startTitleDrag}
                     onPointerLeave={dragOutOfTitle}
-                    className="reader-title w-full rounded-sm bg-transparent
-                               outline-none focus-visible:ring-2
+                    /* `reader-title-field` is the hit area and the hover, not
+                       the setting — see the note beside it in globals.css. The
+                       reading view and the export share `reader-title` alone,
+                       so neither moves. */
+                    className="reader-title reader-title-field w-full rounded-sm
+                               bg-transparent outline-none focus-visible:ring-2
                                focus-visible:ring-accent/60"
                   />
                 </div>

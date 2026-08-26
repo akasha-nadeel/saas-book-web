@@ -16,6 +16,7 @@ import {
 } from "@/lib/library-store";
 import { useCover } from "@/lib/use-library";
 import { clearCover, saveCover } from "@/lib/cover-save";
+import { SwitchTrack } from "@/components/ui/switch";
 
 /**
  * Editing what a book *is*: its title, who wrote it, what kind of book it is,
@@ -89,26 +90,47 @@ export function CoverDialog({
   };
 
   return (
+    /* **On the house pattern, which this dialog predates.**
+​
+       It used to roll its own: no `data-dialog-presentation`, so on a phone it
+       fell into the catch-all in globals.css that makes an unmarked dialog a
+       full-screen page with `overflow-y: auto` on the element itself — a second
+       scroller wrapping the form's own. And the form carried `h-full
+       overflow-y-auto`, which *guarantees* a scroll container whatever the
+       content, against a height capped only by the browser's own
+       `viewport − 38px`. Four labelled fields stacked in a 34rem column landed
+       past 800px, so it scrolled on any ordinary laptop.
+
+       `sheet` gives the phone a proper bottom sheet and the sticky footer for
+       free; `oc-dialog-scroll` caps at `min(78dvh, …)` and contains the
+       overscroll; `oc-dialog-actions` is the footer row every other dialog
+       uses. The hand-rolled sticky bar that used to be down there is gone. */
     <dialog
       ref={dialogRef}
+      data-dialog-presentation="sheet"
       onClose={onClose}
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[34rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="oc-dialog m-auto w-[44rem] max-w-[calc(100vw-2rem)] rounded-lg
+                 bg-panel p-0 text-fg backdrop:bg-black/70"
     >
-      <form
-        onSubmit={save}
-        className="scroll-slim h-full overflow-y-auto p-4 pb-[max(1rem,var(--oc-safe-bottom))] sm:p-7"
-      >
+      <form onSubmit={save} className="oc-dialog-scroll p-6">
         <h2 className="font-serif text-xl">Edit book details</h2>
         <p className="mt-1 font-sans text-sm text-muted">
           What this book is, and how it appears on your shelf.
         </p>
 
-        <div className="mt-6 flex flex-col items-start gap-5 sm:flex-row">
-          <div className="w-28 shrink-0 self-center sm:self-start">
+        {/* **Two columns, because width buys height back.** The picture and
+            the two controls that set it go down one side and the four fields
+            down the other, which is about 180px of height moved sideways — the
+            difference between a dialog that fits an ordinary window and one
+            that scrolls. The same argument `upgrade-dialog.tsx` makes for its
+            own width, and the same shape `matter-setup-dialog.tsx` uses.
+
+            One column below `sm`, where there is no width to spend. */}
+        <div className="mt-5 grid gap-6 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
+          <div className="mx-auto w-36 sm:mx-0 sm:w-full">
             <BookCover
               title={title.trim() || "Untitled Book"}
               subtitle={subtitle.trim() || undefined}
@@ -118,80 +140,8 @@ export function CoverDialog({
               bare={bare}
               seed={book.id}
             />
-          </div>
 
-          <div className="min-w-0 flex-1">
-            <label className="block font-sans text-sm">
-              <span className="font-medium text-fg">Title</span>
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Untitled Book"
-                autoFocus
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg placeholder:text-muted
-                           focus-visible:border-accent focus-visible:outline-none"
-              />
-            </label>
-
-            <label className="mt-4 block font-sans text-sm">
-              <span className="font-medium text-fg">Subtitle</span>
-              <input
-                value={subtitle}
-                onChange={(e) => setSubtitle(e.target.value)}
-                placeholder="A novel"
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg placeholder:text-muted
-                           focus-visible:border-accent focus-visible:outline-none"
-              />
-            </label>
-
-            <label className="mt-4 block font-sans text-sm">
-              <span className="font-medium text-fg">Author</span>
-              <input
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                placeholder="Your name"
-                autoComplete="name"
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg placeholder:text-muted
-                           focus-visible:border-accent focus-visible:outline-none"
-              />
-            </label>
-
-            {/* Genre, which until now could only be set when a book was made.
-                That was fine while every book came from /book/new, which asks
-                — an imported one never does, and a book without it silently
-                dead-ends comp titles, categories, the blurb examples and the
-                structure targets, because `buildQuery()` has nothing to search
-                on. Four broken tools, one blank field, and nothing anywhere
-                that let a writer fill it in.
-
-                A select rather than free text: the same list `/book/new` offers
-                and `suggestTarget()` knows about, so the three cannot drift. */}
-            <label className="mt-4 block font-sans text-sm">
-              <span className="font-medium text-fg">Genre</span>
-              <select
-                value={genre}
-                onChange={(e) => setGenre(e.target.value)}
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg focus-visible:border-accent
-                           focus-visible:outline-none"
-              >
-                <option value="">Not sure yet</option>
-                {GENRES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
-                ))}
-              </select>
-              <span className="mt-1 block text-xs text-muted">
-                Comp titles, categories, blurb examples and structure all read
-                this.
-              </span>
-            </label>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-3 flex flex-col gap-2">
               {/* **Filled with `bg-fg`/`text-surface`, never a literal black.**
                   The same pair the covers tool's "Check another" uses, and for
                   the same reason: the two tokens invert *with* the palette, so
@@ -242,54 +192,135 @@ export function CoverDialog({
                 </button>
               )}
             </div>
+          </div>
 
-            {/* **Whose words go on the front.**
+          {/* **Title alone, then the two short ones paired.** Four labelled
+              fields stacked is 330px of column against a picture that is only
+              210 — the height the dialog could not afford. Subtitle and Author
+              are both a few words and read perfectly well side by side, which
+              takes a row out of the stack; the title keeps the full measure
+              because it is the longest thing here and the one being read
+              back. One column below `sm`, as everything else is. */}
+          <div className="min-w-0">
+            <label className="block font-sans text-sm">
+              <span className="font-medium text-fg">Title</span>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Untitled Book"
+                autoFocus
+                className="mt-1.5 w-full rounded-md border border-line bg-surface
+                           px-3 py-2 text-fg placeholder:text-muted
+                           focus-visible:border-accent focus-visible:outline-none"
+              />
+            </label>
 
-                A designed jacket already carries the title, the subtitle and
-                the byline, set by somebody who chose where they sit — and the
-                shelf printed ours over the top of theirs, which is worse than
-                showing nothing. `bareCover` and every reader of it have been
-                in the store since the field was added; what was missing was
-                anywhere to say so. This is that control, and it is here rather
-                than on the covers tool because the question is about the
-                *relationship* between the three fields above and the picture
-                beside them — both are on this screen and nowhere else at once.
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block font-sans text-sm">
+              <span className="font-medium text-fg">Subtitle</span>
+              <input
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
+                placeholder="A novel"
+                className="mt-1.5 w-full rounded-md border border-line bg-surface
+                           px-3 py-2 text-fg placeholder:text-muted
+                           focus-visible:border-accent focus-visible:outline-none"
+              />
+            </label>
 
-                Only with artwork, because `BookCover` ignores it without: a
-                typeset face is the title, so hiding the words there would
-                leave a blank cloth cover.
+            <label className="block font-sans text-sm">
+              <span className="font-medium text-fg">Author</span>
+              <input
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                placeholder="Your name"
+                autoComplete="name"
+                className="mt-1.5 w-full rounded-md border border-line bg-surface
+                           px-3 py-2 text-fg placeholder:text-muted
+                           focus-visible:border-accent focus-visible:outline-none"
+              />
+            </label>
+            </div>
 
-                The hint is not a nicety. The fields stay in the book and go on
-                driving the EPUB's metadata, the title page and the shop
-                listing — this changes the picture and nothing else — and a
-                writer who reads "hide the title" without that has every reason
-                to think they are deleting it. */}
-            {preview && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={bare}
-                onClick={() => setBare(!bare)}
-                className="mt-4 flex w-full items-start gap-3 rounded-md border
-                           border-line px-3 py-3 text-left outline-none
-                           transition-colors hover:bg-raised
-                           focus-visible:ring-2 focus-visible:ring-accent/60"
+            {/* Genre, which until now could only be set when a book was made.
+                That was fine while every book came from /book/new, which asks
+                — an imported one never does, and a book without it silently
+                dead-ends comp titles, categories, the blurb examples and the
+                structure targets, because `buildQuery()` has nothing to search
+                on. Four broken tools, one blank field, and nothing anywhere
+                that let a writer fill it in.
+
+                A select rather than free text: the same list `/book/new` offers
+                and `suggestTarget()` knows about, so the three cannot drift. */}
+            <label className="mt-4 block font-sans text-sm">
+              <span className="font-medium text-fg">Genre</span>
+              <select
+                value={genre}
+                onChange={(e) => setGenre(e.target.value)}
+                className="mt-1.5 w-full rounded-md border border-line bg-surface
+                           px-3 py-2 text-fg focus-visible:border-accent
+                           focus-visible:outline-none"
               >
-                <SwitchTrack on={bare} />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-sans text-sm font-medium text-fg">
-                    The artwork already has the words on it
-                  </span>
-                  <span className="mt-0.5 block font-sans text-xs text-muted">
-                    Show the picture as it is, with no title, subtitle or author
-                    printed over it. The fields above are still used for the
-                    shops and the exported book.
-                  </span>
-                </span>
-              </button>
-            )}
+                <option value="">Not sure yet</option>
+                {GENRES.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+              <span className="mt-1 block text-xs text-muted">
+                Comp titles, categories, blurb examples and structure all read
+                this.
+              </span>
+            </label>
           </div>
         </div>
+
+        {/* **Whose words go on the front.**
+
+            A designed jacket already carries the title, the subtitle and
+            the byline, set by somebody who chose where they sit — and the
+            shelf printed ours over the top of theirs, which is worse than
+            showing nothing. `bareCover` and every reader of it have been
+            in the store since the field was added; what was missing was
+            anywhere to say so. This is that control, and it is here rather
+            than on the covers tool because the question is about the
+            *relationship* between the three fields above and the picture
+            beside them — both are on this screen and nowhere else at once.
+
+            Only with artwork, because `BookCover` ignores it without: a
+            typeset face is the title, so hiding the words there would
+            leave a blank cloth cover.
+
+            The hint is not a nicety. The fields stay in the book and go on
+            driving the EPUB's metadata, the title page and the shop
+            listing — this changes the picture and nothing else — and a
+            writer who reads "hide the title" without that has every reason
+            to think they are deleting it. */}
+        {preview && (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={bare}
+            onClick={() => setBare(!bare)}
+            className="mt-3 flex w-full items-start gap-3 rounded-md border
+                       border-line px-3 py-2.5 text-left outline-none
+                       transition-colors hover:bg-raised
+                       focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <SwitchTrack on={bare} className="mt-0.5" />
+            <span className="min-w-0 flex-1">
+              <span className="block font-sans text-sm font-medium text-fg">
+                The artwork already has the words on it
+              </span>
+              <span className="mt-0.5 block font-sans text-xs text-muted">
+                Show the picture as it is, with no title, subtitle or author
+                printed over it. The fields above are still used for the
+                shops and the exported book.
+              </span>
+            </span>
+          </button>
+        )}
 
         <input
           ref={fileRef}
@@ -333,7 +364,11 @@ export function CoverDialog({
           </p>
         )}
 
-        <div className="sticky bottom-0 -mx-4 mt-7 flex items-center justify-end gap-2 border-t border-line bg-panel/95 px-4 pt-3 pb-[max(0.5rem,var(--oc-safe-bottom))] backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none">
+        {/* `oc-dialog-actions` rather than the sticky bar that used to be
+            hand-written here: the sheet presentation gives a phone the same
+            thing in CSS, and every other dialog in the app already reads from
+            that one rule. */}
+        <div className="oc-dialog-actions mt-6 flex items-center justify-end gap-2">
           <button
             type="button"
             onClick={onClose}
@@ -356,36 +391,5 @@ export function CoverDialog({
         </div>
       </form>
     </dialog>
-  );
-}
-
-/**
- * The track and thumb behind the one switch on this dialog.
- *
- * Drawn here rather than pulled into `ui/`, which is deliberately two files
- * wide and takes a primitive on the third copy rather than the second: the
- * export wizard has the only other one. If a third screen wants a switch, that
- * is the moment to extract this and `SwitchTrack` in `export-page.tsx`
- * together — not before.
- *
- * `bg-accent` with an `accent-ink` thumb, because the fill is white at night
- * and near-black by day; a fixed `bg-white` thumb is invisible in exactly one
- * theme, which is the half nobody tests.
- */
-function SwitchTrack({ on }: { on: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5
-                  transition-colors ${
-                    on ? "bg-accent" : "bg-raised ring-1 ring-line ring-inset"
-                  }`}
-    >
-      <span
-        className={`h-4 w-4 rounded-full transition-transform ${
-          on ? "translate-x-4 bg-accent-ink" : "bg-muted"
-        }`}
-      />
-    </span>
   );
 }

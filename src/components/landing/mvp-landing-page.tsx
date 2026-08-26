@@ -171,7 +171,7 @@ const TESTIMONIALS = [
   },
   {
     quote: "Seriously, OpenChapter is amazing.",
-    name: "Marcus Vance",
+    name: "Maya Vance",
     role: "Non-Fiction Author",
     avatar: "/testimonials/avatar-3.png",
     bg: "bg-[#f5fce3]",
@@ -185,7 +185,7 @@ const TESTIMONIALS = [
   },
   {
     quote: "The new OpenChapter is the first online editor I can see myself using to build a full project.",
-    name: "David Chen",
+    name: "Grace Chen",
     role: "Biographer & Essayist",
     avatar: "/testimonials/avatar-6.png",
     bg: "bg-[#c0f400]",

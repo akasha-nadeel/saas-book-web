@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { Book } from "@/lib/library-store";
 import type { LoadedChapter } from "./blocks";
 import { DEFAULT_TYPESET } from "./typeset";
-import { bindBook, frontSections, withoutReplaced } from "./front-matter";
+import {
+  bindBook,
+  coverSection,
+  frontSections,
+  withoutReplaced,
+} from "./front-matter";
 
 const book: Book = {
   id: "b",
@@ -411,4 +416,57 @@ describe("bindBook", () => {
       "Acknowledgements",
     ]);
   });
+});
+
+// --- the cover ---------------------------------------------------------
+
+describe("coverSection", () => {
+  it("is the artwork and nothing else", () => {
+    const section = coverSection("data:image/jpeg;base64,AAAA", "Silent Wind");
+
+    expect(section.id).toBe("cover");
+    expect(section.html).toContain('src="data:image/jpeg;base64,AAAA"');
+    // Named for a reader who cannot see it, the same alt `coverXhtml` writes.
+    expect(section.html).toContain('alt="Cover of Silent Wind"');
+    /* **No title, subtitle or byline drawn over it.** A cover is a finished
+       piece of art; the shelf prints the words over its own thumbnail and that
+       is a shelf affordance, not the book. The words belong on the title page,
+       which is the very next sheet. */
+    expect(section.html).not.toContain("book-title");
+    expect(section.html).not.toContain("A. Writer");
+    // `cover-page` is what takes the full-bleed page box in `typesetCss`.
+    expect(section.html).toContain('class="front-page cover-page"');
+  });
+
+  it("escapes a title with markup in it", () => {
+    const section = coverSection("data:,x", 'Cats & <Dogs>');
+    expect(section.html).toContain("Cats &amp; &lt;Dogs&gt;");
+    expect(section.html).not.toContain("<Dogs>");
+  });
+});
+
+/**
+ * **This is a position test too, and it belongs with the block above.**
+ *
+ * `bindBook` needs no rule for the cover: an id it does not recognise ranks
+ * -1, and every front-matter division ranks 0 or higher, so "cover" sorts in
+ * front of even a half-title on its own. Pin it, because the day somebody
+ * gives unknown ids a different fallback is the day a PDF starts opening on
+ * the half-title with the cover buried behind it.
+ */
+it("binds a cover in front of everything, including a half-title", () => {
+  const pages: LoadedChapter[] = [
+    { title: "Half-title page", doc, number: null, matter: "front" },
+    { title: "Chapter One", doc, number: 1, matter: "body" },
+  ];
+  const bound = bindBook(pages, [
+    coverSection("data:,x", "Silent Wind"),
+    { id: "title", html: "" },
+  ]);
+
+  expect(
+    bound.map((page) =>
+      page.kind === "generated" ? `[${page.section.id}]` : page.chapter.title,
+    ),
+  ).toEqual(["[cover]", "Half-title page", "[title]", "Chapter One"]);
 });

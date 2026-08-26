@@ -379,16 +379,44 @@ export async function runExport({
     : slugify(book.title);
 
   if (format === "markdown") {
+    /* **No cover here, and it is not an oversight.** Markdown generates no
+       title, copyright or contents page either — it is one text file with no
+       sidecar to keep an image in, so a cover could only be an enormous base64
+       blob pasted into the prose, which is the same fault that took the format
+       off the list in the first place. See TODO.md under "Taken out on
+       purpose". */
     const text = buildMarkdownFile(book, chapters, { single });
     return handed(new Blob([text], { type: "text/markdown" }), `${base}.md`);
   }
+
+  /* **The artwork, resolved once for whichever renderer wants it.**
+​
+     This sat inside the EPUB branch until the cover became a page in every
+     format, and it is read here rather than inside a builder because covers
+     live at their own storage key and the builders are meant to touch no
+     storage at all.
+
+     **The full-size artwork first, and the thumbnail only as a fallback.** The
+     copy in localStorage is 700px because that is what a shelf needs; packaging
+     it shipped a 495×700 picture out of artwork the writer had supplied at
+     1600×2560, which is below what every shop asks for — and below what this
+     app's own cover check had just told them was required. See cover-store.ts.
+     A browser that cannot hold the original still exports, with the smaller
+     copy, exactly as it did before.
+
+     Fetched even when `typeset.cover` is off, because the read is cheap against
+     a book that has no cover at all and each renderer applies the switch
+     itself — one rule, three readers, rather than a condition duplicated here
+     and there. */
+  const print = await getPrintCover(book.id);
+  const cover = print?.dataUrl ?? getCover(book.id);
 
   if (format === "docx") {
     // Dynamic import: ~1MB of library that a writer who never exports should
     // never download.
     const { buildDocx } = await import("./docx");
     return handed(
-      await buildDocx(book, chapters, { manuscript, typeset }),
+      await buildDocx(book, chapters, { manuscript, typeset, cover }),
       `${base}.docx`,
     );
   }
@@ -399,7 +427,7 @@ export async function runExport({
        takes a few seconds of it. Without the await the caller would clear its
        "working" state while Paged.js was still laying out pages, and the print
        dialog would arrive after the screen had said it was finished. */
-    const pdf = await printBook(book, chapters, typeset);
+    const pdf = await printBook(book, chapters, typeset, cover);
     /* **A blob means a file; null means a dialog.** The PDF is rendered by a
        browser on the server now, so most of the time there is a real file to
        hand over and name — and the writer gets the same confirmation every
@@ -410,21 +438,8 @@ export async function runExport({
   }
 
   const { buildEpub } = await import("./epub");
-  /* Read here rather than inside the builder: covers live at their own storage
-     key, and epub.ts is meant to stay a builder that touches no storage.
-
-     **The full-size artwork first, and the thumbnail only as a fallback.** The
-     copy in localStorage is 700px because that is what a shelf needs; packaging
-     it shipped a 495×700 picture out of artwork the writer had supplied at
-     1600×2560, which is below what every shop asks for — and below what this
-     app's own cover check had just told them was required. See cover-store.ts.
-     A browser that cannot hold the original still exports, with the smaller
-     copy, exactly as it did before. */
-  const print = await getPrintCover(book.id);
   return handed(
-    await buildEpub(book, chapters, typeset, {
-      cover: print?.dataUrl ?? getCover(book.id),
-    }),
+    await buildEpub(book, chapters, typeset, { cover }),
     `${base}.epub`,
   );
 }

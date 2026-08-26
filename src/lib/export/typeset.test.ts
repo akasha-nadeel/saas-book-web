@@ -634,3 +634,14 @@ describe("templateFor", () => {
     expect(templateFor("epub", "manuscript")).toBe(DEFAULT_TYPESET.template);
   });
 });
+
+/**
+ * **On by default, for the reason the copyright page is.** A front-matter page
+ * defaulted off is a page missing from every book exported by somebody who
+ * never opened that step — and unlike copyright, a missing cover is the first
+ * thing a reader notices. A writer sending a print interior to a shop turns it
+ * off; nobody else has to do anything.
+ */
+it("puts the cover in by default", () => {
+  expect(DEFAULT_TYPESET.cover).toBe(true);
+});

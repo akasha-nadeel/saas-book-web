@@ -1,7 +1,6 @@
 "use client";
 
-import type { ImportSummary } from "@/lib/import/split";
-import { nounFor, plural } from "@/lib/plural";
+import { summaryPhrase, type ImportSummary } from "@/lib/import/split";
 
 /**
  * The bar across the top after an import, until the writer decides.
@@ -25,10 +24,13 @@ import { nounFor, plural } from "@/lib/plural";
  */
 export function ImportBanner({
   summary,
+  leftOut,
   onUndo,
   onKeep,
 }: {
   summary: ImportSummary;
+  /** What the file held that did not belong to the part being imported into. */
+  leftOut?: readonly string[];
   /**
    * Absent on the new-book path, which has no `ImportUndo` to call: undoing a
    * book that has just been created is deleting it, which the shelf already
@@ -38,14 +40,9 @@ export function ImportBanner({
   onUndo?: () => void;
   onKeep: () => void;
 }) {
-  /* `plural` carries the number, `nounFor` does not — the two matter pages read
-     "8 front pages", with the word between the figure and the noun. */
-  const parts = [
-    summary.front > 0 &&
-      `${summary.front} front ${nounFor(summary.front, "page")}`,
-    summary.body > 0 && plural(summary.body, "chapter"),
-    summary.back > 0 && `${summary.back} back ${nounFor(summary.back, "page")}`,
-  ].filter((part): part is string => typeof part === "string");
+  /* Phrased in `split.ts` beside the counting, so this bar and the
+     add-or-replace dialog cannot describe the same file differently. */
+  const landed = summaryPhrase(summary);
 
   return (
     <div
@@ -55,7 +52,17 @@ export function ImportBanner({
                  text-fg md:px-6"
     >
       <span className="min-w-0 flex-1">
-        Imported <span className="font-semibold">{parts.join(", ")}</span>.{" "}
+        Imported <span className="font-semibold">{landed}</span>.{" "}
+        {/* **A filter nobody can see is worse than the problem it solves.** A
+            section import uses only the part of a file that belongs to it, and
+            saying so here is the only place a writer hears about it when the
+            part was empty and no question was asked. */}
+        {leftOut && leftOut.length > 0 && (
+          <>
+            Left out, as {leftOut.length === 1 ? "it is" : "they are"} not part
+            of this section: <span className="font-semibold">{leftOut.join(", ")}</span>.{" "}
+          </>
+        )}
         {onUndo
           ? "Check the panel — undo if it isn’t right."
           : "Check the panel — anything in the wrong part can be moved there."}

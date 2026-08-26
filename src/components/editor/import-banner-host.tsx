@@ -26,6 +26,16 @@ interface BannerState {
    */
   undo?: ImportUndo;
   summary: ImportSummary;
+  /**
+   * What the file held that was not this part, when a section import left
+   * something behind.
+   *
+   * The card's dialog names it too, but only when it is shown — and it is not
+   * shown for a part that had no pages to ask about. Without this, a manuscript
+   * dropped on an empty Back matter card would land its epilogue and say
+   * nothing at all about the ten chapters it left on the floor.
+   */
+  leftOut?: readonly string[];
 }
 
 let current: BannerState | null = null;
@@ -39,8 +49,9 @@ export function showImportBanner(
   bookId: string,
   summary: ImportSummary,
   undo?: ImportUndo,
+  leftOut?: readonly string[],
 ) {
-  current = { bookId, summary, undo };
+  current = { bookId, summary, undo, leftOut };
   emit();
 }
 
@@ -71,6 +82,7 @@ export function ImportBannerHost() {
   return (
     <ImportBanner
       summary={state.summary}
+      leftOut={state.leftOut}
       onKeep={clearImportBanner}
       onUndo={
         undo

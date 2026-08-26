@@ -8,7 +8,7 @@ import {
   type ImportedChapter,
 } from "./split";
 import type { EpubSection } from "./epub";
-import { matterDivisionOf } from "../matter";
+import { matterDivisionOf, type MatterPart } from "../matter";
 
 /**
  * Read a split book's chapter names for the standard divisions.
@@ -106,7 +106,20 @@ export function setupFromImport(book: ImportedBook): BookSetup {
   };
 }
 
-export async function importFile(file: File): Promise<ImportedBook> {
+export async function importFile(
+  file: File,
+  /**
+   * The part of the book this whole file is, when the writer has said — an
+   * import aimed at one of the panel's three cards rather than at the book.
+   *
+   * It reaches exactly one place: the divider vocabulary the no-headings path
+   * uses (`splitIntoChapters`). **Deciding what to keep is not done here** —
+   * that is `partOfImport`, applied by the caller, so an EPUB (which already
+   * declares its own parts) needs no special case and the tagging rule stays in
+   * one testable place.
+   */
+  part?: MatterPart,
+): Promise<ImportedBook> {
   const extension = extensionOf(file.name);
 
   if (file.size > MAX_IMPORT_BYTES) {
@@ -258,7 +271,7 @@ export async function importFile(file: File): Promise<ImportedBook> {
        * everything before it in the body, which is exactly the manuscript this
        * was built for.
        */
-      taggedByName(splitIntoChapters(blocks, title));
+      taggedByName(splitIntoChapters(blocks, title, false, part));
   const pages: ImportedChapter[] = matter.map((section, i) => ({
     title: section.title || `Page ${i + 1}`,
     doc: toDoc(section.blocks),

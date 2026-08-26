@@ -357,6 +357,16 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   export has to tell a written page from scaffolding, and it survives a rename
   and a round trip. `isUntouchedMatter` in `export/blocks.ts` is the one rule
   and the panel calls it too; the export screen **names every page it left out**.
+- **The panel lists the sixteen divisions with a switch on each**, not the
+  pages the book happens to have — on creates the page (`createMatterPage`),
+  off deletes it into the book's trash. **There is no stored "included" flag
+  and there must not be one**: a page either exists or it does not, so nothing
+  is threaded through the exporters and no column is added. Switching off a
+  page `isDraftMatter` calls scaffolding skips the confirmation; a page with
+  the writer's prose on it does not. `matter-list.ts` is the merge and is pure
+  — **it never reorders a page the book has**, because `bindBook` sorts front
+  matter by `matterSectionIndex` and leaves the back in stored order, so a
+  sorted card would disagree with the file.
 - The matter question is put once per book (`shouldAskMatter`), Skip is a real
   answer, nothing is created until a press, and `matter-picks.ts` keeps the
   dialog and `/book/new` saying the same thing.
@@ -392,7 +402,8 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   id and the assistant needs the editor instance; the import banner is the one
   exception and does live in that layout.
 - `book-panel.tsx` is the navigator (front/body/back as cards, each opening into
-  a list of pages). Its face is the stored `bookPanel` pref rather than component
+  a list — chapters in the body, the sixteen divisions with their switches in
+  the other two). Its face is the stored `bookPanel` pref rather than component
   state, and **which card is open lives in `useOpenPart`, called by the *screen***
   — the page sheet's edge takes the colour of the selected part, and two copies
   of that state would be two answers to one question.
@@ -475,6 +486,13 @@ four renderers read**.
 - **Markdown is built, tested and reachable from nothing** (`soon: true`), over
   base64 images. **Every "four formats" claim comes back in the same commit** it
   does.
+- **The cover is page one of every format but Markdown**, behind
+  `typeset.cover` (on by default). `runExport` resolves the artwork once above
+  the dispatch; `coverSection` writes the PDF's and Word's, the EPUB keeps its
+  own `cover.xhtml` in the spine, and `bindBook` needed no change because an id
+  it does not know ranks `-1`. **It is the artwork alone** — no title composited
+  over it, which is what a shop expects and the only thing Word can do. The PDF
+  is a print interior, so the switch is what a writer sends a print shop.
 - **A cover is three things written together** (`cover-save.ts`): a 700px JPEG
   thumbnail in `localStorage`, the original artwork in IndexedDB, and the
   measurements in `coverfacts:`. The export reads `getPrintCover` first. The

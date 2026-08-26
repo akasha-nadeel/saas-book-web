@@ -38,6 +38,7 @@ import {
   picksFrom,
 } from "@/lib/matter-picks";
 import { MatterPartRows } from "@/components/editor/matter-rows";
+import { SwitchTrack } from "@/components/ui/switch";
 import { BookCover } from "@/components/shelf/book-cover";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import {
@@ -739,7 +740,7 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
                          transition-colors hover:bg-raised
                          focus-visible:ring-2 focus-visible:ring-accent/60"
                   >
-                    <SwitchTrack on={bare} />
+                    <SwitchTrack on={bare} className="mt-0.5" />
                     <span className="min-w-0 flex-1">
                       <span className="block font-sans text-sm font-medium text-fg">
                         The artwork already has the words on it
@@ -1095,35 +1096,5 @@ function Stepper({
         );
       })}
     </ol>
-  );
-}
-
-/**
- * The track and thumb behind this form's one switch.
- *
- * A second copy of the shape `cover-dialog.tsx` draws, and the third would be
- * the one to extract — `ui/` is deliberately narrow and takes a primitive when
- * a pattern proves itself, not on its first repeat. The two live a screen
- * apart and set the same field, so if either moves they both should.
- *
- * `bg-accent` with an `accent-ink` thumb: the fill is white at night and
- * near-black by day, so a fixed `bg-white` thumb is invisible in exactly one
- * theme — the half nobody tests.
- */
-function SwitchTrack({ on }: { on: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5
-                  transition-colors ${
-                    on ? "bg-accent" : "bg-raised ring-1 ring-line ring-inset"
-                  }`}
-    >
-      <span
-        className={`h-4 w-4 rounded-full transition-transform ${
-          on ? "translate-x-4 bg-accent-ink" : "bg-muted"
-        }`}
-      />
-    </span>
   );
 }

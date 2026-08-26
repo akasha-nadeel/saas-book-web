@@ -1,8 +1,17 @@
 import { expect, it } from "vitest";
-import { countWords, toDoc, type Block } from "@/lib/import/blocks";
+import { countWords, paragraph, toDoc, type Block } from "@/lib/import/blocks";
 import { parseHtml } from "@/lib/import/html";
 import { parseText } from "@/lib/import/plain-text";
-import { importSummary, splitIntoChapters } from "@/lib/import/split";
+import {
+  importAsksFirst,
+  importSummary,
+  looksLikeChapterLine,
+  looksLikeMatterLine,
+  partOfImport,
+  splitIntoChapters,
+  summaryParts,
+  summaryPhrase,
+} from "@/lib/import/split";
 import { importFile, titleFromFileName } from "@/lib/import/index";
 
 // --- plain text ------------------------------------------------------------
@@ -577,4 +586,166 @@ it("counts a chapter that says nothing about its part as body", () => {
     back: 0,
   });
   expect(importSummary([])).toEqual({ front: 0, body: 0, back: 0 });
+});
+
+// --- what an import says about itself --------------------------------------
+
+it("names the two matter parts as pages and only the body as chapters", () => {
+  // The bug this closes: the add-or-replace dialog counted the file's matter
+  // pages and called all of them chapters, so eight back-matter pages were
+  // announced as "8 chapters" and offered a chapter number.
+  expect(summaryParts({ front: 5, body: 2, back: 3 })).toEqual([
+    "5 front pages",
+    "2 chapters",
+    "3 back pages",
+  ]);
+  expect(summaryParts({ front: 1, body: 1, back: 1 })).toEqual([
+    "1 front page",
+    "1 chapter",
+    "1 back page",
+  ]);
+});
+
+it("leaves a part with nothing in it out rather than printing a zero", () => {
+  // Most imports are chapters and nothing else, and "0 front pages" is noise
+  // on the common case.
+  expect(summaryParts({ front: 0, body: 12, back: 0 })).toEqual(["12 chapters"]);
+  expect(summaryParts({ front: 0, body: 0, back: 8 })).toEqual(["8 back pages"]);
+  expect(summaryParts({ front: 0, body: 0, back: 0 })).toEqual([]);
+});
+
+it("phrases the count so it can sit inside a sentence", () => {
+  expect(summaryPhrase({ front: 0, body: 0, back: 8 })).toBe("8 back pages");
+  expect(summaryPhrase({ front: 2, body: 10, back: 0 })).toBe(
+    "2 front pages and 10 chapters",
+  );
+  expect(summaryPhrase({ front: 5, body: 2, back: 3 })).toBe(
+    "5 front pages, 2 chapters and 3 back pages",
+  );
+  // Never an empty string: the callers drop this straight into a sentence.
+  expect(summaryPhrase({ front: 0, body: 0, back: 0 })).toBe("nothing");
+});
+
+/**
+ * **The question is only worth asking when Replace has something to mean.**
+ *
+ * Replace clears the body and spares every front- and back-matter page, so a
+ * file carrying no chapters gives both answers nothing to do: Add would number
+ * named pages on from the last chapter, and Replace would delete the writer's
+ * chapters in exchange for pages that cannot fill them.
+ */
+it("asks only when the book has writing and the file has chapters", () => {
+  const chapters = { front: 0, body: 3, back: 0 };
+  const pagesOnly = { front: 0, body: 0, back: 8 };
+
+  expect(importAsksFirst(true, chapters)).toBe(true);
+  // A file of back matter alone goes straight in, whatever is already written.
+  expect(importAsksFirst(true, pagesOnly)).toBe(false);
+  // An empty book has nothing to lose either way.
+  expect(importAsksFirst(false, chapters)).toBe(false);
+  expect(importAsksFirst(false, pagesOnly)).toBe(false);
+});
+
+// --- importing one part of a book on its own --------------------------------
+
+/**
+ * A real back-matter document with **no heading styles at all** — the shape a
+ * writer actually produces, and the one the whole-book importer reads as a
+ * single page called "Epilogue" because `CHAPTER_LINE` is a closed vocabulary.
+ */
+const BACK_MATTER = [
+  "Epilogue",
+  "Six months later, Julian lived in a cabin entirely off the grid.",
+  "Afterword",
+  "Writing The Code of Echoes was an exercise in exploring control.",
+  "Acknowledgements",
+  "Thank you to my editor, Sarah Jenkins, for helping me trim the fat.",
+  "About the Author",
+  "Elias Thorne is a former software engineer who now writes fiction.",
+  "Also by the Author",
+  "The Silicon Vein. Ghost in the Server. Analog Dreams.",
+  "A Word About Reviews",
+  "If you enjoyed this short novel, please consider leaving a review.",
+  "Excerpt from the next book: The Echo Protocol",
+  "The radio static hadn't just been a phantom frequency.",
+  "Glossary",
+  "Core, The: the centralized quantum processing unit.",
+].join("\n\n");
+
+it("opens a page at a division name once the writer has named the part", () => {
+  const line = paragraph("Afterword");
+  expect(looksLikeMatterLine(line, "back")).toBe(true);
+  // Not at the other end of the book, and not a chapter divider on its own.
+  expect(looksLikeMatterLine(line, "front")).toBe(false);
+  expect(looksLikeChapterLine(line)).toBe(false);
+});
+
+/**
+ * **This is the test the feature exists for.**
+ *
+ * Unscoped, the file above splits once — only "Epilogue" is in the standing
+ * divider vocabulary, so the other seven divisions arrive buried inside it and
+ * the import looks broken when the file was fine. Naming the part is what
+ * widens the vocabulary, and it widens it only to that part's own page names.
+ */
+it("splits a back-matter file the whole-book importer would not", async () => {
+  const whole = await importFile(asFile(BACK_MATTER, "back.txt"));
+  expect(whole.chapters).toHaveLength(1);
+
+  /* Eight pages, where the whole-book read found one. Seven arrive in the
+     catalogue's spelling because `taggedByName` recognised them on the way
+     through; the excerpt keeps the writer's own heading, because the general
+     rule cannot see past its colon — `partOfImport` is what settles that one,
+     and the test below is where it does. */
+  const scoped = await importFile(asFile(BACK_MATTER, "back.txt"), "back");
+  expect(scoped.chapters.map((c) => c.title)).toEqual([
+    "Epilogue",
+    "Afterword",
+    "Acknowledgements",
+    "About the author",
+    "Also by the author",
+    "A word about reviews",
+    "Excerpt from the next book: The Echo Protocol",
+    "Glossary",
+  ]);
+});
+
+it("keeps what belongs to the part and names what does not", async () => {
+  const scoped = await importFile(asFile(BACK_MATTER, "back.txt"), "back");
+  const { kept, leftOut } = partOfImport(scoped.chapters, "back");
+
+  expect(leftOut).toEqual([]);
+  // Every page tagged, and renamed to the catalogue's own spelling.
+  expect(kept.every((c) => c.matter === "back")).toBe(true);
+  expect(kept.map((c) => c.title)).toEqual([
+    "Epilogue",
+    "Afterword",
+    "Acknowledgements",
+    "About the author",
+    "Also by the author",
+    "A word about reviews",
+    "An excerpt from the next book",
+    "Glossary",
+  ]);
+});
+
+it("lands nothing from a manuscript aimed at the wrong card", async () => {
+  // The mis-drop. Nothing is forced into the back of the book, and every piece
+  // is named rather than dropped in silence.
+  const book = await importFile(asFile(MANUSCRIPT, "novel.md"), "back");
+  const { kept, leftOut } = partOfImport(book.chapters, "front");
+
+  expect(kept.map((c) => c.title)).toContain("Half-title page");
+  expect(leftOut.length).toBeGreaterThan(0);
+  expect(leftOut).toContain("Epilogue");
+});
+
+it("reads the body as everything the catalogue did not claim", async () => {
+  const book = await importFile(asFile(MANUSCRIPT, "novel.md"));
+  const { kept, leftOut } = partOfImport(book.chapters, "body");
+
+  expect(kept.every((c) => !c.matter)).toBe(true);
+  expect(kept).toHaveLength(importSummary(book.chapters).body);
+  expect(leftOut).toContain("Half-title page");
+  expect(leftOut).toContain("Glossary");
 });

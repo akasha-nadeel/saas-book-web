@@ -1,13 +1,24 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RailButton } from "@/components/editor/icon-rail";
+import { ImportFailedDialog } from "@/components/editor/import-failed-dialog";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
-import { importSummary, type ImportedChapter } from "@/lib/import/split";
-import { bookWordCount, importIntoBook, type Book } from "@/lib/library-store";
+import {
+  NOTHING_NEW,
+  importAsksFirst,
+  importSummary,
+  type ImportedChapter,
+} from "@/lib/import/split";
+import {
+  bookWordCount,
+  importIntoBook,
+  newInImport,
+  type Book,
+} from "@/lib/library-store";
 
 /**
  * Bringing a manuscript file into this book, from the manuscript's own rail.
@@ -45,12 +56,25 @@ export function ImportChapterButton({
     setProblem(null);
     try {
       const parsed = await importFile(file);
-      // Already written here? Ask add-or-replace. An empty book just takes it.
-      if (bookWordCount(book) > 0) {
-        setPending(parsed.chapters);
+
+      /* **Dropped here rather than inside the store**, so the writer is told
+         which pages the book already had instead of meeting a storage error.
+         Everything downstream — the question, the banner, the import itself —
+         sees this list, so all three describe the same set of pages. */
+      const fresh = newInImport(book, parsed.chapters);
+      if (!fresh.length) {
+        setProblem(NOTHING_NEW);
         return;
       }
-      run(parsed.chapters, "replace");
+
+      const written = bookWordCount(book) > 0;
+      if (importAsksFirst(written, importSummary(fresh))) {
+        setPending(fresh);
+        return;
+      }
+      /* Nothing at stake: an empty book is replaced outright and numbered from
+         one, and a file with no chapters in it can only ever be added to. */
+      run(fresh, written ? "add" : "replace");
     } catch (err) {
       setProblem(
         err instanceof ImportError
@@ -116,8 +140,8 @@ export function ImportChapterButton({
 
       {pending && (
         <ImportModeDialog
-          existingCount={book.chapters.filter((c) => !c.matter).length}
-          importCount={pending.length}
+          existing={importSummary(book.chapters)}
+          incoming={importSummary(pending)}
           onAdd={() => run(pending, "add")}
           onReplace={() => run(pending, "replace")}
           onClose={() => setPending(null)}
@@ -131,57 +155,5 @@ export function ImportChapterButton({
         />
       )}
     </>
-  );
-}
-
-/**
- * A failed read, said in a dialog.
- *
- * In the chapter list this was a paragraph under the button, which a rail has
- * no room for — and a rail button that silently does nothing on a damaged file
- * is the worst of the options. The message is the importer's own, which names
- * the format problem rather than saying the file is bad.
- */
-function ImportFailedDialog({
-  message,
-  onClose,
-}: {
-  message: string;
-  onClose: () => void;
-}) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    dialogRef.current?.showModal();
-  }, []);
-
-  return (
-    <dialog
-      ref={dialogRef}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === dialogRef.current) onClose();
-      }}
-      className="m-auto w-[26rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
-    >
-      <div className="p-6">
-        <h2 className="font-serif text-xl">That file did not come in</h2>
-        <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
-          {message}
-        </p>
-        <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md border border-line px-3 py-2 font-sans text-sm
-                       text-fg outline-none transition-colors hover:bg-raised
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </dialog>
   );
 }

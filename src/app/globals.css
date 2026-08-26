@@ -3977,6 +3977,42 @@ body {
 .reader-opener-link:focus-visible .reader-title {
   color: var(--color-accent);
 }
+/**
+ * The editable title's hit area, and the one sign that it is one.
+ *
+ * The chapter title on the page has been an `<input>` since the opener was
+ * built, and nothing on screen said so. Its box is only as tall as its own
+ * line — 42px of target sitting inside a 190px `.chapter-opener`, with the
+ * label above it and 1.9em of dead paper below — so a writer aiming at the big
+ * centred title and landing five pixels high hits the wrapper and nothing
+ * happens at all. That reads as "the title cannot be edited from here" rather
+ * than as a miss, which is exactly what it was reported as.
+ *
+ * **The padding is taken out of the margin below**, so the band grows by four
+ * tenths of an em top and bottom and the page setting does not move a pixel —
+ * the prose starts where it always did, and the reading view and the export,
+ * which share `.reader-title` and not this class, are untouched.
+ *
+ * The tint is mixed from `--paper-fg` the way `--paper-select` is a few rules
+ * up, so it holds on white, cream, grey and the dark sheet without four
+ * values. Only on hover: a permanent field on a manuscript page would be the
+ * chrome climbing onto the paper.
+ */
+.reader-title-field {
+  padding: 0.4em 0.3em;
+  /* Both edges pulled back by what the padding added, so the band grows
+     outwards into paper that was already blank and the title itself does not
+     move: the label above keeps its gap and the prose below starts on the same
+     line it did. */
+  margin-top: -0.4em;
+  margin-bottom: calc(1.9em - 0.4em);
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+.reader-title-field:hover:not(:focus) {
+  background: color-mix(in srgb, var(--paper-fg) 6%, transparent);
+}
 .reader-empty {
   text-align: center;
   text-indent: 0;

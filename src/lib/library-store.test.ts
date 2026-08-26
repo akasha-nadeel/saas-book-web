@@ -34,6 +34,7 @@ import {
   setChapterUnnumbered,
   spellNumber,
   importIntoBook,
+  newInImport,
   restoreChapter,
   trashedChapters,
   undoChapterImport,
@@ -1545,6 +1546,150 @@ const importedPage = (title: string, matter: "front" | "back") => ({
  * importing a `.docx` twice duplicated chapters and nothing else. Now every
  * re-import carries the whole apparatus with it.
  */
+/**
+ * **The screen that asks and the store that acts read one rule.**
+ *
+ * `newInImport` was inlined in `importIntoBook` until the import dialog needed
+ * the same answer *before* the writer chose. Re-importing a file of pages the
+ * book already had fell through the store's single `null` return and surfaced
+ * as "the book may be too large for this browser's storage" — the wrong cause,
+ * blaming the browser, sending the writer to clear space they did not need.
+ */
+it("reports which pages of an import are new", () => {
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [importedPage("Dedication", "front")], "add");
+  const book = findBook(getShelf(), bookId)!;
+
+  // Every page already here: nothing to bring in, and a screen can say so.
+  expect(
+    newInImport(book, [importedPage("Dedication", "front")]),
+  ).toEqual([]);
+
+  // The same name at the other end of the book is a different page.
+  expect(
+    newInImport(book, [importedPage("Dedication", "back")]),
+  ).toHaveLength(1);
+
+  // A body chapter is never a duplicate — a book may genuinely have two of a
+  // name, and they are renumbered on the way in.
+  expect(newInImport(book, [imported("The Woods"), imported("The Woods")]))
+    .toHaveLength(2);
+});
+
+/**
+ * **Replace clears one part, and the other two are not its business.**
+ *
+ * A manuscript replaces the chapters and spares the writer's dedication; a file
+ * imported into the Back matter card replaces the back matter and spares the
+ * chapters. Same rule, told which part it is about — and the reason the card's
+ * import can offer Replace at all, which is the thing a writer with eight
+ * template back pages and a file of the real prose had no way to say.
+ */
+it("replaces one part of the book and leaves the other two alone", () => {
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [imported("One"), imported("Two")], "add");
+  importIntoBook(bookId, [importedPage("Dedication", "front")], "add");
+  importIntoBook(
+    bookId,
+    [importedPage("Epilogue", "back"), importedPage("Glossary", "back")],
+    "add",
+  );
+
+  const result = importIntoBook(
+    bookId,
+    [importedPage("Afterword", "back")],
+    "replace",
+    "back",
+  )!;
+  expect(result).not.toBeNull();
+
+  const after = findBook(getShelf(), bookId)!;
+  const titles = (m: "front" | "back" | undefined) =>
+    after.chapters.filter((c) => c.matter === m).map((c) => c.title);
+
+  expect(titles("back")).toEqual(["Afterword"]);
+  // Untouched, both of them. ("Chapter One" is the one `createBook` seeds.)
+  expect(titles("front")).toEqual(["Dedication"]);
+  expect(after.chapters.filter((c) => !c.matter).map((c) => c.title)).toEqual([
+    "Chapter One",
+    "Chapter 2 – One",
+    "Chapter 3 – Two",
+  ]);
+});
+
+it("does not renumber the chapters when the back matter is replaced", () => {
+  // `startNumber` resets to zero only when the body is the thing being
+  // cleared. A back-matter import that renumbered the book from one would be a
+  // quiet disaster in a file nobody thought was about chapters.
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [imported("One"), imported("Two")], "add");
+  importIntoBook(bookId, [importedPage("Epilogue", "back")], "add");
+
+  const bodyTitles = () =>
+    findBook(getShelf(), bookId)!
+      .chapters.filter((c) => !c.matter)
+      .map((c) => c.title);
+  const before = bodyTitles();
+
+  importIntoBook(bookId, [importedPage("Glossary", "back")], "replace", "back");
+
+  expect(bodyTitles()).toEqual(before);
+});
+
+it("puts every part back when a scoped replace is undone", () => {
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [imported("One")], "add");
+  importIntoBook(
+    bookId,
+    [importedPage("Epilogue", "back"), importedPage("Glossary", "back")],
+    "add",
+  );
+
+  const result = importIntoBook(
+    bookId,
+    [importedPage("Afterword", "back")],
+    "replace",
+    "back",
+  )!;
+  undoChapterImport(result.undo);
+
+  const after = findBook(getShelf(), bookId)!;
+  expect(after.chapters.filter((c) => c.matter === "back").map((c) => c.title))
+    .toEqual(["Epilogue", "Glossary"]);
+  // The seeded "Chapter One" plus the one imported above.
+  expect(after.chapters.filter((c) => !c.matter)).toHaveLength(2);
+});
+
+it("counts a page as new when its own part is the one being replaced", () => {
+  /* The rule that used to be mode-independent and is not any more. A page the
+     book already has is a duplicate under Add — the pages stay — and is *not*
+     one under a replace of its own part, because they are what is going. Get
+     this backwards and the card's Replace silently imports nothing. */
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [importedPage("Epilogue", "back")], "add");
+  const book = findBook(getShelf(), bookId)!;
+  const file = [importedPage("Epilogue", "back")];
+
+  expect(newInImport(book, file)).toEqual([]);
+  expect(newInImport(book, file, "back")).toHaveLength(1);
+  // Replacing the body says nothing about the back matter.
+  expect(newInImport(book, file, "body")).toEqual([]);
+});
+
+it("gives the same answer whichever way the import is about to land", () => {
+  /* Replace clears the body and spares every matter page, so the set being
+     compared against is identical in both modes. That is what lets the dialog
+     ask before the writer has chosen — and it must not quietly stop being
+     true. */
+  const { bookId } = createBook("A");
+  importIntoBook(bookId, [imported("One")], "add");
+  importIntoBook(bookId, [importedPage("Glossary", "back")], "add");
+  const book = findBook(getShelf(), bookId)!;
+
+  const file = [imported("Two"), importedPage("Glossary", "back")];
+  expect(newInImport(book, file).map((c) => c.title)).toEqual(["Two"]);
+});
+
 it("does not add a matter page the book already has", () => {
   const { bookId } = createBook("A");
   importIntoBook(bookId, [importedPage("Dedication", "front")], "add");

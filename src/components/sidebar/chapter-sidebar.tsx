@@ -12,6 +12,7 @@ import {
   canWriteBook,
   findBook,
   importIntoBook,
+  newInImport,
   moveChapter,
   renameChapter,
   setPref,
@@ -22,7 +23,12 @@ import {
 import { RowMenu, menuIcons } from "@/components/sidebar/row-menu";
 import { useShelf } from "@/lib/use-library";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
-import { importSummary, type ImportedChapter } from "@/lib/import/split";
+import {
+  NOTHING_NEW,
+  importAsksFirst,
+  importSummary,
+  type ImportedChapter,
+} from "@/lib/import/split";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 
@@ -95,14 +101,26 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
     setImportError(null);
     try {
       const parsed = await importFile(file);
-      // "Already wrote a novel here" = any chapter with words in it.
-      if (book && bookWordCount(book) > 0) {
-        setPending(parsed.chapters);
+
+      /* The same three steps the rail's copy of this control takes, over the
+         same two rules — `newInImport` and `importAsksFirst` — so the two doors
+         into one book cannot ask different questions about one file. */
+      const fresh = newInImport(book, parsed.chapters);
+      if (!fresh.length) {
+        setImportError(NOTHING_NEW);
         return;
       }
-      // Nothing written yet: replace the empty placeholder chapters cleanly,
-      // numbered from one, with no question asked.
-      runImport(parsed.chapters, "replace");
+
+      // "Already wrote a novel here" = any chapter with words in it.
+      const written = bookWordCount(book) > 0;
+      if (importAsksFirst(written, importSummary(fresh))) {
+        setPending(fresh);
+        return;
+      }
+      // Nothing at stake: an empty book has its blank placeholder chapters
+      // replaced cleanly, numbered from one, with no question asked — and a
+      // file carrying no chapters can only ever be added to.
+      runImport(fresh, written ? "add" : "replace");
     } catch (err) {
       setImportError(
         err instanceof ImportError
@@ -656,8 +674,8 @@ export function ChapterSidebar({ bookId }: { bookId: string }) {
 
       {pending && (
         <ImportModeDialog
-          existingCount={allBodyChapters.length}
-          importCount={pending.length}
+          existing={importSummary(book.chapters)}
+          incoming={importSummary(pending)}
           onAdd={() => runImport(pending, "add")}
           onReplace={() => runImport(pending, "replace")}
           onClose={() => setPending(null)}

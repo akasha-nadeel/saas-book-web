@@ -22,26 +22,22 @@ import {
   setChapterMatter,
   setChapterUnnumbered,
   shouldAskMatter,
-  startMatter,
   toggleBookmark,
   type Book,
   type ChapterMatter,
   type ChapterMeta,
 } from "@/lib/library-store";
-import { missingSections, type MatterPart } from "@/lib/matter";
+import type { MatterPart, MatterSection } from "@/lib/matter";
+import { matterRows } from "@/lib/matter-list";
 import { isDraftMatter } from "@/lib/export/blocks";
-import {
-  Menu,
-  MenuButton,
-  MenuLabel,
-  MenuSeparator,
-} from "@/components/ui/menu";
+import { SwitchTrack } from "@/components/ui/switch";
 import {
   RowMenu,
   menuIcons,
   type RowMenuItem,
 } from "@/components/sidebar/row-menu";
 import { MatterSetupDialog } from "@/components/editor/matter-setup-dialog";
+import { SectionImportButton } from "@/components/editor/section-import";
 import { ConfirmDialog, PromptDialog } from "@/components/ui/dialog";
 
 /**
@@ -554,22 +550,26 @@ export function BookPanel({
   };
 
   /**
-   * Make a part's standard pages, for a book that has none.
+   * A standard division switched on, and **the writer stays where they are.**
    *
-   * Front matter used to be one page carrying every division as a heading, and
-   * this made that one page. It makes eight now — see `src/lib/matter.ts` for
-   * why — and lands the writer on the first of them with the list open beside
-   * it, so the shape of what they just got is on screen rather than hidden
-   * behind a card they would have to press again.
+   * The Add-page menu this replaced opened the new page, which was right for a
+   * menu: you went looking for one page and got it. A switch is a setting, and
+   * a writer setting up the front of a book flips four or five of them in a
+   * row — opening each one would remount the editor and the panel underneath
+   * them four or five times, and leave them somewhere they did not ask to be.
+   * The row lighting up with its Draft mark is the answer, and the row is
+   * still a press away from the page itself.
    */
-  const handleStartMatter = (part: MatterPart) => {
-    const first = startMatter(bookId, part);
-    if (!first) return;
-    body.remember(part);
-    open(first);
+  const handleSwitchOnMatterPage = (part: MatterPart, title: string) => {
+    createMatterPage(bookId, part, title);
   };
 
-  /** One more page in a part, opened so the writer can fill it in. */
+  /**
+   * A page the writer named themselves, opened so they can fill it in.
+   *
+   * Unlike the switch above: they have just typed a title for a page that is
+   * on no list, so the page is what they were after.
+   */
   const handleAddMatterPage = (part: MatterPart, title: string) => {
     const id = createMatterPage(bookId, part, title);
     if (!id) return;
@@ -869,6 +869,7 @@ export function BookPanel({
               part="front"
               label="Front matter"
               description="The pages before Chapter 1 — a title page, the copyright, a dedication."
+              book={book}
               bookId={bookId}
               pages={frontPages}
               chapterId={chapterId}
@@ -880,10 +881,11 @@ export function BookPanel({
               }
               compact={!!body.open && body.open !== "front"}
               onToggle={() => openPartList("front")}
-              onStart={() => handleStartMatter("front")}
               onAdd={(title) => handleAddMatterPage("front", title)}
+              onSwitchOn={(title) => handleSwitchOnMatterPage("front", title)}
               onOpenPage={open}
               onDelete={(id, title) => setDeleting({ id, title })}
+              onDeleteNow={handleDelete}
               canWrite={canWrite}
             />
 
@@ -912,6 +914,17 @@ export function BookPanel({
                 body.open === "body" || (!body.open && openPart === "body")
               }
               onAction={() => openPartList("body")}
+              /* This part's own import, beside the two controls the card
+                 already had. A reader is offered none of the three. */
+              trailing={
+                canWrite ? (
+                  <SectionImportButton
+                    book={book}
+                    part="body"
+                    label="Body matter"
+                  />
+                ) : undefined
+              }
               compact={!!body.open && body.open !== "body"}
               // Only once the list is open. Shut, the card has one thing to
               // offer — open me — and a second button beside it halves the
@@ -989,6 +1002,7 @@ export function BookPanel({
               part="back"
               label="Back matter"
               description="The pages after the story — an epilogue, acknowledgements, about the author."
+              book={book}
               bookId={bookId}
               pages={backPages}
               chapterId={chapterId}
@@ -998,10 +1012,11 @@ export function BookPanel({
               }
               compact={!!body.open && body.open !== "back"}
               onToggle={() => openPartList("back")}
-              onStart={() => handleStartMatter("back")}
               onAdd={(title) => handleAddMatterPage("back", title)}
+              onSwitchOn={(title) => handleSwitchOnMatterPage("back", title)}
               onOpenPage={open}
               onDelete={(id, title) => setDeleting({ id, title })}
+              onDeleteNow={handleDelete}
               canWrite={canWrite}
             />
           </div>
@@ -1132,6 +1147,8 @@ function ChapterPill({
   onClick,
   menu,
   mark,
+  markColumn,
+  onSwitchOff,
 }: {
   number: number | null;
   title: string;
@@ -1140,6 +1157,19 @@ function ChapterPill({
   menu: RowMenuItem[];
   /** A word in place of the number — "Draft" on an unfilled matter page. */
   mark?: string;
+  /**
+   * Keep the wide mark column on a row that has no mark.
+   *
+   * A matter list is mostly rows without one, and the column was sized per
+   * row — so a finished dedication and a draft one started their titles four
+   * characters apart, in a list whose whole job is being read down.
+   */
+  markColumn?: boolean;
+  /**
+   * The switch that takes this page back out of the book. Absent on a body
+   * chapter, and on a book somebody let this writer only read.
+   */
+  onSwitchOff?: () => void;
 }) {
   return (
     /* `group` and `relative` for the ⋯: it is laid over the row's right end
@@ -1151,9 +1181,11 @@ function ChapterPill({
         onClick={onClick}
         aria-current={active ? "page" : undefined}
         className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
-                    py-2 pr-9 pl-2.5 text-left font-sans text-sm outline-none
+                    py-2 pl-2.5 text-left font-sans text-sm outline-none
                     border transition-colors focus-visible:ring-2
                     focus-visible:ring-accent/50 ${
+                      onSwitchOff ? "pr-11" : "pr-9"
+                    } ${
                       active
                         ? ROW_ACTIVE
                         : "border-transparent text-fg hover:bg-raised"
@@ -1167,7 +1199,11 @@ function ChapterPill({
             about these pages worth seeing without opening them. */}
         <span
           className={`shrink-0 text-right text-[10px] tabular-nums ${
-            mark ? "w-10 tracking-wide uppercase" : "w-5 text-xs"
+            mark
+              ? "w-10 tracking-wide uppercase"
+              : markColumn
+                ? "w-10"
+                : "w-5 text-xs"
           } ${active ? "text-fg" : "text-muted"}`}
         >
           {mark ?? number ?? ""}
@@ -1180,13 +1216,90 @@ function ChapterPill({
           so a book somebody let this writer *read* passes an empty list — and a ⋯
           that opens onto nothing is worse than no ⋯ at all. */}
       {menu.length > 0 && (
-        <span className="absolute top-1/2 right-1 -translate-y-1/2">
+        <span
+          className={`absolute top-1/2 -translate-y-1/2 ${
+            onSwitchOff ? "right-11" : "right-1"
+          }`}
+        >
           {/* `active` keeps the trigger shown on the open chapter: its actions
               should be one click away rather than one hover, and it is the row a
               touch user cannot hover to find at all. */}
           <RowMenu label={title} items={menu} active={active} />
         </span>
       )}
+
+      {/* **The switch says whether the book has this page at all**, which is
+          the question the card is now a list of answers to.
+
+          A sibling of the row's button rather than a child of it: a control
+          inside a control is not a thing the platform has, and nesting them
+          would make one press mean both "open this page" and "delete it". */}
+      {onSwitchOff && (
+        <span className="absolute top-1/2 right-1 -translate-y-1/2">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={true}
+            aria-label={`Take ${title} out of the book`}
+            onClick={onSwitchOff}
+            className="flex cursor-pointer rounded-full outline-none
+                       focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <SwitchTrack on={true} />
+          </button>
+        </span>
+      )}
+    </li>
+  );
+}
+
+/**
+ * A division the book has no page for yet.
+ *
+ * There is nothing to open, so the whole row *is* the switch — the shape every
+ * settings list uses, and the reason the card no longer needs an Add page
+ * menu. It keeps the page row's height, its left edge and its mark column so
+ * the two read as one list rather than two.
+ *
+ * Quieter than a page row on purpose: `text-muted` and no mark. The card is a
+ * list of what the book has, and these are the gaps in it — legible, one press
+ * away, and not competing with the pages that are really there.
+ */
+function MatterOfferPill({
+  section,
+  onSwitchOn,
+}: {
+  section: MatterSection;
+  onSwitchOn: () => void;
+}) {
+  return (
+    <li className="relative">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={false}
+        onClick={onSwitchOn}
+        /* The name as well as the hint, because this column is narrow enough
+           to truncate the longest of them — "An excerpt from the next book"
+           does not survive it — and a row you cannot finish reading is a row
+           you cannot decide about. */
+        title={`${section.title} — ${section.hint}`}
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg
+                   border border-transparent py-2 pr-11 pl-2.5 text-left
+                   font-sans text-sm text-muted outline-none transition-colors
+                   hover:bg-raised hover:text-fg focus-visible:ring-2
+                   focus-visible:ring-accent/50"
+      >
+        <span aria-hidden="true" className="w-10 shrink-0" />
+        <span className="min-w-0 flex-1 truncate">{section.title}</span>
+      </button>
+
+      {/* Laid over the row and deaf to the pointer, so the press lands on the
+          button underneath and the whole row is one target. There is no second
+          thing to press here — unlike a page row, which also opens a page. */}
+      <span className="pointer-events-none absolute top-1/2 right-1 -translate-y-1/2">
+        <SwitchTrack on={false} />
+      </span>
     </li>
   );
 }
@@ -1227,6 +1340,7 @@ function MatterCard({
   onAction,
   secondary,
   secondaryNode,
+  trailing,
   grow = false,
   compact = false,
   gapToPage = 0,
@@ -1268,6 +1382,16 @@ function MatterCard({
    * caller error rather than a state worth guarding.
    */
   secondaryNode?: React.ReactNode;
+  /**
+   * A control at the end of the button row, outside the flex-1 share.
+   *
+   * The two above take an equal half of the row each, which is right for two
+   * words apiece and wrong for a third: the body card would read
+   * `[Hide chapters][New chapter][Import]` across a card about 250px wide and
+   * the first label would not fit. This slot is for a square icon button that
+   * takes only its own width, so the text buttons keep theirs.
+   */
+  trailing?: React.ReactNode;
   grow?: boolean;
   /**
    * Shrink to a name and nothing else, because another card is using the room.
@@ -1514,6 +1638,8 @@ function MatterCard({
                   {secondary.label}
                 </button>
               )}
+
+              {trailing}
             </div>
           </div>
         </div>
@@ -1593,11 +1719,26 @@ function MatterCard({
  * left alone that sheet exported: a reader opening the finished EPUB found a
  * bare list of terms between the cover and Chapter One.
  *
- * They are pages now. The card behaves exactly like the body's — press it and
- * the list unfolds inside it, click a row to open that page, ⋯ to rename or
- * delete, Add page for one more. Same card, same rows, same gestures, because
- * the three parts of a book are three of the same kind of thing and the panel
- * had been saying they were not.
+ * They are pages now. The card behaves like the body's — press it and the list
+ * unfolds inside it, click a row to open that page, ⋯ to rename or move it —
+ * because the three parts of a book are three of the same kind of thing and
+ * the panel had been saying they were not.
+ *
+ * **Where the body lists chapters, this lists divisions**, and that is the one
+ * place the two cards part company. A book has whatever chapters the writer
+ * wrote; the divisions are a fixed catalogue of sixteen (`matter.ts`), and the
+ * question about each is only ever whether this book has one. So every one of
+ * them is a row with a switch — on when the page exists, off when it does not
+ * — and the card is a list of answers rather than a list of pages.
+ *
+ * That replaced an **Add page** menu, which hid fourteen of the sixteen behind
+ * a dropdown and left the card unable to say what it was for: a writer looking
+ * at three rows had no way to know whether their book was missing a copyright
+ * page or had never been offered one. Switching a row on is what adding a page
+ * has become, and switching it off deletes it — into the book's trash, the
+ * same soft delete the ⋯ menu's Delete does, so nothing said yes to here
+ * cannot be taken back. A page with the writer's own prose on it still asks
+ * first; see `switchOff` below.
  *
  * **The "draft" mark is the honest half.** Each page is seeded with the real
  * shape of the thing — `For [name].` for a dedication — and every line the
@@ -1609,6 +1750,7 @@ function MatterPagesCard({
   part,
   label,
   description,
+  book,
   bookId,
   pages,
   chapterId,
@@ -1617,15 +1759,18 @@ function MatterPagesCard({
   compact,
   gapToPage,
   onToggle,
-  onStart,
   onAdd,
+  onSwitchOn,
   onOpenPage,
   onDelete,
+  onDeleteNow,
   canWrite,
 }: {
   part: MatterPart;
   label: string;
   description: string;
+  /** The whole book: the section import counts against it and dedupes on it. */
+  book: Book;
   bookId: string;
   pages: readonly ChapterMeta[];
   chapterId: string | null;
@@ -1634,11 +1779,15 @@ function MatterPagesCard({
   compact: boolean;
   gapToPage: number;
   onToggle: () => void;
-  onStart: () => void;
+  /** A page the writer named themselves. Creates it and opens it. */
   onAdd: (title: string) => void;
+  /** A standard division switched on. Creates it and stays put. */
+  onSwitchOn: (title: string) => void;
   onOpenPage: (id: string) => void;
   /** Confirms, deletes, and moves off the page when it was the open one. */
   onDelete: (id: string, title: string) => void;
+  /** The same, with no question asked. Only for a page with nothing on it. */
+  onDeleteNow: (id: string) => void;
   /** False for a book somebody let this writer read: no controls that write. */
   canWrite: boolean;
 }) {
@@ -1680,10 +1829,42 @@ function MatterPagesCard({
     }
   }
 
-  const missing = missingSections(
-    part,
-    pages.map((p) => p.title),
-  );
+  /**
+   * Every division this part offers, whether or not the book has a page for
+   * it — and the pages the book has that are on no list, at the end.
+   *
+   * The arithmetic is `matter-list.ts` rather than a sort here, because the
+   * one rule that is easy to get wrong lives in it: a page the book already
+   * has is never moved, and an offer sits exactly where switching it on would
+   * put the page. See the note at the top of that file.
+   *
+   * **A reader sees the book that exists.** Filtering the offers out rather
+   * than showing sixteen dead switches is the same choice the header buttons
+   * make — a control that cannot be worked is worse than no control.
+   */
+  const rows = canWrite
+    ? matterRows(part, pages)
+    : matterRows(part, pages).filter((row) => row.kind === "page");
+
+  /**
+   * Switching a page off.
+   *
+   * **The question is only worth asking when there is something to lose.** A
+   * page still carrying its `[brackets]` has nothing on it the writer wrote —
+   * the export leaves it out for exactly that reason, and it goes to the
+   * book's trash either way — so a dialog there is a speed bump in the middle
+   * of setting up a book, four or five switches at a time. A page they have
+   * actually written gets the same confirmation the row menu's Delete gives
+   * it, because the switch must never be a quiet way to bin somebody's
+   * dedication.
+   *
+   * `drafts` is the same `isDraftMatter` answer the row's mark is drawn from,
+   * so the rule a writer can see on the row is the rule that decides.
+   */
+  const switchOff = (page: ChapterMeta) => {
+    if (drafts.has(page.id)) onDeleteNow(page.id);
+    else onDelete(page.id, page.title);
+  };
 
   return (
     <MatterCard
@@ -1695,131 +1876,108 @@ function MatterPagesCard({
           ? `${pages.length} ${pages.length === 1 ? "page" : "pages"}`
           : undefined
       }
-      // "Start" only while there is nothing there. Once the pages exist the
-      // card does what the body's does, and says so in the same words.
-      // A reader is never offered "Start": it makes a dozen pages, which is a
-      // decision about the shape of somebody else's book. `undefined` removes the
-      // button rather than greying it — see MatterCard.
-      action={started ? (open ? "Hide pages" : "Pages") : canWrite ? "Start" : undefined}
+      // Always the same two words, where this used to say "Start" on an empty
+      // part. There is no empty state left to start: a part with no pages
+      // opens onto its eight offers with every switch off, which says what the
+      // part is for far better than a button that made all eight at once.
+      action={open ? "Hide pages" : "Pages"}
       active={active}
-      onAction={started ? onToggle : onStart}
+      onAction={onToggle}
       compact={compact}
       grow={open}
-      // Same rule as the body's New chapter: only once the list is open. Shut,
-      // the card has one thing to offer and a second control beside it halves
-      // the width of that one thing.
-      secondaryNode={
-        open && canWrite ? (
-          <Menu
-            label={`Add a page to ${label.toLowerCase()}`}
-            align="end"
-            width={264}
-            triggerClassName={`flex-1 cursor-pointer rounded-lg py-1.5
-                               font-sans text-xs font-semibold outline-none
-                               transition-colors focus-visible:ring-2
-                               ${CARD_OUTLINE}`}
-            trigger="Add page"
-          >
-            {(close) => (
-              <>
-                {/* **Two groups, because "the usual pages" was not true of all
-                    of them.** One heading over a list running from Dedication
-                    to Glossary tells a writer that a finished book has the
-                    lot — which is the reading that produces empty epigraphs
-                    and invented also-by pages, and no shop asks for any of
-                    them. The few most books have go first under their own
-                    heading; the rest are still one glance below.
-
-                    Named and explained either way: "Epigraph" is a word a
-                    first-time writer has no reason to know, and a menu of
-                    eight of them is a menu of eight guesses. */}
-                {missing.usual.length > 0 && (
-                  <>
-                    <MenuLabel>Most books have</MenuLabel>
-                    {missing.usual.map((section) => (
-                      <MenuButton
-                        key={section.title}
-                        onClick={() => {
-                          close();
-                          onAdd(section.title);
-                        }}
-                        hint={section.hint}
-                      >
-                        {section.title}
-                      </MenuButton>
-                    ))}
-                  </>
-                )}
-                {missing.rest.length > 0 && (
-                  <>
-                    <MenuLabel>If your book needs one</MenuLabel>
-                    {missing.rest.map((section) => (
-                      <MenuButton
-                        key={section.title}
-                        onClick={() => {
-                          close();
-                          onAdd(section.title);
-                        }}
-                        hint={section.hint}
-                      >
-                        {section.title}
-                      </MenuButton>
-                    ))}
-                  </>
-                )}
-                {(missing.usual.length > 0 || missing.rest.length > 0) && (
-                  <MenuSeparator />
-                )}
-                <MenuButton
-                  onClick={() => {
-                    close();
-                    setNaming(true);
-                  }}
-                  hint="A page of your own, named by you."
-                >
-                  Something else…
-                </MenuButton>
-              </>
-            )}
-          </Menu>
+      /* This part on its own, from a file. Front matter, the chapters and back
+         matter are often three documents rather than one, and the rail's
+         whole-book import has no way to be told which of the three it is
+         holding. See `section-import.tsx`. */
+      trailing={
+        canWrite ? (
+          <SectionImportButton book={book} part={part} label={label} />
         ) : undefined
       }
     >
-      {started ? (
-        pages.map((page) => (
+      {rows.map((row) =>
+        row.kind === "offer" ? (
+          <MatterOfferPill
+            key={`offer:${row.section.title}`}
+            section={row.section}
+            onSwitchOn={() => onSwitchOn(row.section.title)}
+          />
+        ) : (
           <ChapterPill
-            key={page.id}
+            key={row.page.id}
             number={null}
             // Never a number — these pages are named, not counted. The column
             // carries whether the page is still scaffolding instead, which is
             // the one thing about it worth seeing from the list.
-            mark={drafts.has(page.id) ? "Draft" : undefined}
-            title={page.title}
-            active={page.id === chapterId}
-            onClick={() => onOpenPage(page.id)}
-            menu={!canWrite ? [] : [
-              {
-                label: "Rename",
-                icon: menuIcons.rename,
-                onSelect: () => {
-                  setRenamingPage({ id: page.id, title: page.title });
-                },
-              },
-              /* The direction that matters most for an import: a page the
-                 catalogue put in the wrong part, back into the story. */
-              ...destinationsFrom(bookId, page.id, part),
-              {
-                label: "Delete",
-                icon: menuIcons.trash,
-                danger: true,
-                onSelect: () => onDelete(page.id, page.title),
-              },
-            ]}
+            mark={drafts.has(row.page.id) ? "Draft" : undefined}
+            markColumn
+            title={row.page.title}
+            active={row.page.id === chapterId}
+            onClick={() => onOpenPage(row.page.id)}
+            onSwitchOff={canWrite ? () => switchOff(row.page) : undefined}
+            menu={
+              !canWrite
+                ? []
+                : [
+                    {
+                      label: "Rename",
+                      icon: menuIcons.rename,
+                      onSelect: () => {
+                        setRenamingPage({
+                          id: row.page.id,
+                          title: row.page.title,
+                        });
+                      },
+                    },
+                    /* The direction that matters most for an import: a page the
+                       catalogue put in the wrong part, back into the story. */
+                    ...destinationsFrom(bookId, row.page.id, part),
+                    {
+                      label: "Delete",
+                      icon: menuIcons.trash,
+                      danger: true,
+                      onSelect: () => onDelete(row.page.id, row.page.title),
+                    },
+                  ]
+            }
           />
-        ))
-      ) : (
+        ),
+      )}
+
+      {/* Only ever a reader: a writer always has sixteen rows, because the
+          offers are rows. Somebody who was let in to read a part with no pages
+          in it should be told that rather than shown a gap. */}
+      {rows.length === 0 && (
         <li className="px-1 py-2 font-sans text-xs text-muted italic">
           No pages yet.
+        </li>
+      )}
+
+      {/* **A page of the writer's own, and the last thing on the list.**
+          The Add-page menu it came off carried this as "Something else…" —
+          the switches replace the other sixteen entries, but not this one:
+          nothing on a catalogue can express a page nobody has named yet, and
+          a book with an "A note on the maps" in it is a book that needed one.
+
+          A row rather than a button in the header, because it is not a peer of
+          "Hide pages" — it is the end of the list it adds to. */}
+      {canWrite && (
+        <li className="relative">
+          <button
+            type="button"
+            onClick={() => setNaming(true)}
+            className="flex w-full cursor-pointer items-center gap-2.5
+                       rounded-lg border border-dashed border-line py-2 pr-3
+                       pl-2.5 text-left font-sans text-sm text-muted
+                       outline-none transition-colors hover:border-fg/35
+                       hover:text-fg focus-visible:ring-2
+                       focus-visible:ring-accent/50"
+          >
+            <span aria-hidden="true" className="w-10 shrink-0 text-right">
+              +
+            </span>
+            <span className="min-w-0 flex-1 truncate">Add your own page</span>
+          </button>
         </li>
       )}
 

@@ -73,6 +73,43 @@ export function fitImage(
   };
 }
 
+/**
+ * The text height of a page, in CSS pixels at 96dpi.
+ *
+ * US Letter at the one-inch margins `buildDocx` sets, matching `COLUMN_PX`'s
+ * reasoning. Only the cover needs it: everything else in a book flows over as
+ * many sheets as it takes, and a picture that is too tall simply starts the
+ * next page.
+ */
+export const PAGE_PX = 864;
+
+/**
+ * How big a cover goes in a `.docx`.
+ *
+ * **Fitted to the sheet rather than to the column**, which is the one place
+ * `fitImage`'s rule is wrong. A cover is about 2:3, so at the full column width
+ * of 624px it stands 936px tall — taller than the page — and Word answers that
+ * by pushing the whole picture onto the next sheet, leaving the cover as a
+ * blank page followed by a cover page. Fitting the height first keeps it on one
+ * sheet, centred, whatever shape the artwork is.
+ *
+ * A `.docx` cannot bleed to the paper edge — a section would need its own zero
+ * margins and Word still prints an unprintable margin — so this is the honest
+ * best: the largest cover that fits inside the page, with the white of the
+ * sheet around it.
+ */
+export function fitCover(
+  natural: { width: number; height: number },
+  column: number = COLUMN_PX,
+  page: number = PAGE_PX,
+): { width: number; height: number } {
+  if (natural.width <= 0 || natural.height <= 0) {
+    return { width: 0, height: 0 };
+  }
+  const byHeight = (page * natural.width) / natural.height;
+  return fitImage(natural, undefined, Math.max(1, Math.min(column, byHeight)));
+}
+
 /** What `docx` can package as-is, by the blob type a browser reports. */
 const READY: Record<string, "png" | "jpg"> = {
   "image/png": "png",

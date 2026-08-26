@@ -31,8 +31,10 @@ import {
   type Format,
 } from "@/lib/export";
 import { Spinner } from "@/components/ui/spinner";
+import { SwitchTrack } from "@/components/ui/switch";
 import { BookPages } from "@/components/reader/book-pages";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
+import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { ToolStepDone } from "@/components/ui/tool-save";
 import { useToolSave } from "@/lib/use-tool-save";
 import { GENERATED_BY_TITLE, writtenPages } from "@/lib/export/front-matter";
@@ -324,6 +326,10 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const hydrated = useHydrated();
   const shelf = useShelf();
   const cover = useCover(bookId);
+  /* The book's details, opened from the Preview step. `CoverDialog` writes
+     straight to the store, so the preview under it re-renders on save with no
+     wiring of its own. */
+  const [editingDetails, setEditingDetails] = useState(false);
 
   /*
    * Where to open, and in what format.
@@ -775,18 +781,46 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                   is going somewhere on purpose, and the format and formatting
                   are decisions you would want to make again afterwards
                   anyway. A `<Link>`, so the unsaved-draft guard catches it. */}
-              {step.id === "preview" && editorHref && (
-                <Link
-                  href={editorHref}
-                  className="float-right ml-4 flex items-center gap-2 rounded-lg
-                             border border-line bg-panel px-4 py-2.5 font-sans
-                             text-sm font-medium text-fg outline-none
-                             transition-colors hover:bg-raised
-                             focus-visible:ring-2 focus-visible:ring-accent/60"
-                >
-                  <PencilGlyph />
-                  Open the editor
-                </Link>
+              {/* **Both controls in one float, not two.** Floats stack
+                  right-to-left, so a second floated element would land on the
+                  *left* of the first and the pair would read backwards. One
+                  floated row keeps them in source order and keeps the heading
+                  and its deck wrapping around the pair as they already do. */}
+              {step.id === "preview" && (
+                <div className="float-right ml-4 flex flex-wrap items-center gap-2">
+                  {/* The book's title, subtitle and author live here, and this
+                      step is where a writer notices one is missing or wrong:
+                      the cover is the artwork alone, so the words they are
+                      looking for are on the title page one turn later. Opening
+                      the dialog in place rather than linking to the shelf, for
+                      the reason the Preview is a step and not a link — leaving
+                      the wizard throws away the format, template, trim and
+                      front-matter switches, which are component state persisted
+                      nowhere. */}
+                  <button
+                    type="button"
+                    onClick={() => setEditingDetails(true)}
+                    className="flex items-center gap-2 rounded-lg
+                               border border-line bg-panel px-4 py-2.5 font-sans
+                               text-sm font-medium text-fg outline-none
+                               transition-colors hover:bg-raised
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    <PencilGlyph />
+                    Edit book details
+                  </button>
+
+                  {editorHref && (
+                    <Link href={editorHref} className="flex items-center gap-2 rounded-lg
+                               border border-line bg-panel px-4 py-2.5 font-sans
+                               text-sm font-medium text-fg outline-none
+                               transition-colors hover:bg-raised
+                               focus-visible:ring-2 focus-visible:ring-accent/60">
+                      <PencilGlyph />
+                      Open the editor
+                    </Link>
+                  )}
+                </div>
               )}
 
               <h1 className="font-serif text-2xl text-fg md:text-[1.75rem]">
@@ -844,6 +878,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                 {step.id === "frontmatter" && (
                   <FrontMatterStep
                     book={book}
+                    cover={cover}
                     typeset={typeset}
                     written={written}
                     skipped={skipped}
@@ -888,7 +923,13 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
                 {step.id === "preview" && (
                   <BookPages
                     book={book}
-                    cover={cover}
+                    /* **The cover only when the file will have one.** The
+                       preview showed the artwork whatever the format and
+                       whatever the switch said, so for every PDF and every
+                       `.docx` ever exported it showed a first page that was
+                       not in the file. This step's whole claim is that it is
+                       "the whole book as this export will build it". */
+                    cover={typeset.cover ? cover : null}
                     typeset={typeset}
                     setting="export"
                     className="h-[38rem] w-full overflow-hidden rounded-lg
@@ -1030,6 +1071,10 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
           done={done}
           onClose={() => setDone(null)}
         />
+      )}
+
+      {editingDetails && (
+        <CoverDialog book={book} onClose={() => setEditingDetails(false)} />
       )}
     </main>
   );
@@ -1961,12 +2006,15 @@ function LayoutStep({
  */
 function FrontMatterStep({
   book,
+  cover,
   typeset,
   written,
   skipped,
   onSet,
 }: {
   book: Book;
+  /** The book's artwork, or null. Only its presence is read here. */
+  cover: string | null;
   typeset: TypesetOptions;
   written: ReadonlySet<string>;
   skipped: string[];
@@ -2055,6 +2103,28 @@ function FrontMatterStep({
 
   return (
     <div className="space-y-4">
+      {/* **The cover, above the three generated pages and not among them.**
+          Those three are pages this app *writes* from the book's details, which
+          is why each carries a drawn specimen and a "yours or ours" question.
+          The cover is the writer's own artwork and there is nothing to
+          generate: the only question is whether it goes in the file, so it
+          takes the plain settings row every other yes-or-no on these steps
+          takes.
+
+          Shown only when there is artwork. A switch over a book with no cover
+          is a control that cannot do anything, and the step already has enough
+          to read. */}
+      {cover && (
+        <SettingsCard>
+          <SwitchRow
+            label="Cover page"
+            hint="Your artwork as the first page of the file. A print shop usually wants the cover as its own file — turn this off for one. Shops expect an EPUB to carry one."
+            on={typeset.cover}
+            onChange={(next) => onSet("cover", next)}
+          />
+        </SettingsCard>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-3">
         <MatterCard
           label="Title page"
@@ -2318,7 +2388,7 @@ function MatterCard({
             {hint}
           </span>
         </span>
-        <SwitchTrack on={on} />
+        <SwitchTrack on={on} className="mt-0.5" />
       </span>
     </button>
   );
@@ -2610,33 +2680,15 @@ function SettingsCard({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * The switch itself.
+ * One setting in that card.
  *
  * **A control has to look like what it does.** These were `role="switch"` on a
  * card whose only state was a tinted border — the same tint the format cards
  * use for *chosen* — so nothing on screen said on or off, and the front-matter
  * step in particular was three identical white boxes for three settings that
- * were all switched on. A track and a thumb say it without a word, and say it
- * the same way every phone the writer owns says it.
+ * were all switched on. The track and thumb (`ui/switch.tsx`) say it without a
+ * word, and say it the same way every phone the writer owns says it.
  */
-function SwitchTrack({ on }: { on: boolean }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`mt-0.5 flex h-5 w-9 shrink-0 items-center rounded-full p-0.5
-                  transition-colors ${
-                    on ? "bg-accent" : "bg-raised ring-1 ring-line ring-inset"
-                  }`}
-    >
-      <span
-        className={`h-4 w-4 rounded-full transition-transform ${
-          on ? "translate-x-4 bg-accent-ink" : "bg-muted"
-        }`}
-      />
-    </span>
-  );
-}
-
 function SwitchRow({
   label,
   hint,
@@ -2666,7 +2718,7 @@ function SwitchRow({
           {hint}
         </span>
       </span>
-      <SwitchTrack on={on} />
+      <SwitchTrack on={on} className="mt-0.5" />
     </button>
   );
 }
