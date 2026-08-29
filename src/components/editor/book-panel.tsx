@@ -138,15 +138,15 @@ export type BookPanelMode = "book" | "chapters";
  * book would make the chrome the loudest thing on the screen again, which is
  * the whole reason the parts' colour ladder came off these cards.
  */
-const CARD_BUTTON = `border border-fg/20 bg-fg/14 text-fg
-                     hover:border-accent/60 hover:bg-fg/24
+const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-accent
+                     hover:border-accent/60 hover:bg-accent/25
                      focus-visible:ring-accent/50`;
 
 /** The second control, when a card has one. Outlined, so the pair is not two
  *  identical slabs — the same relationship the header's controls have. Its edge
  *  matches the filled one's, or the two read as different kinds of thing. */
-const CARD_OUTLINE = `border border-fg/20 bg-transparent text-fg
-                      hover:border-accent/60 hover:bg-fg/10
+const CARD_OUTLINE = `border border-accent/30 bg-transparent text-accent
+                      hover:border-accent/60 hover:bg-accent/10
                       focus-visible:ring-accent/50`;
 
 /**
@@ -174,7 +174,7 @@ const ROW_ACTIVE = "border-line bg-raised font-medium text-fg";
  * instead now, which is what the label was always for, and the panel keeps one
  * button style from top to bottom.
  */
-const CARD_STRIP = `bg-raised text-fg hover:bg-line
+const CARD_STRIP = `bg-white text-fg hover:bg-accent/5
                     focus-visible:ring-accent/50`;
 
 /**
@@ -657,7 +657,7 @@ export function BookPanel({
       // no manuscript to protect and this panel is the only way into the book,
       // so it is always shown — hiding it there would leave that screen a guide
       // with no navigation at all.
-      className={`book-panel w-80 shrink-0 flex-col xl:w-[22rem] 2xl:w-96 ${
+      className={`book-panel w-80 shrink-0 flex-col bg-white dark:bg-accent/7 xl:w-[22rem] 2xl:w-96 ${
         always ? "flex" : "hidden xl:flex"
       }`}
     >
@@ -1459,7 +1459,7 @@ function MatterCard({
                   ${
                     compact
                       ? `${CARD_STRIP} border-line`
-                      : `bg-panel/60 ${
+                      : `bg-white ${
                           active ? CARD_EDGE_ACTIVE : CARD_EDGE
                         }`
                   }

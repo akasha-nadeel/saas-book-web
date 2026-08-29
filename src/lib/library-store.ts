@@ -4957,6 +4957,8 @@ export async function syncWithServer(): Promise<void> {
        well as from `LibrarySync` costs nothing. */
     await loadFromDisk();
     await reconcile();
+  } catch (err) {
+    console.warn("[sync] syncWithServer failed:", err);
   } finally {
     // In a `finally` because every path out of `reconcile` has to settle the
     // phase — the early returns for a signed-out reader and a failed upload

@@ -673,7 +673,7 @@ export function ChapterEditor({
           entering={entering}
         />
 
-        <div className="editor-main flex min-w-0 flex-1 flex-col">
+        <div className="editor-main flex min-w-0 flex-1 flex-col bg-white dark:bg-transparent">
           {/* Book View selects no part of the book, so there is no page to
               show; the overview stands in its place. The panel and the middle
               of the window are one statement — the book as an object, or a page
@@ -1627,7 +1627,7 @@ function EditorSurface({
 
               No rule and no panel behind it either. The desk that was already
               there is the bar; an edge would only have drawn a second one. */}
-          <div className="editor-desk-strip shrink-0 px-4 pt-3 pb-2">
+          <div className="editor-desk-strip shrink-0 bg-white dark:bg-accent/7 px-4 pt-3 pb-2">
             <div
               className="mx-auto flex items-center justify-between gap-3
                          font-sans text-xs text-muted"
@@ -1706,7 +1706,7 @@ function EditorSurface({
 
           <main
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                       bg-transparent px-4 pt-3 pb-8 md:pb-10"
+                       bg-white dark:bg-accent/7 px-4 pt-3 pb-8 md:pb-10"
             // Both edges reserved for the scrollbar, so the page is centred in
             // the same box the bar above it is. Without it the scrollbar takes
             // its width off one side only, the page shifts left by half of it,

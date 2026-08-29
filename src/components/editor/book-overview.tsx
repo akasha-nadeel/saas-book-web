@@ -84,7 +84,7 @@ export function BookOverview({ bookId }: { bookId: string }) {
   if (!book) return <MissingBook />;
 
   return (
-    <div className="book-overview-shell flex h-[var(--oc-layout-height)] min-w-0">
+    <div className="book-overview-shell flex h-[var(--oc-layout-height)] min-w-0 bg-white dark:bg-transparent">
       {/* The way out, in the corner the rail used to fill — the same control
           the editor puts there in Book View, so the two screens that show a
           book with no page on it cannot drift. See BackToBooks. */}

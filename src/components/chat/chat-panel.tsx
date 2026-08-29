@@ -172,9 +172,11 @@ export function ChatPanel({
               message.role === "user" ? (
                 <li
                   key={i}
-                  className="rounded-md bg-raised px-3 py-2 font-sans text-sm text-fg"
+                  className="flex justify-end"
                 >
-                  {message.content}
+                  <span className="max-w-[85%] rounded-2xl rounded-tr-sm bg-accent/20 dark:bg-accent/25 px-3 py-2 font-sans text-sm text-fg">
+                    {message.content}
+                  </span>
                 </li>
               ) : (
                 /* **The reply is parsed rather than printed.** It arrives in
