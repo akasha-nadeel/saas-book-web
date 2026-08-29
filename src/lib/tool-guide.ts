@@ -17,6 +17,29 @@ export interface ToolGuide {
 
 export const TOOL_GUIDES: ToolGuide[] = [
   {
+    path: "consistency",
+    headline: "The mistakes that only show up when the whole book is read at once",
+    claim: "Names, spellings and quotation marks",
+    lead: " — checked across every chapter in one pass.",
+    points: [
+      {
+        term: "A name spelled two ways",
+        detail:
+          "Katherine through the first twelve chapters and Catherine in the thirtieth is invisible from inside a draft, because nobody reads their own book straight through. This finds both spellings and says which chapters each one is in.",
+      },
+      {
+        term: "British and American spellings in one book",
+        detail:
+          "Colour beside color, travelled beside traveled, grey beside gray. Neither spelling is wrong, and a manuscript carrying both is one of the things a copy editor is hired to catch.",
+      },
+      {
+        term: "Straight quotation marks among curly ones",
+        detail:
+          "Text typed here takes typographic quotes, while text brought in from elsewhere keeps whatever it arrived with, so one manuscript can print two ways. This says where each kind is.",
+      },
+    ],
+  },
+  {
     path: "export",
     headline: "A clean file when your book needs to leave OpenChapter",
     claim: "Word, EPUB and PDF",

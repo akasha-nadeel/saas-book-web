@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { exportAllowed } from "@/lib/launch";
+import { LAUNCH_LIMITS, exportAllowed } from "@/lib/launch";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { billingConfigured } from "./provider";
@@ -183,15 +183,23 @@ export async function requireLaunchExport(format: string): Promise<Response | nu
     );
   }
 
+  /* **Free to everybody: there is nothing to ask the gateway.** Every format
+     is on both plans (`LAUNCH_LIMITS`), so a subscription lookup here would be
+     a Postgres round trip on every export that could only ever answer yes. The
+     check above it stays, because free is not the same as anonymous — this
+     route launches a browser on markup the caller wrote. */
+  if (exportAllowed(format, false)) return null;
+
   if (!billingConfigured()) return null;
 
   const subscription = await subscriptionFor(supabase, userId);
   if (exportAllowed(format, isPro(subscription))) return null;
 
+  /* Unreachable while the two arrays match, and written from the data rather
+     than from the formats' names so it cannot start lying if they stop. */
   return Response.json(
     {
-      error:
-        "EPUB and PDF export are part of Pro. The Free plan includes Word export.",
+      error: `Your plan includes ${LAUNCH_LIMITS.freeExports.join(", ")} export.`,
       upgrade: true,
     },
     { status: 402 },

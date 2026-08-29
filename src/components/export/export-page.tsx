@@ -55,7 +55,7 @@ import { chapterNumeral } from "@/lib/export/blocks";
 import { useCover, useHydrated, useShelf } from "@/lib/use-library";
 import { type ToolPageProps } from "@/lib/tool-page";
 import { areaLabel } from "@/lib/areas";
-import { exportAllowed } from "@/lib/launch";
+import { LAUNCH_LIMITS, exportAllowed } from "@/lib/launch";
 import { usePlan } from "@/lib/use-plan";
 
 /**
@@ -113,7 +113,7 @@ const FORMATS: FormatOption[] = [
   {
     value: "epub",
     label: "EPUB",
-    hint: "Pro export for e-readers and ebook shops",
+    hint: "For e-readers and ebook shops",
     produces: "One .epub file",
   },
   {
@@ -124,13 +124,13 @@ const FORMATS: FormatOption[] = [
        finished file comes back. A card telling a writer to choose "Save as PDF"
        from a dialog that never opens is the plainest kind of claim the code
        cannot back. */
-    hint: "Pro export, typeset to your trim size",
+    hint: "Typeset to your trim size",
     produces: "One .pdf file",
   },
   {
     value: "docx",
     label: "Word",
-    hint: "Free export for agents, editors and backup",
+    hint: "For agents, editors and backup",
     produces: "One .docx file",
   },
 ];
@@ -394,8 +394,14 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const [error, setError] = useState<string | null>(null);
   const plan = usePlan();
   const hasFullExport = !plan.loading && (!plan.billing || plan.pro);
+  /* **Kept, and it can no longer refuse anything.** Every format is on both
+     plans (`LAUNCH_LIMITS`), so this answers false for all three — but it reads
+     from `exportAllowed` rather than from a list of format names, so it comes
+     back on its own if that decision is ever narrowed, and there is no gate to
+     re-derive. The message is built from the same data for the same reason. */
   const needsExportUpgrade = (format: Format) =>
     (plan.loading || plan.billing) && !exportAllowed(format, hasFullExport);
+  const notOnYourPlan = `Your plan includes ${LAUNCH_LIMITS.freeExports.join(", ")} export.`;
 
   /*
    * The file that just left, or null.
@@ -594,11 +600,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
 
   const pick = (value: Format) => {
     setOutput(value);
-    setError(
-      needsExportUpgrade(value)
-        ? "EPUB and PDF export are part of Pro. The Free plan includes Word export."
-        : null,
-    );
+    setError(needsExportUpgrade(value) ? notOnYourPlan : null);
     /* **The template has to survive the format changing, and Manuscript does
        not.** It is offered for print and withheld from an e-reader
        (`templatesFor`), so a writer who set it for a PDF and then switched to
@@ -616,9 +618,7 @@ export function ExportPage({ bookId, embedded, heading }: ToolPageProps) {
   const run = async () => {
     if (output === null) return;
     if (needsExportUpgrade(output)) {
-      setError(
-        "EPUB and PDF export are part of Pro. The Free plan includes Word export.",
-      );
+      setError(notOnYourPlan);
       return;
     }
     setBusy(true);

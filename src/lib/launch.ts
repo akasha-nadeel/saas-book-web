@@ -12,7 +12,22 @@ export const LAUNCH_LIMITS = {
   freeBooks: 5,
   freeAssistantRepliesPerMonth: 5,
   proAssistantRepliesPerMonth: 60,
-  freeExports: ["docx"],
+  /**
+   * **Every format, on both plans, and the two arrays being identical is the
+   * point rather than an oversight.**
+   *
+   * The launch MVP shipped `["docx"]` here and sold EPUB and PDF as the two
+   * things Pro bought. That reversed a rule this app had already written down —
+   * *export must never move behind the plan* — and it was the wrong thing to
+   * charge for: a writer has to be able to take the book and go, and a tool
+   * that holds the finished file back is the one thing this trade's writers
+   * have been burned by often enough to look for first. Pro is unlimited books
+   * and the assistant's allowance; it is not the door.
+   *
+   * The pair stays as a pair so the decision has somewhere to live and so
+   * narrowing it again is still one edit — `exportAllowed` reads both.
+   */
+  freeExports: ["docx", "epub", "pdf"],
   proExports: ["docx", "epub", "pdf"],
 } as const;
 

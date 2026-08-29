@@ -4,6 +4,7 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { parseActivity, type Activity } from "./activity";
 import { parseArc, type ArcReader } from "./arc";
 import { parseBible, type BibleEntry } from "./bible";
+import { parseDismissals, type Dismissal } from "./consistency";
 import { parseLedger, type Entry } from "./ledger";
 import { parseHistory, type Snapshot } from "./history";
 import { parseIdeas, type Idea } from "./ideas";
@@ -31,6 +32,9 @@ import {
   getArcRaw,
   getServerArcRaw,
   subscribeToArc,
+  getConsistencyRaw,
+  getServerConsistencyRaw,
+  subscribeToConsistency,
   getLedgerRaw,
   getServerLedgerRaw,
   subscribeToLedger,
@@ -299,6 +303,27 @@ export function useArc(bookId: string): ArcReader[] {
   const snapshot = useCallback(() => getArcRaw(bookId), [bookId]);
   const raw = useSyncExternalStore(subscribe, snapshot, getServerArcRaw);
   return useMemo(() => parseArc(raw), [raw]);
+}
+
+/**
+ * The consistency findings this writer has already set aside for this book.
+ *
+ * The snapshot is the raw string and not the parsed list, like every other
+ * store here: `useSyncExternalStore` compares with `Object.is`, so handing it
+ * a fresh array on each call would re-render for ever.
+ */
+export function useDismissals(bookId: string): Dismissal[] {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => subscribeToConsistency(bookId, onStoreChange),
+    [bookId],
+  );
+  const snapshot = useCallback(() => getConsistencyRaw(bookId), [bookId]);
+  const raw = useSyncExternalStore(
+    subscribe,
+    snapshot,
+    getServerConsistencyRaw,
+  );
+  return useMemo(() => parseDismissals(raw), [raw]);
 }
 
 /** Every cost and every royalty the writer has recorded, newest first. */

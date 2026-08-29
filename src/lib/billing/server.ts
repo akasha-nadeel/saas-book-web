@@ -109,9 +109,9 @@ export async function currentSubscription(): Promise<{
 /**
  * A session, and nothing more — for a route that is free but must not be open.
  *
- * **`/api/export/pdf` is the one caller, and export must never move behind the
- * plan**, so `requirePro` is the wrong tool: that route is free for every
- * writer and will stay so. It also must not be *anonymous*. It launches a
+ * **Export must never move behind the plan**, so `requirePro` is the wrong tool
+ * for `/api/export/pdf`: that route is free for every writer and will stay so.
+ * It also must not be *anonymous*. It launches a
  * headless browser, renders markup the caller supplied, and may run for five
  * minutes — with no session check a stranger could spend that, repeatedly, on
  * somebody else's server.

@@ -65,8 +65,8 @@ $4.50/month. The exact total is stored in `plans.ts`; the displayed monthly
 equivalent is derived from that total so rounding happens once.
 
 This lower first-launch price is deliberate: the public MVP now sells a focused
-book-writing workspace, a monthly writing-assistant allowance, one Free book,
-unlimited Pro books, and Pro EPUB/PDF export. It is priced below mature author
+book-writing workspace, a monthly writing-assistant allowance, five Free
+books and unlimited Pro books. Every export format is free on both plans. It is priced below mature author
 software while still protecting AI costs with hard usage limits. After there
 are paying subscribers, a price change is an announcement rather than an edit,
 and Paddle leaves an existing subscription on the price it was bought at
@@ -85,10 +85,12 @@ one-off price every month, that there is no period end to store, and that
 `isPro` has to answer without a date.
 
 **What is free is enough to understand the product.** Free includes five books,
-unlimited chapters and words, autosave/sync where accounts are configured, Word
-export, and five writing-assistant replies each calendar month. Pro unlocks
-unlimited books, sixty assistant replies each calendar month, and EPUB/PDF
-export. The backend enforces expensive or paid limits: the book limit is in the
+unlimited chapters and words, autosave/sync where accounts are configured,
+**every export format**, and five writing-assistant replies each calendar
+month. Pro unlocks unlimited books and sixty assistant replies each calendar
+month — two things, not three. EPUB and PDF were Pro until 2026-08-27; see the
+note in `launch.ts` for why that was the wrong thing to charge for, and
+`launch.test.ts` for what now stops it drifting back. The backend enforces expensive or paid limits: the book limit is in the
 database trigger (which counts the active shelf only, and fires on the
 restore as well as the insert so archive-and-restore cannot walk past it),
 assistant usage is claimed through a Supabase RPC, and PDF

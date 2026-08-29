@@ -193,7 +193,7 @@ export function BillingPage({
                   <p className="mt-0.5 font-sans text-xs text-muted">
                     {plural(LAUNCH_LIMITS.freeBooks, "book")},{" "}
                     {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant
-                    replies/month, Word export
+                    replies/month, every export format
                   </p>
                 )}
               </div>
@@ -493,7 +493,10 @@ export function BillingPage({
                   but read-only above that.
                 </li>
                 <li>Five assistant replies a month instead of sixty.</li>
-                <li>Word export. EPUB and PDF stop.</li>
+                {/* Export is on both plans, so cancelling takes nothing
+                    away there — and a writer deciding whether to cancel is
+                    exactly who needs told that their book still comes out. */}
+                <li>Every export format stays. Nothing you have written moves.</li>
               </ul>
             </div>
 

@@ -187,6 +187,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     title: "The publishing tools",
     items: [
       {
+        name: "Consistency check",
+        desc: "Reads every chapter of a book at once and reports what it spells more than one way — a name spelled two ways, British and American spellings side by side, straight quotation marks among curly ones, a word typed twice. It reports and never changes a word, and anything you say is not a mistake stays put away.",
+      },
+      {
         name: "Formats",
         desc: "Export to Word (.docx) or EPUB, or print to PDF. Markdown is marked Soon on the format step: the text half works, but a book with pictures in it would carry them as code rather than as pictures, so it comes back as a text file with an images folder beside it.",
       },

@@ -57,7 +57,7 @@ export function selectPanel(
  * tooltip on the button and the heading on the panel it opens cannot drift.
  */
 const GROUPS: readonly (readonly PanelTab[])[] = [
-  ["chapters", "search"],
+  ["chapters", "search", "consistency"],
   ["notes", "assistant"],
 ];
 
@@ -67,6 +67,7 @@ const FOOTER: readonly PanelTab[] = ["history", "trash"];
 const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
   chapters: icons.chapters,
   search: icons.search,
+  consistency: icons.consistency,
   bookmarks: icons.bookmarks,
   notes: icons.notes,
   ideas: icons.ideas,
@@ -74,6 +75,19 @@ const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
   assistant: icons.assistant,
   history: icons.history,
   trash: icons.trash,
+};
+
+/**
+ * The src path for tabs that use a custom PNG icon instead of an inline SVG.
+ * Any entry here overrides the SVG paths in TAB_ICONS for that tab.
+ */
+const TAB_IMG_SRCS: Partial<Record<PanelTab, string>> = {
+  consistency: "/icons/icon-consistency.png",
+  assistant: "/icons/icon-assistant.png",
+  search: "/icons/icon-search.png",
+  history: "/icons/icon-history.png",
+  trash: "/icons/icon-trash.png",
+  notes: "/icons/icon-notes.png",
 };
 
 /**
@@ -185,6 +199,7 @@ export function WorkspaceRail({
         onClick={() =>
           selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel })
         }
+        imgSrc={TAB_IMG_SRCS[value]}
       >
         {TAB_ICONS[value]}
       </RailButton>
@@ -222,18 +237,7 @@ export function WorkspaceRail({
           rule leaves with the button for the same reason: a divider at the very
           top of a list separates it from nothing. So the column closes up and
           the tabs sit at the top, which is where a writer looks for them. */}
-      {!leftPanel && (
-        <>
-          <RailButton label="Show panel" onClick={() => onPanel(true)}>
-            {icons.panel}
-          </RailButton>
-          <RailDivider />
-        </>
-      )}
-
-      <RailButton label="All books" href="/">
-        {icons.home}
-      </RailButton>
+      <RailButton label="All books" href="/" imgSrc="/icons/icon-home.png" />
 
       {groups.map((group, i) => (
         <div key={i} className="flex flex-col items-center gap-2">

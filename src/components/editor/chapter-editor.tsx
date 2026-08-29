@@ -83,6 +83,7 @@ import {
   touchLastOpened,
   typographyOf,
   type Book,
+  type PaperColor,
   type Prefs,
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
@@ -98,6 +99,148 @@ import {
 import { useTypewriter } from "@/lib/use-typewriter";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
 import { LoadingScreen } from "@/components/loading-screen";
+
+const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
+  { value: "white", label: "White", swatch: "#ffffff" },
+  { value: "cream", label: "Off-white", swatch: "#ededed" },
+  { value: "sepia", label: "Grey", swatch: "#d6d6d6" },
+  { value: "slate", label: "Charcoal", swatch: "#1c1c1c" },
+  { value: "black", label: "Black", swatch: "#0d0d0d" },
+];
+
+/**
+ * A rail button that shows the current page colour as a swatch and opens a
+ * small portal dropdown to switch it — same five options as the Aa flyout,
+ * promoted here so they are one press away without opening the full type panel.
+ */
+function PageColorButton({ paper }: { paper: PaperColor }) {
+  const [open, setOpen] = useState(false);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const current = PAPERS.find((p) => p.value === paper) ?? PAPERS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const onPointer = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (
+        !triggerRef.current?.contains(t) &&
+        !panelRef.current?.contains(t)
+      ) {
+        setOpen(false);
+      }
+    };
+    const onResize = () => setOpen(false);
+    const onScroll = (e: Event) => {
+      if (panelRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    window.addEventListener("resize", onResize);
+    document.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+      window.removeEventListener("resize", onResize);
+      document.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+          } else {
+            setRect(triggerRef.current?.getBoundingClientRect() ?? null);
+            setOpen(true);
+          }
+        }}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-label="Page colour"
+        title="Page colour"
+        className={`flex h-12 w-12 shrink-0 items-center justify-center
+                    rounded-xl outline-none transition-colors
+                    focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                      open
+                        ? "bg-raised text-fg"
+                        : "text-muted hover:bg-raised/50 hover:text-fg"
+                    }`}
+      >
+        {/* Orange circle background matching the search/other PNG rail icons,
+            with the colour swatch centred inside it. */}
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 items-center justify-center rounded-full"
+          style={{ background: "#f5a030" }}
+        >
+          <span
+            className="h-5 w-5 rounded-full border-[3px] border-black"
+            style={{ background: current.swatch }}
+          />
+        </span>
+      </button>
+
+      {open && rect && (
+        <div
+          ref={panelRef}
+          style={{
+            position: "fixed",
+            top: rect.top,
+            left: rect.left,
+            transform: "translateX(-100%)",
+            paddingRight: 8,
+            zIndex: 50,
+          }}
+        >
+          <div className="flex flex-col gap-1 rounded-md border border-line bg-panel p-2 shadow-xl">
+            <p className="px-1 font-sans text-[0.62rem] tracking-wide text-muted uppercase">
+              Page colour
+            </p>
+            <div className="flex flex-col gap-1">
+              {PAPERS.map((p) => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => {
+                    setPref("paper", p.value);
+                    setOpen(false);
+                  }}
+                  aria-label={p.label}
+                  title={p.label}
+                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left
+                              font-sans text-xs outline-none transition-colors
+                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                p.value === paper
+                                  ? "bg-accent text-accent-ink"
+                                  : "text-fg hover:bg-raised"
+                              }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 rounded-full border border-line"
+                    style={{ background: p.swatch }}
+                  />
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 const STATUS_LABEL: Record<SaveStatus, string> = {
   saved: "Saved",
@@ -201,10 +344,25 @@ export function ChapterEditor({
   });
   // The left panel here is tools only — the book panel beside the manuscript is
   // the chapter list, so offering a second one was the same list twice. With no
-  // chapter list to land on, the panel starts closed and a rail tab opens it;
-  // "search" is only the seed, never seen until a tab is picked.
-  const [tab, setTab] = useState<PanelTab>("search");
-  const [panelOpen, setPanelOpen] = useState(false);
+  /*
+   * **Which panel is open, and whether it is, are stored rather than held.**
+   *
+   * They were `useState` here, and opening a chapter closed the panel. A route
+   * change replaces this component's subtree, so the state went with it — and
+   * both panels that list chapters hand the writer links *into* chapters, which
+   * made the panel dismiss itself every time it was used for the thing it is
+   * for. The search panel had it first and had it longest.
+   *
+   * Same reasoning as `bookPanel` below, and the same store: a navigation is
+   * not a decision, and neither is a reload.
+   */
+  const tab = prefs.panelTab;
+  const setTab = useCallback((next: PanelTab) => setPref("panelTab", next), []);
+  const panelOpen = prefs.leftPanel;
+  const setPanelOpen = useCallback(
+    (open: boolean) => setPref("leftPanel", open),
+    [],
+  );
   const [mobileBookOpen, setMobileBookOpen] = useState(false);
   // Which face the right book panel shows — the cover-and-steppers Book View, or
   // the book's three parts. Stored rather than held in memory: it used to be a
@@ -358,7 +516,7 @@ export function ChapterEditor({
       setPanelOpen(open);
       if (!open) restoreEditorFocus();
     },
-    [captureSelection, restoreEditorFocus],
+    [captureSelection, restoreEditorFocus, setPanelOpen],
   );
 
   const closeMobileBookNavigation = useCallback(() => {
@@ -376,7 +534,7 @@ export function ChapterEditor({
     setFormatOpen(false);
     setMoreOpen(false);
     setMobileBookOpen(true);
-  }, [body, captureSelection]);
+  }, [body, captureSelection, setPanelOpen]);
 
   // ⌘K / Ctrl+K opens search in the panel, wherever the caret is.
   useEffect(() => {
@@ -398,7 +556,7 @@ export function ChapterEditor({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelMode, setEditorPanel]);
+  }, [panelMode, setEditorPanel, setTab]);
 
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
@@ -633,9 +791,11 @@ export function ChapterEditor({
                     a reader, like every other write: `canWrite` is the same
                     test the chapter list used. */}
                 {canWriteThis && <ImportChapterButton book={book} />}
-                <RailButton label="Export" href={`/book/${bookId}/export`}>
-                  {icons.export}
-                </RailButton>
+                <RailButton
+                  label="Export"
+                  href={`/book/${bookId}/export`}
+                  imgSrc="/icons/icon-export.png"
+                />
               </>
             }
           >
@@ -679,19 +839,9 @@ export function ChapterEditor({
               label="Typewriter scrolling"
               active={prefs.typewriter}
               onClick={() => setPref("typewriter", !prefs.typewriter)}
-            >
-              {icons.typewriter}
-            </RailButton>
-            {/* Word's ¶ button: what is actually on the page, as against what
-              can be seen of it. Passed as `glyph` rather than as a child —
-              a child goes inside the rail's `<svg>`, where an HTML span is in
-              the SVG namespace and is never painted. See RailButton. */}
-            <RailButton
-              label="Show paragraph marks"
-              active={prefs.marks}
-              onClick={() => setPref("marks", !prefs.marks)}
-              glyph="¶"
+              imgSrc="/icons/icon-typewriter.png"
             />
+            <PageColorButton paper={prefs.paper} />
           </Rail>
         )}
       </div>

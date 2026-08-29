@@ -1662,6 +1662,19 @@ function CurrentBookCard({
                           then they stop opening it for the things it does
                           hold. What is left is what has no other way in. */}
                       <MenuLabel>This book</MenuLabel>
+                      {/* Here rather than on the card, by the rule the note
+                          above states: the row holds what a writer reaches for
+                          every day, and this menu holds what has no other way
+                          in. A whole-book read is a thing you do once, near
+                          the end — not a third button beside Open and
+                          Export. */}
+                      <MenuLink
+                        href={`/book/${book.id}/consistency`}
+                        icon={shelfIcons.search}
+                        onNavigate={close}
+                      >
+                        Check for consistency
+                      </MenuLink>
                       <MenuButton
                         icon={shelfIcons.info}
                         onClick={() => {
@@ -2441,8 +2454,8 @@ function ProCard({ plan }: { plan: PlanState }) {
           Pro takes the shelf from {plural(LAUNCH_LIMITS.freeBooks, "book")} to
           unlimited, the assistant from{" "}
           {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies a month to{" "}
-          {LAUNCH_LIMITS.proAssistantRepliesPerMonth}, and adds EPUB and PDF
-          export.
+          {LAUNCH_LIMITS.proAssistantRepliesPerMonth}. Every export format is
+          free on either plan.
         </p>
         <Link
           href="/upgrade"
@@ -3094,6 +3107,13 @@ function Write({
                       >
                         {(close) => (
                           <>
+                            <MenuLink
+                              href={`/book/${book.id}/consistency`}
+                              icon={shelfIcons.search}
+                              onNavigate={close}
+                            >
+                              Check for consistency
+                            </MenuLink>
                             <MenuLink
                               href={`/book/${book.id}/export`}
                               icon={shelfIcons.prepare}

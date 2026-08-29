@@ -64,12 +64,32 @@ export const GET_IT_OUT: ToolGroup = {
       path: "export",
       icon: "package",
       name: "Export",
-      what: "Download a Word file on Free, or unlock EPUB and PDF on Pro.",
+      what: "Word, EPUB or PDF, free on either plan — the file a shop, an agent or an editor asks for.",
     },
   ],
 };
 
-export const TOOL_GROUPS: ToolGroup[] = [GET_IT_OUT];
+/**
+ * The things only a whole-book read can find.
+ *
+ * Its own group rather than a second tool under Export, because the job is a
+ * different one: Export is what a writer does when the book is finished, and
+ * this is what they do just before deciding that it is.
+ */
+export const READ_IT_BACK: ToolGroup = {
+  title: "Before it goes out",
+  note: "The things you cannot catch by reading your own draft.",
+  tools: [
+    {
+      path: "consistency",
+      icon: "search",
+      name: "Consistency check",
+      what: "A name spelled two ways, British and American spellings side by side, straight quotation marks among curly ones — across every chapter at once.",
+    },
+  ],
+};
+
+export const TOOL_GROUPS: ToolGroup[] = [READ_IT_BACK, GET_IT_OUT];
 
 /** Flat, for anything that needs a count or a lookup rather than the grouping. */
 export const ALL_TOOLS: BookTool[] = TOOL_GROUPS.flatMap((g) => g.tools);

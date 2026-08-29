@@ -21,6 +21,7 @@
  */
 
 import type { CollabRole } from "./collab";
+import { isPanelTab, type PanelTab } from "./panel-tabs";
 import type { CoverFacts } from "./cover-check";
 import {
   parseActivity,
@@ -3090,6 +3091,18 @@ export interface Prefs {
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
   /**
+   * Which of the rail's panels is showing.
+   *
+   * Stored, with `leftPanel`, for the same reason `bookPanel` is: **a
+   * navigation is not a decision.** Opening a chapter is a route change, which
+   * replaces the editor's subtree and takes its `useState` with it — so a
+   * writer who opened the consistency check and then followed one of its own
+   * chapter links arrived with the panel shut, having asked for nothing of the
+   * sort. The search panel had the same bug, and for longer: every result it
+   * lists is a `router.push`.
+   */
+  panelTab: PanelTab;
+  /**
    * Which face the editor's book panel shows — the cover, or the three parts.
    *
    * Stored rather than held in memory because a reload is not a decision. A
@@ -3196,6 +3209,7 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
+  panelTab: "search",
   // The cover: the panel opens on the book as an object, and the writer
   // steps into its parts from there.
   bookPanel: "book",
@@ -3264,6 +3278,9 @@ function parsePrefs(raw: string | null): Prefs {
       typewriter: parsed.typewriter === true,
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
+      panelTab: isPanelTab(parsed.panelTab)
+        ? parsed.panelTab
+        : DEFAULT_PREFS.panelTab,
       bookPanel: parsed.bookPanel === "chapters" ? "chapters" : "book",
       paper: paperFrom(parsed),
       theme: THEMES.includes(parsed.theme as Theme)
@@ -3890,6 +3907,58 @@ export function getServerArcRaw(): string | null {
 export function saveArcRaw(bookId: string, json: string) {
   window.localStorage.setItem(arcKey(bookId), json);
   for (const listener of arcListeners) listener();
+}
+
+// ---------------------------------------------------------------------------
+// The consistency check's dismissals
+//
+// One key per book, like the bible and the advance-copy list. What is held
+// here is the writer's judgement — "these are two people, not one name typed
+// twice" — so it belongs to the manuscript it was made about and to nothing
+// else. It does not sync: a judgement about a draft is not worth a column.
+// ---------------------------------------------------------------------------
+
+const CONSISTENCY_PREFIX = "openchapter:consistency:";
+const consistencyKey = (bookId: string) => `${CONSISTENCY_PREFIX}${bookId}`;
+const consistencyListeners = new Set<() => void>();
+
+export function subscribeToConsistency(
+  bookId: string,
+  onStoreChange: () => void,
+) {
+  consistencyListeners.add(onStoreChange);
+  const key = consistencyKey(bookId);
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === key) onStoreChange();
+  };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    consistencyListeners.delete(onStoreChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function getConsistencyRaw(bookId: string): string | null {
+  return readRaw(consistencyKey(bookId));
+}
+
+export function getServerConsistencyRaw(): string | null {
+  return null;
+}
+
+/**
+ * Set a finding aside, or put it back.
+ *
+ * Swallowed rather than thrown: losing a dismissal costs the writer one press
+ * next time they run the check, which is not worth stopping a screen over.
+ */
+export function saveConsistencyRaw(bookId: string, json: string) {
+  try {
+    window.localStorage.setItem(consistencyKey(bookId), json);
+  } catch {
+    // Out of room. `storage-space.ts` is already saying so somewhere louder.
+  }
+  for (const listener of consistencyListeners) listener();
 }
 
 // ---------------------------------------------------------------------------

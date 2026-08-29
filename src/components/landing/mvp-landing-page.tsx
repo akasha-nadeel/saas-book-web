@@ -530,9 +530,10 @@ const FAQ: [question: string, answer: ReactNode][] = [
   [
     "Do I have to pay to get my book out?",
     <>
-      No. Word export is on the free plan, and a .docx is what an agent, an
-      editor or a beta reader will ask you for. EPUB and PDF are the two Pro
-      buys, because they are the files a shop takes.
+      No. Word, EPUB and PDF are all on the free plan, with no limit on how
+      often. A .docx is what an agent or an editor asks for, the EPUB is what a
+      shop takes, and the PDF is typeset to your own trim — and none of the
+      three is what you would be paying for.
     </>,
   ],
   [
@@ -559,8 +560,10 @@ const FAQ: [question: string, answer: ReactNode][] = [
     "What happens to my books if I stop paying?",
     <>
       Nothing is taken away and nothing is locked. Your books stay where they
-      are, you keep writing in all of them, and Word export goes on working. The
-      two Pro exports and the larger assistant allowance are what stop.
+      are, you keep writing in all of them, and every export format goes on
+      working. The larger assistant allowance is what stops, and the shelf goes
+      back to holding {plural(LAUNCH_LIMITS.freeBooks, "book")} — the rest are
+      kept safe and read-only rather than deleted.
     </>,
   ],
   [
@@ -568,8 +571,8 @@ const FAQ: [question: string, answer: ReactNode][] = [
     <>
       That is the point of the export screen existing on the free plan. Every
       book comes out as a .docx you can open in Word, Google Docs or
-      LibreOffice, with your chapters, your headings and your front matter
-      intact.
+      LibreOffice — or as an EPUB, or a typeset PDF — with your chapters, your
+      headings and your front matter intact.
     </>,
   ],
   [
@@ -936,7 +939,7 @@ export function MvpLandingPage() {
               <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
                 One price, two cycles, and nothing held hostage.{" "}
                 <strong className={LEAD_EM}>
-                  The free plan keeps its books and its Word export for good.
+                  Every export format is free, on both plans, for good.
                 </strong>
               </p>
             </div>
@@ -952,7 +955,7 @@ export function MvpLandingPage() {
                   "Import Word, EPUB, Markdown, text and HTML",
                   "Sync across your devices",
                   `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant replies a month`,
-                  "Word (.docx) export",
+                  "Word, EPUB and PDF export",
                 ]}
                 href="/signup"
                 cta="Start writing free"
@@ -963,13 +966,11 @@ export function MvpLandingPage() {
                 title="Pro"
                 price={`${monthly}`}
                 cadence="a month"
-                blurb="For the book that is going out — every format it needs, and the assistant when you want it."
+                blurb="For a shelf that keeps growing, and the assistant to hand while it does."
                 lines={[
                   "Unlimited books",
                   "Everything on Free",
                   `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} assistant replies a month`,
-                  "EPUB export, checked at zero errors",
-                  "PDF export, typeset to your trim",
                 ]}
                 note={`Or ${annualTotal} a year — about ${annualPerMonth} a month.`}
                 href="/upgrade"
@@ -1112,7 +1113,7 @@ export function MvpLandingPage() {
           lines rather than one: the break is the threshold, and it keeps the
           heading to the two-line stack the section's height is measured
           against. Nothing here is a claim `launch.ts` does not carry — the
-          file at the end is the Word export, which is free. */}
+          file at the end is an export, and every format is free. */}
       <CtaBanner
         title={
           <>

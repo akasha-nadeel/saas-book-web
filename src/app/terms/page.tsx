@@ -72,12 +72,12 @@ export default function TermsPage() {
           unlimited chapters and words, autosave and sync where accounts are
           configured,{" "}
           {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} writing-assistant
-          replies per month, and Word export.
+          replies per month, and Word, EPUB and PDF export.
         </p>
         <p>
-          Pro includes unlimited books,{" "}
+          Pro includes unlimited books and{" "}
           {LAUNCH_LIMITS.proAssistantRepliesPerMonth} writing-assistant replies
-          per month, and Word, EPUB and PDF export.
+          per month. Every export format is included on both plans.
         </p>
         <p>
           {TRADING_NAME} Pro is {displayPrice(priceOf("monthly"))} a month or{" "}
@@ -129,8 +129,8 @@ export default function TermsPage() {
         </p>
         <Note>
           <Term>Keep your own copies.</Term> Export exists so your manuscript
-          is not trapped in OpenChapter. Free users can export Word files; Pro
-          users can also export EPUB and PDF.
+          is not trapped in OpenChapter. Word, EPUB and PDF are available on
+          every plan, paid or not.
         </Note>
       </Section>
 

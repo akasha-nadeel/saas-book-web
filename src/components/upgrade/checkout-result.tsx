@@ -58,7 +58,7 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
           <Result
             tone="good"
             title="You're on Pro"
-            body="Unlimited books, more assistant replies, and EPUB/PDF export are switched on. PayHere has emailed your receipt."
+            body="Unlimited books and more assistant replies are switched on. PayHere has emailed your receipt."
             action={{ href: "/", label: "Back to writing" }}
           />
         ) : refused ? (

@@ -17,6 +17,7 @@ export function RailButton({
   onClick,
   href,
   glyph,
+  imgSrc,
   disabled,
   children,
 }: {
@@ -45,6 +46,15 @@ export function RailButton({
    * them rather than reading as a piece of text that fell into the rail.
    */
   glyph?: string;
+  /**
+   * A PNG/image path (relative to `/public`) instead of a drawn SVG icon.
+   *
+   * Use this for custom branded icons (e.g. Streamline Kameleon) that cannot
+   * be reproduced faithfully as paths. The image is sized to match the inline
+   * SVG icons (20×20px rendered, 48px source) and carries `aria-hidden` so
+   * the button's own `aria-label` remains the accessible name.
+   */
+  imgSrc?: string;
   children?: React.ReactNode;
 }) {
   // A large filled tile for the active rail item, as in the reference, rather
@@ -57,7 +67,17 @@ export function RailButton({
                          : "text-muted hover:bg-raised hover:text-fg"
                      } ${disabled ? "opacity-50" : ""}`;
 
-  const icon = glyph ? (
+  const icon = imgSrc ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={imgSrc}
+      alt=""
+      aria-hidden="true"
+      width={36}
+      height={36}
+      className="h-9 w-9 object-contain"
+    />
+  ) : glyph ? (
     <span
       aria-hidden="true"
       className="flex h-5 w-5 items-center justify-center font-sans text-lg
@@ -301,6 +321,17 @@ export const icons = {
     <>
       <circle cx="8.8" cy="8.8" r="5.3" />
       <path d="m12.7 12.7 4 4" />
+    </>
+  ),
+  // Lines of prose with a tick through them: a pass over what is written,
+  // rather than a lookup in it. Deliberately unlike the magnifier beside it,
+  // because "search this book" and "check this book" are not the same errand.
+  consistency: (
+    <>
+      <path d="M3.4 5.4h13.2" />
+      <path d="M3.4 9.4h7.2" />
+      <path d="M3.4 13.4h4.4" />
+      <path d="m10.6 14 2.4 2.4 4-5" />
     </>
   ),
   // A stack of pages, with a down-arrow through it: the whole book on one

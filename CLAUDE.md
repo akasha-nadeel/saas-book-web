@@ -244,10 +244,13 @@ wrong with this book, worst first, each carrying the control that fixes it).
 
 **The tool catalogue is declared once** in `src/lib/book-tools.ts` (path, name,
 one-line description, grouped). Nothing in that list is a preview: a tool that
-is not finished does not go in it. **Since `1daca70` it holds one entry —
-Export — and one group**, because the list is what the dashboard, the book
-card's ⋯ sheet and the landing page all read, and the MVP may only name what is
-reachable. `src/lib/tool-guide.ts` was cut to match. The sixteen tool *screens*
+is not finished does not go in it. **It holds two entries in two groups** —
+the Consistency check and Export — because the list is what the dashboard, the
+book card's ⋯ sheet and the landing page all read, and the MVP may only name
+what is reachable. (`1daca70` cut it to Export alone; the consistency check was
+added on 2026-08-27 as the second live tool, and is the only one of the
+seventeen that was written *for* the MVP rather than un-gated into it.)
+`src/lib/tool-guide.ts` carries one guide per entry. The sixteen older tool *screens*
 are all still in the tree under `src/app/book/[bookId]/` and
 `src/components/`; bringing one back is an entry here, an entry there, and a
 line off `HIDDEN_BOOK_TOOL_PATHS`. Its file comment still says sixteen.
@@ -640,18 +643,24 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   carries the same two figures for the marketing copy. **A price change is three
   edits**: this table, two *new* prices in Paddle's catalog (never an edit of a
   live one), and the resulting env ids.
-- **The launch MVP charges for what the earlier plan gave away, and the two
-  policies are both in the tree.** What is free now is **five books**, unlimited
-  words and chapters, imports, sync, and **Word export only**; Pro buys
-  unlimited books, EPUB and PDF, and sixty assistant replies a month against
-  five. The old rule — *export must never move behind the plan* — is the one
-  this reversed deliberately, so do not "restore" it from this file; if it is
-  revisited, `LAUNCH_LIMITS.freeExports` is the single edit.
+- **Export is free on both plans, and *export must never move behind the plan*
+  is the rule again.** The launch MVP sold EPUB and PDF as the two things Pro
+  bought; that was undone on 2026-08-27, because a writer has to be able to take
+  the book and go and a tool that holds the finished file back is the thing this
+  trade's writers check for first. `freeExports` and `proExports` now carry the
+  same three formats, and the pair stays as a pair so the decision has somewhere
+  to live and narrowing it is still one edit. **`launch.test.ts` pins it** —
+  nothing else would notice the array changing. What is free is **five books**,
+  unlimited words and chapters, imports, sync and every export format; **Pro
+  buys two things**: unlimited books, and sixty assistant replies a month
+  against five.
 - **What the launch MVP meters, it meters on the server**, because it costs
   model time: `billing/launch-entitlements.ts` claims an assistant reply through
   the `claim_assistant_reply` RPC against the `ai_usage` table (UTC calendar
   month, **402** unpaid / **429** Pro, and a `refund()` if the reply never
-  lands), `requireLaunchExport()` gates EPUB and PDF, and the free book limit is
+  lands), `requireLaunchExport()` now only checks for a session — free is not
+  anonymous, since `/api/export/pdf` launches a browser on markup a caller sent —
+  and the free book limit is
   a **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
   count. `new-book-form.tsx` mirrors it in the UI; the trigger is what enforces
   it. **The count is stated twice and both have to move** — `freeBooks` in

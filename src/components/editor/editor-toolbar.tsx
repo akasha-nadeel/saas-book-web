@@ -384,7 +384,17 @@ export function ToolRail({
     >
       <Flyout
         label="Text & type"
-        trigger={<span className="font-serif text-lg">Aa</span>}
+        trigger={
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src="/icons/icon-text.png"
+            alt=""
+            aria-hidden="true"
+            width={36}
+            height={36}
+            className="h-9 w-9 object-contain"
+          />
+        }
       >
         <div className="flex max-h-[78vh] w-64 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-0.5">
           <div className="flex gap-1">
@@ -672,11 +682,15 @@ export function ToolRail({
         disabled={busy}
         onClick={() => fileRef.current?.click()}
       >
-        <Icon>
-          <rect x="2.6" y="3.8" width="14.8" height="12.4" rx="2" />
-          <circle cx="7.1" cy="8.2" r="1.4" />
-          <path d="m2.9 14.4 3.9-3.9a1.2 1.2 0 0 1 1.7 0l2.6 2.6 1.7-1.7a1.2 1.2 0 0 1 1.7 0l2.6 2.6" />
-        </Icon>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/icons/icon-image.png"
+          alt=""
+          aria-hidden="true"
+          width={36}
+          height={36}
+          className="h-9 w-9 object-contain"
+        />
       </ToolButton>
       <input
         ref={fileRef}
@@ -782,11 +796,15 @@ export function ToolRail({
                 className="absolute -inset-1.5 animate-ping rounded-full bg-danger/40"
               />
             )}
-            <Icon>
-              <rect x="7.4" y="2.6" width="5.2" height="9.4" rx="2.6" />
-              <path d="M4.6 9.6a5.4 5.4 0 0 0 10.8 0" />
-              <path d="M10 15v2.4" />
-            </Icon>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/icon-mic.png"
+              alt=""
+              aria-hidden="true"
+              width={36}
+              height={36}
+              className="h-9 w-9 object-contain"
+            />
           </span>
         </ToolButton>
       )}

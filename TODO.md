@@ -2663,6 +2663,259 @@ should either ship or lose the card.
       inside the chapter (it opens the chapter, not the line).
 - [ ] **Per-chapter status and synopsis.** Offered early, never chosen.
 
+## What writers ask for — read off the competition
+
+Added 2026-08-27, from a review of **22 writing tools** published 2025-05-16 by
+Dominic de Souza, an author writing a long series with heavy worldbuilding —
+exactly the reader this app is aimed at. It is one person's opinion and is
+written down as one, but his likes and dislikes are the ones this category
+repeats, and several of them are things we have already built and hidden.
+
+**What he says he wants**, in his own order: a beautiful, immersive writing
+experience; freedom to brain-dump, organise and mind-map his own way; offline
+access ("the moment I open Chrome, I'm Pavlov'd to open new tabs"); free or
+low-cost while he is *not* writing, which may be six months at a stretch; and
+**export freedom — "so I can take everything and leave anytime I want"**.
+
+**What blocks him**: busy design, having to learn somebody else's method,
+systems that cannot hold a large world, a writing surface that does not feel
+good, online-only, and a subscription that bills through the fallow months.
+
+His scoring lines up with that, and it is the *reasons* that are worth keeping:
+
+| Rated well | Why |
+|---|---|
+| Obsidian 9 | offline, folders, messy or structured as you like, no imposed method |
+| Anytype 9 | offline, header art and icons, a whole duplicated workspace per book |
+| Craft 8.5 | page background art and gradients, character cards as a visual cluster |
+| Novelcrafter 8.5 | minimal chrome, a Codex for characters and lore, $4/month |
+| Milanote 8 | drag-and-drop columns; scene planning by moving cards |
+
+| Rated badly | Why |
+|---|---|
+| Novelize 5.5 | brand orange louder than the prose, washed-out text, dated grey |
+| AutoCrit 5.5 | locked features and pro upgrades all over the interface |
+| Storywriter Pro 5.5 | **cannot export anything unless you pay** |
+| FirstDraftPro 6.5 | a permanent upgrade prompt in the sidebar he cannot dismiss |
+| Motif 6.5 | writing column far too wide — "nobody reads lines that long" |
+| Speare 6 | forces its structure on a writer who needs to be messy first |
+
+### What we already answer
+
+The quiet chrome, the real page at a real trim, and a measure held near 66
+characters (`bookSetting`) — the exact fault Motif was marked down for. Storage
+is local-first. Three export formats. The price sits between Novelcrafter's $4
+and everybody else's $9–10.
+
+### The one to watch — answered 2026-08-27
+
+**Done — every format is free on both plans now.** `freeExports` carries all
+three, `launch.test.ts` pins it, and the copy across twelve files, both legal
+pages and the landing page says so. What follows is why, kept because the
+reasoning is the useful part and because it is the argument against reversing
+it again.
+
+**Export behind the plan was the riskiest thing in the launch MVP.** His
+first-stated want is to take everything and leave; the one tool he singles out
+for locking export scored 5.5. Free Word export softens it and is probably
+enough — but if this app starts being reviewed, that is the sentence that gets
+written. It is one edit (`LAUNCH_LIMITS.freeExports`), and the older rule it
+reversed — *export must never move behind the plan* — is recorded under
+**Billing** above.
+
+Second, smaller: two tools lost a point each for **a permanent upgrade prompt
+sitting in the chrome**. Ours must never live in the rail or the sidebar.
+
+### Why editing tools annoy the writers who buy them
+
+From *What Writers Often Get Wrong About Editing Tools*, Anca Antoci, The
+Writing Cooperative, 2024-06-25, on Grammarly and ProWritingAid. **Only the free
+preview was readable** — the thesis, the section on adverbs and the comments —
+so this is a partial read and is written down as one.
+
+**The complaint is tone, not accuracy.** A tool underlines every adverb; the
+writer reads the underline as an instruction, accepts everything, and ends up
+with prose that is "accurate but dull, losing the author's voice in the
+process". Her answer: *"the tools highlight them for your consideration, not
+elimination. It's all about context."* She also notes that Stephen King's
+"kill your adverbs" is teacherly exaggeration aimed at dialogue tags — he uses
+them, sparingly.
+
+**This is evidence for three rules already in the house style**, from the side
+of the writer they were written for: *report facts, never verdicts*; no score,
+no grade, no rating out of a hundred; and the prose report has no rewrite
+button. Her image of the problem is "a page full of red underlines, feeling like
+your creativity is being strangled."
+
+**And one thing we have earned and do not say.** The top comment is a writer
+using ProWritingAid's Rephrase and asking *"Do I need to disclose AI
+assistance?"* — a real anxiety with a real cost. **The assistant here never
+writes into the book**, so a writer using OpenChapter has nothing to disclose:
+every word in the file is theirs. That is an architectural decision recorded in
+`CLAUDE.md` and stated on no page a visitor sees. Against Sudowrite and AutoCrit,
+both marked down in the review above for being AI-heavy, it is the difference
+worth naming.
+
+**For the prose report, when it comes off `HIDDEN_BOOK_TOOL_PATHS`:**
+
+- Show **where** something clusters, with the sentence. "40 adverbs" is a
+  number; "12 of them in dialogue tags" is a thing a writer can act on.
+- **Never red.** Red means error, and an adverb is not one.
+- The screen already may not carry a score. This is the same rule pointed at
+  the wording rather than at the arithmetic.
+
+**Writers stack tools** — one commenter runs ProWritingAid and then AutoCrit.
+We do not have to be the last word on editing; we have to not fight the
+workflow, which is what export in every format on every plan is for.
+
+### What writers say in the comments, which is where the useful part is
+
+From *Best Writing Apps and Tools for Authors in 2025*, Caroline Mitchell
+(23 books, 2M+ copies sold), and the 23 comments under it. The tool round-up
+covers the same ground as the review above — Scrivener, Dabble, Atticus,
+Reedsy, Vellum, Ulysses, Word, Docs. **The comments are the new information.**
+
+**Speed on a long manuscript is something people ask for refunds over.** One
+commenter: *"I love Atticus but it became incredibly slow once I got over 50,000
+words (I mean, it took days to update text — they gave me a refund)."* The
+article says the same of Google Docs, which *"doesn't handle huge documents as
+smoothly (long novels can get sluggish)."*
+
+**We are structurally safe from that in the editor and not in the other two
+screens**, which is worth knowing before it is claimed anywhere. Bodies are one
+document per *chapter* (`saveBody(bookId, chapterId, doc, words)`), so the
+editor never holds a whole novel and Atticus's failure cannot reach it. The
+**reading view** and the **export** do load every chapter — `loadChapters` walks
+the book and `paginate()` measures the lot. Neither has been tried against a
+real 120,000-word manuscript. **Do that before it is a sentence on a page.**
+
+**Three claims we have earned and make nowhere:**
+
+- **It runs on any computer.** Scrivener is desktop-only with no Android,
+  Vellum is Mac-only, Ulysses is Mac and iOS. A commenter asks outright:
+  *"With more people bailing out of the Microsoft sphere with all of the Win11
+  mandates, it would be helpful to add which ones are available with Linux
+  users."* A browser app answers that for free, and Linux and Chromebook are
+  audiences nobody in this list is serving.
+- **Write and format in one place, free.** The most detailed comment in the
+  thread describes stitching two tools together: *"So I write and edit in
+  Scrivener. Format in D2D"* — Draft2Digital — *"and get the formats I need to
+  upload."* Chosen because it is free, and because Word means *"you have to have
+  separate files for world building and characters."* One tool that writes,
+  holds the world and produces the files, at no charge, is the whole of that
+  comment answered.
+- **No card to start.** The first comment on the post is *"do Novlr and Vellum
+  are free to use them?"* — price is the first question. A fifth-grader further
+  down: *"I cannot seem to sign up to any of these apps"*, and is sent to Google
+  Docs. So is a 57-year-old finally starting. Sign-up friction is the filter.
+
+**Subscription fatigue, for the second post running:** *"I find subscription
+based software very obnoxious — that was a deal breaker for me."* Noted beside
+the pause idea below.
+
+**Already built and being asked for:** *"I need a software package where I can
+insert images and illustrations into my chapters."* Inline images with resize,
+alignment and wrap have been in the editor since `resizable-image.ts`.
+
+**One audience we are not built for, written down so it is not mistaken for a
+gap.** Two commenters want non-fiction with apparatus — a language course with
+dialogues, exercises and pictures; an illustrated instructional book. The whole
+model here is the novel: chapters, front and back matter, a trim size. Serving
+them is a different product, not a feature.
+
+### A hundred complaints about a competitor, and how many we already answer
+
+From the Play Store reviews of **Novelist**, a free offline Android novel
+writer with around 50,000 users, read 2026-08-27. Roughly a hundred reviews with
+the developer's replies underneath. **This is the most useful of the three
+sources here**, because it is not a reviewer's opinion of what writers want —
+it is writers describing what actually went wrong.
+
+**The complaints, by how many people made them:**
+
+| Theme | Roughly | A representative one |
+|---|---|---|
+| Lost work | a dozen | *"When my phone ceased to stop working, I lost EVERYTHING."* |
+| Lag on a real manuscript | eight | *"After you have over 3,000 words it takes a few seconds for the app to catch up… a few seconds per letter."* (61 found it helpful) |
+| Images in chapters | eight | *"I need an option for… adding pictures directly to a book."* |
+| No sync between devices | seven | *"There is no sign in… you cannot access what you have on your phone on your computer."* |
+| Losing your place | **101 found it helpful** | *"When reopening the tab, it takes me back up to the top of my writing rather than being where I left off."* |
+| Too complicated | six | *"Overwhelming with its terms: themes, events, character, location, props, extra, plot, scene, write, organize. I just want to write a book."* |
+
+**Most of that list is already answered here**, and it is worth writing down
+which, because it is the clearest evidence yet that the architecture was pointed
+at the right problems:
+
+- **Lost work** — autosave that says *Saved* only once the IndexedDB write
+  resolves, `rescueBody` to `localStorage` on page close, and optional Supabase
+  sync. Novelist's answer to a dozen people who lost books is *"it's a free
+  offline app, the user is responsible for safety backups"*, which reads as
+  blame and earned more one-star reviews than the bug did.
+- **Lag** — one document per *chapter*, so the editor never holds a novel. His
+  workaround is to tell writers to *"keep scenes short (1000-2000 words)"*: the
+  architecture asking the user to compensate for it.
+- **Images, spell check, page size, drop caps, indentation** — all built. His
+  reply to the font request is *"How many font options have you actually seen in
+  novels?"*, and to the page-size one, *"Novelist is a writing tool, not a
+  publishing tool. Pages are a matter of publishing."* That division is exactly
+  the one this app decided not to make.
+- **Export that a shop refuses** — *"EPUB export fail the upload checker 4
+  amazon & draft2digital"*, *"No copyright page. If you create 1 the TOC is
+  before the copyright which is wrong"*, *"chapter 2 can begin on the same
+  page"*. Those three are `bindBook`, the generated copyright page and the
+  section page-breaks — every one of them a bug this app has already had and
+  fixed, which is what `export/consistency.test.ts` is standing guard over.
+
+**Two gaps this turns up that we do not answer:**
+
+1. **Your place inside the chapter.** `resume.ts` returns a `ChapterMeta` — the
+   right chapter, opened at the top of it. On a five-thousand-word chapter that
+   is a scroll every single time you come back. **101 people marked that
+   complaint helpful, more than any other review in the set**, so it matters
+   more than its size suggests. Storing a caret position or a scroll offset per
+   chapter is small; deciding where it lives (`prefs`, not the shelf) is the
+   only real question.
+2. **Performance on a whole book** — the reading view and the export, already
+   written down above. This source is the second independent report that slow
+   is not a polish issue but the thing people leave over.
+
+**And a lesson that is not a feature.** The developer answers criticism badly,
+and it costs him: *"Bad reviews because the app is too simple. Bad reviews
+because it has too many features… The result is that I'll stop developing
+Novelist soon. Bye."* One reviewer dropped a star purely for the replies —
+*"the creator's responses to criticism are so unprofessional that it is actually
+a detriment"* — and another wrote a review entirely about them. **How a
+complaint is answered is part of the product**, and this is the file where that
+gets remembered.
+
+**The sharpest line in the whole set**, from somebody who left:
+*"It was structured like how you analyze a novel rather than how you write
+one."* That is the test to hold every tool to as it comes off
+`HIDDEN_BOOK_TOOL_PATHS`.
+
+### Ideas to bank, roughly by how often the category asks for them
+
+1. **Worldbuilding that is not a form.** Every tool he rated 8.5 or above has
+   one — Codex, objects, a wiki. `bible.ts` is built and tested; it is on
+   `HIDDEN_BOOK_TOOL_PATHS`.
+2. **A visual board.** Scene cards dragged into columns. It is the whole of
+   Milanote's 8, and the half-point Lattics lost for feeling unimmersive.
+3. **Atmosphere per book.** Cover art as a page header, a colour that says
+   *this world*. Craft and Anytype both scored on this alone, and we have the
+   artwork already.
+4. **A link to share for feedback.** The *only* gap he names in Obsidian, his
+   9/10 — he copies the book into Google Docs to get comments. Collaboration is
+   built; `/invite/[token]` redirects home under the launch flag.
+5. **Installable, and offline in so many words.** Named as a want five times
+   across the review. We are local-first already; a PWA would let the landing
+   page say so without inventing a claim.
+6. **Somewhere to pause.** "Pricey subscriptions when I might not even be
+   writing for six months." An annual plan exists; a pause does not.
+
+**Three of those six are things already written and switched off** (1, 4, and
+arguably 5), which makes them the cheapest items on any roadmap here. See
+`LAUNCH_POST_BACKLOG` for the order they were meant to come back in.
+
 ## Known rough edges
 
 - [ ] **`/tools` has no screenshots yet, and the space for them is reserved.**

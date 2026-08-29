@@ -10,8 +10,15 @@ import { IdeasPanel } from "@/components/editor/ideas-panel";
 import { NotesPanel } from "@/components/editor/notes-panel";
 import { TrashPanel } from "@/components/editor/trash-panel";
 import { SearchPanel } from "@/components/editor/search-panel";
+import { ConsistencyPanel } from "@/components/editor/consistency-panel";
 import { icons } from "@/components/editor/icon-rail";
 import { EDITOR_LAYOUT_EVENT } from "@/lib/use-visual-viewport";
+import { PANEL_TITLES, type PanelTab } from "@/lib/panel-tabs";
+
+// Re-exported so the rail and the editor keep importing the panel's
+// vocabulary from the panel. The definitions moved to `lib/panel-tabs.ts`
+// only because `library-store.ts` needs the type for a stored preference.
+export { PANEL_TITLES, type PanelTab };
 
 /**
  * Whatever the left rail currently points at.
@@ -40,17 +47,6 @@ import { EDITOR_LAYOUT_EVENT } from "@/lib/use-visual-viewport";
  * the panel's name, and the control that hides it — and the sub-panels below
  * render their contents only.
  */
-
-export type PanelTab =
-  | "chapters"
-  | "search"
-  | "notes"
-  | "ideas"
-  | "bible"
-  | "bookmarks"
-  | "assistant"
-  | "history"
-  | "trash";
 
 /**
  * What each panel is called, in one place.
@@ -87,17 +83,6 @@ function panelScope(tab: PanelTab, chapterTitle: string): string | null {
   return null;
 }
 
-export const PANEL_TITLES: Record<PanelTab, string> = {
-  chapters: "Manuscript",
-  search: "Search this book",
-  notes: "Notes",
-  ideas: "Ideas",
-  bible: "Story bible",
-  bookmarks: "Bookmarks",
-  assistant: "Assistant",
-  history: "Versions",
-  trash: "Deleted chapters",
-};
 
 /** How long the drawer takes to leave. Matches `.oc-drawer-out` in globals.css. */
 const EXIT_MS = 180;
@@ -232,6 +217,26 @@ export function LeftPanel({
     return () => window.clearTimeout(timer);
   }, [open]);
 
+  /*
+   * **A panel that was already open when this mounted is not opening.**
+   *
+   * Which panel is showing is a stored preference now, and opening a chapter
+   * is a route change that replaces this component — so the panel came back
+   * with `open` already true and played its 220ms slide from off-screen left
+   * every single time. Following one of the consistency check's own chapter
+   * links made the panel appear to blink out and rush back in, twice a
+   * sentence.
+   *
+   * So the entrance is skipped for a panel that arrives open, and armed again
+   * the moment it is genuinely closed — a writer who presses the rail tab
+   * still gets the slide, because by then `open` has been false.
+   */
+  const [instant, setInstant] = useState(open);
+  // Adjusted during render, like `rendered` above and for the same reason —
+  // an effect would arm the entrance one frame late, and the lint rule this
+  // file already follows forbids setting state from one.
+  if (!open && instant) setInstant(false);
+
   if (!rendered) return null;
 
   return (
@@ -262,7 +267,9 @@ export function LeftPanel({
                     flex w-(--sidebar-width) max-w-[80vw] flex-col border-r
                     border-line shadow-2xl md:max-w-none ${
                       open
-                        ? "oc-drawer-in"
+                        ? instant
+                          ? ""
+                          : "oc-drawer-in"
                         : "oc-drawer-out pointer-events-none"
                     }`}
         aria-label={fullName}
@@ -306,16 +313,27 @@ export function LeftPanel({
             way — but a writer whose eye is *in* the panel should not have to
             travel back to the edge of the window to be rid of it. The two
             controls are one toggle, so they can never disagree. */}
-        <header className="flex h-11 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
           {/* The name never shrinks and the scope does. At 15rem a long chapter
               title would otherwise eat the word telling you which panel you are
               in, which is the half that has to survive. `title` carries the
               whole of it for anything the ellipsis takes. */}
           <h2
             title={fullName}
-            className="flex min-w-0 flex-1 items-baseline gap-1.5 font-sans text-xs font-semibold"
+            className="flex min-w-0 flex-1 items-baseline gap-1.5 font-sans text-base font-bold"
           >
-            <span className="shrink-0 tracking-wide text-muted uppercase">
+            {/* The panel's own name reads as a heading rather than as a label.
+                At `text-xs` in muted grey it was quieter than the findings
+                under it, and a writer glancing at the column could not tell
+                which panel they were in without reading the contents.
+
+                **Uppercase and letter-spacing came off on the way up.** Both
+                are small-label conventions: they earn their keep at 12px, and
+                at 16px they only shout and eat width — "CONSISTENCY CHECK"
+                spaced out is most of a 15rem column before the close button
+                has had any. Sentence case at the larger size is narrower and
+                reads as the heading it now is. */}
+            <span className="shrink-0 text-fg">
               {PANEL_TITLES[tab]}
             </span>
             {scope && (
@@ -354,6 +372,7 @@ export function LeftPanel({
         <div className="min-h-0 flex-1">
           {tab === "chapters" && <ChapterSidebar bookId={bookId} />}
           {tab === "search" && <SearchPanel bookId={bookId} />}
+          {tab === "consistency" && <ConsistencyPanel bookId={bookId} />}
           {tab === "notes" && (
             <NotesPanel key={chapterId} chapterId={chapterId} />
           )}

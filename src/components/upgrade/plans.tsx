@@ -97,7 +97,9 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
  * **The split is by what a row costs to run and who it is for**, not by what
  * would squeeze hardest. Three lines govern it:
  *
- * - **Writing a book and getting it out is free, whole.** All three exports, the
+ * - **Writing a book and getting it out is free, whole**, and as of 2026-08-27
+ *   that is true again rather than aspirational — the launch MVP sold EPUB and
+ *   PDF as Pro for a while and it has been undone. All three exports, the
  *   pre-upload check and the roadmap included. Every competitor charges for
  *   formatting — Scrivener at $60, Atticus at $147, Vellum at $200 and up — so
  *   giving it away is the wedge, and the landing page has already promised it
@@ -177,8 +179,17 @@ const ROWS: {
   },
   {
     group: "AI and export",
+    /* **The same on both sides, and that is the row doing its job.** Export was
+       the one thing Pro bought that a writer cannot do without, and charging
+       for the door is the thing this trade's writers check for first. The row
+       stays rather than coming out: a reader comparing the columns should be
+       able to see that the file is not what they are paying for.
+
+       The label is matched by string in `STARTER_HIGHLIGHT` below — renaming it
+       silently drops the highlight. */
     label: "Export",
-    starter: "Word",
+    detail: "Word, EPUB and PDF, on either plan.",
+    starter: "Word, EPUB, PDF",
     pro: "Word, EPUB, PDF",
   },
 ];
@@ -291,8 +302,9 @@ export function Plans({
           className="mx-auto mt-4 max-w-2xl font-sans text-lg leading-relaxed
                      font-medium text-fg/80"
         >
-          Start with one complete book for free. Upgrade when you need more
-          books, more assistant help, or professional export formats.
+          Every format is free, on both plans — take your book and go whenever
+          you like. Pro is for when you need more books than five, or more of
+          the assistant.
         </p>
 
         <PeriodToggle period={period} onChange={setPeriod} />
@@ -316,7 +328,7 @@ export function Plans({
           <PlanCard
             mark={<PenIcon className="h-6 w-6" />}
             name="Free"
-            blurb="For trying OpenChapter with one complete book and a small assistant allowance."
+            blurb="For writing a book and getting it out — every export format, and a small assistant allowance."
             price="$0"
             rows={ROWS.map((r) => ({
               group: r.group,
@@ -345,7 +357,7 @@ export function Plans({
             badge="Best for serious writers"
             mark={<StackIcon className="h-6 w-6" />}
             name="Pro"
-            blurb="For unlimited books, more assistant help, and full export."
+            blurb="For a shelf that keeps growing, and the assistant to hand."
             price={headline}
             note={note}
             rows={ROWS.map((r) => ({
@@ -416,8 +428,8 @@ export function Plans({
         <ComingSoonDialog title="Pro" onClose={() => setSoon(false)}>
           There is no payment gateway configured on this copy of OpenChapter, so
           there is nothing to buy and nothing is held back. Once billing is
-          configured, Pro unlocks unlimited books, more assistant replies, and
-          EPUB/PDF export.
+          configured, Pro unlocks unlimited books and more assistant replies.
+          Every export format is free either way.
         </ComingSoonDialog>
       )}
     </main>

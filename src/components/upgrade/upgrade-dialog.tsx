@@ -34,8 +34,15 @@ import { plural } from "@/lib/plural";
  * that needed it is an answer.
  */
 
-/** Why the writer is looking at this. Each reason owns its own headline. */
-export type UpgradeReason = "books" | "restore" | "export";
+/**
+ * Why the writer is looking at this. Each reason owns its own headline.
+ *
+ * There was an `export` reason here, written when EPUB and PDF were Pro. It was
+ * never wired to anything — nothing ever passed it — and every format is free
+ * on both plans now, so the refusal it headlined cannot happen. Gone rather
+ * than left as a dialog for a state the app has no way to reach.
+ */
+export type UpgradeReason = "books" | "restore";
 
 const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   books: {
@@ -45,10 +52,6 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   restore: {
     lead: "There is no room to put this one back.",
     title: `Free carries ${plural(LAUNCH_LIMITS.freeBooks, "book")}. Pro carries as many as you write.`,
-  },
-  export: {
-    lead: "That format is part of Pro.",
-    title: "Free exports Word. Pro exports EPUB and PDF as well.",
   },
 };
 
@@ -165,8 +168,10 @@ const FREE: Row[] = [
   },
   {
     icon: icons.word,
-    name: "Word (.docx) export",
-    detail: "The file an editor asks you for.",
+    /* On the Free column because it *is* free, and named in full so the two
+       columns cannot be read as Word here and the real formats over there. */
+    name: "Word, EPUB and PDF export",
+    detail: "Every format, on either plan. Take the book and go.",
   },
 ];
 
@@ -180,16 +185,6 @@ const PRO: Row[] = [
     icon: icons.assistant,
     name: `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} assistant replies a month`,
     detail: "Twelve times what Free carries.",
-  },
-  {
-    icon: icons.epub,
-    name: "EPUB export",
-    detail: "Zero errors, for Kindle and Apple Books.",
-  },
-  {
-    icon: icons.pdf,
-    name: "PDF export",
-    detail: "Typeset to your own trim size.",
   },
   {
     icon: icons.everything,

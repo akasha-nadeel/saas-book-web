@@ -1394,24 +1394,36 @@
   );
 }
 
+/* **The panel is wider than it was at every size above a phone**, and it can
+   afford to be: it *floats over* the manuscript rather than pushing it (see
+   `left-panel.tsx`), so width here costs the page nothing but cover. What it
+   buys is real — the assistant is a conversation, the search results are
+   sentences, and the story bible is a list of names with descriptions under
+   them. At the old 17rem the assistant's own suggested questions wrapped to two
+   lines, which is the panel telling you it is too narrow for the thing inside
+   it.
+
+   The middle step also comes down from 1440px to 1280px, because a great many
+   laptops sit between the two and were getting the small panel on a screen with
+   room for the large one. */
 @media (min-width: 768px) {
   :root {
     --rail-width: 4rem;
-    --sidebar-width: 17rem;
+    --sidebar-width: 20rem;
   }
 }
 
-@media (min-width: 1440px) {
+@media (min-width: 1280px) {
   :root {
     --rail-width: 4.5rem;
-    --sidebar-width: 20rem;
+    --sidebar-width: 24rem;
   }
 }
 
 @media (min-width: 1800px) {
   :root {
     --rail-width: 5rem;
-    --sidebar-width: 24rem;
+    --sidebar-width: 28rem;
   }
 }
 

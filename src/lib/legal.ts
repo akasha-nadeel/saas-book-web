@@ -49,7 +49,7 @@ export const CONTACT_EMAIL = "contact@openchapterapp.com";
  * day, which tells a reader nothing and is untrue. Bump it by hand when the
  * words change.
  */
-export const UPDATED = "20 August 2026";
+export const UPDATED = "27 August 2026";
 
 /**
  * The no-questions refund window, in days from the first payment.
