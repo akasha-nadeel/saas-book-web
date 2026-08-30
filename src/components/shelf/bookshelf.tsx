@@ -825,43 +825,6 @@ export function Bookshelf({
             monitor and leave the eye travelling between a number and its
             label. */}
           <main className="mx-auto max-w-6xl px-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 md:pb-16">
-            {/* The band, above the title rather than under it: it is about
-              the writer and the session, and the heading below is about the
-              screen. Overview only — the other areas open on their own work. */}
-            {area === "overview" && (
-              <WelcomeBand
-                account={account}
-                current={current}
-                settled={settled}
-              />
-            )}
-
-            {/* Write gets one too, and only over the *active* list. Archived,
-                Trash and Favourites are lists somebody came to manage, and a
-                strip inviting them to start a book sits badly over a trash
-                can — the same rule the current-book card follows below. */}
-            {area === "write" && view === "active" && (
-              <WriteBand books={counts.active} settled={settled} />
-            )}
-
-            {area === "write" && view === "favourite" && (
-              <FavouritesBand books={counts.favourite} settled={settled} />
-            )}
-
-            {/* One block. The heading and its line used to be two siblings with
-              `mb-8` and `-mt-6` cancelling each other out — a spacing bug
-              waiting to be inherited by the next area added. */}
-            {/* The title, and nothing under it.
-
-                Each area carried a line of prose — "See your books and continue
-                writing." — which said what the area beneath it was already
-                showing. A deck earns its place when the screen would be
-                ambiguous without it, and none of these were.
-
-                Write titles itself after the list it is showing. The rail's
-                four rows all land in the same area, so a page headed "Write"
-                over a trash can was the screen disagreeing with the row that
-                opened it. */}
             <div className="mt-8 mb-7 flex items-center gap-3">
               <h1 className="text-2xl font-extrabold text-fg">
                 {area === "write" ? VIEW_LABEL[view] : meta.label}
