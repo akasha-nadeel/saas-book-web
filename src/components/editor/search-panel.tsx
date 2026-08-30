@@ -28,6 +28,7 @@ let cachedSearchQuery = "";
 let cachedReplacement = "";
 let cachedOnlyThisChapter = false;
 let cachedActiveMatchId: string | null = null;
+let cachedScrollTop = 0;
 
 /**
  * Senior UI/UX Find & Replace panel for the manuscript.
@@ -52,6 +53,13 @@ export function SearchPanel({
   const findInputRef = useRef<HTMLInputElement>(null);
   const replaceFindInputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Restore panel scroll position across chapter navigation / remounts
+  useEffect(() => {
+    if (scrollContainerRef.current && cachedScrollTop > 0) {
+      scrollContainerRef.current.scrollTop = cachedScrollTop;
+    }
+  }, []);
 
   // Tab state is persisted in preferences so chapter navigation never resets it
   const activeTab = prefs.searchTab ?? "find";
@@ -150,16 +158,6 @@ export function SearchPanel({
     const defaultMatch = matchInCurrent ?? allMatches[0];
     setActiveMatchId(defaultMatch.id);
   }, [allMatches, activeMatchId, currentChapterId, setActiveMatchId]);
-
-  // Smoothly scroll active match into view in the panel
-  useEffect(() => {
-    if (activeMatchId) {
-      const el = document.getElementById(`search-match-${activeMatchId}`);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }
-    }
-  }, [activeMatchId]);
 
   // Synchronize live editor highlights and editor scroll position
   useEffect(() => {
@@ -310,7 +308,10 @@ export function SearchPanel({
   return (
     <div
       ref={scrollContainerRef}
-      className="scroll-slim flex h-full min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden p-3 pb-12 overscroll-contain scroll-smooth bg-panel text-fg"
+      onScroll={(e) => {
+        cachedScrollTop = e.currentTarget.scrollTop;
+      }}
+      className="scroll-slim flex h-full min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overflow-x-hidden p-3 pb-12 overscroll-contain bg-panel text-fg"
     >
       {/* 1. TOP SEGMENTED TAB SWITCHER CARD & SCOPE TOGGLE */}
       <div className="shrink-0 overflow-hidden rounded-xl border border-line/70 bg-surface/50 p-2 shadow-xs backdrop-blur-xs flex flex-col gap-2">
