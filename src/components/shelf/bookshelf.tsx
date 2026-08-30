@@ -770,11 +770,11 @@ export function Bookshelf({
           aria-haspopup="dialog"
           aria-expanded={navigationOpen}
           aria-controls="mobile-dashboard-navigation"
-          className="fixed bottom-[calc(0.75rem+var(--oc-safe-bottom))] left-1/2 z-40 flex h-12 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-fg/15 bg-fg px-4 text-sm font-semibold text-surface shadow-[0_12px_32px_rgb(0_0_0/0.24)] outline-none transition-[transform,background-color] hover:bg-fg/90 active:translate-y-px focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface md:hidden"
+          className="fixed bottom-[calc(0.75rem+var(--oc-safe-bottom))] left-1/2 z-40 flex h-12 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-2.5 rounded-full border border-line bg-white px-4 text-sm font-semibold text-fg shadow-[0_8px_28px_rgba(0,0,0,0.12)] outline-none transition-all hover:bg-raised active:translate-y-px focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface dark:bg-panel dark:border-line md:hidden"
         >
-          <span className="text-surface/80">{meta.icon}</span>
-          <span className="min-w-0 max-w-40 truncate">{meta.label}</span>
-          <span aria-hidden="true" className="ml-1 text-base leading-none text-surface/70">
+          <span className="flex items-center text-fg/80 [&>svg]:h-4 [&>svg]:w-4">{meta.icon}</span>
+          <span className="min-w-0 max-w-40 truncate font-semibold text-fg">{meta.label}</span>
+          <span aria-hidden="true" className="ml-1 text-base leading-none text-muted">
             ☰
           </span>
         </button>
