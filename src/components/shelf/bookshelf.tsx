@@ -1876,40 +1876,22 @@ function Overview({
           that are true of the whole library rather than of one manuscript. */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Figure
-          icon={
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src="/icons/books.png"
-              alt=""
-              className="h-16 w-16 object-contain opacity-80"
-            />
-          }
+          icon={shelfIcons.overview}
           label={books === 1 ? "book" : "books"}
           value={books.toLocaleString()}
+          iconColor="text-blue-700 dark:text-blue-400"
         />
         <Figure
-          icon={
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src="/icons/words.png"
-              alt=""
-              className="h-16 w-16 object-contain opacity-80"
-            />
-          }
+          icon={shelfIcons.write}
           label={nounFor(words, "word")}
           value={words.toLocaleString()}
+          iconColor="text-emerald-700 dark:text-emerald-400"
         />
         <Figure
-          icon={
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src="/icons/chapters.png"
-              alt=""
-              className="h-16 w-16 object-contain opacity-80"
-            />
-          }
+          icon={shelfIcons.prepare}
           label={nounFor(chapters, "chapter")}
           value={chapters.toLocaleString()}
+          iconColor="text-amber-700 dark:text-amber-400"
         />
       </div>
 
@@ -2439,10 +2421,14 @@ function Figure({
   icon,
   label,
   value,
+  cardBg = "bg-panel border-line",
+  iconColor = "text-fg",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
+  cardBg?: string;
+  iconColor?: string;
 }) {
   return (
     /* A `<dl>` per card, not one list split across three. Each of these is a
@@ -2450,15 +2436,18 @@ function Figure({
        exactly that — where three cards sharing one `<dl>` would tell a screen
        reader they were three parts of one thing. */
     <dl
-      className="flex min-h-32 items-center gap-5 rounded-[8px] border border-line bg-panel
-                 px-6 py-6 sm:min-h-36 sm:py-7"
+      className={`flex min-h-28 items-center gap-4 rounded-[8px] border px-6 py-6 sm:min-h-32 sm:py-7 ${cardBg}`}
     >
-      <div className="flex h-16 w-16 shrink-0 items-center justify-center">
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center [&>svg]:h-7 [&>svg]:w-7 [&>svg]:stroke-[2] ${iconColor}`}
+      >
         {icon}
-      </div>
+      </span>
       <div className="min-w-0 flex-1">
-        <dt className="truncate text-xs font-medium uppercase tracking-wider text-muted sm:text-sm">{label}</dt>
-        <dd className="mt-0.5 text-2xl leading-tight font-extrabold tabular-nums text-fg sm:text-3xl">
+        <dt className="truncate text-xs font-semibold uppercase tracking-wider text-black sm:text-sm">
+          {label}
+        </dt>
+        <dd className="mt-0.5 text-2xl leading-tight font-extrabold tabular-nums text-black sm:text-3xl">
           {value}
         </dd>
       </div>
