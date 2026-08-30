@@ -27,6 +27,7 @@ import {
 let cachedSearchQuery = "";
 let cachedReplacement = "";
 let cachedOnlyThisChapter = false;
+let cachedActiveMatchId: string | null = null;
 
 /**
  * Senior UI/UX Find & Replace panel for the manuscript.
@@ -62,12 +63,23 @@ export function SearchPanel({
   const [replacement, setReplacementState] = useState(cachedReplacement);
   const [onlyThisChapter, setOnlyThisChapterState] = useState(cachedOnlyThisChapter);
   const [collapsedChapters, setCollapsedChapters] = useState<Record<string, boolean>>({});
-  const [activeMatchId, setActiveMatchId] = useState<string | null>(null);
+  const [activeMatchId, setActiveMatchIdState] = useState<string | null>(cachedActiveMatchId);
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const setActiveMatchId = useCallback((id: string | null) => {
+    cachedActiveMatchId = id;
+    setActiveMatchIdState(id);
+  }, []);
 
   const setQuery = useCallback((val: string) => {
     cachedSearchQuery = val;
-    setQueryState(val);
+    setQueryState((prev) => {
+      if (prev !== val) {
+        cachedActiveMatchId = null;
+        setActiveMatchIdState(null);
+      }
+      return val;
+    });
   }, []);
 
   const setReplacement = useCallback((val: string) => {
@@ -98,7 +110,7 @@ export function SearchPanel({
       matchWord: false,
       chapterId: onlyThisChapter ? currentChapterId : null,
     }),
-    [onlyThisChapter, currentChapterId],
+    [onlyThisChapter, onlyThisChapter ? currentChapterId : null],
   );
 
   const groups: ChapterSearchGroup[] = useMemo(() => {
@@ -121,16 +133,23 @@ export function SearchPanel({
 
   const activeMatch: SearchMatch | null = allMatches[activeMatchIndex] ?? null;
 
-  // Auto-select first match when query yields results
+  // Auto-select first match only when no active match is set or when active match is deleted
   useEffect(() => {
-    if (allMatches.length > 0) {
-      if (!activeMatchId || !allMatches.some((m) => m.id === activeMatchId)) {
-        setActiveMatchId(allMatches[0].id);
-      }
-    } else {
+    if (allMatches.length === 0) {
       setActiveMatchId(null);
+      return;
     }
-  }, [allMatches, activeMatchId]);
+    // If activeMatchId already points to a valid match in allMatches, preserve it!
+    if (activeMatchId && allMatches.some((m) => m.id === activeMatchId)) {
+      return;
+    }
+    // Otherwise, default to the first match in the current chapter if present, or allMatches[0]
+    const matchInCurrent = allMatches.find(
+      (m) => m.chapterId === currentChapterId,
+    );
+    const defaultMatch = matchInCurrent ?? allMatches[0];
+    setActiveMatchId(defaultMatch.id);
+  }, [allMatches, activeMatchId, currentChapterId, setActiveMatchId]);
 
   // Smoothly scroll active match into view in the panel
   useEffect(() => {
@@ -221,7 +240,7 @@ export function SearchPanel({
         }
       }
     },
-    [bookId, currentChapterId, editor, query, router, searchOptions],
+    [bookId, currentChapterId, editor, query, router, searchOptions, setActiveMatchId],
   );
 
   const handleNextMatch = useCallback(() => {
