@@ -612,7 +612,7 @@ export function Bookshelf({
                     <img
                       src="/oc-icon.png"
                       alt="OpenChapter"
-                      className="h-7 w-7 object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 dark:invert"
+                      className="h-7 w-7 object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 dark:brightness-0 dark:invert"
                     />
 
                     {/* Expand icon hidden by default, smoothly appears on hover */}

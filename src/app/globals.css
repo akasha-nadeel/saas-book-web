@@ -291,7 +291,7 @@
 
      The two are therefore near neighbours rather than identical, and are kept
      in step by hand — change one, look at the other. */
-  --color-wordmark: #3b82f6;
+  --color-wordmark: #9ca3af;
 
   /* ------------------------------------------------------------------------
      Blue, and the one thing it is allowed to mean: *this is a chapter*.
@@ -1142,7 +1142,7 @@
   --color-badge-pro-ink: #d8b4fe;
   --color-badge-new-bg: #15803d;
   --color-badge-new-ink: #ffffff;
-  --color-wordmark: #3b82f6;
+  --color-wordmark: #9ca3af;
   --color-chapter-fg: #7dd3fc;
   --color-brand-fill: #146ef5;
   --color-brand-ink: #ffffff;
