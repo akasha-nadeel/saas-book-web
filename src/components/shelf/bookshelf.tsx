@@ -241,7 +241,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/Dashboard-Square--Streamline-Flex.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   write: (
@@ -249,7 +249,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/Pencil-Line--Streamline-Flex.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   favourite: (
@@ -257,7 +257,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/Heart--Streamline-Flex.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   archived: (
@@ -265,7 +265,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/Archive-Box--Streamline-Flex.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   trashed: (
@@ -273,7 +273,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/Recycle-Bin-2--Streamline-Flex.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   support: (
@@ -281,7 +281,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/support.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   feedback: (
@@ -289,7 +289,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/feedbacks.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
   pricing: (
@@ -297,7 +297,7 @@ const SIDEBAR_ICONS: Record<string, ReactNode> = {
     <img
       src="/icons/sidebar/pricing.png"
       alt=""
-      className="h-5 w-5 object-contain opacity-75"
+      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
     />
   ),
 };
@@ -612,7 +612,7 @@ export function Bookshelf({
                     <img
                       src="/oc-icon.png"
                       alt="OpenChapter"
-                      className="h-7 w-7 object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0"
+                      className="h-7 w-7 object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0 dark:invert"
                     />
 
                     {/* Expand icon hidden by default, smoothly appears on hover */}
@@ -620,7 +620,7 @@ export function Bookshelf({
                     <img
                       src="/icons/sidebar/panel-expand.png"
                       alt=""
-                      className="absolute h-5 w-5 object-contain scale-75 opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-80"
+                      className="absolute h-5 w-5 object-contain scale-75 opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-80 dark:invert dark:group-hover:opacity-90"
                     />
                   </button>
                 </div>
@@ -643,7 +643,7 @@ export function Bookshelf({
                     <img
                       src="/icons/sidebar/panel-collapse.png"
                       alt=""
-                      className="h-4 w-4 object-contain opacity-75 hover:opacity-100 transition-opacity"
+                      className="h-4 w-4 object-contain opacity-75 hover:opacity-100 transition-opacity dark:invert dark:opacity-85"
                     />
                   </button>
                 </div>
