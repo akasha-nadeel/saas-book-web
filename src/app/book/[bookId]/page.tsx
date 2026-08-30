@@ -1,22 +1,46 @@
 "use client";
 
-import { use } from "react";
-import { BookOverview } from "@/components/editor/book-overview";
+import { use, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { findBook, orderedChapters } from "@/lib/library-store";
+import { useHydrated, useShelf } from "@/lib/use-library";
+import { LoadingScreen } from "@/components/loading-screen";
 
 /**
- * A book's own page: its overview, shown when no chapter is open. Opening a book
- * lands here rather than jumping into a chapter — the writer picks where to work
- * from the panel, and the workspace carries a short guide until they do.
- *
- * Client-side, because the book lives in localStorage and the server cannot see
- * it.
+ * Opening a book lands directly in the manuscript where the writer left off
+ * (or the first chapter for a new book), rather than showing an overview guide.
  */
 export default function BookPage({
   params,
 }: {
   params: Promise<{ bookId: string }>;
 }) {
-  // params is a Promise in Next 16; `use` is how a Client Component unwraps it.
   const { bookId } = use(params);
-  return <BookOverview bookId={bookId} />;
+  const router = useRouter();
+  const hydrated = useHydrated();
+  const shelf = useShelf();
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const book = findBook(shelf, bookId);
+    if (!book) {
+      router.replace("/");
+      return;
+    }
+
+    const chapters = orderedChapters(book);
+    const resume =
+      chapters.find((c) => c.id === book.lastOpenedId) ??
+      chapters.find((c) => c.words > 0) ??
+      chapters[0];
+
+    if (resume) {
+      router.replace(`/book/${bookId}/chapter/${resume.id}`);
+    } else {
+      router.replace("/");
+    }
+  }, [hydrated, bookId, shelf, router]);
+
+  return <LoadingScreen />;
 }
+

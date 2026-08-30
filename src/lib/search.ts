@@ -74,6 +74,7 @@ export function escapeRegExp(string: string): string {
 /** Plain text of a stored chapter document. */
 export function chapterText(title: string, raw: string | null): string {
   const parts: string[] = [];
+  if (title) parts.push(title);
   if (raw) {
     try {
       walk(JSON.parse(raw) as DocNode, parts);
@@ -116,7 +117,7 @@ export function searchChaptersDetailed(
   options: SearchOptions = {},
 ): ChapterSearchGroup[] {
   const trimmed = query.trim();
-  if (trimmed.length < 1) return [];
+  if (trimmed.length < 2) return [];
 
   const regex = buildSearchRegex(query, options);
   if (!regex) return [];
