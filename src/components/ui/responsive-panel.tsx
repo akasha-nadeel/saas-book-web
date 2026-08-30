@@ -30,13 +30,17 @@ export function ResponsivePanel({
   useEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
-    dialog.showModal();
-    return () => {
-      if (dialog.open) dialog.close();
-    };
+    if (!dialog.open) dialog.showModal();
   }, []);
 
-  const dismiss = () => ref.current?.close();
+  const dismiss = () => {
+    const dialog = ref.current;
+    if (dialog && dialog.open) {
+      dialog.close();
+    } else {
+      onClose();
+    }
+  };
 
   return (
     <dialog

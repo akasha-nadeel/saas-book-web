@@ -82,6 +82,7 @@ const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
  * Any entry here overrides the SVG paths in TAB_ICONS for that tab.
  */
 const TAB_IMG_SRCS: Partial<Record<PanelTab, string>> = {
+  chapters: "/icons/icon-chapters.png",
   consistency: "/icons/icon-consistency.png",
   assistant: "/icons/icon-assistant.png",
   search: "/icons/icon-search.png",
@@ -168,6 +169,8 @@ export function WorkspaceRail({
   leftPanel,
   onPanel,
   chapters = true,
+  chapterSectionOpen,
+  onToggleChapters,
   assistant = true,
   className = "",
 }: {
@@ -179,6 +182,10 @@ export function WorkspaceRail({
   onPanel: (open: boolean) => void;
   /** Offer the chapter-list tab. False where a book panel already shows one. */
   chapters?: boolean;
+  /** Whether the manuscript chapter section is expanded beside the editor. */
+  chapterSectionOpen?: boolean;
+  /** Callback to toggle chapter section expansion. */
+  onToggleChapters?: (open: boolean) => void;
   /** Offer the assistant tab. False only on screens that intentionally omit AI. */
   assistant?: boolean;
   /** Responsive visibility supplied by the editor shell. */
@@ -189,22 +196,34 @@ export function WorkspaceRail({
   const allowed = (value: PanelTab) =>
     (chapters || value !== "chapters") && (assistant || value !== "assistant");
 
-  const tabButton = (value: PanelTab) => (
-    <span key={value} data-panel-tab={value} className="contents">
-      <RailButton
-        label={PANEL_TITLES[value]}
-        // Clicking the panel you are already on closes it, so the rail
-        // doubles as the way to get the width back.
-        active={leftPanel && tab === value}
-        onClick={() =>
-          selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel })
+  const tabButton = (value: PanelTab) => {
+    const isChapterTab = value === "chapters";
+    const isActive = isChapterTab ? !!chapterSectionOpen : (leftPanel && tab === value);
+    const handleClick = () => {
+      if (isChapterTab) {
+        if (onToggleChapters) {
+          onToggleChapters(!chapterSectionOpen);
+        } else {
+          onPanel(!chapterSectionOpen);
         }
-        imgSrc={TAB_IMG_SRCS[value]}
-      >
-        {TAB_ICONS[value]}
-      </RailButton>
-    </span>
-  );
+      } else {
+        selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel });
+      }
+    };
+
+    return (
+      <span key={value} data-panel-tab={value} className="contents">
+        <RailButton
+          label={PANEL_TITLES[value]}
+          active={isActive}
+          onClick={handleClick}
+          imgSrc={TAB_IMG_SRCS[value]}
+        >
+          {TAB_ICONS[value]}
+        </RailButton>
+      </span>
+    );
+  };
 
   const groups = GROUPS.map((group) => group.filter(allowed)).filter(
     (group) => group.length > 0,

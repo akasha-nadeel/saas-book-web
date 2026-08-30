@@ -113,9 +113,22 @@ export function ImportChapterButton({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={importing}
-          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-line px-3 py-2.5 text-left text-sm text-fg outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-45"
+          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-left text-sm font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-45"
         >
-          <span>{importing ? "Reading file…" : "Import a file"}</span>
+          <span className="flex min-w-0 items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/icon-import.png"
+              alt=""
+              aria-hidden="true"
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 object-contain"
+            />
+            <span className="truncate font-semibold">
+              {importing ? "Reading file…" : "Import a file"}
+            </span>
+          </span>
           <span aria-hidden="true" className="text-muted">↑</span>
         </button>
       )}

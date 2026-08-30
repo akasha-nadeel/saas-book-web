@@ -48,6 +48,11 @@ import { TextAlign } from "@/lib/editor/text-align";
 import { NoIndent } from "@/lib/editor/no-indent";
 import { SmartQuotes } from "@/lib/editor/smart-quotes";
 import {
+  SearchHighlight,
+  clearSearchHighlights,
+  deselectEditorText,
+} from "@/lib/editor/search-highlight";
+import {
   useDictation,
   useDictationLive,
   type Dictation,
@@ -363,6 +368,11 @@ export function ChapterEditor({
     (open: boolean) => setPref("leftPanel", open),
     [],
   );
+  const chapterSectionOpen = prefs.chapterSectionOpen;
+  const setChapterSectionOpen = useCallback(
+    (open: boolean) => setPref("chapterSectionOpen", open),
+    [],
+  );
   const [mobileBookOpen, setMobileBookOpen] = useState(false);
   // Which face the right book panel shows — the cover-and-steppers Book View, or
   // the book's three parts. Stored rather than held in memory: it used to be a
@@ -370,6 +380,9 @@ export function ChapterEditor({
   // not a reload, so refreshing put a writer back on the cover having asked for
   // nothing of the sort. A reload is not a decision.
   const panelMode: BookPanelMode = prefs.bookPanel;
+  const isLeftPanelOpen = Boolean(
+    panelOpen && tab !== "chapters" && panelMode !== "book",
+  );
 
   /**
    * Whether the panel and page should play their entrance.
@@ -581,6 +594,16 @@ export function ChapterEditor({
     // "Back to Book View" the instant it was pressed.
   }, [hydrated, bookId, chapterId]);
 
+  // When switching to another tab on the left rail (Consistency check, Notes, Bible, etc.)
+  // or closing the panel, deselect all search highlights and active selections in the manuscript
+  useEffect(() => {
+    if (!liveEditor || liveEditor.isDestroyed) return;
+    if (tab !== "search" || !panelOpen) {
+      clearSearchHighlights(liveEditor);
+      deselectEditorText(liveEditor);
+    }
+  }, [tab, panelOpen, liveEditor]);
+
   const initialContent = useMemo<JSONContent | null>(() => {
     if (!raw) return null;
     try {
@@ -621,6 +644,8 @@ export function ChapterEditor({
           leftPanel={panelOpen}
           onPanel={setEditorPanel}
           chapters
+          chapterSectionOpen={chapterSectionOpen}
+          onToggleChapters={setChapterSectionOpen}
           // The manuscript's own right rail carries it now, beside the tools
           // that act on the page it talks about. Two sparkles on two edges of
           // one screen is the duplication the book panel already taught us to
@@ -650,113 +675,109 @@ export function ChapterEditor({
 
         {/* Rendered whether or not it is open: it owns its own mounting so it
             can animate its way out, and it renders nothing until first opened.
-            See LeftPanel's `open`. */}
+            See LeftPanel's `open`. Tool tabs (search, notes, etc.) float over
+            the editor; chapters section sits inline to push the page. */}
         <LeftPanel
-          open={panelOpen}
+          open={panelOpen && tab !== "chapters"}
           tab={tab}
           bookId={bookId}
           chapterId={chapterId}
           chapterTitle={chapter.title}
+          editor={liveEditor}
           getChapterText={() => liveEditor?.getText() ?? ""}
           onClose={() => setEditorPanel(false)}
         />
 
-        {/* The book panel sits on the left, the manuscript to its right. */}
-        <BookPanel
-          book={book}
-          chapterId={chapterId}
-          cover={cover}
-          paper={prefs.paper}
-          mode={panelMode}
-          onMode={changePanelMode}
-          body={body}
-          entering={entering}
-        />
+        {(panelMode === "book" || chapterSectionOpen) && (
+          <BookPanel
+            book={book}
+            chapterId={chapterId}
+            cover={cover}
+            paper={prefs.paper}
+            mode={panelMode}
+            onMode={changePanelMode}
+            body={body}
+            entering={entering}
+            always
+            connectToPage={true}
+            onClose={() => setChapterSectionOpen(false)}
+          />
+        )}
 
         <div className="editor-main flex min-w-0 flex-1 flex-col bg-white dark:bg-transparent">
-          {/* Book View selects no part of the book, so there is no page to
-              show; the overview stands in its place. The panel and the middle
-              of the window are one statement — the book as an object, or a page
-              of it — rather than a panel that can describe one thing while the
-              page shows another.
+                {/* Book View selects no part of the book, so there is no page to
+                    show; the overview stands in its place. The panel and the middle
+                    of the window are one statement — the book as an object, or a page
+                    of it — rather than a panel that can describe one thing while the
+                    page shows another.
 
-              The surface is unmounted rather than hidden. Its autosave flushes
-              on dispose, so nothing typed is lost, and a hidden manuscript is a
-              manuscript whose pagination measures a zero-height column. */}
-          {panelMode === "book" ? (
-            <BookGuide title={book.title} book={book} entering={entering} />
-          ) : (
-            /* Keyed on the id and a cross-tab reload counter — not the stored
-               text — so a save from another tab reloads the surface, while this
-               tab's own autosaves never remount it mid-keystroke. */
-            <EditorSurface
-              key={`${chapterId}:${reload}`}
-              bookId={bookId}
-              chapterId={chapterId}
-              chapterTitle={chapter.title}
-              chapterNumber={chapterNumberOf(book, chapterId)}
-              // Front and back matter are designed on the page — a title page, a
-              // dedication, an epigraph. Only they get click-and-type; a body
-              // chapter flows. See handleSheetDoubleClick.
-              placeable={chapterMatterOf(chapter) !== "body"}
-              book={book}
-              initialContent={initialContent}
-              prefs={prefs}
-              zoom={zoom}
-              onZoom={setZoom}
-              matter={selectedPart}
-              entering={entering}
-              dictation={dictation}
-              onEditorReady={setEditor}
-              formatOpen={formatOpen}
-              assistantOpen={panelOpen && tab === "assistant"}
-              moreOpen={moreOpen}
-              onOpenChapters={openMobileBookNavigation}
-              onFormat={() => {
-                captureSelection();
-                setMoreOpen(false);
-                setFormatOpen(true);
-              }}
-              onAssistant={() => {
-                captureSelection();
-                selectPanel(
-                  "assistant",
-                  { tab, open: panelOpen },
-                  { onSelectTab: setTab, onPanel: setEditorPanel },
-                );
-              }}
-              onMore={() => {
-                captureSelection();
-                setFormatOpen(false);
-                setMoreOpen(true);
-              }}
-            />
-          )}
-        </div>
+                    The surface is unmounted rather than hidden. Its autosave flushes
+                    on dispose, so nothing typed is lost, and a hidden manuscript is a
+                    manuscript whose pagination measures a zero-height column. */}
+                {panelMode === "book" ? (
+                  <BookGuide title={book.title} book={book} entering={entering} />
+                ) : (
+                  /* Keyed on the id and a cross-tab reload counter — not the stored
+                     text — so a save from another tab reloads the surface, while this
+                     tab's own autosaves never remount it mid-keystroke. */
+                  <EditorSurface
+                    key={`${chapterId}:${reload}`}
+                    bookId={bookId}
+                    chapterId={chapterId}
+                    chapterTitle={chapter.title}
+                    chapterNumber={chapterNumberOf(book, chapterId)}
+                    // Front and back matter are designed on the page — a title page, a
+                    // dedication, an epigraph. Only they get click-and-type; a body
+                    // chapter flows. See handleSheetDoubleClick.
+                    placeable={chapterMatterOf(chapter) !== "body"}
+                    book={book}
+                    initialContent={initialContent}
+                    prefs={prefs}
+                    zoom={zoom}
+                    onZoom={setZoom}
+                    matter={selectedPart}
+                    entering={entering}
+                    dictation={dictation}
+                    onEditorReady={setEditor}
+                    formatOpen={formatOpen}
+                    assistantOpen={panelOpen && tab === "assistant"}
+                    moreOpen={moreOpen}
+                    onOpenChapters={openMobileBookNavigation}
+                    onFormat={() => {
+                      captureSelection();
+                      setMoreOpen(false);
+                      setFormatOpen((open) => !open);
+                    }}
+                    onAssistant={() => {
+                      captureSelection();
+                      selectPanel(
+                        "assistant",
+                        { tab, open: panelOpen },
+                        { onSelectTab: setTab, onPanel: setEditorPanel },
+                      );
+                    }}
+                    onMore={() => {
+                      captureSelection();
+                      setFormatOpen(false);
+                      setMoreOpen((open) => !open);
+                    }}
+                  />
+                )}
+              </div>
 
-        {/* The right rail belongs to the manuscript, so it leaves with it.
-            Book View unmounts the surface and sets `liveEditor` to null, and the
-            rail was still being rendered around that null — so what stayed on
-            screen was a stump: the cover, print and export, with every text
-            control that needs an editor silently gone. A rail of absent controls
-            is worse than no rail, and it is the dead UI the house rules forbid.
-            The book panel is the navigator in this mode; the page's tools have
-            nothing to act on. */}
-        {panelMode !== "book" && (
-          <Rail
-            side="right"
-            // Hidden on phones: the formatting tools want a pointer and room, and
-            // the screen has neither to spare next to the page. Export moves to the
-            // manuscript header there instead.
-            className="hidden lg:flex"
-            /* **The controls that leave the page, together at the foot.**
-​
-               Everything above this acts on the sheet — the type, an image,
-               the microphone, how the page is shown. Import and Export do not:
-               they move a manuscript into or out of the app, so they stay at
-               the foot. The assistant moved to the left rail with the other
-               panels, where the panel it opens actually appears. */
-            footer={
+              {/* The right rail belongs to the manuscript, so it leaves with it.
+                  When the left panel expands, the right rail smoothly slides right
+                  and disappears, allowing the editor canvas to occupy the full remaining space. */}
+              {panelMode !== "book" && (
+                <Rail
+                  side="right"
+                  // Hidden on phones: the formatting tools want a pointer and room.
+                  className={`hidden lg:flex transition-all duration-300 ease-in-out ${
+                    isLeftPanelOpen
+                      ? "translate-x-full opacity-0 pointer-events-none !w-0 !border-l-0 overflow-hidden"
+                      : "translate-x-0 opacity-100 w-(--rail-width)"
+                  }`}
+                  footer={
               <>
                 <RailDivider />
                 {/* **Share, beside Export, and the group is the argument.**
@@ -871,7 +892,7 @@ export function ChapterEditor({
         />
       )}
 
-      {formatOpen && liveEditor && (
+      {formatOpen && (
         <ResponsivePanel
           title="Format"
           presentation="sheet"
@@ -880,16 +901,18 @@ export function ChapterEditor({
             restoreEditorFocus();
           }}
         >
-          <FormatControls
-            editor={liveEditor}
-            book={book}
-            paper={prefs.paper}
-            runCommand={runWithSelection}
-          />
+          {liveEditor ? (
+            <FormatControls
+              editor={liveEditor}
+              book={book}
+              paper={prefs.paper}
+              runCommand={runWithSelection}
+            />
+          ) : null}
         </ResponsivePanel>
       )}
 
-      {moreOpen && liveEditor && (
+      {moreOpen && (
         <ResponsivePanel
           title="More writing tools"
           presentation="full"
@@ -983,6 +1006,7 @@ function MobileBookNavigation({
         always
         connectToPage={false}
         onNavigate={onNavigate}
+        onClose={onClose}
       />
     </dialog>
   );
@@ -1330,6 +1354,8 @@ function EditorSurface({
       /* Curly quotes, the em dash and the ellipsis, as a book prints them.
          Input rules, so nothing already written is touched. */
       SmartQuotes,
+      // Search match highlights in the live manuscript (active match = green, others = grey).
+      SearchHighlight,
       // Print layout: measures the prose and lays it out on real page sheets.
       // The closures are held by the plugin and only ever run later, from its
       // measure loop — never during render — so reading the ref here is safe.
@@ -1415,6 +1441,12 @@ function EditorSurface({
       holdCaret(editor);
     },
   });
+
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
 
   /**
    * A click on a bare part of the sheet — the blank tail below the prose, or a

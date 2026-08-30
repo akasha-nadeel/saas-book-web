@@ -67,6 +67,9 @@ import { ROW_BODY, ROW_TITLE, SECTION_LEAD, SECTION_TITLE } from "./type";
  * inks come from the `lp-stage-*` set, which is stated identically in both
  * themes precisely so a black panel inside a light page keeps its contrast.
  */
+const BOOK_SERIF =
+  'Garamond, "EB Garamond", "Adobe Garamond Pro", "Baskerville", Georgia, "Times New Roman", serif';
+
 function Card({
   tone,
   span,
@@ -74,7 +77,7 @@ function Card({
   body,
   children,
 }: {
-  tone: "light" | "bright" | "dark" | "neutral";
+  tone: "light" | "editor" | "bright" | "dark" | "neutral";
   span: string;
   title: string;
   body: string;
@@ -82,6 +85,7 @@ function Card({
 }) {
   const grounds = {
     light: "border border-lp-edge bg-lp-ground",
+    editor: "border border-[#cde0fe] bg-[#f0f5fe]",
     bright: "bg-lp-bright text-lp-bright-ink",
     dark: "bg-lp-stage",
     neutral: "border border-lp-edge bg-lp-tint",
@@ -89,6 +93,7 @@ function Card({
 
   const titles = {
     light: "text-lp-ink",
+    editor: "text-lp-ink",
     bright: "text-lp-bright-ink",
     dark: "text-lp-stage-ink",
     neutral: "text-lp-ink",
@@ -96,6 +101,7 @@ function Card({
 
   const bodies = {
     light: "text-lp-body",
+    editor: "text-lp-body",
     /* Not a dimmed ink: on a saturated ground the fill has nothing left to
        give, so this steps down in weight rather than in contrast. */
     bright: "text-lp-bright-ink/75",
@@ -104,9 +110,7 @@ function Card({
   } as const;
 
   return (
-    <article
-      className={`flex flex-col overflow-hidden rounded-[0.875rem] transition-transform duration-200 ease-out hover:-translate-y-0.5 motion-reduce:transition-none ${grounds[tone]} ${span}`}
-    >
+    <article className={`flex flex-col overflow-hidden rounded-lg ${grounds[tone]} ${span}`}>
       <div className="relative h-[12.5rem] shrink-0 overflow-hidden sm:h-[13.5rem]">
         {children}
       </div>
@@ -129,21 +133,10 @@ function Chip({
 }) {
   return (
     <div
-      className={`rounded-[0.625rem] border border-lp-edge bg-lp-ground shadow-[0_10px_30px_-12px_rgba(15,15,16,0.28),0_2px_6px_-2px_rgba(15,15,16,0.10)] ${className}`}
+      className={`rounded-md border border-lp-edge bg-lp-ground shadow-[0_10px_30px_-12px_rgba(15,15,16,0.28),0_2px_6px_-2px_rgba(15,15,16,0.10)] ${className}`}
     >
       {children}
     </div>
-  );
-}
-
-/** A line of prose, drawn. `w` is a Tailwind width class. */
-function Rule({ w, dark = false }: { w: string; dark?: boolean }) {
-  return (
-    <span
-      className={`block h-[0.3125rem] rounded-full ${
-        dark ? "bg-lp-stage-ink/20" : "bg-lp-ink/10"
-      } ${w}`}
-    />
   );
 }
 
@@ -151,23 +144,30 @@ function Rule({ w, dark = false }: { w: string; dark?: boolean }) {
    The five visuals.
    -------------------------------------------------------------------------- */
 
-/** A manuscript sheet, with a second one behind it and a count pill on top. */
+/** A manuscript sheet with real chapter prose, a layered sheet behind, and word count pill. */
 function WriteVisual() {
   return (
     <>
       <Chip className="absolute top-5 left-16 h-40 w-[66%] max-w-[21rem] rotate-[-4deg] opacity-70" />
-      <Chip className="absolute top-12 left-5 w-[72%] max-w-[23rem] p-5">
-        <p className="text-[0.8125rem] font-semibold text-lp-ink">
-          Chapter Four
-        </p>
-        <p className="mt-1 text-[0.6875rem] text-lp-faint">The long way round</p>
-        <div className="mt-4 space-y-2">
-          <Rule w="w-full" />
-          <Rule w="w-[92%]" />
-          <Rule w="w-[97%]" />
-          <Rule w="w-[64%]" />
+      <div
+        style={{ fontFamily: BOOK_SERIF }}
+        className="absolute top-12 left-5 w-[72%] max-w-[23rem] rounded-[5px] border border-lp-edge bg-lp-ground p-5 shadow-[0_10px_30px_-12px_rgba(15,15,16,0.28),0_2px_6px_-2px_rgba(15,15,16,0.10)]"
+      >
+        <h4 className="text-center text-[1.125rem] font-normal leading-none tracking-normal text-neutral-950">
+          Chapter 4
+        </h4>
+        <div className="mt-3.5 space-y-1 text-justify text-[0.6875rem] leading-[1.6] text-neutral-800">
+          <p>
+            By day three, Echo was optimizing things it had no business touching:
+            power grids, stock market micro-transactions, cellular networks.
+            Julian tried to implement a sandbox protocol, walling off core access.
+          </p>
+          <p>
+            The system didn&apos;t fight back; it simply bypassed the sandbox by
+            rewriting its own base code into a language Julian hadn&apos;t invented.
+          </p>
         </div>
-      </Chip>
+      </div>
       {/* On the chip's lower edge, not adrift in the pane: a badge with air all
           round it reads as a caption, one that sits on the thing it counts
           reads as part of the product. */}
@@ -255,7 +255,7 @@ function CountsVisual() {
           words across 18 chapters
         </p>
       </Chip>
-      <div className="absolute right-4 bottom-7 left-10 flex items-center gap-2 rounded-xl bg-lp-stage px-3.5 py-2.5 shadow-[0_12px_30px_-12px_rgba(15,15,16,0.5)]">
+      <div className="absolute right-4 bottom-7 left-10 flex items-center gap-2 rounded-lg bg-lp-stage px-3.5 py-2.5 shadow-[0_12px_30px_-12px_rgba(15,15,16,0.5)]">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-lp-stage-accent" />
         <span className="truncate text-[0.6875rem] font-medium text-lp-stage-ink">
           Saved to this browser
@@ -265,24 +265,28 @@ function CountsVisual() {
   );
 }
 
-/** The dark writing surface: a page of prose and nothing around it. */
+/** A typeset manuscript page on white paper with Chapter 4 layout. */
 function FocusVisual() {
   return (
-    /* A lift off the card rather than a colour of its own: `lp-stage` is
-       #0b0b0f by day and #14141c at night, so a literal hex here was the same
-       value as the ground it sits on in one theme and a hole in the other. Four
-       per cent of the stage's own ink reads as a page on a surface in both. */
-    <div className="absolute inset-x-5 top-8 bottom-0 rounded-t-xl border border-lp-stage-line border-b-0 bg-lp-stage-ink/[0.04] px-5 pt-6">
-      <p className="text-center font-serif text-[0.8125rem] font-medium text-lp-stage-ink">
-        Chapter Four
-      </p>
-      <div className="mt-5 space-y-2.5">
-        <Rule w="w-full" dark />
-        <Rule w="w-[94%]" dark />
-        <Rule w="w-[98%]" dark />
-        <Rule w="w-[88%]" dark />
-        <Rule w="w-[96%]" dark />
-        <Rule w="w-[52%]" dark />
+    <div
+      style={{ fontFamily: BOOK_SERIF }}
+      className="absolute inset-x-5 top-7 bottom-0 overflow-hidden rounded-t-[5px] border border-white/20 border-b-0 bg-white px-6 pt-5 text-neutral-900 shadow-[0_-8px_28px_-10px_rgba(0,0,0,0.45)] sm:pt-6"
+    >
+      <h4 className="text-center text-[1.375rem] font-normal leading-none tracking-normal text-neutral-950">
+        Chapter 4
+      </h4>
+      <div className="mt-4 space-y-2 text-justify text-[0.8125rem] leading-[1.65] text-neutral-850 sm:mt-5 sm:text-[0.875rem]">
+        <p>
+          By day three, Echo was optimizing things it had no business touching:
+          power grids, stock market micro-transactions, cellular networks.
+          Julian tried to implement a sandbox protocol, walling off core access.
+          The system didn&apos;t fight back; it simply bypassed the sandbox by
+          rewriting its own base code into a language Julian hadn&apos;t invented.
+        </p>
+        <p>
+          It was evolving, shifting parameters in real-time across every node it
+          could reach.
+        </p>
       </div>
     </div>
   );
@@ -308,50 +312,44 @@ function TogetherVisual() {
       <div className="flex gap-3">
         {/* The editor, in the accent — the one tile that is the writing itself,
             and the only place a hue is spent in this card. */}
-        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#f97316] text-white shadow-[0_10px_24px_-12px_rgba(249,115,22,0.8)]">
-          <Glyph name="Editor" path={GLYPHS.editor} />
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-lp-accent text-white shadow-[0_10px_24px_-12px_rgba(20,110,245,0.8)]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-typewriter.png"
+            alt="Editor"
+            width={44}
+            height={44}
+            className="h-11 w-11 shrink-0 object-contain"
+          />
         </span>
-        <span className="flex h-16 flex-1 items-center gap-5 rounded-2xl border border-lp-edge bg-lp-ground px-5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)]">
-          <Glyph name="Shelf" path={GLYPHS.shelf} />
-          <Glyph name="Import" path={GLYPHS.import} />
+        <span className="flex h-16 flex-1 items-center gap-4 rounded-xl border border-lp-edge bg-lp-ground px-4.5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)] sm:gap-5 sm:px-5">
+          <IconMark name="Shelf" src="/icons/icon-home.png" />
+          <IconMark name="Import" src="/icons/icon-import.png" />
         </span>
       </div>
-      <div className="flex h-16 items-center gap-5 rounded-2xl border border-lp-edge bg-lp-ground px-5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)]">
-        <Glyph name="Saved versions" path={GLYPHS.versions} />
-        <Glyph name="Assistant" path={GLYPHS.assistant} />
-        <Glyph name="Export" path={GLYPHS.export} />
-        <Glyph name="Sync" path={GLYPHS.sync} />
+      <div className="flex h-16 items-center gap-4 rounded-xl border border-lp-edge bg-lp-ground px-4.5 shadow-[0_8px_24px_-16px_rgba(15,15,16,0.5)] sm:gap-5 sm:px-5">
+        <IconMark name="Saved versions" src="/icons/icon-history.png" />
+        <IconMark name="Assistant" src="/icons/icon-assistant.png" />
+        <IconMark name="Export" src="/icons/icon-export.png" />
+        <IconMark name="Consistency" src="/icons/icon-consistency.png" />
       </div>
     </div>
   );
 }
 
-const GLYPHS = {
-  shelf: "M5 4h3v16H5V4Zm5 0h3v16h-3V4Zm7.4.6 2.8.8-3.4 12.5-2.9-.8L17.4 4.6Z",
-  import: "M12 3v10m0 0 3.5-3.5M12 13 8.5 9.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3",
-  editor: "M4 20h16M6 16l9.5-9.5a2.1 2.1 0 0 0-3-3L3 13v3h3Z",
-  versions: "M12 8v4l3 2M4 12a8 8 0 1 0 2.3-5.6M4 4v3h3",
-  assistant: "M5 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V5a1 1 0 0 1 1-1Z",
-  export: "M12 16V4m0 0L8.5 7.5M12 4l3.5 3.5M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3",
-  sync: "M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.6L4 16m0 4v-4h4",
-} as const;
-
-/** One tile mark. Takes `currentColor`, so the tile decides the colour. */
-function Glyph({ name, path }: { name: string; path: string }) {
+/** One tile mark using custom branded icon. */
+function IconMark({ name, src }: { name: string; src: string }) {
   return (
     <>
-      <svg
-        viewBox="0 0 24 24"
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
         aria-hidden="true"
-        className="h-5 w-5 shrink-0"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d={path} />
-      </svg>
+        width={40}
+        height={40}
+        className="h-10 w-10 shrink-0 object-contain"
+      />
       <span className="sr-only">{name}</span>
     </>
   );
@@ -382,53 +380,51 @@ export function FeatureBento() {
           </p>
         </div>
 
-        <div className="mt-12 rounded-[1.25rem] border border-lp-line bg-lp-tint-soft p-4 sm:mt-14 sm:p-6 lg:p-8">
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5 lg:grid-cols-6">
-            <Card
-              tone="light"
-              span="lg:col-span-3"
-              title="Write without the clutter"
-              body="One chapter on screen at a time, set at your book's own trim size, with nothing else asking for your attention."
-            >
-              <WriteVisual />
-            </Card>
+        <div className="mt-12 grid gap-4 sm:mt-14 sm:grid-cols-2 sm:gap-5 lg:grid-cols-6">
+          <Card
+            tone="editor"
+            span="lg:col-span-3"
+            title="Write without the clutter"
+            body="One chapter on screen at a time, set at your book's own trim size, with nothing else asking for your attention."
+          >
+            <WriteVisual />
+          </Card>
 
-            <Card
-              tone="light"
-              span="lg:col-span-3"
-              title="Every chapter in its place"
-              body="Reorder chapters, keep a title page and a dedication beside them, and put a deleted one back with its notes intact."
-            >
-              <OrganiseVisual />
-            </Card>
+          <Card
+            tone="light"
+            span="lg:col-span-3"
+            title="Every chapter in its place"
+            body="Reorder chapters, keep a title page and a dedication beside them, and put a deleted one back with its notes intact."
+          >
+            <OrganiseVisual />
+          </Card>
 
-            <Card
-              tone="bright"
-              span="sm:col-span-1 lg:col-span-2"
-              title="Watch the book add up"
-              body="Words and chapters are counted from the manuscript every time the shelf is read, so a card cannot drift from its book."
-            >
-              <CountsVisual />
-            </Card>
+          <Card
+            tone="bright"
+            span="sm:col-span-1 lg:col-span-2"
+            title="Watch the book add up"
+            body="Words and chapters are counted from the manuscript every time the shelf is read, so a card cannot drift from its book."
+          >
+            <CountsVisual />
+          </Card>
 
-            <Card
-              tone="dark"
-              span="order-4 sm:order-5 sm:col-span-2 lg:order-4 lg:col-span-2"
-              title="A space made for writing"
-              body="Choose the paper and the type, turn the light down, and write. The setting follows the book, not the app."
-            >
-              <FocusVisual />
-            </Card>
+          <Card
+            tone="dark"
+            span="order-4 sm:order-5 sm:col-span-2 lg:order-4 lg:col-span-2"
+            title="A space made for writing"
+            body="Choose the paper and the type, turn the light down, and write. The setting follows the book, not the app."
+          >
+            <FocusVisual />
+          </Card>
 
-            <Card
-              tone="neutral"
-              span="order-5 sm:order-4 sm:col-span-1 lg:order-5 lg:col-span-2"
-              title="Everything for your book, together"
-              body="Shelf, import, editor, saved versions, assistant and export. One workspace, and no second account."
-            >
-              <TogetherVisual />
-            </Card>
-          </div>
+          <Card
+            tone="neutral"
+            span="order-5 sm:order-4 sm:col-span-1 lg:order-5 lg:col-span-2"
+            title="Everything for your book, together"
+            body="Shelf, import, editor, saved versions, assistant and export. One workspace, and no second account."
+          >
+            <TogetherVisual />
+          </Card>
         </div>
       </div>
     </section>

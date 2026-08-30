@@ -23,6 +23,18 @@ export type AuthState = {
   notice?: string;
 };
 
+async function getOrigin(): Promise<string> {
+  const h = await headers();
+  const origin = h.get("origin");
+  if (origin && origin !== "null") return origin.replace(/\/+$/, "");
+
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  if (host) return `${proto}://${host}`.replace(/\/+$/, "");
+
+  return (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/+$/, "");
+}
+
 function readCredentials(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -40,14 +52,19 @@ export async function signIn(
     return { error: "Enter your email and password." };
   }
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-  if (error) {
-    // Supabase says "Invalid login credentials" without saying which half was
-    // wrong, and that is the right answer — telling someone an email exists is
-    // how account lists get harvested. Pass it through rather than guessing.
-    return { error: error.message };
+    if (error) {
+      // Supabase says "Invalid login credentials" without saying which half was
+      // wrong, and that is the right answer — telling someone an email exists is
+      // how account lists get harvested. Pass it through rather than guessing.
+      return { error: error.message };
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to sign in.";
+    return { error: message };
   }
 
   // The shelf renders per-request now, so the cached signed-out render has to
@@ -72,32 +89,42 @@ export async function signUp(
     return { error: "Use at least 8 characters." };
   }
 
-  const origin = (await headers()).get("origin") ?? "";
+  const origin = await getOrigin();
   const next = safeNext(formData.get("next"));
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
-    },
-  });
+  let shouldRedirect = false;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
+      },
+    });
 
-  if (error) return { error: error.message };
+    if (error) return { error: error.message };
 
-  // An email that is already registered comes back looking like a fresh signup
-  // with no identities — deliberately, so the form cannot be used to test which
-  // addresses exist. Answer the same way a real signup does.
-  if (data.user && data.user.identities?.length === 0) {
-    return {
-      notice: `If ${email} isn't already registered, a confirmation link is on its way.`,
-    };
+    // An email that is already registered comes back looking like a fresh signup
+    // with no identities — deliberately, so the form cannot be used to test which
+    // addresses exist. Answer the same way a real signup does.
+    if (data.user && data.user.identities?.length === 0) {
+      return {
+        notice: `If ${email} isn't already registered, a confirmation link is on its way.`,
+      };
+    }
+
+    // With email confirmation switched off, signUp returns a live session and the
+    // writer is simply in. With it on, session is null until they click the link.
+    if (data.session) {
+      shouldRedirect = true;
+    }
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to sign up.";
+    return { error: message };
   }
 
-  // With email confirmation switched off, signUp returns a live session and the
-  // writer is simply in. With it on, session is null until they click the link.
-  if (data.session) {
+  if (shouldRedirect) {
     revalidatePath("/", "layout");
     redirect(next);
   }
@@ -120,24 +147,35 @@ export async function signUp(
  * state to hand back.
  */
 export async function signInWithGoogle(formData: FormData) {
-  if (!isSupabaseConfigured()) redirect("/signin?error=config");
+  if (!isSupabaseConfigured()) {
+    redirect("/signin?error=config");
+  }
 
   const next = safeNext(formData.get("next"));
-  const origin = (await headers()).get("origin") ?? "";
+  const origin = await getOrigin();
 
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
-    },
-  });
+  let targetUrl = "";
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${origin}/auth/confirm?next=${encodeURIComponent(next)}`,
+      },
+    });
 
-  // The likely failure is the provider being switched off in the Supabase
-  // dashboard, which is a configuration problem, not something the writer did.
-  if (error || !data.url) redirect("/signin?error=oauth");
+    if (error || !data?.url) {
+      targetUrl = "/signin?error=oauth";
+    } else {
+      targetUrl = data.url;
+    }
+  } catch {
+    targetUrl = "/signin?error=oauth";
+  }
 
-  redirect(data.url);
+  if (targetUrl) {
+    redirect(targetUrl);
+  }
 }
 
 /**
@@ -157,7 +195,7 @@ export async function requestPasswordReset(
   const email = String(formData.get("email") ?? "").trim();
   if (!email) return { error: "Enter your email." };
 
-  const origin = (await headers()).get("origin") ?? "";
+  const origin = await getOrigin();
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email, {

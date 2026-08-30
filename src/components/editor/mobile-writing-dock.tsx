@@ -8,13 +8,15 @@ function DockButton({
   onClick,
   disabled,
   active,
+  imgSrc,
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
-  children: React.ReactNode;
+  imgSrc?: string;
+  children?: React.ReactNode;
 }) {
   return (
     <button
@@ -27,9 +29,21 @@ function DockButton({
         active ? "bg-raised text-fg" : "text-muted hover:bg-raised hover:text-fg"
       }`}
     >
-      <span aria-hidden="true" className="text-base leading-none">
-        {children}
-      </span>
+      {imgSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imgSrc}
+          alt=""
+          aria-hidden="true"
+          width={24}
+          height={24}
+          className="h-5 w-5 object-contain"
+        />
+      ) : (
+        <span aria-hidden="true" className="text-base leading-none">
+          {children}
+        </span>
+      )}
       <span>{label}</span>
     </button>
   );
@@ -81,9 +95,8 @@ export function MobileWritingDock({
         label="AI"
         active={assistantOpen}
         onClick={onAssistant}
-      >
-        ✦
-      </DockButton>
+        imgSrc="/icons/icon-assistant.png"
+      />
       <DockButton label="More" active={moreOpen} onClick={onMore}>
         •••
       </DockButton>

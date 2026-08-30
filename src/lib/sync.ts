@@ -632,7 +632,7 @@ export async function hasClaimed(): Promise<boolean> {
     .maybeSingle();
 
   if (error) {
-    console.error(`[sync] could not read claim:${describe(error)}`);
+    console.warn(`[sync] could not read claim:${describe(error)}`);
     // Fail closed. A failed read must not be taken as "never claimed" — that
     // is exactly the case that resurrects deleted books.
     return true;
@@ -646,15 +646,6 @@ export async function uploadLibrary(
   bodies: Map<string, string>,
   notes: Map<string, string>,
   covers: Map<string, string>,
-  /**
-   * Null to leave the account's own settings alone.
-   *
-   * A whole-library upload carries them, because that is a browser claiming an
-   * empty account. Rescuing one stray book into an account that already exists
-   * must not: this browser's theme and paper would silently replace settings
-   * the writer chose somewhere else, which is a change nobody asked for and
-   * nothing on screen would explain.
-   */
   prefs: Prefs | null,
 ): Promise<boolean> {
   const owner = await currentOwner();
@@ -978,7 +969,7 @@ async function flush() {
       // reads the same for a blip and for a write that has just been given up
       // on, and only one of those is worth a writer's attention.
       const e = err as Partial<Record<"message" | "code" | "details" | "hint", string>>;
-      console.error(
+      console.warn(
         `[sync] ${key} failed${e?.code ? ` [${e.code}]` : ""}${
           retrying ? `, retrying (${tries}/${MAX_ATTEMPTS})` : ", giving up"
         }: ${e?.message ?? String(err)}`,

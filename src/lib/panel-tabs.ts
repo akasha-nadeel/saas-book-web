@@ -25,7 +25,7 @@ export type PanelTab =
 
 export const PANEL_TITLES: Record<PanelTab, string> = {
   chapters: "Manuscript",
-  search: "Search this book",
+  search: "Find & replace",
   consistency: "Consistency check",
   notes: "Notes",
   ideas: "Ideas",

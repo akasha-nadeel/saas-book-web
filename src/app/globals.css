@@ -1409,21 +1409,21 @@
 @media (min-width: 768px) {
   :root {
     --rail-width: 4rem;
-    --sidebar-width: 20rem;
+    --sidebar-width: 18.5rem;
   }
 }
 
 @media (min-width: 1280px) {
   :root {
     --rail-width: 4.5rem;
-    --sidebar-width: 24rem;
+    --sidebar-width: 21.5rem;
   }
 }
 
 @media (min-width: 1800px) {
   :root {
     --rail-width: 5rem;
-    --sidebar-width: 28rem;
+    --sidebar-width: 25rem;
   }
 }
 
@@ -3750,15 +3750,6 @@ body {
   display: none;
 }
 
-:root[data-editor-navigator="persistent"] [data-panel-tab="chapters"] {
-  display: none !important;
-}
-
-:root[data-editor-navigator="persistent"]
-  .oc-editor-panel[data-panel-tab="chapters"] {
-  display: none !important;
-}
-
 :root[data-editor-layout="continuous"] .oc-editor-panel-scrim {
   display: none;
 }
@@ -4240,6 +4231,36 @@ body {
 .manuscript .tiptap .oc-font-preview {
   /* No paint of its own. */
   font-synthesis: none;
+}
+
+/* Search highlights in the editor manuscript */
+.manuscript .tiptap .oc-search-match-inactive {
+  background-color: rgba(140, 140, 140, 0.28);
+  color: inherit;
+  border-radius: 2px;
+  padding: 1px 2px;
+  box-shadow: 0 0 0 1px rgba(140, 140, 140, 0.15);
+}
+
+.manuscript .tiptap .oc-search-match-active {
+  background-color: #d9f99d !important;
+  color: #000000 !important;
+  border-radius: 3px;
+  padding: 1px 3px;
+  box-shadow: 0 0 0 2px #bef264, 0 1px 3px rgba(0, 0, 0, 0.12);
+  font-weight: 600;
+}
+
+.dark .manuscript .tiptap .oc-search-match-inactive {
+  background-color: rgba(220, 220, 220, 0.22);
+  color: inherit;
+}
+
+.dark .manuscript .tiptap .oc-search-match-active {
+  background-color: #bef264 !important;
+  color: #000000 !important;
+  box-shadow: 0 0 0 2px #a3e635, 0 1px 4px rgba(0, 0, 0, 0.3);
+  font-weight: 600;
 }
 
 /* Inline code and links also belong to the page, not the chrome. */

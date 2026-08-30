@@ -3090,6 +3090,10 @@ export interface Prefs {
   typewriter: boolean;
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
+  /** Whether the manuscript chapter section is expanded beside the editor. */
+  chapterSectionOpen: boolean;
+  /** Which sub-tab the find & replace panel is currently showing ("find" | "replace"). */
+  searchTab: "find" | "replace";
   /**
    * Which of the rail's panels is showing.
    *
@@ -3209,6 +3213,8 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
+  chapterSectionOpen: false,
+  searchTab: "find",
   panelTab: "search",
   // The cover: the panel opens on the book as an object, and the writer
   // steps into its parts from there.
@@ -3278,6 +3284,8 @@ function parsePrefs(raw: string | null): Prefs {
       typewriter: parsed.typewriter === true,
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
+      chapterSectionOpen: parsed.chapterSectionOpen === true,
+      searchTab: parsed.searchTab === "replace" ? "replace" : "find",
       panelTab: isPanelTab(parsed.panelTab)
         ? parsed.panelTab
         : DEFAULT_PREFS.panelTab,

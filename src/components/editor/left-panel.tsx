@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { Editor } from "@tiptap/react";
 import { ChatPanel } from "@/components/chat/chat-panel";
 import { ChapterSidebar } from "@/components/sidebar/chapter-sidebar";
 import { BookmarksPanel } from "@/components/editor/bookmarks-panel";
@@ -93,6 +94,7 @@ export function LeftPanel({
   bookId,
   chapterId,
   chapterTitle,
+  editor,
   getChapterText,
   onClose,
 }: {
@@ -114,6 +116,7 @@ export function LeftPanel({
   bookId: string;
   chapterId: string;
   chapterTitle: string;
+  editor?: Editor | null;
   getChapterText: () => string;
   /** Dismiss the panel. Required: the header's control and Escape both need it. */
   onClose: () => void;
@@ -163,7 +166,13 @@ export function LeftPanel({
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target;
       if (!(target instanceof Element)) return;
-      if (panelRef.current?.contains(target)) return;
+      if (
+        panelRef.current?.contains(target) ||
+        target.closest("[data-panel-tab]") ||
+        target.closest(".oc-editor-panel")
+      ) {
+        return;
+      }
       if (target.closest("[data-rail]")) return;
       close.current();
     };
@@ -179,10 +188,6 @@ export function LeftPanel({
     let frame = 0;
     const respondToLayout = () => {
       const root = document.documentElement;
-      if (tab === "chapters" && root.dataset.editorNavigator === "persistent") {
-        close.current();
-        return;
-      }
       if (root.dataset.editorLayout !== "continuous") return;
       frame = requestAnimationFrame(() => dismissRef.current?.focus());
     };
@@ -313,65 +318,75 @@ export function LeftPanel({
             way — but a writer whose eye is *in* the panel should not have to
             travel back to the edge of the window to be rid of it. The two
             controls are one toggle, so they can never disagree. */}
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
-          {/* The name never shrinks and the scope does. At 15rem a long chapter
-              title would otherwise eat the word telling you which panel you are
-              in, which is the half that has to survive. `title` carries the
-              whole of it for anything the ellipsis takes. */}
-          <h2
-            title={fullName}
-            className="flex min-w-0 flex-1 items-baseline gap-1.5 font-sans text-base font-bold"
-          >
-            {/* The panel's own name reads as a heading rather than as a label.
-                At `text-xs` in muted grey it was quieter than the findings
-                under it, and a writer glancing at the column could not tell
-                which panel they were in without reading the contents.
-
-                **Uppercase and letter-spacing came off on the way up.** Both
-                are small-label conventions: they earn their keep at 12px, and
-                at 16px they only shout and eat width — "CONSISTENCY CHECK"
-                spaced out is most of a 15rem column before the close button
-                has had any. Sentence case at the larger size is narrower and
-                reads as the heading it now is. */}
-            <span className="shrink-0 text-fg">
-              {PANEL_TITLES[tab]}
-            </span>
-            {scope && (
-              <span className="min-w-0 truncate font-medium text-muted/75">
-                <span aria-hidden="true">· </span>
-                {scope}
-              </span>
-            )}
-          </h2>
-          <button
-            ref={dismissRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Hide panel"
-            title="Hide panel"
-            className="flex h-8 w-8 shrink-0 items-center justify-center
-                       rounded-lg text-muted outline-none transition-colors
-                       hover:bg-raised hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-5 w-5"
+        {tab !== "chapters" && (
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
+            {/* The name never shrinks and the scope does. At 15rem a long chapter
+                title would otherwise eat the word telling you which panel you are
+                in, which is the half that has to survive. `title` carries the
+                whole of it for anything the ellipsis takes. */}
+            <h2
+              title={fullName}
+              className="flex min-w-0 flex-1 items-baseline gap-1.5 font-sans text-base font-bold"
             >
-              {icons.panel}
-            </svg>
-          </button>
-        </header>
+              {/* The panel's own name reads as a heading rather than as a label.
+                  At `text-xs` in muted grey it was quieter than the findings
+                  under it, and a writer glancing at the column could not tell
+                  which panel they were in without reading the contents.
 
-        <div className="min-h-0 flex-1">
-          {tab === "chapters" && <ChapterSidebar bookId={bookId} />}
-          {tab === "search" && <SearchPanel bookId={bookId} />}
+                  **Uppercase and letter-spacing came off on the way up.** Both
+                  are small-label conventions: they earn their keep at 12px, and
+                  at 16px they only shout and eat width — "CONSISTENCY CHECK"
+                  spaced out is most of a 15rem column before the close button
+                  has had any. Sentence case at the larger size is narrower and
+                  reads as the heading it now is. */}
+              <span className="shrink-0 text-fg">
+                {PANEL_TITLES[tab]}
+              </span>
+              {scope && (
+                <span className="min-w-0 truncate font-medium text-muted/75">
+                  <span aria-hidden="true">· </span>
+                  {scope}
+                </span>
+              )}
+            </h2>
+            <button
+              ref={dismissRef}
+              type="button"
+              onClick={onClose}
+              aria-label="Hide panel"
+              title="Hide panel"
+              className="flex h-8 w-8 shrink-0 items-center justify-center
+                         rounded-lg text-muted outline-none transition-colors
+                         hover:bg-raised hover:text-fg focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-5 w-5"
+              >
+                {icons.panel}
+              </svg>
+            </button>
+          </header>
+        )}
+
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
+          {tab === "chapters" && (
+            <ChapterSidebar bookId={bookId} onNavigate={onClose} />
+          )}
+          {tab === "search" && (
+            <SearchPanel
+              bookId={bookId}
+              currentChapterId={chapterId}
+              editor={editor}
+            />
+          )}
           {tab === "consistency" && <ConsistencyPanel bookId={bookId} />}
           {tab === "notes" && (
             <NotesPanel key={chapterId} chapterId={chapterId} />

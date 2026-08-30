@@ -138,14 +138,14 @@ export type BookPanelMode = "book" | "chapters";
  * book would make the chrome the loudest thing on the screen again, which is
  * the whole reason the parts' colour ladder came off these cards.
  */
-const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-accent
+const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-black dark:text-fg
                      hover:border-accent/60 hover:bg-accent/25
                      focus-visible:ring-accent/50`;
 
 /** The second control, when a card has one. Outlined, so the pair is not two
  *  identical slabs — the same relationship the header's controls have. Its edge
  *  matches the filled one's, or the two read as different kinds of thing. */
-const CARD_OUTLINE = `border border-accent/30 bg-transparent text-accent
+const CARD_OUTLINE = `border border-accent/30 bg-transparent text-black dark:text-fg
                       hover:border-accent/60 hover:bg-accent/10
                       focus-visible:ring-accent/50`;
 
@@ -174,7 +174,7 @@ const ROW_ACTIVE = "border-line bg-raised font-medium text-fg";
  * instead now, which is what the label was always for, and the panel keeps one
  * button style from top to bottom.
  */
-const CARD_STRIP = `bg-white text-fg hover:bg-accent/5
+const CARD_STRIP = `border border-accent/30 bg-accent/15 text-black dark:text-fg hover:bg-accent/25
                     focus-visible:ring-accent/50`;
 
 /**
@@ -345,6 +345,8 @@ export function BookPanel({
   always = false,
   connectToPage = true,
   onNavigate,
+  onClose,
+  className,
 }: {
   book: Book;
   chapterId: string | null;
@@ -373,6 +375,10 @@ export function BookPanel({
   connectToPage?: boolean;
   /** Called before a chapter/page route is opened, so an overlay can dismiss. */
   onNavigate?: () => void;
+  /** Hide or dismiss the panel. */
+  onClose?: () => void;
+  /** Optional custom class name override. */
+  className?: string;
 }) {
   const router = useRouter();
   const bookId = book.id;
@@ -657,8 +663,12 @@ export function BookPanel({
       // no manuscript to protect and this panel is the only way into the book,
       // so it is always shown — hiding it there would leave that screen a guide
       // with no navigation at all.
-      className={`book-panel w-80 shrink-0 flex-col bg-white dark:bg-accent/7 xl:w-[22rem] 2xl:w-96 ${
-        always ? "flex" : "hidden xl:flex"
+      className={`book-panel flex-col bg-white dark:bg-transparent ${
+        className
+          ? className
+          : `w-72 shrink-0 xl:w-80 2xl:w-[22rem] ${
+              always ? "flex" : "hidden xl:flex"
+            }`
       }`}
     >
       {/* **Outside both modes' scroll containers, so it cannot be scrolled
@@ -818,7 +828,7 @@ export function BookPanel({
               Back is an icon alone. A chevron at the left end of a bar is the
               one icon nobody has to be taught, and its name lives in the label
               and the tooltip for anyone who does. */}
-          <div className="flex items-stretch gap-2">
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => onMode("book")}
@@ -842,6 +852,33 @@ export function BookPanel({
                 <path d="M12 5l-5 5 5 5" />
               </svg>
             </button>
+
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Hide panel"
+                title="Hide panel"
+                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center
+                           rounded-lg border border-line text-muted outline-none
+                           transition-colors hover:border-accent/60 hover:bg-raised hover:text-fg
+                           focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5"
+                >
+                  <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+                  <path d="M8 3.5v13" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* The book's three parts, one card each. Front matter opens the
@@ -1458,8 +1495,8 @@ function MatterCard({
                   duration-500 ease-out
                   ${
                     compact
-                      ? `${CARD_STRIP} border-line`
-                      : `bg-white ${
+                      ? CARD_STRIP
+                      : `bg-white dark:bg-panel/60 ${
                           active ? CARD_EDGE_ACTIVE : CARD_EDGE
                         }`
                   }
@@ -1519,7 +1556,7 @@ function MatterCard({
         <h3
           className={`min-w-0 flex-1 truncate font-serif font-semibold
                       transition-[font-size,color,line-height] duration-500
-                      ease-out ${compact ? "text-sm" : "text-base font-bold text-fg"}`}
+                      ease-out ${compact ? "text-sm text-black dark:text-fg" : "text-base font-bold text-fg"}`}
         >
           {label}
         </h3>
@@ -1532,7 +1569,7 @@ function MatterCard({
           className={`shrink-0 font-sans text-xs transition-opacity duration-500
                       ease-out ${
                         compact
-                          ? "text-muted opacity-100"
+                          ? "text-black dark:text-fg opacity-100 font-medium"
                           : "w-0 overflow-hidden opacity-0"
                       }`}
         >

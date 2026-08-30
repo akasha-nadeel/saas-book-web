@@ -182,9 +182,11 @@ export function Rail({
          and the rail's icons would flicker under a moving sheet. Above it, the
          panel appears from the rail's own edge, which is where it comes from.
          45 rather than 50: under the app's dialogs, over the panel at 40. */
-      className={`scroll-slim flex w-(--rail-width) shrink-0 flex-col
+      className={`scroll-slim flex shrink-0 flex-col
                   items-center gap-2 overflow-y-auto pt-4 pb-14 nav-chrome ${
-                    side === "left" ? "relative z-[45] border-r" : "border-l"
+                    side === "left"
+                      ? "relative z-[45] border-r w-(--rail-width)"
+                      : "border-l"
                   } border-line ${className}`}
     >
       {children}

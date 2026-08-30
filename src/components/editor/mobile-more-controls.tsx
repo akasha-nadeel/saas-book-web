@@ -14,25 +14,58 @@ function Action({
   detail,
   onClick,
   active,
+  imgSrc,
+  glyph,
+  icon,
 }: {
   label: string;
   detail?: string;
   onClick: () => void;
   active?: boolean;
+  imgSrc?: string;
+  glyph?: string;
+  icon?: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 ${
         active
-          ? "border-accent bg-raised text-fg"
-          : "border-line text-fg hover:bg-raised"
+          ? "border-accent bg-raised text-fg shadow-xs"
+          : "border-line bg-surface/50 text-fg hover:bg-raised"
       }`}
     >
-      <span>{label}</span>
-      {detail && <span className="text-xs text-muted">{detail}</span>}
+      <span className="flex min-w-0 items-center gap-3">
+        {imgSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imgSrc}
+            alt=""
+            aria-hidden="true"
+            width={32}
+            height={32}
+            className="h-8 w-8 shrink-0 object-contain"
+          />
+        ) : glyph ? (
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-raised font-sans text-base font-semibold text-fg"
+          >
+            {glyph}
+          </span>
+        ) : icon ? (
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-raised text-muted"
+          >
+            {icon}
+          </span>
+        ) : null}
+        <span className="truncate font-semibold">{label}</span>
+      </span>
+      {detail && <span className="shrink-0 text-xs text-muted">{detail}</span>}
     </button>
   );
 }
@@ -98,6 +131,7 @@ export function MobileMoreControls({
         <Action
           label={imageBusy ? "Preparing image…" : "Insert image"}
           detail="JPG, PNG, WebP"
+          imgSrc="/icons/icon-image.png"
           onClick={() => imageRef.current?.click()}
         />
         <input
@@ -122,6 +156,7 @@ export function MobileMoreControls({
             label={dictation.listening ? "Stop dictating" : "Start dictation"}
             detail={dictation.listening ? "Listening" : "Speech to text"}
             active={dictation.listening}
+            imgSrc="/icons/icon-mic.png"
             onClick={() =>
               dictation.listening ? dictation.stop() : dictation.start()
             }
@@ -137,12 +172,14 @@ export function MobileMoreControls({
           label="Typewriter scrolling"
           detail={prefs.typewriter ? "On" : "Off"}
           active={prefs.typewriter}
+          imgSrc="/icons/icon-typewriter.png"
           onClick={() => setPref("typewriter", !prefs.typewriter)}
         />
         <Action
           label="Paragraph marks"
           detail={prefs.marks ? "Shown" : "Hidden"}
           active={prefs.marks}
+          glyph="¶"
           onClick={() => setPref("marks", !prefs.marks)}
         />
       </section>
@@ -151,15 +188,39 @@ export function MobileMoreControls({
         <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
           Book
         </h3>
-        {canShare && <Action label="Share" onClick={onShare} />}
+        {canShare && (
+          <Action
+            label="Share"
+            imgSrc="/icons/icon-home.png"
+            onClick={onShare}
+          />
+        )}
         <ImportChapterButton book={book} presentation="list" />
         <Link
           href={`/book/${book.id}/export`}
-          className="flex min-h-11 items-center rounded-lg border border-line px-3 py-2.5 text-sm text-fg outline-none hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-sm font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          Export
+          <span className="flex min-w-0 items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/icons/icon-export.png"
+              alt=""
+              aria-hidden="true"
+              width={32}
+              height={32}
+              className="h-8 w-8 shrink-0 object-contain"
+            />
+            <span className="truncate font-semibold">Export</span>
+          </span>
+          <span aria-hidden="true" className="text-xs text-muted">
+            Word, EPUB, PDF
+          </span>
         </Link>
-        <Action label="Book details" onClick={onDetails} />
+        <Action
+          label="Book details"
+          imgSrc="/icons/icon-chapters.png"
+          onClick={onDetails}
+        />
       </section>
     </div>
   );

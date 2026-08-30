@@ -14,24 +14,21 @@ export function MobileEditorHeader({
 }) {
   return (
     <header className="oc-editor-mobile-header fixed inset-x-0 top-(--oc-visual-offset-top) z-[35] hidden items-center gap-2 border-b border-line bg-panel/95 px-[max(0.5rem,var(--oc-safe-left))] pt-(--oc-safe-top) backdrop-blur">
-      <div className="flex shrink-0 items-center">
+      <div className="flex shrink-0 items-center gap-0.5">
         <Link
           href="/"
           aria-label="All books"
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          <svg
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-home.png"
+            alt=""
             aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-          >
-            {icons.home}
-          </svg>
+            width={36}
+            height={36}
+            className="h-8 w-8 object-contain"
+          />
         </Link>
 
         <button
@@ -40,18 +37,15 @@ export function MobileEditorHeader({
           aria-label={`Choose a chapter. Current chapter: ${chapterTitle}`}
           className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          <svg
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/icons/icon-chapters.png"
+            alt=""
             aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.7"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-5 w-5"
-          >
-            {icons.chapters}
-          </svg>
+            width={36}
+            height={36}
+            className="h-8 w-8 object-contain"
+          />
         </button>
       </div>
 
