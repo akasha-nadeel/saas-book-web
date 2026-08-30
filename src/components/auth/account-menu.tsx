@@ -173,7 +173,7 @@ export function AccountMenu({
         className={
           variant === "bar"
             ? collapsed
-              ? `flex w-full items-center justify-center rounded-lg p-2 text-left
+              ? `group relative flex w-full items-center justify-center rounded-lg p-2 text-left
                  outline-none transition-colors hover:bg-raised
                  focus-visible:ring-2 focus-visible:ring-accent/50 ${
                    open ? "bg-raised" : ""
@@ -192,6 +192,14 @@ export function AccountMenu({
         {variant === "bar" ? (
           <>
             <Avatar url={account?.avatarUrl ?? null} name={name} size={30} />
+            {collapsed && (
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute left-full top-1/2 ml-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
+              >
+                {name}
+              </span>
+            )}
             {!collapsed && (
               <>
                 <span className="flex min-w-0 flex-1 flex-col leading-tight">
