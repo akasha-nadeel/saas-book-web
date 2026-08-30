@@ -75,6 +75,25 @@ export function TabList({
   children,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  let tabCount = 0;
+
+  const processChildren = (nodes: React.ReactNode): React.ReactNode => {
+    return React.Children.map(nodes, (child) => {
+      if (!React.isValidElement(child)) return child;
+      if (child.type === React.Fragment) {
+        return (
+          <React.Fragment key={child.key}>
+            {processChildren((child.props as { children?: React.ReactNode }).children)}
+          </React.Fragment>
+        );
+      }
+      const index = tabCount++;
+      return React.cloneElement(child as React.ReactElement<any>, {
+        __index: (child.props as any).__index ?? index,
+      });
+    });
+  };
+
   return (
     <div
       role="tablist"
@@ -84,12 +103,7 @@ export function TabList({
       )}
       {...props}
     >
-      {React.Children.map(children, (child, idx) => {
-        if (!React.isValidElement(child)) return child;
-        return React.cloneElement(child as React.ReactElement<any>, {
-          __index: idx,
-        });
-      })}
+      {processChildren(children)}
     </div>
   );
 }

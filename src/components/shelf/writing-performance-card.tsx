@@ -462,20 +462,17 @@ export function WritingPerformanceCard() {
         <Card className="mt-6 overflow-hidden p-0">
           <TabList className="space-x-0 bg-raised/20">
             {summary.map((tab) => (
-              <React.Fragment key={tab.name}>
-                <Tab className="py-4 pl-5 pr-12 text-left">
-                  <span className="block text-xs font-medium text-muted">
-                    {tab.name}
-                  </span>
-                  <span className="mt-1 block text-2xl font-bold tracking-tight tabular-nums text-fg">
-                    {tab.value}
-                  </span>
-                </Tab>
-                <div
-                  className="border-r border-line"
-                  aria-hidden={true}
-                />
-              </React.Fragment>
+              <Tab
+                key={tab.name}
+                className="border-r border-line py-4 pl-5 pr-12 text-left last:border-r-0"
+              >
+                <span className="block text-xs font-medium text-muted">
+                  {tab.name}
+                </span>
+                <span className="mt-1 block text-2xl font-bold tracking-tight tabular-nums text-fg">
+                  {tab.value}
+                </span>
+              </Tab>
             ))}
           </TabList>
           <TabPanels>
