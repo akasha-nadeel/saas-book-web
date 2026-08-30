@@ -55,10 +55,13 @@ const EDGE_PADDING = 8;
 export function AccountMenu({
   account,
   variant = "chip",
+  collapsed = false,
 }: {
   account: Account | null;
   /** `bar` is the sidebar row; `chip` the header control. See the note above. */
   variant?: "chip" | "bar";
+  /** When true in bar mode, only the avatar is shown centered. */
+  collapsed?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
@@ -169,11 +172,17 @@ export function AccountMenu({
         // sign of being one — it just does not announce itself at rest.
         className={
           variant === "bar"
-            ? `flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left
-               outline-none transition-colors hover:bg-raised
-               focus-visible:ring-2 focus-visible:ring-accent/50 ${
-                 open ? "bg-raised" : ""
-               }`
+            ? collapsed
+              ? `flex w-full items-center justify-center rounded-lg p-2 text-left
+                 outline-none transition-colors hover:bg-raised
+                 focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                   open ? "bg-raised" : ""
+                 }`
+              : `flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left
+                 outline-none transition-colors hover:bg-raised
+                 focus-visible:ring-2 focus-visible:ring-accent/50 ${
+                   open ? "bg-raised" : ""
+                 }`
             : `flex shrink-0 items-center gap-2.5 rounded-full py-1 pr-1
                pl-3 text-left outline-none transition-colors
                hover:bg-raised focus-visible:ring-2
@@ -182,42 +191,31 @@ export function AccountMenu({
       >
         {variant === "bar" ? (
           <>
-            {/* Avatar first, then the name, then the ⋯ at the far end. The row
-                *is* the button — the ⋯ is drawn inside it as the affordance
-                rather than sitting beside it as a second control, because a
-                second control that opened the same menu would be two things to
-                explain and one of them redundant.
-
-                The full name rather than the first, unlike the chip: this row
-                is the width of the sidebar and has the room the chip did not.
-
-                The plan sits under the name, as it did in the header chip —
-                and it is the one thing on this row a writer might want at a
-                glance rather than a click, since it is what decides whether
-                the assistant and the research tools will answer. Null until known:
-                a paying writer seeing "Free plan" flash under their own name
-                on every load is worse than a line that arrives a moment late. */}
             <Avatar url={account?.avatarUrl ?? null} name={name} size={30} />
-            <span className="flex min-w-0 flex-1 flex-col leading-tight">
-              <span className="truncate font-sans text-sm font-medium text-fg">
-                {name}
-              </span>
-              {planLabel && (
-                <span className="font-sans text-[0.6875rem] font-medium text-muted">
-                  {planLabel}
+            {!collapsed && (
+              <>
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="truncate font-sans text-sm font-medium text-fg">
+                    {name}
+                  </span>
+                  {planLabel && (
+                    <span className="font-sans text-[0.6875rem] font-medium text-muted">
+                      {planLabel}
+                    </span>
+                  )}
                 </span>
-              )}
-            </span>
-            <span
-              aria-hidden="true"
-              className="shrink-0 text-muted transition-colors group-hover:text-fg"
-            >
-              <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <circle cx="4" cy="10" r="1.6" />
-                <circle cx="10" cy="10" r="1.6" />
-                <circle cx="16" cy="10" r="1.6" />
-              </svg>
-            </span>
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-muted transition-colors group-hover:text-fg"
+                >
+                  <svg viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                    <circle cx="4" cy="10" r="1.6" />
+                    <circle cx="10" cy="10" r="1.6" />
+                    <circle cx="16" cy="10" r="1.6" />
+                  </svg>
+                </span>
+              </>
+            )}
           </>
         ) : (
           <>

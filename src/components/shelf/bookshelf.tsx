@@ -65,7 +65,7 @@ import {
   type Pace,
 } from "@/lib/activity";
 import { targetShare } from "@/lib/target";
-import { smoothArea, smoothPath } from "@/lib/spark";
+import { WritingPerformanceCard } from "@/components/shelf/writing-performance-card";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { usePlan, type PlanState } from "@/lib/use-plan";
@@ -235,6 +235,73 @@ const VIEW_ICON: Record<ShelfView, ReactNode> = {
   trashed: shelfIcons.trash,
 };
 
+const SIDEBAR_ICONS: Record<string, ReactNode> = {
+  overview: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/Dashboard-Square--Streamline-Flex.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  write: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/Pencil-Line--Streamline-Flex.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  favourite: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/Heart--Streamline-Flex.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  archived: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/Archive-Box--Streamline-Flex.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  trashed: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/Recycle-Bin-2--Streamline-Flex.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  support: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/support.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  feedback: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/feedbacks.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+  pricing: (
+    /* eslint-disable-next-line @next/next/no-img-element */
+    <img
+      src="/icons/sidebar/pricing.png"
+      alt=""
+      className="h-5 w-5 object-contain opacity-75"
+    />
+  ),
+};
+
 type Sort = "recent" | "title" | "words";
 const SORT_LABEL: Record<Sort, string> = {
   recent: "Recently opened",
@@ -274,6 +341,7 @@ export function Bookshelf({
   const asked = params.get("area");
   const [picked, setPicked] = useState<Area | null>(null);
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // What the URL says, until the writer clicks something. After that their
   // click wins — retyping the URL on every tab change would stack history
@@ -523,21 +591,70 @@ export function Bookshelf({
           exact corner — and it left a hand's width of empty rail at the bottom
           of the shipped product to dodge something only a developer ever sees.
           The badge is moved to bottom-right in next.config.ts instead. */}
-        <aside className="shelf-sidebar hidden min-h-0 w-56 shrink-0 flex-col border-r border-line md:flex">
-          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-3 pt-4 pb-2">
+        <aside
+          className={`shelf-sidebar hidden min-h-0 shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 ease-in-out md:flex ${
+            sidebarCollapsed ? "w-16" : "w-56"
+          }`}
+        >
+          <div className="scroll-slim min-h-0 flex-1 overflow-y-auto px-2 pt-4 pb-2">
             <div className="flex min-h-full flex-col">
-              <Link
-                href="/"
-                className="mb-6 px-2 text-2xl font-bold tracking-tight text-fg"
-              >
-                Open<span className="text-wordmark">Chapter</span>
-              </Link>
+              {sidebarCollapsed ? (
+                <div className="mb-6 flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(false)}
+                    title="Expand sidebar"
+                    aria-label="Expand sidebar"
+                    className="group relative flex h-10 w-10 items-center justify-center rounded-xl p-1 text-muted transition-all duration-200 hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
+                  >
+                    {/* Logo shown by default, hidden on hover */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/oc-icon.png"
+                      alt="OpenChapter"
+                      className="h-7 w-7 object-contain transition-all duration-200 group-hover:scale-75 group-hover:opacity-0"
+                    />
+
+                    {/* Expand icon hidden by default, smoothly appears on hover */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/icons/sidebar/panel-expand.png"
+                      alt=""
+                      className="absolute h-5 w-5 object-contain scale-75 opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-80"
+                    />
+                  </button>
+                </div>
+              ) : (
+                <div className="mb-6 flex items-center justify-between px-2">
+                  <Link
+                    href="/"
+                    className="min-w-0 text-xl font-bold tracking-tight text-fg transition-opacity hover:opacity-85"
+                  >
+                    Open<span className="text-wordmark">Chapter</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setSidebarCollapsed(true)}
+                    title="Collapse sidebar"
+                    aria-label="Collapse sidebar"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/icons/sidebar/panel-collapse.png"
+                      alt=""
+                      className="h-4 w-4 object-contain opacity-75 hover:opacity-100 transition-opacity"
+                    />
+                  </button>
+                </div>
+              )}
 
               <nav className="flex flex-col gap-0.5">
                 {AREAS.filter((a) => a.stage).map((a) => (
                   <Fragment key={a.id}>
                     <SideItem
-                      icon={a.icon}
+                      icon={SIDEBAR_ICONS[a.id] ?? a.icon}
+                      collapsed={sidebarCollapsed}
                       /* Write is the *active list*, not merely the area.
                          Asking `area === "write"` alone lit Write and Trash at
                          once, which is a rail claiming the writer is in two
@@ -555,26 +672,13 @@ export function Bookshelf({
                     </SideItem>
 
                     {/* The other three lists, as rows exactly like the one
-                        above them.
-
-                        They were nested and half a size smaller, which was
-                        wrong twice over. *Books* and *Write* were one
-                        destination wearing two names — the row above already
-                        goes there, so it is gone. And the three that remain
-                        are destinations in the same sense Overview is: a
-                        smaller type and an indent said they were something
-                        lesser, which nothing about them supports.
-
-                        Always present, never conditional on being in Write. A
-                        rail whose rows appear and disappear as you move
-                        through it is a rail nobody learns the shape of, and
-                        the trash is a place writers go looking for from
-                        wherever they happen to be standing. */}
+                        above them. */}
                     {a.id === "write" &&
                       RAIL_VIEWS.map((v) => (
                         <SideItem
                           key={v}
-                          icon={VIEW_ICON[v]}
+                          icon={SIDEBAR_ICONS[v] ?? VIEW_ICON[v]}
+                          collapsed={sidebarCollapsed}
                           active={area === "write" && view === v}
                           onClick={() => showShelf(v)}
                           badge={
@@ -597,7 +701,8 @@ export function Bookshelf({
                     {AREAS.filter((a) => !a.stage).map((a) => (
                       <SideItem
                         key={a.id}
-                        icon={a.icon}
+                        icon={SIDEBAR_ICONS[a.id] ?? a.icon}
+                        collapsed={sidebarCollapsed}
                         active={area === a.id}
                         onClick={() => goToArea(a.id)}
                       >
@@ -608,45 +713,40 @@ export function Bookshelf({
                 </>
               )}
 
-              {/* Getting help, then giving it back. Help before Support because
-                Support's own first line points at the guide, and Feedback after
-                both because it is the other direction: nothing comes back, and
-                a writer reaching for it is not stuck. */}
+              {/* Getting help, then giving it back. */}
               <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
                 <SideItem
-                  icon={shelfIcons.support}
+                  icon={SIDEBAR_ICONS.support}
+                  collapsed={sidebarCollapsed}
                   onClick={() => setDialog("support")}
                 >
                   Support
                 </SideItem>
                 <SideItem
-                  icon={shelfIcons.feedback}
+                  icon={SIDEBAR_ICONS.feedback}
+                  collapsed={sidebarCollapsed}
                   onClick={() => setDialog("feedback")}
                 >
                   Send feedback
                 </SideItem>
-                <SideItem icon={shelfIcons.pricing} href="/upgrade">
+                <SideItem
+                  icon={SIDEBAR_ICONS.pricing}
+                  collapsed={sidebarCollapsed}
+                  href="/upgrade"
+                >
                   Pricing
                 </SideItem>
               </div>
             </div>
           </div>
 
-          {/* Outside the scroller: who you are remains reachable at every
-            navigation scroll position, and everything that is a setting rather
-            than a place stays anchored to the foot of the rail.
-
-            This row opens the menu that holds the account, the plan and the
-            theme. It sits at the very foot, where every tool built in the last
-            five years puts it — it used to be a chip in the top-right corner,
-            which is the other convention and the one this product was not
-            otherwise following.
-
-            One row rather than two. Theme had a row of its own here and has
-            moved inside the menu, because it is a setting about the app and
-            that menu is now where the app's settings are. */}
-          <footer className="shrink-0 border-t border-line bg-panel px-3 pt-2 pb-3">
-            <AccountMenu account={account} variant="bar" />
+          {/* Outside the scroller */}
+          <footer className="shrink-0 border-t border-line bg-panel px-2 pt-2 pb-3">
+            <AccountMenu
+              account={account}
+              variant="bar"
+              collapsed={sidebarCollapsed}
+            />
           </footer>
         </aside>
 
@@ -1069,7 +1169,7 @@ function MobileDashboardNavigation({
             {AREAS.filter((item) => item.stage).map((item) => (
               <SideItem
                 key={item.id}
-                icon={item.icon}
+                icon={SIDEBAR_ICONS[item.id] ?? item.icon}
                 active={area === item.id}
                 onClick={() => onArea(item.id)}
               >
@@ -1080,18 +1180,18 @@ function MobileDashboardNavigation({
 
           <div className="mt-4 border-t border-line pt-3 pb-3">
             <SideItem
-              icon={shelfIcons.support}
+              icon={SIDEBAR_ICONS.support}
               onClick={() => showDialog("support")}
             >
               Support
             </SideItem>
             <SideItem
-              icon={shelfIcons.feedback}
+              icon={SIDEBAR_ICONS.feedback}
               onClick={() => showDialog("feedback")}
             >
               Send feedback
             </SideItem>
-            <SideItem icon={shelfIcons.pricing} href="/upgrade">
+            <SideItem icon={SIDEBAR_ICONS.pricing} href="/upgrade">
               Pricing
             </SideItem>
           </div>
@@ -1776,17 +1876,38 @@ function Overview({
           that are true of the whole library rather than of one manuscript. */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Figure
-          icon={shelfIcons.overview}
+          icon={
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src="/icons/books.png"
+              alt=""
+              className="h-16 w-16 object-contain opacity-80"
+            />
+          }
           label={books === 1 ? "book" : "books"}
           value={books.toLocaleString()}
         />
         <Figure
-          icon={shelfIcons.write}
+          icon={
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src="/icons/words.png"
+              alt=""
+              className="h-16 w-16 object-contain opacity-80"
+            />
+          }
           label={nounFor(words, "word")}
           value={words.toLocaleString()}
         />
         <Figure
-          icon={shelfIcons.prepare}
+          icon={
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src="/icons/chapters.png"
+              alt=""
+              className="h-16 w-16 object-contain opacity-80"
+            />
+          }
           label={nounFor(chapters, "chapter")}
           value={chapters.toLocaleString()}
         />
@@ -1813,10 +1934,10 @@ function Overview({
           across the middle of the screen. The week card is the one that
           stretches — its chart has somewhere to grow into, where the dial and
           the plan card are the size they are. */}
-      <div className="grid gap-5 lg:grid-cols-2">
-        <WeekCard activity={activity} week={week} run={run} logged={logged} />
+      <div className="grid gap-5">
+        <WritingPerformanceCard />
 
-        <div className="flex flex-col gap-5">
+        <div className="grid gap-5 lg:grid-cols-2">
           <ProCard plan={plan} />
           {/* Nothing at all until this book carries a target — an empty dial
               is a nought per cent nobody asked for. The place to set one is
@@ -2100,7 +2221,7 @@ function TargetGauge({ book, target }: { book: Book; target: number }) {
   };
 
   return (
-    <div className="flex flex-col rounded-2xl border border-line bg-panel p-5 shadow-sm">
+    <div className="flex flex-col rounded-lg border border-line bg-panel p-5">
       <div className="flex items-baseline justify-between gap-3">
         <h3 className="text-sm font-bold text-fg">Target</h3>
         <p className="min-w-0 truncate text-xs font-medium text-muted">
@@ -2217,157 +2338,7 @@ function TargetGauge({ book, target }: { book: Book; target: number }) {
   );
 }
 
-/**
- * The week, with the fortnight behind it.
- *
- * The figure alone answered "how much"; the line under it answers "how
- * steadily", which is the question a writer with seventeen minutes a day
- * cannot answer from the inside. `recentDays` hands back fourteen entries with
- * the days off included as zeroes, which is what makes the gaps in the line
- * mean something.
- *
- * **Scaled to its own busiest day, not to a fixed ceiling.** A writer of three
- * hundred words a day and one of three thousand should both see shape —
- * `heatLevel` in `activity.ts` takes the same view of the month grid, and for
- * the same reason. The scale is printed, so the shape can be read as a
- * quantity rather than admired as a squiggle.
- *
- * **A day of cutting is real work and the page says so**, but it cannot sit on
- * a scale that runs upward for more, so the line is drawn off the positive days
- * and a negative one reads as a trough at the floor rather than off the bottom.
- *
- * **"—" rather than 0 when nothing is logged.** The day log started when it
- * shipped, so a shelf written before it has nothing in here and a zero would be
- * a lie by arithmetic. The card says why in place of the chart.
- */
-function WeekCard({
-  activity,
-  week,
-  run,
-  logged,
-}: {
-  activity: Activity;
-  week: Pace;
-  run: number;
-  logged: boolean;
-}) {
-  const fillId = useId();
-  const days = useMemo(() => recentDays(activity, 14), [activity]);
-  const busiest = useMemo(
-    () => days.reduce((most, d) => Math.max(most, d.words), 0),
-    [days],
-  );
 
-  /* The drawing is 100 across and 32 down with a two-unit head-room, so a peak
-     at the busiest day is not clipped by its own stroke. */
-  const points = useMemo(
-    () =>
-      days.map((d, i) => ({
-        x: (i / (days.length - 1)) * 100,
-        y: busiest > 0 ? 30 - (Math.max(0, d.words) / busiest) * 26 : 30,
-      })),
-    [days, busiest],
-  );
-
-  return (
-    <div className="flex h-full flex-col rounded-2xl border border-line bg-panel p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-fg">Writing</h3>
-        {logged && (
-          <span className="shrink-0 rounded-full border border-line px-3 py-1 text-xs font-medium text-muted">
-            Last 14 days
-          </span>
-        )}
-      </div>
-
-      <div className="mt-4 flex items-center gap-3.5">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-accent/10 text-accent">
-          {shelfIcons.calendar}
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-muted">This week</p>
-          <p className="text-2xl leading-tight font-extrabold tabular-nums text-fg">
-            {logged ? week.words.toLocaleString() : "—"}
-          </p>
-        </div>
-      </div>
-
-      {logged ? (
-        <>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            {week.daysWritten > 0
-              ? `${nounFor(week.words, "word")} across ${plural(
-                  week.daysWritten,
-                  "day",
-                )}${run > 0 ? ` · ${plural(run, "day")} running` : ""}`
-              : "nothing yet this week — that is allowed"}
-          </p>
-
-          {/* A rule between the figure and the chart, because they answer two
-              questions: how much this week, and how it has gone since. */}
-          <div className="mt-4 border-t border-line pt-4">
-            <p className="text-xs font-medium text-muted">Net words a day</p>
-          </div>
-
-          {/* `flex-1` and a floor: the chart is what grows when the column
-              beside it is taller, and the scale is drawn in the same units as
-              the line so the two cannot drift. */}
-          <div className="mt-3 flex min-h-24 flex-1 gap-2">
-            <div className="flex shrink-0 flex-col justify-between py-[2px] text-[10px] tabular-nums text-muted">
-              <span>{busiest.toLocaleString()}</span>
-              <span>0</span>
-            </div>
-            <svg
-              viewBox="0 0 100 32"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-              className="h-full w-full text-accent"
-            >
-              <defs>
-                <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="currentColor" stopOpacity="0.22" />
-                  <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-
-              {/* Two rules and a floor, at the busiest day, its half, and
-                  nothing. The scale beside them says what they are. */}
-              {[4, 17, 30].map((y) => (
-                <line
-                  key={y}
-                  x1="0"
-                  x2="100"
-                  y1={y}
-                  y2={y}
-                  strokeWidth="1"
-                  vectorEffect="non-scaling-stroke"
-                  className="stroke-line"
-                />
-              ))}
-
-              <path d={smoothArea(points, 32)} fill={`url(#${fillId})`} />
-              <path
-                d={smoothPath(points)}
-                fill="none"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                vectorEffect="non-scaling-stroke"
-                className="stroke-accent"
-              />
-            </svg>
-          </div>
-        </>
-      ) : (
-        <p className="mt-3.5 text-xs leading-relaxed text-muted">
-          The log starts the first time you write here, and counts net words a
-          day — so a day of cutting counts too. Anything already on your shelf
-          came before it.
-        </p>
-      )}
-    </div>
-  );
-}
 
 /**
  * What Pro adds, for somebody who is not on it.
@@ -2408,7 +2379,7 @@ function ProCard({ plan }: { plan: PlanState }) {
        placed drawing and a hand-tuned measure would do on the one column this
        card is narrowest in. */
     <section
-      className="flex gap-4 overflow-hidden rounded-2xl bg-linear-to-r
+      className="flex gap-4 overflow-hidden rounded-lg bg-linear-to-r
                  from-upgrade-from to-upgrade-to p-5 sm:min-h-52"
     >
       <div className="min-w-0 flex-1">
@@ -2479,23 +2450,15 @@ function Figure({
        exactly that — where three cards sharing one `<dl>` would tell a screen
        reader they were three parts of one thing. */
     <dl
-      className="flex items-center gap-4 rounded-2xl border border-line bg-panel
-                 px-6 py-5 shadow-sm"
+      className="flex min-h-32 items-center gap-5 rounded-[8px] border border-line bg-panel
+                 px-6 py-6 sm:min-h-36 sm:py-7"
     >
-      {/* A circle, and the same accent wash on all three. The reference gives
-          each card its own pastel; four hues carrying no information is a
-          palette pretending to be a legend. What the bubble is actually for is
-          giving the eye a fixed left edge to run down, and one tint does that
-          as well as four. */}
-      <span
-        className="grid h-12 w-12 shrink-0 place-items-center rounded-full
-                   bg-accent/10 text-accent"
-      >
+      <div className="flex h-16 w-16 shrink-0 items-center justify-center">
         {icon}
-      </span>
-      <div className="min-w-0">
-        <dt className="truncate text-xs font-medium text-muted">{label}</dt>
-        <dd className="text-2xl leading-tight font-extrabold tabular-nums text-fg">
+      </div>
+      <div className="min-w-0 flex-1">
+        <dt className="truncate text-xs font-medium uppercase tracking-wider text-muted sm:text-sm">{label}</dt>
+        <dd className="mt-0.5 text-2xl leading-tight font-extrabold tabular-nums text-fg sm:text-3xl">
           {value}
         </dd>
       </div>
@@ -4108,6 +4071,7 @@ function SideItem({
   onClick,
   badge,
   children,
+  collapsed = false,
 }: {
   icon: ReactNode;
   active?: boolean;
@@ -4116,27 +4080,37 @@ function SideItem({
   /** A marker at the right of the row — "Soon" on anything not built yet. */
   badge?: ReactNode;
   children: ReactNode;
+  collapsed?: boolean;
 }) {
-  const className = `flex min-h-11 items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm
-     font-medium transition-colors ${
-       active
-         ? "bg-accent/10 text-accent"
-         : "text-muted hover:bg-raised hover:text-fg"
-     }`;
+  const labelText = typeof children === "string" ? children : undefined;
+  const className = `flex min-h-10 items-center rounded-lg transition-colors ${
+    collapsed
+      ? "justify-center p-2.5"
+      : "gap-2.5 px-3 py-2 text-left text-sm font-medium"
+  } ${
+    active
+      ? "bg-blue-500/15 font-semibold text-fg dark:bg-blue-500/25"
+      : "text-fg/80 hover:bg-raised/70 hover:text-fg"
+  }`;
 
-  // `mr-auto` on the label rather than `ml-auto` on the badge, so a row without
-  // one keeps the icon and its word tight together exactly as before.
-  const body = (
+  const body = collapsed ? (
+    <span className="shrink-0">{icon}</span>
+  ) : (
     <>
-      {icon}
-      <span className={badge ? "mr-auto" : undefined}>{children}</span>
+      <span className="shrink-0">{icon}</span>
+      <span className={badge ? "mr-auto truncate" : "truncate"}>{children}</span>
       {badge}
     </>
   );
 
   if (href) {
     return (
-      <Link href={href} className={className}>
+      <Link
+        href={href}
+        title={labelText}
+        aria-label={labelText}
+        className={className}
+      >
         {body}
       </Link>
     );
@@ -4145,6 +4119,8 @@ function SideItem({
     <button
       type="button"
       onClick={onClick}
+      title={labelText}
+      aria-label={labelText}
       aria-current={active ? "page" : undefined}
       className={className}
     >

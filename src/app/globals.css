@@ -753,13 +753,11 @@
 [data-theme="light"] {
   color-scheme: light;
 
-  /* The desk is grey and the cards are white *on* it. This is the inversion
-     that catches people: `raised` is a step darker than `panel` here, because
-     a hover on white deepens — it cannot glow. */
-  --color-surface: #f4f4f5;
+  /* Pure white surface and panel for seamless dashboard appearance. */
+  --color-surface: #ffffff;
   --color-panel: #ffffff;
-  --color-raised: #e9e9ec;
-  --color-line: #e2e2e5;
+  --color-raised: #f4f4f5;
+  --color-line: #d4d4d8;
 
   --color-fg: #17171a;
   --color-muted: #62626b;
