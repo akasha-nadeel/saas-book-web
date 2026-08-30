@@ -173,8 +173,7 @@ function PageColorButton({ paper }: { paper: PaperColor }) {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label="Page colour"
-        title="Page colour"
-        className={`flex h-12 w-12 shrink-0 items-center justify-center
+        className={`group relative flex h-12 w-12 shrink-0 items-center justify-center
                     rounded-xl outline-none transition-colors
                     focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       open
@@ -194,6 +193,14 @@ function PageColorButton({ paper }: { paper: PaperColor }) {
             style={{ background: current.swatch }}
           />
         </span>
+        {!open && (
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute right-full top-1/2 mr-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
+          >
+            Page colour
+          </span>
+        )}
       </button>
 
       {open && rect && (
@@ -799,7 +806,7 @@ export function ChapterEditor({
                     stays last — it is the end of the road, and Share is a
                     thing you do while still on it. */}
                 {canShare && (
-                  <RailButton label="Share" onClick={() => setSharing(true)}>
+                  <RailButton label="Share" side="right" onClick={() => setSharing(true)}>
                     {icons.share}
                   </RailButton>
                 )}
@@ -814,6 +821,7 @@ export function ChapterEditor({
                 {canWriteThis && <ImportChapterButton book={book} />}
                 <RailButton
                   label="Export"
+                  side="right"
                   href={`/book/${bookId}/export`}
                   imgSrc="/icons/icon-export.png"
                 />
@@ -826,24 +834,31 @@ export function ChapterEditor({
               It is also the way in to changing it. A cover is the one thing
               here you would click expecting to edit it, and there was nowhere
               else in the editor to reach the title page from. */}
-            <button
-              type="button"
-              onClick={() => setEditingCover(true)}
-              aria-label={`Edit the cover of ${book.title}`}
-              title="Edit book details"
-              className="block w-10 shrink-0 rounded-md outline-none
-                       transition-transform hover:-translate-y-0.5
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-            >
-              <BookCover
-                title={book.title}
-                subtitle={book.subtitle}
-                author={book.author}
-                words={bookWordCount(book)}
-                image={cover}
-                seed={book.id}
-              />
-            </button>
+            <div className="group relative flex justify-center">
+              <button
+                type="button"
+                onClick={() => setEditingCover(true)}
+                aria-label={`Edit the cover of ${book.title}`}
+                className="block w-10 shrink-0 rounded-md outline-none
+                         transition-transform hover:-translate-y-0.5
+                         focus-visible:ring-2 focus-visible:ring-accent/60"
+              >
+                <BookCover
+                  title={book.title}
+                  subtitle={book.subtitle}
+                  author={book.author}
+                  words={bookWordCount(book)}
+                  image={cover}
+                  seed={book.id}
+                />
+              </button>
+              <span
+                role="tooltip"
+                className="pointer-events-none absolute right-full top-1/2 mr-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
+              >
+                Edit book details
+              </span>
+            </div>
 
             <RailDivider />
 
@@ -858,6 +873,7 @@ export function ChapterEditor({
 
             <RailButton
               label="Typewriter scrolling"
+              side="right"
               active={prefs.typewriter}
               onClick={() => setPref("typewriter", !prefs.typewriter)}
               imgSrc="/icons/icon-typewriter.png"

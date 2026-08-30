@@ -104,6 +104,7 @@ export function ImportChapterButton({
       {presentation === "rail" ? (
         <RailButton
           label={importing ? "Reading file…" : "Import a file"}
+          side="right"
           onClick={() => fileRef.current?.click()}
           disabled={importing}
           imgSrc="/icons/icon-import.png"

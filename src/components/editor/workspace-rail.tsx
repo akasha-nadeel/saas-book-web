@@ -116,12 +116,11 @@ const TAB_IMG_SRCS: Partial<Record<PanelTab, string>> = {
  */
 export function BackToBooks() {
   return (
-    <div className="book-overview-back flex w-(--rail-width) shrink-0 justify-center pt-4">
+    <div className="book-overview-back flex w-(--rail-width) shrink-0 justify-center pt-4 overflow-visible">
       <Link
         href="/"
         aria-label="All books"
-        title="All books"
-        className="flex h-12 w-12 items-center justify-center rounded-xl
+        className="group relative flex h-12 w-12 items-center justify-center rounded-xl
                    text-muted outline-none transition-colors hover:bg-raised
                    hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
       >
@@ -137,6 +136,12 @@ export function BackToBooks() {
         >
           {icons.home}
         </svg>
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-full top-1/2 ml-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
+        >
+          All books
+        </span>
       </Link>
     </div>
   );

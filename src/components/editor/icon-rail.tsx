@@ -19,6 +19,7 @@ export function RailButton({
   glyph,
   imgSrc,
   disabled,
+  side = "left",
   children,
 }: {
   label: string;
@@ -55,11 +56,12 @@ export function RailButton({
    * the button's own `aria-label` remains the accessible name.
    */
   imgSrc?: string;
+  side?: "left" | "right";
   children?: React.ReactNode;
 }) {
   // A large filled tile for the active rail item, as in the reference, rather
   // than a subtle tint — at this size the rail is the primary navigation.
-  const className = `flex h-12 w-12 items-center justify-center rounded-xl
+  const className = `group relative flex h-12 w-12 items-center justify-center rounded-xl
                      outline-none transition-colors focus-visible:ring-2
                      focus-visible:ring-accent/60 ${
                        active
@@ -100,10 +102,25 @@ export function RailButton({
     </svg>
   );
 
+  const tooltipPosition =
+    side === "left"
+      ? "left-full ml-3.5 top-1/2 -translate-y-1/2"
+      : "right-full mr-3.5 top-1/2 -translate-y-1/2";
+
+  const tooltip = (
+    <span
+      role="tooltip"
+      className={`pointer-events-none absolute ${tooltipPosition} z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]`}
+    >
+      {label}
+    </span>
+  );
+
   if (href) {
     return (
-      <Link href={href} aria-label={label} title={label} className={className}>
+      <Link href={href} aria-label={label} className={className}>
         {icon}
+        {tooltip}
       </Link>
     );
   }
@@ -115,10 +132,10 @@ export function RailButton({
       disabled={disabled}
       aria-label={label}
       aria-pressed={active}
-      title={label}
       className={className}
     >
       {icon}
+      {tooltip}
     </button>
   );
 }
@@ -160,7 +177,7 @@ export function Rail({
     <nav
       aria-label={side === "left" ? "Panels" : "Tools"}
       /* Marks both rails as "not outside the tool panel".
-​
+
          The panel closes on a press anywhere else, and the controls that open
          and close it live here — on the left as tabs, on the right as the
          Assistant button. Without this the toggle eats itself: pressing the tab
@@ -183,10 +200,10 @@ export function Rail({
          panel appears from the rail's own edge, which is where it comes from.
          45 rather than 50: under the app's dialogs, over the panel at 40. */
       className={`scroll-slim flex shrink-0 flex-col
-                  items-center gap-2 overflow-y-auto pt-4 pb-14 nav-chrome ${
+                  items-center gap-2 overflow-visible pt-4 pb-14 nav-chrome ${
                     side === "left"
                       ? "relative z-[45] border-r w-(--rail-width)"
-                      : "border-l"
+                      : "relative z-[45] border-l w-(--rail-width)"
                   } border-line ${className}`}
     >
       {children}

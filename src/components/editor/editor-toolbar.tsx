@@ -272,8 +272,7 @@ function Flyout({
         aria-haspopup="true"
         aria-expanded={open}
         aria-label={label}
-        title={label}
-        className={`flex h-11 w-11 shrink-0 items-center justify-center
+        className={`group relative flex h-11 w-11 shrink-0 items-center justify-center
                     rounded-lg outline-none transition-colors
                     focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       open
@@ -282,6 +281,14 @@ function Flyout({
                     }`}
       >
         {trigger}
+        {!open && (
+          <span
+            role="tooltip"
+            className="pointer-events-none absolute right-full top-1/2 mr-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
+          >
+            {label}
+          </span>
+        )}
       </button>
 
       {open &&
