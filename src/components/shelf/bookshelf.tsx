@@ -2444,10 +2444,10 @@ function Figure({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <dt className="truncate text-xs font-semibold uppercase tracking-wider text-black dark:text-white sm:text-sm">
+        <dt className="truncate text-xs font-semibold uppercase tracking-wider text-muted sm:text-sm">
           {label}
         </dt>
-        <dd className="mt-0.5 text-2xl leading-tight font-extrabold tabular-nums text-black dark:text-white sm:text-3xl">
+        <dd className="mt-0.5 text-2xl leading-tight font-extrabold tabular-nums text-fg sm:text-3xl">
           {value}
         </dd>
       </div>
