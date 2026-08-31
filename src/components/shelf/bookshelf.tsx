@@ -1776,11 +1776,20 @@ function CurrentBookCard({
               <div className="col-span-2 mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 text-sm sm:flex sm:flex-wrap">
                 <Link
                   href={`/book/${book.id}`}
-                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border
-                             border-accent bg-accent px-4 py-2 font-semibold text-accent-ink
-                             transition-colors hover:bg-accent-strong active:bg-accent-strong focus-visible:outline-none
-                             focus-visible:ring-2 focus-visible:ring-accent/50 sm:border-line
-                             sm:bg-surface sm:text-fg sm:hover:bg-raised"
+                  /* **Filled at every width, where it used to un-fill from
+                     `sm` up.** It was the accent on a phone and an outline on a
+                     desktop, so the card's main verb looked exactly like Export
+                     beside it on the screen most writers open it on. Opening
+                     the book is what this card is for; the fill says so.
+
+                     `text-accent-ink`, never a literal white: the fill is the
+                     brand blue by day and white at night, and the ink inverts
+                     with it. */
+                  className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border
+                             border-accent bg-accent px-4 py-1.5 font-semibold text-accent-ink
+                             transition-colors hover:bg-accent-strong active:bg-accent-strong
+                             focus-visible:outline-none focus-visible:ring-2
+                             focus-visible:ring-accent/50 sm:min-h-9"
                 >
                   {shelfIcons.write}
                   Open book
@@ -1788,10 +1797,11 @@ function CurrentBookCard({
                 <Link
                   href={`/book/${book.id}/export`}
                   aria-label="Export this book"
-                  className="flex min-h-11 items-center justify-center gap-1.5 rounded-lg border
-                             border-line bg-surface px-4 py-2 font-semibold text-fg
-                             transition-colors hover:bg-raised active:bg-raised focus-visible:outline-none
-                             focus-visible:ring-2 focus-visible:ring-accent/50"
+                  className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border
+                             border-line bg-surface px-4 py-1.5 font-semibold text-fg
+                             transition-colors hover:bg-raised active:bg-raised
+                             focus-visible:outline-none focus-visible:ring-2
+                             focus-visible:ring-accent/50 sm:min-h-9"
                 >
                   {shelfIcons.prepare}
                   Export
@@ -1799,10 +1809,10 @@ function CurrentBookCard({
                 <Menu
                   label={`More for ${book.title}`}
                   width={232}
-                  triggerClassName="flex h-11 w-11 items-center justify-center justify-self-end
+                  triggerClassName="flex h-10 w-10 items-center justify-center justify-self-end
                                     rounded-lg border border-line bg-surface text-fg transition-colors
                                     hover:bg-raised active:bg-raised focus-visible:outline-none focus-visible:ring-2
-                                    focus-visible:ring-accent/50 sm:h-auto sm:w-auto sm:px-2.5 sm:py-2"
+                                    focus-visible:ring-accent/50 sm:h-9 sm:w-auto sm:px-2.5"
                   trigger={shelfIcons.more}
                 >
                   {(close) => (
