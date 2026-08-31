@@ -44,6 +44,51 @@ export function exportAllowed(format: string, pro: boolean): boolean {
   return (allowed as readonly string[]).includes(format);
 }
 
+/**
+ * Whether the reader is *known* to be on the metered free plan.
+ *
+ * **All three parts matter, and the middle one is a bug this app has already
+ * paid for.** With no payment gateway configured there are no plans and
+ * nothing is held back, so `billing` is half the question. The other half is
+ * `loading`: `usePlan()` starts at UNKNOWN — `loading: true, pro: false` — and
+ * asks the server on mount, so for the width of one request a Pro account is
+ * indistinguishable from a free one. Gating during that window told a writer
+ * with unlimited books that there was no room to restore their own book.
+ * **Not knowing yet is not a reason to refuse.**
+ *
+ * Structural rather than typed to `PlanState`, so this module keeps importing
+ * nothing — and so the same three-part test cannot be written four ways in
+ * four call sites, which is how it came to be missing a part in two of them.
+ */
+export function onFreePlan(plan: {
+  loading: boolean;
+  billing: boolean;
+  pro: boolean;
+}): boolean {
+  return !plan.loading && plan.billing && !plan.pro;
+}
+
+/**
+ * Whether a book's inside is shut to this reader.
+ *
+ * **The trash is the free plan's one closed door, and it is a browser gate
+ * that is honest about being one.** The manuscript is already on this machine
+ * — `localStorage` and IndexedDB — so no server check could keep a determined
+ * reader out of a book they have, and none is claimed to. What this does is
+ * keep the trash from being a free shelf: a book put there is on its way out,
+ * and reading it is what restoring it is for. Pro opens one where it sits.
+ *
+ * It reads the *book*, never the shelf view, so the editor route and the card
+ * cannot disagree about which books are shut — a pasted URL is the same
+ * question as a press.
+ */
+export function trashedBookClosed(
+  book: { trashedAt?: number | null } | null | undefined,
+  plan: { loading: boolean; billing: boolean; pro: boolean },
+): boolean {
+  return !!book?.trashedAt && onFreePlan(plan);
+}
+
 const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "arc",
   "blurb",

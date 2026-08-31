@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BookCover } from "@/components/shelf/book-cover";
-import { GENRES } from "@/lib/book-kinds";
+import { GENRES, suggestTarget } from "@/lib/book-kinds";
 import {
   COVER_MAX_BYTES,
   COVER_MAX_EDGE,
@@ -12,6 +12,7 @@ import {
   bookWordCount,
   setBareCover,
   setBookDetails,
+  setTargetWords,
   type Book,
 } from "@/lib/library-store";
 import { useCover } from "@/lib/use-library";
@@ -46,6 +47,19 @@ export function CoverDialog({
   const [subtitle, setSubtitle] = useState(book.subtitle ?? "");
   const [author, setAuthor] = useState(book.author ?? "");
   const [genre, setGenre] = useState(book.genre ?? "");
+  /**
+   * The length the book is aiming at, as typed.
+   *
+   * A string rather than a number, because a half-typed "1" and an emptied
+   * field are different intentions and `Number("")` flattens both to zero —
+   * which `setTargetWords` reads as *remove the target*. Empty means remove;
+   * anything that is not a number is ignored on save.
+   */
+  const [target, setTarget] = useState(
+    /* Grouped, like the placeholder beside it and every other five-figure
+       number in the app. The save strips the separators again. */
+    book.targetWords ? book.targetWords.toLocaleString() : "",
+  );
   // Undefined means "unchanged"; null means "remove the one that is there".
   const [cover, setNextCover] = useState<string | null | undefined>(undefined);
   /* The picked file itself, held until Save.
@@ -75,6 +89,20 @@ export function CoverDialog({
        shelf write, a second fan-out and a second push — and saving a retyped
        subtitle should not spend one on a field nobody touched. */
     if (bare !== Boolean(book.bareCover)) setBareCover(book.id, bare);
+
+    /* Same rule for the target, and the same reason. A blank field is `0`,
+       which `setTargetWords` already means by "no target at all".
+
+       Digits only, rather than stripping the separators by name: the value
+       arrives grouped by `toLocaleString()`, and which character that groups
+       with is the reader's locale's business — a comma here, a full stop in
+       Berlin, a non-breaking space in Paris. Stripping everything that is not
+       a digit is right in all three, where `replace(/,/g, "")` turns 110.000
+       into a target of 110. */
+    const wanted = Number(target.replace(/[^0-9]/g, "") || "0");
+    if (Number.isFinite(wanted) && wanted !== (book.targetWords ?? 0)) {
+      setTargetWords(book.id, wanted);
+    }
 
     if (coverFile) {
       // One call sets all three: the thumbnail, the full-size artwork the
@@ -272,6 +300,47 @@ export function CoverDialog({
               <span className="mt-1 block text-xs text-tremor-content">
                 Comp titles, categories, blurb examples and structure all read
                 this.
+              </span>
+            </label>
+
+            {/* **How long the book is meant to be, editable at last.**
+
+                It could only ever be set when a book was *made*. The two
+                screens that can change one — the comp-title search and the
+                structure report — are both hidden by the launch flag, so an
+                imported book, or one made without a figure, had no way to gain
+                a target and the dial on its card had nothing to draw.
+
+                The placeholder is `suggestTarget(genre)`, the same figure
+                `/book/new` offers for the genre chosen right above, so the two
+                screens cannot suggest different lengths for one kind of book.
+                It is a *placeholder*: nothing is stored until the writer types
+                a number, because a suggested length silently saved as a goal is
+                the invented figure this app refuses everywhere else.
+
+                Empty clears the target, which is what `setTargetWords` already
+                means by zero, and the hint says so — a field that quietly
+                deletes a goal when blanked is a trap. */}
+            <label className="mt-4 block font-sans text-sm">
+              <span className="font-medium text-tremor-content-strong">
+                Target length
+              </span>
+              <input
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+                inputMode="numeric"
+                placeholder={
+                  genre
+                    ? suggestTarget(genre).toLocaleString()
+                    : "No length to aim at"
+                }
+                className="mt-1.5 w-full rounded-md border border-tremor-border bg-tremor-background-muted
+                           px-3 py-2 text-tremor-content-strong placeholder:text-tremor-content
+                           focus-visible:border-accent focus-visible:outline-none"
+              />
+              <span className="mt-1 block text-xs text-tremor-content">
+                Words. {bookWordCount(book).toLocaleString()} written so far.
+                Leave it empty for no target.
               </span>
             </label>
           </div>

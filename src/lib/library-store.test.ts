@@ -1220,6 +1220,41 @@ it("counts a book that is both archived and trashed once, as trashed", () => {
   expect(booksAgainstPlan(getShelf())).toEqual([]);
 });
 
+/**
+ * **A book somebody shared with this writer does not spend one of their five.**
+ *
+ * The trigger counts `where b.owner = new.owner`, so a shared book — whose row
+ * belongs to whoever owns it — has never counted in Postgres. The browser
+ * counted every book on the shelf, so accepting an editor invitation appeared
+ * to eat two slots: a writer with three of their own and two shared with them
+ * was told the shelf was full at five and refused a fourth the server would
+ * have taken. Found on a real library, where two shared books read as books
+ * that had appeared from nowhere.
+ */
+it("does not count a book shared with this writer against their plan", () => {
+  const mine = createBook("Mine").bookId;
+
+  // What a download of an editor invitation looks like: a book with a role and
+  // somebody else's id on it, alongside this writer's own.
+  const remote = getShelf();
+  applyRemoteForTest({
+    ...remote,
+    books: [
+      ...remote.books,
+      {
+        ...remote.books[0],
+        id: "shared-book",
+        title: "Somebody else's",
+        ownerId: "another-writer",
+        role: "editor",
+      },
+    ],
+  });
+
+  expect(booksIn(getShelf(), "active")).toHaveLength(2);
+  expect(booksAgainstPlan(getShelf()).map((b) => b.id)).toEqual([mine]);
+});
+
 it("counts the active shelf and the archive together", () => {
   const active = createBook("A").bookId;
   const filed = createBook("B").bookId;

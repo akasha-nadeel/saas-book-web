@@ -39,6 +39,14 @@ import { useActivity } from "@/lib/use-library";
  * The two figures and the two lists are counts, and a bad month is reported in
  * the same voice as a good one.
  *
+ * **A shelf with nothing on it still gets the whole card.** It drew a single
+ * explanatory paragraph in place of the chart until 2026-08-31, on the reading
+ * that thirty zeroes render an empty result as a good one — which is true of
+ * thirty zeroes *on their own*. Said out loud they are neither: they are what a
+ * writer with no books has written, and the shape of them is where their own
+ * figures will appear. So the chart, the two tabs and the two lists are always
+ * drawn, and the note above them carries the honesty the blank card used to.
+ *
  * The Progress tool says the same things per book with a month grid and a
  * finish date. It is hidden under the launch flag, so today this is the only
  * place a writer sees any of it — and both read `activity.ts`, so the two
@@ -99,14 +107,23 @@ export function WritingPerformanceCard({
     [activity],
   );
 
-  const manuscript = useMemo(
-    () =>
-      runningTotal(activity, words, WINDOW_DAYS).map((d) => ({
-        date: d.date,
-        Manuscript: d.words,
-      })),
-    [activity, words],
-  );
+  /**
+   * What the manuscript weighed, day by day.
+   *
+   * `runningTotal` answers with *nothing at all* when no day in the window
+   * carries a change — it will not pad a flat run in front of itself, and it
+   * is right not to. That used to be handled by the card drawing no chart. The
+   * chart is drawn either way now, so the flat run is made here instead, at
+   * what the shelf weighs **today**, and the caption below says in words that
+   * it is a total held level rather than a month somebody lived.
+   */
+  const manuscript = useMemo(() => {
+    const line = runningTotal(activity, words, WINDOW_DAYS);
+    if (line.length > 0) {
+      return line.map((d) => ({ date: d.date, Manuscript: d.words }));
+    }
+    return written.map((d) => ({ date: d.date, Manuscript: words }));
+  }, [activity, words, written]);
 
   const weekdays = useMemo(() => byWeekday(activity, WINDOW_DAYS), [activity]);
 
@@ -154,8 +171,9 @@ export function WritingPerformanceCard({
        * and cannot tell whether the book barely moved or the app simply has
        * not been watching long — and those are opposite facts.
        */
-      caption:
-        manuscript.length > 0 && manuscript.length < WINDOW_DAYS
+      caption: !logged
+        ? "The day log has nothing in it yet, so the line is held level at what the shelf weighs today. Nothing before today is known."
+        : manuscript.length > 0 && manuscript.length < WINDOW_DAYS
           ? `The day log reaches back ${plural(manuscript.length, "day")}. Anything before that is not known, so the line starts there.`
           : null,
     },
@@ -169,113 +187,119 @@ export function WritingPerformanceCard({
         {WINDOW_DAYS} days.
       </p>
 
-      {!logged ? (
-        /* A flat chart of thirty zeroes would draw an empty result as a good
-           one. This says the plain thing instead, and says what starts it. */
-        <p className="mt-6 rounded-lg border border-line bg-raised/20 p-5 text-sm text-muted">
-          Nothing recorded yet. This fills in on its own as you write — a day
-          counts whether the book grew or you cut it back.
+      {!logged && (
+        /* **The chart is drawn either way now; this line is what keeps it
+            honest.** A month of zeroes on its own would render an empty result
+            as a good one, which is the house rule this card was written for.
+            Said out loud, the same zeroes are a true picture of a shelf with
+            nothing on it yet — and they show a writer where their own figures
+            will appear, which an explanatory paragraph in place of the whole
+            card never did. */
+        <p className="mt-4 rounded-lg border border-line bg-raised/20 p-3 text-sm text-muted">
+          Nothing recorded yet, so the last {WINDOW_DAYS} days below read as
+          zero. This fills in on its own as you write — a day counts whether the
+          book grew or you cut it back.
         </p>
-      ) : (
-        <TabGroup defaultIndex={0}>
-          <Card className="mt-6 overflow-hidden p-0">
-            {/* `flex` with `flex-1` tabs rather than the fixed `pr-12` this
-                came with: two tabs at that padding wanted about 316px, and a
-                360px phone leaves the card roughly 280. Split evenly they
-                cannot overflow at any width. */}
-            <TabList className="flex space-x-0 bg-raised/20">
-              {tabs.map((tab) => (
-                <Tab
-                  key={tab.name}
-                  className="min-w-0 flex-1 border-r border-line px-4 py-3 text-left last:border-r-0 sm:px-5 sm:py-4"
-                >
-                  <span className="block truncate text-xs font-medium text-muted">
-                    {tab.name}{" "}
-                    <span className="hidden sm:inline">· {tab.note}</span>
-                  </span>
-                  <span className="mt-1 block truncate text-xl font-bold tracking-tight tabular-nums text-fg sm:text-2xl">
-                    {tab.value}
-                  </span>
-                </Tab>
-              ))}
-            </TabList>
-            <TabPanels>
-              {tabs.map((tab) => (
-                <TabPanel key={tab.name} className="p-4 sm:p-6">
-                  {/* Two instances rather than one, because `showYAxis` and
-                      `startEndOnly` are props and not CSS — the small one
-                      drops the axis and thins the labels to two. */}
-                  <AreaChart
-                    data={tab.data}
-                    index="date"
-                    categories={[tab.category]}
-                    colors={["cyan"]}
-                    valueFormatter={format}
-                    showGradient={true}
-                    showLegend={false}
-                    yAxisWidth={56}
-                    className="hidden sm:block sm:h-72 lg:h-96"
-                  />
-                  <AreaChart
-                    data={tab.data}
-                    index="date"
-                    categories={[tab.category]}
-                    colors={["cyan"]}
-                    valueFormatter={format}
-                    showGradient={true}
-                    showLegend={false}
-                    showYAxis={false}
-                    startEndOnly={true}
-                    className="h-56 sm:hidden"
-                  />
-                  {tab.caption && (
-                    <p className="mt-3 text-xs leading-relaxed text-muted">
-                      {tab.caption}
-                    </p>
-                  )}
-                </TabPanel>
-              ))}
-            </TabPanels>
+      )}
+
+      <TabGroup defaultIndex={0}>
+        <Card className="mt-6 overflow-hidden p-0">
+          {/* `flex` with `flex-1` tabs rather than the fixed `pr-12` this
+              came with: two tabs at that padding wanted about 316px, and a
+              360px phone leaves the card roughly 280. Split evenly they
+              cannot overflow at any width. */}
+          <TabList className="flex space-x-0 bg-raised/20">
+            {tabs.map((tab) => (
+              <Tab
+                key={tab.name}
+                className="min-w-0 flex-1 border-r border-line px-4 py-3 text-left last:border-r-0 sm:px-5 sm:py-4"
+              >
+                <span className="block truncate text-xs font-medium text-muted">
+                  {tab.name}{" "}
+                  <span className="hidden sm:inline">· {tab.note}</span>
+                </span>
+                <span className="mt-1 block truncate text-xl font-bold tracking-tight tabular-nums text-fg sm:text-2xl">
+                  {tab.value}
+                </span>
+              </Tab>
+            ))}
+          </TabList>
+          <TabPanels>
+            {tabs.map((tab) => (
+              <TabPanel key={tab.name} className="p-4 sm:p-6">
+                {/* Two instances rather than one, because `showYAxis` and
+                    `startEndOnly` are props and not CSS — the small one
+                    drops the axis and thins the labels to two. */}
+                <AreaChart
+                  data={tab.data}
+                  index="date"
+                  categories={[tab.category]}
+                  colors={["cyan"]}
+                  valueFormatter={format}
+                  showGradient={true}
+                  showLegend={false}
+                  yAxisWidth={56}
+                  className="hidden sm:block sm:h-72 lg:h-96"
+                />
+                <AreaChart
+                  data={tab.data}
+                  index="date"
+                  categories={[tab.category]}
+                  colors={["cyan"]}
+                  valueFormatter={format}
+                  showGradient={true}
+                  showLegend={false}
+                  showYAxis={false}
+                  startEndOnly={true}
+                  className="h-56 sm:hidden"
+                />
+                {tab.caption && (
+                  <p className="mt-3 text-xs leading-relaxed text-muted">
+                    {tab.caption}
+                  </p>
+                )}
+              </TabPanel>
+            ))}
+          </TabPanels>
+        </Card>
+
+        {/* Below the tabs rather than inside a panel: neither list changes
+            with the tab — one is the shelf as it stands, the other is the
+            window — and two identical panels that redraw on a press would
+            promise a change that never comes. */}
+        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <Card>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="min-w-0 truncate text-sm font-semibold text-fg">
+                Words by book
+              </p>
+              <span className="shrink-0 text-xs font-medium text-muted">
+                Now
+              </span>
+            </div>
+            {byBook.length > 0 ? (
+              <BarList data={byBook} valueFormatter={format} />
+            ) : (
+              <p className="text-sm text-muted">No words on the shelf yet.</p>
+            )}
           </Card>
 
-          {/* Below the tabs rather than inside a panel: neither list changes
-              with the tab — one is the shelf as it stands, the other is the
-              window — and two identical panels that redraw on a press would
-              promise a change that never comes. */}
-          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <Card>
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-sm font-semibold text-fg">
-                  Words by book
-                </p>
-                <span className="shrink-0 text-xs font-medium text-muted">
-                  Now
-                </span>
-              </div>
-              {byBook.length > 0 ? (
-                <BarList data={byBook} valueFormatter={format} />
-              ) : (
-                <p className="text-sm text-muted">No words on the shelf yet.</p>
-              )}
-            </Card>
-
-            <Card>
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <p className="min-w-0 truncate text-sm font-semibold text-fg">
-                  Days of the week
-                </p>
-                <span className="shrink-0 text-xs font-medium text-muted">
-                  {WINDOW_DAYS} days
-                </span>
-              </div>
-              {/* Which day you actually write on is a thing you cannot see
-                  from the inside. A weekday that comes out negative is left
-                  negative — it reads as "that is when I cut". */}
-              <BarList data={weekdays} valueFormatter={signed} />
-            </Card>
-          </div>
-        </TabGroup>
-      )}
+          <Card>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="min-w-0 truncate text-sm font-semibold text-fg">
+                Days of the week
+              </p>
+              <span className="shrink-0 text-xs font-medium text-muted">
+                {WINDOW_DAYS} days
+              </span>
+            </div>
+            {/* Which day you actually write on is a thing you cannot see
+                from the inside. A weekday that comes out negative is left
+                negative — it reads as "that is when I cut". */}
+            <BarList data={weekdays} valueFormatter={signed} />
+          </Card>
+        </div>
+      </TabGroup>
     </div>
   );
 }

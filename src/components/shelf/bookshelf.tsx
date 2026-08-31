@@ -20,6 +20,7 @@ import {
   bookChapterCount,
   bookWordCount,
   booksAgainstPlan,
+  isSharedBook,
   booksIn,
   deleteBook,
   getArcRaw,
@@ -47,6 +48,8 @@ import {
   useShelf,
 } from "@/lib/use-library";
 import { targetShare } from "@/lib/target";
+import { resumeChapter } from "@/lib/resume";
+import { ResumeCard } from "@/components/editor/resume-card";
 import { WritingPerformanceCard } from "@/components/shelf/writing-performance-card";
 import { SearchDialog } from "@/components/shelf/search-dialog";
 import { BookThumb } from "@/components/shelf/book-thumb";
@@ -68,7 +71,12 @@ import {
   SHELF_LAYOUTS,
   type ShelfLayout,
 } from "@/lib/shelf-layout";
-import { LAUNCH_LIMITS } from "@/lib/launch";
+import {
+  LAUNCH_LIMITS,
+  onFreePlan,
+  trashedBookClosed,
+} from "@/lib/launch";
+import { TrashedBookDialog } from "@/components/upgrade/trashed-book";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { usePlan, type PlanState } from "@/lib/use-plan";
 import {
@@ -486,6 +494,14 @@ export function Bookshelf({
      the archive stopped being a way round the limit when archived books
      started counting against it. See `booksAgainstPlan`. */
   const [noRoomFor, setNoRoomFor] = useState<Book | null>(null);
+  /**
+   * The fourth: a trashed book the free plan will not open.
+   *
+   * Pressed rather than arrived at — the jacket refuses the press and this
+   * says why, with the way back (Restore) and the way forward (Pro) both on
+   * it. Same rule as the route gate; see `trashedBookClosed`.
+   */
+  const [closedBook, setClosedBook] = useState<Book | null>(null);
   /** A batch waiting on a confirmation, and how many a refused restore would fit. */
   const [bulkAsk, setBulkAsk] = useState<{
     action: BulkAction;
@@ -525,9 +541,7 @@ export function Bookshelf({
        the cost of waving through a restore we would have refused is that
        Postgres refuses it instead, which is the right way round. */
     const gated =
-      !plan.loading &&
-      plan.billing &&
-      !plan.pro &&
+      onFreePlan(plan) &&
       booksAgainstPlan(shelf).length >= LAUNCH_LIMITS.freeBooks;
     if (gated) {
       setNoRoomFor(book);
@@ -570,7 +584,7 @@ export function Bookshelf({
        module — filling the last two slots and leaving three behind is a
        half-done action the writer never chose the shape of. */
     if (action === "restore") {
-      const gated = !plan.loading && plan.billing && !plan.pro;
+      const gated = onFreePlan(plan);
       const { needRoom, room, fits } = planRestore(books, shelf, gated);
       if (!fits) {
         setNoRoomForBatch({ wanted: needRoom.length, room });
@@ -978,6 +992,10 @@ export function Bookshelf({
                 onTrash={handleTrash}
                 onDeleteForever={handleDeleteForever}
                 onRestore={handleRestore}
+                /* The plan lives up here, so the card asks a question rather
+                   than making a judgement — the same shape as `onRestore`. */
+                closed={(b) => trashedBookClosed(b, plan)}
+                onClosed={setClosedBook}
                 onBulk={handleBulk}
                 layout={prefs.shelfLayout}
                 onLayout={(next) => setPref("shelfLayout", next)}
@@ -1153,6 +1171,18 @@ export function Bookshelf({
              stops being legible. `restore` only changes the line above the
              headline. */
           <UpgradeDialog reason="restore" onClose={() => setNoRoomFor(null)} />
+        )}
+
+        {closedBook && (
+          /* Restore runs the ordinary path, which is what makes the two
+             refusals stack correctly: a free shelf with no room answers this
+             press with `UpgradeDialog` a moment later, and neither dialog has
+             to know about the other. */
+          <TrashedBookDialog
+            title={closedBook.title}
+            onRestore={() => handleRestore(closedBook)}
+            onClose={() => setClosedBook(null)}
+          />
         )}
 
         {erasing && (
@@ -1658,6 +1688,15 @@ function CurrentBookCard({
                         ? PHASE_STATE[progress.next.phase]
                         : "Every step done"}
                     </p>
+                    {/* The badge the note above this block describes, and it
+                        was never drawn: whose book this is belongs over the
+                        name, not under it. Nothing at all on a writer's own
+                        shelf, which is the common case. */}
+                    {isSharedBook(book) && (
+                      <span className="rounded-full border border-line bg-raised px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide text-muted uppercase">
+                        Shared with you
+                      </span>
+                    )}
                   </div>
                   <h2 className="mt-1.5 line-clamp-2 text-pretty break-words text-xl font-bold text-fg">
                     {book.title}
@@ -1729,12 +1768,14 @@ function CurrentBookCard({
                 )}
               </div>
 
-              {/* Only when the writer set a goal. A bar against a target we
-                  invented would be the made-up number this app keeps
-                  refusing to print. */}
-              {/* The target used to draw a bar here. It is a gauge in the
-                  column beside this card now — one figure in one place, rather
-                  than the same percentage twice on one screen. */}
+              {/* **The target is back on this card, as a dial in the column
+                  to the right rather than a bar across the middle.** It drew a
+                  bar here, then spent a week as a card of its own on Overview —
+                  the screen about the *writer* — where a figure about one book
+                  had to carry that book's name and its own way in. Beside the
+                  cover and the title it needs neither. Still only when the
+                  writer set a goal: a bar against a target we invented would be
+                  the made-up number this app keeps refusing to print. */}
 
               {/* ---- The diagnosis, and why it is not here ---------------
 
@@ -1873,6 +1914,49 @@ function CurrentBookCard({
                 </Menu>
               </div>
             </div>
+
+            {/* ---- The target, or the offer to set one ------------------
+
+                A third column of the same row, so the dial sits beside the
+                book it counts rather than under the buttons. `sm:w-[13.5rem]`
+                with `shrink-0`: a fixed measure for the figure, and the title
+                column (`sm:flex-1`) takes whatever is left. On a phone the row
+                is a two-column grid, so it spans both and lands under the
+                actions with a rule above it. */}
+            <div
+              className="col-span-2 mt-4 border-t border-line pt-4
+                         sm:col-span-1 sm:mt-0 sm:w-[13.5rem] sm:shrink-0
+                         sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5"
+            >
+              {book.targetWords ? (
+                <TargetGauge book={book} target={book.targetWords} />
+              ) : (
+                /* **An offer, not an empty frame.** Until 2026-09-01 a target
+                   could only be set when the book was made — the two screens
+                   that can change one, comps and structure, are both hidden by
+                   the launch flag — so a book imported or made without a goal
+                   had no way to gain one. This opens the same dialog the ⋯ menu
+                   opens, which is where the field now lives. */
+                <div className="flex h-full flex-col justify-center gap-2">
+                  <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
+                    Target
+                  </h3>
+                  <p className="text-sm leading-snug text-muted">
+                    No length to aim at yet.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => onCover(book)}
+                    className="mt-1 rounded-lg border border-line bg-surface px-3 py-2
+                               text-sm font-semibold text-fg transition-colors
+                               hover:bg-raised focus-visible:outline-none
+                               focus-visible:ring-2 focus-visible:ring-accent/50"
+                  >
+                    Set a word target
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </section>
       ) : settled ? (
@@ -1951,6 +2035,19 @@ function Overview({
    * check in particular has to live beside the chart it suppresses.
    */
 
+  /**
+   * Whether the plan card is going to draw itself.
+   *
+   * The same three-part test `ProCard` makes — through `onFreePlan`, the one
+   * statement of it — read once here because two things depend on the answer:
+   * whether the row has a second column, and whether the card in the first one
+   * lays itself out as a banner. Kept while the plan is still *unknown*, which
+   * is the rule the limit gates follow: a free writer is the common case, so
+   * reserving the column means their card never moves once the answer lands,
+   * and a Pro writer sees it widen once.
+   */
+  const offering = plan.loading || onFreePlan(plan);
+
   return (
     <div className="flex flex-col gap-5">
       {/* ---- What is on the shelf ----------------------------------------
@@ -2017,14 +2114,32 @@ function Overview({
       <div className="grid gap-5">
         <WritingPerformanceCard books={bookList} words={words} />
 
-        <div className="grid gap-5 lg:grid-cols-2">
+        {/* **The writer's own work on the left, the offer on the right — and
+            the whole width once there is no offer.**
+
+            The dial that stood here is on the book card in Write, where the
+            book it counts is. What takes its place is the one thing this
+            screen had no answer for once the dial left: a way back into the
+            manuscript.
+
+            `ProCard` draws nothing for somebody already paying, and a two
+            column grid with one child in it left a Pro writer looking at a
+            half card beside a hole. So the *row* asks the same question the
+            card asks itself — through `onFreePlan`, which is the one statement
+            of it — and drops to a single column when there is nothing to put
+            in the second.
+
+            **The slot is kept while the plan is still unknown**, which is the
+            same rule the limit gates follow one screen over: `usePlan()` starts
+            at UNKNOWN, and a free writer is the common case, so reserving the
+            column means their card never moves once the answer lands. A Pro
+            writer sees it widen once, which is the cheaper of the two jumps. */}
+        <div className={`grid gap-5 ${offering ? "lg:grid-cols-2" : ""}`}>
+          <ResumeSlot book={current} wide={!offering} />
+          {/* Its own guard stays: this decides the *shape of the row*, and a
+              card that draws itself only when it should is what makes a
+              disagreement between the two harmless. */}
           <ProCard plan={plan} />
-          {/* Nothing at all until this book carries a target — an empty dial
-              is a nought per cent nobody asked for. The place to set one is
-              the book card in Write, which is where the picker lives. */}
-          {current?.targetWords ? (
-            <TargetGauge book={current} target={current.targetWords} />
-          ) : null}
         </div>
       </div>
 
@@ -2052,7 +2167,8 @@ function Overview({
           Three zeros beside a shelf of finished books is a lie by arithmetic:
           the day log only started when it shipped, so a writer with 6,000 words
           behind them would read that they had written nothing. Until there is a
-          single logged day, this is one card that says why it is empty. */}
+          single logged day, the card still draws its chart and its lists — at
+          zero, over a line that says nothing has been recorded yet. */}
     </div>
   );
 }
@@ -2244,10 +2360,13 @@ function FavouritesBand({
  * it appears — two readings of one percentage on one screen is two things to
  * keep in step.
  *
- * **It follows the shelf's own idea of "the book you are in"** — `current` in
- * the screen above, which is the remembered book and failing that the most
- * recently opened one. So the dial moves to whatever was last worked on rather
- * than being pinned to a book chosen once.
+ * **It is a panel, not a card, and it lives inside the book card in Write.**
+ * It stood in its own frame on Overview until 2026-09-01, which put a figure
+ * about *one book* on the screen about the *writer* — and made it carry its own
+ * title, its own copy of the book's name and a second "Open book", because at
+ * that distance from the book it had to introduce itself. Beside the cover and
+ * the title on the card it is about, all three were duplicates and are gone.
+ * What is left is the dial and the two figures.
  *
  * A shelf-wide version of this — every target added up, with the words capped
  * per book so one novel could not lend its overshoot to another — was built and
@@ -2255,11 +2374,6 @@ function FavouritesBand({
  * a worse one to open the day with: a writer wants to know where the book they
  * are in stands, and the three counts across the top of this screen are already
  * the whole shelf.
- *
- * **It names its book, and it opens it.** The card that used to sit beside it —
- * with the title, the cover and the picker — is in Write now, so a dial
- * captioned only "Target" would be a percentage of nothing a reader could see,
- * and a percentage with no way into the book it is about is a dead end.
  *
  * All three judgements come from `lib/target.ts` and none are re-derived here:
  * the share is floored so nothing rounds up into a claim, a non-zero count
@@ -2301,17 +2415,17 @@ function TargetGauge({ book, target }: { book: Book; target: number }) {
   };
 
   return (
-    <div className="flex flex-col rounded-lg border border-line bg-panel p-5">
-      <div className="flex items-baseline justify-between gap-3">
-        <h3 className="text-sm font-bold text-fg">Target</h3>
-        <p className="min-w-0 truncate text-xs font-medium text-muted">
-          {book.title}
-        </p>
-      </div>
+    <div className="flex flex-col">
+      {/* Still labelled, because a bare percentage on a card that already
+          carries a chapter count and a word count is a third number with
+          nothing to say which it is. */}
+      <h3 className="text-xs font-bold tracking-widest text-muted uppercase">
+        Target
+      </h3>
 
       <svg
         viewBox="0 0 140 88"
-        className="mx-auto mt-4 block w-[210px] max-w-full"
+        className="mx-auto mt-2 block w-[160px] max-w-full"
         role="img"
         aria-label={`${label} of a ${target.toLocaleString()} word target`}
       >
@@ -2376,8 +2490,13 @@ function TargetGauge({ book, target }: { book: Book; target: number }) {
 
       {/* Two labelled figures, the shape the reference closes on. Named rather
           than left as a bare pair: "24" and "29,976" on one line are two
-          numbers a reader has to guess the relationship between. */}
-      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-line pt-4">
+          numbers a reader has to guess the relationship between.
+
+          Side by side at both widths. Stacked, they made the dial's column
+          the tallest thing on the card and left the cover and the buttons
+          sitting in a hole; the column is 13.5rem, which is room enough for
+          two five-figure numbers under their own labels. */}
+      <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-line pt-3">
         <div className="flex items-center gap-2">
           <span className="text-accent">{shelfIcons.write}</span>
           <div className="min-w-0">
@@ -2400,25 +2519,104 @@ function TargetGauge({ book, target }: { book: Book; target: number }) {
         </div>
       </dl>
 
-      {/* The way into the book the figure is about. Bordered rather than
-          filled: the plan card directly above it holds the one filled action
-          in this column, and two of them side by side is two things claiming
-          to be the way forward. It lands on the book's own screen — the
-          overview, where the chapters and the tools are — rather than in a
-          chapter, because the writer may be coming here to look rather than
-          to type. */}
-      <Link
-        href={`/book/${book.id}`}
-        className="mt-4 block rounded-lg border border-line bg-surface px-4 py-2.5
-                   text-center text-sm font-semibold text-fg transition-colors hover:bg-raised"
-      >
-        Open book
-      </Link>
+      {/* **No "Open book" here any more.** It was the way into the book from a
+          screen that had no other one; the card this now sits in opens the
+          book with a filled button a few inches to the left, and two of them
+          on one card is two things claiming to be the way forward. */}
     </div>
   );
 }
 
 
+
+/**
+ * Where the writer left off, on the screen they land on.
+ *
+ * **This is what the target dial's slot became**, and it is a better use of it:
+ * a dial is a fact about a book, and what Overview was missing once the dial
+ * moved to Write was a *way in*. `ResumeCard` had been sitting finished and
+ * callerless since `/book/[bookId]` became a redirect — the last paragraph
+ * written, the note left behind, and who is in the scene, none of it new data
+ * and all of it three clicks away otherwise.
+ *
+ * Seventeen minutes minus the ten it takes to remember where you were is seven
+ * minutes of writing. That is the whole argument, and it is the top-voted pain
+ * in the research; see the note on `resume.ts`.
+ *
+ * **`resumeChapter` decides, here as everywhere else.** The card asks the same
+ * question of the same module, so the two cannot disagree about which chapter
+ * "where I left off" means — what this adds is the answer for a book that has
+ * no such chapter at all, which the card handles by drawing nothing. A writer
+ * who has just made their first book would then see an empty half-row; they
+ * see where their own words will appear instead, which is the same call the
+ * writing record's zero state makes one card above.
+ */
+function ResumeSlot({
+  book,
+  wide,
+}: {
+  book: Book | null;
+  /** Spanning the row rather than sharing it — see `ResumeCard`'s note. */
+  wide: boolean;
+}) {
+  /* No book at all is not an empty state to explain — the shelf above is
+     already saying there is nothing here, and a second card saying it again on
+     the same screen is noise. */
+  if (!book) return null;
+
+  if (resumeChapter(book)) return <ResumeCard book={book} wide={wide} />;
+
+  return (
+    /* `rounded-lg` and `sm:min-h-52` to match `ProCard` beside it, and the same
+       row-when-wide treatment — see the notes on the written card in
+       `resume-card.tsx`. The two states of this card are held to one another;
+       a writer should not be able to tell which one they are looking at from
+       its shape. */
+    <section
+      className={`relative isolate flex flex-col overflow-hidden rounded-lg
+                  border border-white/15 bg-panel p-5 text-white shadow-sm
+                  sm:min-h-52 ${wide ? "" : "justify-center"}`}
+    >
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-20 bg-cover"
+        style={{
+          backgroundImage: "url('/resume-card-background.jpg')",
+          /* The same crop as the written card — see the note there. */
+          backgroundPosition: "center 78%",
+        }}
+      />
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.74)_0%,rgba(0,0,0,0.58)_48%,rgba(0,0,0,0.24)_100%)]"
+      />
+      {/* Title left, the book's name right, at both widths — the same
+          arrangement as the written card. See the note there. */}
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-base font-bold text-white">Where you left off</h3>
+        <p className="min-w-0 truncate text-xs text-white/70">{book.title}</p>
+      </div>
+
+      <p className="mt-3 min-w-0 text-sm leading-relaxed text-white/85">
+        Nothing written yet. The last lines you write show up here, with the
+        note you left yourself beside them — so a short session starts with
+        writing rather than with remembering.
+      </p>
+
+      <Link
+        href={`/book/${book.id}`}
+        className={`rounded-lg bg-white px-5 py-2.5 text-sm font-semibold
+                   text-neutral-950 shadow-sm outline-none transition
+                   hover:bg-white/90 focus-visible:ring-2
+                   focus-visible:ring-white/70 ${
+                     wide ? "mt-auto self-end" : "mt-4 self-start"
+                   }`}
+      >
+        Open book
+      </Link>
+    </section>
+  );
+}
 
 /**
  * What Pro adds, for somebody who is not on it.
@@ -2863,6 +3061,8 @@ function Write({
   onTrash,
   onDeleteForever,
   onRestore,
+  closed,
+  onClosed,
   onBulk,
   layout,
   onLayout,
@@ -2884,6 +3084,17 @@ function Write({
   onDeleteForever: (b: Book) => void;
   /** Not `restoreBook` itself: the free plan may have no room for the book. */
   onRestore: (b: Book) => void;
+  /**
+   * Whether this book's inside is shut to the reader — the free plan's trash.
+   *
+   * Asked as a question rather than worked out here, for the same reason
+   * `onRestore` is a callback: the plan is the screen above's, and a second
+   * copy of the test is a second answer waiting to disagree with the route
+   * gate. See `trashedBookClosed`.
+   */
+  closed: (b: Book) => boolean;
+  /** The press a shut book refuses, so the screen above can say why. */
+  onClosed: (b: Book) => void;
   /**
    * Act on several books at once.
    *
@@ -3387,9 +3598,23 @@ function Write({
                    button so the markup, the tab order and the focus ring stay
                    exactly as they are when not selecting. */
                 onClick={(e) => {
-                  if (!selecting) return;
-                  e.preventDefault();
-                  pick(book, e.shiftKey);
+                  if (selecting) {
+                    e.preventDefault();
+                    pick(book, e.shiftKey);
+                    return;
+                  }
+                  /* **The one press on this screen that opens a book and can
+                     be refused.** A trashed card has no Write button, so the
+                     jacket is the only way in — and on the free plan the way
+                     in is to restore it first. Prevented rather than drawn as
+                     a dead card: the writer gets the reason and both ways out
+                     on the press, and the markup, tab order and focus ring
+                     stay what they are for every other book. The route under
+                     it makes the same check, so a pasted URL is answered too. */
+                  if (closed(book)) {
+                    e.preventDefault();
+                    onClosed(book);
+                  }
                 }}
                 className={`min-w-0 rounded-lg outline-none focus-visible:ring-2
                             focus-visible:ring-accent/60 ${
@@ -3419,6 +3644,9 @@ function Write({
                         {book.title}
                       </span>
                       <span className="mt-0.5 block truncate font-sans text-xs text-muted">
+                        {/* Same mark as the grid card above — see the note
+                            there. */}
+                        {isSharedBook(book) && <>Shared · </>}
                         {plural(bookChapterCount(book), "chapter")} ·{" "}
                         {plural(bookWordCount(book), "word")} · Opened{" "}
                         {relativeTime(book.lastOpenedAt)}
@@ -3440,6 +3668,13 @@ function Write({
                           invented numbers. `span`, not `p`: this is inside an
                           anchor, and a paragraph there is invalid markup. */}
                       <span className="mt-1.5 block font-sans text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
+                        {/* **A book somebody shared reads as one of yours
+                            without this**, which is how two of them landing
+                            on a shelf looks like books appearing from
+                            nowhere. The Collaborators area is where the
+                            detail is; this is only the mark that sends
+                            somebody there. */}
+                        {isSharedBook(book) && <>Shared · </>}
                         {plural(bookChapterCount(book), "chapter")} ·{" "}
                         {plural(bookWordCount(book), "word")}
                       </span>

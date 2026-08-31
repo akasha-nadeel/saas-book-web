@@ -1618,6 +1618,124 @@ function commit(next: Shelf) {
  */
 let pushedBooks: readonly Book[] | null = null;
 
+/**
+ * Books this browser has deleted, kept until the server agrees they are gone.
+ *
+ * **The queue forgets a delete; this does not.** `flush()` in `sync.ts` clears
+ * every pending job the moment it finds no session — which is correct, and
+ * documented there: pushing a writer's rows under nobody's session is how one
+ * account's edits land in another's. But a delete dropped that way is dropped
+ * for good. Nothing re-queues it and nothing on a later load notices, so the
+ * book sits on the server, and `applyRemote` — which writes the server's list
+ * over the local one — hands it straight back on the next load. From the
+ * writer's side a book they deleted reappears, and deleting it again does the
+ * same thing again.
+ *
+ * So the *intent* is written down where a dropped push cannot take it: an id
+ * and the moment it was deleted, in `localStorage`, local-only and never
+ * synced. `reconcile` settles them against each download — anything the server
+ * still has is deleted again now that there is a session, and anything it no
+ * longer has is forgotten, because the server agreeing is the only confirmation
+ * worth having. `keepLocalOnly` is the second half: while a tombstone stands,
+ * the download may not put that book back.
+ *
+ * **Two bounds, and both are about not haunting a library forever.** A
+ * tombstone older than `TOMBSTONE_DAYS` is dropped whether or not it was ever
+ * confirmed — a delete nobody could deliver in three months is not going to be
+ * delivered — and the list is capped so an origin that never reaches a server
+ * cannot fill up with them.
+ *
+ * **What it deliberately does not do is protect another machine.** Delete a
+ * book here while signed out, keep writing it on a second machine, and this
+ * will carry out the delete when this browser next reaches the server. That is
+ * the same thing a delete whose push merely *succeeded late* would do, and the
+ * writer did press the button and answer the confirmation; the age bound is
+ * what stops it being unbounded.
+ *
+ * Own books only. A shared book leaving the shelf means access ended rather
+ * than that the book did — `pushShelfDiff` already makes that distinction and
+ * this is written inside it.
+ */
+const DELETED_KEY = "openchapter:deleted";
+const TOMBSTONE_DAYS = 90;
+const TOMBSTONE_MAX = 500;
+
+interface Tombstone {
+  id: string;
+  /** When this browser deleted it, epoch milliseconds. */
+  at: number;
+}
+
+function tombstones(): Tombstone[] {
+  const raw = readRaw(DELETED_KEY);
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (t): t is Tombstone =>
+        Boolean(t) &&
+        typeof (t as Tombstone).id === "string" &&
+        typeof (t as Tombstone).at === "number",
+    );
+  } catch {
+    // A malformed list costs a deferred delete, never a render.
+    return [];
+  }
+}
+
+function writeTombstones(list: readonly Tombstone[]): void {
+  try {
+    if (list.length === 0) window.localStorage.removeItem(DELETED_KEY);
+    else window.localStorage.setItem(DELETED_KEY, JSON.stringify(list));
+  } catch {
+    // Out of room. The delete still happened locally and the push is still
+    // queued; what is lost is only the second chance at it.
+  }
+}
+
+/** The ids a download may not put back. */
+function deletedIds(): ReadonlySet<string> {
+  return new Set(tombstones().map((t) => t.id));
+}
+
+/** Remember that this browser deleted a book, in case the push does not land. */
+function noteBookDeleted(bookId: string, now: number = Date.now()): void {
+  const kept = tombstones().filter((t) => t.id !== bookId);
+  kept.push({ id: bookId, at: now });
+  // Newest last, so trimming from the front drops the oldest.
+  writeTombstones(kept.slice(-TOMBSTONE_MAX));
+}
+
+/**
+ * Settle every standing tombstone against what the server just sent.
+ *
+ * Called with the download in hand, before the merge: a book the server still
+ * lists is deleted again — there is a session now, which is exactly what the
+ * dropped push lacked — and one it no longer lists is forgotten. The age bound
+ * is applied in the same pass so an unreachable server cannot leave a tombstone
+ * standing for ever.
+ */
+function settleTombstones(
+  onServer: ReadonlySet<string>,
+  now: number = Date.now(),
+): void {
+  const standing = tombstones();
+  if (standing.length === 0) return;
+
+  const cutoff = now - TOMBSTONE_DAYS * 86_400_000;
+  const kept: Tombstone[] = [];
+
+  for (const stone of standing) {
+    if (stone.at < cutoff) continue;
+    if (!onServer.has(stone.id)) continue; // The server agrees; nothing to keep.
+    pushBookDeleted(stone.id);
+    kept.push(stone);
+  }
+
+  if (kept.length !== standing.length) writeTombstones(kept);
+}
+
 function chapterIdsOf(book: Book): Set<string> {
   const ids = new Set<string>();
   for (const c of book.chapters) ids.add(c.id);
@@ -1728,7 +1846,11 @@ function pushShelfDiff(next: Shelf, previous: Shelf) {
   // Whatever is left never made it into the new shelf. Only ever our own: a
   // shared book leaving the shelf means access ended, not that the book did.
   for (const [id, book] of before) {
-    if (!isSharedBook(book) && book.access !== "lost") pushBookDeleted(id);
+    if (isSharedBook(book) || book.access === "lost") continue;
+    // Written *before* the push, because the push is the part that can be
+    // dropped. See `noteBookDeleted`.
+    noteBookDeleted(id);
+    pushBookDeleted(id);
   }
 
   pushedBooks = next.books;
@@ -4549,12 +4671,24 @@ export function booksIn(shelf: Shelf, view: BookView): Book[] {
  * past the limit. Coming back out of the *archive* is not gated any more and
  * must not be: the slot was never given up.
  *
+ * **A book somebody shared with this writer is not one of their books**, and
+ * counting it was a real disagreement with the trigger rather than a nicety.
+ * `enforce_launch_book_limit` counts `where b.owner = new.owner`; the row for a
+ * shared book belongs to whoever owns it, so Postgres has never counted one.
+ * The browser did — every book on the shelf, whosever it was — so a writer with
+ * three books of their own and two shared with them was told their shelf was
+ * full at five, and refused a fourth the server would have accepted. It also
+ * reads as books appearing from nowhere: an editor invitation lands two books
+ * on the shelf, and the plan appears to have been spent by them.
+ *
  * `enforce_launch_book_limit` in Postgres counts the same way and is the half
  * that enforces it; this one only decides what the browser offers. Change one
  * and change the other.
  */
 export function booksAgainstPlan(shelf: Shelf): Book[] {
-  return [...booksIn(shelf, "active"), ...booksIn(shelf, "archived")];
+  return [...booksIn(shelf, "active"), ...booksIn(shelf, "archived")].filter(
+    (book) => !isSharedBook(book),
+  );
 }
 
 /**
@@ -4731,9 +4865,21 @@ export async function clearLocalLibrary(): Promise<void> {
  */
 function keepLocalOnly(local: Shelf, remote: Shelf): Shelf {
   const mine = new Map(local.books.map((b) => [b.id, b]));
+
+  /*
+   * **A book this browser deleted does not come back down.**
+   *
+   * The delete may not have reached the server yet — the push queue is cleared
+   * whenever there is no session — and this function is what would otherwise
+   * hand the writer their deleted book back on the next load. `reconcile`'s
+   * `settleTombstones` re-issues the delete and drops the tombstone once the
+   * server agrees; until then the download is filtered. See `noteBookDeleted`.
+   */
+  const gone = deletedIds();
+
   return {
     ...remote,
-    books: remote.books.map((book) => {
+    books: remote.books.filter((b) => !gone.has(b.id)).map((book) => {
       const was = mine.get(book.id);
       let kept = book;
 
@@ -5097,6 +5243,19 @@ async function reconcile(): Promise<void> {
   const remote = await fetchLibrary(getShelf());
   if (remote) {
     const onServer = new Set(remote.shelf.books.map((b) => b.id));
+
+    /*
+     * **Deletions this browser could not deliver, delivered now.** There is a
+     * session here — which is the thing a dropped push lacked — so a book the
+     * server still lists is deleted again, and one it no longer lists is
+     * forgotten. Before the merge below, so `keepLocalOnly` reads a settled
+     * list. See `noteBookDeleted`.
+     *
+     * The strays path below needs no guard of its own: a tombstoned book is by
+     * definition not on this shelf, and strays are read out of the shelf.
+     */
+    settleTombstones(onServer);
+
     /*
      * **A shared book missing from the download is revoked, not stray**, and this
      * clause is the difference between the two. `ownerId` is absent on every book

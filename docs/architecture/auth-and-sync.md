@@ -83,6 +83,30 @@ stranger write to any writer's shelf. The decision is now the pure, tested
 `pushOwner(book, me)`, whose whole content is that the *session* decides
 whether to push and the book only decides who to attribute it to.
 
+**A delete outlives the queue that carries it.** The rule above — drop the
+queue when there is no session — is right about edits and lossy about deletions:
+an edit is re-sent by the next save or by `syncWithServer`'s repair pass, and a
+`book:<id>` delete is re-sent by nothing at all. So the row stayed on the
+server, `applyRemote` wrote the server's list over the local one on the next
+load, and the writer's deleted book was back; deleting it again, in the same
+sessionless window, did the same thing again. What is written down now is the
+*intent*: `pushShelfDiff` records the id and the moment at
+**`openchapter:deleted`** — local-only, never synced, own books only, since a
+shared book leaving the shelf means access ended rather than that the book did
+— and `reconcile` settles the list against each download. A book the server
+still lists is deleted again, now that there is a session; one it no longer
+lists is forgotten, because the server agreeing is the only confirmation worth
+having; and either way a tombstone older than **ninety days** is dropped, so an
+origin that never reaches a server cannot fill up with them. `keepLocalOnly`
+filters the download while a tombstone stands — the half that keeps the book off
+the shelf in between. The trade-off, stated in the code: a delete made here
+while signed out is carried out when *this* browser next reaches the server,
+even if a second machine has been writing that book since. That is what a delete
+whose push merely succeeded late would do, the writer did press the button and
+answer the confirmation, and the ninety days is what stops it being unbounded.
+`push-deletes.test.ts` covers the cycle, and three of its four tombstone cases
+fail with the readers removed.
+
 **The mapping narrows values on the way out** (`matterOrNull`, `count`, `text`,
 the guard in `toIso`). The types describe today's code; `localStorage` holds
 whatever older versions left there, unchecked by any compiler, and the database

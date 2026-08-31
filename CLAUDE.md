@@ -593,6 +593,17 @@ local-only, with the account menu saying why. Every entry point checks
   rule: the *session* decides whether to push, the book only decides
   attribution. Postgres's 42501 hint recommending `GRANT … TO anon` must not be
   taken — it would let any stranger write to any writer's shelf.
+- **A hard delete leaves a tombstone, because that rule drops one.** `flush()`
+  clears the whole queue when it finds no session, so a `book:<id>` delete made
+  in that window was lost and the next download handed the book back — the
+  writer deletes it, it returns, and deleting it again repeats the cycle. So
+  `pushShelfDiff` records the id at **`openchapter:deleted`** (local-only, never
+  synced, own books only) and `reconcile` settles the list against every
+  download: still on the server → delete it again now there is a session; gone
+  from the server → forget it; older than **90 days** → give up either way.
+  `keepLocalOnly` filters the download while a tombstone stands, which is the
+  half that keeps the book off the shelf in between. `push-deletes.test.ts`
+  covers it, and three of its four cases fail without the readers.
 - **The mapping narrows values on the way out** — `localStorage` holds whatever
   older versions left there and the database has CHECK constraints and NOT
   NULLs; one stale field would otherwise abort a whole library upload.
@@ -727,7 +738,12 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   insert**; unarchiving is no longer a crossing at all. `booksAgainstPlan` in
   `library-store.ts` is the browser's copy and the trigger is the real one —
   they are two statements of one rule and must agree, or the browser offers
-  restores Postgres then refuses.
+  restores Postgres then refuses. **A book shared *with* this writer counts on
+  neither side**, which the browser got wrong until 2026-09-01: the trigger
+  counts `where b.owner = new.owner`, so a shared row has never spent one of
+  the owner's five, while `booksAgainstPlan` counted every book on the shelf —
+  so accepting two editor invitations appeared to eat two slots, and a writer
+  with three of their own was refused a fourth the server would have taken.
 - **A limit gate must never fire while the plan is still unknown.** `usePlan()`
   starts at `UNKNOWN` (`loading: true`, `pro: false`) and asks the server on
   mount, so for the width of one request a Pro account looks exactly like a free
@@ -1062,6 +1078,11 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
     — unhooked 2026-08-30 when `/book/[bookId]` became a redirect into the last
     chapter opened. It is the only screen that showed a book's parts with no
     page open; bringing it back is a branch in that page rather than a rebuild.
+    **`editor/resume-card.tsx` came off the same screen and is live again** —
+    Overview mounts it through `ResumeSlot` since 2026-09-01, in the slot the
+    target dial left when it moved onto the book card in Write. So
+    `lastParagraph`, `noteHint`, `tail` and the bible's `mentionedIn` are on a
+    reachable path again rather than tested against a callerless file.
   - **`ChapterMeta.matterKey`**, left over from the one-page matter design and
     read by nothing — books written before the change still carry a combined page.
 - Storage limits are real: covers capped at 250KB, inline images at 900KB,
