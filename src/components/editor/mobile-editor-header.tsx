@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { icons } from "@/components/editor/icon-rail";
+import { RailMark } from "@/components/editor/rail-mark";
 
 export function MobileEditorHeader({
   chapterTitle,
@@ -18,34 +18,18 @@ export function MobileEditorHeader({
         <Link
           href="/"
           aria-label="All books"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-fg/80 outline-none hover:bg-raised/70 hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/icons/icon-home.png"
-            alt=""
-            aria-hidden="true"
-            width={36}
-            height={36}
-            className="h-8 w-8 object-contain"
-          />
+          <RailMark mark="home" />
         </Link>
 
         <button
           type="button"
           onClick={onChapters}
           aria-label={`Choose a chapter. Current chapter: ${chapterTitle}`}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted outline-none hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="group flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-fg/80 outline-none hover:bg-raised/70 hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/icons/icon-chapters.png"
-            alt=""
-            aria-hidden="true"
-            width={36}
-            height={36}
-            className="h-8 w-8 object-contain"
-          />
+          <RailMark mark="chapters" />
         </button>
       </div>
 

@@ -377,7 +377,7 @@ function sliceBlock(
  * box being measured and is not counted, so every chapter's first sheet
  * over-filled by about two lines and dropped them off the foot of the page.
  *
- * Shared by the reading view, the flip-book and the editor's Book View preview,
+ * Shared by the reading view and the flip-book,
  * so all three break the pages in the same places.
  */
 export function paginate(
@@ -429,18 +429,36 @@ export function paginate(
     ? (host.firstElementChild as HTMLElement | null)
     : null;
   /** Each block, and the list it belongs to if it is an item of one. */
-  const pieces: { el: HTMLElement; list: HTMLElement | null }[] = [];
+  const pieces: { el: HTMLElement; list: HTMLElement | null; item: number }[] =
+    [];
   for (const child of Array.from((shell ?? host).children) as HTMLElement[]) {
-    if (shell && (child.tagName === "OL" || child.tagName === "UL")) {
-      for (const item of Array.from(child.children) as HTMLElement[]) {
-        pieces.push({ el: item, list: child });
-      }
+    // **Every list is opened out, not only a generated page's.** It was the
+    // contents page alone, on the reasoning that a written list is short. A
+    // pasted one is not: a manuscript full of bullets put thirty items in one
+    // unbreakable block, which ran off the sheet and was cut off by
+    // `.reader-page`'s `overflow: hidden` — the same defect this walk was
+    // written to fix, on the writer's own prose instead of on ours. The editor
+    // splits lists between their items too, and the two have to agree about
+    // one manuscript.
+    if (child.tagName === "OL" || child.tagName === "UL") {
+      Array.from(child.children).forEach((item, at) => {
+        pieces.push({ el: item as HTMLElement, list: child, item: at });
+      });
     } else {
-      pieces.push({ el: child, list: null });
+      pieces.push({ el: child, list: null, item: 0 });
     }
   }
   const kids = pieces.map((piece) => piece.el);
   if (kids.length === 0) return [""];
+
+  /** One piece of a sheet: its markup, and where it came from if it is a
+   *  list item — the list itself, and its place in it. */
+  type SheetPart = {
+    html: string;
+    list: HTMLElement | null;
+    /** Its index in that list, so a continuation can count from it. */
+    item: number;
+  };
 
   /**
    * One sheet's blocks, back inside what they came out of.
@@ -451,7 +469,7 @@ export function paginate(
    * setting. Rebuilt rather than sliced because a list cut by a Range comes
    * back as a fragment of items with no list around them.
    */
-  const sheet = (parts: { html: string; list: HTMLElement | null }[]): string => {
+  const sheet = (parts: SheetPart[]): string => {
     let out = "";
     for (let i = 0; i < parts.length; ) {
       const list = parts[i].list;
@@ -460,12 +478,19 @@ export function paginate(
         i += 1;
         continue;
       }
+      // Where this run picks the list up, so a numbered list carried onto the
+      // next sheet carries on counting rather than starting again at one.
+      const from = parts[i].item;
       let inner = "";
       while (i < parts.length && parts[i].list === list) {
         inner += parts[i].html;
         i += 1;
       }
       const listClone = list.cloneNode(false) as HTMLElement;
+      if (listClone.tagName === "OL" && from > 0) {
+        const start = Number(list.getAttribute("start") ?? 1);
+        listClone.setAttribute("start", String(start + from));
+      }
       listClone.innerHTML = inner;
       out += listClone.outerHTML;
     }
@@ -549,7 +574,7 @@ export function paginate(
     gap: contentH,
   };
 
-  const breaks = pageBreaks(blocks, geometry, linesOf);
+  const breaks = pageBreaks(blocks, geometry, linesOf).spacers;
 
   // Back from break points to sheets: which blocks open a page, and where a
   // page opens in the middle of one.
@@ -567,19 +592,19 @@ export function paginate(
   }
 
   const pages: string[] = [];
-  let current: { html: string; list: HTMLElement | null }[] = [];
+  let current: SheetPart[] = [];
 
   const breakHere = () => {
     pages.push(sheet(current));
     current = [];
   };
 
-  pieces.forEach(({ el, list }, index) => {
+  pieces.forEach(({ el, list, item }, index) => {
     if (opensPage.has(index) && current.length) breakHere();
 
     const cuts = cutsIn.get(index);
     if (!cuts || cuts.length === 0) {
-      current.push({ html: el.outerHTML, list });
+      current.push({ html: el.outerHTML, list, item });
       return;
     }
 
@@ -590,6 +615,7 @@ export function paginate(
       current.push({
         html: sliceBlock(el, nodes, total, bounds[i], bounds[i + 1]),
         list,
+        item,
       });
       if (i < bounds.length - 2) breakHere();
     }

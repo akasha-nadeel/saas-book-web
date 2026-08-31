@@ -1,12 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import {
-  Rail,
-  RailButton,
-  RailDivider,
-  icons,
-} from "@/components/editor/icon-rail";
+import { Rail, RailButton, RailDivider } from "@/components/editor/icon-rail";
+import type { MarkName } from "@/components/editor/rail-mark";
 import { PANEL_TITLES, type PanelTab } from "@/components/editor/left-panel";
 
 /**
@@ -64,98 +59,28 @@ const GROUPS: readonly (readonly PanelTab[])[] = [
 /** Below the rest, always. See the note above. */
 const FOOTER: readonly PanelTab[] = ["history", "trash"];
 
-const TAB_ICONS: Record<PanelTab, React.ReactNode> = {
-  chapters: icons.chapters,
-  search: icons.search,
-  consistency: icons.consistency,
-  bookmarks: icons.bookmarks,
-  notes: icons.notes,
-  ideas: icons.ideas,
-  bible: icons.bible,
-  assistant: icons.assistant,
-  history: icons.history,
-  trash: icons.trash,
-};
-
 /**
- * The src path for tabs that use a custom PNG icon instead of an inline SVG.
- * Any entry here overrides the SVG paths in TAB_ICONS for that tab.
+ * Each tab's mark. One per tab and no fallback, so a tab cannot ship without
+ * one — the names are `MarkName`s, and `RailMark` owns what each is drawn as.
  */
-const TAB_IMG_SRCS: Partial<Record<PanelTab, string>> = {
-  chapters: "/icons/icon-chapters.png",
-  consistency: "/icons/icon-consistency.png",
-  assistant: "/icons/icon-assistant.png",
-  search: "/icons/icon-search.png",
-  history: "/icons/icon-history.png",
-  trash: "/icons/icon-trash.png",
-  notes: "/icons/icon-notes.png",
+const TAB_MARKS: Record<PanelTab, MarkName> = {
+  chapters: "chapters",
+  search: "search",
+  consistency: "consistency",
+  bookmarks: "bookmarks",
+  notes: "notes",
+  ideas: "ideas",
+  bible: "bible",
+  assistant: "assistant",
+  history: "history",
+  trash: "trash",
 };
-
-/**
- * **The way out, standing where the rail would be.**
- *
- * Two screens show a book with no page on it — the book overview, and the
- * editor switched to Book View — and neither carries the rail. Every one of
- * those tabs is something a writer keeps *beside a page they are writing*:
- * search, the notes on this chapter, versions of it. With no page on screen
- * they are nine ways to open a panel about a chapter nobody chose. What such a
- * screen wants in that corner is the way back out, which the rail was burying
- * among them — the same argument that already takes the manuscript's right rail
- * away in Book View.
- *
- * One button rather than a strip: from a book, "back" has a single meaning, the
- * shelf you came from. It is a link rather than `router.back()`, which would
- * send somebody who arrived from a chapter into the chapter again.
- *
- * It takes the rail's **own** width and top inset from `--rail-width` rather
- * than from a padding that happens to add up — that variable steps at three
- * breakpoints, so a hand-measured 4rem box agreed with the rail on medium
- * screens and disagreed on every other one, moving the panel beside it. Living
- * here, next to the rail it stands in for, is what keeps the two screens from
- * drifting apart on the one measurement they share.
- */
-export function BackToBooks() {
-  return (
-    <div className="book-overview-back flex w-(--rail-width) shrink-0 justify-center pt-4 overflow-visible">
-      <Link
-        href="/"
-        aria-label="All books"
-        className="group relative flex h-12 w-12 items-center justify-center rounded-xl
-                   text-muted outline-none transition-colors hover:bg-raised
-                   hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-5 w-5"
-        >
-          {icons.home}
-        </svg>
-        <span
-          role="tooltip"
-          className="pointer-events-none absolute left-full top-1/2 ml-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
-        >
-          All books
-        </span>
-      </Link>
-    </div>
-  );
-}
 
 /**
  * The left rail, which belongs to the editor and to a page being written.
  *
  * It selects which panel is open and doubles as the way to hide it: clicking the
  * tab you are already on closes the panel, so there is one control, never two.
- *
- * **It stands down wherever there is no manuscript** — on the book overview, and
- * in the editor's own Book View — and `BackToBooks` above takes its place. See
- * the note there.
  *
  * One tab is left out where something else already carries it, for the same
  * reason — one control, never two:
@@ -201,11 +126,40 @@ export function WorkspaceRail({
   const allowed = (value: PanelTab) =>
     (chapters || value !== "chapters") && (assistant || value !== "assistant");
 
+  /**
+   * Whether a *tool* panel is on screen — the drawer, not the navigator.
+   *
+   * The same expression the editor hands `LeftPanel` as its `open`, and it has
+   * to stay the same one: the navigator and the drawer share a slot, and this
+   * is what decides which of them the writer is actually looking at.
+   */
+  const toolPanelOpen = leftPanel && tab !== "chapters";
+
   const tabButton = (value: PanelTab) => {
     const isChapterTab = value === "chapters";
-    const isActive = isChapterTab ? !!chapterSectionOpen : (leftPanel && tab === value);
+    /* **A tab is lit when it is what is on screen, not when its flag is set.**
+       The navigator stays open behind a tool panel — that is deliberate, so
+       closing the panel puts the writer back where they were — but it is not
+       *visible*, and a rail that lights Manuscript and Find & replace at once
+       is a rail claiming the writer is in two places. */
+    const isActive = isChapterTab
+      ? !!chapterSectionOpen && !toolPanelOpen
+      : leftPanel && tab === value;
     const handleClick = () => {
       if (isChapterTab) {
+        /* **Manuscript means *show me the navigator*, not *flip a flag*.**
+           With a tool panel over it the navigator is open and hidden, so a
+           plain toggle shut the one thing the press was asking to see — the
+           writer pressed it, the panel stayed, and the cards behind it went
+           away. So a press while something is covering it closes the cover
+           instead, and only a press while the navigator is the visible thing
+           puts it away. Same rule as `selectPanel` above: one control, and its
+           second press undoes what its first press did. */
+        if (toolPanelOpen) {
+          onPanel(false);
+          if (!chapterSectionOpen) onToggleChapters?.(true);
+          return;
+        }
         if (onToggleChapters) {
           onToggleChapters(!chapterSectionOpen);
         } else {
@@ -222,10 +176,8 @@ export function WorkspaceRail({
           label={PANEL_TITLES[value]}
           active={isActive}
           onClick={handleClick}
-          imgSrc={TAB_IMG_SRCS[value]}
-        >
-          {TAB_ICONS[value]}
-        </RailButton>
+          mark={TAB_MARKS[value]}
+        />
       </span>
     );
   };
@@ -261,7 +213,7 @@ export function WorkspaceRail({
           rule leaves with the button for the same reason: a divider at the very
           top of a list separates it from nothing. So the column closes up and
           the tabs sit at the top, which is where a writer looks for them. */}
-      <RailButton label="All books" href="/" imgSrc="/icons/icon-home.png" />
+      <RailButton label="All books" href="/" mark="home" />
 
       {groups.map((group, i) => (
         <div key={i} className="flex flex-col items-center gap-2">

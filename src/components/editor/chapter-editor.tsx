@@ -23,10 +23,8 @@ import {
   Rail,
   RailButton,
   RailDivider,
-  icons,
 } from "@/components/editor/icon-rail";
 import {
-  BackToBooks,
   WorkspaceRail,
   selectPanel,
 } from "@/components/editor/workspace-rail";
@@ -64,10 +62,8 @@ import { LeftPanel, type PanelTab } from "@/components/editor/left-panel";
 import {
   BookPanel,
   useOpenPart,
-  type BookPanelMode,
   type OpenPart,
 } from "@/components/editor/book-panel";
-import { BookGuide } from "@/components/editor/book-guide";
 import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { ShareDialog } from "@/components/collab/share-dialog";
@@ -173,26 +169,30 @@ function PageColorButton({ paper }: { paper: PaperColor }) {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label="Page colour"
+        // `RailButton`'s own string, open standing in for active — this sits
+        // in the rail among them and must not be the one control that answers
+        // differently. See the note there.
         className={`group relative flex h-12 w-12 shrink-0 items-center justify-center
                     rounded-xl outline-none transition-colors
                     focus-visible:ring-2 focus-visible:ring-accent/60 ${
                       open
-                        ? "bg-raised text-fg"
-                        : "text-muted hover:bg-raised/50 hover:text-fg"
+                        ? "bg-blue-500/15 text-fg dark:bg-blue-500/25"
+                        : "text-fg/80 hover:bg-raised/70 hover:text-fg"
                     }`}
       >
-        {/* Orange circle background matching the search/other PNG rail icons,
-            with the colour swatch centred inside it. */}
+        {/* The chosen paper itself rather than a picture of a paint pot: this
+            is the one button on the rail whose subject *is* a colour, so
+            showing which one is worth more than drawing an icon for it. The
+            ring is the rail's own ink, so a white sheet still reads as a
+            swatch on a light theme rather than disappearing into it. */}
         <span
           aria-hidden="true"
-          className="flex h-9 w-9 items-center justify-center rounded-full"
-          style={{ background: "#f5a030" }}
-        >
-          <span
-            className="h-5 w-5 rounded-full border-[3px] border-black"
-            style={{ background: current.swatch }}
-          />
-        </span>
+          className="h-6 w-6 rounded-full border-2 border-current
+                     transition-transform duration-150 ease-out
+                     group-hover:scale-[1.08] motion-reduce:transition-none
+                     motion-reduce:group-hover:scale-100"
+          style={{ background: current.swatch }}
+        />
         {!open && (
           <span
             role="tooltip"
@@ -341,8 +341,8 @@ export function ChapterEditor({
    */
   const dictation = useDictation((text) => {
     // A phrase can arrive after the surface has gone — the writer navigating
-    // away, or switching to Book View, while still speaking. There is nowhere
-    // to put it, so it is dropped rather than pushed into a dead instance.
+    // away while still speaking. There is nowhere to put it, so it is dropped
+    // rather than pushed into a dead instance.
     if (!editor || editor.isDestroyed) return;
 
     const at = editor.state.selection.from;
@@ -365,8 +365,7 @@ export function ChapterEditor({
    * made the panel dismiss itself every time it was used for the thing it is
    * for. The search panel had it first and had it longest.
    *
-   * Same reasoning as `bookPanel` below, and the same store: a navigation is
-   * not a decision, and neither is a reload.
+   * A navigation is not a decision, and neither is a reload.
    */
   const tab = prefs.panelTab;
   const setTab = useCallback((next: PanelTab) => setPref("panelTab", next), []);
@@ -381,15 +380,7 @@ export function ChapterEditor({
     [],
   );
   const [mobileBookOpen, setMobileBookOpen] = useState(false);
-  // Which face the right book panel shows — the cover-and-steppers Book View, or
-  // the book's three parts. Stored rather than held in memory: it used to be a
-  // module variable, which survived the remount a chapter change triggers but
-  // not a reload, so refreshing put a writer back on the cover having asked for
-  // nothing of the sort. A reload is not a decision.
-  const panelMode: BookPanelMode = prefs.bookPanel;
-  const isLeftPanelOpen = Boolean(
-    panelOpen && tab !== "chapters" && panelMode !== "book",
-  );
+  const isLeftPanelOpen = Boolean(panelOpen && tab !== "chapters");
 
   /**
    * Whether the panel and page should play their entrance.
@@ -425,17 +416,6 @@ export function ChapterEditor({
     url.searchParams.delete("new");
     window.history.replaceState(null, "", url.pathname + url.search);
   }, [isNewBook]);
-  const changePanelMode = (mode: BookPanelMode) => {
-    setEntering(true);
-    setMobileBookOpen(false);
-    // Book View takes the rail down with the manuscript, and the rail is what
-    // opens and closes the tool panel. Left open it would be a drawer anchored
-    // at `left-(--rail-width)` against a rail that is no longer there, with its
-    // own header button the only way to shut it — and every tab in it is about
-    // a chapter that is no longer on screen.
-    if (mode === "book") setPanelOpen(false);
-    setPref("bookPanel", mode);
-  };
   useEffect(() => {
     if (!entering) return;
     // Comfortably past the page's 760ms, which is the last to land. Removing
@@ -490,30 +470,24 @@ export function ChapterEditor({
   const chapterPart = chapter ? chapterMatterOf(chapter) : "body";
   const body = useOpenPart();
 
-  // Book View is not one of the three parts. It shows the book whole and picks
-  // out none of them, so the page takes the accent of the button it offers — the
-  // same rule as the rest, applied to a panel that has nothing selected.
-  const selectedPart =
-    panelMode === "book" ? "book" : (body.open ?? chapterPart);
+  const selectedPart = body.open ?? chapterPart;
 
   /**
    * The editor, but only while there is one to act on.
    *
    * `editor` is state set from the surface's `onCreate`, so it outlives the
    * surface: the instance sits there destroyed until a new one replaces it.
-   * There are two windows where that matters — Book View, which unmounts the
-   * surface for as long as it is showing, and the render between one chapter's
-   * editor being destroyed and the next one's `onCreate`. In both, anything
-   * that touches the instance reaches through a null `view`; `editor.can()` in
-   * the formatting rail throws outright.
+   * The window that matters is the render between one chapter's editor being
+   * destroyed and the next one's `onCreate` — anything that touches the
+   * instance there reaches through a null `view`, and `editor.can()` in the
+   * formatting rail throws outright.
    *
    * So the rail, the assistant and dictation all read this instead. Derived
    * rather than cleared in an effect, because an effect would leave exactly the
    * render that crashes. `isDestroyed` is safe to read on a dead editor — it
    * answers from `editorView?.isDestroyed ?? true` rather than assuming a view.
    */
-  const liveEditor =
-    panelMode === "book" || !editor || editor.isDestroyed ? null : editor;
+  const liveEditor = !editor || editor.isDestroyed ? null : editor;
 
   const {
     capture: captureSelection,
@@ -561,44 +535,18 @@ export function ChapterEditor({
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        // Book View has no rail for the drawer to come out from — only the way
-        // back out, which the drawer would cover. Searching is something you do
-        // beside a page, so asking for it asks for the page back; without this
-        // the one shortcut that can still open the panel opens it onto the one
-        // screen with nothing to close it with.
-        if (panelMode === "book") {
-          setEntering(true);
-          setPref("bookPanel", "chapters");
-        }
         setTab("search");
         setEditorPanel(true);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panelMode, setEditorPanel, setTab]);
+  }, [setEditorPanel, setTab]);
 
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
   useEffect(() => {
     if (hydrated) touchLastOpened(bookId, chapterId);
-  }, [hydrated, bookId, chapterId]);
-
-  // Opening a chapter shows the chapter.
-  //
-  // The panel's face is one preference shared with the book overview, and the
-  // overview resets it to "book" on arrival — which is right there and wrong
-  // here, because in this screen "book" means the manuscript is unmounted and
-  // the guide stands in its place. Without this, opening a chapter from the
-  // overview lands the writer on a page with no page on it.
-  //
-  // The pair is the whole rule: the overview always opens on the book, a
-  // chapter always opens on the chapter, and switching faces afterwards is the
-  // writer's and sticks until they leave.
-  useEffect(() => {
-    if (hydrated) setPref("bookPanel", "chapters");
-    // Per chapter arrival. Not watching prefs.bookPanel, which would undo
-    // "Back to Book View" the instant it was pressed.
   }, [hydrated, bookId, chapterId]);
 
   // When switching to another tab on the left rail (Consistency check, Notes, Bible, etc.)
@@ -628,39 +576,23 @@ export function ChapterEditor({
     // No chrome bar across the top: the rail runs full height on the left, the
     // panels and manuscript fill the rest, and the word count and save status
     // float in the workspace's top-left corner (see EditorSurface).
-    <div
-      className="editor-shell flex h-full min-w-0"
-      data-panel-mode={panelMode}
-    >
-      {/* **Book View takes the left rail down too, and for the right rail's own
-          reason.** The rail is what a writer keeps beside a page — search, this
-          chapter's notes, its versions — and Book View unmounts the page. So a
-          rail left standing there is nine ways into panels about a chapter that
-          is no longer on screen, drawn around a manuscript that is not there.
-          The book overview is this screen with the page taken out and has never
-          carried one; showing one here made the same book look like two
-          different screens depending on which way in the writer took.
-          `BackToBooks` is what the overview puts in that corner. */}
-      {panelMode === "book" ? (
-        <BackToBooks />
-      ) : (
-        <WorkspaceRail
-          bookId={bookId}
-          tab={tab}
-          onSelectTab={setTab}
-          leftPanel={panelOpen}
-          onPanel={setEditorPanel}
-          chapters
-          chapterSectionOpen={chapterSectionOpen}
-          onToggleChapters={setChapterSectionOpen}
-          // The manuscript's own right rail carries it now, beside the tools
-          // that act on the page it talks about. Two sparkles on two edges of
-          // one screen is the duplication the book panel already taught us to
-          // avoid — and the panel it opens is the same panel either way.
-          assistant
-          className="editor-workspace-rail hidden md:flex"
-        />
-      )}
+    <div className="editor-shell flex h-full min-w-0">
+      <WorkspaceRail
+        bookId={bookId}
+        tab={tab}
+        onSelectTab={setTab}
+        leftPanel={panelOpen}
+        onPanel={setEditorPanel}
+        chapters
+        chapterSectionOpen={chapterSectionOpen}
+        onToggleChapters={setChapterSectionOpen}
+        // The manuscript's own right rail carries it now, beside the tools
+        // that act on the page it talks about. Two sparkles on two edges of
+        // one screen is the duplication the book panel already taught us to
+        // avoid — and the panel it opens is the same panel either way.
+        assistant
+        className="editor-workspace-rail hidden md:flex"
+      />
 
       {/* One continuous gradient wash behind the book panel and the paper — the
           shelf hero's, in both themes — so the two read as one surface rather
@@ -674,7 +606,6 @@ export function ChapterEditor({
             cover={cover}
             paper={prefs.paper}
             body={body}
-            onMode={changePanelMode}
             onNavigate={closeMobileBookNavigation}
             onClose={closeMobileBookNavigation}
           />
@@ -682,8 +613,9 @@ export function ChapterEditor({
 
         {/* Rendered whether or not it is open: it owns its own mounting so it
             can animate its way out, and it renders nothing until first opened.
-            See LeftPanel's `open`. Tool tabs (search, notes, etc.) float over
-            the editor; chapters section sits inline to push the page. */}
+            See LeftPanel's `open`. It is `fixed` — it wants the window's full
+            height, its own slide and a scrim on a phone — so the slot below
+            holds the page's place for it. */}
         <LeftPanel
           open={panelOpen && tab !== "chapters"}
           tab={tab}
@@ -695,96 +627,117 @@ export function ChapterEditor({
           onClose={() => setEditorPanel(false)}
         />
 
-        {(panelMode === "book" || chapterSectionOpen) && (
+        {/* **The left chrome is one slot, and the page sits beside it rather
+            than under it.**
+
+            The tool panel used to float over the manuscript: a 25rem sheet laid
+            across the page, with its left margin and the first character of
+            every line underneath. That reads as a panel covering the writing
+            rather than standing next to it, and the one thing a writer needs to
+            see while searching their book is the book.
+
+            The panel cannot simply take a place in this row — `fixed` is what
+            gives it the window's full height, its slide from the rail's edge
+            and the phone's scrim — so this empty box takes it instead, at the
+            same `--sidebar-width`. When the navigator is open it is already
+            holding that width and the panel covers it exactly, so a spacer
+            *as well* would push the page twice; hence the `&&`.
+
+            The width transitions rather than switching, at the drawer's own
+            220ms, so the page travels with the panel instead of arriving before
+            it. `main` centres the paper in whatever is left (`.pageflow` is
+            `margin: 0 auto`), and nothing here remounts — the pagination
+            re-measures off its own ResizeObserver and the caret stays put. */}
+        {isLeftPanelOpen && !chapterSectionOpen && (
+          <div
+            aria-hidden="true"
+            className="oc-panel-slot hidden w-(--sidebar-width) shrink-0
+                       transition-[width] duration-[220ms]
+                       ease-[cubic-bezier(0.22,0.61,0.36,1)] md:block"
+          />
+        )}
+
+        {chapterSectionOpen && (
           <BookPanel
             book={book}
             chapterId={chapterId}
             cover={cover}
             paper={prefs.paper}
-            mode={panelMode}
-            onMode={changePanelMode}
             body={body}
             entering={entering}
             always
-            connectToPage={true}
+            /* The rules say *this card and that page are the same thing*, so
+               they stand down when the card is not on screen to say it about.
+               The navigator stays mounted behind an open tool panel — that is
+               what puts the writer back where they were when the panel
+               closes — and its rules are drawn in a body-level portal, so
+               without this they went on running out from behind the panel and
+               across the desk, pointing at a card nobody could see. */
+            connectToPage={!isLeftPanelOpen}
             onClose={() => setChapterSectionOpen(false)}
           />
         )}
 
         <div className="editor-main flex min-w-0 flex-1 flex-col bg-white dark:bg-transparent">
-                {/* Book View selects no part of the book, so there is no page to
-                    show; the overview stands in its place. The panel and the middle
-                    of the window are one statement — the book as an object, or a page
-                    of it — rather than a panel that can describe one thing while the
-                    page shows another.
-
-                    The surface is unmounted rather than hidden. Its autosave flushes
-                    on dispose, so nothing typed is lost, and a hidden manuscript is a
-                    manuscript whose pagination measures a zero-height column. */}
-                {panelMode === "book" ? (
-                  <BookGuide title={book.title} book={book} entering={entering} />
-                ) : (
-                  /* Keyed on the id and a cross-tab reload counter — not the stored
-                     text — so a save from another tab reloads the surface, while this
-                     tab's own autosaves never remount it mid-keystroke. */
-                  <EditorSurface
-                    key={`${chapterId}:${reload}`}
-                    bookId={bookId}
-                    chapterId={chapterId}
-                    chapterTitle={chapter.title}
-                    chapterNumber={chapterNumberOf(book, chapterId)}
-                    // Front and back matter are designed on the page — a title page, a
-                    // dedication, an epigraph. Only they get click-and-type; a body
-                    // chapter flows. See handleSheetDoubleClick.
-                    placeable={chapterMatterOf(chapter) !== "body"}
-                    book={book}
-                    initialContent={initialContent}
-                    prefs={prefs}
-                    zoom={zoom}
-                    onZoom={setZoom}
-                    matter={selectedPart}
-                    entering={entering}
-                    dictation={dictation}
-                    onEditorReady={setEditor}
-                    formatOpen={formatOpen}
-                    assistantOpen={panelOpen && tab === "assistant"}
-                    moreOpen={moreOpen}
-                    onOpenChapters={openMobileBookNavigation}
-                    onFormat={() => {
-                      captureSelection();
-                      setMoreOpen(false);
-                      setFormatOpen((open) => !open);
-                    }}
-                    onAssistant={() => {
-                      captureSelection();
-                      selectPanel(
-                        "assistant",
-                        { tab, open: panelOpen },
-                        { onSelectTab: setTab, onPanel: setEditorPanel },
-                      );
-                    }}
-                    onMore={() => {
-                      captureSelection();
-                      setFormatOpen(false);
-                      setMoreOpen((open) => !open);
-                    }}
-                  />
-                )}
-              </div>
+          {/* Keyed on the id and a cross-tab reload counter — not the stored
+              text — so a save from another tab reloads the surface, while this
+              tab's own autosaves never remount it mid-keystroke. */}
+          <EditorSurface
+            key={`${chapterId}:${reload}`}
+            bookId={bookId}
+            chapterId={chapterId}
+            chapterTitle={chapter.title}
+            chapterNumber={chapterNumberOf(book, chapterId)}
+            // Front and back matter are designed on the page — a title page, a
+            // dedication, an epigraph. Only they get click-and-type; a body
+            // chapter flows. See handleSheetDoubleClick.
+            placeable={chapterMatterOf(chapter) !== "body"}
+            book={book}
+            initialContent={initialContent}
+            prefs={prefs}
+            zoom={zoom}
+            onZoom={setZoom}
+            matter={selectedPart}
+            entering={entering}
+            dictation={dictation}
+            onEditorReady={setEditor}
+            formatOpen={formatOpen}
+            assistantOpen={panelOpen && tab === "assistant"}
+            moreOpen={moreOpen}
+            onOpenChapters={openMobileBookNavigation}
+            onFormat={() => {
+              captureSelection();
+              setMoreOpen(false);
+              setFormatOpen((open) => !open);
+            }}
+            onAssistant={() => {
+              captureSelection();
+              selectPanel(
+                "assistant",
+                { tab, open: panelOpen },
+                { onSelectTab: setTab, onPanel: setEditorPanel },
+              );
+            }}
+            onMore={() => {
+              captureSelection();
+              setFormatOpen(false);
+              setMoreOpen((open) => !open);
+            }}
+          />
+        </div>
 
               {/* The right rail belongs to the manuscript, so it leaves with it.
                   When the left panel expands, the right rail smoothly slides right
                   and disappears, allowing the editor canvas to occupy the full remaining space. */}
-              {panelMode !== "book" && (
-                <Rail
-                  side="right"
-                  // Hidden on phones: the formatting tools want a pointer and room.
-                  className={`hidden lg:flex transition-all duration-300 ease-in-out ${
-                    isLeftPanelOpen
-                      ? "translate-x-full opacity-0 pointer-events-none !w-0 !border-l-0 overflow-hidden"
-                      : "translate-x-0 opacity-100 w-(--rail-width)"
-                  }`}
-                  footer={
+              <Rail
+                side="right"
+                // Hidden on phones: the formatting tools want a pointer and room.
+                className={`hidden lg:flex transition-all duration-300 ease-in-out ${
+                  isLeftPanelOpen
+                    ? "translate-x-full opacity-0 pointer-events-none !w-0 !border-l-0 overflow-hidden"
+                    : "translate-x-0 opacity-100 w-(--rail-width)"
+                }`}
+                footer={
               <>
                 <RailDivider />
                 {/* **Share, beside Export, and the group is the argument.**
@@ -806,9 +759,12 @@ export function ChapterEditor({
                     stays last — it is the end of the road, and Share is a
                     thing you do while still on it. */}
                 {canShare && (
-                  <RailButton label="Share" side="right" onClick={() => setSharing(true)}>
-                    {icons.share}
-                  </RailButton>
+                  <RailButton
+                    label="Share"
+                    side="right"
+                    mark="share"
+                    onClick={() => setSharing(true)}
+                  />
                 )}
                 {/* **Import, immediately above Export, because they are a
                     pair.** It used to be a third button in the chapter list's
@@ -823,7 +779,7 @@ export function ChapterEditor({
                   label="Export"
                   side="right"
                   href={`/book/${bookId}/export`}
-                  imgSrc="/icons/icon-export.png"
+                  mark="export"
                 />
               </>
             }
@@ -876,11 +832,10 @@ export function ChapterEditor({
               side="right"
               active={prefs.typewriter}
               onClick={() => setPref("typewriter", !prefs.typewriter)}
-              imgSrc="/icons/icon-typewriter.png"
+              mark="typewriter"
             />
             <PageColorButton paper={prefs.paper} />
-          </Rail>
-        )}
+        </Rail>
       </div>
 
       {/* Rendered on the press and never from an effect, like every other
@@ -970,7 +925,6 @@ function MobileBookNavigation({
   cover,
   paper,
   body,
-  onMode,
   onNavigate,
   onClose,
 }: {
@@ -979,7 +933,6 @@ function MobileBookNavigation({
   cover: string | null;
   paper: string;
   body: OpenPart;
-  onMode: (mode: BookPanelMode) => void;
   onNavigate: () => void;
   onClose: () => void;
 }) {
@@ -1016,8 +969,6 @@ function MobileBookNavigation({
         chapterId={chapterId}
         cover={cover}
         paper={paper}
-        mode="chapters"
-        onMode={onMode}
         body={body}
         always
         connectToPage={false}
@@ -1118,9 +1069,8 @@ function EditorSurface({
   prefs: Prefs;
   zoom: number;
   onZoom: (zoom: number) => void;
-  /** What the panel has selected — the sheet's edge takes its colour. "book" is
-   *  Book View, which selects no part of the book at all. */
-  matter: "front" | "body" | "back" | "book";
+  /** What the panel has selected — the sheet's edge takes its colour. */
+  matter: "front" | "body" | "back";
   /** Play the page's entrance. Set only when the panel's face changes, never
    *  on the remount that opening a different chapter causes. */
   entering: boolean;
@@ -1650,9 +1600,9 @@ function EditorSurface({
         // Shows the ¶ at the end of every paragraph — see the note in
         // globals.css for why it is drawn at zero width.
         data-marks={prefs.marks ? "" : undefined}
-        // page-enter: this element is mounted fresh whenever the writer comes
-        // back from Book View or opens a different chapter, so the entrance
-        // plays exactly when a new page arrives and never on a keystroke.
+        // page-enter: this element is mounted fresh whenever the writer opens
+        // a different chapter, so the entrance plays exactly when a new page
+        // arrives and never on a keystroke.
         className={`manuscript flex min-h-0 flex-1 flex-col ${
           entering ? "page-enter" : ""
         }`}

@@ -1,6 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import {
+  RailMark,
+  useMarkHandle,
+  type MarkName,
+} from "@/components/editor/rail-mark";
 
 /**
  * The narrow icon columns down each edge.
@@ -17,7 +22,7 @@ export function RailButton({
   onClick,
   href,
   glyph,
-  imgSrc,
+  mark,
   disabled,
   side = "left",
   children,
@@ -48,37 +53,42 @@ export function RailButton({
    */
   glyph?: string;
   /**
-   * A PNG/image path (relative to `/public`) instead of a drawn SVG icon.
+   * A drawn icon that moves on hover — see `RailMark`.
    *
-   * Use this for custom branded icons (e.g. Streamline Kameleon) that cannot
-   * be reproduced faithfully as paths. The image is sized to match the inline
-   * SVG icons (20×20px rendered, 48px source) and carries `aria-hidden` so
-   * the button's own `aria-label` remains the accessible name.
+   * **This replaced `imgSrc`, which took a PNG out of `public/icons/`.** A
+   * bitmap is the one thing on this rail that cannot follow the theme, cannot
+   * take a size and goes soft on a retina screen; the marks are ordinary SVG
+   * and their motion is driven from this button, since the glyph is 24px
+   * inside a 48px target and most of a hover never touches it.
    */
-  imgSrc?: string;
+  mark?: MarkName;
   side?: "left" | "right";
   children?: React.ReactNode;
 }) {
-  // A large filled tile for the active rail item, as in the reference, rather
-  // than a subtle tint — at this size the rail is the primary navigation.
+  const handle = useMarkHandle();
+
+  /* **The selected button is the dashboard's own pale blue, not a filled
+     accent tile.** It was `bg-accent text-accent-ink` — a solid slab, white at
+     night and indigo by day — which made whichever tab was open the loudest
+     thing beside the manuscript, and inverted its icon on top of that. The
+     dashboard's rail had already answered this question for the same kind of
+     control: a wash at 15% that says *you are here* without shouting it, with
+     the icon staying in the app's own ink either way. Two navigations in one
+     product should not disagree about what selected looks like, so this is
+     `SideItem`'s string in `bookshelf.tsx` — change one and change both.
+
+     The icons themselves are `fg`, near-black by day and near-white at night,
+     rather than `muted`: they are the controls, not their captions. */
   const className = `group relative flex h-12 w-12 items-center justify-center rounded-xl
                      outline-none transition-colors focus-visible:ring-2
                      focus-visible:ring-accent/60 ${
                        active
-                         ? "bg-accent text-accent-ink"
-                         : "text-muted hover:bg-raised hover:text-fg"
+                         ? "bg-blue-500/15 text-fg dark:bg-blue-500/25"
+                         : "text-fg/80 hover:bg-raised/70 hover:text-fg"
                      } ${disabled ? "opacity-50" : ""}`;
 
-  const icon = imgSrc ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={imgSrc}
-      alt=""
-      aria-hidden="true"
-      width={36}
-      height={36}
-      className="h-9 w-9 object-contain"
-    />
+  const icon = mark ? (
+    <RailMark mark={mark} markRef={handle.ref} />
   ) : glyph ? (
     <span
       aria-hidden="true"
@@ -116,9 +126,20 @@ export function RailButton({
     </span>
   );
 
+  // The mark's motion is the button's to start: an icon left to its own
+  // `onHoverStart` sits still through most of a hover, because it is 20px in
+  // the middle of a 48px target. Focus counts too — a keyboard is a way to be
+  // on a control, and the tooltip already answers to it.
+  const moves = {
+    onMouseEnter: handle.onEnter,
+    onMouseLeave: handle.onLeave,
+    onFocus: handle.onEnter,
+    onBlur: handle.onLeave,
+  };
+
   if (href) {
     return (
-      <Link href={href} aria-label={label} className={className}>
+      <Link href={href} aria-label={label} className={className} {...moves}>
         {icon}
         {tooltip}
       </Link>
@@ -133,6 +154,7 @@ export function RailButton({
       aria-label={label}
       aria-pressed={active}
       className={className}
+      {...moves}
     >
       {icon}
       {tooltip}
@@ -219,148 +241,19 @@ export function Rail({
 }
 
 /*
- * Icon paths, kept here so the rails read as a list of actions.
+ * The one icon path this module still owns.
  *
- * Drawn to one system: a 20-unit box with the shape living between 2.5 and
- * 17.5, so every glyph carries the same optical weight and the column of them
- * lines up. Stroke width, caps and joins come from the wrapper — a path that
- * sets its own would break step with the rest.
+ * The rails' own glyphs moved to `rail-mark.tsx` when they became coloured
+ * discs over the itshover set. This is not one of them: it is the tool panel's
+ * own close control, drawn in the panel's ink at the panel's weight, and a
+ * coloured disc on the chrome *inside* a panel is exactly the second design
+ * the mark palette is scoped to avoid.
  */
 export const icons = {
-  /** A clock turned back, for chapter history. */
-  history: (
-    <>
-      <path d="M3.2 10a6.8 6.8 0 1 0 2-4.8" />
-      <path d="M2.9 3.6v3.4h3.4" />
-      <path d="M10 6.6V10l2.4 1.4" />
-    </>
-  ),
-  /** An open book with a bookmark, for the story bible. */
-  bible: (
-    <>
-      <path d="M3.2 4.6h4.4a2.4 2.4 0 0 1 2.4 2.4v9.2a1.8 1.8 0 0 0-1.8-1.8H3.2Z" />
-      <path d="M16.8 4.6h-4.4A2.4 2.4 0 0 0 10 7v9.2a1.8 1.8 0 0 1 1.8-1.8h5Z" />
-    </>
-  ),
-  /** A lamp, for the idea parking lot. One shape, one viewBox, round caps. */
-  ideas: (
-    <>
-      <path d="M10 2.9a4.7 4.7 0 0 0-2.8 8.5c.5.4.8 1 .8 1.6v.6h4v-.6c0-.6.3-1.2.8-1.6A4.7 4.7 0 0 0 10 2.9Z" />
-      <path d="M8.4 16.1h3.2M8.9 17.7h2.2" />
-    </>
-  ),
-  home: (
-    <>
-      <path d="M2.8 8.4 10 2.8l7.2 5.6v7.1a1.4 1.4 0 0 1-1.4 1.4H4.2a1.4 1.4 0 0 1-1.4-1.4z" />
-      <path d="M7.9 16.9v-4.4h4.2v4.4" />
-    </>
-  ),
-  chapters: (
-    <>
-      <path d="M10 6.4c0-1.1-1.4-1.9-3.8-1.9h-3v9.6h3c2.4 0 3.8.9 3.8 2" />
-      <path d="M10 6.4c0-1.1 1.4-1.9 3.8-1.9h3v9.6h-3c-2.4 0-3.8.9-3.8 2" />
-    </>
-  ),
-  notes: (
-    <>
-      <path d="M11.6 2.8H6.2a1.5 1.5 0 0 0-1.5 1.5v11.4a1.5 1.5 0 0 0 1.5 1.5h7.6a1.5 1.5 0 0 0 1.5-1.5V6.4z" />
-      <path d="M11.6 2.8v2.9a.9.9 0 0 0 .9.9h2.8" />
-      <path d="M7.5 10.6h5M7.5 13.4h3.2" />
-    </>
-  ),
-  bookmarks: (
-    <path d="M5.6 4.1a1.4 1.4 0 0 1 1.4-1.3h6a1.4 1.4 0 0 1 1.4 1.3v13L10 13.7 5.6 17.1z" />
-  ),
-  add: <path d="M10 4.2v11.6M4.2 10h11.6" />,
-  focus: (
-    <>
-      <circle cx="10" cy="10" r="7" />
-      <circle cx="10" cy="10" r="3.2" />
-      {/* Filled, so the centre reads as a point rather than a third ring. */}
-      <circle cx="10" cy="10" r="1.1" fill="currentColor" stroke="none" />
-    </>
-  ),
-  typewriter: (
-    <>
-      <path d="M5.6 8V4.4a1 1 0 0 1 1-1h6.8a1 1 0 0 1 1 1V8" />
-      <rect x="2.6" y="8" width="14.8" height="6.4" rx="1.6" />
-      <path d="M6.6 11.2h6.8" />
-    </>
-  ),
-  assistant: (
-    <>
-      {/* The four-pointed spark that has come to mean "a machine wrote this".
-          Concave sides rather than a straight-edged star: it reads as light
-          rather than as a rating. */}
-      <path d="M9.6 2.6c.9 3.4 1.7 4.2 5.1 5.1-3.4.9-4.2 1.7-5.1 5.1-.9-3.4-1.7-4.2-5.1-5.1 3.4-.9 4.2-1.7 5.1-5.1z" />
-      {/* A second, smaller one, so the mark reads as a sparkle and not as a
-          single lopsided shape. */}
-      <path d="M15 12.4c.45 1.7.85 2.1 2.55 2.55-1.7.45-2.1.85-2.55 2.55-.45-1.7-.85-2.1-2.55-2.55 1.7-.45 2.1-.85 2.55-2.55z" />
-    </>
-  ),
-  export: (
-    <>
-      <path d="M10 2.9v8.7" />
-      <path d="m6.4 8.2 3.6 3.6 3.6-3.6" />
-      <path d="M3.4 13.6v1.9a1.6 1.6 0 0 0 1.6 1.6h10a1.6 1.6 0 0 0 1.6-1.6v-1.9" />
-    </>
-  ),
-  /**
-   * Two people, for sharing the book with a co-writer.
-   *
-   * **Not the three-nodes-and-two-lines "share" glyph**, which every product
-   * that uses it means *send this somewhere else* by — a tweet, a link, a
-   * system share sheet. Nothing is sent here: the owner adds somebody to the
-   * book and the two of them work on it. Google Docs, Notion and Figma all put
-   * a person on this control for that reason, and the second figure is what
-   * separates "share with someone" from "my account".
-   *
-   * Drawn to the same 20-unit system as the rest — the shapes sit between 2.5
-   * and 17.5 — with the second figure behind and to the right, so it reads as
-   * two people rather than one person with a smudge.
-   */
-  share: (
-    <>
-      <path d="M8 9.4a2.9 2.9 0 1 0 0-5.8 2.9 2.9 0 0 0 0 5.8Z" />
-      <path d="M2.9 16.4a5.1 5.1 0 0 1 10.2 0" />
-      <path d="M13.4 4.1a2.7 2.7 0 0 1 0 5.2" />
-      <path d="M15.2 11.4a4.6 4.6 0 0 1 2 3.7" />
-    </>
-  ),
   panel: (
     <>
       <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
       <path d="M8 3.5v13" />
-    </>
-  ),
-  trash: (
-    <path d="M3.5 5.5h13M8 5.5V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M5.5 5.5l.7 10a1 1 0 0 0 1 .9h5.6a1 1 0 0 0 1-.9l.7-10M8.4 8.4v5M11.6 8.4v5" />
-  ),
-  search: (
-    <>
-      <circle cx="8.8" cy="8.8" r="5.3" />
-      <path d="m12.7 12.7 4 4" />
-    </>
-  ),
-  // Lines of prose with a tick through them: a pass over what is written,
-  // rather than a lookup in it. Deliberately unlike the magnifier beside it,
-  // because "search this book" and "check this book" are not the same errand.
-  consistency: (
-    <>
-      <path d="M3.4 5.4h13.2" />
-      <path d="M3.4 9.4h7.2" />
-      <path d="M3.4 13.4h4.4" />
-      <path d="m10.6 14 2.4 2.4 4-5" />
-    </>
-  ),
-  // A stack of pages, with a down-arrow through it: the whole book on one
-  // scrolling page. Deliberately unlike the open-book "chapters" glyph, so the
-  // two rail buttons don't read as the same thing.
-  read: (
-    <>
-      <rect x="4.6" y="2.8" width="10.8" height="14.4" rx="1.6" />
-      <path d="M10 6.2v7.6" />
-      <path d="M7.4 11.2 10 13.8l2.6-2.6" />
     </>
   ),
 };

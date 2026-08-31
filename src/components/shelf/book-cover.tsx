@@ -44,10 +44,9 @@ function coverPalette(seed: string) {
  * What makes a cover sit on a surface rather than float above it: a tight
  * contact shadow at its foot, and a soft cast falling well below.
  *
- * Exported because the editor's Book View frames a book's artwork itself, at
- * the page's real trim rather than through this component, and has to wear the
- * same treatment. Its comment already claimed the two matched while they had
- * quietly drifted a long way apart — so now they are literally the same string.
+ * Exported so anything that frames a book's artwork itself — at the page's
+ * real trim rather than through this component — wears the same treatment
+ * rather than a copy of it that quietly drifts.
  */
 export const BOOK_SHADOW =
   "shadow-[0_2px_6px_-2px_rgba(0,0,0,0.35),0_20px_42px_-12px_rgba(0,0,0,0.9)]";
@@ -56,7 +55,7 @@ export const BOOK_SHADOW =
  * A book as an object rather than a row.
  *
  * Two parts of three, which is a 6×9 novel — the trim the app is built around
- * and the shape the Book View draws a real page at. It was three parts of four,
+ * and the shape a real page is drawn at. It was three parts of four,
  * a squarer card that reads as a thumbnail rather than as a book, and made a
  * shelf disagree with the page the same book was written on.
  *

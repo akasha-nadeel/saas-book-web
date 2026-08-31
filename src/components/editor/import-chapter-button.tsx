@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RailButton } from "@/components/editor/icon-rail";
+import { RailMark } from "@/components/editor/rail-mark";
 import { ImportFailedDialog } from "@/components/editor/import-failed-dialog";
 import { ImportModeDialog } from "@/components/editor/import-mode-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
@@ -107,7 +108,7 @@ export function ImportChapterButton({
           side="right"
           onClick={() => fileRef.current?.click()}
           disabled={importing}
-          imgSrc="/icons/icon-import.png"
+          mark="import"
         />
       ) : (
         <button
@@ -117,15 +118,7 @@ export function ImportChapterButton({
           className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-left text-sm font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-45"
         >
           <span className="flex min-w-0 items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/icons/icon-import.png"
-              alt=""
-              aria-hidden="true"
-              width={32}
-              height={32}
-              className="h-8 w-8 shrink-0 object-contain"
-            />
+            <RailMark mark="import" size={26} />
             <span className="truncate font-semibold">
               {importing ? "Reading file…" : "Import a file"}
             </span>

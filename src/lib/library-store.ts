@@ -3248,8 +3248,8 @@ export interface Prefs {
   /**
    * Which of the rail's panels is showing.
    *
-   * Stored, with `leftPanel`, for the same reason `bookPanel` is: **a
-   * navigation is not a decision.** Opening a chapter is a route change, which
+   * Stored, with `leftPanel`, because **a navigation is not a decision.**
+   * Opening a chapter is a route change, which
    * replaces the editor's subtree and takes its `useState` with it — so a
    * writer who opened the consistency check and then followed one of its own
    * chapter links arrived with the panel shut, having asked for nothing of the
@@ -3257,14 +3257,6 @@ export interface Prefs {
    * lists is a `router.push`.
    */
   panelTab: PanelTab;
-  /**
-   * Which face the editor's book panel shows — the cover, or the three parts.
-   *
-   * Stored rather than held in memory because a reload is not a decision. A
-   * writer who moved the panel to the parts and then refreshed was put back on
-   * the cover, having asked for nothing of the sort.
-   */
-  bookPanel: "book" | "chapters";
   /**
    * How the shelf draws its books — see `shelf-layout.ts`.
    *
@@ -3374,9 +3366,6 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   chapterSectionOpen: false,
   searchTab: "find",
   panelTab: "search",
-  // The cover: the panel opens on the book as an object, and the writer
-  // steps into its parts from there.
-  bookPanel: "book",
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
   // Black by default, because the chrome around it is. A white sheet on a black
@@ -3449,7 +3438,6 @@ function parsePrefs(raw: string | null): Prefs {
       panelTab: isPanelTab(parsed.panelTab)
         ? parsed.panelTab
         : DEFAULT_PREFS.panelTab,
-      bookPanel: parsed.bookPanel === "chapters" ? "chapters" : "book",
       // Narrowed like `panelTab`: a mode written by an older version would
       // fall out of `gridClassFor`'s switch and draw an unstyled column.
       shelfLayout: isShelfLayout(parsed.shelfLayout)

@@ -192,13 +192,39 @@ where both defaulted to the literal string.
 chapters, search, notes, ideas, bible, bookmarks, assistant, history, trash) is
 open, and clicking the active tab closes it — one control, never two.
 
-**The tool panel floats over the manuscript; it does not push it.** It was a
-static column at `md` and up, so opening Search slid the panel, the sheet and
-the right rail 15rem across and closing it slid them back — the sentence being
-read moved under the eye and the paragraph re-wrapped at a new measure. These
-panels are *consulted* and dismissed, and a surface you glance at may not reflow
-the one you are working in. It is `fixed` at every width now, with a shadow,
-because a layer over another layer has to say so.
+**The left chrome is one slot, `--sidebar-width` wide, and the page stands
+beside it.** At most one thing in the slot is visible at a time: the book
+navigator, a tool panel, or a tool panel over the navigator. `BookPanel` takes
+that width outright. `LeftPanel` stays `fixed` — it wants the window's full
+height, its slide from the rail's own edge, and the phone's scrim, none of
+which survive being a flex item — so `.oc-panel-slot` in `chapter-editor.tsx`
+stands in for it in the row, and **only when the navigator is not already
+holding that width**, or the page would be pushed twice. The slot stands down
+below `md` and in continuous layout, where the panel is a modal over the page
+rather than a neighbour, and a 25rem gap would push the writing off a phone.
+
+**This reverses the rule that stood here before**, which was worth its keep for
+a while and then stopped being: *the tool panel floats over the manuscript; it
+does not push it.* The panel had been a static column at `md` and up, so
+opening Search slid the panel, the sheet and the right rail 15rem across and
+back — the sentence being read moved under the eye and the paragraph re-wrapped
+at a new measure. Going `fixed` fixed that and bought a worse problem as the
+panel grew: at 25rem a floating panel does not sit *beside* a 6×9 page, it lies
+across it, covering the left margin and the first character of every line. A
+writer searching their book could not see the book. The slot is the third
+answer and keeps both halves — the page moves once, by exactly the panel's own
+width, and the measure is whatever is left rather than whatever is not covered.
+
+**The navigator stays open behind an open tool panel**, so dismissing the panel
+puts the writer back where they were rather than on a bare page. Two things
+follow from its being open but not visible. The rail lights whichever is on
+screen (`toolPanelOpen` in `workspace-rail.tsx`) — a rail lighting Manuscript
+*and* Find & replace is a rail claiming the writer is in two places — and
+pressing Manuscript while something covers it closes the cover rather than the
+navigator, because a plain toggle on a flag that is already true shuts the one
+thing the press was asking to see. The connector rules go the same way:
+`connectToPage` is false while a panel is over the navigator, or they carry on
+running out from behind it, across the desk, pointing at a card nobody can see.
 
 Four things follow. **One header for all nine tabs**, written by `LeftPanel`:
 four of them drew their own and five drew none, so the panel's top edge moved
@@ -214,8 +240,8 @@ own casing, not uppercased with the heading beside it.
 **Four ways out and they are one toggle** — the rail's tab, the header's control
 at the top right, Escape from inside the panel only (it is a layer, not a modal,
 so Escape in the manuscript must not close it), and **a press anywhere else**.
-That last one is what a floating panel owes the page under it: it is consulted
-and dismissed, and the dismissal should be the gesture you were making anyway.
+That last one is what a panel owes the page beside it: it is consulted and
+dismissed, and the dismissal should be the gesture you were making anyway.
 Both rails are excluded from "anywhere else" (`data-rail`) and that is not a
 nicety — they hold the controls that open and close it, so pressing the tab you
 are on would close the panel on `pointerdown` and have it opened straight back

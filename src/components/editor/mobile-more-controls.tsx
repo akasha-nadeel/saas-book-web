@@ -4,6 +4,11 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import type { Editor } from "@tiptap/react";
 import { ImportChapterButton } from "@/components/editor/import-chapter-button";
+import {
+  RailMark,
+  useMarkHandle,
+  type MarkName,
+} from "@/components/editor/rail-mark";
 import { ACCEPTED, importImage } from "@/lib/image-import";
 import { insertWidthPercent } from "@/lib/editor/image-resize";
 import type { Dictation } from "@/lib/editor/use-dictation";
@@ -14,7 +19,7 @@ function Action({
   detail,
   onClick,
   active,
-  imgSrc,
+  mark,
   glyph,
   icon,
 }: {
@@ -22,32 +27,28 @@ function Action({
   detail?: string;
   onClick: () => void;
   active?: boolean;
-  imgSrc?: string;
+  mark?: MarkName;
   glyph?: string;
   icon?: React.ReactNode;
 }) {
+  const handle = useMarkHandle();
+
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      onMouseEnter={handle.onEnter}
+      onMouseLeave={handle.onLeave}
+      className={`group flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 ${
         active
           ? "border-accent bg-raised text-fg shadow-xs"
           : "border-line bg-surface/50 text-fg hover:bg-raised"
       }`}
     >
       <span className="flex min-w-0 items-center gap-3">
-        {imgSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imgSrc}
-            alt=""
-            aria-hidden="true"
-            width={32}
-            height={32}
-            className="h-8 w-8 shrink-0 object-contain"
-          />
+        {mark ? (
+          <RailMark mark={mark} markRef={handle.ref} size={26} />
         ) : glyph ? (
           <span
             aria-hidden="true"
@@ -131,7 +132,7 @@ export function MobileMoreControls({
         <Action
           label={imageBusy ? "Preparing image…" : "Insert image"}
           detail="JPG, PNG, WebP"
-          imgSrc="/icons/icon-image.png"
+          mark="image"
           onClick={() => imageRef.current?.click()}
         />
         <input
@@ -156,7 +157,7 @@ export function MobileMoreControls({
             label={dictation.listening ? "Stop dictating" : "Start dictation"}
             detail={dictation.listening ? "Listening" : "Speech to text"}
             active={dictation.listening}
-            imgSrc="/icons/icon-mic.png"
+            mark="mic"
             onClick={() =>
               dictation.listening ? dictation.stop() : dictation.start()
             }
@@ -172,7 +173,7 @@ export function MobileMoreControls({
           label="Typewriter scrolling"
           detail={prefs.typewriter ? "On" : "Off"}
           active={prefs.typewriter}
-          imgSrc="/icons/icon-typewriter.png"
+          mark="typewriter"
           onClick={() => setPref("typewriter", !prefs.typewriter)}
         />
         <Action
@@ -191,7 +192,7 @@ export function MobileMoreControls({
         {canShare && (
           <Action
             label="Share"
-            imgSrc="/icons/icon-home.png"
+            mark="home"
             onClick={onShare}
           />
         )}
@@ -201,15 +202,7 @@ export function MobileMoreControls({
           className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-sm font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           <span className="flex min-w-0 items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/icons/icon-export.png"
-              alt=""
-              aria-hidden="true"
-              width={32}
-              height={32}
-              className="h-8 w-8 shrink-0 object-contain"
-            />
+            <RailMark mark="export" size={26} />
             <span className="truncate font-semibold">Export</span>
           </span>
           <span aria-hidden="true" className="text-xs text-muted">
@@ -218,7 +211,7 @@ export function MobileMoreControls({
         </Link>
         <Action
           label="Book details"
-          imgSrc="/icons/icon-chapters.png"
+          mark="chapters"
           onClick={onDetails}
         />
       </section>

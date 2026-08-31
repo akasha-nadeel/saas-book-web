@@ -45,12 +45,12 @@ const atomic = () => null;
 
 describe("pageBreaks", () => {
   it("leaves a document that fits on one page alone", () => {
-    expect(pageBreaks([block(0, LINES_PER_PAGE, 0)], G, linesIn)).toEqual([]);
+    expect(pageBreaks([block(0, LINES_PER_PAGE, 0)], G, linesIn).spacers).toEqual([]);
   });
 
   it("splits a paragraph across the seam instead of pushing it down whole", () => {
     const b = block(0, 30, 0);
-    const breaks = pageBreaks([b], G, linesIn);
+    const breaks = pageBreaks([b], G, linesIn).spacers;
 
     expect(breaks).toHaveLength(1);
     // The break falls before line 21 — the first that would overhang — and that
@@ -65,7 +65,7 @@ describe("pageBreaks", () => {
     // A five-line paragraph, then a long one. The long one must not be pushed
     // down whole: 16 of its lines belong on the rest of this page.
     const long = block(5 * LINE, 40, 100);
-    const breaks = pageBreaks([block(0, 5, 0), long], G, linesIn);
+    const breaks = pageBreaks([block(0, 5, 0), long], G, linesIn).spacers;
 
     expect(breaks[0].inline).toBe(true);
     expect(breaks[0].pos).toBe(linesIn(long)[16].pos);
@@ -78,7 +78,7 @@ describe("pageBreaks", () => {
       [block(0, LINES_PER_PAGE, 0), next],
       G,
       linesIn,
-    );
+    ).spacers;
 
     expect(breaks).toHaveLength(1);
     expect(breaks[0].inline).toBe(false);
@@ -123,7 +123,7 @@ describe("pageBreaks", () => {
       inline: i > 0,
     }));
 
-    const breaks = pageBreaks([long], G, () => lines);
+    const breaks = pageBreaks([long], G, () => lines).spacers;
 
     // 100 lines over 21-line pages is four seams, and four lookups — not 99.
     expect(breaks).toHaveLength(4);
@@ -144,7 +144,7 @@ describe("pageBreaks", () => {
       inline: i > 0,
     }));
 
-    const breaks = pageBreaks([long], G, () => lines);
+    const breaks = pageBreaks([long], G, () => lines).spacers;
 
     // The seam at line 21 is lost; the later ones still land.
     expect(breaks.length).toBeGreaterThan(0);
@@ -159,7 +159,7 @@ describe("pageBreaks", () => {
       block(0, 10, 0),
       { top: 10 * LINE, height: 400, pos: 400, splittable: false },
     ];
-    const breaks = pageBreaks(blocks, G, linesIn);
+    const breaks = pageBreaks(blocks, G, linesIn).spacers;
 
     expect(breaks).toHaveLength(1);
     expect(breaks[0].pos).toBe(400);
@@ -184,7 +184,7 @@ describe("pageBreaks", () => {
       // Twenty lines tall, but only two of them measurable.
       { top: 5 * LINE, height: 20 * LINE, pos: 100, splittable: true },
     ];
-    const breaks = pageBreaks(blocks, G, () => short);
+    const breaks = pageBreaks(blocks, G, () => short).spacers;
 
     expect(breaks).toHaveLength(1);
     expect(breaks[0].pos).toBe(100);
@@ -195,7 +195,7 @@ describe("pageBreaks", () => {
     // The guard above must not fire when the lines did their job, or every
     // split paragraph would be moved whole straight after being split.
     const b = block(0, 30, 0);
-    const breaks = pageBreaks([b], G, linesIn);
+    const breaks = pageBreaks([b], G, linesIn).spacers;
 
     expect(breaks).toHaveLength(1);
     expect(breaks[0].inline).toBe(true);
@@ -204,7 +204,7 @@ describe("pageBreaks", () => {
   it("falls back to moving a paragraph whole when its lines cannot be read", () => {
     // linesOf returning null is the safety valve: a paragraph whose lines can
     // not be trusted behaves exactly as it did before splitting existed.
-    const breaks = pageBreaks([block(0, 5, 0), block(5 * LINE, 40, 100)], G, atomic);
+    const breaks = pageBreaks([block(0, 5, 0), block(5 * LINE, 40, 100)], G, atomic).spacers;
 
     expect(breaks[0].inline).toBe(false);
     expect(breaks[0].pos).toBe(100);
@@ -214,12 +214,12 @@ describe("pageBreaks", () => {
     const blocks: BlockBox[] = [
       { top: 0, height: 900, pos: 0, splittable: false },
     ];
-    expect(pageBreaks(blocks, G, linesIn)).toEqual([]);
+    expect(pageBreaks(blocks, G, linesIn).spacers).toEqual([]);
   });
 
   it("opens as many pages as the text needs", () => {
     // 100 lines at 21 to the page is five sheets, so four seams.
-    expect(pageBreaks([block(0, 100, 0)], G, linesIn)).toHaveLength(4);
+    expect(pageBreaks([block(0, 100, 0)], G, linesIn).spacers).toHaveLength(4);
   });
 
   it("adds a page for the line that will not fit, and gives it back when it goes", () => {
@@ -228,19 +228,19 @@ describe("pageBreaks", () => {
     // that paragraph away again, and with it the page — no sheet outlives the
     // text that called for it.
     const full = block(0, LINES_PER_PAGE, 0);
-    expect(pageBreaks([full], G, linesIn)).toEqual([]);
+    expect(pageBreaks([full], G, linesIn).spacers).toEqual([]);
 
     // ...Enter.
     const pressed: BlockBox[] = [
       full,
       { top: LINES_PER_PAGE * LINE, height: LINE, pos: 500, splittable: true },
     ];
-    const opened = pageBreaks(pressed, G, linesIn);
+    const opened = pageBreaks(pressed, G, linesIn).spacers;
     expect(opened).toHaveLength(1);
     expect(opened[0].pos).toBe(500);
 
     // ...Backspace. Exactly the state we started in, and no page left behind.
-    expect(pageBreaks([full], G, linesIn)).toEqual([]);
+    expect(pageBreaks([full], G, linesIn).spacers).toEqual([]);
   });
 
   it("keeps a page for every line that still overhangs after one is removed", () => {
@@ -255,11 +255,11 @@ describe("pageBreaks", () => {
       splittable: true,
     }));
 
-    expect(pageBreaks([full, ...overhang], G, linesIn)).toHaveLength(1);
-    expect(pageBreaks([full, ...overhang.slice(0, 2)], G, linesIn)).toHaveLength(1);
-    expect(pageBreaks([full, ...overhang.slice(0, 1)], G, linesIn)).toHaveLength(1);
+    expect(pageBreaks([full, ...overhang], G, linesIn).spacers).toHaveLength(1);
+    expect(pageBreaks([full, ...overhang.slice(0, 2)], G, linesIn).spacers).toHaveLength(1);
+    expect(pageBreaks([full, ...overhang.slice(0, 1)], G, linesIn).spacers).toHaveLength(1);
     // Only when the last of them goes does the page go.
-    expect(pageBreaks([full], G, linesIn)).toEqual([]);
+    expect(pageBreaks([full], G, linesIn).spacers).toEqual([]);
   });
 
   it("forgives a sub-pixel overshoot rather than breaking a page early", () => {
@@ -267,7 +267,7 @@ describe("pageBreaks", () => {
       { top: 0, height: 300, pos: 0, splittable: false },
       { top: 300, height: 330.6, pos: 10, splittable: false },
     ];
-    expect(pageBreaks(blocks, G, linesIn)).toEqual([]);
+    expect(pageBreaks(blocks, G, linesIn).spacers).toEqual([]);
   });
 
   it("breaks a paragraph that starts a page and is longer than one", () => {
@@ -278,7 +278,7 @@ describe("pageBreaks", () => {
     // or it simply overflows. Requiring a block to be movable before looking
     // inside it is what made a long opening paragraph do exactly that.
     const b = block(0, 50, 0);
-    const breaks = pageBreaks([b], G, linesIn);
+    const breaks = pageBreaks([b], G, linesIn).spacers;
 
     expect(breaks).toHaveLength(2);
     expect(breaks.every((s) => s.inline)).toBe(true);
@@ -293,19 +293,101 @@ describe("pageBreaks", () => {
     const blocks: BlockBox[] = [
       { top: 0, height: 700, pos: 0, splittable: false },
     ];
-    expect(pageBreaks(blocks, G, linesIn)).toEqual([]);
+    expect(pageBreaks(blocks, G, linesIn).spacers).toEqual([]);
   });
 
-  it("gives up rather than ask for a gap of negative height", () => {
-    // What follows something that has already overhung its sheet is further
-    // past the page foot than the page is tall, so the room to fill works out
-    // negative. There is no sensible gap to draw, and the content flows on
-    // instead. A long-standing limit of oversized blocks, pinned here so that
-    // changing it is a decision rather than an accident.
+  /*
+   * **What follows an oversized block is paginated like anything else.**
+   *
+   * This used to be the opposite test, and it recorded a real defect as a
+   * limit: with the page origin left behind on the sheet the oversized block
+   * began on, everything after it worked out as further past the page foot
+   * than the page is tall, so every gap came out negative and was dropped —
+   * and once one was dropped the origin never moved again, so they all were.
+   * One pasted list longer than a page and the rest of the chapter was never
+   * paginated at all: prose running over the seams of sheets drawn at fixed
+   * intervals, out through the margins and into the desk.
+   *
+   * The block still overflows — it has nowhere to go and nothing to break
+   * between — but the origin now moves on with it.
+   */
+  it("keeps paginating after a block that overhung its sheet", () => {
     const blocks: BlockBox[] = [
       { top: 0, height: 900, pos: 0, splittable: false },
       { top: 900, height: 60, pos: 50, splittable: false },
     ];
-    expect(pageBreaks(blocks, G, linesIn)).toEqual([]);
+    const flow = pageBreaks(blocks, G, linesIn);
+
+    // 900px of block covers two 630px sheets, and the 60px that follows sits
+    // on the second of them with room to spare — so still no gap to draw, but
+    // for the right reason this time.
+    expect(flow.spacers).toEqual([]);
+    expect(flow.pages).toBe(2);
+  });
+
+  it("breaks the block after an oversized one rather than letting it run on", () => {
+    // The case the old behaviour lost outright. The third block starts past
+    // the foot of the sheet the second one ends on, so it has to be moved —
+    // and under the old arithmetic its gap was negative and it was dropped.
+    const blocks: BlockBox[] = [
+      { top: 0, height: 1500, pos: 0, splittable: false },
+      { top: 1500, height: 600, pos: 50, splittable: false },
+      { top: 2100, height: 60, pos: 90, splittable: false },
+    ];
+    const flow = pageBreaks(blocks, G, linesIn);
+
+    expect(flow.spacers.map((s) => s.pos)).toEqual([50, 90]);
+    expect(flow.spacers.every((s) => s.height > 0)).toBe(true);
+  });
+
+  /*
+   * **A list breaks between its items, and that is what a pasted document is
+   * made of.** Only paragraphs used to split, so a thirty-bullet list was one
+   * atom taller than a page — it could not move and could not break, and it
+   * took the rest of the chapter's pagination down with it. `pagination.ts`
+   * hands the items in as the block's "lines"; this is the arithmetic's half.
+   */
+  it("breaks a long list between its items", () => {
+    // Thirty items, three lines each: 90 lines over 21-line pages.
+    const list: BlockBox = {
+      top: 0,
+      height: 90 * LINE,
+      pos: 0,
+      splittable: true,
+    };
+    const items: LineBox[] = Array.from({ length: 30 }, (_, i) => ({
+      top: i * 3 * LINE,
+      height: 3 * LINE,
+      // A break in front of the list itself for the first item, and the item's
+      // own position for the rest — the shape `itemsOf` returns.
+      pos: i === 0 ? 0 : 100 + i,
+      inline: false,
+    }));
+
+    const flow = pageBreaks([list], G, () => items);
+
+    expect(flow.spacers.length).toBeGreaterThan(0);
+    // Never in front of the whole list, and never inside an item.
+    expect(flow.spacers.every((s) => !s.inline)).toBe(true);
+    expect(flow.spacers.every((s) => s.pos !== 0)).toBe(true);
+    // Each break lands on an item boundary rather than anywhere in between.
+    const boundaries = new Set(items.map((i) => i.pos));
+    expect(flow.spacers.every((s) => boundaries.has(s.pos))).toBe(true);
+  });
+
+  it("counts the sheets an oversized block covers", () => {
+    // 2000px of unbreakable block over a 630px text area is four sheets, and
+    // the sheet layer is drawn from this number — one short and the tail of
+    // the block hangs off the last page with nothing under it.
+    const blocks: BlockBox[] = [
+      { top: 0, height: 2000, pos: 0, splittable: false },
+    ];
+    expect(pageBreaks(blocks, G, linesIn).pages).toBe(4);
+  });
+
+  it("counts one page per seam when nothing overflows", () => {
+    // The ordinary case, so the new number cannot drift from the old one.
+    const flow = pageBreaks([block(0, 100, 0)], G, linesIn);
+    expect(flow.pages).toBe(flow.spacers.length + 1);
   });
 });

@@ -2,22 +2,29 @@
 
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "./editor-toolbar";
+import {
+  RailMark,
+  useMarkHandle,
+  type MarkName,
+} from "@/components/editor/rail-mark";
 
 function DockButton({
   label,
   onClick,
   disabled,
   active,
-  imgSrc,
+  mark,
   children,
 }: {
   label: string;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
-  imgSrc?: string;
+  mark?: MarkName;
   children?: React.ReactNode;
 }) {
+  const handle = useMarkHandle();
+
   return (
     <button
       type="button"
@@ -25,20 +32,16 @@ function DockButton({
       disabled={disabled}
       aria-label={label}
       aria-pressed={active}
-      className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[10px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-35 ${
+      onMouseEnter={handle.onEnter}
+      onMouseLeave={handle.onLeave}
+      className={`group flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[10px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-35 ${
         active ? "bg-raised text-fg" : "text-muted hover:bg-raised hover:text-fg"
       }`}
     >
-      {imgSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imgSrc}
-          alt=""
-          aria-hidden="true"
-          width={24}
-          height={24}
-          className="h-5 w-5 object-contain"
-        />
+      {mark ? (
+        // Smaller here than on the rails: the dock gives each control a label
+        // under its icon and five of them a phone's width.
+        <RailMark mark={mark} markRef={handle.ref} size={22} />
       ) : (
         <span aria-hidden="true" className="text-base leading-none">
           {children}
@@ -95,7 +98,7 @@ export function MobileWritingDock({
         label="AI"
         active={assistantOpen}
         onClick={onAssistant}
-        imgSrc="/icons/icon-assistant.png"
+        mark="assistant"
       />
       <DockButton label="More" active={moreOpen} onClick={onMore}>
         •••

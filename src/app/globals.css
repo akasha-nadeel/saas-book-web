@@ -421,6 +421,7 @@
   --color-step-line: #2c2764;
   --color-step-fg: #a9a4ee;
 
+
   /* ------------------------------------------------------------------------
      The landing page.
 
@@ -998,6 +999,7 @@
      under 4.5, where the deeper shade holds 5.9:1. */
   --color-step-fg: #0b57d0;
 
+
   /* The landing page in daylight — see the long note in the dark block.
 
      **This is the landing page, full stop**: it pins itself here with
@@ -1249,6 +1251,7 @@
   --color-step-bg: #15132e;
   --color-step-line: #2c2764;
   --color-step-fg: #a9a4ee;
+
   --color-lp-ground: #0b0b0e;
   --color-lp-tint: #14141b;
   --color-lp-tint-soft: #101015;
@@ -2270,7 +2273,6 @@ body {
   background: #ffffff;
 }
 
-
 /* --------------------------------------------------------------------------
    Display type on the landing page.
 
@@ -2853,9 +2855,9 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   Book View page turn.
+   The flip-book's page turn.
 
-   Flipping the preview turns the leaf like a real book: the incoming page is
+   Flipping the reading view's book turns the leaf like a real book: the incoming page is
    hinged at the spine (its left edge for a left-bound book) and swings down flat
    from edge-on. Going back turns the other way, hinged at the fore-edge. A
    perspective on the wrapper gives the rotation its depth; a shadow sweeps
@@ -2941,7 +2943,7 @@ body {
 }
 
 /* --------------------------------------------------------------------------
-   The open book — a two-page spread in Book View.
+   The open book — the reading view's two-page spread.
 
    Two facing sheets side by side, bound at a centre spine, with a page block of
    stacked leaves down each fore-edge and a grounded shadow, so the preview reads
@@ -3083,12 +3085,12 @@ body {
    editable is transparent on top, and the desk shows through the gaps between.
    -------------------------------------------------------------------------- */
 /* --------------------------------------------------------------------------
-   Coming into the Chapters view.
+   Coming into the book's parts.
 
-   Leaving Book View swaps two things at once: the panel becomes the book's
-   three parts, and the middle of the window becomes the manuscript. Both are
-   mounting fresh, so a plain appearance is a jump-cut — the eye has nothing
-   telling it these are the same two regions it was already looking at.
+   Opening the chapter section mounts the panel's cards and slides the page
+   over to make room for them. Both are mounting fresh, so a plain appearance
+   is a jump-cut — the eye has nothing telling it these are the same two
+   regions it was already looking at.
 
    So each enters from its own side, the panel's cards from the left in the
    order they are bound and the page from the right, which says in movement what
@@ -3154,11 +3156,6 @@ body {
   animation-delay: 260ms;
 }
 
-/* Book View's two bands, and the same reasoning as the cards above: the face is
-   mounting fresh, so it arrives rather than appearing. They come from opposite
-   ends because that is where they sit — the book down onto the panel, the card
-   up from under it — and meet in the middle, which is the shape of the panel
-   they are making. */
 /* --------------------------------------------------------------------------
    The "Available soon" headline.
 
@@ -3222,37 +3219,6 @@ body {
   }
 }
 
-@keyframes book-cover-in {
-  from {
-    opacity: 0;
-    transform: translateY(-2rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes book-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(2rem);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.book-cover-enter {
-  animation: book-cover-in 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
-
-/* Behind the cover, so the book lands first and the card follows it up. */
-.book-card-enter {
-  animation: book-card-in 620ms cubic-bezier(0.22, 0.61, 0.36, 1) 130ms both;
-}
-
 @keyframes page-in {
   from {
     opacity: 0;
@@ -3274,8 +3240,6 @@ body {
    regions, in place. */
 @media (prefers-reduced-motion: reduce) {
   .matter-stack > *,
-  .book-cover-enter,
-  .book-card-enter,
   .page-enter {
     animation: none;
   }
@@ -3308,13 +3272,9 @@ body {
 /* Set on the manuscript container by the editor, so every sheet in the chapter
    picks it up. Two pixels, matching the border on the panel's cards: the point
    is that the page and the card it came from are plainly the same colour. */
-/* Book View is not a part of the book but a state of the panel — it shows the
-   book whole and selects nothing — and it is in the list for the same reason
-   the other three are: the panel has something open, and the sheet says so. */
 [data-matter="front"],
 [data-matter="body"],
-[data-matter="back"],
-[data-matter="book"] {
+[data-matter="back"] {
   --paper-edge: var(--paper-edge-on);
   --paper-edge-w: 2px;
 }
@@ -3812,43 +3772,19 @@ body {
   display: none !important;
 }
 
-:root[data-editor-layout="continuous"]
-  :is(.editor-shell[data-panel-mode="book"], .book-overview-shell) {
-  flex-direction: column;
-}
-
-:root[data-editor-layout="continuous"]
-  :is(.editor-shell[data-panel-mode="book"], .book-overview-shell)
-  .book-overview-back {
-  width: 100%;
-  min-height: calc(var(--oc-mobile-header-height) + var(--oc-safe-top));
-  justify-content: flex-start;
-  padding-top: var(--oc-safe-top);
-  padding-right: max(0.5rem, var(--oc-safe-right));
-  padding-left: max(0.5rem, var(--oc-safe-left));
-  border-bottom: 1px solid var(--color-line);
-  background: color-mix(in srgb, var(--color-panel) 95%, transparent);
-}
-
-:root[data-editor-layout="continuous"]
-  :is(.editor-shell[data-panel-mode="book"], .book-overview-shell)
-  .book-panel {
-  display: flex !important;
-  width: 100% !important;
-  min-width: 0;
-  min-height: 0;
-  flex: 1 1 auto;
-}
-
-:root[data-editor-layout="continuous"]
-  .editor-shell[data-panel-mode="book"]
-  .editor-main,
-:root[data-editor-layout="continuous"] .book-overview-shell .book-guide-shell {
-  display: none;
-}
-
 :root[data-editor-layout="continuous"] .oc-editor-panel-scrim {
   display: none;
+}
+
+/* The slot that holds the page's place beside an open tool panel — see the
+   long note beside it in `chapter-editor.tsx`. It stands down wherever the
+   panel is a *modal* rather than a neighbour: below `md` it is an overlay with
+   a scrim over the page (that half is `hidden md:block` on the element), and
+   in continuous layout it fills the window. There is nothing beside a
+   full-width panel for the slot to make room for, and a 25rem gap on a phone
+   would push the writing off the screen. */
+:root[data-editor-layout="continuous"] .oc-panel-slot {
+  display: none !important;
 }
 
 :root[data-editor-layout="continuous"] .oc-editor-panel {

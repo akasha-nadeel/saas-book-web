@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PromptDialog } from "@/components/ui/dialog";
+import { RailMark } from "@/components/editor/rail-mark";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 
@@ -389,20 +390,7 @@ export function ToolRail({
       // closer together than its neighbours reads as a sub-list of one of them.
       className="flex flex-col items-center gap-2"
     >
-      <Flyout
-        label="Text & type"
-        trigger={
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src="/icons/icon-text.png"
-            alt=""
-            aria-hidden="true"
-            width={36}
-            height={36}
-            className="h-9 w-9 object-contain"
-          />
-        }
-      >
+      <Flyout label="Text & type" trigger={<RailMark mark="type" />}>
         <div className="flex max-h-[78vh] w-64 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-0.5">
           <div className="flex gap-1">
             {/* Normal text — turns a heading back into body prose. Its own
@@ -689,15 +677,7 @@ export function ToolRail({
         disabled={busy}
         onClick={() => fileRef.current?.click()}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/icons/icon-image.png"
-          alt=""
-          aria-hidden="true"
-          width={36}
-          height={36}
-          className="h-9 w-9 object-contain"
-        />
+        <RailMark mark="image" />
       </ToolButton>
       <input
         ref={fileRef}
@@ -803,15 +783,7 @@ export function ToolRail({
                 className="absolute -inset-1.5 animate-ping rounded-full bg-danger/40"
               />
             )}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/icons/icon-mic.png"
-              alt=""
-              aria-hidden="true"
-              width={36}
-              height={36}
-              className="h-9 w-9 object-contain"
-            />
+            <RailMark mark="mic" />
           </span>
         </ToolButton>
       )}

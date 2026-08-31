@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { PagePreview } from "@/components/editor/page-preview";
 import { SharedBadge } from "@/components/collab/shared-badge";
 import { relativeTime } from "@/lib/relative-time";
-import { resumeChapter } from "@/lib/resume";
 import {
   bookWordCount,
   chapterMatterOf,
@@ -79,25 +78,19 @@ function destinationsFrom(
     }));
 }
 
-export type BookPanelMode = "book" | "chapters";
-
 /**
- * The book navigator, between the workspace rail and the manuscript. Two faces
- * of the same thing:
+ * The book navigator, between the workspace rail and the manuscript: the
+ * book's three parts as boxes that open and shut — a table of contents you
+ * scroll and click.
  *
- * - **Book View** — the cover, large, with the two page steppers and the way in
- *   to the chapter list. The book as an object.
- * - **Chapters** — the cover small beside its figures, the make-and-import
- *   controls, then the book's three parts as boxes that open and shut — a
- *   table of contents you scroll and click. The book as its parts.
+ * **It has one face, and used to have two.** The other was Book View: the
+ * cover large, two page steppers, and a guide standing where the manuscript
+ * had been. It is gone, because a panel describing the book as an object while
+ * the middle of the window showed a page of it was two screens pretending to
+ * be one, and the way in was a chevron nobody was looking for.
  *
- * The mode changes only this panel; the manuscript in the centre is untouched.
- * Previous / Next Page step to the page either side of the open one — front
- * matter, body, back matter, in the book's own order — so the centre and the
- * cover thumbnail on the tool rail both move with it.
- *
- * (The module-scope pieces below belong to the Chapters face; the component
- * itself follows them.)
+ * (The module-scope pieces below belong to it; the component itself follows
+ * them.)
  */
 
 /**
@@ -338,8 +331,6 @@ export function BookPanel({
   chapterId,
   cover,
   paper,
-  mode,
-  onMode,
   body,
   entering = false,
   always = false,
@@ -353,8 +344,6 @@ export function BookPanel({
   cover: string | null;
   /** The page-colour preference, handed to the print preview. */
   paper: string;
-  mode: BookPanelMode;
-  onMode: (mode: BookPanelMode) => void;
   /* No `dictation`. This panel used to carry a second microphone beside the
      manuscript rail's, on the reasoning that a writer reading the chapter list
      might want to start speaking without going back to the page. One engine
@@ -393,73 +382,6 @@ export function BookPanel({
    */
   const canWrite = canWriteBook(book);
 
-  /**
-   * How far it is from the edge of these cards to the edge of the paper.
-   *
-   * The two rules that run out of the selected card have to *land* on the page,
-   * and that distance is not a number anyone can write down: the page is
-   * centred in whatever the window leaves and drawn at the writer's zoom, so it
-   * moves with the window, with the zoom, and with the panel's own breakpoints.
-   * Measured, then, and re-measured whenever either end moves.
-   *
-   * Zero where there is no page — the book overview shows these same cards with
-   * a guide beside them rather than a manuscript, and a rule reaching for
-   * nothing is worse than no rule.
-   */
-  const stackRef = useRef<HTMLDivElement>(null);
-  const [gapToPage, setGapToPage] = useState(0);
-
-  useEffect(() => {
-    if (mode !== "chapters" || !connectToPage) return;
-
-    let frame = 0;
-    let last = -1;
-
-    const measure = () => {
-      // The card's own right edge, not the column's: the stack carries a
-      // right padding, and measuring from outside it left every rule short by
-      // exactly that much.
-      const card = stackRef.current?.firstElementChild;
-      const page = document.querySelector<HTMLElement>(".pageflow");
-
-      // Three pixels past the paper's left edge, so the rule finishes *under*
-      // the page's border instead of against it. Butted up, a hairline of
-      // background shows between the two and the join looks like a near miss.
-      const next =
-        card && page
-          ? Math.max(
-              0,
-              Math.round(
-                page.getBoundingClientRect().left -
-                  card.getBoundingClientRect().right +
-                  3,
-              ),
-            )
-          : 0;
-
-      if (next !== last) {
-        last = next;
-        setGapToPage(next);
-      }
-      frame = requestAnimationFrame(measure);
-    };
-
-    // Measured every frame rather than watched.
-    //
-    // A ResizeObserver was the obvious answer and it is the wrong one: it
-    // reports a box changing *size*, and most of what moves this page changes
-    // only its *position*. The zoom control scales the page with CSS `zoom`,
-    // which leaves its CSS box exactly as it was; opening the tool panel slides
-    // the page sideways without resizing it at all. Both left the rules pointing
-    // at where the paper used to be.
-    //
-    // Two getBoundingClientRect calls a frame is nothing, state is set only when
-    // the number actually changes so React almost never re-renders, and the loop
-    // runs only on this face of the panel — Book View has no page to reach.
-    frame = requestAnimationFrame(measure);
-    return () => cancelAnimationFrame(frame);
-  }, [connectToPage, mode]);
-
   const chapters = book.chapters;
   const bodyChapters = chapters.filter((c) => chapterMatterOf(c) === "body");
   const frontPages = chapters.filter((c) => chapterMatterOf(c) === "front");
@@ -473,8 +395,6 @@ export function BookPanel({
     : null;
   const openPart = openChapter ? chapterMatterOf(openChapter) : null;
 
-  // The Book View flip-book: page 0 is the cover, 1…N the chapter's printed
-  // pages. The preview reports its page count so the pager can clamp.
   /**
    * Whether to put the front/back-matter question, asked once per book.
    *
@@ -491,39 +411,12 @@ export function BookPanel({
    */
   const [askMatter, setAskMatter] = useState(() => shouldAskMatter(book));
 
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
-  const prevPage = () => setPreviewIndex((i) => Math.max(0, i - 1));
-  const nextPage = () => setPreviewIndex((i) => Math.min(pageCount, i + 1));
-
   const open = (id: string) => {
     onNavigate?.();
     router.push(`/book/${bookId}/chapter/${id}`);
   };
 
   const handleCreate = () => open(createChapter(bookId));
-
-  /**
-   * Where this book carries on — the chapter, or null for an empty one.
-   *
-   * Asked through `resumeChapter` rather than worked out here, so this button
-   * and anything else that wants to know cannot arrive at different answers.
-   */
-  const resume = resumeChapter(book);
-
-  /**
-   * Back into the writing: the chapter list, and the chapter.
-   *
-   * The face change and the navigation both, because they are one intention.
-   * `remember` rather than a plain toggle, since opening a page remounts this
-   * panel and would cut the card's collapse off mid-move — see `arriving`.
-   */
-  const openBook = () => {
-    onMode("chapters");
-    if (!resume) return;
-    body.remember("body");
-    open(resume.id);
-  };
 
   /**
    * Reveal a part's list — and, the first time, go to a page in it.
@@ -649,14 +542,19 @@ export function BookPanel({
   return (
     <aside
       aria-label="Book"
-      data-book-panel-mode={mode}
       // Transparent, with no divider: the gradient wash and the seamless blend
       // into the paper come from the shared row in the editor layout, so the
       // book panel and the manuscript read as one surface.
-      // Widens with the window rather than taking one fixed number. 18rem was
-      // set for the cover, which is the narrower of the two things this panel
-      // shows; the chapter list wants room for a title, its number and its word
-      // count without the title truncating.
+      //
+      // **`--sidebar-width`, the tool panel's own width, and that is the point
+      // of it.** These were three hand-set steps (18/20/22rem) on breakpoints
+      // that were not the panel's either, so a tool panel opened over this
+      // column overhung it by up to 3rem and ate that much of the page behind
+      // it. The left chrome is one slot: whatever is in it — this navigator, a
+      // tool panel, or a tool panel over this navigator — is the same width, so
+      // the page moves by one number and the cover is exact. `--rail-width`
+      // is shared between the rail and the overview's back button for the same
+      // reason, and drifted the same way before it was.
       //
       // Beside a manuscript it appears only at lg and up, so the page keeps its
       // measure on a laptop and gains from a monitor. On the overview there is
@@ -666,7 +564,7 @@ export function BookPanel({
       className={`book-panel flex-col bg-white dark:bg-transparent ${
         className
           ? className
-          : `w-72 shrink-0 xl:w-80 2xl:w-[22rem] ${
+          : `w-(--sidebar-width) shrink-0 ${
               always ? "flex" : "hidden xl:flex"
             }`
       }`}
@@ -682,161 +580,27 @@ export function BookPanel({
         </div>
       )}
 
-      {mode === "book" ? (
-        /* Three bands, in the order a writer reads them: the page, what the
-           book is, and the way out of here. `gap-7` sets the rhythm once
-           instead of a different margin on each child, and the action is
-           pushed to the foot by mt-auto so it sits in the same place whether
-           the book is one chapter or forty. */
-        <div className="scroll-slim flex h-full flex-col gap-7 overflow-y-auto px-6 py-8">
-          {/* The cover on page 0; every page after it is the chapter as it will
-              print, so the writer can flip through the finished pages here. */}
-          <div
-            className={`flex flex-col items-center gap-3 ${
-              entering ? "book-cover-enter" : ""
-            }`}
-          >
-            <PagePreview
-              book={book}
-              cover={cover}
-              paper={paper}
-              index={previewIndex}
-              onPageCount={setPageCount}
-            />
+      <div className="flex h-full min-h-0 flex-col px-5 pt-4 pb-5">
+        {/* One control, and only when there is somewhere to put it.
 
-            {/* A pager, not two arrows over the page.
-                Laid on the preview they covered the prose — which is the one
-                thing the preview exists to show, so the controls were hiding
-                their own subject. Set beside the caption they cover nothing,
-                the page keeps its full width, and the three parts read as one
-                control: back, where you are, forward.
-
-                Tabular figures so the number does not jog sideways as the count
-                passes a wider digit and shifts the arrows under the cursor. */}
-            <div className="flex items-center gap-1">
-              <PageArrow
-                label="Previous page"
-                disabled={previewIndex === 0}
-                onClick={prevPage}
-                direction="left"
-              />
-              <span className="min-w-[7.5rem] text-center font-sans text-xs tabular-nums text-muted">
-                {previewIndex === 0
-                  ? "Cover"
-                  : `Page ${previewIndex} of ${pageCount}`}
-              </span>
-              <PageArrow
-                label="Next page"
-                disabled={previewIndex >= pageCount}
-                onClick={nextPage}
-                direction="right"
-              />
-            </div>
-          </div>
-
-          {/* Title, figures and the way in to the chapters, as one block on a
-              card rather than three things loose on the panel.
-
-              They were loose, with the action pinned to the foot — which left a
-              hand's width of nothing between the last line and the button. A
-              gap that size reads as something failing to load. Grouping them
-              gives the text an edge to sit against and puts the action where
-              the reader already is, and the empty space falls below the block
-              where it looks like room rather than a hole.
-
-              The figures are one quiet line, not a grid of labelled cells:
-              three numbers do not need a table, and the labels were louder than
-              the values they described. */}
-          <div
-            className={`rounded-xl border border-line bg-panel/70 p-4 ${
-              entering ? "book-card-enter" : ""
-            }`}
-          >
-            <h2 className="font-serif text-lg leading-snug font-medium text-fg">
-              {book.title}
-            </h2>
-
-            <p className="mt-1.5 font-sans text-sm text-muted">
-              <span className="font-medium text-fg">
-                {bodyChapters.length.toLocaleString()}
-              </span>{" "}
-              <span className="text-chapter-fg">
-                {bodyChapters.length === 1 ? "chapter" : "chapters"}
-              </span>
-              <span aria-hidden="true" className="px-1.5 text-line">
-                |
-              </span>
-              <span className="font-medium text-fg">
-                {bookWordCount(book).toLocaleString()}
-              </span>{" "}
-              words
-            </p>
-            <p className="mt-0.5 font-sans text-xs text-muted">
-              Opened {relativeTime(book.lastOpenedAt)}
-            </p>
-
-            {/* **The one way back into the writing, and it carries on where
-                the writer left off.**
-
-                There used to be two: this button, which opened the chapter
-                list, and a "Where you left off" card in the middle of the
-                overview with a Carry on button under it. Two controls for one
-                intention, on one screen, a hand's width apart — and the card
-                was the one with the answer while this was the one that looked
-                like the way in. So the card is gone and its job is here: press
-                it and the chapter list opens *and* the chapter you were in
-                does.
-
-                It says which of the two it is doing, because "Chapters" on a
-                button that jumps you into chapter nine is a name for the
-                lesser half of what happens. A book with nothing written in it
-                has nowhere to carry on to, and there it stays "Chapters". */}
+            This row used to hold four — a way back to Book View, a
+            microphone and an import button behind a spacer. The microphone
+            and Import were second copies of something the manuscript's own
+            rail already carried, and reaching them meant opening a list
+            first; Book View itself is gone, since a panel that could
+            describe the book while the middle of the window showed a page of
+            it was two screens pretending to be one. What is left is the way
+            to shut the panel, at the end of the row where a dismiss belongs. */}
+        <div className="flex items-center justify-end gap-2">
+          {onClose && (
             <button
               type="button"
-              onClick={openBook}
-              className="mt-4 w-full cursor-pointer rounded-lg bg-accent py-2.5
-                         font-sans text-sm font-semibold text-accent-ink outline-none
-                         transition-colors hover:bg-accent-strong
-                         focus-visible:ring-2 focus-visible:ring-accent/50"
-            >
-              {resume ? "Carry on" : "Chapters"}
-            </button>
-
-            {/* Which chapter, and when — the two lines of the old card that
-                were doing real work. The rest of it (the last paragraph, the
-                note, who is in the scene) is on the page itself the moment the
-                button is pressed, which is one press away rather than one
-                screen away. */}
-            {resume && (
-              <p className="mt-2 text-center font-sans text-xs text-muted">
-                {resume.title} · {relativeTime(book.lastOpenedAt)}
-              </p>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="flex h-full min-h-0 flex-col px-5 pt-4 pb-5">
-          {/* The way back to Book View, and nothing else.
-​
-              This row used to hold four controls — back, a microphone and an
-              import button behind a spacer. Both of those were second copies
-              of something the manuscript's own rail already carried, and
-              reaching them meant opening a list first; dictation lives on that
-              rail and Import now sits beside Export there, which is the pair
-              it belongs to.
-
-              Back is an icon alone. A chevron at the left end of a bar is the
-              one icon nobody has to be taught, and its name lives in the label
-              and the tooltip for anyone who does. */}
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={() => onMode("book")}
-              aria-label="Back to Book View"
-              title="Back to Book View"
+              onClick={onClose}
+              aria-label="Hide panel"
+              title="Hide panel"
               className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center
-                         rounded-lg border border-line text-fg outline-none
-                         transition-colors hover:border-accent/60 hover:bg-raised
+                         rounded-lg border border-line text-muted outline-none
+                         transition-colors hover:border-accent/60 hover:bg-raised hover:text-fg
                          focus-visible:ring-2 focus-visible:ring-accent/50"
             >
               <svg
@@ -844,221 +608,194 @@ export function BookPanel({
                 viewBox="0 0 20 20"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.8"
+                strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="h-4 w-4"
+                className="h-5 w-5"
               >
-                <path d="M12 5l-5 5 5 5" />
+                <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
+                <path d="M8 3.5v13" />
               </svg>
             </button>
-
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Hide panel"
-                title="Hide panel"
-                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center
-                           rounded-lg border border-line text-muted outline-none
-                           transition-colors hover:border-accent/60 hover:bg-raised hover:text-fg
-                           focus-visible:ring-2 focus-visible:ring-accent/50"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 20 20"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-5 w-5"
-                >
-                  <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
-                  <path d="M8 3.5v13" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* The book's three parts, one card each. Front matter opens the
-              book, the body is the story, back matter closes it — the order
-              they are bound in.
-
-              Cards rather than a flat list because the list had no shape: nine
-              chapters ran between two markers with nothing saying where the
-              story started and stopped, and nothing at all saying what "front
-              matter" means to someone who has not published before.
-
-              Front and back keep their natural height and the body takes what
-              is left once its list is open, so the story fills the panel and
-              scrolls inside its own card — the two short cards cannot be pushed
-              off the bottom by a forty-chapter book, which is exactly when a
-              writer wants to reach them. */}
-          <div
-            ref={stackRef}
-            className={`mt-3 flex min-h-0 flex-1 flex-col gap-2 pr-1 ${
-              entering ? "matter-stack" : ""
-            }`}
-          >
-            <MatterPagesCard
-              gapToPage={gapToPage}
-              part="front"
-              label="Front matter"
-              description="The pages before Chapter 1 — a title page, the copyright, a dedication."
-              book={book}
-              bookId={bookId}
-              pages={frontPages}
-              chapterId={chapterId}
-              open={body.open === "front"}
-              // Yields to whichever list is open, so exactly one part is ever
-              // marked and the page's edge always has a card to match.
-              active={
-                body.open === "front" || (!body.open && openPart === "front")
-              }
-              compact={!!body.open && body.open !== "front"}
-              onToggle={() => openPartList("front")}
-              onAdd={(title) => handleAddMatterPage("front", title)}
-              onSwitchOn={(title) => handleSwitchOnMatterPage("front", title)}
-              onOpenPage={open}
-              onDelete={(id, title) => setDeleting({ id, title })}
-              onDeleteNow={handleDelete}
-              canWrite={canWrite}
-            />
-
-            <MatterCard
-              gapToPage={gapToPage}
-              label="Body matter"
-              description={
-                body.open === "body"
-                  ? undefined
-                  : "The story itself, chapter by chapter, in reading order."
-              }
-              meta={
-                <>
-                  {bodyChapters.length}{" "}
-                  <span className="text-chapter-fg">
-                    {bodyChapters.length === 1 ? "chapter" : "chapters"}
-                  </span>
-                </>
-              }
-              action={body.open === "body" ? "Hide chapters" : "Chapters"}
-              // Open counts as selected, as well as being in a chapter. The
-              // page's edge is driven from the same expression upstream, so
-              // this border and that edge cannot disagree — which is the only
-              // reason "open" is allowed to mean "selected" at all.
-              active={
-                body.open === "body" || (!body.open && openPart === "body")
-              }
-              onAction={() => openPartList("body")}
-              /* This part's own import, beside the two controls the card
-                 already had. A reader is offered none of the three. */
-              trailing={
-                canWrite ? (
-                  <SectionImportButton
-                    book={book}
-                    part="body"
-                    label="Body matter"
-                  />
-                ) : undefined
-              }
-              compact={!!body.open && body.open !== "body"}
-              // Only once the list is open. Shut, the card has one thing to
-              // offer — open me — and a second button beside it halves the
-              // width of that one thing to sit next to a list nobody is looking
-              // at. The new chapter appears in the list it was added to, so the
-              // button belongs where the list is.
-              secondary={
-                body.open === "body" && canWrite
-                  ? { label: "New chapter", onClick: handleCreate }
-                  : undefined
-              }
-              grow={body.open === "body"}
-            >
-              {bodyChapters.length > 0 ? (
-                bodyChapters.map((c) => (
-                  <ChapterPill
-                    key={c.id}
-                    number={chapterNumberOf(book, c.id)}
-                    title={c.title}
-                    active={c.id === chapterId}
-                    onClick={() => open(c.id)}
-                    // Empty for a reader: every item writes the chapter row.
-                    menu={!canWrite ? [] : [
-                      {
-                        label: c.bookmarked ? "Unstar" : "Star",
-                        icon: c.bookmarked
-                          ? menuIcons.starFilled
-                          : menuIcons.star,
-                        onSelect: () => toggleBookmark(bookId, c.id),
-                      },
-                      {
-                        label: "Rename",
-                        icon: menuIcons.rename,
-                        // A dialog rather than the sidebar's edit-in-place:
-                        // the same three actions, without a second copy of the
-                        // rename state to keep in step with it. It was
-                        // `window.prompt` until the browser's own "stop showing
-                        // these" made renaming fail silently — see `ui/dialog`.
-                        onSelect: () =>
-                          setRenaming({ id: c.id, title: c.title }),
-                      },
-                      /* **Only on the body's list, and only one item.** The
-                         three Move-to-part entries came off this menu the same
-                         day for being three destinations on every page; this is
-                         one line, on the one list where it means anything — a
-                         front-matter page is named rather than numbered and has
-                         nothing to take out. See `ChapterMeta.unnumbered`. */
-                      {
-                        label: c.unnumbered
-                          ? "Number this one"
-                          : "Don’t number this one",
-                        icon: menuIcons.numbering,
-                        onSelect: () =>
-                          setChapterUnnumbered(bookId, c.id, !c.unnumbered),
-                      },
-                      ...destinationsFrom(bookId, c.id, "body"),
-                      {
-                        label: "Delete",
-                        icon: menuIcons.trash,
-                        danger: true,
-                        onSelect: () => setDeleting({ id: c.id, title: c.title }),
-                      },
-                    ]}
-                  />
-                ))
-              ) : (
-                <li className="px-1 py-2 font-sans text-xs text-muted italic">
-                  No chapters yet.
-                </li>
-              )}
-            </MatterCard>
-
-            <MatterPagesCard
-              gapToPage={gapToPage}
-              part="back"
-              label="Back matter"
-              description="The pages after the story — an epilogue, acknowledgements, about the author."
-              book={book}
-              bookId={bookId}
-              pages={backPages}
-              chapterId={chapterId}
-              open={body.open === "back"}
-              active={
-                body.open === "back" || (!body.open && openPart === "back")
-              }
-              compact={!!body.open && body.open !== "back"}
-              onToggle={() => openPartList("back")}
-              onAdd={(title) => handleAddMatterPage("back", title)}
-              onSwitchOn={(title) => handleSwitchOnMatterPage("back", title)}
-              onOpenPage={open}
-              onDelete={(id, title) => setDeleting({ id, title })}
-              onDeleteNow={handleDelete}
-              canWrite={canWrite}
-            />
-          </div>
+          )}
         </div>
-      )}
+
+        {/* The book's three parts, one card each. Front matter opens the
+            book, the body is the story, back matter closes it — the order
+            they are bound in.
+
+            Cards rather than a flat list because the list had no shape: nine
+            chapters ran between two markers with nothing saying where the
+            story started and stopped, and nothing at all saying what "front
+            matter" means to someone who has not published before.
+
+            Front and back keep their natural height and the body takes what
+            is left once its list is open, so the story fills the panel and
+            scrolls inside its own card — the two short cards cannot be pushed
+            off the bottom by a forty-chapter book, which is exactly when a
+            writer wants to reach them. */}
+        <div
+          className={`mt-3 flex min-h-0 flex-1 flex-col gap-2 pr-1 ${
+            entering ? "matter-stack" : ""
+          }`}
+        >
+          <MatterPagesCard
+            connectToPage={connectToPage}
+            part="front"
+            label="Front matter"
+            description="The pages before Chapter 1 — a title page, the copyright, a dedication."
+            book={book}
+            bookId={bookId}
+            pages={frontPages}
+            chapterId={chapterId}
+            open={body.open === "front"}
+            // Yields to whichever list is open, so exactly one part is ever
+            // marked and the page's edge always has a card to match.
+            active={
+              body.open === "front" || (!body.open && openPart === "front")
+            }
+            compact={!!body.open && body.open !== "front"}
+            onToggle={() => openPartList("front")}
+            onAdd={(title) => handleAddMatterPage("front", title)}
+            onSwitchOn={(title) => handleSwitchOnMatterPage("front", title)}
+            onOpenPage={open}
+            onDelete={(id, title) => setDeleting({ id, title })}
+            onDeleteNow={handleDelete}
+            canWrite={canWrite}
+          />
+
+          <MatterCard
+            connectToPage={connectToPage}
+            label="Body matter"
+            description={
+              body.open === "body"
+                ? undefined
+                : "The story itself, chapter by chapter, in reading order."
+            }
+            meta={
+              <>
+                {bodyChapters.length}{" "}
+                <span className="text-chapter-fg">
+                  {bodyChapters.length === 1 ? "chapter" : "chapters"}
+                </span>
+              </>
+            }
+            action={body.open === "body" ? "Hide chapters" : "Chapters"}
+            // Open counts as selected, as well as being in a chapter. The
+            // page's edge is driven from the same expression upstream, so
+            // this border and that edge cannot disagree — which is the only
+            // reason "open" is allowed to mean "selected" at all.
+            active={
+              body.open === "body" || (!body.open && openPart === "body")
+            }
+            onAction={() => openPartList("body")}
+            /* This part's own import, beside the two controls the card
+               already had. A reader is offered none of the three. */
+            trailing={
+              canWrite ? (
+                <SectionImportButton
+                  book={book}
+                  part="body"
+                  label="Body matter"
+                />
+              ) : undefined
+            }
+            compact={!!body.open && body.open !== "body"}
+            // Only once the list is open. Shut, the card has one thing to
+            // offer — open me — and a second button beside it halves the
+            // width of that one thing to sit next to a list nobody is looking
+            // at. The new chapter appears in the list it was added to, so the
+            // button belongs where the list is.
+            secondary={
+              body.open === "body" && canWrite
+                ? { label: "New chapter", onClick: handleCreate }
+                : undefined
+            }
+            grow={body.open === "body"}
+          >
+            {bodyChapters.length > 0 ? (
+              bodyChapters.map((c) => (
+                <ChapterPill
+                  key={c.id}
+                  number={chapterNumberOf(book, c.id)}
+                  title={c.title}
+                  active={c.id === chapterId}
+                  onClick={() => open(c.id)}
+                  // Empty for a reader: every item writes the chapter row.
+                  menu={!canWrite ? [] : [
+                    {
+                      label: c.bookmarked ? "Unstar" : "Star",
+                      icon: c.bookmarked
+                        ? menuIcons.starFilled
+                        : menuIcons.star,
+                      onSelect: () => toggleBookmark(bookId, c.id),
+                    },
+                    {
+                      label: "Rename",
+                      icon: menuIcons.rename,
+                      // A dialog rather than the sidebar's edit-in-place:
+                      // the same three actions, without a second copy of the
+                      // rename state to keep in step with it. It was
+                      // `window.prompt` until the browser's own "stop showing
+                      // these" made renaming fail silently — see `ui/dialog`.
+                      onSelect: () =>
+                        setRenaming({ id: c.id, title: c.title }),
+                    },
+                    /* **Only on the body's list, and only one item.** The
+                       three Move-to-part entries came off this menu the same
+                       day for being three destinations on every page; this is
+                       one line, on the one list where it means anything — a
+                       front-matter page is named rather than numbered and has
+                       nothing to take out. See `ChapterMeta.unnumbered`. */
+                    {
+                      label: c.unnumbered
+                        ? "Number this one"
+                        : "Don’t number this one",
+                      icon: menuIcons.numbering,
+                      onSelect: () =>
+                        setChapterUnnumbered(bookId, c.id, !c.unnumbered),
+                    },
+                    ...destinationsFrom(bookId, c.id, "body"),
+                    {
+                      label: "Delete",
+                      icon: menuIcons.trash,
+                      danger: true,
+                      onSelect: () => setDeleting({ id: c.id, title: c.title }),
+                    },
+                  ]}
+                />
+              ))
+            ) : (
+              <li className="px-1 py-2 font-sans text-xs text-muted italic">
+                No chapters yet.
+              </li>
+            )}
+          </MatterCard>
+
+          <MatterPagesCard
+            connectToPage={connectToPage}
+            part="back"
+            label="Back matter"
+            description="The pages after the story — an epilogue, acknowledgements, about the author."
+            book={book}
+            bookId={bookId}
+            pages={backPages}
+            chapterId={chapterId}
+            open={body.open === "back"}
+            active={
+              body.open === "back" || (!body.open && openPart === "back")
+            }
+            compact={!!body.open && body.open !== "back"}
+            onToggle={() => openPartList("back")}
+            onAdd={(title) => handleAddMatterPage("back", title)}
+            onSwitchOn={(title) => handleSwitchOnMatterPage("back", title)}
+            onOpenPage={open}
+            onDelete={(id, title) => setDeleting({ id, title })}
+            onDeleteNow={handleDelete}
+            canWrite={canWrite}
+          />
+        </div>
+      </div>
 
       {askMatter && (
         <MatterSetupDialog
@@ -1108,59 +845,138 @@ export function BookPanel({
   );
 }
 
-/** One of the two page steppers under the cover in Book View — each flips the
- *  print preview by a page. */
 /**
- * One end of the pager under the page.
+ * The two rules that run from the selected card to the edge of the paper.
  *
- * Quiet by default and lit on hover, because a pager sits under something worth
- * looking at and should not compete with it. Disabled it dims rather than
- * disappearing: the pair keeps its shape, so the caption between them does not
- * shift sideways at the first and last page.
+ * They say that the card and the page are the same thing: the sheet's edge is
+ * already wearing that part's colour, and these join the two rather than
+ * leaving a reader to notice that they match.
  *
- * Icon-only, so it carries a label for anyone not looking at it — the arrow
- * tells a sighted reader which way and a screen reader nothing at all.
+ * **Measured, because the distance is not a number anyone can write down.** The
+ * page is centred in whatever the window leaves and drawn at the writer's zoom,
+ * so it moves with the window, with the zoom, and with the panel's own
+ * breakpoints. The card's end moves too — the cards grow and collapse over half
+ * a second as a list opens.
+ *
+ * **Drawn in a portal at `position: fixed`, and that is the fix rather than a
+ * flourish.** They used to be `position: absolute; left: 100%` inside the card,
+ * where they had to escape the panel to reach the paper — and they stopped dead
+ * at the panel's edge, a third of the way there. The panel sits between two
+ * scroll containers and an animating rail, and any one of them can clip a box
+ * that leaves it. Fixed and portalled, nothing between here and the page can
+ * cut them; `row-menu.tsx` is out of the same drawer for the same reason.
  */
-function PageArrow({
-  label,
-  disabled,
-  onClick,
-  direction,
+function PageConnector({
+  cardRef,
 }: {
-  label: string;
-  disabled: boolean;
-  onClick: () => void;
-  direction: "left" | "right";
+  cardRef: React.RefObject<HTMLElement | null>;
 }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      // bg-panel, not white: a white disc here would be a bright hole punched
-      // in a dark card. The panel's own value plus a hairline keeps it a disc.
-      className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center
-                 rounded-full border border-line bg-panel text-fg shadow-sm
-                 outline-none transition-[background-color,box-shadow,color]
-                 hover:bg-raised hover:shadow focus-visible:ring-2
-                 focus-visible:ring-accent/60 disabled:pointer-events-none
-                 disabled:opacity-30"
-    >
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 20 20"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="h-4 w-4"
-      >
-        <path d={direction === "left" ? "M12 4 6 10l6 6" : "M8 4l6 6-6 6"} />
-      </svg>
-    </button>
+  const [rules, setRules] = useState<{
+    x: number;
+    width: number;
+    ys: readonly [number, number];
+  } | null>(null);
+  // Held back for one frame so the pair can be seen to travel. A rule that
+  // appears at its full length has nowhere to come from, and going out of the
+  // card to the paper is the whole point of it.
+  const [grown, setGrown] = useState(false);
+
+  useEffect(() => {
+    let frame = 0;
+    let last = "";
+
+    const measure = () => {
+      const card = cardRef.current;
+      // The sheet, not the flow around it: it is the thing the eye reads as
+      // the page's edge, and it is the edge these have to land on.
+      const sheet =
+        document.querySelector<HTMLElement>(".pageflow-sheet") ??
+        document.querySelector<HTMLElement>(".pageflow");
+
+      let next: {
+        x: number;
+        width: number;
+        ys: readonly [number, number];
+      } | null = null;
+
+      if (card && sheet) {
+        const c = card.getBoundingClientRect();
+        const p = sheet.getBoundingClientRect();
+        // Three pixels past the paper's left edge, so a rule finishes *under*
+        // the page's border instead of against it. Butted up, a hairline of
+        // background shows between the two and the join looks like a near miss.
+        const width = Math.round(p.left - c.right + 3);
+        if (width > 0 && c.height > 0) {
+          next = {
+            x: Math.round(c.right),
+            width,
+            ys: [
+              Math.round(c.top + c.height * 0.25),
+              Math.round(c.top + c.height * 0.75),
+            ],
+          };
+        }
+      }
+
+      // Measured every frame rather than watched.
+      //
+      // A ResizeObserver was the obvious answer and it is the wrong one: it
+      // reports a box changing *size*, and most of what moves this page changes
+      // only its *position*. The zoom control scales the page with CSS `zoom`,
+      // which leaves its CSS box exactly as it was; opening the tool panel
+      // slides the page sideways without resizing it at all. Both left the
+      // rules pointing at where the paper used to be.
+      //
+      // Two getBoundingClientRect calls a frame is nothing, and the state is
+      // set only when the numbers actually change, so React almost never
+      // re-renders.
+      const key = JSON.stringify(next);
+      if (key !== last) {
+        last = key;
+        setRules(next);
+      }
+      frame = requestAnimationFrame(measure);
+    };
+
+    frame = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(frame);
+  }, [cardRef]);
+
+  useEffect(() => {
+    if (!rules || grown) return;
+    const frame = requestAnimationFrame(() => setGrown(true));
+    return () => cancelAnimationFrame(frame);
+  }, [rules, grown]);
+
+  if (!rules) return null;
+
+  return createPortal(
+    <>
+      {rules.ys.map((y, i) => (
+        <span
+          key={i}
+          aria-hidden="true"
+          className="pointer-events-none fixed z-40 h-1.5 -translate-y-1/2
+                     rounded-r-sm transition-[width,opacity] duration-700
+                     ease-out"
+          style={{
+            left: `${rules.x}px`,
+            top: `${y}px`,
+            width: grown ? `${rules.width}px` : 0,
+            opacity: grown ? 1 : 0,
+            // A flat colour. It was a gradient fading to nothing, from back
+            // when the distance was a guess and a rule had to have no endpoint
+            // to get wrong — measured, it lands on the paper, and the fade was
+            // only ever reading as a smear.
+            backgroundColor: `var(${CARD_EDGE_VAR})`,
+            // The lower one a beat behind the upper, so the pair draws itself
+            // rather than arriving.
+            transitionDelay: `${i * 110}ms`,
+          }}
+        />
+      ))}
+    </>,
+    document.body,
   );
 }
 
@@ -1380,7 +1196,7 @@ function MatterCard({
   trailing,
   grow = false,
   compact = false,
-  gapToPage = 0,
+  connectToPage = false,
   children,
 }: {
   label: string;
@@ -1439,19 +1255,21 @@ function MatterCard({
    * from opening, but no longer spending a paragraph each on it.
    */
   compact?: boolean;
-  /** Distance from the panel to the page, measured upstream. Zero where
-   *  there is no page to reach. */
-  gapToPage?: number;
+  /** Draw the rules toward the manuscript. False where there is no page for
+   *  them to land on — see `PageConnector`. */
+  connectToPage?: boolean;
   children?: React.ReactNode;
 }) {
   const listOpen = grow && !!children;
-  // How far the rules run. Only the selected card draws them, and never a
-  // shrunk one — three cards each trailing rules would be a diagram of
-  // nothing, and a strip has no height to hang two of them on.
-  const reach = active && !compact ? gapToPage : 0;
+  const cardRef = useRef<HTMLElement>(null);
+  // Only the selected card draws the rules, and never a shrunk one — three
+  // cards each trailing rules would be a diagram of nothing, and a strip has
+  // no height to hang two of them on.
+  const connected = connectToPage && active && !compact;
 
   return (
     <section
+      ref={cardRef}
       aria-current={active ? "page" : undefined}
       // `relative` for the shrunk card's cover button, below.
       //
@@ -1487,9 +1305,8 @@ function MatterCard({
       // Shrunk, the border takes the fill's own colour rather than going
       // transparent, so the box does not appear to lose two pixels of height at
       // the same moment it is losing the rest.
-      // Not overflow-hidden. It was, and the two rules below could not have
-      // left the card — the collapsing regions inside clip themselves, so
-      // nothing here needed it.
+      // Not overflow-hidden: the collapsing regions inside clip themselves, so
+      // nothing here needs it.
       className={`relative flex flex-col rounded-xl border-2
                   transition-[background-color,border-color,flex-grow]
                   duration-500 ease-out
@@ -1503,46 +1320,7 @@ function MatterCard({
                   min-h-0
                   ${listOpen ? "shrink grow" : "shrink-0 grow-0"}`}
     >
-      {/* Two rules running out of the selected card towards the page, in that
-          part's own colour — the page's edge is already wearing it, and these
-          say the two are the same thing rather than leaving a reader to notice
-          that they match.
-
-          They fade out rather than meeting the paper. The gap between this
-          panel and the page is not a number anyone can know: the page is
-          centred in whatever is left of the window and drawn at the writer's
-          zoom, so a rule of fixed length would fall short on one screen and lie
-          across the paper on the next. A rule that fades has no endpoint to get
-          wrong, and reads as reaching rather than as stopping short.
-
-          Only when the card is the selected one — three cards each trailing
-          rules would be a diagram of nothing. */}
-      {[25, 75].map((y, i) => (
-        <span
-          key={y}
-          aria-hidden="true"
-          // Always mounted, and grown from nothing rather than switched on. A
-          // rule that appears at its full length has nowhere to travel from,
-          // and travelling out of the card to the paper is the whole point of
-          // it — so the element is always here and its width is what changes.
-          className="pointer-events-none absolute left-full h-1.5
-                     -translate-y-1/2 rounded-r-sm transition-[width,opacity]
-                     duration-700 ease-out"
-          style={{
-            top: `${y}%`,
-            width: reach ? `${reach}px` : 0,
-            opacity: reach ? 1 : 0,
-            // A flat colour. It was a gradient fading to nothing, from back when
-            // the distance was a guess and a rule had to have no endpoint to get
-            // wrong — measured, it lands on the paper, and the fade was only ever
-            // reading as a smear.
-            backgroundColor: `var(${CARD_EDGE_VAR})`,
-            // The lower one a beat behind the upper, so the pair draws itself
-            // rather than arriving.
-            transitionDelay: `${i * 110}ms`,
-          }}
-        />
-      ))}
+      {connected && <PageConnector cardRef={cardRef} />}
 
       {/* The one row that survives shrinking. It restyles rather than being
           replaced: the title steps down a size and takes the fill's ink, and
@@ -1794,7 +1572,7 @@ function MatterPagesCard({
   open,
   active,
   compact,
-  gapToPage,
+  connectToPage,
   onToggle,
   onAdd,
   onSwitchOn,
@@ -1814,7 +1592,7 @@ function MatterPagesCard({
   open: boolean;
   active: boolean;
   compact: boolean;
-  gapToPage: number;
+  connectToPage: boolean;
   onToggle: () => void;
   /** A page the writer named themselves. Creates it and opens it. */
   onAdd: (title: string) => void;
@@ -1905,7 +1683,7 @@ function MatterPagesCard({
 
   return (
     <MatterCard
-      gapToPage={gapToPage}
+      connectToPage={connectToPage}
       label={label}
       description={open ? undefined : description}
       meta={

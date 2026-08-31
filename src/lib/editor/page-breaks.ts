@@ -79,6 +79,19 @@ export interface LineBox {
   inline: boolean;
 }
 
+/** Where the pages fall, and how many of them there are. */
+export interface PageFlow {
+  spacers: Spacer[];
+  /**
+   * How many sheets the text needs.
+   *
+   * Reported rather than derived from the number of gaps, because the two are
+   * not the same: a block taller than a page covers several sheets without a
+   * gap anywhere inside it — see `overflowPast`.
+   */
+  pages: number;
+}
+
 /** A top-level block, measured with one rectangle read — the cheap pass. */
 export interface BlockBox {
   top: number;
@@ -114,10 +127,11 @@ export function pageBreaks(
    * keystroke is what made typing stutter. At most one block per page needs it.
    */
   linesOf: (block: BlockBox) => LineBox[] | null,
-): Spacer[] {
+): PageFlow {
   const gapBetween = g.mB + g.gap + g.mT;
   const spacers: Spacer[] = [];
   let pageStart = 0;
+  let pages = 1;
 
   /** Any part of it falls past the foot of the page it is on. */
   const runsPast = (top: number, height: number) =>
@@ -137,6 +151,34 @@ export function pageBreaks(
     if (height <= 0) return;
     spacers.push({ pos, height, inline });
     pageStart = top;
+    pages += 1;
+  };
+
+  /**
+   * A block ran off the foot of its sheet, so the sheets it covers are counted
+   * and the page origin moves on to the one it ends on.
+   *
+   * **This is what stops one oversized block breaking the rest of the
+   * chapter.** Something that cannot be moved and cannot be split — a pasted
+   * list, a picture taller than the page — overflows, and that has always been
+   * allowed: it has nowhere better to go, and pushing it would only strand an
+   * empty sheet in front of it. What was not allowed for is what comes *after*
+   * it. With the origin left behind on the sheet the block began on, every
+   * later block worked out as further past the page foot than the page is
+   * tall, so its gap came out negative and was dropped — and then the next
+   * one, and the next. One bullet list longer than a page and the remainder of
+   * the manuscript was never paginated at all: prose flowing straight over the
+   * seams of sheets drawn at fixed intervals, out through the margins.
+   *
+   * Moving the origin on by whole pages makes a negative gap impossible, and
+   * costs nothing anywhere else: the loop runs only for a block that actually
+   * overhangs, and one whose bottom is already on this page leaves it alone.
+   */
+  const overflowPast = (bottom: number) => {
+    while (bottom - pageStart > g.contentH + 1) {
+      pageStart += g.contentH;
+      pages += 1;
+    }
   };
 
   for (const block of blocks) {
@@ -174,7 +216,10 @@ export function pageBreaks(
     }
 
     if (canMove(block.top)) breakBefore(block.top, block.pos, false);
+
+    // Moved or not, it may still be taller than the sheet it now starts on.
+    overflowPast(block.top + block.height);
   }
 
-  return spacers;
+  return { spacers, pages };
 }

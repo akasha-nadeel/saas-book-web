@@ -240,6 +240,40 @@ Three more things follow from the palette, and each has bitten already:
   #ffffff on purpose: `--color-panel` is white in daylight, and a pure white
   sheet on a white card is a sheet nobody can see.
 
+## The editor's rail icons
+
+`src/components/icons/` is [itshover](https://itshover.com) (Apache-2.0),
+vendored file by file rather than pulled with `shadcn add`: this repo has no
+`components.json`, and `shadcn init` would rewrite `globals.css` with shadcn's
+own token set over the `@theme` block the whole app is coloured from. They are
+ordinary stroked SVG on a 24-unit grid taking `currentColor`, with their motion
+in the component (`motion`, their one dependency) rather than in a sprite. Each
+carries a `"use client"` directive added here, since they use hooks and ship
+none of their own.
+
+`editor/rail-mark.tsx` is the wrapper both rails, the phone dock and the More
+sheet draw through. Two rules hold it together, and both were paid for:
+
+- **The icons take `currentColor` and spend no hue of their own.** They
+  replaced PNGs that each carried a coloured disc baked in, which put a column
+  of eleven hues down the edge of a manuscript — the loudest thing on a screen
+  whose subject is a page of prose, and the exact thing the closed list above
+  exists to prevent. There is no `--color-mark-*` family; there was one for an
+  afternoon and it is gone.
+- **Selected is the dashboard's own wash**, `bg-blue-500/15
+  dark:bg-blue-500/25`, taken verbatim from `SideItem` in `bookshelf.tsx`. Two
+  navigations in one product must not disagree about what selected looks like.
+  It replaced a filled `bg-accent` tile that inverted its icon and shouted.
+- The animation is started from the **button**, through each icon's imperative
+  handle, because the glyph is 24px inside a 48px target and most of a hover
+  never touches it — and it is skipped outright under
+  `prefers-reduced-motion`, which a media query cannot do for a scripted
+  animation.
+
+Two marks have no itshover equivalent — the microphone and the Ideas lamp — and
+keep the app's own paths in `DRAWN`. They do not animate. A wrong metaphor that
+happened to move would be worse than a right one that sits still.
+
 The writer-facing looks stored in `prefs` are each applied their own way:
 `theme` as `[data-theme]` on `<html>` (above), `paper` as `[data-paper]` on the
 writing surface, and `focusMode` / `typewriter` as behaviour.

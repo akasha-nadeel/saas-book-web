@@ -379,6 +379,19 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   undo, autosave and export see the same text. It measures in **lines** with the
   existing spacers hidden, and the arithmetic is the pure `page-breaks.ts`,
   shared with the reading view.
+- **A paragraph breaks between its lines; a list and a blockquote break between
+  their children** (`SPLITTABLE` / `BY_CHILDREN`, and `itemsOf` beside
+  `linesOf`). Everything else stays whole. Only `P` split until 2026-09-01, and
+  a pasted document is mostly bullets: a list longer than a page could neither
+  move nor break, so it overflowed its sheet — and that took the rest of the
+  chapter with it, because the page origin stayed behind on the sheet the list
+  began on and every later gap then worked out negative and was dropped. Prose
+  ran straight over the seams and out through the margins for the whole
+  remainder of the chapter. **`overflowPast` in `page-breaks.ts` is the other
+  half**: a block that overhangs moves the origin on by whole pages, so a
+  negative gap is impossible. `pageBreaks` therefore returns
+  `{ spacers, pages }` — the sheet count is **reported, not `spacers.length +
+  1`**, which is only right while every sheet is opened by a gap.
 - **The selection bar owns the selection range** and puts it back inside
   `apply()`; `BarMenu` holds the placement, the portal, the upwards-only rule
   and the four ways out for both pickers. Font preview is a **decoration, never
@@ -386,14 +399,33 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
 - **Inline images** store width as a percentage of the column; the resize
   arithmetic is the pure `image-resize.ts` and **must divide by the page zoom**
   (`PAGE_SCALE`) — the editor's other two measuring sites already do.
-- **The tool panel floats over the manuscript; it does not push it.** One header
-  for all ten tabs, four ways out that are one toggle, and `LeftPanel` owns its
-  own mounting so it can animate out. **The tabs are named once, in
-  `src/lib/panel-tabs.ts`** — chapters, search, consistency, notes, ideas,
-  bible, bookmarks, assistant, history, trash — and not in the panel, because
-  which tab is open is a stored preference and `library-store.ts` needs the type
-  without importing a `"use client"` component. The rail owns the order; that
-  module owns the words.
+- **The left chrome is one slot, `--sidebar-width` wide, and the page stands
+  beside it.** At most one thing in it is visible: the book navigator, a tool
+  panel, or a tool panel over the navigator. `BookPanel` takes that width
+  outright; `LeftPanel` stays `fixed` (it wants the window's full height, its
+  slide from the rail's edge and the phone's scrim) and the `.oc-panel-slot`
+  spacer in `chapter-editor.tsx` holds its place in the flex row — **only when
+  the navigator is not already holding it**, or the page is pushed twice. The
+  slot stands down below `md` and in continuous layout, where the panel is a
+  modal over the page rather than a neighbour.
+
+  **This reverses a rule that stood here for a long time** — *the tool panel
+  floats over the manuscript; it does not push it* — and the reason is what a
+  25rem sheet over a 6×9 page actually does: it covers the left margin and the
+  first character of every line, so searching your book hides the book. The
+  navigator **stays open behind an open tool panel**, so closing the panel puts
+  the writer back where they were; the rail lights whichever is *visible*, and
+  pressing Manuscript while something covers it closes the cover rather than
+  the navigator (`toolPanelOpen` in `workspace-rail.tsx`). The connector rules
+  go with it: `connectToPage` is false while a panel is over the navigator, or
+  they run out from behind it pointing at a card nobody can see.
+- One header for all ten tabs, four ways out that are one toggle, and
+  `LeftPanel` owns its own mounting so it can animate out. **The tabs are named
+  once, in `src/lib/panel-tabs.ts`** — chapters, search, consistency, notes,
+  ideas, bible, bookmarks, assistant, history, trash — and not in the panel,
+  because which tab is open is a stored preference and `library-store.ts` needs
+  the type without importing a `"use client"` component. The rail owns the
+  order; that module owns the words.
 - **Front and back matter are lists of pages** (`matter.ts`). **Every template
   line a writer must replace carries a `[bracket]`** — that is the only mark the
   export has to tell a written page from scaffolding, and it survives a rename
@@ -437,24 +469,36 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   do. `ui/responsive-panel.tsx` is the one overlay primitive over native
   `<dialog>` (sheet or full-screen when continuous, right drawer when paged),
   so focus trap, Escape and focus restoration are the platform's job.
-- **There is no book overview screen any more — opening a book lands in the
-  manuscript.** `/book/[bookId]` is a redirect: `lastOpenedId`, else the first
-  chapter with words, else the first chapter, else home (`659c706`). So the
-  editor is the only screen mounting the three parts — rail, tool panel, book
-  panel — and `editor/book-overview.tsx` and `editor/book-guide.tsx` are now
-  **finished code reachable from nothing**, which is a standing category here
-  and not an invitation to delete them (see the list further down). What that
-  redirect cost is worth knowing before bringing it back: the overview was the
-  one place a writer saw the book's parts without a page open. **The panes live
-  in the pages rather than in `book/[bookId]/layout.tsx`**, because the left
-  panel needs the chapter id and the assistant needs the editor instance; the
-  import banner is the one exception and does live in that layout.
-- `book-panel.tsx` is the navigator (front/body/back as cards, each opening into
-  a list — chapters in the body, the sixteen divisions with their switches in
-  the other two). Its face is the stored `bookPanel` pref rather than component
-  state, and **which card is open lives in `useOpenPart`, called by the *screen***
-  — the page sheet's edge takes the colour of the selected part, and two copies
-  of that state would be two answers to one question.
+- **There is no screen of a book without a page on it, and there must not be
+  one.** `/book/[bookId]` is a redirect into the last chapter opened
+  (`lastOpenedId`, else the first chapter with words, else the first chapter,
+  else home — `659c706`), and the editor's own **Book View was removed on
+  2026-09-01**: a panel face that showed the cover, two page steppers and a
+  guide where the manuscript had been. It went because the panel and the middle
+  of the window were then describing two different things — the book as an
+  object on one side, nothing at all on the other — and the only way in was a
+  chevron in the panel's header that nobody was looking for. `book-guide.tsx`,
+  `book-overview.tsx` and `page-preview.tsx` were deleted with it, along with
+  the `bookPanel` pref, `BackToBooks`, and the `[data-matter="book"]` sheet
+  edge. **The panes live in the pages rather than in
+  `book/[bookId]/layout.tsx`**, because the left panel needs the chapter id and
+  the assistant needs the editor instance; the import banner is the one
+  exception and does live in that layout.
+- `book-panel.tsx` is the navigator and has **one face** (front/body/back as
+  cards, each opening into a list — chapters in the body, the sixteen divisions
+  with their switches in the other two). **Which card is open lives in
+  `useOpenPart`, called by the *screen*** — the page sheet's edge takes the
+  colour of the selected part, and two copies of that state would be two
+  answers to one question.
+- **The two rules from the selected card to the paper are portalled and
+  `fixed`** (`PageConnector`). They were `absolute; left: 100%` inside the card
+  and were cut off at the panel's edge, a third of the way to the page. The
+  panel sits between two scroll containers and an animating rail, and any one
+  of them can clip a box that leaves it; fixed and portalled, nothing between
+  the card and the paper can. `sidebar/row-menu.tsx` is out of the same drawer.
+  The distance is measured every animation frame from the card's own right edge
+  to the first `.pageflow-sheet` — a `ResizeObserver` sees a box change *size*
+  and most of what moves the page changes only its *position*.
 
 ### The reading view — `docs/architecture/reader.md`
 
@@ -463,10 +507,14 @@ wizard's Preview mounts the same setting, so two copies would be two books.
 **Prose is not re-laid out** — each chapter goes through the export path
 (`toBlocks` → `blocksToXhtml`), so the read-through, the PDF and the EPUB match.
 
-- **`paginate()` in `reader/page-flow.ts` backs all three screens** (the reading
-  view, the flip-book, and the editor's Book View). Keep them on the one
-  function. It measures outside any `zoom` wrapper and re-runs once the
-  manuscript font **and the pictures** have settled.
+- **`paginate()` in `reader/page-flow.ts` backs the reading view and the
+  flip-book alike.** Keep them on the one function. It measures outside any
+  `zoom` wrapper and re-runs once the manuscript font **and the pictures** have
+  settled. **A list is opened out into its items before it is measured**, so a
+  pasted thirty-bullet list breaks between entries instead of being one block
+  taller than a sheet that `.reader-page`'s `overflow: hidden` then cut off;
+  the editor splits lists the same way, and the two must not answer differently
+  about one manuscript.
 - **`boundReaderPages` (`reader/bound-pages.ts`) shows the book the *export*
   would build** — it calls `withoutReplaced → frontSections → bindBook`, the
   export's own functions in the export's own order. **Anything that looks like a
@@ -1074,10 +1122,11 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
     modules, `landing-path.ts`, the drawn `phase-screens.tsx`, and `WorksWith()`
     in `works-with.tsx`, whose `DESTINATIONS` export *is* still live). Treat the
     old design as reference rather than as something to wire back up unchanged.
-  - **The book overview** (`editor/book-overview.tsx`, `editor/book-guide.tsx`)
-    — unhooked 2026-08-30 when `/book/[bookId]` became a redirect into the last
-    chapter opened. It is the only screen that showed a book's parts with no
-    page open; bringing it back is a branch in that page rather than a rebuild.
+  - **The book overview is not on this list any more — it was deleted.**
+    `editor/book-overview.tsx`, `editor/book-guide.tsx` and
+    `editor/page-preview.tsx` went on 2026-09-01 with the editor's Book View;
+    see the editor section above for why. Do not put them back without the
+    argument that answers it.
     **`editor/resume-card.tsx` came off the same screen and is live again** —
     Overview mounts it through `ResumeSlot` since 2026-09-01, in the slot the
     target dial left when it moved onto the book card in Write. So

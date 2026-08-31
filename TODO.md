@@ -1529,6 +1529,39 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **Book View, and with it the book overview** — removed on **2026-09-01** at
+  the owner's request, and **deleted rather than unhooked**, which is the part
+  worth knowing before anyone rebuilds it.
+
+  **What it was.** A second face of the editor's book panel, reached by a
+  chevron at the top of the chapter list: the cover large with two page
+  steppers under it, a card carrying the book's title, its counts and a *Carry
+  on* button, and — where the manuscript had been — a "BOOK OVERVIEW" guide
+  explaining what the panel's three parts were.
+
+  **Why it went.** The panel and the middle of the window were describing two
+  different things at once: the book as an object on the left, and on the right
+  nothing at all, because the surface was unmounted for as long as the face was
+  showing. Every argument the app already makes about the editor points the
+  other way — `/book/[bookId]` is a redirect *into* a chapter for the same
+  reason, and the whole point of the coloured sheet edge is that the panel and
+  the page cannot disagree.
+
+  **What went with it.** `editor/book-guide.tsx`, `editor/book-overview.tsx`
+  and `editor/page-preview.tsx`; the `bookPanel` pref in `library-store.ts`;
+  `BackToBooks` in `workspace-rail.tsx`; the `[data-matter="book"]` sheet edge,
+  the `[data-panel-mode="book"]` / `.book-overview-*` / `.book-guide-shell`
+  rules and the `book-cover-in` / `book-card-in` animations in `globals.css`.
+  The flip-book CSS (`.oc-leaf-*`, `.oc-book*`) **stayed** — the reading view's
+  `reader-flipbook.tsx` uses it, and only the comments naming Book View were
+  corrected. `editor/resume-card.tsx` is untouched and still live on the
+  shelf's Overview.
+
+  **What is lost, if it is ever wanted back.** It was the one place a writer
+  saw the book's parts with no page open, and the only in-app flip-through of
+  a chapter's printed pages. Both would be a branch in the editor rather than a
+  rebuild of the panel — but bring back the argument first, not the screen.
+
 - **The export wizard's four-pane review** — the way in came off on
   **2026-08-17** at the owner's request, to be put back once the panes
   themselves are fixed. The owner asked to be reminded of it, so it is here and

@@ -7,6 +7,7 @@ import {
   pageBreaks,
   type BlockBox,
   type LineBox,
+  type PageFlow,
   type PageGeometry,
   type Spacer,
 } from "./page-breaks";
@@ -19,6 +20,7 @@ export {
   pageBreaks,
   type BlockBox,
   type LineBox,
+  type PageFlow,
   type PageGeometry,
   type Spacer,
 };
@@ -49,6 +51,30 @@ export interface PaginationOptions {
 }
 
 const key = new PluginKey<DecorationSet>("pagination");
+
+/**
+ * The blocks a page may break *inside*, by the DOM tag they render as.
+ *
+ * A paragraph splits between its lines, the way a word processor fills a page
+ * to the bottom and carries the same paragraph over. A list and a blockquote
+ * split between their children, which is the only place they *can* break —
+ * cutting an entry in half would leave half a bullet on one sheet.
+ *
+ * **The list and the quote are the reason a pasted document came out broken.**
+ * Only `P` was here, so a bullet list longer than a page — which is what most
+ * pasted notes, specs and outlines are made of — was one atom that could
+ * neither move nor break, and it overflowed its sheet and took the rest of the
+ * chapter's pagination with it. See `overflowPast` in `page-breaks.ts` for the
+ * other half of that fix; this half is what stops the overflow happening at
+ * all in the common case.
+ *
+ * Everything else stays whole, as it always did: a picture, a rule, a code
+ * block or a heading has nothing to break between.
+ */
+const SPLITTABLE = new Set(["P", "UL", "OL", "BLOCKQUOTE"]);
+
+/** A list or a quote — it breaks between its children, not between its lines. */
+const BY_CHILDREN = new Set(["UL", "OL", "BLOCKQUOTE"]);
 
 /** A gap that fills the rest of a page and the margins around the seam. Not part
  *  of the document — a widget the editor draws and the writer cannot enter. */
@@ -104,10 +130,13 @@ function settled(a: Spacer[], b: Spacer[]): boolean {
  */
 export function paginationFrame(
   geometry: PageGeometry | null,
-  spacers: Spacer[],
+  flow: PageFlow,
 ): { spacers: Spacer[]; pageCount: number } {
+  // The count is the arithmetic's own, not `spacers.length + 1`, which is only
+  // right while every sheet is opened by a gap. A block taller than the page
+  // covers several with no gap anywhere inside it — see `overflowPast`.
   return geometry
-    ? { spacers, pageCount: spacers.length + 1 }
+    ? { spacers: flow.spacers, pageCount: flow.pages }
     : { spacers: [], pageCount: 1 };
 }
 
@@ -264,7 +293,7 @@ class PaginationView {
 
     const g = this.opts.getGeometry();
     if (!g) {
-      const frame = paginationFrame(null, this.applied);
+      const frame = paginationFrame(null, { spacers: this.applied, pages: 1 });
       this.opts.onPages(frame.pageCount);
       if (!settled(frame.spacers, this.applied)) this.apply(frame.spacers);
       this.lastHeight = this.height();
@@ -317,14 +346,14 @@ class PaginationView {
     // offset being counted twice, lines measured by their glyph boxes rather
     // than their line boxes, and a paragraph that opens a page never being
     // split. The arithmetic stands on its own now.
-    let spacers: Spacer[];
+    let flow: PageFlow;
     try {
-      spacers = this.breaksInNaturalFlow(paper, g);
+      flow = this.breaksInNaturalFlow(paper, g);
     } finally {
       for (const gap of gaps) gap.style.display = "";
     }
 
-    const frame = paginationFrame(g, spacers);
+    const frame = paginationFrame(g, flow);
     this.opts.onPages(frame.pageCount);
 
     if (!settled(frame.spacers, this.applied)) this.apply(frame.spacers);
@@ -412,7 +441,7 @@ class PaginationView {
   }
 
   /** Runs with every existing gap hidden — see measure. */
-  private breaksInNaturalFlow(paper: HTMLElement, g: PageGeometry): Spacer[] {
+  private breaksInNaturalFlow(paper: HTMLElement, g: PageGeometry): PageFlow {
     const view = this.view;
 
     // Positions are read with getBoundingClientRect and normalised by the zoom
@@ -425,7 +454,7 @@ class PaginationView {
     // a transform, since it never trusts offsetWidth.
     const paperRect = paper.getBoundingClientRect();
     const scale = g.pageW ? paperRect.width / g.pageW : 1;
-    if (!(scale > 0)) return [];
+    if (!(scale > 0)) return { spacers: [], pages: 1 };
     const contentTop = paperRect.top + g.mT * scale;
 
     // The document position before each top-level node, so a break maps to a
@@ -453,9 +482,7 @@ class PaginationView {
         top: (rect.top - contentTop) / scale,
         height: rect.height / scale,
         pos,
-        // Only prose splits. An image, a rule, a code block or a heading has
-        // nothing to break between, and stays whole as it always did.
-        splittable: node.tagName === "P",
+        splittable: SPLITTABLE.has(node.tagName),
       });
       elements.set(pos, node);
     }
@@ -464,17 +491,68 @@ class PaginationView {
       const node = elements.get(block.pos);
       if (!node) return null;
       try {
-        return this.linesOf(node, block.pos, contentTop, scale);
+        return BY_CHILDREN.has(node.tagName)
+          ? this.itemsOf(node, block.pos, contentTop, scale)
+          : this.linesOf(node, block.pos, contentTop, scale);
       } catch {
-        // Reading a paragraph's lines must never be able to bring down the
-        // whole pass. If it did, the measure would abort before reporting the
-        // page count — and the page count is what draws the sheets, so a sheet
+        // Reading a block's parts must never be able to bring down the whole
+        // pass. If it did, the measure would abort before reporting the page
+        // count — and the page count is what draws the sheets, so a sheet
         // would stay on screen after the text that called for it had gone, with
         // no way to get rid of it short of reloading. Falling back to treating
-        // the paragraph as unsplittable is always safe.
+        // the block as unsplittable is always safe.
         return null;
       }
     });
+  }
+
+  /**
+   * A list's or a quote's children, as the places a page may break.
+   *
+   * The cheap half of splitting. A paragraph has to be taken apart
+   * geometrically, because a soft wrap has no document position of its own —
+   * see `linesOf`. A list does not: every `<li>` *is* a node, so the
+   * rectangles come from the elements themselves and the positions from
+   * walking the ProseMirror node's own children. No hit test, no Range, and
+   * the answer is exact rather than inferred.
+   *
+   * Every break here is `inline: false` — between two items is between two
+   * blocks, which is the older and simpler case. The widget lands inside the
+   * `<ul>` as a plain `<div>`, which lays out as a block and takes no number
+   * from an ordered list's counter.
+   *
+   * Returns null when the DOM and the document have drifted apart, so the
+   * caller falls back to treating the whole list as unsplittable — which is
+   * how this behaved before, and is never worse than wrong-looking.
+   */
+  private itemsOf(
+    node: HTMLElement,
+    pos: number,
+    contentTop: number,
+    scale: number,
+  ): LineBox[] | null {
+    const pmNode = this.view.state.doc.nodeAt(pos);
+    if (!pmNode) return null;
+
+    const children = Array.from(node.children) as HTMLElement[];
+    if (children.length !== pmNode.childCount) return null;
+
+    const boxes: LineBox[] = [];
+    let offset = pos + 1;
+    pmNode.forEach((child, _at, index) => {
+      const rect = children[index].getBoundingClientRect();
+      boxes.push({
+        top: (rect.top - contentTop) / scale,
+        height: rect.height / scale,
+        // The first child breaks in front of the list itself, so an untouched
+        // list moves exactly as it always did.
+        pos: index === 0 ? pos : offset,
+        inline: false,
+      });
+      offset += child.nodeSize;
+    });
+
+    return boxes;
   }
 
   /**
