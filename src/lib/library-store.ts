@@ -1556,6 +1556,9 @@ export function bookChapterCount(book: Book): number {
  * stake is the writer's ability to fix the problem at all.
  */
 function commit(next: Shelf) {
+  /* Read *before* the write, because `getShelf()` re-reads once the key
+     changes. This is the fallback diff baseline — see `pushShelfDiff`. */
+  const previous = getShelf();
   const raw = JSON.stringify(next);
 
   const write = (): boolean => {
@@ -1579,7 +1582,7 @@ function commit(next: Shelf) {
   }
 
   emitShelf();
-  pushShelfDiff(next);
+  pushShelfDiff(next, previous);
 }
 
 /**
@@ -1597,7 +1600,23 @@ function commit(next: Shelf) {
  * catches every path — emptying the trash, undoing an import, a chapter deleted
  * for good — without any of them having to say so.
  */
-let pushedBooks: readonly Book[] = [];
+/**
+ * What the server is believed to hold, or `null` before anything has told us.
+ *
+ * **`null` rather than `[]`, and the difference is a bug that deleted nothing.**
+ * An empty array is a claim — "the server has no books" — and the deletion loop
+ * below iterates what has *left* this list, so an empty baseline finds nothing
+ * to delete however many books were removed. It is seeded by `applyRemote` and
+ * by the first upload, and `applyRemote` returns early when the download failed
+ * (`if (!remote) return`), so one dropped request left it empty for the rest of
+ * the session. The next book deleted was never deleted on the server, and the
+ * load after that downloaded it back — with every other book re-uploaded as
+ * new besides, since an absent baseline makes them all look unseen.
+ *
+ * `null` says the honest thing, and `commit` supplies the shelf as it was
+ * before the write to diff against instead.
+ */
+let pushedBooks: readonly Book[] | null = null;
 
 function chapterIdsOf(book: Book): Set<string> {
   const ids = new Set<string>();
@@ -1667,8 +1686,13 @@ function changedChapterIds(
   return changed;
 }
 
-function pushShelfDiff(next: Shelf) {
-  const before = new Map(pushedBooks.map((b) => [b.id, b]));
+function pushShelfDiff(next: Shelf, previous: Shelf) {
+  /* The shelf as it was a moment ago is the best available account of what the
+     server holds when nothing has seeded the baseline. It is exactly right in
+     the ordinary case — local and server agree between edits — and strictly
+     better than an empty list, which silently swallows every deletion. */
+  const baseline = pushedBooks ?? previous.books;
+  const before = new Map(baseline.map((b) => [b.id, b]));
 
   next.books.forEach((book, position) => {
     const previous = before.get(book.id);
@@ -4664,7 +4688,7 @@ export async function clearLocalLibrary(): Promise<void> {
 
   cachedRaw = null;
   cachedShelf = EMPTY_SHELF;
-  pushedBooks = [];
+  pushedBooks = null;
   emitShelf();
   refreshEverything();
   for (const listener of prefsListeners) listener();
