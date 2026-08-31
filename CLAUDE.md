@@ -76,13 +76,22 @@ is the thing to read **before changing that area**, not after.
 | Tests — what is covered, and which ones must not be "fixed" | `docs/testing.md` |
 | `next.config.ts` | `docs/architecture/build-config.md` |
 
-`docs/plans/` holds the original design notes for the bookshelf, export and the
-Supabase persistence design. `docs/checks/` holds the SQL that verifies the RLS
-policies. Read the relevant one before reworking any of them.
+`docs/plans/` holds the original design notes for the bookshelf, export, the
+Supabase persistence design and the mobile editor's chapter icon
+(`2026-08-22-mobile-editor-chapter-icon-design.md`, with the implementation note
+under `docs/superpowers/plans/`). `docs/checks/` holds the SQL that verifies the
+RLS policies. Read the relevant one before reworking any of them.
+
+**`README.md` is not one of these.** It is still the untouched `create-next-app`
+boilerplate and describes nothing about this app — do not read it for facts, and
+do not treat its absence of a subject as a gap to fill unless somebody asks.
 
 ## Commands
 
-- `npm run dev` — dev server (http://localhost:3000)
+- `npm run dev` — dev server (http://localhost:3000). The script is
+  `set NODE_OPTIONS=--max-old-space-size=4096 && next dev`, which is **cmd
+  syntax and fails in a POSIX shell** — from bash run `npx next dev` instead.
+  The heap bump is what the `set` is there for; keep it on Windows.
 - `npm run build` — production build. Also the way to check Tailwind output: v4
   silently drops utilities it cannot parse, so verify against `.next/static/chunks/*.css`.
 - `npm run lint` — ESLint (next/core-web-vitals + next/typescript). It does *not*
@@ -97,11 +106,23 @@ policies. Read the relevant one before reworking any of them.
 - `node scripts/feature-shots.cjs` — regenerates the landing page's bitmap
   product shots from raw captures kept outside the repo. A one-shot tool, not
   part of the build.
+- `node scripts/cut-illustration.cjs <source> <out.webp> [width]` — lifts the
+  two dashboard illustrations off their background (`public/upgrade-card.webp`,
+  `public/write-band.webp`). Also one-shot, also reads sources from outside the
+  tree, and it needs `sharp`, which is **not a dependency** — install it by hand
+  to run this.
 
-The suite is 101 files / 1,904 tests and takes about ninety seconds (measured
-2026-08-25, all green); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 104 files / 2,000 tests and takes about a hundred seconds (measured
+2026-08-31, all green); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
-from the routing tests — both are expected, not failures. Tests live beside
+from the routing tests — both are expected, not failures.
+
+**A green exit code is not a green suite.** Under load — running `npx tsc
+--noEmit` alongside it is enough — Vitest's forks pool times out starting
+workers, prints `Failed to start forks worker`, **skips those files, and still
+exits 0**. One run here reported 97 of 104 files that way. Read the
+`Test Files N passed` line rather than `$?`, and don't run the suite and a
+typecheck at once. Tests live beside
 their subjects as `*.test.ts` and
 cover the pure logic only — components are not tested, and jsdom is there for
 `localStorage` rather than for a DOM. **Several tests assert *positions* rather
@@ -120,8 +141,21 @@ captures from outside the tree — so moving it cost nothing.
 
 If a copy is ever put back, put it **outside** the project root. Two other
 things it used to cost, worth knowing if one reappears: `git add .` commits
-thousands of bundled files, and `npm run lint` reports thousands of problems —
-`src/` lints clean, so a large number is noise rather than news.
+thousands of bundled files, and `npm run lint` reports thousands of problems.
+`.gitignore` and `eslint.config.mjs` now both exclude `/.shot-app/` and
+`/.reference/` (local upstream checkouts, reference only), so a four-figure
+count is still noise rather than news.
+
+**`src/` no longer lints clean, and the doc used to say it did.** As of
+2026-08-31 `npm run lint` reports **7 errors and 14 warnings**, all in four
+files, and all of them from the dashboard and find-and-replace work:
+`components/ui/tremor.tsx` (six `no-explicit-any`),
+`components/editor/search-panel.tsx` (one `set-state-in-effect` error plus three
+warnings), `components/shelf/bookshelf.tsx` (ten unused-var warnings —
+`WelcomeBand`, `WriteBand` and `FavouritesBand` are the banner sections
+`95386a2` removed and left behind), and `components/editor/mobile-editor-header.tsx`
+(one). `npx tsc --noEmit` **is** clean. Treat that count as a debt to clear, not
+as the normal state.
 
 Every environment variable is optional and all but one are documented, with
 their failure modes, in `.env.local.example`. That file is the canonical list —
@@ -353,8 +387,13 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   arithmetic is the pure `image-resize.ts` and **must divide by the page zoom**
   (`PAGE_SCALE`) — the editor's other two measuring sites already do.
 - **The tool panel floats over the manuscript; it does not push it.** One header
-  for all nine tabs, four ways out that are one toggle, and `LeftPanel` owns its
-  own mounting so it can animate out.
+  for all ten tabs, four ways out that are one toggle, and `LeftPanel` owns its
+  own mounting so it can animate out. **The tabs are named once, in
+  `src/lib/panel-tabs.ts`** — chapters, search, consistency, notes, ideas,
+  bible, bookmarks, assistant, history, trash — and not in the panel, because
+  which tab is open is a stored preference and `library-store.ts` needs the type
+  without importing a `"use client"` component. The rail owns the order; that
+  module owns the words.
 - **Front and back matter are lists of pages** (`matter.ts`). **Every template
   line a writer must replace carries a `[bracket]`** — that is the only mark the
   export has to tell a written page from scaffolding, and it survives a rename
@@ -398,12 +437,18 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
   do. `ui/responsive-panel.tsx` is the one overlay primitive over native
   `<dialog>` (sheet or full-screen when continuous, right drawer when paged),
   so focus trap, Escape and focus restoration are the platform's job.
-- **The editor and the book overview mount the *same three parts*** — rail, tool
-  panel, book panel — so a change lands on both screens at once. The overview
-  differs only in having no manuscript. **The panes live in the pages rather
-  than in `book/[bookId]/layout.tsx`**, because the left panel needs the chapter
-  id and the assistant needs the editor instance; the import banner is the one
-  exception and does live in that layout.
+- **There is no book overview screen any more — opening a book lands in the
+  manuscript.** `/book/[bookId]` is a redirect: `lastOpenedId`, else the first
+  chapter with words, else the first chapter, else home (`659c706`). So the
+  editor is the only screen mounting the three parts — rail, tool panel, book
+  panel — and `editor/book-overview.tsx` and `editor/book-guide.tsx` are now
+  **finished code reachable from nothing**, which is a standing category here
+  and not an invitation to delete them (see the list further down). What that
+  redirect cost is worth knowing before bringing it back: the overview was the
+  one place a writer saw the book's parts without a page open. **The panes live
+  in the pages rather than in `book/[bookId]/layout.tsx`**, because the left
+  panel needs the chapter id and the assistant needs the editor instance; the
+  import banner is the one exception and does live in that layout.
 - `book-panel.tsx` is the navigator (front/body/back as cards, each opening into
   a list — chapters in the body, the sixteen divisions with their switches in
   the other two). Its face is the stored `bookPanel` pref rather than component
@@ -814,7 +859,22 @@ of components so they can be tested and changed in one place: `book-kinds.ts`,
 *parameter*, since English plurals are not derivable), `resume.ts` (which stores
 nothing: the "where you left off" card is read back out of what already exists),
 `account.ts` (a chain of fallbacks, taking whatever is in the JWT rather than a
-typed user) and `auth-redirect.ts` (`safeNext()`).
+typed user), `auth-redirect.ts` (`safeNext()`), `panel-tabs.ts` (the ten left-panel
+tabs and their titles) and `areas.ts` (the six dashboard areas by id and by
+name). The last of those exists because a tool screen fills the window with none
+of the dashboard around it, so a link in may carry `?from=<area>` and the tool
+offers a way back to *that list* rather than to the launcher — and it is its own
+module because both ends need the labels and the dashboard is one enormous
+client component nobody wants pulled into every tool header. Reading a `?from=`
+is a lookup against the fixed set, never a cast; anyone can put anything in a
+query string.
+
+`src/components/sidebar/` is the third place the navigator appears —
+`chapter-sidebar.tsx` mounts the same `BookPanel` rather than a second copy, and
+`row-menu.tsx` is the ⋯ menu on a row, **portalled** because the chapter list
+scrolls and an ancestor with `overflow` would clip it, and **opened by click**
+because a hover menu is unreachable from a keyboard, absent on a touch screen,
+and puts a destructive action one stray mouse movement away.
 
 **Feedback is a private channel**, and what it may carry is the whole design:
 `authenticated` gets an insert and **no select at all**, so it is a suggestion
@@ -837,18 +897,20 @@ plan, payment method, assistant usage and invoice list (signed in only; display
 only — the subscription row is written by the webhook and nothing else) ·
 `/privacy` ·
 `/terms` · `/refunds` · `/contact` (public, and public is the point) ·
-`/book/new` · `/book/import` · `/book/[bookId]` book overview (lands here, not
-on a chapter) · `/book/[bookId]/chapter/[chapterId]` editor ·
+`/book/new` · `/book/import` · `/book/[bookId]` **a redirect into the last
+chapter opened**, not a screen · `/book/[bookId]/chapter/[chapterId]` editor ·
 `/book/[bookId]/read` reading view · `/invite/[token]` (gated, which is what
 makes the link a pointer rather than a credential).
 
-The sixteen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
+The seventeen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `paperback`, `listing` · `comps`, `blurb`, `categories`, `covers`,
 `title-check` · `structure`, `prose`, `progress`, `provenance` · `money`,
-`track`, `arc` — grouped there the way `book-tools.ts` groups them. **Under the
-launch flag the proxy redirects all of them home but `export`**, along with
-`/book/[bookId]/read`, `/tools` and `/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS`
-in `launch.ts` is the list.
+`track`, `arc` · and `consistency`, the seventeenth, written for the MVP rather
+than un-gated into it — grouped the way `book-tools.ts` groups them. **Under the
+launch flag the proxy redirects all of them home but `export` and
+`consistency`**, along with `/book/[bookId]/read`, `/tools` and
+`/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS` in `launch.ts` is the list, and it
+holds sixteen entries — the fifteen hidden tools plus `read`.
 
 **API routes:** `/api/chat` · `/api/narrate` · `/api/transcribe` · `/api/comps` ·
 `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
@@ -889,8 +951,17 @@ custom properties the editor and the reading view both read.
 - **`prefs.theme` is `system` | `light` | `dark`**, resolved onto
   `<html data-theme>` by the bootstrap script before first paint; `ThemeSync`
   carries every change after that and listens to the media query while the pref
-  is "system". **Do not use Tailwind's `dark:` variant** — it keys off
-  `prefers-color-scheme` and would ignore a writer who chose against their system.
+  is "system".
+- **`dark:` is safe now, and this file used to forbid it.** The rule was right
+  while the variant meant `prefers-color-scheme`, which ignores a writer who
+  chose against their system. `globals.css` line 3 re-points it —
+  `@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *))` — so
+  `dark:` and the token blocks now answer to the same attribute and cannot
+  disagree (`b9639b9`). A dozen files rely on it. **Tokens are still the first
+  choice**: `dark:` states a colour twice in a class list, where a token states
+  it once in `globals.css`, so reach for it only where a token would have to be
+  invented for one call site — and never as a way to sneak in a sixth exception
+  to the closed list below.
 - **A filled action carries `text-accent-ink`**, never a literal `text-white`:
   the fill is white at night and near-black by day. `bg-danger` and the matter
   fills each carry their own `-ink` token for the same reason.
@@ -906,9 +977,30 @@ custom properties the editor and the reading view both read.
   `docs/styling.md`: `--color-upgrade-*` (the one gradient), the pricing table's
   value badges, `--color-wordmark`, the sixteen tool marks, `--color-sheet`
   (paper, stated identically in both blocks because a picture of paper stays
-  literal), and the landing page's `lp-*` set. Do not add a sixth.
+  literal), and the landing page's `lp-*` set.
+- **`--color-tremor-*` is the sixth, added 2026-08-31, and it is the last.** It
+  is Tremor's own palette, adopted deliberately for the *dialog system* after
+  the trade-off was put and accepted: it is a second greyscale beside the
+  app's, which is the thing this list exists to prevent. **What keeps it from
+  becoming two designs is that it is scoped to dialogs and nothing else.** A
+  modal sits on a scrim, so a different ground inside it reads as a surface of
+  its own; on an ordinary screen it would read as another product. `ui/button.tsx`,
+  `ui/text-input.tsx` and `ui/dialog.tsx` wear it, and nothing on a page may.
+  Stated in all three blocks under one name each — **not** Tremor's own
+  `tremor-*`/`dark-tremor-*` pair, because this app flips token values by theme
+  rather than selecting with `dark:`. `free-limit.tsx`'s `LimitDialog` is
+  exempt: it is a photograph with a literal `#050a18` frame matched to the
+  artwork, and a photograph does not follow the theme.
 - **`src/components/ui/` is deliberately narrow** and things land there on the
-  third copy, not the first. Primitives take `currentColor`.
+  third copy, not the first. Primitives take `currentColor` — except the three
+  dialog primitives above, which carry the dialog palette by design.
+- **`ui/button.tsx` is the button, and there are still ~250 that predate it.**
+  It arrived on 2026-08-31 against 299 hand-classed `<button>`s across 98
+  files, in which the primary action alone was spelled eight ways. The dialogs
+  are converted; the rest still carry their own classes and work. **A new
+  button inside a dialog uses the primitive**; one on an ordinary screen is
+  still hand-classed against the app's own tokens, because the primitive wears
+  the dialog palette.
 - **`assistant-reply.tsx` over the pure `markdown.ts` is what every assistant
   panel prints with.** The parser returns **data, never HTML** — nothing
   downstream may reach for `dangerouslySetInnerHTML` — a link keeps its words and
@@ -966,6 +1058,10 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
     modules, `landing-path.ts`, the drawn `phase-screens.tsx`, and `WorksWith()`
     in `works-with.tsx`, whose `DESTINATIONS` export *is* still live). Treat the
     old design as reference rather than as something to wire back up unchanged.
+  - **The book overview** (`editor/book-overview.tsx`, `editor/book-guide.tsx`)
+    — unhooked 2026-08-30 when `/book/[bookId]` became a redirect into the last
+    chapter opened. It is the only screen that showed a book's parts with no
+    page open; bringing it back is a branch in that page rather than a rebuild.
   - **`ChapterMeta.matterKey`**, left over from the one-page matter design and
     read by nothing — books written before the change still carry a combined page.
 - Storage limits are real: covers capped at 250KB, inline images at 900KB,

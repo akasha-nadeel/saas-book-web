@@ -11,6 +11,8 @@ import {
 } from "@/lib/feedback";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { DialogClose } from "@/components/ui/dialog";
 
 /**
  * The suggestion box.
@@ -105,47 +107,35 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-line
-                 bg-panel p-0 text-fg backdrop:bg-black/50"
+      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-tremor-border
+                 bg-tremor-background p-0 text-tremor-content-strong backdrop:bg-black/50"
     >
-      <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+      <div className="flex items-start justify-between gap-4 border-b border-tremor-border px-6 py-4">
         <div>
           <h2 className="text-lg font-bold">Send feedback</h2>
-          <p className="mt-0.5 text-sm text-muted">
+          <p className="mt-0.5 text-sm text-tremor-content">
             It comes straight to us. No other writer sees it.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="-mt-1 shrink-0 rounded-lg px-2.5 py-1.5 text-xl leading-none
-                     text-muted hover:bg-raised"
-        >
-          ×
-        </button>
+        <DialogClose onClose={onClose} corner={false} />
       </div>
 
       {sent ? (
         <div className="px-6 py-8 text-center">
-          <p className="text-lg font-bold text-fg">Thank you — that arrived.</p>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
+          <p className="text-lg font-bold text-tremor-content-strong">Thank you — that arrived.</p>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-tremor-content">
             We read all of it. There is no reply address on this, so if you need
             an answer rather than to be heard, the Help guide is the faster
             route.
           </p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="mt-5 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink"
-          >
+          <Button onClick={onClose} className="mt-5">
             Back to writing
-          </button>
+          </Button>
         </div>
       ) : !configured ? (
         <div className="px-6 py-8">
-          <p className="font-bold text-fg">There is nowhere to send this.</p>
-          <p className="mt-2 text-sm text-muted">
+          <p className="font-bold text-tremor-content-strong">There is nowhere to send this.</p>
+          <p className="mt-2 text-sm text-tremor-content">
             This copy of OpenChapter runs without a Supabase project, so it has
             no server to post to. Everything else works exactly as it does with
             one — see <code>.env.local.example</code>.
@@ -160,14 +150,14 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
           }}
         >
           <label className="block">
-            <span className="text-sm font-bold text-fg">
+            <span className="text-sm font-bold text-tremor-content-strong">
               What is this about?
             </span>
             <select
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              className="mt-1.5 w-full rounded-lg border border-line bg-surface px-3 py-2
-                         text-sm text-fg outline-none focus-visible:ring-2
+              className="mt-1.5 w-full rounded-lg border border-tremor-border bg-tremor-background-muted px-3 py-2
+                         text-sm text-tremor-content-strong outline-none focus-visible:ring-2
                          focus-visible:ring-accent/50"
             >
               <option value="">Select a topic…</option>
@@ -180,7 +170,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
           </label>
 
           <label className="mt-4 block">
-            <span className="text-sm font-bold text-fg">
+            <span className="text-sm font-bold text-tremor-content-strong">
               What happened, or what would help?
             </span>
             <textarea
@@ -189,16 +179,16 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
               rows={5}
               maxLength={MESSAGE_MAX}
               placeholder="The more specific, the more we can do about it."
-              className="mt-1.5 w-full resize-y rounded-lg border border-line bg-surface
-                         px-3 py-2 text-sm leading-relaxed text-fg outline-none
+              className="mt-1.5 w-full resize-y rounded-lg border border-tremor-border bg-tremor-background-muted
+                         px-3 py-2 text-sm leading-relaxed text-tremor-content-strong outline-none
                          focus-visible:ring-2 focus-visible:ring-accent/50"
             />
           </label>
 
           <div className="mt-4">
-            <p className="text-sm font-bold text-fg">
+            <p className="text-sm font-bold text-tremor-content-strong">
               How is it going, overall?{" "}
-              <span className="font-normal text-muted">Optional.</span>
+              <span className="font-normal text-tremor-content">Optional.</span>
             </p>
             <div className="mt-2 flex gap-2">
               {SENTIMENTS.map((s) => (
@@ -217,7 +207,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
                               text-lg transition-colors ${
                                 sentiment === s.id
                                   ? "border-accent bg-accent/10"
-                                  : "border-line bg-surface hover:bg-raised"
+                                  : "border-tremor-border bg-tremor-background-muted hover:bg-tremor-background-subtle"
                               }`}
                 >
                   <span aria-hidden="true">{s.face}</span>
@@ -228,7 +218,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
           </div>
 
           {problem && (
-            <p className="mt-4 rounded-lg border border-line bg-raised px-3 py-2 text-sm text-fg">
+            <p className="mt-4 rounded-lg border border-tremor-border bg-tremor-background-subtle px-3 py-2 text-sm text-tremor-content-strong">
               {problem}
             </p>
           )}
@@ -237,7 +227,7 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
               opens. This is the one screen where a writer is being asked to
               send us something, on a product whose pitch is that nothing
               leaves the machine. */}
-          <p className="mt-4 text-xs leading-relaxed text-muted">
+          <p className="mt-4 text-xs leading-relaxed text-tremor-content">
             Sent: the topic, your message, and the face if you picked one. Your
             account is attached so we can tell one writer&rsquo;s notes from
             another&rsquo;s. Nothing from your books goes — no title, no
@@ -245,14 +235,9 @@ export function FeedbackDialog({ onClose }: { onClose: () => void }) {
           </p>
 
           <div className="mt-4 flex justify-end">
-            <button
-              type="submit"
-              disabled={sending}
-              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink
-                         disabled:opacity-50"
-            >
+            <Button type="submit" disabled={sending}>
               {sending ? "Sending…" : "Send"}
-            </button>
+            </Button>
           </div>
         </form>
       )}

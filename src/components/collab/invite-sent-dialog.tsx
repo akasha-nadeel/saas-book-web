@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { INVITE_DAYS, ROLE_LABELS, type CollabRole } from "@/lib/collab";
+import { Button } from "@/components/ui/button";
 
 /**
  * What happens the moment an invitation exists.
@@ -97,7 +98,7 @@ export function InviteSentDialog({
         if (e.target === dialogRef.current) onClose();
       }}
       className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-2xl border
-                 border-line bg-panel p-0 text-fg backdrop:bg-black/50"
+                 border-tremor-border bg-tremor-background p-0 text-tremor-content-strong backdrop:bg-black/50"
     >
       <div className="px-6 pt-6 pb-5">
         {/* A mark rather than a heading alone: this is a *result*, and a result
@@ -127,11 +128,11 @@ export function InviteSentDialog({
           </svg>
         </span>
 
-        <h2 id="invite-sent-title" className="text-lg font-bold text-fg">
+        <h2 id="invite-sent-title" className="text-lg font-bold text-tremor-content-strong">
           {emailed ? "Invitation sent" : "Their invitation is ready"}
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          <strong className="font-semibold text-fg">{email}</strong> will be
+        <p className="mt-1.5 text-sm leading-relaxed text-tremor-content">
+          <strong className="font-semibold text-tremor-content-strong">{email}</strong> will be
           able to {ROLE_LABELS[role].label.replace(/^Can /, "")} this book once
           they accept.
         </p>
@@ -139,7 +140,7 @@ export function InviteSentDialog({
         {/* The link, and the sentence that explains why the writer is holding
             it. Two readings of the same control: a spare when the mail went, and
             the way through when it did not. */}
-        <p className="mt-4 text-sm font-semibold text-fg">
+        <p className="mt-4 text-sm font-semibold text-tremor-content-strong">
           {emailed
             ? "Or send them the link yourself"
             : "We couldn’t email them — send this link instead"}
@@ -151,18 +152,13 @@ export function InviteSentDialog({
             value={url}
             aria-label="Invitation link"
             onFocus={(e) => e.currentTarget.select()}
-            className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3
-                       py-2 font-mono text-xs text-fg outline-none
+            className="min-w-0 flex-1 rounded-lg border border-tremor-border bg-tremor-background-muted px-3
+                       py-2 font-mono text-xs text-tremor-content-strong outline-none
                        focus-visible:ring-2 focus-visible:ring-accent/50"
           />
-          <button
-            type="button"
-            onClick={() => void copy()}
-            className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold
-                       text-accent-ink transition-opacity hover:opacity-90"
-          >
+          <Button onClick={() => void copy()} className="shrink-0">
             {copied ? "Copied" : "Copy"}
-          </button>
+          </Button>
         </div>
 
         {failed && (
@@ -172,9 +168,9 @@ export function InviteSentDialog({
           </p>
         )}
 
-        <ul className="mt-4 space-y-1.5 text-xs leading-relaxed text-muted">
+        <ul className="mt-4 space-y-1.5 text-xs leading-relaxed text-tremor-content">
           <li>
-            It works only for <strong className="text-fg">{email}</strong>, so
+            It works only for <strong className="text-tremor-content-strong">{email}</strong>, so
             forwarding it gives nobody else access.
           </li>
           <li>It lasts {INVITE_DAYS} days.</li>
@@ -203,15 +199,10 @@ export function InviteSentDialog({
         </ul>
       </div>
 
-      <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold
-                     text-accent-ink transition-opacity hover:opacity-90"
-        >
+      <div className="flex justify-end gap-2 border-t border-tremor-border px-6 py-4">
+        <Button onClick={onClose}>
           Done
-        </button>
+        </Button>
       </div>
     </dialog>
   );

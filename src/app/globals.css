@@ -721,6 +721,59 @@
      fills its column, so the window sets the line length. */
   --text-manuscript: 1.1875rem; /* 19px */
   --text-manuscript--line-height: 1.75;
+
+  /* ---- The dialog system's palette -----------------------------------
+     **Tremor's own colours, and the sixth entry on the closed list.**
+
+     Adopted deliberately, with the cost understood: this is a second
+     greyscale beside the app's, and `docs/styling.md` says the exceptions
+     are a closed list for good reason. What keeps it from becoming two
+     designs is that **it is scoped to the dialog system and nothing else**.
+     A modal sits on a scrim, so a different ground inside it reads as a
+     surface of its own rather than as a clash with the near-black chrome
+     behind it. Use one of these on an ordinary screen and that stops being
+     true immediately.
+
+     **One name per token, not Tremor's two.** Upstream ships `tremor-*` and
+     `dark-tremor-*` and picks between them with the `dark:` variant. This
+     app flips token *values* by theme instead, so the same name is stated in
+     all three blocks and `dark:` is never needed — `text-tremor-content`
+     alone is correct in both themes.
+
+     Values are Tailwind's own scale, named in Tremor's config; the hexes are
+     resolved from those names rather than transcribed. */
+
+  --color-tremor-brand-faint: #0b1229;
+  --color-tremor-brand-muted: #172554; /* blue-950 */
+  --color-tremor-brand-subtle: #1e40af; /* blue-800 */
+  --color-tremor-brand: #3b82f6; /* blue-500 */
+  --color-tremor-brand-emphasis: #60a5fa; /* blue-400 */
+  --color-tremor-brand-inverted: #030712; /* gray-950 */
+
+  --color-tremor-background-muted: #131a2b;
+  --color-tremor-background-subtle: #1f2937; /* gray-800 */
+  --color-tremor-background: #111827; /* gray-900 */
+  --color-tremor-background-emphasis: #d1d5db; /* gray-300 */
+
+  --color-tremor-border: #1f2937; /* gray-800 */
+  --color-tremor-ring: #1f2937; /* gray-800 */
+
+  --color-tremor-content-subtle: #4b5563; /* gray-600 */
+  --color-tremor-content: #6b7280; /* gray-500 */
+  --color-tremor-content-emphasis: #e5e7eb; /* gray-200 */
+  --color-tremor-content-strong: #f9fafb; /* gray-50 */
+  --color-tremor-content-inverted: #030712; /* gray-950 */
+
+  /* Radii and shadows are the same in both themes — Tremor states one set. */
+  --radius-tremor-small: 0.375rem;
+  --radius-tremor-default: 0.5rem;
+  --radius-tremor-full: 9999px;
+
+  --shadow-tremor-input: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-tremor-card:
+    0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-tremor-dropdown:
+    0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 /* --------------------------------------------------------------------------
@@ -1081,6 +1134,28 @@
   --color-lp-stage-accent: #74a9ff;
   --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #b9b9c4;
+
+  /* The dialog palette, light. Same names as @theme. */
+  --color-tremor-brand-faint: #eff6ff; /* blue-50 */
+  --color-tremor-brand-muted: #bfdbfe; /* blue-200 */
+  --color-tremor-brand-subtle: #60a5fa; /* blue-400 */
+  --color-tremor-brand: #3b82f6; /* blue-500 */
+  --color-tremor-brand-emphasis: #1d4ed8; /* blue-700 */
+  --color-tremor-brand-inverted: #ffffff;
+
+  --color-tremor-background-muted: #f9fafb; /* gray-50 */
+  --color-tremor-background-subtle: #f3f4f6; /* gray-100 */
+  --color-tremor-background: #ffffff;
+  --color-tremor-background-emphasis: #374151; /* gray-700 */
+
+  --color-tremor-border: #e5e7eb; /* gray-200 */
+  --color-tremor-ring: #e5e7eb; /* gray-200 */
+
+  --color-tremor-content-subtle: #9ca3af; /* gray-400 */
+  --color-tremor-content: #6b7280; /* gray-500 */
+  --color-tremor-content-emphasis: #374151; /* gray-700 */
+  --color-tremor-content-strong: #111827; /* gray-900 */
+  --color-tremor-content-inverted: #ffffff;
 }
 
 /* --------------------------------------------------------------------------
@@ -1222,6 +1297,28 @@
   --color-lp-stage-accent: #74a9ff;
   --color-lp-stage-line: #2b2b36;
   --color-lp-device-edge: #14141a;
+
+  /* The dialog palette, dark. Same names as @theme. */
+  --color-tremor-brand-faint: #0b1229;
+  --color-tremor-brand-muted: #172554; /* blue-950 */
+  --color-tremor-brand-subtle: #1e40af; /* blue-800 */
+  --color-tremor-brand: #3b82f6; /* blue-500 */
+  --color-tremor-brand-emphasis: #60a5fa; /* blue-400 */
+  --color-tremor-brand-inverted: #030712; /* gray-950 */
+
+  --color-tremor-background-muted: #131a2b;
+  --color-tremor-background-subtle: #1f2937; /* gray-800 */
+  --color-tremor-background: #111827; /* gray-900 */
+  --color-tremor-background-emphasis: #d1d5db; /* gray-300 */
+
+  --color-tremor-border: #1f2937; /* gray-800 */
+  --color-tremor-ring: #1f2937; /* gray-800 */
+
+  --color-tremor-content-subtle: #4b5563; /* gray-600 */
+  --color-tremor-content: #6b7280; /* gray-500 */
+  --color-tremor-content-emphasis: #e5e7eb; /* gray-200 */
+  --color-tremor-content-strong: #f9fafb; /* gray-50 */
+  --color-tremor-content-inverted: #030712; /* gray-950 */
 }
 
 /* App shell. Layout constants, not part of the design language.

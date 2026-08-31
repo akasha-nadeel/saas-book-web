@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { summaryPhrase, type ImportSummary } from "@/lib/import/split";
 import { plural } from "@/lib/plural";
+import { Button } from "@/components/ui/button";
 
 /**
  * Asked before an import lands in a book that already has chapters in it.
@@ -67,15 +68,15 @@ export function ImportModeDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="oc-dialog-scroll p-6">
         <h2 className="font-serif text-xl">This book already has writing</h2>
-        <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
-          You have <span className="text-fg">{summaryPhrase(existing)}</span> in
+        <p className="mt-3 font-sans text-sm leading-relaxed text-tremor-content">
+          You have <span className="text-tremor-content-strong">{summaryPhrase(existing)}</span> in
           this book, and the file has{" "}
-          <span className="text-fg">{summaryPhrase(incoming)}</span>. What should
+          <span className="text-tremor-content-strong">{summaryPhrase(incoming)}</span>. What should
           happen to your chapters?
         </p>
 
@@ -84,14 +85,14 @@ export function ImportModeDialog({
           <button
             type="button"
             onClick={onAdd}
-            className="rounded-lg border border-line px-4 py-3 text-left outline-none
-                       transition-colors hover:border-accent/60 hover:bg-raised
+            className="rounded-lg border border-tremor-border px-4 py-3 text-left outline-none
+                       transition-colors hover:border-accent/60 hover:bg-tremor-background-subtle
                        focus-visible:ring-2 focus-visible:ring-accent/60"
           >
-            <span className="block font-sans text-sm font-semibold text-fg">
+            <span className="block font-sans text-sm font-semibold text-tremor-content-strong">
               Add to my book
             </span>
-            <span className="mt-0.5 block font-sans text-xs text-muted">
+            <span className="mt-0.5 block font-sans text-xs text-tremor-content">
               Keep everything you have. The file&rsquo;s {theirChapters} go after
               yours, numbered on from Chapter {existing.body + 1}.
               {bringsPages
@@ -106,7 +107,7 @@ export function ImportModeDialog({
             type="button"
             onClick={onReplace}
             className="rounded-lg border px-4 py-3 text-left outline-none
-                       transition-colors hover:bg-raised focus-visible:ring-2
+                       transition-colors hover:bg-tremor-background-subtle focus-visible:ring-2
                        focus-visible:ring-accent/60"
             style={{ borderColor: "color-mix(in srgb, var(--color-danger) 45%, transparent)" }}
           >
@@ -116,7 +117,7 @@ export function ImportModeDialog({
             >
               Replace my chapters
             </span>
-            <span className="mt-0.5 block font-sans text-xs text-muted">
+            <span className="mt-0.5 block font-sans text-xs text-tremor-content">
               Delete the {yourChapters} you have here and use the file&rsquo;s
               instead, numbered from Chapter 1.
               {keepsPages
@@ -128,15 +129,9 @@ export function ImportModeDialog({
         </div>
 
         <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-2 font-sans text-sm text-muted outline-none
-                       transition-colors hover:bg-raised hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
+          <Button variant="secondary" onClick={onClose} className="text-tremor-content hover:bg-tremor-background-subtle hover:text-tremor-content-strong">
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

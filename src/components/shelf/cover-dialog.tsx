@@ -17,6 +17,7 @@ import {
 import { useCover } from "@/lib/use-library";
 import { clearCover, saveCover } from "@/lib/cover-save";
 import { SwitchTrack } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
 
 /**
  * Editing what a book *is*: its title, who wrote it, what kind of book it is,
@@ -113,11 +114,11 @@ export function CoverDialog({
         if (e.target === dialogRef.current) onClose();
       }}
       className="oc-dialog m-auto w-[44rem] max-w-[calc(100vw-2rem)] rounded-lg
-                 bg-panel p-0 text-fg backdrop:bg-black/70"
+                 bg-tremor-background p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <form onSubmit={save} className="oc-dialog-scroll p-6">
         <h2 className="font-serif text-xl">Edit book details</h2>
-        <p className="mt-1 font-sans text-sm text-muted">
+        <p className="mt-1 font-sans text-sm text-tremor-content">
           What this book is, and how it appears on your shelf.
         </p>
 
@@ -183,7 +184,7 @@ export function CoverDialog({
                      would read as the primary action of the pair, which it is
                      the opposite of. Same treatment as the covers tool's own
                      Remove. */
-                  className="rounded-md px-3 py-2 font-sans text-sm text-muted
+                  className="rounded-md px-3 py-2 font-sans text-sm text-tremor-content
                              outline-none transition-colors hover:bg-stop-bg
                              hover:text-danger focus-visible:ring-2
                              focus-visible:ring-accent/60"
@@ -203,40 +204,40 @@ export function CoverDialog({
               back. One column below `sm`, as everything else is. */}
           <div className="min-w-0">
             <label className="block font-sans text-sm">
-              <span className="font-medium text-fg">Title</span>
+              <span className="font-medium text-tremor-content-strong">Title</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Untitled Book"
                 autoFocus
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg placeholder:text-muted
+                className="mt-1.5 w-full rounded-md border border-tremor-border bg-tremor-background-muted
+                           px-3 py-2 text-tremor-content-strong placeholder:text-tremor-content
                            focus-visible:border-accent focus-visible:outline-none"
               />
             </label>
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="block font-sans text-sm">
-              <span className="font-medium text-fg">Subtitle</span>
+              <span className="font-medium text-tremor-content-strong">Subtitle</span>
               <input
                 value={subtitle}
                 onChange={(e) => setSubtitle(e.target.value)}
                 placeholder="A novel"
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg placeholder:text-muted
+                className="mt-1.5 w-full rounded-md border border-tremor-border bg-tremor-background-muted
+                           px-3 py-2 text-tremor-content-strong placeholder:text-tremor-content
                            focus-visible:border-accent focus-visible:outline-none"
               />
             </label>
 
             <label className="block font-sans text-sm">
-              <span className="font-medium text-fg">Author</span>
+              <span className="font-medium text-tremor-content-strong">Author</span>
               <input
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
                 placeholder="Your name"
                 autoComplete="name"
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg placeholder:text-muted
+                className="mt-1.5 w-full rounded-md border border-tremor-border bg-tremor-background-muted
+                           px-3 py-2 text-tremor-content-strong placeholder:text-tremor-content
                            focus-visible:border-accent focus-visible:outline-none"
               />
             </label>
@@ -253,12 +254,12 @@ export function CoverDialog({
                 A select rather than free text: the same list `/book/new` offers
                 and `suggestTarget()` knows about, so the three cannot drift. */}
             <label className="mt-4 block font-sans text-sm">
-              <span className="font-medium text-fg">Genre</span>
+              <span className="font-medium text-tremor-content-strong">Genre</span>
               <select
                 value={genre}
                 onChange={(e) => setGenre(e.target.value)}
-                className="mt-1.5 w-full rounded-md border border-line bg-surface
-                           px-3 py-2 text-fg focus-visible:border-accent
+                className="mt-1.5 w-full rounded-md border border-tremor-border bg-tremor-background-muted
+                           px-3 py-2 text-tremor-content-strong focus-visible:border-accent
                            focus-visible:outline-none"
               >
                 <option value="">Not sure yet</option>
@@ -268,7 +269,7 @@ export function CoverDialog({
                   </option>
                 ))}
               </select>
-              <span className="mt-1 block text-xs text-muted">
+              <span className="mt-1 block text-xs text-tremor-content">
                 Comp titles, categories, blurb examples and structure all read
                 this.
               </span>
@@ -304,16 +305,16 @@ export function CoverDialog({
             aria-checked={bare}
             onClick={() => setBare(!bare)}
             className="mt-3 flex w-full items-start gap-3 rounded-md border
-                       border-line px-3 py-2.5 text-left outline-none
-                       transition-colors hover:bg-raised
+                       border-tremor-border px-3 py-2.5 text-left outline-none
+                       transition-colors hover:bg-tremor-background-subtle
                        focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <SwitchTrack on={bare} className="mt-0.5" />
             <span className="min-w-0 flex-1">
-              <span className="block font-sans text-sm font-medium text-fg">
+              <span className="block font-sans text-sm font-medium text-tremor-content-strong">
                 The artwork already has the words on it
               </span>
-              <span className="mt-0.5 block font-sans text-xs text-muted">
+              <span className="mt-0.5 block font-sans text-xs text-tremor-content">
                 Show the picture as it is, with no title, subtitle or author
                 printed over it. The fields above are still used for the
                 shops and the exported book.
@@ -358,7 +359,7 @@ export function CoverDialog({
           <p
             role="alert"
             className="mt-5 rounded-md border border-accent/50 bg-accent-deep/30
-                       px-3 py-2.5 font-sans text-sm text-fg"
+                       px-3 py-2.5 font-sans text-sm text-tremor-content-strong"
           >
             {error}
           </p>
@@ -369,25 +370,10 @@ export function CoverDialog({
             thing in CSS, and every other dialog in the app already reads from
             that one rule. */}
         <div className="oc-dialog-actions mt-6 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-2 font-sans text-sm text-muted
-                       outline-none transition-colors hover:bg-raised
-                       hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                       font-medium text-accent-ink outline-none transition-colors
-                       hover:bg-accent-strong focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
-            Save
-          </button>
+          </Button>
+          <Button type="submit">Save</Button>
         </div>
       </form>
     </dialog>

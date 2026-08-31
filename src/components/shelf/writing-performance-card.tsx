@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useMemo } from "react";
 import {
   AreaChart,
   BarList,
@@ -10,518 +10,272 @@ import {
   TabList,
   TabPanel,
   TabPanels,
-  RiGithubFill,
-  RiGoogleFill,
-  RiRedditFill,
-  RiTwitterFill,
-  RiYoutubeFill,
 } from "@/components/ui/tremor";
+import {
+  byWeekday,
+  dailySeries,
+  pace,
+  runningTotal,
+} from "@/lib/activity";
+import { bookWordCount, type Book } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
+import { useActivity } from "@/lib/use-library";
 
-const data = [
-  {
-    date: "Aug 01",
-    "Page views": 7100,
-    "Unique visitors": 4434,
-  },
-  {
-    date: "Aug 02",
-    "Page views": 10943,
-    "Unique visitors": 6954,
-  },
-  {
-    date: "Aug 03",
-    "Page views": 10889,
-    "Unique visitors": 7100,
-  },
-  {
-    date: "Aug 04",
-    "Page views": 10909,
-    "Unique visitors": 7909,
-  },
-  {
-    date: "Aug 05",
-    "Page views": 10778,
-    "Unique visitors": 7103,
-  },
-  {
-    date: "Aug 06",
-    "Page views": 10900,
-    "Unique visitors": 7534,
-  },
-  {
-    date: "Aug 07",
-    "Page views": 10129,
-    "Unique visitors": 7412,
-  },
-  {
-    date: "Aug 08",
-    "Page views": 10021,
-    "Unique visitors": 7834,
-  },
-  {
-    date: "Aug 09",
-    "Page views": 10279,
-    "Unique visitors": 7159,
-  },
-  {
-    date: "Aug 10",
-    "Page views": 10224,
-    "Unique visitors": 8260,
-  },
-  {
-    date: "Aug 11",
-    "Page views": 10380,
-    "Unique visitors": 4965,
-  },
-  {
-    date: "Aug 12",
-    "Page views": 10414,
-    "Unique visitors": 4989,
-  },
-  {
-    date: "Aug 13",
-    "Page views": 6540,
-    "Unique visitors": 4839,
-  },
-  {
-    date: "Aug 14",
-    "Page views": 6634,
-    "Unique visitors": 4343,
-  },
-  {
-    date: "Aug 15",
-    "Page views": 7124,
-    "Unique visitors": 4903,
-  },
-  {
-    date: "Aug 16",
-    "Page views": 7934,
-    "Unique visitors": 5273,
-  },
-  {
-    date: "Aug 17",
-    "Page views": 10287,
-    "Unique visitors": 6900,
-  },
-  {
-    date: "Aug 18",
-    "Page views": 10323,
-    "Unique visitors": 6732,
-  },
-  {
-    date: "Aug 19",
-    "Page views": 10511,
-    "Unique visitors": 6523,
-  },
-  {
-    date: "Aug 20",
-    "Page views": 11043,
-    "Unique visitors": 7422,
-  },
-  {
-    date: "Aug 21",
-    "Page views": 6700,
-    "Unique visitors": 4334,
-  },
-  {
-    date: "Aug 22",
-    "Page views": 6900,
-    "Unique visitors": 4943,
-  },
-  {
-    date: "Aug 23",
-    "Page views": 7934,
-    "Unique visitors": 7812,
-  },
-  {
-    date: "Aug 24",
-    "Page views": 9021,
-    "Unique visitors": 7729,
-  },
-  {
-    date: "Aug 25",
-    "Page views": 9198,
-    "Unique visitors": 7178,
-  },
-  {
-    date: "Aug 26",
-    "Page views": 9557,
-    "Unique visitors": 7158,
-  },
-  {
-    date: "Aug 27",
-    "Page views": 9959,
-    "Unique visitors": 7100,
-  },
-  {
-    date: "Aug 28",
-    "Page views": 10034,
-    "Unique visitors": 7934,
-  },
-  {
-    date: "Aug 29",
-    "Page views": 10243,
-    "Unique visitors": 7223,
-  },
-  {
-    date: "Aug 30",
-    "Page views": 10078,
-    "Unique visitors": 8779,
-  },
-  {
-    date: "Aug 31",
-    "Page views": 11134,
-    "Unique visitors": 8190,
-  },
-  {
-    date: "Sep 01",
-    "Page views": 12347,
-    "Unique visitors": 4839,
-  },
-  {
-    date: "Sep 02",
-    "Page views": 12593,
-    "Unique visitors": 5153,
-  },
-  {
-    date: "Sep 03",
-    "Page views": 12043,
-    "Unique visitors": 5234,
-  },
-  {
-    date: "Sep 04",
-    "Page views": 12144,
-    "Unique visitors": 5478,
-  },
-  {
-    date: "Sep 05",
-    "Page views": 12489,
-    "Unique visitors": 5741,
-  },
-  {
-    date: "Sep 06",
-    "Page views": 12748,
-    "Unique visitors": 6743,
-  },
-  {
-    date: "Sep 07",
-    "Page views": 12933,
-    "Unique visitors": 7832,
-  },
-  {
-    date: "Sep 08",
-    "Page views": 13028,
-    "Unique visitors": 8943,
-  },
-  {
-    date: "Sep 09",
-    "Page views": 13412,
-    "Unique visitors": 9932,
-  },
-  {
-    date: "Sep 10",
-    "Page views": 13649,
-    "Unique visitors": 10139,
-  },
-  {
-    date: "Sep 11",
-    "Page views": 13748,
-    "Unique visitors": 10441,
-  },
-  {
-    date: "Sep 12",
-    "Page views": 13148,
-    "Unique visitors": 10933,
-  },
-  {
-    date: "Sep 13",
-    "Page views": 12839,
-    "Unique visitors": 10073,
-  },
-  {
-    date: "Sep 14",
-    "Page views": 12428,
-    "Unique visitors": 10128,
-  },
-  {
-    date: "Sep 15",
-    "Page views": 12012,
-    "Unique visitors": 10412,
-  },
-  {
-    date: "Sep 16",
-    "Page views": 11801,
-    "Unique visitors": 9501,
-  },
-  {
-    date: "Sep 17",
-    "Page views": 10102,
-    "Unique visitors": 7923,
-  },
-  {
-    date: "Sep 18",
-    "Page views": 12132,
-    "Unique visitors": 10212,
-  },
-  {
-    date: "Sep 19",
-    "Page views": 12901,
-    "Unique visitors": 10101,
-  },
-  {
-    date: "Sep 20",
-    "Page views": 13132,
-    "Unique visitors": 10132,
-  },
-  {
-    date: "Sep 21",
-    "Page views": 14132,
-    "Unique visitors": 10212,
-  },
-  {
-    date: "Sep 22",
-    "Page views": 14245,
-    "Unique visitors": 12163,
-  },
-  {
-    date: "Sep 23",
-    "Page views": 14328,
-    "Unique visitors": 10036,
-  },
-  {
-    date: "Sep 24",
-    "Page views": 14949,
-    "Unique visitors": 8985,
-  },
-  {
-    date: "Sep 25",
-    "Page views": 15967,
-    "Unique visitors": 9700,
-  },
-  {
-    date: "Sep 26",
-    "Page views": 17349,
-    "Unique visitors": 10943,
-  },
-];
+/**
+ * Whether the writing is moving.
+ *
+ * **This card used to be a web-analytics demo** — page views, unique visitors,
+ * traffic from google and reddit, every figure typed into the file. None of it
+ * was true of anything, and it sat at the top of the first screen a writer
+ * sees. It is now the same shape over the day log the app has been keeping all
+ * along (`activity.ts`), which is the only honest thing this slot can hold.
+ *
+ * **Net words, and a day of cutting is a day of writing.** The measure is what
+ * the book weighs at the end of the day against the start, so a hard revision
+ * reads as work rather than as a failed day. The chart draws it below the line;
+ * `tremor.tsx` had to stop clamping its floor to zero before it could.
+ *
+ * **Facts, never verdicts.** No score, no grade, no "you should write more".
+ * The two figures and the two lists are counts, and a bad month is reported in
+ * the same voice as a good one.
+ *
+ * The Progress tool says the same things per book with a month grid and a
+ * finish date. It is hidden under the launch flag, so today this is the only
+ * place a writer sees any of it — and both read `activity.ts`, so the two
+ * cannot drift apart when Progress comes back.
+ */
 
-const data1 = [
-  {
-    name: "/",
-    value: 20874,
-  },
-  {
-    name: "/components",
-    value: 19188,
-  },
-  {
-    name: "/docs/getting-started/installation",
-    value: 17922,
-  },
-  {
-    name: "/docs/visualizations/area-chart",
-    value: 10067,
-  },
-  {
-    name: "/docs/visualizations/bar-chart",
-    value: 9067,
-  },
-];
+const WINDOW_DAYS = 30;
 
-const data2 = [
-  {
-    name: "google.com",
-    value: 9882,
-    icon: RiGoogleFill,
-  },
-  {
-    name: "twitter.com",
-    value: 1904,
-    icon: RiTwitterFill,
-  },
-  {
-    name: "github.com",
-    value: 1904,
-    icon: RiGithubFill,
-  },
-  {
-    name: "youtube.com",
-    value: 1118,
-    icon: RiYoutubeFill,
-  },
-  {
-    name: "reddit.com",
-    value: 396,
-    icon: RiRedditFill,
-  },
-];
+/** Top five, because a sixth row is a list rather than a ranking. */
+const TOP_BOOKS = 5;
 
-const data3 = [
-  {
-    name: "/components",
-    value: 60874,
-  },
-  {
-    name: "/",
-    value: 51188,
-  },
-  {
-    name: "/docs/getting-started/installation",
-    value: 38922,
-  },
-  {
-    name: "/docs/visualizations/area-chart",
-    value: 20067,
-  },
-  {
-    name: "/docs/visualizations/bar-chart",
-    value: 19067,
-  },
-];
+const format = (n: number) => Intl.NumberFormat("us").format(n);
 
-const data4 = [
-  {
-    name: "google.com",
-    value: 12892,
-    icon: RiGoogleFill,
-  },
-  {
-    name: "twitter.com",
-    value: 2070,
-    icon: RiTwitterFill,
-  },
-  {
-    name: "github.com",
-    value: 1296,
-    icon: RiGithubFill,
-  },
-  {
-    name: "youtube.com",
-    value: 779,
-    icon: RiYoutubeFill,
-  },
-  {
-    name: "reddit.com",
-    value: 438,
-    icon: RiRedditFill,
-  },
-];
+/**
+ * A window's net change, with its sign kept.
+ *
+ * A month of revision is a real thing to have done and reads as `−1,240`. The
+ * minus is U+2212 rather than a hyphen, which is what the rest of the app sets
+ * its negative figures with.
+ */
+function signed(n: number): string {
+  if (n < 0) return `−${format(Math.abs(n))}`;
+  return format(n);
+}
 
-const summary = [
-  {
-    name: "Unique visitors",
-    type: "Visitors",
-    value: "216.8K",
-    categories: [
-      {
-        name: "Top pages",
-        data: data1,
-      },
-      {
-        name: "Top sources",
-        data: data2,
-      },
-    ],
-  },
-  {
-    name: "Page views",
-    type: "Views",
-    value: "271K",
-    categories: [
-      {
-        name: "Top pages",
-        data: data3,
-      },
-      {
-        name: "Top sources",
-        data: data4,
-      },
-    ],
-  },
-];
+export function WritingPerformanceCard({
+  books,
+  words,
+}: {
+  books: Book[];
+  /** The shelf's own total, so this card and the tiles above it agree. */
+  words: number;
+}) {
+  const activity = useActivity();
 
-const valueFormatter = (number: number) =>
-  `${Intl.NumberFormat("us").format(number).toString()}`;
+  const month = useMemo(() => pace(activity, WINDOW_DAYS), [activity]);
 
-export function WritingPerformanceCard() {
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  /**
+   * Whether the day log holds anything at all.
+   *
+   * Not "did they write this month" — a writer back after a fallow summer has
+   * a log worth drawing and a flat month is a true fact about them. This is
+   * the narrower question of whether anything has ever been recorded, which is
+   * the only case where a chart would be rendering an empty result as a good
+   * one.
+   */
+  const logged = useMemo(
+    () => Object.values(activity).some((n) => n !== 0),
+    [activity],
+  );
 
-  const handleIndexChange = (index: number) => {
-    setSelectedIndex(index);
-  };
+  const written = useMemo(
+    () =>
+      dailySeries(activity, WINDOW_DAYS).map((d) => ({
+        date: d.date,
+        "Words written": d.words,
+      })),
+    [activity],
+  );
+
+  const manuscript = useMemo(
+    () =>
+      runningTotal(activity, words, WINDOW_DAYS).map((d) => ({
+        date: d.date,
+        Manuscript: d.words,
+      })),
+    [activity, words],
+  );
+
+  const weekdays = useMemo(() => byWeekday(activity, WINDOW_DAYS), [activity]);
+
+  /**
+   * Where the words live.
+   *
+   * Current size per book rather than the window's change, because the day log
+   * is kept across the whole shelf and cannot be split by book — see the note
+   * on `Activity` in `activity.ts`. So this answers "which manuscript is the
+   * big one", which is a different and still useful question.
+   */
+  const byBook = useMemo(
+    () =>
+      books
+        .map((book) => ({ name: book.title, value: bookWordCount(book) }))
+        .filter((b) => b.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, TOP_BOOKS),
+    [books],
+  );
+
+  const tabs = [
+    {
+      name: "Written",
+      note: `last ${WINDOW_DAYS} days`,
+      value: signed(month.words),
+      data: written,
+      category: "Words written",
+      /* Always the full window by construction — `dailySeries` fills the days
+         off with zero, so there is never anything to explain. */
+      caption: null as string | null,
+    },
+    {
+      name: "Manuscript",
+      note: "every book",
+      value: format(words),
+      data: manuscript,
+      category: "Manuscript",
+      /**
+       * Why the line may start partway across.
+       *
+       * `runningTotal` reconstructs backwards from today's total and stops
+       * where the day log stops, rather than padding a flat run in front of
+       * itself. Without this line a reader sees a short, nearly level chart
+       * and cannot tell whether the book barely moved or the app simply has
+       * not been watching long — and those are opposite facts.
+       */
+      caption:
+        manuscript.length > 0 && manuscript.length < WINDOW_DAYS
+          ? `The day log reaches back ${plural(manuscript.length, "day")}. Anything before that is not known, so the line starts there.`
+          : null,
+    },
+  ];
 
   return (
-    <div className="flex h-full flex-col rounded-lg border border-line bg-panel p-6">
-      <h3 className="text-base font-semibold text-fg">
-        Web analytics
-      </h3>
+    <div className="flex h-full flex-col rounded-lg border border-line bg-panel p-4 sm:p-6">
+      <h3 className="text-base font-semibold text-fg">Your writing</h3>
       <p className="mt-1 text-sm text-muted">
-        Analyze and understand your web traffic.
+        Whether the writing is moving. Counted across every book, over the last{" "}
+        {WINDOW_DAYS} days.
       </p>
-      <TabGroup defaultIndex={0} onIndexChange={handleIndexChange}>
-        <Card className="mt-6 overflow-hidden p-0">
-          <TabList className="space-x-0 bg-raised/20">
-            {summary.map((tab) => (
-              <Tab
-                key={tab.name}
-                className="border-r border-line py-4 pl-5 pr-12 text-left last:border-r-0"
-              >
-                <span className="block text-xs font-medium text-muted">
-                  {tab.name}
-                </span>
-                <span className="mt-1 block text-2xl font-bold tracking-tight tabular-nums text-fg">
-                  {tab.value}
-                </span>
-              </Tab>
-            ))}
-          </TabList>
-          <TabPanels>
-            {summary.map((tab) => (
-              <TabPanel key={tab.name} className="p-6">
-                <AreaChart
-                  data={data}
-                  index="date"
-                  categories={[tab.name]}
-                  valueFormatter={valueFormatter}
-                  showGradient={true}
-                  showLegend={false}
-                  yAxisWidth={45}
-                  className="hidden h-96 sm:block"
-                />
-                <AreaChart
-                  data={data}
-                  index="date"
-                  categories={[tab.name]}
-                  valueFormatter={valueFormatter}
-                  showGradient={true}
-                  showLegend={false}
-                  showYAxis={false}
-                  startEndOnly={true}
-                  className="h-72 sm:hidden"
-                />
-              </TabPanel>
-            ))}
-          </TabPanels>
-        </Card>
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          {summary[selectedIndex].categories.map((category) => (
-            <Card key={category.name}>
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-semibold text-fg">
-                  {category.name}
+
+      {!logged ? (
+        /* A flat chart of thirty zeroes would draw an empty result as a good
+           one. This says the plain thing instead, and says what starts it. */
+        <p className="mt-6 rounded-lg border border-line bg-raised/20 p-5 text-sm text-muted">
+          Nothing recorded yet. This fills in on its own as you write — a day
+          counts whether the book grew or you cut it back.
+        </p>
+      ) : (
+        <TabGroup defaultIndex={0}>
+          <Card className="mt-6 overflow-hidden p-0">
+            {/* `flex` with `flex-1` tabs rather than the fixed `pr-12` this
+                came with: two tabs at that padding wanted about 316px, and a
+                360px phone leaves the card roughly 280. Split evenly they
+                cannot overflow at any width. */}
+            <TabList className="flex space-x-0 bg-raised/20">
+              {tabs.map((tab) => (
+                <Tab
+                  key={tab.name}
+                  className="min-w-0 flex-1 border-r border-line px-4 py-3 text-left last:border-r-0 sm:px-5 sm:py-4"
+                >
+                  <span className="block truncate text-xs font-medium text-muted">
+                    {tab.name}{" "}
+                    <span className="hidden sm:inline">· {tab.note}</span>
+                  </span>
+                  <span className="mt-1 block truncate text-xl font-bold tracking-tight tabular-nums text-fg sm:text-2xl">
+                    {tab.value}
+                  </span>
+                </Tab>
+              ))}
+            </TabList>
+            <TabPanels>
+              {tabs.map((tab) => (
+                <TabPanel key={tab.name} className="p-4 sm:p-6">
+                  {/* Two instances rather than one, because `showYAxis` and
+                      `startEndOnly` are props and not CSS — the small one
+                      drops the axis and thins the labels to two. */}
+                  <AreaChart
+                    data={tab.data}
+                    index="date"
+                    categories={[tab.category]}
+                    colors={["cyan"]}
+                    valueFormatter={format}
+                    showGradient={true}
+                    showLegend={false}
+                    yAxisWidth={56}
+                    className="hidden sm:block sm:h-72 lg:h-96"
+                  />
+                  <AreaChart
+                    data={tab.data}
+                    index="date"
+                    categories={[tab.category]}
+                    colors={["cyan"]}
+                    valueFormatter={format}
+                    showGradient={true}
+                    showLegend={false}
+                    showYAxis={false}
+                    startEndOnly={true}
+                    className="h-56 sm:hidden"
+                  />
+                  {tab.caption && (
+                    <p className="mt-3 text-xs leading-relaxed text-muted">
+                      {tab.caption}
+                    </p>
+                  )}
+                </TabPanel>
+              ))}
+            </TabPanels>
+          </Card>
+
+          {/* Below the tabs rather than inside a panel: neither list changes
+              with the tab — one is the shelf as it stands, the other is the
+              window — and two identical panels that redraw on a press would
+              promise a change that never comes. */}
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
+            <Card>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-sm font-semibold text-fg">
+                  Words by book
                 </p>
-                <span className="text-xs font-medium text-muted">
-                  {summary[selectedIndex].type}
+                <span className="shrink-0 text-xs font-medium text-muted">
+                  Now
                 </span>
               </div>
-              <BarList
-                data={category.data}
-                valueFormatter={valueFormatter}
-              />
+              {byBook.length > 0 ? (
+                <BarList data={byBook} valueFormatter={format} />
+              ) : (
+                <p className="text-sm text-muted">No words on the shelf yet.</p>
+              )}
             </Card>
-          ))}
-        </div>
-      </TabGroup>
+
+            <Card>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-sm font-semibold text-fg">
+                  Days of the week
+                </p>
+                <span className="shrink-0 text-xs font-medium text-muted">
+                  {WINDOW_DAYS} days
+                </span>
+              </div>
+              {/* Which day you actually write on is a thing you cannot see
+                  from the inside. A weekday that comes out negative is left
+                  negative — it reads as "that is when I cut". */}
+              <BarList data={weekdays} valueFormatter={signed} />
+            </Card>
+          </div>
+        </TabGroup>
+      )}
     </div>
   );
 }

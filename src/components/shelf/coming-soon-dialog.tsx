@@ -18,7 +18,7 @@ import { useEffect, useRef } from "react";
  *
  * **So its colours are stated literally, and that is not a style preference.**
  * A fixed ground with themed ink is the same bug as themed ground with fixed
- * ink, pointed the other way: this drew its body in `text-fg` and its button
+ * ink, pointed the other way: this drew its body in `text-tremor-content-strong` and its button
  * label in `text-accent-ink`, both of which are near-black *by day* — on a
  * ground that is black in every theme. The button was white-on-white and the
  * sentence explaining the feature was black-on-black, in exactly one theme,

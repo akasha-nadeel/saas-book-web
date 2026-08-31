@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { nounFor, plural } from "@/lib/plural";
+import { Button } from "@/components/ui/button";
 
 /**
  * Asked before a file lands in one part of the book that already has pages.
@@ -66,15 +67,15 @@ export function SectionImportDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="oc-dialog-scroll p-6">
         <h2 className="font-serif text-xl">
           {label} already has {yours}
         </h2>
-        <p className="mt-3 font-sans text-sm leading-relaxed text-muted">
-          That file has <span className="text-fg">{theirs}</span> for this part.
+        <p className="mt-3 font-sans text-sm leading-relaxed text-tremor-content">
+          That file has <span className="text-tremor-content-strong">{theirs}</span> for this part.
           What should happen to the {nounFor(existingCount, noun)}{" "}
           you have?
         </p>
@@ -84,14 +85,14 @@ export function SectionImportDialog({
           <button
             type="button"
             onClick={onAdd}
-            className="rounded-lg border border-line px-4 py-3 text-left outline-none
-                       transition-colors hover:border-accent/60 hover:bg-raised
+            className="rounded-lg border border-tremor-border px-4 py-3 text-left outline-none
+                       transition-colors hover:border-accent/60 hover:bg-tremor-background-subtle
                        focus-visible:ring-2 focus-visible:ring-accent/60"
           >
-            <span className="block font-sans text-sm font-semibold text-fg">
+            <span className="block font-sans text-sm font-semibold text-tremor-content-strong">
               Keep mine and add what is new
             </span>
-            <span className="mt-0.5 block font-sans text-xs text-muted">
+            <span className="mt-0.5 block font-sans text-xs text-tremor-content">
               {newCount === 0
                 ? `Every ${noun} in that file is one this book already has, so nothing would go in. Pages are matched by name — a book has one dedication, not two.`
                 : `${plural(newCount, noun)} would go in. The ${yours} you have are left exactly as they are.`}
@@ -105,7 +106,7 @@ export function SectionImportDialog({
             type="button"
             onClick={onReplace}
             className="rounded-lg border px-4 py-3 text-left outline-none
-                       transition-colors hover:bg-raised focus-visible:ring-2
+                       transition-colors hover:bg-tremor-background-subtle focus-visible:ring-2
                        focus-visible:ring-accent/60"
             style={{
               borderColor:
@@ -118,7 +119,7 @@ export function SectionImportDialog({
             >
               Replace my {nounFor(existingCount, noun)}
             </span>
-            <span className="mt-0.5 block font-sans text-xs text-muted">
+            <span className="mt-0.5 block font-sans text-xs text-tremor-content">
               Delete the {yours} in {label.toLowerCase()}{" "}
               and use the file&rsquo;s {theirs} instead. Nothing outside this
               part is touched. You can still undo this straight after.
@@ -145,15 +146,9 @@ export function SectionImportDialog({
         )}
 
         <div className="mt-5 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-2 font-sans text-sm text-muted outline-none
-                       transition-colors hover:bg-raised hover:text-fg
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
+          <Button variant="secondary" onClick={onClose} className="text-tremor-content hover:bg-tremor-background-subtle hover:text-tremor-content-strong">
             Cancel
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

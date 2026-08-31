@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { MatterPartRows } from "@/components/editor/matter-rows";
 import { defaultPicked, pagesLabel, picksFrom } from "@/lib/matter-picks";
 import type { MatterPick } from "@/lib/library-store";
+import { Button } from "@/components/ui/button";
 
 /**
  * Asked once per book: which pages go before and after the story.
@@ -88,8 +89,8 @@ export function MatterSetupDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onSkip();
       }}
-      className="m-auto w-[46rem] max-w-[calc(100vw-2rem)] rounded-xl bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[46rem] max-w-[calc(100vw-2rem)] rounded-xl bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       {/* `max-h` and the scrolling middle: sixteen rows is taller than a laptop
           window, and a dialog whose buttons are below the fold is a dialog
@@ -115,7 +116,7 @@ export function MatterSetupDialog({
               are the reason the writer is here. The reassurance that nothing is
               permanent moved to the footer, beside the buttons that act on
               it. */}
-          <p className="mt-1.5 max-w-prose font-sans text-sm leading-relaxed text-muted">
+          <p className="mt-1.5 max-w-prose font-sans text-sm leading-relaxed text-tremor-content">
             No shop requires any of these, so tick only what you will actually
             write — a page left empty is left out of your exports.
           </p>
@@ -135,8 +136,8 @@ export function MatterSetupDialog({
                 </legend>
                 <p
                   aria-hidden="true"
-                  className="sticky top-0 z-10 -mx-1 bg-panel px-1 pb-1 font-sans
-                             text-xs font-bold tracking-wide text-muted uppercase"
+                  className="sticky top-0 z-10 -mx-1 bg-tremor-background px-1 pb-1 font-sans
+                             text-xs font-bold tracking-wide text-tremor-content uppercase"
                 >
                   {part === "front" ? "Before the story" : "After the story"}
                 </p>
@@ -167,13 +168,13 @@ export function MatterSetupDialog({
             only fill on the row, as everywhere else in the chrome. Skip is a
             button rather than a cross, because "no thanks" is an answer and
             should look like one. */}
-        <div className="flex shrink-0 items-center justify-between gap-4 border-t border-line px-6 py-3.5">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-t border-tremor-border px-6 py-3.5">
           <div className="flex min-w-0 items-center gap-1">
             <button
               type="button"
               onClick={onSkip}
-              className="rounded-md px-2.5 py-2 font-sans text-sm text-muted outline-none
-                         transition-colors hover:bg-raised hover:text-fg
+              className="rounded-md px-2.5 py-2 font-sans text-sm text-tremor-content outline-none
+                         transition-colors hover:bg-tremor-background-subtle hover:text-tremor-content-strong
                          focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               Skip for now
@@ -184,26 +185,19 @@ export function MatterSetupDialog({
                 commit — and it pushed the list down. Beside the buttons it is
                 read at the moment it is worth anything. Hidden on a narrow
                 dialog, where the two controls need the room more. */}
-            <p className="hidden font-sans text-xs text-muted sm:block">
+            <p className="hidden font-sans text-xs text-tremor-content sm:block">
               You can add or delete any of these later.
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => (picks.length === 0 ? onSkip() : onCreate(picks))}
-            className="rounded-lg bg-accent px-4 py-2 font-sans text-sm font-semibold
-                       text-accent-ink outline-none transition-colors
-                       hover:bg-accent-strong focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
+          <Button onClick={() => (picks.length === 0 ? onSkip() : onCreate(picks))}>
             {/* Says what will happen, and counts it. Everything unticked makes
                 this the same as Skip, which is what it then says — a button
                 reading "Add 0 pages" is a button that looks broken. */}
             {picks.length === 0
               ? "No pages, thanks"
               : `Add ${pagesLabel(picks.length)}`}
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

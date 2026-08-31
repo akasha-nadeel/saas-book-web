@@ -1,23 +1,11 @@
 "use client";
 
-import {
-  createContext,
-  Fragment,
-  useContext,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
+import { Fragment, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CollabArea } from "@/components/collab/collab-area";
-import { SharedBadge } from "@/components/collab/shared-badge";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
@@ -40,6 +28,7 @@ import {
   migrateLegacy,
   restoreBook,
   setFavourite,
+  setPref,
   trashBook,
   type Book,
   type BookView,
@@ -49,23 +38,36 @@ import { relativeTime } from "@/lib/relative-time";
 import { nounFor, plural } from "@/lib/plural";
 import { withReturn, type AreaId } from "@/lib/areas";
 import {
-  useActivity,
   useCover,
+  useCoverEpoch,
   useHydrated,
   useLedger,
   useLibrarySettled,
-  useCoverEpoch,
+  usePrefs,
   useShelf,
 } from "@/lib/use-library";
-import {
-  pace,
-  recentDays,
-  streak,
-  type Activity,
-  type Pace,
-} from "@/lib/activity";
 import { targetShare } from "@/lib/target";
 import { WritingPerformanceCard } from "@/components/shelf/writing-performance-card";
+import { SearchDialog } from "@/components/shelf/search-dialog";
+import { BookThumb } from "@/components/shelf/book-thumb";
+import {
+  actionsFor,
+  chosen,
+  favouriteIntent,
+  needsConfirming,
+  planRestore,
+  rangeBetween,
+  selectAll,
+  toggle,
+  type BulkAction,
+  type SelectView,
+} from "@/lib/bulk-select";
+import {
+  gridClassFor,
+  isGrid,
+  SHELF_LAYOUTS,
+  type ShelfLayout,
+} from "@/lib/shelf-layout";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { usePlan, type PlanState } from "@/lib/use-plan";
@@ -235,72 +237,18 @@ const VIEW_ICON: Record<ShelfView, ReactNode> = {
   trashed: shelfIcons.trash,
 };
 
-const SIDEBAR_ICONS: Record<string, ReactNode> = {
-  overview: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/Dashboard-Square--Streamline-Flex.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  write: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/Pencil-Line--Streamline-Flex.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  favourite: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/Heart--Streamline-Flex.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  archived: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/Archive-Box--Streamline-Flex.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  trashed: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/Recycle-Bin-2--Streamline-Flex.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  support: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/support.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  feedback: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/feedbacks.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-  pricing: (
-    /* eslint-disable-next-line @next/next/no-img-element */
-    <img
-      src="/icons/sidebar/pricing.png"
-      alt=""
-      className="h-5 w-5 object-contain opacity-75 dark:invert dark:opacity-90"
-    />
-  ),
-};
+/* **`SIDEBAR_ICONS` is gone, and must not come back as bitmaps.**
+
+   It overrode every rail glyph with a Streamline PNG, inverted into dark mode
+   with `dark:invert` — filled bitmaps of varying weight sitting beside the
+   app's own stroke icons, which is exactly what `shelf-icons.tsx` was written
+   to prevent: *"every glyph is on the same 24-grid with the same 1.75 stroke,
+   so the sidebar reads as one alphabet instead of six borrowed ones."*
+
+   Every icon it named already existed there — overview, write, heart, archive,
+   trash, support, feedback, pricing — so removing it was the whole fix. They
+   take `currentColor`, so they need no inversion and no second copy for the
+   dark theme. */
 
 type Sort = "recent" | "title" | "words";
 const SORT_LABEL: Record<Sort, string> = {
@@ -320,6 +268,10 @@ export function Bookshelf({
      only `useLibrarySettled` can tell those apart — see the note on it. */
   const settled = useLibrarySettled();
   const shelf = useShelf();
+  /* The shelf layout lives in `prefs` rather than in state: a writer who chose
+     the dense grid meant it for their shelf, not for one visit to it, and it
+     reaches the other tab for free. */
+  const prefs = usePrefs();
 
   /**
    * Which area is open, taken from `?area=` and written back to it.
@@ -422,13 +374,16 @@ export function Bookshelf({
   const [dialog, setDialog] = useState<
     "help" | "support" | "feedback" | "community" | "audiobook" | null
   >(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   /**
-   * `/` puts the caret in the search box, the convention every list-shaped app
-   * shares. Ignored while the writer is already in a field, or typing a date
-   * into the advance-copies form would jump them somewhere else mid-word.
+   * `/` opens the search panel, the convention every list-shaped app shares.
+   * Ignored while the writer is already in a field, or typing a date into the
+   * advance-copies form would jump them somewhere else mid-word.
+   *
+   * It used to put the caret in the box in the top bar. That bar is gone and
+   * the shortcut is the half of it worth keeping.
    */
-  const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) {
@@ -442,7 +397,7 @@ export function Bookshelf({
         return;
       }
       event.preventDefault();
-      searchRef.current?.focus();
+      setSearchOpen(true);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -531,6 +486,15 @@ export function Bookshelf({
      the archive stopped being a way round the limit when archived books
      started counting against it. See `booksAgainstPlan`. */
   const [noRoomFor, setNoRoomFor] = useState<Book | null>(null);
+  /** A batch waiting on a confirmation, and how many a refused restore would fit. */
+  const [bulkAsk, setBulkAsk] = useState<{
+    action: BulkAction;
+    books: Book[];
+  } | null>(null);
+  const [noRoomForBatch, setNoRoomForBatch] = useState<{
+    wanted: number;
+    room: number;
+  } | null>(null);
 
   const handleTrash = (book: Book) => setTrashing(book);
   const handleDeleteForever = (book: Book) => setErasing(book);
@@ -570,6 +534,57 @@ export function Bookshelf({
       return;
     }
     restoreBook(book.id);
+  };
+
+  /** Carry out a batch that has already been asked about, if it needed asking. */
+  const runBulk = (action: BulkAction, books: Book[]) => {
+    for (const b of books) {
+      switch (action) {
+        case "favourite":
+          setFavourite(b.id, true);
+          break;
+        case "unfavourite":
+          setFavourite(b.id, false);
+          break;
+        case "archive":
+          archiveBook(b.id);
+          break;
+        case "trash":
+          trashBook(b.id);
+          break;
+        case "restore":
+          restoreBook(b.id);
+          break;
+        case "erase":
+          deleteBook(b.id);
+          break;
+      }
+    }
+  };
+
+  const handleBulk = (action: BulkAction, books: Book[]) => {
+    if (books.length === 0) return;
+
+    /* **The plan is asked once for the whole batch, and refuses all of it.**
+       The same gate `handleRestore` makes for one book, through the same
+       module — filling the last two slots and leaving three behind is a
+       half-done action the writer never chose the shape of. */
+    if (action === "restore") {
+      const gated = !plan.loading && plan.billing && !plan.pro;
+      const { needRoom, room, fits } = planRestore(books, shelf, gated);
+      if (!fits) {
+        setNoRoomForBatch({ wanted: needRoom.length, room });
+        return;
+      }
+    }
+
+    /* One confirmation for the batch, naming the count — not one per book,
+       and not none: these are the two this screen cannot undo. */
+    if (needsConfirming(action)) {
+      setBulkAsk({ action, books });
+      return;
+    }
+    runBulk(action, books);
   };
 
   if (!hydrated) return <LoadingScreen />;
@@ -615,12 +630,9 @@ export function Bookshelf({
                     />
 
                     {/* Expand icon hidden by default, smoothly appears on hover */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/icons/sidebar/panel-expand.png"
-                      alt=""
-                      className="absolute h-5 w-5 object-contain scale-75 opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-80 dark:invert dark:group-hover:opacity-90"
-                    />
+                    <span className="absolute scale-75 text-fg/70 opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100">
+                      {shelfIcons.panelExpand}
+                    </span>
 
                     {/* Floating hover toast */}
                     <span
@@ -632,35 +644,62 @@ export function Bookshelf({
                   </button>
                 </div>
               ) : (
-                <div className="mb-6 flex items-center justify-between px-2">
+                <div className="mb-6 flex items-center justify-between pl-2 pr-0">
+                  {/* `pr-0` against the wordmark's `pl-2`: `justify-between`
+                      had already pushed the pair as far right as the padding
+                      allowed, so the only room left to give them was the
+                      rail's own right margin. */}
                   <Link
                     href="/"
                     className="min-w-0 text-xl font-bold tracking-tight text-fg transition-opacity hover:opacity-85"
                   >
                     Open<span className="text-wordmark">Chapter</span>
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarCollapsed(true)}
-                    title="Collapse sidebar"
-                    aria-label="Collapse sidebar"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/icons/sidebar/panel-collapse.png"
-                      alt=""
-                      className="h-4 w-4 object-contain opacity-75 hover:opacity-100 transition-opacity dark:invert dark:opacity-85"
-                    />
-                  </button>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    {/* Search sits beside the collapse control rather than in
+                        the list below it. It is not an area of the dashboard —
+                        it opens a panel over whatever you are on — and a row
+                        among Overview and Write claimed it was one. */}
+                    <button
+                      type="button"
+                      onClick={() => setSearchOpen(true)}
+                      title="Search books and chapters"
+                      aria-label="Search books and chapters"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
+                    >
+                      {shelfIcons.search}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSidebarCollapsed(true)}
+                      title="Collapse sidebar"
+                      aria-label="Collapse sidebar"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
+                    >
+                      {shelfIcons.panelCollapse}
+                    </button>
+                  </div>
                 </div>
               )}
 
               <nav className="flex flex-col gap-0.5">
+                {/* Only while the rail is collapsed. Expanded, search lives in
+                    the header beside the collapse control; at 64px there is no
+                    header row to put it in, and `/` is no help to somebody
+                    reaching for a mouse. */}
+                {sidebarCollapsed && (
+                  <SideItem
+                    icon={shelfIcons.search}
+                    collapsed
+                    onClick={() => setSearchOpen(true)}
+                  >
+                    Search
+                  </SideItem>
+                )}
                 {AREAS.filter((a) => a.stage).map((a) => (
                   <Fragment key={a.id}>
                     <SideItem
-                      icon={SIDEBAR_ICONS[a.id] ?? a.icon}
+                      icon={a.icon}
                       collapsed={sidebarCollapsed}
                       /* Write is the *active list*, not merely the area.
                          Asking `area === "write"` alone lit Write and Trash at
@@ -684,7 +723,7 @@ export function Bookshelf({
                       RAIL_VIEWS.map((v) => (
                         <SideItem
                           key={v}
-                          icon={SIDEBAR_ICONS[v] ?? VIEW_ICON[v]}
+                          icon={VIEW_ICON[v]}
                           collapsed={sidebarCollapsed}
                           active={area === "write" && view === v}
                           onClick={() => showShelf(v)}
@@ -708,7 +747,7 @@ export function Bookshelf({
                     {AREAS.filter((a) => !a.stage).map((a) => (
                       <SideItem
                         key={a.id}
-                        icon={SIDEBAR_ICONS[a.id] ?? a.icon}
+                        icon={a.icon}
                         collapsed={sidebarCollapsed}
                         active={area === a.id}
                         onClick={() => goToArea(a.id)}
@@ -723,21 +762,21 @@ export function Bookshelf({
               {/* Getting help, then giving it back. */}
               <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
                 <SideItem
-                  icon={SIDEBAR_ICONS.support}
+                  icon={shelfIcons.support}
                   collapsed={sidebarCollapsed}
                   onClick={() => setDialog("support")}
                 >
                   Support
                 </SideItem>
                 <SideItem
-                  icon={SIDEBAR_ICONS.feedback}
+                  icon={shelfIcons.feedback}
                   collapsed={sidebarCollapsed}
                   onClick={() => setDialog("feedback")}
                 >
                   Send feedback
                 </SideItem>
                 <SideItem
-                  icon={SIDEBAR_ICONS.pricing}
+                  icon={shelfIcons.pricing}
                   collapsed={sidebarCollapsed}
                   href="/upgrade"
                 >
@@ -789,154 +828,114 @@ export function Bookshelf({
         {/* ---- The area ------------------------------------------------ */}
         {/* Named so `goToArea` can put it back to the top on a switch. */}
         <div id={AREA_SCROLLER} className="flex-1 overflow-y-auto">
-          {/* The bar keeps its full-width background and border — a sticky
-            header that stopped short of the edges would tear as the page
-            scrolled under it — but its *contents* sit in the same max-w-6xl
-            column as the page, so the search lines up with the heading below
-            and the account chip lines up with the right edge of the cards. */}
-          <header className="sticky top-0 z-30 border-b border-line bg-panel/95 backdrop-blur">
-            {/* Tighter from `md` up, and only from `md` up. The 44px minimum
-              is a *touch* target — it exists so a thumb can hit the search box
-              and the New book button — so it stays wherever there is no mouse.
-              On a pointer it is 40px, which takes a fifth off the bar and gives
-              the line back to the page. */}
-            <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 md:flex md:flex-wrap md:py-2">
-              <Link
-                href="/"
-                className="col-start-1 row-start-1 flex h-11 min-w-0 items-center text-xl font-bold tracking-tight text-fg outline-none focus-visible:rounded-md focus-visible:ring-2 focus-visible:ring-accent/60 md:hidden"
-              >
-                Open<span className="text-wordmark">Chapter</span>
-              </Link>
+          {/* **The top bar is gone.**
 
-              {/* Capped rather than `flex-1`. At full width it was the loudest
-              thing on the screen, and it is a filter for one list, not the
-              product's main verb. */}
-              <div className="relative col-start-1 row-start-2 min-w-0 md:min-w-[8rem] md:max-w-sm md:flex-1">
-                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-muted">
-                  {shelfIcons.search}
-                </span>
-                <input
-                  ref={searchRef}
-                  name="book-search"
-                  autoComplete="off"
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    // The results live in Write. Searching from Overview used to
-                    // filter a list nobody could see, so the box appeared broken.
-                    if (e.target.value.trim()) setArea("write");
-                  }}
-                  placeholder="Search your books…"
-                  aria-label="Search your books"
-                  className="min-h-11 w-full rounded-lg border border-line bg-surface py-2 pr-4 pl-9
-                         text-sm text-fg outline-none focus-visible:ring-2
-                         focus-visible:ring-accent/50 sm:pr-12 md:min-h-10"
-                />
-                <kbd
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-y-0 right-2.5 my-auto hidden h-5
-                         items-center rounded border border-line bg-raised px-1.5
-                         text-[11px] font-medium text-muted sm:flex"
-                >
-                  /
-                </kbd>
-              </div>
+            It held a search field and the New book button across the full
+            width, and both have better homes: search is a rail item opening a
+            panel that can reach a *chapter* — which a box filtering one list of
+            books never could — and New book sits beside the heading it acts on.
+            What is left is the page's own header, below.
 
-              {/* **One button that opens the menu, not a split one.**
-
-              It was a split button — the label a `<Link>` straight to
-              `/book/new`, a hairline, and the chevron opening the other three
-              ways in. The shape is a promise that the two halves do different
-              things, and it collects mis-presses for it: the target that reads
-              as "the button" is the words, and pressing the words skipped the
-              choice the menu exists to offer. Nothing is lost by folding them
-              together, because **"Blank book" is the first item in that menu**
-              and goes exactly where the label used to — one press became two
-              for the commonest path, and the other three stopped being hidden
-              behind a 20px chevron.
-
-              The divider went with it. A hairline down a button says there are
-              two controls here; there is one. */}
-              <div className="col-start-2 row-start-2 flex items-stretch justify-self-end md:ml-auto">
-                <Menu
-                  label="New book"
-                  align="end"
-                  width={248}
-                  triggerClassName="flex h-11 w-11 items-center justify-center gap-1.5 whitespace-nowrap
-                                    rounded-lg bg-accent text-sm font-semibold text-accent-ink
-                                    transition-colors hover:bg-accent-strong active:bg-accent-strong
-                                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
-                                    sm:w-auto sm:py-2 sm:pr-2.5 sm:pl-3.5 md:h-10"
-                  trigger={
-                    <>
-                      {shelfIcons.plus}
-                      <span className="hidden sm:inline">New book</span>
-                      {/* Kept, and it is the whole of what tells a writer
-                            this opens rather than acts. */}
-                      <span className="hidden sm:block">{shelfIcons.chevron}</span>
-                    </>
-                  }
-                >
-                  {/* **Four ways in, and all four are the same road.**
-                        "Import a file…" used to open a dialog that parsed the
-                        manuscript, asked for a title and made the book there
-                        and then — a second, shorter creation path, so an
-                        imported book arrived with no author, no genre and no
-                        word-count goal while a blank one was asked for all
-                        three. The three tabs that were inside that dialog are
-                        named here instead, because a writer with a recording
-                        cannot discover that this app takes recordings from a
-                        menu item that says "file", and each carries the writer
-                        into `/book/new` with the source it names. */}
-                  {(close) => (
-                    <>
-                      <MenuLabel>Start a book</MenuLabel>
-                      <MenuLink
-                        href="/book/new"
-                        icon={shelfIcons.plus}
-                        onNavigate={close}
-                      >
-                        Blank book
-                      </MenuLink>
-                      <MenuLink
-                        href="/book/new?source=file"
-                        icon={shelfIcons.upload}
-                        onNavigate={close}
-                      >
-                        Local file
-                      </MenuLink>
-                      <MenuLink
-                        href="/book/new?source=paste"
-                        icon={shelfIcons.paste}
-                        onNavigate={close}
-                      >
-                        Paste text
-                      </MenuLink>
-                    </>
-                  )}
-                </Menu>
-              </div>
-
-              {/* Only where there is no sidebar to hold it. The account moved
-                to the foot of the rail, and the rail is `hidden md:flex` —
-                so on a phone this is the one way to reach sign-out, and
-                removing it outright would have stranded exactly the writers
-                least able to work around it. */}
-              <div className="col-start-2 row-start-1 justify-self-end md:hidden">
-                <AccountMenu account={account} />
-              </div>
-            </div>
-          </header>
+            Three things did live only here and had to be carried out rather
+            than deleted: the account menu on a phone, which is the one way to
+            reach sign-out where there is no rail; the wordmark linking home,
+            for the same reason; and the `/` shortcut, which now opens the
+            search panel instead of focusing a field that no longer exists. */}
 
           {/* Capped, so the cards do not stretch to a metre wide on a desktop
             monitor and leave the eye travelling between a number and its
             label. */}
           <main className="mx-auto max-w-6xl px-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 md:pb-16">
-            <div className="mt-8 mb-7 flex items-center gap-3">
-              <h1 className="text-2xl font-extrabold text-fg">
-                {area === "write" ? VIEW_LABEL[view] : meta.label}
-              </h1>
-              {!meta.live && <Badge>Not built yet</Badge>}
+            {/* ---- The section, and the one action it takes -------------
+
+                The name of the area with its own rail icon beside it, and New
+                book on the right. One row rather than a bar above a heading:
+                two would print "Overview" twice, once as chrome and once as a
+                title, and a reader has to work out that they are the same
+                thing.
+
+                It stacks below `sm`, where the two halves will not sit side by
+                side without the title truncating to nothing. */}
+            <div className="mt-6 mb-6 flex flex-col gap-4 border-b border-line pb-5 sm:mt-8 sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex min-w-0 items-center gap-3">
+                {/* No glyph beside the title. The rail already names the area
+                    and lights the row the writer is on, so a second copy of
+                    the same icon two inches away labelled the same word
+                    twice. */}
+                <h1 className="min-w-0 truncate text-2xl font-extrabold text-fg">
+                  {area === "write" ? VIEW_LABEL[view] : meta.label}
+                </h1>
+                {!meta.live && <Badge>Not built yet</Badge>}
+
+                {/* Only where there is no rail to hold them. The wordmark and
+                    the account both live in the sidebar from `md` up; below it
+                    this is the one way to reach sign-out, and dropping it
+                    would strand exactly the writers least able to work
+                    around it. */}
+                <div className="ml-auto flex items-center gap-2 md:hidden">
+                  <AccountMenu account={account} />
+                </div>
+              </div>
+
+              <div className="flex items-stretch sm:ml-auto">
+  <Menu
+                    label="New book"
+                    align="end"
+                    width={248}
+                    triggerClassName="flex h-10 w-10 items-center justify-center gap-1.5 whitespace-nowrap
+                                      rounded-lg bg-accent text-sm font-semibold text-accent-ink
+                                      transition-colors hover:bg-accent-strong active:bg-accent-strong
+                                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50
+                                      sm:w-auto sm:py-1.5 sm:pr-2 sm:pl-3 md:h-9"
+                    trigger={
+                      <>
+                        {shelfIcons.plus}
+                        <span className="hidden sm:inline">New book</span>
+                        {/* Kept, and it is the whole of what tells a writer
+                              this opens rather than acts. */}
+                        <span className="hidden sm:block">{shelfIcons.chevron}</span>
+                      </>
+                    }
+                  >
+                    {/* **Four ways in, and all four are the same road.**
+                          "Import a file…" used to open a dialog that parsed the
+                          manuscript, asked for a title and made the book there
+                          and then — a second, shorter creation path, so an
+                          imported book arrived with no author, no genre and no
+                          word-count goal while a blank one was asked for all
+                          three. The three tabs that were inside that dialog are
+                          named here instead, because a writer with a recording
+                          cannot discover that this app takes recordings from a
+                          menu item that says "file", and each carries the writer
+                          into `/book/new` with the source it names. */}
+                    {(close) => (
+                      <>
+                        <MenuLabel>Start a book</MenuLabel>
+                        <MenuLink
+                          href="/book/new"
+                          icon={shelfIcons.plus}
+                          onNavigate={close}
+                        >
+                          Blank book
+                        </MenuLink>
+                        <MenuLink
+                          href="/book/new?source=file"
+                          icon={shelfIcons.upload}
+                          onNavigate={close}
+                        >
+                          Local file
+                        </MenuLink>
+                        <MenuLink
+                          href="/book/new?source=paste"
+                          icon={shelfIcons.paste}
+                          onNavigate={close}
+                        >
+                          Paste text
+                        </MenuLink>
+                      </>
+                    )}
+                  </Menu>
+              </div>
             </div>
 
             {area === "overview" && (
@@ -944,6 +943,7 @@ export function Bookshelf({
                 plan={plan}
                 current={current}
                 books={active.length}
+                bookList={active}
                 words={totals.words}
                 chapters={totals.chapters}
               />
@@ -978,6 +978,9 @@ export function Bookshelf({
                 onTrash={handleTrash}
                 onDeleteForever={handleDeleteForever}
                 onRestore={handleRestore}
+                onBulk={handleBulk}
+                layout={prefs.shelfLayout}
+                onLayout={(next) => setPref("shelfLayout", next)}
               />
             )}
 
@@ -1011,6 +1014,22 @@ export function Bookshelf({
         )}
         {covering && (
           <CoverDialog book={covering} onClose={() => setCovering(null)} />
+        )}
+        {/* Over the *active* shelf, which is the list the writer is working
+            in. Archived and trashed books are reachable from the rail, and a
+            search that offered a book out of the bin would be offering to open
+            something already thrown away. */}
+        {searchOpen && (
+          <SearchDialog
+            books={active}
+            onClose={() => setSearchOpen(false)}
+            onPickBook={(book) => {
+              /* The same path the old search box took: filter the shelf to
+                 what was chosen and show it in Write. */
+              setQuery(book.title);
+              goToArea("write");
+            }}
+          />
         )}
         {dialog === "help" && <HelpDialog onClose={() => setDialog(null)} />}
         {dialog === "support" && (
@@ -1062,6 +1081,69 @@ export function Bookshelf({
             confirmLabel="Move to trash"
             onConfirm={() => trashBook(trashing.id)}
             onClose={() => setTrashing(null)}
+          />
+        )}
+
+        {bulkAsk && (
+          /* One dialog for the batch, naming the count and the verb. The
+             single-book versions above say the title instead, which is the
+             right thing when there is one — a list of nineteen titles in a
+             confirmation is not read. */
+          <ConfirmDialog
+            title={
+              bulkAsk.action === "erase"
+                ? `Delete ${plural(bulkAsk.books.length, "book")} for good?`
+                : `Move ${plural(bulkAsk.books.length, "book")} to the trash?`
+            }
+            body={
+              bulkAsk.action === "erase" ? (
+                <>
+                  This cannot be undone. Everything in{" "}
+                  {bulkAsk.books.length === 1 ? "it" : "them"} goes — chapters,
+                  notes, covers and history.
+                </>
+              ) : (
+                <>
+                  {bulkAsk.books.length === 1 ? "It" : "They"} leave your shelf.
+                  You can restore{" "}
+                  {bulkAsk.books.length === 1 ? "it" : "them"} from the trash.
+                </>
+              )
+            }
+            confirmLabel={
+              bulkAsk.action === "erase" ? "Delete for good" : "Move to trash"
+            }
+            onConfirm={() => runBulk(bulkAsk.action, bulkAsk.books)}
+            onClose={() => setBulkAsk(null)}
+          />
+        )}
+
+        {noRoomForBatch && (
+          /* **Nothing was restored**, and the numbers say why. Filling the
+             last slots and leaving the rest behind would be a batch the
+             writer never chose the shape of. */
+          <ConfirmDialog
+            title="Not enough room on your plan"
+            danger={false}
+            body={
+              <>
+                You chose{" "}
+                <span className="text-fg">
+                  {plural(noRoomForBatch.wanted, "book")}
+                </span>
+                , and your plan has room for{" "}
+                <span className="text-fg">
+                  {noRoomForBatch.room === 0
+                    ? "no more"
+                    : plural(noRoomForBatch.room, "more book")}
+                </span>
+                . Nothing has been restored — choose fewer, or go Pro for
+                unlimited books.
+              </>
+            }
+            confirmLabel="See Pro"
+            onConfirm={() => router.push("/upgrade")}
+            onClose={() => setNoRoomForBatch(null)}
           />
         )}
 
@@ -1176,7 +1258,7 @@ function MobileDashboardNavigation({
             {AREAS.filter((item) => item.stage).map((item) => (
               <SideItem
                 key={item.id}
-                icon={SIDEBAR_ICONS[item.id] ?? item.icon}
+                icon={item.icon}
                 active={area === item.id}
                 onClick={() => onArea(item.id)}
               >
@@ -1187,18 +1269,18 @@ function MobileDashboardNavigation({
 
           <div className="mt-4 border-t border-line pt-3 pb-3">
             <SideItem
-              icon={SIDEBAR_ICONS.support}
+              icon={shelfIcons.support}
               onClick={() => showDialog("support")}
             >
               Support
             </SideItem>
             <SideItem
-              icon={SIDEBAR_ICONS.feedback}
+              icon={shelfIcons.feedback}
               onClick={() => showDialog("feedback")}
             >
               Send feedback
             </SideItem>
-            <SideItem icon={SIDEBAR_ICONS.pricing} href="/upgrade">
+            <SideItem icon={shelfIcons.pricing} href="/upgrade">
               Pricing
             </SideItem>
           </div>
@@ -1576,7 +1658,6 @@ function CurrentBookCard({
                         ? PHASE_STATE[progress.next.phase]
                         : "Every step done"}
                     </p>
-                    <SharedBadge book={book} />
                   </div>
                   <h2 className="mt-1.5 line-clamp-2 text-pretty break-words text-xl font-bold text-fg">
                     {book.title}
@@ -1621,15 +1702,18 @@ function CurrentBookCard({
                         {all.map((b) => (
                           <MenuButton
                             key={b.id}
-                            icon={
-                              b.id === book.id ? (
-                                shelfIcons.check
-                              ) : (
-                                <span
-                                  aria-hidden="true"
-                                  className="block h-[18px] w-[18px]"
-                                />
-                              )
+                            /* The book's own cover, which is how a writer
+                               picks one out — eleven identical glyphs told
+                               them nothing they could not read in the titles.
+                               The slot is filled on every row, so the
+                               alignment the blank spacer used to protect is
+                               kept without needing one. */
+                            icon={<BookThumb book={b} width="w-6" />}
+                            /* The tick moves to the right end, which is where
+                               a menu usually marks the current choice, now
+                               that the left slot carries the cover. */
+                            badge={
+                              b.id === book.id ? shelfIcons.check : undefined
                             }
                             onClick={() => {
                               setPicked(b.id);
@@ -1818,6 +1902,7 @@ function Overview({
   plan,
   current,
   books,
+  bookList,
   words,
   chapters,
 }: {
@@ -1826,10 +1911,11 @@ function Overview({
   /** The book the shelf is on — the dial is about this one, and follows it. */
   current: Book | null;
   books: number;
+  /** The books themselves, for the writing card's per-book list. */
+  bookList: Book[];
   words: number;
   chapters: number;
 }) {
-  const activity = useActivity();
   /* `useLibrarySettled` used to be read here for the empty state. The empty
      state moved out with the book card, and the band above the title reads it
      from the shell now — one caller, at the top. */
@@ -1845,33 +1931,15 @@ function Overview({
    * The rule survives in `arc.ts`; see TODO.md under "Taken out on purpose".
    */
 
-  /**
-   * Momentum, not totals.
+  /*
+   * **The day log is read by `WritingPerformanceCard`, not here.**
    *
-   * The three numbers here were books, words and chapters — facts about the
-   * library that change by a rounding error in a week and answer no question a
-   * writer actually has on opening the app. `activity.ts` has been recording
-   * net words per day all along, and "did I write this week" is the question
-   * the screen is being asked.
+   * This function used to compute a week's `pace`, a `streak` and whether the
+   * log held anything, for a band that came off the screen. They sat unread
+   * afterwards. The card below now asks `activity.ts` the same questions and
+   * draws the answers, so there is one reader rather than two — and the empty
+   * check in particular has to live beside the chart it suppresses.
    */
-  // The thirty-day figure went with the tile that carried it. The Progress
-  // tool has the full picture, per book and with a finish date; this screen
-  // needs one line about whether there is movement.
-  const week = useMemo(() => pace(activity, 7), [activity]);
-  const run = useMemo(() => streak(activity), [activity]);
-
-  /**
-   * Whether the day log has anything in it at all.
-   *
-   * Not "did they write this month" — a writer back after a fallow summer has
-   * a log worth showing and a zero week is a true fact about them. This is the
-   * narrower question of whether the log has ever recorded a day, which is the
-   * only case where three zeros would misrepresent the shelf behind them.
-   */
-  const logged = useMemo(
-    () => Object.values(activity).some((n) => n !== 0),
-    [activity],
-  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -1882,23 +1950,36 @@ function Overview({
           this kind opens with, and they are the only figures on this screen
           that are true of the whole library rather than of one manuscript. */}
       <div className="grid gap-4 sm:grid-cols-3">
+        {/* The tint matches the icon each card already carried, so the colour
+            names the count rather than merely decorating it.
+
+            Night is not the day's colour darkened — it is a near-black wash of
+            the hue (`-950` at 40%, so the app's own ground shows through) with
+            the border carrying the hue instead. That is what stops three dark
+            cards reading as three empty holes. */}
         <Figure
           icon={shelfIcons.overview}
           label={books === 1 ? "book" : "books"}
           value={books.toLocaleString()}
+          cardBg="bg-blue-100 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900/70"
+          iconBg="bg-blue-200/70 dark:bg-blue-500/15"
           iconColor="text-blue-700 dark:text-blue-400"
         />
         <Figure
           icon={shelfIcons.write}
           label={nounFor(words, "word")}
           value={words.toLocaleString()}
+          cardBg="bg-emerald-100 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800/70"
+          iconBg="bg-emerald-200/70 dark:bg-emerald-500/15"
           iconColor="text-emerald-700 dark:text-emerald-400"
         />
         <Figure
           icon={shelfIcons.prepare}
           label={nounFor(chapters, "chapter")}
           value={chapters.toLocaleString()}
-          iconColor="text-amber-700 dark:text-amber-400"
+          cardBg="bg-orange-100 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800/70"
+          iconBg="bg-orange-200/70 dark:bg-orange-500/15"
+          iconColor="text-orange-700 dark:text-orange-400"
         />
       </div>
 
@@ -1924,7 +2005,7 @@ function Overview({
           stretches — its chart has somewhere to grow into, where the dial and
           the plan card are the size they are. */}
       <div className="grid gap-5">
-        <WritingPerformanceCard />
+        <WritingPerformanceCard books={bookList} words={words} />
 
         <div className="grid gap-5 lg:grid-cols-2">
           <ProCard plan={plan} />
@@ -2424,18 +2505,42 @@ function ProCard({ plan }: { plan: PlanState }) {
  * the eye choose between them; stacked, the word is read once and the column
  * of numbers can then be scanned on its own.
  */
+/**
+ * One of the three counts at the top of Overview.
+ *
+ * **The tint follows the theme**: a pale wash by day, a very dark one of the
+ * same hue at night with a visible border in that hue to hold the shape. It
+ * was fixed pale in both to begin with, on the reasoning that a coloured card
+ * stays its colour after dark — and that was simply wrong to look at. Three
+ * pastel blocks on a near-black screen read as a strip of daylight sitting on
+ * top of the app rather than as part of it.
+ *
+ * So every colour here is stated twice, and the pairs have to move together:
+ * ground, border, icon, label and value. A dark ground with the day's
+ * near-black type on it is the failure this shape invites.
+ */
 function Figure({
   icon,
   label,
   value,
   cardBg = "bg-panel border-line",
   iconColor = "text-fg",
+  iconBg = "bg-black/5 dark:bg-white/10",
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   cardBg?: string;
   iconColor?: string;
+  /**
+   * The disc behind the icon.
+   *
+   * A wash of the card's own hue rather than a grey, so it reads as part of
+   * the card instead of a plate set on it — and stated per theme like
+   * everything else here, because a 10% white disc is invisible on a pale
+   * ground and a 5% black one is invisible on a dark one.
+   */
+  iconBg?: string;
 }) {
   return (
     /* A `<dl>` per card, not one list split across three. Each of these is a
@@ -2443,21 +2548,33 @@ function Figure({
        exactly that — where three cards sharing one `<dl>` would tell a screen
        reader they were three parts of one thing. */
     <dl
-      className={`flex min-h-28 items-center gap-4 rounded-[8px] border px-6 py-6 sm:min-h-32 sm:py-7 ${cardBg}`}
+      className={`flex min-h-28 gap-4 rounded-[8px] border px-6 py-6 sm:min-h-32 sm:py-7 ${cardBg}`}
     >
-      <span
-        className={`flex h-10 w-10 shrink-0 items-center justify-center [&>svg]:h-7 [&>svg]:w-7 [&>svg]:stroke-[2] ${iconColor}`}
-      >
-        {icon}
-      </span>
-      <div className="min-w-0 flex-1">
-        <dt className="truncate text-xs font-semibold uppercase tracking-wider text-muted sm:text-sm">
+      {/* The label above the number, left-aligned, with the icon out of the
+          way in the corner. Side by side the icon read as the subject of the
+          card and the words as a caption on it; stacked, the eye lands on the
+          count, which is the thing the card is for. */}
+      <div className="flex min-w-0 flex-1 flex-col justify-center">
+        {/* `capitalize`, not `uppercase`. The label is stored lowercase and
+            pluralised by `nounFor`, so the case is set here — and setting it in
+            capitals meant the three headings shouted at the top of the first
+            screen. `tracking-wider` went with it: the extra letter-spacing was
+            there to keep all-caps legible and only loosens ordinary words. */}
+        <dt className="truncate text-xs font-semibold capitalize text-neutral-900 dark:text-neutral-300 sm:text-sm">
           {label}
         </dt>
-        <dd className="mt-0.5 text-2xl leading-tight font-extrabold tabular-nums text-fg sm:text-3xl">
+        <dd className="mt-1 text-2xl leading-tight font-extrabold tabular-nums text-neutral-900 dark:text-white sm:text-3xl">
           {value}
         </dd>
       </div>
+      {/* `h-11 w-11` against the icon's own `h-[22px]`, so the glyph sits in
+          the disc with a ring of ground around it rather than filling it.
+          `self-start` pins it to the top corner however tall the card grows. */}
+      <span
+        className={`flex h-11 w-11 shrink-0 self-start items-center justify-center rounded-full [&>svg]:h-[22px] [&>svg]:w-[22px] [&>svg]:stroke-[2] ${iconBg} ${iconColor}`}
+      >
+        {icon}
+      </span>
     </dl>
   );
 }
@@ -2736,6 +2853,9 @@ function Write({
   onTrash,
   onDeleteForever,
   onRestore,
+  onBulk,
+  layout,
+  onLayout,
 }: {
   /** The current book's card, over the active list. Null on the other three. */
   banner: ReactNode;
@@ -2754,9 +2874,88 @@ function Write({
   onDeleteForever: (b: Book) => void;
   /** Not `restoreBook` itself: the free plan may have no room for the book. */
   onRestore: (b: Book) => void;
+  /**
+   * Act on several books at once.
+   *
+   * One callback rather than six: the confirmations, the plan check and the
+   * store writes all belong to the screen above, which already owns them for
+   * the single-book path. This component chooses *what*; it never decides
+   * whether a thing may happen.
+   */
+  onBulk: (action: BulkAction, books: Book[]) => void;
+  /** How the books are drawn — see `shelf-layout.ts`. Stored in `prefs`. */
+  layout: ShelfLayout;
+  onLayout: (next: ShelfLayout) => void;
   /** Opens the sheet holding every per-book tool. */
 }) {
+  /** Read once: half the card's markup asks it. */
+  const listed = !isGrid(layout);
   const settled = useLibrarySettled();
+
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  /** The last card clicked, so shift-click knows where a range starts. */
+  const [anchor, setAnchor] = useState<string | null>(null);
+
+  const picked = chosen(visible, selected);
+
+  const stopSelecting = useCallback(() => {
+    setSelecting(false);
+    setSelected(new Set());
+    setAnchor(null);
+  }, []);
+
+  /**
+   * **The selection does not survive the list changing under it.**
+   *
+   * Without this a writer ticks five books, switches to Trash or types in
+   * search, and presses Archive — acting on books that are no longer on the
+   * screen. Nothing about the bar would look wrong while it happened. Clearing
+   * is the only honest answer, and it costs a writer nothing they cannot redo
+   * in two clicks.
+   *
+   * Adjusted **during render** rather than in an effect, which is React's own
+   * answer for resetting state when a prop changes. An effect would clear it
+   * one paint late — long enough to show a bar reading "5 books selected" over
+   * a list that no longer holds them, which is the exact misreading this
+   * exists to prevent.
+   */
+  const [listKey, setListKey] = useState({ view, searching });
+  if (listKey.view !== view || listKey.searching !== searching) {
+    setListKey({ view, searching });
+    setSelecting(false);
+    setSelected(new Set());
+    setAnchor(null);
+  }
+
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        stopSelecting();
+        return;
+      }
+      // Ctrl/Cmd+A takes the list rather than the page's text, but only while
+      // selecting — outside it, select-all should still mean select-all.
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "a") {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest("input, textarea, [contenteditable]")) return;
+        event.preventDefault();
+        setSelected(selectAll(visible));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selecting, visible, stopSelecting]);
+
+  const pick = (book: Book, shiftKey: boolean) => {
+    setSelected((current) =>
+      shiftKey && anchor
+        ? rangeBetween(visible, current, anchor, book.id)
+        : toggle(current, book.id),
+    );
+    setAnchor(book.id);
+  };
 
   return (
     <div>
@@ -2766,7 +2965,17 @@ function Write({
           figures about the whole library. */}
       {banner && <div className="mb-6">{banner}</div>}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 md:justify-end">
+      {/* Sticky **only while selecting**. That is what the floating bar was
+          buying: tick a book at the foot of thirty-four and the actions are
+          still on screen. Off the rest of the time, so an ordinary visit to
+          the shelf is unchanged. */}
+      <div
+        className={`flex flex-wrap items-center justify-between gap-3 md:justify-end ${
+          selecting
+            ? "sticky top-0 z-30 -mx-4 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6"
+            : ""
+        }`}
+      >
         {/* One question, one control. The rail carries these four from `md` up,
             where it is on screen; below that there is no rail, so the segmented
             control is the only way to reach the archive and it stays. Two live
@@ -2789,20 +2998,196 @@ function Write({
             </button>
           ))}
         </div>
-        <label className="flex items-center gap-2 text-sm text-muted">
-          Sort
-          <select
-            value={sort}
-            onChange={(e) => onSort(e.target.value as Sort)}
-            className="rounded-lg border border-line bg-panel px-3 py-1.5 text-fg"
+        {/* Off by default, and a press to turn on. The shelf's ordinary job is
+            being looked at, and a checkbox on every jacket all the time puts a
+            control on a screen that is mostly read.
+
+            **Cancel wears the danger colour**, which is a departure worth
+            naming: nothing is destroyed by leaving selection mode. It is red
+            because it is the way *out* of a mode — the one control here that
+            undoes the state the other two are working in — and a writer
+            scanning three grey buttons could not tell which of them let go.
+            The accent is spoken for; it means "the way forward". */}
+        {visible.length > 0 && (
+          <div className="flex shrink-0 flex-wrap items-center gap-2 md:mr-auto">
+            {/* Ahead of the buttons, not among them: it is the subject of the
+                row — what you have — and the controls after it are what can be
+                done with it. Announced as it changes, not merely shown. */}
+            {picked.length > 0 && (
+              <p
+                aria-live="polite"
+                className="shrink-0 pr-1 text-sm font-semibold text-fg"
+              >
+                {plural(picked.length, "book")} selected
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => (selecting ? stopSelecting() : setSelecting(true))}
+              aria-pressed={selecting}
+              className={`shrink-0 rounded-lg border px-3 py-1.5 text-sm font-medium
+                          transition-colors ${
+                            selecting
+                              ? "border-danger/50 bg-danger/10 text-danger hover:bg-danger/15"
+                              : "border-line bg-panel text-muted hover:bg-raised hover:text-fg"
+                          }`}
+            >
+              {selecting ? "Cancel" : "Select"}
+            </button>
+
+            {/* **Beside Select from the start, not once selection is on.**
+                Pressed cold it turns the mode on *and* takes everything, which
+                is the only thing "select all" can sensibly mean when nothing
+                is selected yet.
+
+                **It leaves rather than flipping to Clear.** It used to become
+                a Clear button at the top end; Cancel already lets go of the
+                whole mode one button to the left, so that was a second way out
+                wearing a different word. Gone once everything is taken, which
+                is also when it would have had nothing left to do. */}
+            {(!selecting || picked.length < visible.length) && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selecting) setSelecting(true);
+                  setSelected(selectAll(visible));
+                }}
+                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line
+                           bg-panel px-3 py-1.5 text-sm font-medium text-muted
+                           transition-colors hover:bg-raised hover:text-fg"
+              >
+                <span className="[&>svg]:h-4 [&>svg]:w-4">
+                  {shelfIcons.check}
+                </span>
+                Select all {visible.length}
+              </button>
+            )}
+
+            {/* **The actions sit here rather than in a bar at the foot.**
+
+                They floated over the shelf to begin with, so they stayed
+                reachable however far down the list you had scrolled. In place
+                they read better — one row holds the whole mode, and nothing
+                covers the last book — and the reachability they were floating
+                for is bought back by the row going sticky below, which costs
+                nothing when the mode is off. */}
+            {picked.length > 0 && (
+              <>
+                <span
+                  aria-hidden="true"
+                  className="mx-1 h-6 w-px shrink-0 bg-line"
+                />
+
+                {actionsFor(view as SelectView).map((action) => {
+                  /* The one favourite button points whichever way the
+                     selection is not: remove only when every book already is
+                     one. `actionsFor` names the slot; the intent decides the
+                     word, so a mixed selection does one predictable thing. */
+                  const intent = favouriteIntent(picked);
+                  const resolved =
+                    action === "favourite" || action === "unfavourite"
+                      ? intent === "remove"
+                        ? "unfavourite"
+                        : "favourite"
+                      : action;
+                  const danger = resolved === "erase" || resolved === "trash";
+                  return (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => {
+                        onBulk(resolved, picked);
+                        stopSelecting();
+                      }}
+                      className={`flex shrink-0 items-center gap-1.5 rounded-lg border
+                                  px-3 py-1.5 text-sm font-medium transition-colors ${
+                                    danger
+                                      ? "border-danger/40 text-danger hover:bg-danger/10"
+                                      : "border-line bg-panel text-fg hover:bg-raised"
+                                  }`}
+                    >
+                      <span className="[&>svg]:h-4 [&>svg]:w-4">
+                        {BULK_ACTIONS[resolved].icon}
+                      </span>
+                      {BULK_ACTIONS[resolved].label}
+                    </button>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        )}
+        {/* **How the shelf is drawn, not what is being done to it.**
+
+            Both come off the row while selecting. They answer a different
+            question from the one the writer is in the middle of — and the
+            row is holding Cancel, Select all, a count and three actions by
+            then, which is more than it can carry with these still on it. */}
+        {!selecting && (
+          <>
+          {/* **A menu, not a row of icon buttons.** Four modes is past what an
+              unlabelled icon strip can carry — "small covers" and "list" are the
+              same two lines to anyone who has not learned the set — and a menu
+              names each one and ticks the current. Explorer's View, in shape;
+              not in length. */}
+          <Menu
+            label="View"
+            align="end"
+            width={220}
+            triggerClassName="flex shrink-0 items-center gap-1.5 rounded-lg border
+                              border-line bg-panel px-3 py-1.5 text-sm text-muted
+                              transition-colors hover:bg-raised hover:text-fg
+                              focus-visible:outline-none focus-visible:ring-2
+                              focus-visible:ring-accent/50"
+            trigger={
+              <>
+                <span className="[&>svg]:h-4 [&>svg]:w-4">{shelfIcons.tools}</span>
+                View
+                <span className="[&>svg]:h-4 [&>svg]:w-4">
+                  {shelfIcons.chevron}
+                </span>
+              </>
+            }
           >
-            {(Object.keys(SORT_LABEL) as Sort[]).map((s) => (
-              <option key={s} value={s}>
-                {SORT_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </label>
+            {(close) => (
+              <>
+                <MenuLabel>Show books as</MenuLabel>
+                {SHELF_LAYOUTS.map((option) => (
+                  <MenuButton
+                    key={option.id}
+                    /* The tick on the right, as the book picker does it — the
+                       left slot stays empty on every row so the labels line up
+                       whichever one is current. */
+                    badge={
+                      option.id === layout ? shelfIcons.check : undefined
+                    }
+                    onClick={() => {
+                      onLayout(option.id);
+                      close();
+                    }}
+                  >
+                    {option.label}
+                  </MenuButton>
+                ))}
+              </>
+            )}
+          </Menu>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Sort
+            <select
+              value={sort}
+              onChange={(e) => onSort(e.target.value as Sort)}
+              className="rounded-lg border border-line bg-panel px-3 py-1.5 text-fg"
+            >
+              {(Object.keys(SORT_LABEL) as Sort[]).map((s) => (
+                <option key={s} value={s}>
+                  {SORT_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </label>
+          </>
+        )}
       </div>
 
       {visible.length === 0 && !settled && !searching ? (
@@ -2890,10 +3275,7 @@ function Write({
 
             Narrow cards fit more across, so the grid runs to four and five
             where it used to stop at three. */
-        <ul
-          className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4
-                     2xl:grid-cols-5"
-        >
+        <ul className={`mt-6 ${gridClassFor(layout)}`}>
           {visible.map((book) => (
             <li
               key={book.id}
@@ -2906,9 +3288,79 @@ function Write({
                  shadow on the card underneath made two things move for one
                  pointer, and the jacket is the thing the writer is reaching
                  for. */
-              className="group relative flex flex-col rounded-xl border
-                         border-line bg-panel p-3"
+              className={`group relative rounded-xl border transition-colors ${
+                listed
+                  ? "flex items-center gap-3 p-2.5 sm:gap-4 sm:p-3"
+                  : "flex flex-col p-3"
+              } ${
+                selected.has(book.id)
+                  /* **A ring on top of the border, not a thicker border.**
+                     Going from `border` to `border-2` on selection moves every
+                     card by a pixel as it is ticked, and in a grid that reads
+                     as the whole shelf twitching. A ring is drawn outside the
+                     box and takes no space, so the edge reads as three pixels
+                     of accent and nothing reflows. */
+                  ? "border-accent ring-2 ring-accent bg-accent/5"
+                  : "border-line bg-panel"
+              }`}
             >
+              {/* A real checkbox, not a styled div: the space bar, the label
+                  association and every screen reader are the platform's job
+                  here, and a `role="checkbox"` copy gets one of the three
+                  wrong.
+
+                  **Over the jacket in a grid, at the head of the row in a
+                  list.** In a grid the card *is* the cover and there is
+                  nowhere else for it to go; in a row there is a column before
+                  the cover, and floating it over the thumbnail there would
+                  cover most of a 40px jacket. */}
+              {selecting && (
+                <label
+                  className={`z-10 flex cursor-pointer items-center justify-center ${
+                    listed ? "shrink-0" : "absolute left-5 top-5"
+                  }`}
+                  onClick={(e) => {
+                    // Shift-click is read here: the change event has no
+                    // modifier keys on it.
+                    e.preventDefault();
+                    e.stopPropagation();
+                    pick(book, e.shiftKey);
+                  }}
+                >
+                  {/* **Drawn rather than left to the browser**, and white with
+                      a thin dark rule whatever the theme.
+
+                      It sits on a book jacket, not on the page, so it cannot
+                      take its colours from the surface underneath: a native
+                      checkbox is near-black on a dark jacket and a `bg-panel`
+                      box disappears into a pale one. White with a hairline is
+                      the one pairing that reads on artwork of any colour,
+                      which is why every photo library draws it this way.
+
+                      Still a real `<input type="checkbox">` under the paint —
+                      `appearance-none` takes the look, not the semantics, so
+                      the space bar and screen readers are unaffected. */}
+                  <input
+                    type="checkbox"
+                    readOnly
+                    checked={selected.has(book.id)}
+                    aria-label={`Select ${book.title}`}
+                    className="peer h-6 w-6 cursor-pointer appearance-none rounded-md
+                               border border-neutral-900/70 bg-white shadow-sm
+                               transition-colors checked:border-accent checked:bg-accent
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  />
+                  {/* The tick, over the box and only once it is ticked. */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute text-accent-ink opacity-0
+                               transition-opacity peer-checked:opacity-100
+                               [&>svg]:h-4 [&>svg]:w-4"
+                  >
+                    {shelfIcons.check}
+                  </span>
+                </label>
+              )}
               {/* **One link over the cover and the words together**, rather
                   than a link on the title and a separate one on the jacket.
                   A shelf of covers promises that the cover opens the book, and
@@ -2919,8 +3371,22 @@ function Write({
                   that actually opens something. */}
               <Link
                 href={`/book/${book.id}`}
-                className="flex flex-1 flex-col rounded-lg outline-none
-                           focus-visible:ring-2 focus-visible:ring-accent/60"
+                /* In selection mode the whole jacket picks the book instead of
+                   opening it — the target a writer aims at is the cover, not a
+                   28px box in its corner. Prevented rather than swapped for a
+                   button so the markup, the tab order and the focus ring stay
+                   exactly as they are when not selecting. */
+                onClick={(e) => {
+                  if (!selecting) return;
+                  e.preventDefault();
+                  pick(book, e.shiftKey);
+                }}
+                className={`min-w-0 rounded-lg outline-none focus-visible:ring-2
+                            focus-visible:ring-accent/60 ${
+                              listed
+                                ? "flex flex-1 items-center gap-3 sm:gap-4"
+                                : "flex flex-1 flex-col"
+                            }`}
               >
                 {/* Not `editable`. The cover used to open "Edit title, author
                     and cover", which was right for a 64px thumbnail beside a
@@ -2928,26 +3394,51 @@ function Write({
                     card width it is the book's own face and the largest target
                     on the screen, so it opens the book, and editing stays one
                     press away in the ⋯ menu where it already lived. */}
-                <CoverOf book={book} />
+                {listed ? (
+                  /* **A row, and the same three facts.** The jacket shrinks to
+                     a thumbnail and the meta line comes off its own row to sit
+                     under the title — one line rather than three, which is the
+                     whole reason to be in this mode. The numbers are the ones
+                     Sort sorts by, so what was sorted on is visible. */
+                  <>
+                    <span className="w-10 shrink-0">
+                      <CoverOf book={book} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-bold text-fg sm:text-base">
+                        {book.title}
+                      </span>
+                      <span className="mt-0.5 block truncate font-sans text-xs text-muted">
+                        {plural(bookChapterCount(book), "chapter")} ·{" "}
+                        {plural(bookWordCount(book), "word")} · Opened{" "}
+                        {relativeTime(book.lastOpenedAt)}
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <CoverOf book={book} />
 
-                <div className="pt-3 text-center">
-                  <span className="block text-sm leading-snug font-bold text-balance text-fg">
-                    {book.title}
-                  </span>
+                    <div className="pt-3 text-center">
+                      <span className="block text-sm leading-snug font-bold text-balance text-fg">
+                        {book.title}
+                      </span>
 
-                  {/* Small, letterspaced and quiet, which is the slot a shop
-                      grid gives its genre line. Nothing goes under it where
-                      that grid puts a star rating — see the house rule about
-                      invented numbers. `span`, not `p`: this is inside an
-                      anchor, and a paragraph there is invalid markup. */}
-                  <span className="mt-1.5 block font-sans text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
-                    {plural(bookChapterCount(book), "chapter")} ·{" "}
-                    {plural(bookWordCount(book), "word")}
-                  </span>
-                  <span className="mt-0.5 block font-sans text-xs text-muted">
-                    Opened {relativeTime(book.lastOpenedAt)}
-                  </span>
-                </div>
+                      {/* Small, letterspaced and quiet, which is the slot a shop
+                          grid gives its genre line. Nothing goes under it where
+                          that grid puts a star rating — see the house rule about
+                          invented numbers. `span`, not `p`: this is inside an
+                          anchor, and a paragraph there is invalid markup. */}
+                      <span className="mt-1.5 block font-sans text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
+                        {plural(bookChapterCount(book), "chapter")} ·{" "}
+                        {plural(bookWordCount(book), "word")}
+                      </span>
+                      <span className="mt-0.5 block font-sans text-xs text-muted">
+                        Opened {relativeTime(book.lastOpenedAt)}
+                      </span>
+                    </div>
+                  </>
+                )}
               </Link>
 
               {(view === "active" || view === "favourite") && (
@@ -2982,11 +3473,17 @@ function Write({
                      size in the layout, stays in the tab order, and appears on
                      `focus-visible` for anyone arriving by keyboard, who has
                      no hover to reveal it with. */
-                  className={`absolute top-5 right-5 z-10 flex h-8 w-8 items-center
+                  className={`z-10 flex h-8 w-8 shrink-0 items-center
                              justify-center rounded-lg border border-line/60
                              bg-panel/85 shadow-sm outline-none transition
                              hover:bg-panel focus-visible:opacity-100
                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                               /* Over the jacket in a grid, where the card is
+                                  the cover and there is nowhere else; in the
+                                  row's own flow in a list, where floating it
+                                  would land it on the title. */
+                               listed ? "" : "absolute top-5 right-5"
+                             } ${
                                book.favourite
                                  ? "text-danger"
                                  : "opacity-0 text-muted group-hover:opacity-100"
@@ -2999,7 +3496,11 @@ function Write({
               {/* The link above is `flex-1`, so this row sits on the floor of
                   every card and a two-line title never pushes one card's
                   buttons below its neighbour's. */}
-              <div className="mt-3 flex items-center gap-2">
+              <div
+                className={`flex items-center gap-2 ${
+                  listed ? "shrink-0" : "mt-3"
+                }`}
+              >
                   {view === "active" || view === "favourite" ? (
                     <>
                       {/* **Outlined, and now full width.** The argument against
@@ -3125,9 +3626,45 @@ function Write({
           ))}
         </ul>
       )}
+
+      {/* **The bar floats rather than sitting in the toolbar.** Selecting a
+          book at the foot of a shelf of thirty-four and then having to scroll
+          back to the top to act on it is the failure of the inline version.
+
+          Above `--oc-safe-bottom` for the home indicator, and above the
+          mobile navigation pill that already lives in this corner — hence the
+          `bottom-[…]` pair rather than a flat `bottom-4`. The grid gets bottom
+          padding to match while the bar is up, so the last row of books is
+          never underneath it. */}
     </div>
   );
 }
+
+/**
+ * What each bulk action is called and what it wears.
+ *
+ * **One word each, which is shorter than the ⋯ menu says the same things in.**
+ * That menu acts on one book and has a column to itself; these sit in a row
+ * beside a count and two other controls, and "Remove from favourites" alone
+ * pushed the rest of the row onto a second line. The glyphs are the same ones,
+ * so the pairing still reads across the two.
+ *
+ * `erase` reads "Delete" rather than "Delete for good", and the missing half of
+ * that warning is carried by the confirmation, which says *"Delete 6 books for
+ * good?"* and cannot be got past by accident. A label is not the safety here.
+ *
+ * The heart fills for *remove*, which is the state the book is in rather than
+ * the state the press would leave it in — the same way a filled heart on a card
+ * means this one is a favourite.
+ */
+const BULK_ACTIONS: Record<BulkAction, { label: string; icon: ReactNode }> = {
+  favourite: { label: "Favourite", icon: shelfIcons.heart },
+  unfavourite: { label: "Unfavourite", icon: shelfIcons.heartFilled },
+  archive: { label: "Archive", icon: shelfIcons.archive },
+  trash: { label: "Trash", icon: shelfIcons.trash },
+  restore: { label: "Restore", icon: shelfIcons.restore },
+  erase: { label: "Delete", icon: shelfIcons.trash },
+};
 
 /**
  * Prepare — what a shop would refuse, before you find out from the shop.
@@ -3561,21 +4098,12 @@ function Tools({
                 {books.map((b) => (
                   <MenuButton
                     key={b.id}
-                    // The slot is filled either way, blank where there is no
-                    // tick. Passing `undefined` collapses it, and then the one
-                    // checked row sits indented while the rest start further
-                    // left — a list where the current item is the only one out
-                    // of line reads as a rendering fault.
-                    icon={
-                      b.id === book.id ? (
-                        shelfIcons.check
-                      ) : (
-                        <span
-                          aria-hidden="true"
-                          className="block h-[18px] w-[18px]"
-                        />
-                      )
-                    }
+                    /* The cover fills the slot on every row, so the blank
+                       spacer that used to keep the unchecked rows in line with
+                       the checked one is no longer needed — the alignment
+                       comes from the covers themselves. */
+                    icon={<BookThumb book={b} width="w-6" />}
+                    badge={b.id === book.id ? shelfIcons.check : undefined}
                     onClick={() => {
                       setChosen(b.id);
                       close();

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  byWeekday,
+  dailySeries,
   dayKey,
   finishesOn,
   heatLevel,
@@ -8,6 +10,7 @@ import {
   parseActivity,
   recentDays,
   record,
+  runningTotal,
   streak,
   trim,
   type Activity,
@@ -209,5 +212,98 @@ describe("finishesOn", () => {
 
   it("refuses a date so far off it is a joke at the writer's expense", () => {
     expect(finishesOn(0, 90_000, 1, NOW)).toBeNull();
+  });
+});
+
+describe("dailySeries", () => {
+  it("keeps every day in the window, including the days off", () => {
+    const days = dailySeries({ [ago(1)]: 400 }, 3, NOW);
+    expect(days).toHaveLength(3);
+    expect(days.map((d) => d.words)).toEqual([0, 400, 0]);
+  });
+
+  /**
+   * The rule the whole feature turns on. A chart that flattened a cutting day
+   * to zero would draw a month of revision exactly like a month of nothing.
+   */
+  it("leaves a day of cutting negative", () => {
+    const days = dailySeries({ [ago(0)]: -800 }, 2, NOW);
+    expect(days[days.length - 1].words).toBe(-800);
+  });
+
+  it("labels each day for an axis", () => {
+    const days = dailySeries({ [ago(0)]: 10 }, 1, NOW);
+    expect(days[0].date).toMatch(/\w+\s*0?1/);
+  });
+});
+
+describe("runningTotal", () => {
+  it("ends on the total it was given", () => {
+    // Today's figure is the real one the shelf reports; everything before it
+    // is that figure minus what has happened since.
+    const series = runningTotal({ [ago(1)]: 500, [ago(0)]: 300 }, 10_000, 5, NOW);
+    expect(series[series.length - 1].words).toBe(10_000);
+  });
+
+  it("walks back through each day's change", () => {
+    const activity = { [ago(2)]: 1000, [ago(1)]: 500, [ago(0)]: 300 };
+    const series = runningTotal(activity, 10_000, 5, NOW);
+    // 10,000 today; 9,700 before today's 300; 9,200 before yesterday's 500.
+    expect(series.map((d) => d.words)).toEqual([9200, 9700, 10_000]);
+  });
+
+  /**
+   * The log is trimmed at a year, so a writer whose log is shorter than the
+   * window would otherwise get a flat run in front of it that nobody lived.
+   */
+  it("starts where the log starts rather than padding the front", () => {
+    const series = runningTotal({ [ago(1)]: 500 }, 10_000, 30, NOW);
+    expect(series).toHaveLength(2);
+  });
+
+  it("gives nothing at all for a log with no days in the window", () => {
+    expect(runningTotal({}, 10_000, 30, NOW)).toEqual([]);
+  });
+
+  // A manuscript has never had a negative number of words in it.
+  it("does not walk under zero when the log outruns the total", () => {
+    const series = runningTotal({ [ago(1)]: 9000 }, 1000, 5, NOW);
+    expect(series.every((d) => d.words >= 0)).toBe(true);
+  });
+});
+
+describe("byWeekday", () => {
+  it("puts Monday first, matching the month grid", () => {
+    expect(byWeekday({}, 7, NOW).map((d) => d.name)).toEqual([
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun",
+    ]);
+  });
+
+  it("sums a weekday across the window", () => {
+    // NOW is a Saturday; a week back is the Saturday before it.
+    const activity = { [ago(0)]: 300, [ago(7)]: 200 };
+    const saturday = byWeekday(activity, 14, NOW).find((d) => d.name === "Sat");
+    expect(saturday?.value).toBe(500);
+  });
+
+  /**
+   * Must not become `Math.abs`. "Tuesdays are when I cut" is a true and useful
+   * thing to know about a revision, and the sign is the whole of it.
+   */
+  it("leaves a weekday of cutting negative", () => {
+    const day = new Date(`${ago(0)}T12:00:00`).getDay();
+    const name = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][(day + 6) % 7];
+    const totals = byWeekday({ [ago(0)]: -400 }, 7, NOW);
+    expect(totals.find((d) => d.name === name)?.value).toBe(-400);
+  });
+
+  it("has every weekday even for a log with nothing in it", () => {
+    expect(byWeekday({}, 30, NOW)).toHaveLength(7);
   });
 });

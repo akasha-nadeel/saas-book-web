@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ToolGrid } from "@/components/shelf/tool-grid";
 import type { Book } from "@/lib/library-store";
+import { DialogClose } from "@/components/ui/dialog";
 
 /**
  * Everything this app can do to one book, on one sheet.
@@ -45,25 +46,17 @@ export function BookToolsDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[44rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-line
-                 bg-panel p-0 text-fg backdrop:bg-black/50"
+      className="m-auto w-[44rem] max-w-[calc(100vw-2rem)] rounded-2xl border border-tremor-border
+                 bg-tremor-background p-0 text-tremor-content-strong backdrop:bg-black/50"
     >
-      <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+      <div className="flex items-start justify-between gap-4 border-b border-tremor-border px-6 py-4">
         <div className="min-w-0">
           <h2 className="truncate text-lg font-bold">{book.title}</h2>
-          <p className="mt-0.5 text-sm text-muted">
+          <p className="mt-0.5 text-sm text-tremor-content">
             Everything this app can do to this book. All of it works today.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="-mt-1 shrink-0 rounded-lg px-2.5 py-1.5 text-xl leading-none
-                     text-muted hover:bg-raised"
-        >
-          ×
-        </button>
+        <DialogClose onClose={onClose} corner={false} />
       </div>
 
       <div className="max-h-[70vh] overflow-y-auto px-6 py-5">

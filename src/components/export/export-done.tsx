@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { DESTINATIONS } from "@/components/landing/works-with";
 import { download, fileSize, type Format } from "@/lib/export";
+import { Button } from "@/components/ui/button";
+import { DialogClose } from "@/components/ui/dialog";
 
 /**
  * The moment after the file leaves.
@@ -122,31 +124,11 @@ export function ExportDoneDialog({
         if (e.target === dialogRef.current) onClose();
       }}
       className="oc-done-in m-auto w-[34rem] max-w-[calc(100vw-2rem)] overflow-y-auto
-                 rounded-2xl border border-line bg-panel p-0 text-fg shadow-2xl
+                 rounded-2xl border border-tremor-border bg-tremor-background p-0 text-tremor-content-strong shadow-2xl
                  backdrop:bg-black/60"
     >
       <div className="relative p-6 sm:p-7">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute top-4 right-4 flex h-8 w-8 items-center
-                     justify-center rounded-full text-muted outline-none
-                     transition-colors hover:bg-raised hover:text-fg
-                     focus-visible:ring-2 focus-visible:ring-accent/50"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            className="h-4 w-4"
-          >
-            <path d="m5.5 5.5 9 9M14.5 5.5l-9 9" />
-          </svg>
-        </button>
+        <DialogClose onClose={onClose} />
 
         {/* The tick keeps its colour, like every other "this passed" in the app:
             green is the one thing in a greyscale palette that needs no
@@ -172,25 +154,25 @@ export function ExportDoneDialog({
 
         <h2
           id="export-done-title"
-          className="mt-4 font-serif text-2xl leading-tight text-fg"
+          className="mt-4 font-serif text-2xl leading-tight text-tremor-content-strong"
         >
           {/* PDF never reaches here; the fallback is a type-level formality
               rather than a state anything can produce. */}
           {READY[done.format as Exclude<DoneFormat, "pdf">] ??
             "Your file is ready"}
         </h2>
-        <p className="mt-1.5 font-sans text-sm leading-relaxed text-muted">
+        <p className="mt-1.5 font-sans text-sm leading-relaxed text-tremor-content">
           Your browser has it. Where it puts a download is its own setting, so
           look wherever that is — the name is below.
         </p>
 
         {/* ---- The file ------------------------------------------------- */}
-        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-line bg-raised px-4 py-3.5">
+        <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border border-tremor-border bg-tremor-background-subtle px-4 py-3.5">
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-mono text-sm text-fg">
+            <span className="block truncate font-mono text-sm text-tremor-content-strong">
               {done.filename}
             </span>
-            <span className="mt-0.5 block font-sans text-xs text-muted">
+            <span className="mt-0.5 block font-sans text-xs text-tremor-content">
               {fileSize(done.blob.size)}
             </span>
           </span>
@@ -203,16 +185,16 @@ export function ExportDoneDialog({
               download(done.blob, done.filename);
               setAgain(true);
             }}
-            className="shrink-0 rounded-lg border border-line px-3.5 py-2
-                       font-sans text-sm font-semibold text-fg outline-none
-                       transition-colors hover:border-accent/60 hover:bg-panel
+            className="shrink-0 rounded-lg border border-tremor-border px-3.5 py-2
+                       font-sans text-sm font-semibold text-tremor-content-strong outline-none
+                       transition-colors hover:border-accent/60 hover:bg-tremor-background
                        focus-visible:ring-2 focus-visible:ring-accent/50"
           >
             Save it again
           </button>
         </div>
         {again && (
-          <p role="status" className="mt-2 font-sans text-xs text-muted">
+          <p role="status" className="mt-2 font-sans text-xs text-tremor-content">
             Sent to your browser again.
           </p>
         )}
@@ -220,7 +202,7 @@ export function ExportDoneDialog({
         {/* ---- Where it opens -------------------------------------------- */}
         {opens.length > 0 && (
           <div className="mt-5">
-            <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-muted uppercase">
+            <p className="font-sans text-[11px] font-semibold tracking-[0.14em] text-tremor-content uppercase">
               It opens in
             </p>
             {/* Names rather than the brand marks that sit beside them on the
@@ -232,8 +214,8 @@ export function ExportDoneDialog({
               {opens.map((d) => (
                 <li
                   key={d.name}
-                  className="rounded-lg border border-line bg-raised px-2.5 py-1
-                             font-sans text-xs font-medium text-fg"
+                  className="rounded-lg border border-tremor-border bg-tremor-background-subtle px-2.5 py-1
+                             font-sans text-xs font-medium text-tremor-content-strong"
                 >
                   {d.name}
                 </li>
@@ -256,16 +238,9 @@ export function ExportDoneDialog({
             untouched, and all three come back with the tools. */}
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="ml-auto rounded-lg bg-accent px-5 py-2.5 font-sans
-                       text-sm font-semibold text-accent-ink outline-none
-                       transition-colors hover:bg-accent-strong
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
+          <Button onClick={onClose} className="ml-auto">
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

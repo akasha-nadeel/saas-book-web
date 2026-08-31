@@ -69,6 +69,32 @@ export const shelfIcons = {
       <path d="m20 20-3.5-3.5" />
     </Svg>
   ),
+  /* The rail's own collapse and expand, drawn rather than the two PNGs they
+     replace — a panel with its handle on the side it moves towards. Same grid
+     and stroke as everything else here, so the toggle stops being the one
+     control in the sidebar that came from somewhere else. */
+  /* Putting something back: an arrow turning anticlockwise, which is the
+     undo direction every toolbar in the trade uses. */
+  restore: (
+    <Svg>
+      <path d="M4 10a8 8 0 1 1 2.3 5.7" />
+      <path d="M4 5v5h5" />
+    </Svg>
+  ),
+  panelCollapse: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M10 4v16" />
+      <path d="m17 10-2 2 2 2" />
+    </Svg>
+  ),
+  panelExpand: (
+    <Svg>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M10 4v16" />
+      <path d="m15 10 2 2-2 2" />
+    </Svg>
+  ),
   plus: (
     <Svg>
       <path d="M12 5v14M5 12h14" />

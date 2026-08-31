@@ -29,25 +29,25 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[34rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[34rem] max-w-[calc(100vw-2rem)] rounded-lg bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="p-6">
         <h2 className="font-serif text-xl">Start from a template</h2>
-        <p className="mt-1 font-sans text-sm text-muted">
+        <p className="mt-1 font-sans text-sm text-tremor-content">
           A template sets up the chapters. Nothing is written for you.
         </p>
 
         <label className="mt-5 block font-sans text-sm">
-          <span className="text-xs tracking-wide text-muted uppercase">
+          <span className="text-xs tracking-wide text-tremor-content uppercase">
             Book title
           </span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Untitled Book"
-            className="mt-1.5 w-full rounded-md border border-line bg-surface
-                       px-3 py-2 text-fg placeholder:text-muted
+            className="mt-1.5 w-full rounded-md border border-tremor-border bg-tremor-background-muted
+                       px-3 py-2 text-tremor-content-strong placeholder:text-tremor-content
                        focus-visible:border-accent focus-visible:outline-none"
           />
         </label>
@@ -58,21 +58,21 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={() => start(template)}
-                className="w-full rounded-md border border-line px-3 py-2.5
+                className="w-full rounded-md border border-tremor-border px-3 py-2.5
                            text-left outline-none transition-colors
-                           hover:border-accent/60 hover:bg-raised
+                           hover:border-accent/60 hover:bg-tremor-background-subtle
                            focus-visible:ring-2 focus-visible:ring-accent/60"
               >
                 <span className="flex items-baseline justify-between gap-3">
-                  <span className="font-sans text-sm font-medium text-fg">
+                  <span className="font-sans text-sm font-medium text-tremor-content-strong">
                     {template.name}
                   </span>
-                  <span className="shrink-0 font-sans text-xs tabular-nums text-muted">
+                  <span className="shrink-0 font-sans text-xs tabular-nums text-tremor-content">
                     {template.chapters.length}{" "}
                     {template.chapters.length === 1 ? "chapter" : "chapters"}
                   </span>
                 </span>
-                <span className="mt-0.5 block font-sans text-xs text-muted">
+                <span className="mt-0.5 block font-sans text-xs text-tremor-content">
                   {template.description}
                 </span>
               </button>
@@ -84,9 +84,9 @@ export function TemplatesDialog({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 font-sans text-sm text-muted
-                       outline-none transition-colors hover:bg-raised
-                       hover:text-fg focus-visible:ring-2
+            className="rounded-md px-3 py-1.5 font-sans text-sm text-tremor-content
+                       outline-none transition-colors hover:bg-tremor-background-subtle
+                       hover:text-tremor-content-strong focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >
             Cancel

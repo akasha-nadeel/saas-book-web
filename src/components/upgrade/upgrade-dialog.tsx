@@ -6,6 +6,7 @@ import { displayPrice, priceOf } from "@/lib/billing/plans";
 import { IMPORT_FORMATS } from "@/lib/import";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
+import { DialogClose } from "@/components/ui/dialog";
 
 /**
  * What the free plan runs out of, said as two columns rather than one red line.
@@ -243,10 +244,10 @@ function Column({
               {row.icon}
             </span>
             <span className="min-w-0">
-              <span className="block font-sans text-sm leading-tight font-semibold text-fg">
+              <span className="block font-sans text-sm leading-tight font-semibold text-tremor-content-strong">
                 {row.name}
               </span>
-              <span className="mt-1 block font-sans text-xs leading-relaxed text-muted">
+              <span className="mt-1 block font-sans text-xs leading-relaxed text-tremor-content">
                 {row.detail}
               </span>
             </span>
@@ -289,29 +290,10 @@ export function UpgradeDialog({
          job is to be taken in at a glance. `oc-dialog-scroll` still caps the
          height, but on any ordinary window there is now nothing to scroll. */
       className="oc-dialog oc-dialog-whole m-auto w-[52rem] max-w-[calc(100vw-2rem)]
-                 rounded-2xl bg-panel p-0 text-fg backdrop:bg-black/70"
+                 rounded-2xl bg-tremor-background p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="oc-dialog-scroll relative p-5 sm:p-7">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute top-3 right-3 rounded-md p-1.5 text-muted outline-none
-                     transition-colors hover:bg-raised hover:text-fg
-                     focus-visible:ring-2 focus-visible:ring-accent/60"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={1.75}
-            strokeLinecap="round"
-            aria-hidden="true"
-            className="h-[18px] w-[18px]"
-          >
-            <path d="m6 6 12 12M18 6 6 18" />
-          </svg>
-        </button>
+        <DialogClose onClose={onClose} />
 
         {/* **Sans, not the serif every other dialog title wears.** `ui/dialog.tsx`
             sets its questions in `font-serif`, and that is right for a question
@@ -320,12 +302,12 @@ export function UpgradeDialog({
             the shape it is borrowed from sets both lines in the interface face.
             A serif headline over two tinted feature columns reads as a chapter
             opener sitting on a pricing table. */}
-        <p className="pr-8 text-center font-sans text-[0.9375rem] text-muted">
+        <p className="pr-8 text-center font-sans text-[0.9375rem] text-tremor-content">
           {lead}
         </p>
         <h2
           className="mt-1 text-center font-sans text-[1.4rem] leading-snug font-bold
-                     tracking-[-0.01em] text-balance text-fg sm:text-[1.65rem]"
+                     tracking-[-0.01em] text-balance text-tremor-content-strong sm:text-[1.65rem]"
         >
           {title}
         </h2>
@@ -348,7 +330,7 @@ export function UpgradeDialog({
 
         {/* Not "Upgrade now" over a button that opens a price list — the press
             after this one is reading, not buying. */}
-        <p className="mt-3 text-center font-sans text-xs text-muted">
+        <p className="mt-3 text-center font-sans text-xs text-tremor-content">
           {monthly} a month, or less paid yearly. Cancel any time.
         </p>
       </div>

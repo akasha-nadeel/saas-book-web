@@ -22,6 +22,11 @@
 
 import type { CollabRole } from "./collab";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
+import {
+  DEFAULT_SHELF_LAYOUT,
+  isShelfLayout,
+  type ShelfLayout,
+} from "./shelf-layout";
 import type { CoverFacts } from "./cover-check";
 import {
   parseActivity,
@@ -3114,6 +3119,13 @@ export interface Prefs {
    * the cover, having asked for nothing of the sort.
    */
   bookPanel: "book" | "chapters";
+  /**
+   * How the shelf draws its books — see `shelf-layout.ts`.
+   *
+   * A setting rather than navigation, so it is stored: a writer who chose the
+   * dense grid meant it for their shelf, not for one visit to it.
+   */
+  shelfLayout: ShelfLayout;
   /** The colour of the page under the prose. */
   paper: PaperColor;
   /**
@@ -3219,6 +3231,8 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // The cover: the panel opens on the book as an object, and the writer
   // steps into its parts from there.
   bookPanel: "book",
+  // The grid the shelf has always drawn; a writer who wants another says so.
+  shelfLayout: DEFAULT_SHELF_LAYOUT,
   // Black by default, because the chrome around it is. A white sheet on a black
   // app is the one combination that glares, and a writer arriving for the first
   // time should not have to go and fix that. The other four sheets are still
@@ -3290,6 +3304,11 @@ function parsePrefs(raw: string | null): Prefs {
         ? parsed.panelTab
         : DEFAULT_PREFS.panelTab,
       bookPanel: parsed.bookPanel === "chapters" ? "chapters" : "book",
+      // Narrowed like `panelTab`: a mode written by an older version would
+      // fall out of `gridClassFor`'s switch and draw an unstyled column.
+      shelfLayout: isShelfLayout(parsed.shelfLayout)
+        ? parsed.shelfLayout
+        : DEFAULT_SHELF_LAYOUT,
       paper: paperFrom(parsed),
       theme: THEMES.includes(parsed.theme as Theme)
         ? (parsed.theme as Theme)

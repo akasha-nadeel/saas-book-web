@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { TextInput } from "@/components/ui/text-input";
 
 /**
  * Asking a question without handing it to the browser.
@@ -26,12 +28,45 @@ import { useEffect, useRef, useState } from "react";
  * laziness: it brings focus trapping, focus restoration, the top layer and
  * Escape-to-close with no code, and those are exactly the parts a hand-rolled
  * modal gets wrong.
+ *
+ * ---
+ *
+ * **The slot order every dialog here follows**, so they cannot each invent one:
+ *
+ *     <DialogClose />        the cross, top right
+ *     <h2>                   the question
+ *     <p>                    the consequence, in plain words
+ *     …fields…
+ *     <Divider />
+ *     <div class="oc-dialog-actions">   cancel, then the action
  */
-function Shell({
+export function Shell({
   onClose,
+  width = "w-[26rem]",
+  align = "center",
   children,
 }: {
   onClose: () => void;
+  /**
+   * Where the dialog sits in the window.
+   *
+   * Centred for a question, which is the usual case. **`"top"` is for a search
+   * panel**, where the results grow downwards as the writer types: centred, the
+   * whole panel would jump up the screen on every keystroke as it got taller,
+   * and the field they are typing into would move under the caret.
+   */
+  align?: "center" | "top";
+  /**
+   * The dialog's own width class.
+   *
+   * A prop rather than a fixed size because the dialogs genuinely differ — a
+   * confirmation is 26rem and the share sheet is far wider — and the thing
+   * worth centralising is not the number but everything around it. Several
+   * dialogs had hand-rolled their own `<dialog>` purely to change this one
+   * class, and lost `oc-dialog-scroll` and `data-dialog-presentation` on the
+   * way, which is why they never became bottom sheets on a phone.
+   */
+  width?: string;
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -50,25 +85,90 @@ function Shell({
       onClick={(e) => {
         if (e.target === ref.current) onClose();
       }}
-      className="oc-dialog m-auto w-[26rem] max-w-[calc(100vw-2rem)] rounded-lg
-                 bg-panel p-0 text-fg backdrop:bg-black/70"
+      /* `bg-tremor-background` rather than `bg-panel`: this is the dialog
+         palette, and the scrim under it is what lets a different ground read
+         as a surface of its own. See the note in `globals.css`. */
+      className={`oc-dialog ${
+        align === "top" ? "mx-auto mt-[10vh] mb-auto" : "m-auto"
+      } ${width} max-w-[calc(100vw-2rem)] rounded-lg
+                  bg-tremor-background p-0 text-tremor-content-strong
+                  backdrop:bg-black/70`}
     >
-      <div className="oc-dialog-scroll p-6">{children}</div>
+      {/* `relative` so the close cross has something to sit in the corner of,
+         and `oc-dialog-scroll` because `globals.css` uses it to cap the height
+         at 78dvh and to turn this into a bottom sheet on a phone. Dropping
+         that class breaks every dialog on a narrow screen. */}
+      <div className="oc-dialog-scroll relative p-6">{children}</div>
     </dialog>
   );
 }
 
-const CANCEL =
-  "rounded-md px-4 py-2 font-sans text-sm font-medium text-muted outline-none " +
-  "transition-colors hover:bg-raised hover:text-fg " +
-  "focus-visible:ring-2 focus-visible:ring-accent/60";
+/**
+ * The cross, top right.
+ *
+ * Ten dialogs had drawn their own, each with its own classes and its own
+ * guess at whether it needed a label. It is the only control in that corner
+ * and it carries no text, so `aria-label` is not decoration — without it a
+ * screen reader announces a button called nothing.
+ */
+export function DialogClose({
+  onClose,
+  corner = true,
+}: {
+  onClose: () => void;
+  /**
+   * Whether to place itself in the top-right corner.
+   *
+   * True for the dialogs that overlay it on their content, which needs a
+   * `relative` ancestor. **False where the dialog has a real header row** —
+   * `help-dialog.tsx` sets the cross with `justify-between` beside its title,
+   * and an absolutely positioned child there would leave the flex row and
+   * anchor to whatever happens to be positioned further up.
+   */
+  corner?: boolean;
+}) {
+  const button = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={onClose}
+      aria-label="Close"
+      className="px-2 py-2"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        className="size-5 shrink-0"
+        aria-hidden="true"
+      >
+        <path d="M5 5l10 10M15 5L5 15" />
+      </svg>
+    </Button>
+  );
+
+  if (!corner) return button;
+  return <div className="absolute right-0 top-0 pr-3 pt-3">{button}</div>;
+}
+
+/** The rule above an action row. */
+export function Divider({ className = "" }: { className?: string }) {
+  return (
+    <hr
+      className={`my-6 h-px border-0 bg-tremor-border ${className}`}
+      aria-hidden="true"
+    />
+  );
+}
 
 /**
  * A question with two answers, one of which does something irreversible.
  *
- * The confirming button wears `bg-danger` rather than the accent, because the
- * accent in this app means *the way forward* and deleting a chapter is not
- * that. Pass `danger={false}` for a question that is merely irreversible.
+ * The confirming button is red rather than the brand, because blue here means
+ * *the way forward* and deleting a chapter is not that. Pass `danger={false}`
+ * for a question that is merely irreversible.
  */
 export function ConfirmDialog({
   title,
@@ -88,19 +188,25 @@ export function ConfirmDialog({
 }) {
   return (
     <Shell onClose={onClose}>
-      <h2 className="font-serif text-xl">{title}</h2>
+      <DialogClose onClose={onClose} />
+
+      <h2 className="pr-8 font-serif text-xl text-tremor-content-strong">
+        {title}
+      </h2>
       {body && (
-        <div className="mt-3 font-sans text-sm leading-relaxed text-muted">
+        <div className="mt-2 font-sans text-sm leading-6 text-tremor-content">
           {body}
         </div>
       )}
 
-      <div className="oc-dialog-actions mt-6 flex justify-end gap-2">
-        <button type="button" onClick={onClose} className={CANCEL}>
+      <Divider />
+
+      <div className="oc-dialog-actions flex justify-end gap-2">
+        <Button variant="secondary" onClick={onClose}>
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant={danger ? "danger" : "primary"}
           /* Autofocused so Return answers the question and Escape refuses it,
              which is what the native dialog did and the one habit worth
              keeping from it. */
@@ -109,18 +215,9 @@ export function ConfirmDialog({
             onConfirm();
             onClose();
           }}
-          className={`rounded-md px-4 py-2 font-sans text-sm font-semibold outline-none
-                      transition-colors focus-visible:ring-2 ${
-                        danger
-                          /* `text-accent-ink` on a danger fill, which is what `collab-area`
-                             already does: the ink token inverts with the theme
-                             and a literal white would vanish in daylight. */
-                          ? "bg-danger text-accent-ink hover:opacity-90 focus-visible:ring-danger/60"
-                          : "bg-accent text-accent-ink hover:bg-accent-strong focus-visible:ring-accent/60"
-                      }`}
         >
           {confirmLabel}
-        </button>
+        </Button>
       </div>
     </Shell>
   );
@@ -170,6 +267,8 @@ export function PromptDialog({
 
   return (
     <Shell onClose={onClose}>
+      <DialogClose onClose={onClose} />
+
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -178,55 +277,47 @@ export function PromptDialog({
           onClose();
         }}
       >
-        <h2 className="font-serif text-xl">{title}</h2>
+        <h2 className="pr-8 font-serif text-xl text-tremor-content-strong">
+          {title}
+        </h2>
 
-        <label className="mt-4 block font-sans text-xs font-medium text-muted">
-          {label}
-          <input
-            /* Autofocused and selected: the commonest answer is a small edit to
-               what is already there, and the second commonest is replacing it
-               outright. Selecting serves both. */
-            autoFocus
-            value={value}
-            placeholder={placeholder}
-            onChange={(e) => setValue(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            className="mt-1.5 w-full rounded-md border border-line bg-surface px-3 py-2
-                       font-sans text-sm text-fg outline-none
-                       focus-visible:border-accent focus-visible:ring-2
-                       focus-visible:ring-accent/40"
-          />
-        </label>
+        <TextInput
+          label={label}
+          className="mt-4"
+          /* Autofocused and selected: the commonest answer is a small edit to
+             what is already there, and the second commonest is replacing it
+             outright. Selecting serves both. */
+          autoFocus
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => setValue(e.target.value)}
+          onFocus={(e) => e.currentTarget.select()}
+        />
 
-        <div className="oc-dialog-actions mt-6 flex items-center justify-end gap-2">
+        <Divider />
+
+        <div className="oc-dialog-actions flex items-center justify-end gap-2">
           {onRemove && (
             /* Left of the pair, and set apart: it is a third answer rather than
                a second cancel, and putting it beside Save would make the two
                destructive-looking buttons neighbours. */
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              className="mr-auto"
               onClick={() => {
                 onRemove();
                 onClose();
               }}
-              className={`mr-auto ${CANCEL}`}
             >
               {removeLabel}
-            </button>
+            </Button>
           )}
-          <button type="button" onClick={onClose} className={CANCEL}>
+          <Button variant="secondary" onClick={onClose}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!trimmed}
-            className="rounded-md bg-accent px-4 py-2 font-sans text-sm font-semibold
-                       text-accent-ink outline-none transition-colors
-                       hover:bg-accent-strong disabled:opacity-40
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
+          </Button>
+          <Button type="submit" disabled={!trimmed}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </form>
     </Shell>

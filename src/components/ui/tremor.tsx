@@ -209,7 +209,11 @@ export function BarList({
 
         return (
           <div
-            key={item.name || idx}
+            /* By position, not by name. A ranked list's rows are its order —
+               and the names are not identities: a shelf may hold two books
+               with the same title, which React reported as duplicate keys and
+               is entitled to render as one row. */
+            key={idx}
             className="group relative flex items-center justify-between overflow-hidden rounded-lg text-sm transition-colors hover:bg-raised/40"
           >
             {/* Background progress bar */}
@@ -377,10 +381,11 @@ const COLOR_MAP: Record<string, { stroke: string; fill: string; dot: string }> =
     fill: "rgba(244, 63, 94, 0.15)",
     dot: "#f43f5e",
   },
+  /** The writing record's line — see `writing-performance-card.tsx`. */
   cyan: {
-    stroke: "#06b6d4",
-    fill: "rgba(6, 182, 212, 0.15)",
-    dot: "#06b6d4",
+    stroke: "#07b6d4",
+    fill: "rgba(7, 182, 212, 0.15)",
+    dot: "#07b6d4",
   },
   indigo: {
     stroke: "#6366f1",
@@ -473,7 +478,20 @@ export function AreaChart({
 
     const range = max - min || 1;
     const paddedMax = Math.ceil(max + range * 0.08);
-    const paddedMin = Math.max(0, Math.floor(min - range * 0.05));
+    /**
+     * **The floor follows the data, and must not be clamped to zero.**
+     *
+     * It was `Math.max(0, …)`, which pinned every negative value to the
+     * baseline. For a series that can go below nothing — the writing record's
+     * net words per day, where a day of revision is a real day's work — that
+     * drew a month of cutting exactly like a month of doing nothing. A chart
+     * that cannot show a negative number should not be handed one; silently
+     * flattening it is worse than either.
+     *
+     * An all-positive series is unaffected: the clamp only ever bit when
+     * `min - range * 0.05` fell below zero.
+     */
+    const paddedMin = Math.floor(min - range * 0.05);
 
     return { minVal: paddedMin, maxVal: paddedMax };
   }, [data, categories]);
@@ -503,11 +521,25 @@ export function AreaChart({
 
   const yTicks = useMemo(() => {
     const steps = 4;
-    const ticks = [];
+    const ticks: { value: number; y: number }[] = [];
+    /**
+     * **One tick per distinct label.**
+     *
+     * Five evenly spaced ticks over a narrow range all round to the same
+     * number: a manuscript that moved by two words in a month drew an axis
+     * reading 135,793 / 135,793 / 135,792 / 135,792 / 135,791, which is noise
+     * wearing the clothes of a scale. Where the label would repeat, the tick
+     * is dropped rather than the axis being rescaled — the line still shows
+     * the shape of the change, and the axis stops pretending to a precision
+     * the formatter cannot print.
+     */
+    const seen = new Set<string>();
     for (let i = 0; i <= steps; i++) {
-      const val = minVal + ((maxVal - minVal) / steps) * i;
-      const y = paddingTop + (1 - i / steps) * chartHeight;
-      ticks.push({ value: val, y });
+      const value = minVal + ((maxVal - minVal) / steps) * i;
+      const label = String(Math.round(value));
+      if (seen.has(label)) continue;
+      seen.add(label);
+      ticks.push({ value, y: paddingTop + (1 - i / steps) * chartHeight });
     }
     return ticks;
   }, [minVal, maxVal, paddingTop, chartHeight]);
@@ -533,6 +565,12 @@ export function AreaChart({
     }
     return labels;
   }, [data, index, startEndOnly, paddingLeft, chartWidth]);
+
+  /** Where zero sits, or null when the series never crosses it. */
+  const zeroY =
+    minVal < 0 && maxVal > 0
+      ? paddingTop + (1 - (0 - minVal) / (maxVal - minVal)) * chartHeight
+      : null;
 
   const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!containerRef.current || data.length === 0) return;
@@ -612,30 +650,23 @@ export function AreaChart({
                 className="text-line/70"
                 strokeWidth="1"
               />
-              {showYAxis && (
-                <text
-                  x={paddingLeft - 8}
-                  y={tick.y + 4}
-                  textAnchor="end"
-                  className="fill-muted text-[11px] tabular-nums"
-                >
-                  {valueFormatter(Math.round(tick.value))}
-                </text>
-              )}
             </g>
           ))}
 
-          {xLabels.map((lbl, i) => (
-            <text
-              key={i}
-              x={lbl.x}
-              y={height - 6}
-              textAnchor={i === 0 ? "start" : i === xLabels.length - 1 ? "end" : "middle"}
-              className="fill-muted text-[11px]"
-            >
-              {lbl.label}
-            </text>
-          ))}
+          {/* Where nothing happened, drawn solid so a reader can see which side
+              of it a day fell on. Only when the data actually crosses zero —
+              on an all-positive series it would be a second axis line. */}
+          {zeroY !== null && (
+            <line
+              x1={paddingLeft}
+              x2={paddingLeft + chartWidth}
+              y1={zeroY}
+              y2={zeroY}
+              stroke="currentColor"
+              className="text-line"
+              strokeWidth="1.5"
+            />
+          )}
 
           {seriesPoints.map((series, idx) => {
             const pathD = createSmoothPath(series.points);
@@ -705,6 +736,62 @@ export function AreaChart({
             </g>
           )}
         </svg>
+
+        {/* ---- The axis labels, in HTML rather than in the SVG -------------
+
+            The chart draws into a fixed 800×300 viewBox with
+            `preserveAspectRatio="none"`, which is right for the *geometry* —
+            the line should fill whatever box it is given. It is wrong for
+            text: a glyph in that viewBox is stretched by the same non-uniform
+            factor, and in a phone-width column at `h-56` the horizontal factor
+            is about a third of the vertical one, so the numbers came out
+            crushed to a third of their width.
+
+            So the labels live outside the SVG and are placed by percentage.
+            `preserveAspectRatio="none"` maps the viewBox linearly onto the
+            box, so a percentage of the container is exactly the same position
+            the SVG coordinate would have landed on — the labels move with the
+            chart at every size, and no glyph is ever scaled.
+
+            `pointer-events-none`, so the hover line still belongs to the SVG
+            underneath. */}
+        <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+          {showYAxis &&
+            yTicks.map((tick, i) => (
+              <span
+                key={`y-${i}`}
+                className="absolute text-[11px] tabular-nums text-muted"
+                style={{
+                  left: `${((paddingLeft - 8) / width) * 100}%`,
+                  top: `${(tick.y / height) * 100}%`,
+                  transform: "translate(-100%, -50%)",
+                }}
+              >
+                {valueFormatter(Math.round(tick.value))}
+              </span>
+            ))}
+
+          {xLabels.map((lbl, i) => (
+            <span
+              key={`x-${i}`}
+              className="absolute whitespace-nowrap text-[11px] text-muted"
+              style={{
+                left: `${(lbl.x / width) * 100}%`,
+                top: `${((height - 14) / height) * 100}%`,
+                // Matching the `textAnchor` the SVG text used, so the first and
+                // last labels stay inside the box instead of hanging off it.
+                transform:
+                  i === 0
+                    ? "translateY(-50%)"
+                    : i === xLabels.length - 1
+                      ? "translate(-100%, -50%)"
+                      : "translate(-50%, -50%)",
+              }}
+            >
+              {lbl.label}
+            </span>
+          ))}
+        </div>
 
         {activeDataPoint && hoverIndex !== null && (
           <div

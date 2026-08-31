@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { ROLE_LABELS, type Member } from "@/lib/collab";
 import { timeUntil } from "@/lib/relative-time";
+import { Button } from "@/components/ui/button";
 
 /**
  * "Somebody has put you on a book" — told once, on arrival.
@@ -92,7 +93,7 @@ export function InviteWaitingDialog({
         if (e.target === dialogRef.current) onClose();
       }}
       className="m-auto w-[28rem] max-w-[calc(100vw-2rem)] rounded-2xl border
-                 border-line bg-panel p-0 text-fg backdrop:bg-black/50"
+                 border-tremor-border bg-tremor-background p-0 text-tremor-content-strong backdrop:bg-black/50"
     >
       <div className="px-6 pt-6 pb-5">
         {/* `step` — the palette's indigo, and its documented meaning is "the way
@@ -119,17 +120,17 @@ export function InviteWaitingDialog({
           </svg>
         </span>
 
-        <h2 id="invite-waiting-title" className="text-lg font-bold text-fg">
+        <h2 id="invite-waiting-title" className="text-lg font-bold text-tremor-content-strong">
           {one
             ? "You've been invited to a book"
             : `You've been invited to ${invites.length} books`}
         </h2>
 
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1.5 text-sm leading-relaxed text-tremor-content">
           {one ? (
             <>
               Somebody has put you on their book as{" "}
-              <strong className="font-semibold text-fg">
+              <strong className="font-semibold text-tremor-content-strong">
                 {ROLE_LABELS[one.role].label.toLowerCase()}
               </strong>
               . It expires {timeUntil(one.expiresAt)}.
@@ -147,9 +148,9 @@ export function InviteWaitingDialog({
             whole point of a pending invitation granting nothing. It arrives on
             acceptance. Inventing one, or widening the policy to fetch it, would
             both be worse than saying less. */}
-        <p className="mt-3 rounded-lg border border-line bg-raised px-3 py-2 text-xs text-muted">
+        <p className="mt-3 rounded-lg border border-tremor-border bg-tremor-background-subtle px-3 py-2 text-xs text-tremor-content">
           Sent to{" "}
-          <strong className="font-medium text-fg">
+          <strong className="font-medium text-tremor-content-strong">
             {one ? one.email : invites[0]?.email}
           </strong>
           . Accepting puts the book on your shelf and keeps it in step with the
@@ -157,23 +158,18 @@ export function InviteWaitingDialog({
         </p>
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">
+      <div className="flex flex-wrap justify-end gap-2 border-t border-tremor-border px-6 py-4">
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg border border-line px-4 py-2 text-sm font-medium
-                     text-fg transition-colors hover:bg-raised"
+          className="rounded-lg border border-tremor-border px-4 py-2 text-sm font-medium
+                     text-tremor-content-strong transition-colors hover:bg-tremor-background-subtle"
         >
           Later
         </button>
-        <button
-          type="button"
-          onClick={onSee}
-          className="rounded-lg bg-accent px-5 py-2 text-sm font-semibold
-                     text-accent-ink transition-opacity hover:opacity-90"
-        >
+        <Button onClick={onSee}>
           {one ? "See the invitation" : "See them"}
-        </button>
+        </Button>
       </div>
     </dialog>
   );

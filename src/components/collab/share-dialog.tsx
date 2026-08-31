@@ -30,6 +30,8 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Menu, MenuButton, MenuSeparator } from "@/components/ui/menu";
 import { InviteSentDialog } from "./invite-sent-dialog";
+import { Button } from "@/components/ui/button";
+import { DialogClose } from "@/components/ui/dialog";
 
 /**
  * Who is on this book, and the one place that changes.
@@ -234,36 +236,28 @@ export function ShareDialog({
         if (e.target === dialogRef.current) onClose();
       }}
       className="m-auto max-h-[calc(var(--oc-visual-height)-2rem)] w-[34rem] max-w-[calc(100vw-2rem)]
-                 overflow-y-auto rounded-2xl border border-line bg-panel p-0
-                 text-fg backdrop:bg-black/50"
+                 overflow-y-auto rounded-2xl border border-tremor-border bg-tremor-background p-0
+                 text-tremor-content-strong backdrop:bg-black/50"
     >
-      <div className="flex items-start justify-between gap-4 border-b border-line px-6 py-4">
+      <div className="flex items-start justify-between gap-4 border-b border-tremor-border px-6 py-4">
         <div className="min-w-0">
           <h2 id="share-dialog-title" className="text-lg font-bold">
             Share this book
           </h2>
-          <p className="mt-0.5 truncate text-sm text-muted">{bookTitle}</p>
+          <p className="mt-0.5 truncate text-sm text-tremor-content">{bookTitle}</p>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="-mt-1 shrink-0 rounded-lg px-2.5 py-1.5 text-xl leading-none
-                     text-muted hover:bg-raised"
-        >
-          ×
-        </button>
+        <DialogClose onClose={onClose} corner={false} />
       </div>
 
       {error ? (
         <div className="px-6 py-8">
-          <p className="font-bold text-fg">Sharing isn&rsquo;t set up yet.</p>
-          <p className="mt-2 text-sm text-muted">
+          <p className="font-bold text-tremor-content-strong">Sharing isn&rsquo;t set up yet.</p>
+          <p className="mt-2 text-sm text-tremor-content">
             The <code>book_members</code> table could not be read. If this is
             your own server, apply{" "}
             <code>supabase/migrations/20260806000000_collaboration.sql</code>.
           </p>
-          <p className="mt-3 font-mono text-xs break-words text-muted">
+          <p className="mt-3 font-mono text-xs break-words text-tremor-content">
             {error}
           </p>
         </div>
@@ -283,10 +277,10 @@ export function ShareDialog({
           are white. A card that stated its own colour would be right in exactly
           one theme.
         */
-        <div className="space-y-4 bg-surface px-5 py-5">
+        <div className="space-y-4 bg-tremor-background-muted px-5 py-5">
           {/* The invite form */}
           <form
-            className="rounded-xl border border-line bg-panel p-4"
+            className="rounded-xl border border-tremor-border bg-tremor-background p-4"
             onSubmit={(e) => {
               e.preventDefault();
               void invite();
@@ -295,7 +289,7 @@ export function ShareDialog({
             <div className="flex items-end justify-between gap-3">
               <label
                 htmlFor="share-email"
-                className="text-sm font-bold text-fg"
+                className="text-sm font-bold text-tremor-content-strong"
               >
                 Invite someone
               </label>
@@ -311,16 +305,16 @@ export function ShareDialog({
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="their@email.com"
                 autoComplete="off"
-                className="min-w-0 basis-full rounded-lg border border-line bg-surface px-3 sm:flex-1 sm:basis-auto
-                           py-2 text-sm text-fg outline-none placeholder:text-muted
+                className="min-w-0 basis-full rounded-lg border border-tremor-border bg-tremor-background-muted px-3 sm:flex-1 sm:basis-auto
+                           py-2 text-sm text-tremor-content-strong outline-none placeholder:text-tremor-content
                            focus-visible:ring-2 focus-visible:ring-accent/50"
               />
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as CollabRole)}
                 aria-label="What they may do"
-                className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm
-                           text-fg outline-none focus-visible:ring-2
+                className="min-w-0 flex-1 rounded-lg border border-tremor-border bg-tremor-background-muted px-3 py-2 text-sm
+                           text-tremor-content-strong outline-none focus-visible:ring-2
                            focus-visible:ring-accent/50"
               >
                 {COLLAB_ROLES.map((r) => (
@@ -329,15 +323,10 @@ export function ShareDialog({
                   </option>
                 ))}
               </select>
-              <button
-                type="submit"
-                disabled={busy}
-                className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm
-                           font-semibold text-accent-ink disabled:opacity-60"
-              >
+              <Button type="submit" disabled={busy} className="flex">
                 {busy && <Spinner className="h-3.5 w-3.5" />}
                 Invite
-              </button>
+              </Button>
             </div>
 
             {/* **One static line, not a paragraph that rewrites itself.** This
@@ -353,7 +342,7 @@ export function ShareDialog({
                 invitation and the link are certain, the mail is not, and
                 whether it went is reported afterwards rather than assumed
                 here. */}
-            <p className="mt-2 text-xs text-muted">
+            <p className="mt-2 text-xs text-tremor-content">
               We&rsquo;ll email them an invitation, and you&rsquo;ll get a link
               to send on as well. It works only for that address and lasts{" "}
               {INVITE_DAYS} days.
@@ -371,8 +360,8 @@ export function ShareDialog({
                 cheapest thing that makes it plainly real. */}
             <details className="mt-2.5 group">
               <summary
-                className="cursor-pointer list-none text-xs font-semibold text-muted
-                           outline-none transition-colors hover:text-fg
+                className="cursor-pointer list-none text-xs font-semibold text-tremor-content
+                           outline-none transition-colors hover:text-tremor-content-strong
                            focus-visible:ring-2 focus-visible:ring-accent/50"
               >
                 Add a message
@@ -393,8 +382,8 @@ export function ShareDialog({
                 maxLength={500}
                 placeholder="Chapter nine is the one I'd like your eye on."
                 aria-label="A message to send with the invitation"
-                className="mt-2 w-full resize-y rounded-lg border border-line bg-surface
-                           px-3 py-2 text-sm text-fg outline-none placeholder:text-muted
+                className="mt-2 w-full resize-y rounded-lg border border-tremor-border bg-tremor-background-muted
+                           px-3 py-2 text-sm text-tremor-content-strong outline-none placeholder:text-tremor-content
                            focus-visible:ring-2 focus-visible:ring-accent/50"
               />
             </details>
@@ -424,7 +413,7 @@ export function ShareDialog({
           {refused &&
             allowance.blocked &&
             (pro ? (
-              <p className="rounded-xl border border-line bg-panel px-4 py-3 text-sm text-muted">
+              <p className="rounded-xl border border-tremor-border bg-tremor-background px-4 py-3 text-sm text-tremor-content">
                 {spentLine(allowance)} Remove somebody to make room.
               </p>
             ) : (
@@ -432,17 +421,17 @@ export function ShareDialog({
             ))}
 
           {/* Who is on it */}
-          <div className="rounded-xl border border-line bg-panel p-4">
-            <h3 className="text-sm font-bold text-fg">
+          <div className="rounded-xl border border-tremor-border bg-tremor-background p-4">
+            <h3 className="text-sm font-bold text-tremor-content-strong">
               On this book{" "}
               {known && (
-                <span className="font-normal text-muted">
+                <span className="font-normal text-tremor-content">
                   {allowance.used} of {allowance.limit}
                 </span>
               )}
             </h3>
 
-            <ul className="mt-2 divide-y divide-line">
+            <ul className="mt-2 divide-y divide-tremor-border">
               <li className="flex items-center gap-3 py-2.5">
                 <Disc tone="owner">
                   <svg
@@ -457,14 +446,14 @@ export function ShareDialog({
                     <path d="M4.5 16a5.5 5.5 0 0 1 11 0" />
                   </svg>
                 </Disc>
-                <span className="min-w-0 flex-1 truncate text-sm text-fg">
+                <span className="min-w-0 flex-1 truncate text-sm text-tremor-content-strong">
                   You
                 </span>
-                <span className="shrink-0 text-xs text-muted">Owner</span>
+                <span className="shrink-0 text-xs text-tremor-content">Owner</span>
               </li>
 
               {loading && (
-                <li className="flex items-center gap-2 py-3 text-sm text-muted">
+                <li className="flex items-center gap-2 py-3 text-sm text-tremor-content">
                   <Spinner className="h-3.5 w-3.5" /> Reading the list…
                 </li>
               )}
@@ -488,7 +477,7 @@ export function ShareDialog({
             </ul>
 
             {known && members.length === 0 && (
-              <p className="py-2 text-sm text-muted">
+              <p className="py-2 text-sm text-tremor-content">
                 Nobody else yet. This book holds {allowance.limit} people,
                 including you.
               </p>
@@ -511,14 +500,14 @@ export function ShareDialog({
           {/* Meta, not a section — so no box and no rule. The two cards above
               already do the separating that hairline was doing. */}
           <div className="px-1 pt-1">
-            <p className="text-xs text-muted">
+            <p className="text-xs text-tremor-content">
               Chapters and their notes sync. Your story bible, ledger and
               writing record do not.
             </p>
             <details className="group mt-1.5">
               <summary
                 className="inline-flex cursor-pointer list-none items-center gap-1
-                           text-xs font-medium text-fg outline-none
+                           text-xs font-medium text-tremor-content-strong outline-none
                            focus-visible:ring-2 focus-visible:ring-accent/50"
               >
                 What a co-writer will and won&rsquo;t see
@@ -530,12 +519,12 @@ export function ShareDialog({
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-3 w-3 text-muted transition-transform group-open:rotate-180"
+                  className="h-3 w-3 text-tremor-content transition-transform group-open:rotate-180"
                 >
                   <path d="m5.5 8 4.5 4.5L14.5 8" />
                 </svg>
               </summary>
-              <div className="mt-2 space-y-2 text-xs leading-relaxed text-muted">
+              <div className="mt-2 space-y-2 text-xs leading-relaxed text-tremor-content">
                 <p>
                   Your story bible, advance readers, the ledger, your writing
                   record and your roadmap ticks stay on your own machine. None
@@ -594,8 +583,8 @@ function Disc({
     tone === "owner"
       ? "bg-accent text-accent-ink"
       : tone === "pending"
-        ? "border border-dashed border-muted text-muted"
-        : "bg-raised text-fg";
+        ? "border border-dashed border-muted text-tremor-content"
+        : "bg-tremor-background-subtle text-tremor-content-strong";
   return (
     <span
       aria-hidden="true"
@@ -678,15 +667,15 @@ function MemberRow({
       </Disc>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-fg">{shownName ?? member.email}</p>
+        <p className="truncate text-sm text-tremor-content-strong">{shownName ?? member.email}</p>
         {/* The address under the name, where a name is known: two people can
             share a display name and only the address tells them apart — which
             is the whole question this list answers. */}
         {shownName && (
-          <p className="truncate text-xs text-muted">{member.email}</p>
+          <p className="truncate text-xs text-tremor-content">{member.email}</p>
         )}
         {pending ? (
-          <p className="text-xs text-muted">
+          <p className="text-xs text-tremor-content">
             Invited · expires {timeUntil(member.expiresAt)}
           </p>
         ) : expired ? (
@@ -695,7 +684,7 @@ function MemberRow({
           </p>
         ) : (
           member.acceptedAt && (
-            <p className="text-xs text-muted">
+            <p className="text-xs text-tremor-content">
               Joined {relativeTime(member.acceptedAt)}
             </p>
           )
@@ -707,8 +696,8 @@ function MemberRow({
           type="button"
           onClick={onCopy}
           disabled={busy}
-          className="shrink-0 rounded-lg border border-line px-2.5 py-1.5 text-xs
-                     font-medium text-fg transition-colors hover:bg-raised
+          className="shrink-0 rounded-lg border border-tremor-border px-2.5 py-1.5 text-xs
+                     font-medium text-tremor-content-strong transition-colors hover:bg-tremor-background-subtle
                      disabled:opacity-60"
         >
           {copied ? "Copied" : "Copy link"}
@@ -719,9 +708,9 @@ function MemberRow({
         label={`What ${member.email} may do`}
         align="end"
         width={220}
-        triggerClassName="shrink-0 rounded-lg border border-line px-2.5 py-1.5
-                          text-xs font-medium text-fg outline-none
-                          transition-colors hover:bg-raised
+        triggerClassName="shrink-0 rounded-lg border border-tremor-border px-2.5 py-1.5
+                          text-xs font-medium text-tremor-content-strong outline-none
+                          transition-colors hover:bg-tremor-background-subtle
                           focus-visible:ring-2 focus-visible:ring-accent/50"
         trigger={
           <span className="flex items-center gap-1.5">
@@ -734,7 +723,7 @@ function MemberRow({
               strokeWidth="1.8"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="h-3 w-3 text-muted"
+              className="h-3 w-3 text-tremor-content"
             >
               <path d="m5.5 8 4.5 4.5L14.5 8" />
             </svg>

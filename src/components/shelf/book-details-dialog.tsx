@@ -10,6 +10,7 @@ import {
 } from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
 import { useCover } from "@/lib/use-library";
+import { Button } from "@/components/ui/button";
 
 /**
  * What a book is, before opening it.
@@ -45,8 +46,8 @@ export function BookDetailsDialog({
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[32rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[32rem] max-w-[calc(100vw-2rem)] rounded-lg bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="scroll-slim h-full overflow-y-auto p-4 pb-[max(1rem,var(--oc-safe-bottom))] sm:p-7">
         <div className="flex flex-col items-start gap-5 sm:flex-row">
@@ -62,28 +63,28 @@ export function BookDetailsDialog({
           </div>
 
           <div className="min-w-0 flex-1">
-            <h2 className="font-serif text-xl leading-snug text-fg">
+            <h2 className="font-serif text-xl leading-snug text-tremor-content-strong">
               {book.title}
             </h2>
             {book.subtitle ? (
-              <p className="mt-1 font-serif text-sm text-muted italic">
+              <p className="mt-1 font-serif text-sm text-tremor-content italic">
                 {book.subtitle}
               </p>
             ) : null}
             {book.author ? (
-              <p className="mt-2 font-sans text-xs tracking-wide text-muted uppercase">
+              <p className="mt-2 font-sans text-xs tracking-wide text-tremor-content uppercase">
                 {book.author}
               </p>
             ) : null}
 
             <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 font-sans text-sm">
               <div>
-                <dt className="text-xs text-muted">Chapters</dt>
-                <dd className="tabular-nums text-fg">{chapters}</dd>
+                <dt className="text-xs text-tremor-content">Chapters</dt>
+                <dd className="tabular-nums text-tremor-content-strong">{chapters}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted">Words</dt>
-                <dd className="tabular-nums text-fg">
+                <dt className="text-xs text-tremor-content">Words</dt>
+                <dd className="tabular-nums text-tremor-content-strong">
                   {words.toLocaleString()}
                   {book.targetWords
                     ? ` of ${book.targetWords.toLocaleString()}`
@@ -91,8 +92,8 @@ export function BookDetailsDialog({
                 </dd>
               </div>
               <div className="col-span-2">
-                <dt className="text-xs text-muted">Last opened</dt>
-                <dd className="text-fg">{relativeTime(book.lastOpenedAt)}</dd>
+                <dt className="text-xs text-tremor-content">Last opened</dt>
+                <dd className="text-tremor-content-strong">{relativeTime(book.lastOpenedAt)}</dd>
               </div>
               {/* Genre alone since 2026-08-15. This row read "Form" and joined
                   the genre to the book's `kind` — novel, novella or short
@@ -100,8 +101,8 @@ export function BookDetailsDialog({
                   See the note at the top of `book-kinds.ts`. */}
               {book.genre ? (
                 <div className="col-span-2">
-                  <dt className="text-xs text-muted">Genre</dt>
-                  <dd className="text-fg">{book.genre}</dd>
+                  <dt className="text-xs text-tremor-content">Genre</dt>
+                  <dd className="text-tremor-content-strong">{book.genre}</dd>
                 </div>
               ) : null}
             </dl>
@@ -109,28 +110,14 @@ export function BookDetailsDialog({
         </div>
 
         <div className="mt-7 flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            type="button"
-            onClick={onEditCover}
-            className="rounded-md px-3 py-2 font-sans text-sm text-muted
-                       outline-none transition-colors hover:bg-raised
-                       hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
+          <Button variant="secondary" onClick={onEditCover} className="text-tremor-content hover:bg-tremor-background-subtle hover:text-tremor-content-strong">
             Edit details
-          </button>
+          </Button>
 
           <div className="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-2 font-sans text-sm text-muted
-                         outline-none transition-colors hover:bg-raised
-                         hover:text-fg focus-visible:ring-2
-                         focus-visible:ring-accent/60"
-            >
+            <Button variant="secondary" onClick={onClose} className="text-tremor-content hover:bg-tremor-background-subtle hover:text-tremor-content-strong">
               Cancel
-            </button>
+            </Button>
 
             {/* **The Read button came off on 2026-08-25.** It pushed to
                 `/book/[bookId]/read?from=shelf`, and `read` is in
@@ -141,17 +128,9 @@ export function BookDetailsDialog({
 
                 The reading view itself is untouched and still tested. This
                 button comes back with it. */}
-            <button
-              type="button"
-              autoFocus
-              onClick={() => router.push(`/book/${book.id}`)}
-              className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                         font-medium text-accent-ink outline-none transition-colors
-                         hover:bg-accent-strong focus-visible:ring-2
-                         focus-visible:ring-accent/60"
-            >
+            <Button autoFocus onClick={() => router.push(`/book/${book.id}`)}>
               Open book
-            </button>
+            </Button>
           </div>
         </div>
       </div>

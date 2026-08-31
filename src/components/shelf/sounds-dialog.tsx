@@ -9,6 +9,7 @@ import {
   type SceneId,
 } from "@/lib/ambience";
 import { useAmbience, useAmbienceSupported } from "@/lib/use-ambience";
+import { Button } from "@/components/ui/button";
 
 /**
  * The sound mixer: pick a scene, set the level, close it and keep writing.
@@ -39,12 +40,12 @@ export function SoundsDialog({ onClose }: { onClose: () => void }) {
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[30rem] max-w-[calc(100vw-2rem)] rounded-lg bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="p-6">
         <h2 className="font-serif text-xl">Background sound</h2>
-        <p className="mt-2 font-sans text-sm leading-relaxed text-muted">
+        <p className="mt-2 font-sans text-sm leading-relaxed text-tremor-content">
           Keeps playing while you write. Pick the same one again to stop it.
         </p>
 
@@ -72,7 +73,7 @@ export function SoundsDialog({ onClose }: { onClose: () => void }) {
                                   ${
                                     on
                                       ? "border-accent bg-accent/10"
-                                      : "border-line hover:border-accent/50 hover:bg-raised"
+                                      : "border-tremor-border hover:border-accent/50 hover:bg-tremor-background-subtle"
                                   }`}
                     >
                       {/* Three bars that rise and fall while this scene is the
@@ -103,7 +104,7 @@ export function SoundsDialog({ onClose }: { onClose: () => void }) {
                         <span className="block font-sans text-sm font-semibold">
                           {s.name}
                         </span>
-                        <span className="mt-0.5 block font-sans text-xs leading-relaxed text-muted">
+                        <span className="mt-0.5 block font-sans text-xs leading-relaxed text-tremor-content">
                           {s.description}
                         </span>
                       </span>
@@ -114,7 +115,7 @@ export function SoundsDialog({ onClose }: { onClose: () => void }) {
             </ul>
 
             <label className="mt-5 flex items-center gap-3">
-              <span className="font-sans text-sm text-muted">Volume</span>
+              <span className="font-sans text-sm text-tremor-content">Volume</span>
               <input
                 type="range"
                 min={0}
@@ -123,7 +124,7 @@ export function SoundsDialog({ onClose }: { onClose: () => void }) {
                 onChange={(e) => setAmbienceVolume(Number(e.target.value) / 100)}
                 className="h-1.5 flex-1 cursor-pointer accent-accent"
               />
-              <span className="w-9 text-right font-sans text-xs tabular-nums text-muted">
+              <span className="w-9 text-right font-sans text-xs tabular-nums text-tremor-content">
                 {Math.round(volume * 100)}%
               </span>
             </label>
@@ -133,30 +134,16 @@ export function SoundsDialog({ onClose }: { onClose: () => void }) {
         <div className="mt-6 flex items-center justify-between gap-3">
           {/* Only offered when there is something to stop. */}
           {scene ? (
-            <button
-              type="button"
-              onClick={stopAmbience}
-              className="cursor-pointer rounded-md px-3 py-2 font-sans text-sm
-                         font-medium text-muted outline-none transition-colors
-                         hover:bg-raised hover:text-fg focus-visible:ring-2
-                         focus-visible:ring-accent/60"
-            >
+            <Button variant="secondary" onClick={stopAmbience} className="text-tremor-content hover:bg-tremor-background-subtle hover:text-tremor-content-strong">
               Stop
-            </button>
+            </Button>
           ) : (
             <span />
           )}
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded-md bg-accent px-4 py-2 font-sans
-                       text-sm font-semibold text-accent-ink outline-none
-                       transition-colors hover:bg-accent-strong
-                       focus-visible:ring-2 focus-visible:ring-accent/60"
-          >
+          <Button onClick={onClose}>
             Back to writing
-          </button>
+          </Button>
         </div>
       </div>
     </dialog>

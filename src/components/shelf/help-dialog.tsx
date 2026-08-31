@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { DialogClose } from "@/components/ui/dialog";
 
 /**
  * What OpenChapter can do, in one place.
@@ -277,46 +279,28 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
       onClick={(e) => {
         if (e.target === dialogRef.current) onClose();
       }}
-      className="m-auto w-[42rem] max-w-[calc(100vw-2rem)] rounded-lg bg-panel
-                 p-0 text-fg backdrop:bg-black/70"
+      className="m-auto w-[42rem] max-w-[calc(100vw-2rem)] rounded-lg bg-tremor-background
+                 p-0 text-tremor-content-strong backdrop:bg-black/70"
     >
       <div className="flex max-h-[85vh] flex-col">
-        <header className="flex items-center justify-between gap-4 border-b border-line px-6 py-4">
+        <header className="flex items-center justify-between gap-4 border-b border-tremor-border px-6 py-4">
           <h2 className="font-serif text-xl">How OpenChapter works</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="rounded-md p-1.5 text-muted outline-none transition-colors
-                       hover:bg-raised hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="h-5 w-5"
-            >
-              <path d="m5 5 10 10M15 5 5 15" strokeLinecap="round" />
-            </svg>
-          </button>
+          <DialogClose onClose={onClose} corner={false} />
         </header>
 
         <div className="scroll-slim overflow-y-auto px-6 py-5">
           {SECTIONS.map((section) => (
             <section key={section.title} className="mb-6 last:mb-0">
-              <h3 className="font-sans text-xs font-semibold tracking-wide text-muted uppercase">
+              <h3 className="font-sans text-xs font-semibold tracking-wide text-tremor-content uppercase">
                 {section.title}
               </h3>
               <dl className="mt-3 space-y-3">
                 {section.items.map((item) => (
                   <div key={item.name}>
-                    <dt className="font-sans text-sm font-medium text-fg">
+                    <dt className="font-sans text-sm font-medium text-tremor-content-strong">
                       {item.name}
                     </dt>
-                    <dd className="mt-0.5 font-sans text-sm leading-relaxed text-muted">
+                    <dd className="mt-0.5 font-sans text-sm leading-relaxed text-tremor-content">
                       {item.desc}
                     </dd>
                   </div>
@@ -326,17 +310,10 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        <footer className="flex justify-end border-t border-line px-6 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md bg-accent px-4 py-2 font-sans text-sm
-                       font-semibold text-accent-ink outline-none transition-colors
-                       hover:bg-accent-strong focus-visible:ring-2
-                       focus-visible:ring-accent/60"
-          >
+        <footer className="flex justify-end border-t border-tremor-border px-6 py-4">
+          <Button onClick={onClose}>
             Back to writing
-          </button>
+          </Button>
         </footer>
       </div>
     </dialog>
