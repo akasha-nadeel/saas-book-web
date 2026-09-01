@@ -1960,15 +1960,15 @@ function CurrentBookCard({
           </div>
         </section>
       ) : settled ? (
-        <EmptyState
-          title="Nothing on the shelf yet"
-          primary={START}
-          secondary={IMPORT}
-        >
-          Start one and name it later, or bring in a manuscript you already have
-          — .docx, .epub, .md, .txt or .html. Then this screen tells you what
-          stands between it and a shop.
-        </EmptyState>
+        /* **Nothing, because the shelf below already says it.** This used to
+           carry its own "Nothing on the shelf yet", and so does the grid — so
+           an empty shelf answered the same question twice, with the View and
+           Sort controls stranded between the two copies. The grid's is the one
+           that stayed: it sits where the books would be, and it is the one
+           that already knows the difference between an empty shelf, an empty
+           trash and a search that found nothing. Its copy took this one's
+           closing sentence on the way. */
+        null
       ) : (
         /* **Waiting, not empty — and the difference is the first thing a
             writer saw on signing in.** On a machine that has just signed in,
@@ -3169,6 +3169,22 @@ function Write({
     return () => window.removeEventListener("keydown", onKey);
   }, [selecting, visible, stopSelecting]);
 
+  /**
+   * Nothing to look at, and therefore nothing to sort.
+   *
+   * **The View and Sort controls used to stand over every empty state** — an
+   * empty shelf, an empty trash, an empty Favourites — offering to re-order
+   * and re-lay-out a list with nothing in it. A control that cannot change
+   * anything is the thing the house rules forbid, and on the empty shelf it
+   * was worse than useless: it sat *between* two copies of the same "Nothing
+   * on the shelf yet".
+   *
+   * A search that found nothing is the exception and keeps its controls: that
+   * answer is about the query rather than the library, and the way out of it
+   * is one of the controls this would have hidden.
+   */
+  const nothingToShow = visible.length === 0 && !searching;
+
   const pick = (book: Book, shiftKey: boolean) => {
     setSelected((current) =>
       shiftKey && anchor
@@ -3190,6 +3206,7 @@ function Write({
           buying: tick a book at the foot of thirty-four and the actions are
           still on screen. Off the rest of the time, so an ordinary visit to
           the shelf is unchanged. */}
+      {!nothingToShow && (
       <div
         className={`flex flex-wrap items-center justify-between gap-3 md:justify-end ${
           selecting
@@ -3410,6 +3427,7 @@ function Write({
           </>
         )}
       </div>
+      )}
 
       {visible.length === 0 && !settled && !searching ? (
         /* The same wait the Overview makes, for the same reason: on a machine
@@ -3478,7 +3496,8 @@ function Write({
               secondary={IMPORT}
             >
               Start one and name it later, or bring in a manuscript you already
-              have — .docx, .epub, .md, .txt or .html.
+              have — .docx, .epub, .md, .txt or .html. Then this screen tells
+              you what stands between it and a shop.
             </EmptyState>
           )}
         </div>
