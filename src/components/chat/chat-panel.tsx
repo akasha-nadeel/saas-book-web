@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/assistant-reply";
 import { CopyButton } from "@/components/ui/copy-button";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { ListGroup, ListRow, SectionHeader } from "@/components/ui/list";
 import { UpgradeDialog } from "@/components/upgrade/upgrade-dialog";
 import { displayName, firstNameOf } from "@/lib/account";
 import {
@@ -471,32 +472,38 @@ export function ChatPanel({
               </p>
             </div>
 
-            <div className="mt-5 flex flex-col gap-2">
-              {suggestions.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => send(s)}
-                  /* **A light blue plate with near-black type, the same in both
-                     themes** — and stated as a fixed pair on purpose, like
-                     `--color-sheet`. The chip carries its own ground, so black
-                     on light blue is legible on the dark panel and on the light
-                     one; letting it follow the theme would make one control
-                     look like two. They were `border-line` boxes in `muted`,
-                     which is the panel's own quietest treatment — the wrong
-                     weight for the only thing on an empty screen that tells a
-                     writer what to do next. */
-                  className="rounded-md border border-blue-200 bg-blue-100
-                             px-3 py-2 text-left font-sans text-sm text-blue-950
-                             outline-none transition-colors hover:border-blue-300
-                             hover:bg-blue-200 focus-visible:ring-2
-                             focus-visible:ring-accent/60"
-                >
-                  {s}
-                </button>
-              ))}
+            <div className="mt-5">
+              {/* **One group of three rows, where these were three plates.**
+                  They were separate light-blue chips, which read as three
+                  competing buttons rather than as a list of things to ask —
+                  and a coloured plate on an empty panel is the loudest thing
+                  on it. A grouped list is what a set of suggested actions is,
+                  and the chevron says each one does something. */}
+              <SectionHeader>Try asking</SectionHeader>
+              <ListGroup>
+                {suggestions.map((s) => (
+                  <ListRow
+                    key={s}
+                    title={s}
+                    onClick={() => send(s)}
+                    trailing={
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-3.5 w-3.5 text-muted"
+                      >
+                        <path d="M9 5l7 7-7 7" />
+                      </svg>
+                    }
+                  />
+                ))}
+              </ListGroup>
             </div>
-
           </div>
         ) : (
           <ol className="flex flex-col gap-4">

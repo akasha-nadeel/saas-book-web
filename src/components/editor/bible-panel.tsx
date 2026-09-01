@@ -9,6 +9,8 @@ import {
   type EntryKind,
 } from "@/lib/bible";
 import { getBibleRaw, saveBibleRaw } from "@/lib/library-store";
+import { SectionHeader } from "@/components/ui/list";
+import { Segmented } from "@/components/ui/segmented";
 import { chapterText } from "@/lib/search";
 import {
   introducedIn,
@@ -185,7 +187,7 @@ export function BiblePanel({
         <button
           type="button"
           onClick={() => setAdding((a) => !a)}
-          className="w-full rounded-md bg-accent py-1.5 font-sans text-xs
+          className="w-full rounded-[10px] bg-accent py-2 font-sans text-[13px]
                      font-semibold text-accent-ink outline-none
                      transition-colors hover:bg-accent-strong
                      focus-visible:ring-2 focus-visible:ring-accent/50"
@@ -196,28 +198,18 @@ export function BiblePanel({
 
       {hasSeries && (
         <div className="border-b border-line px-3 py-2.5">
-          <div className="flex rounded-md border border-line p-0.5">
-            {(
-              [
-                ["book", "This book"],
-                ["series", "The series"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setScope(id)}
-                aria-pressed={scope === id}
-                className={`flex-1 rounded px-2 py-1 font-sans text-xs font-medium ${
-                  scope === id
-                    ? "bg-raised text-fg"
-                    : "text-muted hover:text-fg"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* The fifth hand-rolled segmented control in the app, now the
+              shared one — an outlined track with a `raised` active segment was
+              a sixth answer to a question `ui/segmented.tsx` settles. */}
+          <Segmented
+            label="Which books to read"
+            value={scope}
+            onChange={setScope}
+            options={[
+              { value: "book" as const, label: "This book" },
+              { value: "series" as const, label: "The series" },
+            ]}
+          />
           {wide && (
             <p className="mt-2 font-sans text-[11px] leading-relaxed text-muted">
               {seriesName ?? "This series"} — {series.length} books on this
@@ -239,7 +231,7 @@ export function BiblePanel({
           <select
             value={kind}
             onChange={(e) => setKind(e.target.value as EntryKind)}
-            className="rounded-md border border-line bg-surface px-2 py-1.5 font-sans text-sm text-fg"
+            className="rounded-[10px] bg-raised px-2.5 py-1.5 font-sans text-[13px] text-fg outline-none placeholder:text-muted focus:ring-2 focus:ring-accent/50"
           >
             {KINDS.map((k) => (
               <option key={k.id} value={k.id}>
@@ -252,7 +244,7 @@ export function BiblePanel({
             onChange={(e) => setName(e.target.value)}
             placeholder="Name"
             aria-label="Name"
-            className="rounded-md border border-line bg-surface px-2 py-1.5 font-sans text-sm
+            className="rounded-[10px] bg-raised px-2.5 py-1.5 font-sans text-[13px]
                        text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           />
           <input
@@ -260,7 +252,7 @@ export function BiblePanel({
             onChange={(e) => setAka(e.target.value)}
             placeholder="Also called (comma separated)"
             aria-label="Also called"
-            className="rounded-md border border-line bg-surface px-2 py-1.5 font-sans text-sm
+            className="rounded-[10px] bg-raised px-2.5 py-1.5 font-sans text-[13px]
                        text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
           />
           <textarea
@@ -269,14 +261,14 @@ export function BiblePanel({
             rows={3}
             placeholder="Anything you will forget by chapter nineteen"
             aria-label="Detail"
-            className="resize-none rounded-md border border-line bg-surface px-2 py-1.5
-                       font-sans text-sm text-fg outline-none
+            className="scroll-slim resize-none rounded-[10px] bg-raised px-2.5 py-1.5
+                       font-sans text-[13px] text-fg outline-none
                        focus-visible:ring-2 focus-visible:ring-accent/50"
           />
           <button
             type="submit"
             disabled={!name.trim()}
-            className="rounded-md bg-accent px-3 py-1.5 font-sans text-xs font-semibold
+            className="rounded-[10px] bg-accent px-3 py-1.5 font-sans text-[13px] font-semibold
                        text-accent-ink disabled:opacity-40"
           >
             Add to this book
@@ -284,7 +276,7 @@ export function BiblePanel({
         </form>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-3">
         {rows.length === 0 ? (
           <p className="font-sans text-sm text-muted">
             {wide
@@ -334,9 +326,9 @@ export function BiblePanel({
               if (inKind.length === 0) return null;
               return (
                 <div key={k.id} className="mb-4">
-                  <p className="mb-1.5 font-sans text-xs tracking-wide text-muted uppercase">
+                  <SectionHeader trailing={inKind.length}>
                     {k.label}
-                  </p>
+                  </SectionHeader>
                   <ul className="flex flex-col gap-1">
                     {inKind.map((row) => (
                       <li key={row.id}>
@@ -345,8 +337,10 @@ export function BiblePanel({
                           onClick={() =>
                             setOpen(open === row.id ? null : row.id)
                           }
-                          className="w-full rounded-md px-2 py-1.5 text-left font-sans
-                                     text-sm text-fg hover:bg-raised"
+                          className="w-full rounded-[7px] px-2 py-1.5 text-left font-sans
+                                     text-[13px] text-fg outline-none transition-colors
+                                     hover:bg-raised focus-visible:ring-2
+                                     focus-visible:ring-accent/60"
                         >
                           {row.name}
                           {row.aka.length > 0 && (

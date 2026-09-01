@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { RailMark } from "@/components/editor/rail-mark";
+import { Tooltip } from "@/components/ui/tooltip";
 import { SectionImportDialog } from "@/components/editor/section-import-dialog";
 import { showImportBanner } from "@/components/editor/import-banner-host";
 import { IMPORT_ACCEPT, ImportError, importFile } from "@/lib/import";
@@ -150,24 +152,26 @@ export function SectionImportButton({
         onClick={() => fileRef.current?.click()}
         disabled={busy}
         aria-label={`Import a file into ${here}`}
-        title={`Import a file into ${here}`}
-        className={`flex w-9 shrink-0 cursor-pointer items-center justify-center
-                    rounded-lg font-sans outline-none transition-colors
-                    focus-visible:ring-2 disabled:opacity-45 ${CARD_OUTLINE}`}
+        /* **The third of three square buttons on the card**, so it matches the
+           two beside it — the same 36px box, the same `md` corner, and the
+           itshover upload mark rather than a hand-drawn arrow on a 20 grid.
+           The `title` is gone with them: `Tooltip` is the app's card, and a
+           browser tooltip beside two real ones is two tooltips. */
+        /* The quiet weight it shares with the add-a-page button beside it —
+           both are secondary to the card's name, and only the disclosure
+           carries a fill. */
+        className={`group relative flex h-8 w-8 shrink-0 cursor-pointer
+                    items-center justify-center rounded-md font-sans outline-none
+                    transition-colors focus-visible:ring-2 disabled:opacity-45
+                    ${CARD_QUIET}`}
       >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-4 w-4"
-        >
-          <path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5" />
-          <path d="M3.5 12.5v2A1.5 1.5 0 0 0 5 16h10a1.5 1.5 0 0 0 1.5-1.5v-2" />
-        </svg>
+        <RailMark mark="import" size={17} />
+        <Tooltip
+          label={`Import a file into ${here}`}
+          side="bottom"
+          align="end"
+          nowrap
+        />
       </button>
 
       <input
@@ -212,10 +216,14 @@ export function SectionImportButton({
   );
 }
 
-/* The card's own outlined button, copied from `book-panel.tsx` rather than
+/* The card's own quiet button, copied from `book-panel.tsx` rather than
    exported from it, because importing the panel here would be a cycle — the
    panel mounts this. Three lines of class names against a circular import is
-   the right trade; if a fourth screen wants them they move to `ui/`. */
-const CARD_OUTLINE = `border border-fg/20 bg-transparent text-fg
-                      hover:border-accent/60 hover:bg-fg/10
-                      focus-visible:ring-accent/50`;
+   the right trade; if a fourth screen wants them they move to `ui/`.
+
+   It was the *outlined* weight, and moved with the panel's when the card's
+   actions went up onto the title row: three bordered boxes in a header is
+   three boxes inside a box. */
+const CARD_QUIET = `border border-transparent bg-transparent text-fg
+                    hover:border-accent/30 hover:bg-accent/10
+                    focus-visible:ring-accent/50`;

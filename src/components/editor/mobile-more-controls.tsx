@@ -10,6 +10,7 @@ import {
   type MarkName,
 } from "@/components/editor/rail-mark";
 import { ACCEPTED, importImage } from "@/lib/image-import";
+import { ListGroup, SectionHeader } from "@/components/ui/list";
 import { insertWidthPercent } from "@/lib/editor/image-resize";
 import type { Dictation } from "@/lib/editor/use-dictation";
 import { setPref, type Book, type Prefs } from "@/lib/library-store";
@@ -40,10 +41,13 @@ function Action({
       aria-pressed={active}
       onMouseEnter={handle.onEnter}
       onMouseLeave={handle.onLeave}
-      className={`group flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-2 text-left text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 ${
-        active
-          ? "border-accent bg-raised text-fg shadow-xs"
-          : "border-line bg-surface/50 text-fg hover:bg-raised"
+      /* **A row in a group, not a card of its own.** Each of these carried its
+         own border, radius and ground, so a section of four read as four
+         stacked plates on a sheet that is already a card. The group draws the
+         container; the row draws itself. `min-h-12` stays — this is the one
+         place in the pass with a real touch target to hit. */
+      className={`group flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2 text-left text-[13px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset ${
+        active ? "bg-accent/10 text-fg" : "text-fg hover:bg-raised"
       }`}
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -66,7 +70,7 @@ function Action({
         ) : null}
         <span className="truncate font-semibold">{label}</span>
       </span>
-      {detail && <span className="shrink-0 text-xs text-muted">{detail}</span>}
+      {detail && <span className="shrink-0 text-[11px] text-muted">{detail}</span>}
     </button>
   );
 }
@@ -125,10 +129,9 @@ export function MobileMoreControls({
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
-      <section className="grid gap-2">
-        <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
-          Insert and write
-        </h3>
+      <section>
+        <SectionHeader>Insert and write</SectionHeader>
+        <ListGroup>
         <Action
           label={imageBusy ? "Preparing image…" : "Insert image"}
           detail="JPG, PNG, WebP"
@@ -148,7 +151,7 @@ export function MobileMoreControls({
           }}
         />
         {imageProblem && (
-          <p role="status" className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger">
+          <p role="status" className="bg-danger/10 px-3.5 py-2 text-[13px] text-danger">
             {imageProblem}
           </p>
         )}
@@ -163,12 +166,12 @@ export function MobileMoreControls({
             }
           />
         )}
+        </ListGroup>
       </section>
 
-      <section className="grid gap-2">
-        <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
-          Writing view
-        </h3>
+      <section>
+        <SectionHeader>Writing view</SectionHeader>
+        <ListGroup>
         <Action
           label="Typewriter scrolling"
           detail={prefs.typewriter ? "On" : "Off"}
@@ -183,12 +186,12 @@ export function MobileMoreControls({
           glyph="¶"
           onClick={() => setPref("marks", !prefs.marks)}
         />
+        </ListGroup>
       </section>
 
-      <section className="grid gap-2">
-        <h3 className="text-xs font-bold tracking-wide text-muted uppercase">
-          Book
-        </h3>
+      <section>
+        <SectionHeader>Book</SectionHeader>
+        <ListGroup>
         {canShare && (
           <Action
             label="Share"
@@ -199,13 +202,13 @@ export function MobileMoreControls({
         <ImportChapterButton book={book} presentation="list" />
         <Link
           href={`/book/${book.id}/export`}
-          className="flex min-h-12 items-center justify-between gap-3 rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-sm font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60"
+          className="flex min-h-12 items-center justify-between gap-3 px-3.5 py-2 text-[13px] font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
         >
           <span className="flex min-w-0 items-center gap-3">
             <RailMark mark="export" size={26} />
             <span className="truncate font-semibold">Export</span>
           </span>
-          <span aria-hidden="true" className="text-xs text-muted">
+          <span aria-hidden="true" className="text-[11px] text-muted">
             Word, EPUB, PDF
           </span>
         </Link>
@@ -214,6 +217,7 @@ export function MobileMoreControls({
           mark="chapters"
           onClick={onDetails}
         />
+        </ListGroup>
       </section>
     </div>
   );

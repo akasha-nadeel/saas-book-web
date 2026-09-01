@@ -33,7 +33,7 @@ export function MobileEditorHeader({
         </button>
       </div>
 
-      <span className="min-w-0 flex-1 truncate font-serif text-sm font-semibold text-fg">
+      <span className="min-w-0 flex-1 truncate font-serif text-[13px] font-semibold text-fg">
         {chapterTitle}
       </span>
 

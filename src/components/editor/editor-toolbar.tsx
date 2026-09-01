@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PromptDialog } from "@/components/ui/dialog";
 import { RailMark } from "@/components/editor/rail-mark";
+import { Tooltip } from "@/components/ui/tooltip";
 import { createPortal } from "react-dom";
 import type { Editor } from "@tiptap/react";
 
@@ -282,14 +283,11 @@ function Flyout({
                     }`}
       >
         {trigger}
-        {!open && (
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute right-full top-1/2 mr-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
-          >
-            {label}
-          </span>
-        )}
+        {/* The shared card, where this had a verbatim copy of the rail's
+            classes on one line. Suppressed while the flyout is open — a
+            tooltip over a menu the writer has already opened is a label for a
+            decision they have made. */}
+        {!open && <Tooltip label={label} side="left" nowrap />}
       </button>
 
       {open &&
@@ -314,7 +312,7 @@ function Flyout({
             }}
             className="z-50"
           >
-            <div className="flex flex-col gap-1 rounded-md border border-line bg-panel p-2 shadow-xl">
+            <div className="flex flex-col gap-1 rounded-xl border border-line/60 bg-panel p-2 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_10px_30px_rgba(0,0,0,0.16)]">
               {children}
             </div>
           </div>,
@@ -391,7 +389,7 @@ export function ToolRail({
       className="flex flex-col items-center gap-2"
     >
       <Flyout label="Text & type" trigger={<RailMark mark="type" />}>
-        <div className="flex max-h-[78vh] w-64 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-0.5">
+        <div className="scroll-slim flex max-h-[78vh] w-64 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-0.5">
           <div className="flex gap-1">
             {/* Normal text — turns a heading back into body prose. Its own
                 button so a paragraph accidentally made a heading is one click to

@@ -41,8 +41,11 @@ const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
   { value: "black", label: "Black", swatch: "#0d0d0d" },
 ];
 
+/* Filled rather than outlined, like every field in the pass. `text-base` and
+   `h-11` stay: this sheet is thumbs on glass, and 16px is also what stops iOS
+   zooming the page when a field takes focus. */
 const SELECT =
-  "h-11 w-full rounded-lg border border-line bg-surface px-3 text-base text-fg outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
+  "h-11 w-full rounded-[10px] bg-raised px-3 text-base text-fg outline-none focus:ring-2 focus:ring-accent/50";
 
 function MarkButton({
   label,
@@ -61,10 +64,15 @@ function MarkButton({
       onClick={onClick}
       aria-label={label}
       aria-pressed={active}
-      className={`flex h-11 min-w-11 flex-1 items-center justify-center rounded-lg border text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
+      /* **The filled active state stays, and it is the one place in the pass
+         that keeps a full accent fill.** Elsewhere selected is a tint, because
+         it marks *where you are*; a B/I/U toggle marks *what the next
+         character will be*, on a touch sheet with no pointer to hover with. A
+         tint is not enough to answer that at a glance. */
+      className={`flex h-11 min-w-11 flex-1 items-center justify-center rounded-[10px] text-[13px] font-semibold outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 ${
         active
-          ? "border-accent bg-accent text-accent-ink"
-          : "border-line text-fg hover:bg-raised"
+          ? "bg-accent text-accent-ink"
+          : "bg-raised text-fg hover:bg-raised/70"
       }`}
     >
       {children}

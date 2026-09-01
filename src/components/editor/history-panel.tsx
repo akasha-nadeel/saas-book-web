@@ -7,6 +7,14 @@ import { plural } from "@/lib/plural";
 import { relativeTime } from "@/lib/relative-time";
 import { useHistory } from "@/lib/use-library";
 import { ConfirmDialog } from "@/components/ui/dialog";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  ListFooter,
+  ListGroup,
+  ListRow,
+  RowAction,
+  SectionHeader,
+} from "@/components/ui/list";
 
 /**
  * A chapter's saved versions, and how many sittings it has had.
@@ -64,63 +72,80 @@ export function HistoryPanel({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-line p-3">
-        <p className="font-sans text-sm font-semibold text-fg">
+      {/* **The count is the header; the explanation moved under the list.**
+          This opened on two paragraphs — what a version is, how often one is
+          kept, how many are held — before a writer reached a single version.
+          A paragraph above a list is read once and then read past forever; the
+          same words below are found by whoever went looking for them. */}
+      <div className="border-b border-line px-3 py-2.5">
+        <p className="font-sans text-[13px] font-semibold text-fg">
           {passes === 0
             ? "No versions saved yet"
             : `${passes} ${passes === 1 ? "sitting" : "sittings"} on this chapter`}
         </p>
-        <p className="mt-1 font-sans text-[11px] leading-relaxed text-muted">
-          A version is kept about every ten minutes you are editing, and the
-          last {MAX_SNAPSHOTS} are kept. This is a safety net for a bad
-          afternoon, not an archive.
-        </p>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="scroll-slim flex min-h-0 flex-1 flex-col overflow-y-auto p-3">
         {history.length === 0 ? (
-          <p className="font-sans text-sm text-muted">
-            Nothing yet. Versions start appearing once you have been writing for
-            a while.
-          </p>
+          <EmptyState
+            glyph={
+              <>
+                <path d="M12 8v4l3 2" />
+                <path d="M3.05 11a9 9 0 1 1 .5 4" />
+                <path d="M3 4v5h5" />
+              </>
+            }
+            title="No versions yet"
+          >
+            Versions start appearing once you have been writing for a while.
+          </EmptyState>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {history.map((version, i) => (
-              <li
-                key={version.at}
-                className="rounded-lg border border-line bg-panel p-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-sans text-sm text-fg">
-                    {relativeTime(version.at)}
-                  </span>
-                  <span className="font-sans text-[11px] text-muted">
-                    {plural(version.words, "word")}
-                    {/* The change against the version before it, which is the
-                        only number that tells a writer which of eight
-                        near-identical timestamps is the one they want. */}
-                    {i < history.length - 1 &&
-                      changeLabel(version.words, history[i + 1].words)}
-                  </span>
-                </div>
-                {i === 0 ? (
-                  <p className="mt-1.5 font-sans text-[11px] text-muted">
-                    The most recent save.
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setAsking({ body: version.body, words: version.words })
-                    }
-                    className="mt-2 font-sans text-[11px] font-semibold text-accent"
-                  >
-                    Put this version back
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
+          <>
+            <SectionHeader trailing={history.length}>Versions</SectionHeader>
+
+            {/* **One group of eight rows, where this was eight cards.** Each
+                version had its own border, its own ground and its own gap —
+                which on a 240px rail is a pile rather than a list, and made
+                eight near-identical timestamps harder to compare, not easier. */}
+            <ListGroup>
+              {history.map((version, i) => (
+                <ListRow
+                  key={version.at}
+                  title={relativeTime(version.at)}
+                  detail={
+                    <>
+                      {plural(version.words, "word")}
+                      {/* The change against the version before it, which is
+                          the only number that tells a writer which of eight
+                          near-identical timestamps is the one they want. */}
+                      {i < history.length - 1 &&
+                        changeLabel(version.words, history[i + 1].words)}
+                    </>
+                  }
+                  trailing={
+                    i === 0 ? (
+                      <span className="text-[11px] text-muted">Current</span>
+                    ) : (
+                      <RowAction
+                        label={`Put back the version from ${relativeTime(version.at)}`}
+                        onClick={() =>
+                          setAsking({ body: version.body, words: version.words })
+                        }
+                      >
+                        Restore
+                      </RowAction>
+                    )
+                  }
+                />
+              ))}
+            </ListGroup>
+
+            <ListFooter>
+              A version is kept about every ten minutes you are editing, and the
+              last {MAX_SNAPSHOTS} are kept. This is a safety net for a bad
+              afternoon, not an archive.
+            </ListFooter>
+          </>
         )}
       </div>
 

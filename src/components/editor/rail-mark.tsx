@@ -5,9 +5,11 @@ import type { AnimatedIconHandle, AnimatedIconProps } from "@/components/icons/t
 import BookIcon from "@/components/icons/book-icon";
 import BookmarkIcon from "@/components/icons/bookmark-icon";
 import CameraIcon from "@/components/icons/camera-icon";
+import ChevronDownIcon from "@/components/icons/chevron-down-icon";
 import DoubleCheckIcon from "@/components/icons/double-check-icon";
 import DownloadIcon from "@/components/icons/download-icon";
 import FileDescriptionIcon from "@/components/icons/file-description-icon";
+import FilePlusIcon from "@/components/icons/file-plus-icon";
 import FocusIcon from "@/components/icons/focus-icon";
 import HistoryCircleIcon from "@/components/icons/history-circle-icon";
 import HomeIcon from "@/components/icons/home-icon";
@@ -65,7 +67,10 @@ export type MarkName =
   | "export"
   | "typewriter"
   | "paper"
-  | "share";
+  | "share"
+  /* The body card's two, since its buttons lost their labels. */
+  | "collapse"
+  | "new-page";
 
 type IconComponent = React.ForwardRefExoticComponent<
   AnimatedIconProps & React.RefAttributes<AnimatedIconHandle>
@@ -98,6 +103,8 @@ const ICONS: Partial<Record<MarkName, IconComponent>> = {
   typewriter: FocusIcon,
   paper: PaintIcon,
   share: UsersGroupIcon,
+  collapse: ChevronDownIcon,
+  "new-page": FilePlusIcon,
 };
 
 /** The two the set above cannot draw, on the app's own 20-unit grid. */

@@ -35,7 +35,13 @@ function DockButton({
       onMouseEnter={handle.onEnter}
       onMouseLeave={handle.onLeave}
       className={`group flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 py-1 text-[10px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-35 ${
-        active ? "bg-raised text-fg" : "text-muted hover:bg-raised hover:text-fg"
+        /* `accent/10`, the one answer to selected the rails, the panels and the
+           dashboard sidebar all give now. It was `raised`, which is also this
+           button's own hover — so on a phone, where there is no pointer, the
+           selected control and a just-tapped one were the same colour. */
+        active
+          ? "bg-accent/10 text-fg"
+          : "text-muted hover:bg-raised hover:text-fg"
       }`}
     >
       {mark ? (

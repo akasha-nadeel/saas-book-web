@@ -1704,8 +1704,21 @@ function EditorSurface({
           </div>
 
           <main
+            /* **A grey desk, so the page reads as a page.** This was
+               `bg-white` in daylight, which put a white sheet on a white
+               ground — the paper had no edge but the hairline drawn round it,
+               and a sheet the same value as the desk it lies on is not a
+               sheet. The dark theme had always known this: its own note on
+               `[data-paper="black"]` says a page must sit one step off the
+               desk behind it, and the desk there is a faint accent wash rather
+               than the black the chrome is.
+
+               `zinc-100` rather than a token: `--color-raised` is the app's
+               *field* grey and is used for controls, and the desk is not a
+               control. It is the one literal here, and it is the same
+               near-white every word processor puts behind a page. */
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                       bg-white dark:bg-accent/7 px-4 pt-3 pb-8 md:pb-10"
+                       bg-zinc-100 dark:bg-accent/7 px-4 pt-3 pb-8 md:pb-10"
             // Both edges reserved for the scrollbar, so the page is centred in
             // the same box the bar above it is. Without it the scrollbar takes
             // its width off one side only, the page shifts left by half of it,

@@ -240,6 +240,60 @@ Three more things follow from the palette, and each has bitten already:
   #ffffff on purpose: `--color-panel` is white in daylight, and a pure white
   sheet on a white card is a sheet nobody can see.
 
+## Panel design — the grouped-list language
+
+Written down 2026-09-01, while taking the editor's panels through an Apple pass.
+The rules below are what `ui/list.tsx`, `ui/segmented.tsx`, `ui/field.tsx` and
+`ui/empty-state.tsx` encode, and the reason they are a system rather than four
+components is that the alternative — styling thirty-six files by hand — produces
+thirty-six slightly different Apples.
+
+**The problem being solved is the pile.** Every panel had grown the same way: a
+column of separately-bordered cards, each with its own hairline, its own tint of
+`bg-surface` and its own shadow. Find & Replace was four of them on one tab and
+five on the other; Versions was one card per snapshot; the consistency page
+nested cards two deep. On a 240px rail that reads as a pile of boxes rather than
+as a screen, and the thing the writer came for is the third or fourth box down.
+
+- **One container per group of related rows, never one per row.** `ListGroup`
+  draws the border and the radius; `divide-y` draws the separators. A border on
+  each row double-draws at every join and leaves a stray rule under the last.
+- **The label sits outside the group.** `SectionHeader` is 11px, uppercase,
+  muted, above the rows it names — not a filled header bar welded to the top of
+  a card, which is what makes every group read as a panel of its own.
+- **Explanatory text goes below the list, not above it.** `ListFooter`. A
+  paragraph above a list is read once and then read past forever; the same words
+  underneath are found by the person who went looking for them. Two panels
+  opened on two paragraphs of explanation before the writer reached anything.
+- **Empty states are not boxed.** A bordered card around "no results" makes an
+  absence look like a result — the same shape a finding arrives in. `EmptyState`
+  centres a quiet glyph, a line and the room around them in the space the
+  content would have filled.
+- **Fields are filled, not outlined**, with the glyph inset and a hairline
+  accent ring on focus. An outlined field is one more box; a filled one is a
+  well in the surface. The clear control appears only when there is something to
+  clear.
+- **A segmented control's active segment is a raised neutral pill**, not a
+  saturated fill. A two-up control filled with the accent is the loudest thing
+  on a panel beside a manuscript, and it says "press me" about a tab that is
+  already selected. **`theme-toggle.tsx` is the exception and keeps its fill**:
+  three 28px icon-only targets, where a pale pill on a pale track is not
+  visibly selected.
+- **One grey and one border.** `bg-raised` and `border-line`, flat.
+  `search-panel.tsx` had reached nine near-identical values —
+  `bg-surface/50 /40 /30 /20`, `border-line/70 /60 /50 /40` — which is not a
+  palette, it is a series of guesses.
+- **Two radii.** `10px` for fields, rows and small controls; `12px`
+  (`rounded-xl`) for groups.
+- **A type ramp, not a size per component.** 11px semibold uppercase for section
+  headers and footnotes, 13px for rows and body, and `tabular-nums` on anything
+  counted so a column of figures does not shift as it changes.
+- **Colour that carries information keeps carrying it, but moves to a glyph.**
+  The consistency panel washed each finding card with a hue per check; six
+  competing card backgrounds is the pile again. The hue moved to a leading glyph
+  on a neutral row, which is how Settings tells one category from another. The
+  `HUES` map is unchanged — what changed is where it is painted.
+
 ## The editor's rail icons
 
 `src/components/icons/` is [itshover](https://itshover.com) (Apache-2.0),

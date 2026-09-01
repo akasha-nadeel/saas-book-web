@@ -57,6 +57,12 @@ import {
 } from "@/lib/library-store";
 import { plural } from "@/lib/plural";
 import {
+  ListGroup,
+  ListRow,
+  RowAction,
+  SectionHeader,
+} from "@/components/ui/list";
+import {
   useBible,
   useDismissals,
   useHydrated,
@@ -83,24 +89,25 @@ const LABELS: Record<ConsistencyFinding["check"], string> = {
 const LOPSIDED = 4;
 
 /**
- * A hue per kind of finding, for the card it sits on.
+ * A hue per kind of finding, carried by the dot at the head of its row.
  *
  * **This spends colour, which the house rule normally forbids** — the accent is
  * reserved for "this is the way forward" and nothing else in the chrome may
  * take a hue. The precedent it follows is the tool marks, which carry one each
  * for the same job: telling one category from another at a glance, on a screen
- * that is a list of categories. Here the panel is a stack of cards a writer
+ * that is a list of categories. Here the panel is a stack of findings a writer
  * scans rather than reads, and the kind of finding is the first thing they are
  * sorting by.
  *
- * **Mixed with transparency rather than stated as a colour**, so one value
- * serves both themes: eight per cent of a hue over near-white is a pale tint,
- * and over near-black it is a dark one. A literal pale green would be a white
- * card at night.
+ * **The hue moved from the card to a dot on 2026-09-01, and the argument above
+ * is why it survived the move rather than being dropped.** It used to wash the
+ * whole finding, and a nested block inside it in a paler mix of the same — so
+ * six findings were six competing backgrounds, two deep, which is exactly the
+ * pile the panel pass was undoing. A leading dot carries the same information
+ * on a neutral row, which is how Settings distinguishes its categories, and the
+ * label beside it still says which check this is in words.
  *
- * The text on the card keeps its own tokens. The tint is background only —
- * a hue behind eleven-pixel type is a contrast problem, and the label already
- * says which check this is in words.
+ * `HUES` is unchanged. What changed is where it is painted.
  */
 const HUES: Record<ConsistencyFinding["check"], string> = {
   names: "#10b981",
@@ -113,10 +120,16 @@ const HUES: Record<ConsistencyFinding["check"], string> = {
   unclosed: "#14b8a6",
 };
 
-const tint = (check: ConsistencyFinding["check"]) => ({
-  backgroundColor: `color-mix(in srgb, ${HUES[check]} 16%, transparent)`,
-  borderColor: `color-mix(in srgb, ${HUES[check]} 45%, transparent)`,
-});
+/** The check's colour, as a dot at the head of its row. */
+function CheckDot({ check }: { check: ConsistencyFinding["check"] }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-1.5 block h-2.5 w-2.5 shrink-0 rounded-full"
+      style={{ backgroundColor: HUES[check] }}
+    />
+  );
+}
 
 /**
  * The last report per book, kept for the length of the session.
@@ -305,16 +318,23 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
                   : "Nothing came back. That is six specific checks finding nothing, not a verdict on the book."}
               </p>
             ) : (
-              <ul className="space-y-3">
-                {showing.map((finding) => (
-                  <Card
-                    key={finding.key}
-                    bookId={bookId}
-                    finding={finding}
-                    onDismiss={dismiss}
-                  />
-                ))}
-              </ul>
+              <>
+                <SectionHeader trailing={showing.length}>
+                  Findings
+                </SectionHeader>
+                {/* One group, hairlines between the findings — where this was
+                    a card per finding, each washed with its check's hue. */}
+                <ListGroup as="ul">
+                  {showing.map((finding) => (
+                    <Card
+                      key={finding.key}
+                      bookId={bookId}
+                      finding={finding}
+                      onDismiss={dismiss}
+                    />
+                  ))}
+                </ListGroup>
+              </>
             )}
           </div>
         </>
@@ -330,25 +350,20 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
             </span>
             <span className="hidden group-open:inline">Hide these again</span>
           </summary>
-          <ul className="mt-2 space-y-1">
+          <ListGroup as="ul" className="mt-2">
             {hidden.map((finding) => (
-              <li
-                key={finding.key}
-                className="flex items-center justify-between gap-2"
-              >
-                <span className="min-w-0 truncate text-[11px] text-fg/70">
-                  {finding.label}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => restore(finding.key)}
-                  className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
-                >
-                  Put back
-                </button>
+              <li key={finding.key}>
+                <ListRow
+                  title={finding.label}
+                  trailing={
+                    <RowAction onClick={() => restore(finding.key)}>
+                      Put back
+                    </RowAction>
+                  }
+                />
               </li>
             ))}
-          </ul>
+          </ListGroup>
         </details>
       )}
 
@@ -387,13 +402,14 @@ function Card({
     finding.variants.length === 2 && common.count >= rare.count * LOPSIDED;
 
   return (
-    <li className="rounded-xl border p-3" style={tint(finding.check)}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
+    <li className="px-3.5 py-3">
+      <div className="flex items-start gap-2.5">
+        <CheckDot check={finding.check} />
+        <div className="min-w-0 flex-1">
           <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
             {LABELS[finding.check]}
           </p>
-          <h3 className="mt-0.5 text-base font-bold break-words text-fg">
+          <h3 className="mt-0.5 text-[15px] font-semibold break-words text-fg">
             {finding.label}
           </h3>
         </div>
@@ -409,13 +425,12 @@ function Card({
         </button>
       </div>
 
-      <div className="mt-2 space-y-2">
+      <div className="mt-2 space-y-2 pl-[1.25rem]">
         {lopsided ? (
           <Spelling
             bookId={bookId}
             variant={rare}
             rare
-            hue={HUES[finding.check]}
             example={finding.passages?.[0]?.text}
           />
         ) : (
@@ -425,7 +440,6 @@ function Card({
               bookId={bookId}
               variant={variant}
               rare={finding.variants.length === 1}
-              hue={HUES[finding.check]}
               example={finding.passages?.[0]?.text}
             />
           ))
@@ -459,31 +473,23 @@ function Spelling({
   bookId,
   variant,
   rare,
-  hue,
   example,
 }: {
   bookId: string;
   variant: Variant;
   rare?: boolean;
-  /** The card's colour, so the links inside it belong to it. */
-  hue: string;
   example?: string;
 }) {
   const sentence = variant.example ?? example;
   return (
     <div
-      /* A paler wash of the card's own hue, not the neutral surface token.
-         Mixed with `--color-panel` rather than with transparency, and that is
-         the whole trick: a transparent tint would sit *on top of* the card's
-         16% and come out darker than it. Mixing toward the panel replaces the
-         colour instead of adding to it, so seven per cent reads as a lighter
-         version of the sixteen behind it — and still resolves the right way
-         at night, where `--color-panel` is near-black rather than white. */
-      style={{
-        backgroundColor: `color-mix(in srgb, ${hue} 7%, var(--color-panel))`,
-        borderColor: `color-mix(in srgb, ${hue} 25%, transparent)`,
-      }}
-      className="rounded-lg border p-2"
+      /* **Neutral now that the hue is a dot.** This was a paler mix of the
+         card's own colour over `--color-panel`, which was the right answer
+         while the card behind it was washed — a transparent tint would have
+         sat *on top of* that wash and come out darker. With the card neutral
+         there is nothing to lighten, and a second hue inside a row whose dot
+         already names the check is colour spent twice. */
+      className="rounded-[10px] border border-line bg-raised px-2.5 py-2"
     >
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <span
@@ -498,7 +504,7 @@ function Spelling({
         </span>
       </div>
 
-      <Chapters bookId={bookId} where={variant.where} hue={hue} />
+      <Chapters bookId={bookId} where={variant.where} />
 
       {sentence && (
         <p className="mt-1.5 line-clamp-2 text-[13px] leading-relaxed text-fg/70">
@@ -521,11 +527,9 @@ const CHAPTER_LIMIT = 4;
 function Chapters({
   bookId,
   where,
-  hue,
 }: {
   bookId: string;
   where: readonly Where[];
-  hue: string;
 }) {
   const shown = where.slice(0, CHAPTER_LIMIT);
   return (
@@ -535,26 +539,18 @@ function Chapters({
           key={at.chapterId}
           href={`/book/${bookId}/chapter/${at.chapterId}`}
           title={at.chapterTitle}
-          /* The accent, because these are the only things on the card that go
-             anywhere — the house rule reserves the hue for "this is the way
-             forward" and a link into the chapter is exactly that. It is the
-             brand blue by day and white at night, which is what
-             `--color-accent` is for; hard-coding a blue would leave a blue pill
-             on a black panel. */
-          /* The card's own hue rather than the accent. These sit inside a
-             tinted card, and a blue link on a green card reads as something
-             borrowed from elsewhere on the screen. Mixed with transparency
-             like the card itself, so one value serves both themes. */
-          style={{
-            backgroundColor: `color-mix(in srgb, ${hue} 20%, transparent)`,
-            borderColor: `color-mix(in srgb, ${hue} 45%, transparent)`,
-          }}
-          /* `text-fg`, not a literal black: it is near-black by day and white
-             at night, and a black label on the dark card these pills sit on at
-             night would be unreadable. The pill keeps its colour in the fill
-             and the edge; the words stay the text colour everything else on
-             the card uses. */
-          className="max-w-[8rem] truncate rounded-full border px-2 py-0.5 text-[11px] font-semibold text-fg hover:brightness-110"
+          /* **The accent, and the comment this replaces is worth keeping in
+             mind.** These pills wore the card's own hue while the card was
+             washed with it — a blue link on a green card did read as something
+             borrowed from elsewhere on the screen. The card is neutral now, so
+             the older argument is the right one again: these are the only
+             things on the row that go anywhere, and the house rule reserves the
+             hue for "this is the way forward". `--color-accent` is the brand
+             blue by day and white at night; a hard-coded blue would leave a
+             blue pill on a black panel.
+
+             `text-fg` rather than a literal, for the same reason. */
+          className="max-w-[8rem] truncate rounded-full border border-accent/40 bg-accent/15 px-2 py-0.5 text-[11px] font-semibold text-fg transition-colors hover:bg-accent/25"
         >
           {at.number === null ? at.chapterTitle : `ch ${at.number}`}
           <span className="ml-1 text-accent/60">×{at.count}</span>

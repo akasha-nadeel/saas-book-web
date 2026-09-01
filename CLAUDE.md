@@ -147,15 +147,20 @@ thousands of bundled files, and `npm run lint` reports thousands of problems.
 count is still noise rather than news.
 
 **`src/` no longer lints clean, and the doc used to say it did.** As of
-2026-08-31 `npm run lint` reports **7 errors and 14 warnings**, all in four
-files, and all of them from the dashboard and find-and-replace work:
-`components/ui/tremor.tsx` (six `no-explicit-any`),
+2026-09-01 `npm run lint` reports **7 errors and 11 warnings**, all in four
+files: `components/ui/tremor.tsx` (six `no-explicit-any`),
 `components/editor/search-panel.tsx` (one `set-state-in-effect` error plus three
-warnings), `components/shelf/bookshelf.tsx` (ten unused-var warnings —
-`WelcomeBand`, `WriteBand` and `FavouritesBand` are the banner sections
-`95386a2` removed and left behind), and `components/editor/mobile-editor-header.tsx`
-(one). `npx tsc --noEmit` **is** clean. Treat that count as a debt to clear, not
-as the normal state.
+warnings, all in its head), `components/shelf/bookshelf.tsx` (four unused-var
+warnings — the banner sections `95386a2` removed and left behind) and
+`components/editor/book-panel.tsx` (four unused imports and props left by the
+Book View deletion). `npx tsc --noEmit` **is** clean. Treat that count as a debt
+to clear, not as the normal state.
+
+**The count moves, so re-measure before blaming a change for it.** This said
+7 errors and 14 warnings across a different four files on 2026-08-31;
+`mobile-editor-header.tsx` has since gone clean, `bookshelf.tsx` dropped six,
+and `book-panel.tsx` gained four that nobody recorded. The errors have not
+moved.
 
 Every environment variable is optional and all but one are documented, with
 their failure modes, in `.env.local.example`. That file is the canonical list —
@@ -1055,6 +1060,13 @@ custom properties the editor and the reading view both read.
   rather than selecting with `dark:`. `free-limit.tsx`'s `LimitDialog` is
   exempt: it is a photograph with a literal `#050a18` frame matched to the
   artwork, and a photograph does not follow the theme.
+- **The editor's panels speak one grouped-list language**, in `ui/list.tsx`,
+  `ui/segmented.tsx`, `ui/field.tsx` and `ui/empty-state.tsx` — one container per
+  group of related rows rather than one per row, the label outside it, explanatory
+  text below rather than above, unboxed empty states, filled fields, and a
+  segmented control whose active segment is a raised neutral pill. The rules and
+  what each was written against are in `docs/styling.md` under "Panel design".
+  **A new panel is built from these**, not hand-classed.
 - **`src/components/ui/` is deliberately narrow** and things land there on the
   third copy, not the first. Primitives take `currentColor` — except the three
   dialog primitives above, which carry the dialog palette by design.

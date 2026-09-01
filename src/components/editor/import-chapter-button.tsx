@@ -115,7 +115,10 @@ export function ImportChapterButton({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={importing}
-          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-line bg-surface/50 px-3.5 py-2 text-left text-sm font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-45"
+          /* A row in the More sheet's group, so the container is the group's
+             to draw — this carried its own border, radius and ground and was
+             the one plate left among rows. */
+          className="flex min-h-12 w-full items-center justify-between gap-3 px-3.5 py-2 text-left text-[13px] font-medium text-fg outline-none transition-colors hover:bg-raised focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset disabled:opacity-45"
         >
           <span className="flex min-w-0 items-center gap-3">
             <RailMark mark="import" size={26} />

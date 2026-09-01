@@ -102,19 +102,30 @@ export function NotesPanel({ chapterId }: { chapterId: string }) {
               setOpen((prev) => ({ ...prev, [section.key]: !prev[section.key] }))
             }
             aria-expanded={open[section.key]}
-            className="flex w-full items-center gap-1.5 rounded-md px-2 py-1.5
-                       font-sans text-xs tracking-wide text-muted uppercase
-                       outline-none hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/60"
+            className="flex w-full items-center gap-1.5 rounded-md px-1 py-1.5
+                       font-sans text-[11px] font-semibold tracking-wide
+                       text-muted uppercase outline-none hover:text-fg
+                       focus-visible:ring-2 focus-visible:ring-accent/60"
           >
-            <span
+            {/* **A drawn chevron, not a `›`.** The character is a typographic
+                mark: it sits on the text baseline rather than centred on the
+                row, its weight is the font's rather than the icon set's, and
+                it rotates around its own em-box instead of its middle. Every
+                other disclosure in the pass is a 24-grid path. */}
+            <svg
               aria-hidden="true"
-              className={`transition-transform ${
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-3 w-3 shrink-0 transition-transform duration-200 ${
                 open[section.key] ? "rotate-90" : ""
               }`}
             >
-              ›
-            </span>
+              <path d="M9 5l7 7-7 7" />
+            </svg>
             {section.title}
           </button>
 
@@ -131,10 +142,12 @@ export function NotesPanel({ chapterId }: { chapterId: string }) {
               }}
               placeholder={section.hint}
               rows={section.key === "synopsis" ? 5 : 8}
-              className="mt-1 w-full resize-y rounded-md border border-line
-                         bg-surface px-3 py-2 font-sans text-sm leading-relaxed
-                         text-fg placeholder:text-muted
-                         focus-visible:border-accent focus-visible:outline-none"
+              /* Filled rather than outlined, and a ring on focus rather than a
+                 border swap — the field treatment the whole pass uses. */
+              className="scroll-slim mt-1 w-full resize-y rounded-[10px] bg-raised
+                         px-3 py-2 font-sans text-[13px] leading-relaxed text-fg
+                         outline-none placeholder:text-muted
+                         focus:ring-2 focus:ring-accent/50"
             />
           )}
         </section>

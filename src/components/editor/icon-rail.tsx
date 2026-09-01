@@ -6,6 +6,7 @@ import {
   useMarkHandle,
   type MarkName,
 } from "@/components/editor/rail-mark";
+import { Tooltip } from "@/components/ui/tooltip";
 
 /**
  * The narrow icon columns down each edge.
@@ -77,13 +78,20 @@ export function RailButton({
      product should not disagree about what selected looks like, so this is
      `SideItem`'s string in `bookshelf.tsx` — change one and change both.
 
+     **It is `accent/10` since 2026-09-01, and both were changed together.**
+     It was a literal `blue-500/15`, which by then was the app's *third* answer
+     to "what does selected look like": the panels beside this rail had moved
+     to the accent, the navigator with them, and a hard-coded blue left the
+     rail disagreeing with the panel it opens. The accent is the brand indigo
+     by day and white at night, so unlike the literal it follows the theme.
+
      The icons themselves are `fg`, near-black by day and near-white at night,
      rather than `muted`: they are the controls, not their captions. */
   const className = `group relative flex h-12 w-12 items-center justify-center rounded-xl
                      outline-none transition-colors focus-visible:ring-2
                      focus-visible:ring-accent/60 ${
                        active
-                         ? "bg-blue-500/15 text-fg dark:bg-blue-500/25"
+                         ? "bg-accent/10 text-fg"
                          : "text-fg/80 hover:bg-raised/70 hover:text-fg"
                      } ${disabled ? "opacity-50" : ""}`;
 
@@ -112,18 +120,15 @@ export function RailButton({
     </svg>
   );
 
-  const tooltipPosition =
-    side === "left"
-      ? "left-full ml-3.5 top-1/2 -translate-y-1/2"
-      : "right-full mr-3.5 top-1/2 -translate-y-1/2";
-
+  /* **`ui/tooltip.tsx` draws this now**, and the card there was lifted from
+     the one that used to live here — so nothing changed on screen. It went to
+     the shelf because eight files had hand-rolled the same `role="tooltip"`
+     card with eight sets of classes; this was the best of them and became the
+     one. `nowrap` is the prop that exists for these labels: a rail label is a
+     word or two with the whole window to spill into, where a tooltip in a
+     240px panel has to wrap. */
   const tooltip = (
-    <span
-      role="tooltip"
-      className={`pointer-events-none absolute ${tooltipPosition} z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]`}
-    >
-      {label}
-    </span>
+    <Tooltip label={label} side={side === "left" ? "right" : "left"} nowrap />
   );
 
   // The mark's motion is the button's to start: an icon left to its own

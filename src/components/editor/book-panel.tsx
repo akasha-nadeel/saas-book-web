@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { SharedBadge } from "@/components/collab/shared-badge";
+import { RailMark } from "@/components/editor/rail-mark";
+import { Tooltip } from "@/components/ui/tooltip";
 import { relativeTime } from "@/lib/relative-time";
 import {
   bookWordCount,
@@ -135,12 +137,18 @@ const CARD_BUTTON = `border border-accent/30 bg-accent/15 text-black dark:text-f
                      hover:border-accent/60 hover:bg-accent/25
                      focus-visible:ring-accent/50`;
 
-/** The second control, when a card has one. Outlined, so the pair is not two
- *  identical slabs — the same relationship the header's controls have. Its edge
- *  matches the filled one's, or the two read as different kinds of thing. */
-const CARD_OUTLINE = `border border-accent/30 bg-transparent text-black dark:text-fg
-                      hover:border-accent/60 hover:bg-accent/10
-                      focus-visible:ring-accent/50`;
+/**
+ * The quiet weight, for a glyph action on the card's title row.
+ *
+ * **No border and no fill until it is reached for.** Three bordered boxes in a
+ * header is three boxes inside a box; the actions are secondary to the name
+ * they sit beside, and a secondary action that is drawn as loudly as a primary
+ * one just makes the reader work out which is which. `CARD_BUTTON` still
+ * carries the fill, and only the disclosure wears it.
+ */
+const CARD_QUIET = `border border-transparent bg-transparent text-black dark:text-fg
+                    hover:border-accent/30 hover:bg-accent/10
+                    focus-visible:ring-accent/50`;
 
 /**
  * The open row in any of the three lists.
@@ -150,14 +158,26 @@ const CARD_OUTLINE = `border border-accent/30 bg-transparent text-black dark:tex
  * front-matter list and a mid-grey one on the body's, and the panel had three
  * ways of saying one thing.
  *
- * **The hairline is what separates it from a hover**, which is also `raised`.
- * Two more signals back it up, because in daylight `line` and `raised` are a
- * few percent apart: the title takes medium weight, and the number or Draft
- * mark comes up out of muted into full ink. Selection is persistent and a hover
- * is under the pointer, so the two are never really confusable in use — but the
- * row has to be readable in a screenshot too.
+ * **The accent tint is what separates it from a hover**, and that replaced a
+ * hairline on 2026-09-01. Selected was `border-line bg-raised` and hover is
+ * also `raised`, so the two were told apart by a border that is a few per cent
+ * from its own fill in daylight — readable in use, where selection is
+ * persistent and a hover is under the pointer, but not in a screenshot. A tint
+ * is unambiguous at a glance and costs no hue: it is the same `accent/10` the
+ * search results and the assistant's rows now use for *this is the one*, so
+ * the panels agree about what selected looks like.
+ *
+ * The two backing signals stay: medium weight on the title, and the number or
+ * Draft mark coming up out of muted into full ink.
+ *
+ * **This panel keeps sidebar rows and does not become a grouped list**, which
+ * is deliberate rather than an omission. The inset grouped list is Apple's
+ * shape for settings and content; a *navigator* — Finder's sidebar, Mail's,
+ * Notes' — is rounded selection pills on the panel's own ground, with no
+ * container and no dividers. Wrapping these in a bordered group would be the
+ * right pattern applied to the wrong kind of list.
  */
-const ROW_ACTIVE = "border-line bg-raised font-medium text-fg";
+const ROW_ACTIVE = "border-transparent bg-accent/10 font-medium text-fg";
 
 /**
  * A card shrunk to a strip, when another part's list has the room.
@@ -599,7 +619,7 @@ export function BookPanel({
               aria-label="Hide panel"
               title="Hide panel"
               className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center
-                         rounded-lg border border-line text-muted outline-none
+                         rounded-md border border-line text-muted outline-none
                          transition-colors hover:border-accent/60 hover:bg-raised hover:text-fg
                          focus-visible:ring-2 focus-visible:ring-accent/50"
             >
@@ -674,6 +694,13 @@ export function BookPanel({
             }
             meta={
               <>
+                {/* **The word keeps its blue.** Muting this line nearly took
+                    `--color-chapter-fg` with it, and that token is one of the
+                    documented exceptions to *nothing in the chrome may spend a
+                    hue*: the app is named for the thing it counts, and this
+                    panel says "chapter" more often than any other word in it.
+                    The line is quiet now because it is small and grey around
+                    this word — not because the word gave up its colour. */}
                 {bodyChapters.length}{" "}
                 <span className="text-chapter-fg">
                   {bodyChapters.length === 1 ? "chapter" : "chapters"}
@@ -1033,8 +1060,8 @@ function ChapterPill({
         type="button"
         onClick={onClick}
         aria-current={active ? "page" : undefined}
-        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg
-                    py-2 pl-2.5 text-left font-sans text-sm outline-none
+        className={`flex w-full cursor-pointer items-center gap-2.5 rounded-md
+                    py-2 pl-2.5 text-left font-sans text-[13px] outline-none
                     border transition-colors focus-visible:ring-2
                     focus-visible:ring-accent/50 ${
                       onSwitchOff ? "pr-11" : "pr-9"
@@ -1137,9 +1164,9 @@ function MatterOfferPill({
            does not survive it — and a row you cannot finish reading is a row
            you cannot decide about. */
         title={`${section.title} — ${section.hint}`}
-        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg
+        className="flex w-full cursor-pointer items-center gap-2.5 rounded-md
                    border border-transparent py-2 pr-11 pl-2.5 text-left
-                   font-sans text-sm text-muted outline-none transition-colors
+                   font-sans text-[13px] text-muted outline-none transition-colors
                    hover:bg-raised hover:text-fg focus-visible:ring-2
                    focus-visible:ring-accent/50"
       >
@@ -1307,7 +1334,7 @@ function MatterCard({
       // the same moment it is losing the rest.
       // Not overflow-hidden: the collapsing regions inside clip themselves, so
       // nothing here needs it.
-      className={`relative flex flex-col rounded-xl border-2
+      className={`relative flex flex-col rounded-lg border-2
                   transition-[background-color,border-color,flex-grow]
                   duration-500 ease-out
                   ${
@@ -1332,9 +1359,13 @@ function MatterCard({
                     }`}
       >
         <h3
-          className={`min-w-0 flex-1 truncate font-serif font-semibold
+          /* **Sans, not the manuscript's serif.** "Front matter" is the name
+             of a part of the interface, not a line of the book — the serif is
+             the page's face, and three serif headings down a panel read as
+             prose that has got loose into the chrome. */
+          className={`min-w-0 flex-1 truncate font-sans font-semibold
                       transition-[font-size,color,line-height] duration-500
-                      ease-out ${compact ? "text-sm text-black dark:text-fg" : "text-base font-bold text-fg"}`}
+                      ease-out ${compact ? "text-sm text-black dark:text-fg" : "text-base font-semibold text-fg"}`}
         >
           {label}
         </h3>
@@ -1354,13 +1385,70 @@ function MatterCard({
           {action}
         </span>
 
+        {/* **The card's actions live on the title's line, and the disclosure
+            is the last thing on it.**
+
+            They had a row of their own under the description: three 36px boxes
+            ranged hard right, below left-ranged text, above a left-ranged list
+            — an island belonging to nothing, and forty-odd pixels of a panel
+            whose scarce dimension is height. On a header row they are what
+            they are: the things this card does, beside its name.
+
+            **Add and Import are plain glyphs; only the chevron carries a
+            fill.** The old row gave the *chevron* the filled treatment, which
+            said the least consequential control — a disclosure toggle — was
+            the card's primary action, while adding a chapter was outlined
+            beside it. Quiet until hovered is what a secondary action does.
+
+            **The chevron sits last**, where a disclosure indicator sits in
+            every Apple list, and it points the way the card will move. */}
+        {!compact && (
+          <span className="relative z-10 flex shrink-0 items-center gap-0.5">
+            {secondaryNode}
+            {secondary && (
+              <button
+                type="button"
+                onClick={secondary.onClick}
+                aria-label={secondary.label}
+                className={`group relative flex h-8 w-8 cursor-pointer items-center
+                            justify-center rounded-md outline-none transition-colors
+                            focus-visible:ring-2 ${CARD_QUIET}`}
+              >
+                <RailMark mark="new-page" size={17} />
+                <Tooltip label={secondary.label} side="bottom" align="end" nowrap />
+              </button>
+            )}
+            {trailing}
+            {action && (
+              <button
+                type="button"
+                onClick={onAction}
+                aria-expanded={children ? listOpen : undefined}
+                aria-label={action}
+                className={`group relative flex h-8 w-8 cursor-pointer items-center
+                            justify-center rounded-md outline-none transition-colors
+                            focus-visible:ring-2 ${CARD_BUTTON}`}
+              >
+                <span
+                  className={`flex transition-transform duration-300 ${
+                    listOpen ? "rotate-180" : ""
+                  }`}
+                >
+                  <RailMark mark="collapse" size={17} />
+                </span>
+                <Tooltip label={action} side="bottom" align="end" nowrap />
+              </button>
+            )}
+          </span>
+        )}
+
         {!compact && action && (
           <button
             type="button"
             onClick={onAction}
             aria-label={`${label} — ${action}`}
             aria-expanded={children ? listOpen : undefined}
-            className="oc-matter-card-mobile-toggle absolute inset-0 hidden rounded-t-xl outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
+            className="oc-matter-card-mobile-toggle absolute inset-0 hidden rounded-t-lg outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-inset"
           />
         )}
       </div>
@@ -1400,62 +1488,18 @@ function MatterCard({
             )}
 
             {meta && (
-              <p className="mt-1.5 font-sans text-xs font-semibold text-fg">
+              /* **Muted, where this was bold and full-strength ink.** It sat
+                 directly under the title in the same weight and the same
+                 black, so the card opened with two lines shouting equally and
+                 nothing saying which to read first. The title is the card's
+                 name; this is a detail about it, and a detail that has to be
+                 read *past* to reach the list should not be drawn as loudly as
+                 the thing it is about. */
+              <p className="mt-1 font-sans text-xs text-muted">
                 {meta}
               </p>
             )}
 
-            {/* Two buttons of equal width when the card has a second one, not a
-                primary with a smaller thing beside it: seeing the chapters and
-                adding one are both ordinary, frequent moves, and picking a
-                winner between them would only make the loser harder to hit. */}
-            <div className="mt-2.5 flex items-stretch gap-2">
-              {action && (
-              <button
-                type="button"
-                onClick={onAction}
-                // Out of the tab order once shrunk: the cover button is the
-                // control then, and a tab stop inside a zero-height box is a
-                // focus ring on nothing.
-                tabIndex={compact ? -1 : undefined}
-                aria-expanded={children ? listOpen : undefined}
-                // Smaller only when it is sharing the row. Alone it is the
-                // card's one action and takes the card's full width, so it is
-                // set at full size; beside a second button each has half the
-                // room and the pair reads better a step down.
-                className={`flex-1 cursor-pointer rounded-lg font-sans
-                            font-semibold outline-none transition-colors
-                            focus-visible:ring-2 ${CARD_BUTTON} ${
-                              secondary || secondaryNode
-                                ? "py-1.5 text-xs"
-                                : "py-1.5 text-sm"
-                            }`}
-              >
-                {action}
-              </button>
-              )}
-
-              {secondaryNode}
-
-              {secondary && (
-                <button
-                  type="button"
-                  onClick={secondary.onClick}
-                  tabIndex={compact ? -1 : undefined}
-                  // Outlined in the card's own colour rather than filled: two
-                  // solid blocks side by side fight, and this is the card's
-                  // second thing.
-                  className={`flex-1 cursor-pointer rounded-lg
-                              py-1.5 font-sans text-xs font-semibold outline-none
-                              transition-colors focus-visible:ring-2
-                              ${CARD_OUTLINE}`}
-                >
-                  {secondary.label}
-                </button>
-              )}
-
-              {trailing}
-            </div>
           </div>
         </div>
       </div>
@@ -1511,7 +1555,7 @@ function MatterCard({
         // the click that seems to do nothing.
         aria-hidden={!compact}
         tabIndex={compact ? undefined : -1}
-        className={`absolute inset-0 rounded-xl outline-none
+        className={`absolute inset-0 rounded-lg outline-none
                     focus-visible:ring-2 focus-visible:ring-white/70
                     focus-visible:ring-inset ${
                       compact ? "cursor-pointer" : "pointer-events-none"
@@ -1700,6 +1744,18 @@ function MatterPagesCard({
       onAction={onToggle}
       compact={compact}
       grow={open}
+      /* **A page of the writer's own, in the header where the body card puts
+         New chapter.** It was the last row of the list, and the note that put
+         it there argued it is "the end of the list it adds to" rather than a
+         peer of Hide pages. That was right while the body card kept New chapter
+         in its header and these two did not — the two sides of the panel
+         disagreed about where you go to add something. Now all three cards
+         carry the same row: open, add, import. */
+      secondary={
+        open && canWrite
+          ? { label: "Add your own page", onClick: () => setNaming(true) }
+          : undefined
+      }
       /* This part on its own, from a file. Front matter, the chapters and back
          matter are often three documents rather than one, and the rail's
          whole-book import has no way to be told which of the three it is
@@ -1768,33 +1824,17 @@ function MatterPagesCard({
         </li>
       )}
 
-      {/* **A page of the writer's own, and the last thing on the list.**
-          The Add-page menu it came off carried this as "Something else…" —
-          the switches replace the other sixteen entries, but not this one:
-          nothing on a catalogue can express a page nobody has named yet, and
-          a book with an "A note on the maps" in it is a book that needed one.
-
-          A row rather than a button in the header, because it is not a peer of
-          "Hide pages" — it is the end of the list it adds to. */}
-      {canWrite && (
-        <li className="relative">
-          <button
-            type="button"
-            onClick={() => setNaming(true)}
-            className="flex w-full cursor-pointer items-center gap-2.5
-                       rounded-lg border border-dashed border-line py-2 pr-3
-                       pl-2.5 text-left font-sans text-sm text-muted
-                       outline-none transition-colors hover:border-fg/35
-                       hover:text-fg focus-visible:ring-2
-                       focus-visible:ring-accent/50"
-          >
-            <span aria-hidden="true" className="w-10 shrink-0 text-right">
-              +
-            </span>
-            <span className="min-w-0 flex-1 truncate">Add your own page</span>
-          </button>
-        </li>
-      )}
+      {/* **The writer's own page is added from the header now**, beside Pages
+          and the import — see the `secondary` prop above. It was a dashed row
+          at the foot of this list, which is where the note that put it there
+          said it belonged: "the end of the list it adds to". What changed is
+          the body card, which moved New chapter into its own header; with this
+          left behind, the two halves of one panel gave different answers to
+          "where do I add something". The reason it exists at all is unchanged
+          and worth keeping: the switches replace sixteen catalogue entries but
+          not this one, because nothing on a catalogue can express a page
+          nobody has named yet, and a book with "A note on the maps" in it is a
+          book that needed one. */}
 
       {naming && (
         <PromptDialog

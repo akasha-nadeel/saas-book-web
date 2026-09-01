@@ -154,8 +154,11 @@ export function ImageToolbar({ editor }: { editor: Editor | null }) {
       pluginKey="imageToolbar"
       shouldShow={shouldShow}
       options={options}
-      className="flex items-center gap-0.5 rounded-lg border border-line
-                 bg-panel px-1 py-1 shadow-xl"
+      // The same lifted card the selection bar wears — the two float over the
+      // same page and appeared a radius and a shadow apart.
+      className="flex items-center gap-0.5 rounded-xl border border-line/60
+                 bg-panel px-1 py-1
+                 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_10px_30px_rgba(0,0,0,0.16)]"
       // Entering and leaving, rather than pressing and releasing: a writer who
       // presses a button and drags a little before letting go is still on the
       // bar, and so is one moving between two of its buttons.

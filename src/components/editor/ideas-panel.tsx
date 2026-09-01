@@ -11,6 +11,8 @@ import {
 } from "@/lib/ideas";
 import { createBook, saveIdeasRaw } from "@/lib/library-store";
 import { relativeTime } from "@/lib/relative-time";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListGroup, RowAction, SectionHeader } from "@/components/ui/list";
 import { useIdeas } from "@/lib/use-library";
 
 /**
@@ -74,9 +76,12 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
           maxLength={IDEA_MAX}
           placeholder="The idea that is not this book…"
           aria-label="Park an idea"
-          className="w-full resize-none rounded-lg border border-line bg-surface p-2.5
-                     font-sans text-sm text-fg outline-none
-                     focus-visible:ring-2 focus-visible:ring-accent/50"
+          /* Filled rather than outlined, like every other field in the pass:
+             an outlined box on a panel is one more box on a screen made of
+             them. */
+          className="scroll-slim w-full resize-none rounded-[10px] bg-raised p-2.5
+                     font-sans text-[13px] text-fg outline-none
+                     placeholder:text-muted focus:ring-2 focus:ring-accent/50"
         />
         <div className="mt-2 flex items-center justify-between gap-2">
           <span className="font-sans text-[11px] text-muted">
@@ -85,56 +90,71 @@ export function IdeasPanel({ bookId }: { bookId?: string }) {
           <button
             type="submit"
             disabled={!text.trim()}
-            className="rounded-md bg-accent px-3 py-1.5 font-sans text-xs font-semibold
-                       text-accent-ink disabled:opacity-40"
+            className="rounded-[10px] bg-accent px-3 py-1.5 font-sans text-[13px]
+                       font-semibold text-accent-ink transition-opacity
+                       hover:opacity-90 disabled:opacity-40"
           >
             Park it
           </button>
         </div>
       </form>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-3">
         {ideas.length === 0 ? (
-          <p className="font-sans text-sm text-muted">
-            Nothing parked. When the next book barges in halfway through this
-            one, put it here and carry on.
-          </p>
+          <EmptyState
+            glyph={
+              <>
+                <path d="M9 18h6M10 21h4" />
+                <path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6V16h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3Z" />
+              </>
+            }
+            title="Nothing parked"
+          >
+            When the next book barges in halfway through this one, put it here
+            and carry on.
+          </EmptyState>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {ideas.map((idea) => (
-              <li
-                key={idea.id}
-                className="rounded-lg border border-line bg-panel p-3"
-              >
-                <p className="font-sans text-sm leading-relaxed text-fg">
-                  {idea.text}
-                </p>
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <span className="font-sans text-[11px] text-muted">
-                    {relativeTime(idea.at)}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const { bookId: made } = createBook(titleFromIdea(idea.text));
-                      commit(removeIdea(ideas, idea.id));
-                      router.push(`/book/${made}`);
-                    }}
-                    className="font-sans text-[11px] font-semibold text-accent"
-                  >
-                    Start a book
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => commit(removeIdea(ideas, idea.id))}
-                    className="ml-auto font-sans text-[11px] text-muted"
-                  >
-                    Forget it
-                  </button>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <SectionHeader trailing={ideas.length}>Parked</SectionHeader>
+            {/* One group, where each idea was its own bordered card. */}
+            <ListGroup as="ul">
+              {ideas.map((idea) => (
+                <li key={idea.id} className="px-3.5 py-3">
+                  <p className="font-sans text-[13px] leading-relaxed text-fg">
+                    {idea.text}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="font-sans text-[11px] text-muted">
+                      {relativeTime(idea.at)}
+                    </span>
+                    <span className="ml-auto flex items-center gap-1.5">
+                      <RowAction
+                        onClick={() => {
+                          const { bookId: made } = createBook(
+                            titleFromIdea(idea.text),
+                          );
+                          commit(removeIdea(ideas, idea.id));
+                          router.push(`/book/${made}`);
+                        }}
+                      >
+                        Start a book
+                      </RowAction>
+                      <button
+                        type="button"
+                        onClick={() => commit(removeIdea(ideas, idea.id))}
+                        className="rounded-[7px] px-2 py-1 font-sans text-[11px]
+                                   font-semibold text-muted outline-none
+                                   transition-colors hover:bg-raised hover:text-fg
+                                   focus-visible:ring-2 focus-visible:ring-accent/60"
+                      >
+                        Forget it
+                      </button>
+                    </span>
+                  </div>
+                </li>
+              ))}
+            </ListGroup>
+          </>
         )}
       </div>
     </div>

@@ -382,8 +382,14 @@ export function SelectionToolbar({
       // the two. Split by what each row acts on — the selected words above, the
       // paragraphs they sit in below — it is about a third the width and the
       // grouping does some of the explaining.
+      // **A lifted card, not a bordered box.** Apple floats a bar over content
+      // on a shadow: the border was doing the lifting, and a hairline over
+      // prose reads as a box drawn on the page rather than as something above
+      // it. A softer, deeper shadow and a larger radius do the job the border
+      // was doing, and the bar stops competing with the paper it sits on.
       className="selection-toolbar flex w-max max-w-[min(21rem,calc(100vw-2rem))] flex-col gap-px
-                 rounded-lg border border-line bg-panel p-0.5 shadow-xl"
+                 rounded-xl border border-line/60 bg-panel p-1
+                 shadow-[0_2px_6px_rgba(0,0,0,0.06),0_10px_30px_rgba(0,0,0,0.16)]"
       // Entering and leaving, rather than pressing and releasing: a writer who
       // presses a button and drags a little before letting go is still on the
       // bar, and so is one moving between two of its buttons.
@@ -880,8 +886,12 @@ function BarMenu({
               maxHeight: place.maxHeight,
             }}
             // Above the manuscript's desk bar, and under the app's dialogs.
-            className="scroll-slim z-[45] w-44 overflow-y-auto rounded-lg
-                       border border-line bg-panel p-1 shadow-xl"
+            // The same card the bar wears, and the same one `ui/menu.tsx`
+            // draws — a picker that opens off the bar should not be a
+            // differently-cornered box.
+            className="scroll-slim z-[45] w-44 overflow-y-auto rounded-xl
+                       border border-line/60 bg-panel p-1
+                       shadow-[0_2px_6px_rgba(0,0,0,0.06),0_10px_30px_rgba(0,0,0,0.16)]"
           >
             {children(shut)}
           </div>,

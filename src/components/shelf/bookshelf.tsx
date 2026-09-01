@@ -4858,7 +4858,10 @@ function SideItem({
       : "gap-2.5 px-3 py-2 text-left text-sm font-medium"
   } ${
     active
-      ? "bg-blue-500/15 font-semibold text-fg dark:bg-blue-500/25"
+      ? /* `accent/10`, and the same string `RailButton` uses in
+           `icon-rail.tsx` — the note there records why both moved off a
+           literal blue together. */
+        "bg-accent/10 font-semibold text-fg"
       : "text-fg/80 hover:bg-raised/70 hover:text-fg"
   }`;
 

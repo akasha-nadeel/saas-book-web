@@ -10,6 +10,8 @@ import {
 } from "@/lib/library-store";
 import { useShelf } from "@/lib/use-library";
 import { plural } from "@/lib/plural";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ListFooter, ListGroup, ListRow, SectionHeader } from "@/components/ui/list";
 import { relativeTime } from "@/lib/relative-time";
 import { ConfirmDialog } from "@/components/ui/dialog";
 
@@ -33,8 +35,19 @@ export function TrashPanel({ bookId }: { bookId: string }) {
 
   /* Was `window.confirm`, which the browser can be told to stop showing — see
      `ui/dialog.tsx`. The question is state now, so the answer arrives through a
-     callback rather than from a blocking call. */
+     callback rather than from a blocking call.
+
+     **Two slots, because both controls on a row now ask.** They are opposite
+     questions and only one of them is destructive, but the two buttons sit
+     millimetres apart at the end of a narrow row — and a press meant for
+     Restore that lands on Delete is the one mistake in this panel nothing can
+     undo. Asking on both means the mis-press is caught by a dialog that names
+     which one you actually hit. */
   const [confirming, setConfirming] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [restoring, setRestoring] = useState<{
     id: string;
     title: string;
   } | null>(null);
@@ -44,35 +57,39 @@ export function TrashPanel({ bookId }: { bookId: string }) {
     // "Deleted chapters", and two of them was two rows saying one thing.
     <div className="flex h-full flex-col">
       {trash.length === 0 ? (
-        <div className="p-4">
-          <p className="font-sans text-sm text-muted">Nothing deleted.</p>
-          <p className="mt-2 font-sans text-xs text-muted">
-            A chapter you delete from the manuscript is kept here, so you can
-            bring it back.
-          </p>
-        </div>
+        <EmptyState
+          glyph={
+            <>
+              <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" />
+            </>
+          }
+          title="Nothing deleted"
+        >
+          A chapter you delete from the manuscript is kept here, so you can
+          bring it back.
+        </EmptyState>
       ) : (
-        <ul className="scroll-slim flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto p-3">
+          {/* One group, where this was a `gap-0.5` column of loose rows. The
+              two controls per row sit together at the end of it, which is where
+              a row's actions go — not floated at two different insets. */}
+          <SectionHeader trailing={trash.length}>Deleted</SectionHeader>
+          <ListGroup as="ul">
           {trash.map((item) => (
-            <li
-              key={item.id}
-              className="flex items-center gap-1.5 rounded-md py-1.5 pr-1 pl-3"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-sans text-sm text-fg">
-                  {item.title}
-                </span>
-                <span className="mt-0.5 block font-sans text-xs text-muted">
-                  deleted {relativeTime(item.trashedAt)}
-                  {item.words > 0
-                    ? ` · ${plural(item.words, "word")}`
-                    : ""}
-                </span>
-              </span>
-
+            <li key={item.id}>
+              <ListRow
+                title={item.title}
+                detail={
+                  <>
+                    deleted {relativeTime(item.trashedAt)}
+                    {item.words > 0 ? ` · ${plural(item.words, "word")}` : ""}
+                  </>
+                }
+                trailing={
+                  <span className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={() => restore(item.id)}
+                onClick={() => setRestoring(item)}
                 aria-label={`Restore ${item.title}`}
                 title="Restore"
                 className="shrink-0 rounded-md p-1.5 text-muted outline-none
@@ -115,9 +132,42 @@ export function TrashPanel({ bookId }: { bookId: string }) {
                   <path d="m5 5 10 10M15 5 5 15" />
                 </svg>
               </button>
+                  </span>
+                }
+              />
             </li>
           ))}
-        </ul>
+          </ListGroup>
+
+          <ListFooter>
+            A deleted chapter waits here until you delete it for good. Nothing
+            here counts towards your book&rsquo;s word total.
+          </ListFooter>
+        </div>
+      )}
+
+      {restoring && (
+        /* Not `danger`: this puts a chapter back, and a red button on the
+           harmless half of the pair would teach the writer to read the colour
+           rather than the words — which is what makes the red one below stop
+           working. It says where the chapter lands, because restoring also
+           navigates there and a panel that jumps you into a chapter without
+           warning is the same surprise from the other side. */
+        <ConfirmDialog
+          title="Put this chapter back?"
+          body={
+            <>
+              <span className="text-tremor-content-strong">
+                {restoring.title}
+              </span>{" "}
+              returns to the manuscript and opens.
+            </>
+          }
+          confirmLabel="Restore"
+          danger={false}
+          onConfirm={() => restore(restoring.id)}
+          onClose={() => setRestoring(null)}
+        />
       )}
 
       {confirming && (
@@ -125,8 +175,14 @@ export function TrashPanel({ bookId }: { bookId: string }) {
           title="Delete this permanently?"
           body={
             <>
-              <span className="text-fg">{confirming.title}</span> would be gone
-              for good. This cannot be undone.
+              {/* The dialog palette, not the app's. `text-fg` here was the
+                  documented mistake — a dialog carries `--color-tremor-*`, and
+                  the two questions now sit side by side, so an emphasised
+                  title in two different colours would be visible. */}
+              <span className="text-tremor-content-strong">
+                {confirming.title}
+              </span>{" "}
+              would be gone for good. This cannot be undone.
             </>
           }
           confirmLabel="Delete for good"

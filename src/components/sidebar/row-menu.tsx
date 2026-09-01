@@ -231,15 +231,22 @@ export function RowMenu({
               maxHeight,
               ...vertical,
             }}
-            className="z-50 overflow-y-auto rounded-lg border border-line
-                       bg-panel p-1.5 shadow-xl"
+            /* **The same card `ui/menu.tsx` draws**, down to the radius, the
+               padding and the shadow — `rounded-lg p-1.5 shadow-xl` was a
+               second answer to a question that file had already settled, and
+               the two menus appear a few pixels apart on the same screen.
+               Only the card is shared: the mechanics stay here, because this
+               one is portalled with its own placement for a list that
+               scrolls. */
+            className="z-50 overflow-y-auto overscroll-contain rounded-xl
+                       border border-line bg-panel p-1 shadow-xl shadow-black/10"
           >
             {items.map((item, i) => (
               <div key={item.label}>
                 {/* A rule above the destructive action, so it is not the next
                     thing down from a harmless one. */}
                 {item.danger && i > 0 && (
-                  <div aria-hidden="true" className="my-1.5 h-px bg-line" />
+                  <div aria-hidden="true" className="my-1 h-px bg-line" />
                 )}
                 <button
                   type="button"
@@ -248,8 +255,8 @@ export function RowMenu({
                     close(false);
                     item.onSelect();
                   }}
-                  className={`flex w-full items-center gap-2.5 rounded-md px-2.5
-                              py-1.5 text-left font-sans text-sm outline-none
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5
+                              py-2 text-left font-sans text-[13px] outline-none
                               transition-colors focus-visible:ring-2
                               focus-visible:ring-accent/60 ${
                                 item.danger
@@ -262,7 +269,7 @@ export function RowMenu({
                   </span>
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.hint && (
-                    <span className="shrink-0 font-sans text-xs text-muted">
+                    <span className="shrink-0 font-sans text-[11px] text-muted">
                       {item.hint}
                     </span>
                   )}

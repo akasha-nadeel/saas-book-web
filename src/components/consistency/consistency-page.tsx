@@ -18,6 +18,7 @@ import Link from "next/link";
 
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
+import { ListGroup, SectionHeader } from "@/components/ui/list";
 import { namesOf } from "@/lib/bible";
 import { bookTextOf, readable } from "@/lib/book-text";
 import {
@@ -118,7 +119,7 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
         {heading}
 
         {toRead === 0 ? (
-          <p className="rounded-xl border border-line bg-panel p-5 text-muted">
+          <p className="max-w-2xl text-muted">
             Nothing written yet in the body of this book. There is nothing to
             read across.
           </p>
@@ -127,8 +128,10 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
             {/* Keyed on there being no report rather than on the phase, so
                 "Run it again" does not throw the results away and put the
                 opening pitch back on screen for a frame. */}
+            {/* Unboxed: this is the screen's own opening sentence and the
+                press that follows it, not a card among cards. */}
             {!report && (
-              <section className="rounded-xl border border-line bg-panel p-5">
+              <section className="max-w-2xl">
                 <p className="max-w-2xl text-base leading-relaxed text-fg/80">
                   Six checks, over{" "}
                   <strong className="font-semibold text-fg">
@@ -143,7 +146,7 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
                   type="button"
                   onClick={run}
                   disabled={phase === "running"}
-                  className="mt-4 rounded-lg bg-accent px-5 py-2.5 text-sm font-semibold text-accent-ink hover:opacity-90 disabled:opacity-60"
+                  className="mt-5 rounded-[10px] bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink transition-opacity hover:opacity-90 disabled:opacity-60"
                 >
                   {phase === "running"
                     ? `Reading ${plural(toRead, "chapter")}…`
@@ -154,7 +157,10 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
 
             {report && (
               <>
-                <section className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-line bg-panel px-5 py-4">
+                {/* A status line about the run, not a bar. It is one sentence
+                    and a way to run it again; a bordered strip gave it the
+                    weight of a finding. */}
+                <section className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-line pb-4">
                   <p className="text-sm text-muted">
                     Read {plural(report.chapters, "chapter")} and{" "}
                     {plural(report.words, "word")}.
@@ -168,7 +174,7 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
                     type="button"
                     onClick={run}
                     disabled={phase === "running"}
-                    className="ml-auto rounded-lg border border-line px-3.5 py-2 text-xs font-semibold text-muted hover:bg-raised hover:text-fg disabled:opacity-60"
+                    className="ml-auto rounded-[7px] bg-raised px-3 py-1.5 text-[11px] font-semibold text-muted transition-colors hover:text-fg disabled:opacity-60"
                   >
                     {phase === "running" ? "Reading…" : "Run it again"}
                   </button>
@@ -177,15 +183,23 @@ export function ConsistencyPage({ bookId, embedded, heading }: ToolPageProps) {
                 {showing.length === 0 ? (
                   <Nothing report={report} />
                 ) : (
-                  <div className="mt-4 space-y-4">
-                    {showing.map((finding) => (
-                      <FindingCard
-                        key={finding.key}
-                        bookId={bookId}
-                        finding={finding}
-                        onDismiss={dismiss}
-                      />
-                    ))}
+                  <div className="mt-6">
+                    {/* One group over the whole set, where this was a card per
+                        finding at 20px of padding each — six cards down a wide
+                        screen with nothing tying them together. */}
+                    <SectionHeader trailing={showing.length}>
+                      Findings
+                    </SectionHeader>
+                    <ListGroup as="ul">
+                      {showing.map((finding) => (
+                        <FindingCard
+                          key={finding.key}
+                          bookId={bookId}
+                          finding={finding}
+                          onDismiss={dismiss}
+                        />
+                      ))}
+                    </ListGroup>
                   </div>
                 )}
 
@@ -253,13 +267,13 @@ function FindingCard({
   onDismiss: (key: string) => void;
 }) {
   return (
-    <article className="rounded-xl border border-line bg-panel p-5">
+    <li className="px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+          <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">
             {LABELS[finding.check]}
           </p>
-          <h3 className="mt-1 text-lg font-bold break-words text-fg">
+          <h3 className="mt-1 text-[17px] font-semibold break-words text-fg">
             {finding.label}
           </h3>
         </div>
@@ -269,7 +283,7 @@ function FindingCard({
         <button
           type="button"
           onClick={() => onDismiss(finding.key)}
-          className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:bg-raised hover:text-fg"
+          className="shrink-0 rounded-[7px] bg-raised px-3 py-1.5 text-[11px] font-semibold text-muted transition-colors hover:bg-raised hover:text-fg"
         >
           Not a mistake
         </button>
@@ -285,12 +299,9 @@ function FindingCard({
       ))}
 
       {finding.passages && finding.passages.length > 0 && (
-        <ul className="mt-3 space-y-2">
+        <ul className="mt-3 divide-y divide-line overflow-hidden rounded-[10px] border border-line bg-raised/40">
           {finding.passages.map((spot, at) => (
-            <li
-              key={`${spot.chapterId}-${at}`}
-              className="rounded-lg border border-line bg-surface p-3"
-            >
+            <li key={`${spot.chapterId}-${at}`} className="px-3 py-2.5">
               <Link
                 href={`/book/${bookId}/chapter/${spot.chapterId}`}
                 className="text-xs font-semibold text-accent"
@@ -308,7 +319,7 @@ function FindingCard({
       <Disclosure label="Why this is here" closeLabel="Close">
         {finding.note}
       </Disclosure>
-    </article>
+    </li>
   );
 }
 
@@ -330,7 +341,7 @@ function VariantBlock({
   rare: boolean;
 }) {
   return (
-    <div className="mt-3 rounded-lg border border-line bg-surface p-3">
+    <div className="mt-3 rounded-[10px] border border-line bg-raised px-3 py-2.5">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <span
           className={`rounded-md px-2 py-0.5 font-mono text-sm font-semibold ${
@@ -379,18 +390,18 @@ function SetAside({
   onRestore: (key: string) => void;
 }) {
   return (
-    <details className="group mt-6 rounded-xl border border-line bg-panel p-5">
+    <details className="group mt-6">
       <summary className="cursor-pointer text-sm font-semibold text-muted hover:text-fg">
         <span className="group-open:hidden">
           Show the {plural(findings.length, "one")} you set aside
         </span>
         <span className="hidden group-open:inline">Hide these again</span>
       </summary>
-      <ul className="mt-3 space-y-2">
+      <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line bg-raised/40">
         {findings.map((finding) => (
           <li
             key={finding.key}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface p-3"
+            className="flex flex-wrap items-center justify-between gap-3 px-3.5 py-2.5"
           >
             <span className="text-sm break-words text-fg/80">
               {finding.label}
@@ -398,7 +409,7 @@ function SetAside({
             <button
               type="button"
               onClick={() => onRestore(finding.key)}
-              className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-semibold text-muted hover:bg-raised hover:text-fg"
+              className="shrink-0 rounded-[7px] bg-accent/10 px-2.5 py-1 text-[11px] font-semibold text-accent transition-colors hover:bg-accent/20"
             >
               Put back
             </button>
