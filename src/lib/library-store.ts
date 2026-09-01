@@ -3246,6 +3246,19 @@ export interface Prefs {
   /** Which sub-tab the find & replace panel is currently showing ("find" | "replace"). */
   searchTab: "find" | "replace";
   /**
+   * Whether the assistant may offer to put a passage into the chapter.
+   *
+   * **Off by default, and it stays a preference rather than a plan check.** The
+   * plan decides whether the switch can be moved; this records whether the
+   * writer moved it. Reading the two as one thing would turn a lapsed
+   * subscription into a setting that changed itself, and would leave a returning
+   * Pro writer with write access they never asked for.
+   *
+   * Nothing is written by it on its own: with this on, the reply's offered
+   * prose grows an Apply control, and the change still waits for a press.
+   */
+  assistantWrite: boolean;
+  /**
    * Which of the rail's panels is showing.
    *
    * Stored, with `leftPanel`, because **a navigation is not a decision.**
@@ -3365,6 +3378,8 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   leftPanel: true,
   chapterSectionOpen: false,
   searchTab: "find",
+  // Off: the assistant offers text and puts none of it in until asked to.
+  assistantWrite: false,
   panelTab: "search",
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
@@ -3435,6 +3450,7 @@ function parsePrefs(raw: string | null): Prefs {
       leftPanel: parsed.leftPanel !== false,
       chapterSectionOpen: parsed.chapterSectionOpen === true,
       searchTab: parsed.searchTab === "replace" ? "replace" : "find",
+      assistantWrite: parsed.assistantWrite === true,
       panelTab: isPanelTab(parsed.panelTab)
         ? parsed.panelTab
         : DEFAULT_PREFS.panelTab,
@@ -4274,6 +4290,35 @@ function rememberVersion(chapterId: string, body: string, words: number) {
     if (!shouldSnapshot(history, body, now)) return;
 
     const next = addSnapshot(history, { at: now, body, words });
+    void writeStored(HISTORY, chapterId, JSON.stringify(next));
+    sweepHistory(chapterId);
+    for (const listener of historyListeners) listener();
+  } catch {
+    // Deliberately silent. See the note at the head of this section.
+  }
+}
+
+/**
+ * Keep this version now, whatever the usual rules say.
+ *
+ * **The one caller is the assistant putting a passage into the chapter**, and
+ * it is why this exists at all: `rememberVersion` declines most saves, so a
+ * replacement made a minute after the last snapshot would have had no version
+ * behind it. Undo covers the next few seconds; this covers the hour after,
+ * when the writer has kept typing and the change is somewhere up the page.
+ *
+ * A machine-made change to somebody's prose is the one edit that has to be
+ * recoverable from the History panel by name, so the guard is skipped rather
+ * than loosened — loosening it would take more snapshots of every ordinary
+ * save too, which is the budget this section spends its length defending.
+ *
+ * Silent on failure, like everything else here: a full origin means no version,
+ * never a refused write.
+ */
+export function keepVersionNow(chapterId: string, body: string, words: number) {
+  try {
+    const history = parseHistory(getHistoryRaw(chapterId));
+    const next = addSnapshot(history, { at: Date.now(), body, words });
     void writeStored(HISTORY, chapterId, JSON.stringify(next));
     sweepHistory(chapterId);
     for (const listener of historyListeners) listener();

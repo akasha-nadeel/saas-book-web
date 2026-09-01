@@ -96,6 +96,7 @@ export function LeftPanel({
   chapterTitle,
   editor,
   getChapterText,
+  canWrite,
   onClose,
 }: {
   /**
@@ -118,6 +119,15 @@ export function LeftPanel({
   chapterTitle: string;
   editor?: Editor | null;
   getChapterText: () => string;
+  /**
+   * Whether this writer may change this book.
+   *
+   * Passed down rather than read here: `chapter-editor.tsx` already has it from
+   * `canWriteBook`, and two readings of one question are two answers waiting to
+   * disagree. The assistant is the only panel that needs it — it is the only
+   * one that can put words in the manuscript.
+   */
+  canWrite: boolean;
   /** Dismiss the panel. Required: the header's control and Escape both need it. */
   onClose: () => void;
 }) {
@@ -405,6 +415,8 @@ export function LeftPanel({
               chapterId={chapterId}
               chapterTitle={chapterTitle}
               getChapterText={getChapterText}
+              editor={editor}
+              canWrite={canWrite}
             />
           )}
         </div>

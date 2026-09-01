@@ -624,6 +624,7 @@ export function ChapterEditor({
           chapterTitle={chapter.title}
           editor={liveEditor}
           getChapterText={() => liveEditor?.getText() ?? ""}
+          canWrite={canWriteThis}
           onClose={() => setEditorPanel(false)}
         />
 

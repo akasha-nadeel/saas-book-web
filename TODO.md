@@ -1215,11 +1215,36 @@ company from shipping software.
 
 **Do not solve either of these with AI.** Covers and editing are the two
 most-wanted items in the research, and the cheap way to build both is
-generative. Doing so would contradict, in one release, the assistant's lack of
-write access, the roadmap's promise that covers will not come from a stock site
-full of AI, and the FAQ's statement that manuscripts are not training data — in
-front of the one audience that checks. If they are ever built, they come from
-real designers and real editors.
+generative. Doing so would contradict the roadmap's promise that covers will not
+come from a stock site full of AI, and the FAQ's statement that manuscripts are
+not training data — in front of the one audience that checks. If they are ever
+built, they come from real designers and real editors.
+
+*Amended 2026-09-01.* This paragraph used to cite "the assistant's lack of write
+access" as a third thing generative editing would contradict, and the assistant
+now has write access on Pro. **The two are not the same feature, and the
+difference is worth writing down so this entry is not read as reversed.**
+
+What is ruled out is the *editorial job* sold in place of a human editor: a
+machine that reads a manuscript, decides what is wrong with it, and changes it.
+That is the two-sided marketplace above with a model standing in for the people,
+and it is refused for the same reason the covers are.
+
+What shipped is the writer moving their own prose. They select a passage, ask
+for something, read a word-by-word diff of what would change, and press. The
+model chooses no target, changes nothing on its own, and never touches a
+paragraph nobody selected. **Four properties are what keep the two apart, and
+taking any one of them out turns this into the thing above**: the target is the
+writer's own selection or caret and never text matched back out of the
+manuscript; a replacement is shown as a diff before it is made; the change is
+one transaction, so one undo reverts it; and the chapter as it stood is kept in
+history first. It is off by default and it is a switch, not a mode the app puts
+anyone in.
+
+*Still ruled out under this entry, and each fails at least one of the four:* an
+"edit my book" button, a rewrite control on the prose report (it reports on a
+whole book nobody has selected), the assistant editing a chapter it is not open
+on, and anything that applies a change without showing it first.
 
 **No API exists for these, whatever anyone sells you.** Amazon has no public API
 for KDP sales *or* for keywords — which is why the money feature reads the

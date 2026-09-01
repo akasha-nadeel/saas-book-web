@@ -48,6 +48,19 @@ import {
 export function AssistantReply({
   text,
   /**
+   * Extra controls to draw on a block of offered prose, beside Copy.
+   *
+   * A render slot rather than a set of handlers, so this file keeps knowing
+   * nothing about what a caller does with a passage. The editor's assistant
+   * passes an Apply control here; the two workshops pass nothing and are
+   * unchanged, which is the whole reason it is optional.
+   *
+   * It receives the block, so a caller can read `blockText` itself rather than
+   * being handed a string it would have to trust this component to have
+   * flattened the same way the clipboard does.
+   */
+  actions,
+  /**
    * Whether to offer a copy button on blocks that hold offered prose.
    *
    * On by default and off for the two workshops' short conversational turns,
@@ -59,6 +72,7 @@ export function AssistantReply({
   className = "",
 }: {
   text: string;
+  actions?: (block: Block) => React.ReactNode;
   copyable?: boolean;
   className?: string;
 }) {
@@ -68,13 +82,21 @@ export function AssistantReply({
   return (
     <div className={`flex flex-col gap-2.5 text-sm text-fg ${className}`}>
       {blocks.map((block, i) => (
-        <Piece key={i} block={block} copyable={copyable} />
+        <Piece key={i} block={block} copyable={copyable} actions={actions} />
       ))}
     </div>
   );
 }
 
-function Piece({ block, copyable }: { block: Block; copyable: boolean }) {
+function Piece({
+  block,
+  copyable,
+  actions,
+}: {
+  block: Block;
+  copyable: boolean;
+  actions?: (block: Block) => React.ReactNode;
+}) {
   switch (block.kind) {
     case "heading":
       /* Weight and colour, not size — see the note above. */
@@ -107,7 +129,9 @@ function Piece({ block, copyable }: { block: Block; copyable: boolean }) {
               </p>
             ))}
           </div>
-          {copyable && <Offered block={block} label="Copy this passage" />}
+          <Offered block={block} label="Copy this passage" copyable={copyable}>
+            {actions?.(block)}
+          </Offered>
         </figure>
       );
 
@@ -121,7 +145,9 @@ function Piece({ block, copyable }: { block: Block; copyable: boolean }) {
               {block.text}
             </code>
           </pre>
-          {copyable && <Offered block={block} label="Copy this text" />}
+          <Offered block={block} label="Copy this text" copyable={copyable}>
+            {actions?.(block)}
+          </Offered>
         </figure>
       );
 
@@ -165,24 +191,46 @@ function ListBlock({ ordered, items }: { ordered: boolean; items: Run[][] }) {
 }
 
 /**
- * The copy control on a block of offered prose.
+ * The controls on a block of offered prose.
  *
  * Top right and absolutely placed, which is why both callers reserve `pr-9`:
- * in the flow it would push the words it is about, and these blocks are narrow
- * enough already.
+ * in the flow they would push the words they are about, and these blocks are
+ * narrow enough already.
  *
  * `blockText` rather than the raw source, so what lands on the clipboard is the
  * words without the notation — the destination is somebody's novel, and
  * pasting `**bold**` into a manuscript puts asterisks in a book.
+ *
+ * **`isOffered` is the gate for the whole row, not just for Copy.** It is the
+ * one place that decides which blocks are the model *offering text* rather than
+ * talking, and an Apply control on a paragraph of commentary would put the
+ * model's opinion of a scene into the scene.
  */
-function Offered({ block, label }: { block: Block; label: string }) {
+function Offered({
+  block,
+  label,
+  copyable,
+  children,
+}: {
+  block: Block;
+  label: string;
+  copyable: boolean;
+  children?: React.ReactNode;
+}) {
   if (!isOffered(block)) return null;
+  if (!copyable && !children) return null;
+
   return (
-    <CopyButton
-      value={blockText(block)}
-      label={label}
-      className="absolute top-1 right-1 text-muted hover:bg-raised hover:text-fg"
-    />
+    <div className="absolute top-1 right-1 flex items-center gap-0.5">
+      {children}
+      {copyable && (
+        <CopyButton
+          value={blockText(block)}
+          label={label}
+          className="text-muted hover:bg-raised hover:text-fg"
+        />
+      )}
+    </div>
   );
 }
 

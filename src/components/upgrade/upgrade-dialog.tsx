@@ -43,7 +43,7 @@ import { DialogClose } from "@/components/ui/dialog";
  * on both plans now, so the refusal it headlined cannot happen. Gone rather
  * than left as a dialog for a state the app has no way to reach.
  */
-export type UpgradeReason = "books" | "restore";
+export type UpgradeReason = "books" | "restore" | "assistant-write";
 
 const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   books: {
@@ -53,6 +53,15 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   restore: {
     lead: "There is no room to put this one back.",
     title: `Free carries ${plural(LAUNCH_LIMITS.freeBooks, "book")}. Pro carries as many as you write.`,
+  },
+  /* **The headline is about the switch, not about the shelf.** The other two
+     reasons land here from a full shelf and the rows below answer them; this
+     one lands from the assistant panel, and a writer told about book limits
+     when they asked about the assistant has been answered by the wrong door. */
+  "assistant-write": {
+    lead: "The assistant can read your chapter. Writing into it is Pro.",
+    title:
+      "Offer a passage, see exactly what would change, and put it in with one press.",
   },
 };
 
@@ -165,7 +174,7 @@ const FREE: Row[] = [
   {
     icon: icons.assistant,
     name: `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant replies a month`,
-    detail: "It reads and reports, never rewrites.",
+    detail: "It reads the chapter and offers you text.",
   },
   {
     icon: icons.word,
@@ -186,6 +195,11 @@ const PRO: Row[] = [
     icon: icons.assistant,
     name: `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} assistant replies a month`,
     detail: "Twelve times what Free carries.",
+  },
+  {
+    icon: icons.assistant,
+    name: "The assistant can write into your chapter",
+    detail: "You see the change and press. One undo takes it back.",
   },
   {
     icon: icons.everything,

@@ -489,7 +489,7 @@ const ROWS: Row[] = [
   {
     badge: "The assistant",
     title: "Ask about the chapter you are on",
-    lead: "It reads the chapter and answers about it. It offers you text and never writes into your book.",
+    lead: "It reads the chapter and answers about it. On Pro it can offer a passage for the page — you see exactly what would change before it goes in, and one undo takes it back.",
     figure: (
       <AssistantScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
     ),
@@ -971,6 +971,7 @@ export function MvpLandingPage() {
                   "Unlimited books",
                   "Everything on Free",
                   `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} assistant replies a month`,
+                  "The assistant can write into your chapter",
                 ]}
                 note={`Or ${annualTotal} a year — about ${annualPerMonth} a month.`}
                 href="/upgrade"

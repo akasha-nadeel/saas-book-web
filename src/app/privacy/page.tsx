@@ -98,8 +98,19 @@ export default function PrivacyPage() {
             <>
               <Term>The writing assistant</Term> — when you ask the assistant a
               question, the open chapter and your chat message are sent to the
-              configured language-model provider so it can answer. Nothing is
-              used for model training by us.
+              configured language-model provider so it can answer. If you have
+              turned on letting it write into the chapter and you have a passage
+              selected, that passage is sent too, so a replacement it offers
+              fits the words it is replacing. Nothing is used for model training
+              by us.
+            </>,
+            <>
+              <Term>Dictation</Term> — the microphone buttons use your
+              browser&rsquo;s own speech recognition, not ours. While you are
+              dictating, the browser sends the audio to its maker&rsquo;s
+              service to turn into words; in Chrome that is Google. Nothing is
+              sent while it is switched off, and the feature exists only in
+              browsers that offer the engine.
             </>,
             <>
               <Term>Making a PDF</Term> — PDF export sends the full typeset book

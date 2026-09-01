@@ -1090,10 +1090,23 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
   says nothing rather than something plausible. Report facts, never verdicts —
   the people selling verdicts to this audience are the ones it has been burned
   by.
-- **The assistant reads and reports; it never writes into the book.** Same rule
-  behind the prose report having no rewrite button. Two features are ruled out
-  on this ground and stay ruled out: AI-generated covers and AI editing. See
-  TODO.md.
+- **The assistant never changes the book on its own — every word it puts there
+  is a press.** This replaced *"it reads and reports; it never writes into the
+  book"* on 2026-09-01, and the rule it protects did not change: what was
+  refused was a machine altering somebody's prose without them seeing it.
+  A writer on Pro can turn on a switch in the assistant panel; with it on, prose
+  the model offers grows Replace and Insert. **Four things are the rule, not the
+  implementation, and none may be dropped**: a replacement is shown as a diff
+  before it is made; the anchor is the writer's own selection or caret and
+  *never* text matched back out of the manuscript; the whole change is one
+  transaction, so one undo reverts it; and the chapter as it stood is kept in
+  history first. Off by default. The prose report still has no rewrite button —
+  it reports on a whole book nobody has selected, which is the case none of the
+  four above can cover. **Two features are still ruled out and stay ruled out:
+  AI-generated covers and AI editing** — meaning the editorial *job*, sold in
+  place of a human editor. See TODO.md, which says why the two are not the same
+  thing. `src/components/chat/chat-panel.tsx` and `src/lib/editor/assistant-write.ts`
+  are where this lives; `/api/chat` gates write mode with `requirePro`.
 - **The Help dialog is documentation and goes stale like documentation.** When a
   feature ships, add it to the `SECTIONS` list in `shelf/help-dialog.tsx` — it's
   the only place in the app that explains what exists.

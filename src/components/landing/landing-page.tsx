@@ -772,7 +772,7 @@ const ORDER_STATIONS: Station[] = PHASES.filter(
 const REFUSALS = [
   [
     "We will not design your cover or edit your prose with AI",
-    "AI here reads and reports. It never writes into your book. The cheap way to build covers and editing is generative, and doing it would make liars of us in front of the one audience that checks. If those ever exist here, they come from real designers and real editors.",
+    "The assistant never changes your book on its own: it offers a passage, shows you exactly what would change, and waits for you to press. Nothing is rewritten behind your back and one undo puts your words back. The cheap way to build covers and editing is generative, and doing it would make liars of us in front of the one audience that checks. If those ever exist here, they come from real designers and real editors.",
     "We will check the cover you already have",
     "Dimensions, shape, weight and contrast against what a shop refuses, and a shelf of the covers already selling in your genre to set yours beside. Then a count of what is in your prose, with none of it changed.",
   ],

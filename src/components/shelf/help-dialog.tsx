@@ -183,6 +183,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         name: "Assistant",
         desc: "An AI writing partner for the chapter you have open. Needs either an ANTHROPIC_API_KEY or a GOOGLE_GENERATIVE_AI_API_KEY set on the server.",
       },
+      {
+        name: "Letting the assistant write",
+        desc: "A switch at the foot of the assistant panel, on Pro. With it on, prose the assistant offers grows Replace and Insert beside the copy button: Replace swaps the passage you have selected and shows you the change word by word before it is made, Insert puts a new paragraph in below the cursor. Nothing moves without a press, one undo takes any of it back, and the chapter as it stood is kept in Versions first. Off by default, and off is the assistant exactly as it was.",
+      },
     ],
   },
   {

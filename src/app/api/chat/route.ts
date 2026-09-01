@@ -5,6 +5,7 @@ import {
   type ChatMessage,
 } from "@/lib/ai";
 import { claimAssistantReplyAllowance } from "@/lib/billing/launch-entitlements";
+import { requirePro } from "@/lib/billing/server";
 
 /**
  * The assistant behind the editor's right-hand panel.
@@ -30,6 +31,15 @@ const MAX_CHAPTER_CHARS = 60_000;
 const MAX_MESSAGES = 20;
 const MAX_MESSAGE_CHARS = 4_000;
 const MAX_OUTPUT_TOKENS = 2_000;
+/**
+ * The highlighted passage, capped separately from the chapter.
+ *
+ * Its own cap because it is its own field on the way out and its own line on
+ * `/privacy`: a writer who selects half a chapter and asks for a rewrite would
+ * otherwise be sending that half twice, and the point of the field is to say
+ * *which part* rather than to send the part again.
+ */
+const MAX_SELECTION_CHARS = 8_000;
 
 const SYSTEM = `You are a writing assistant inside a novel-drafting app, helping
 with the chapter the writer currently has open.
@@ -45,6 +55,33 @@ in a sentence; do not survey every option.
 
 You cannot edit the document. Offer text for the writer to use, and say so
 plainly if a request needs something you cannot see.`;
+
+/**
+ * The same assistant, for a writer who has turned write mode on.
+ *
+ * **Only the closing paragraph differs, and deliberately so.** Everything above
+ * it is what makes the answers good — the voice rule, the brevity, the single
+ * reservation — and a second prompt that drifted from the first would be two
+ * assistants under one name. What changes is the shape offered prose has to
+ * arrive in, because a blockquote is the thing the panel can put a control on:
+ * `isOffered` in `markdown.ts` is the whole of the protocol, and it recognises
+ * exactly two kinds of block.
+ *
+ * **It still does not say the model can edit anything**, because it cannot. It
+ * writes a passage and the writer presses Apply. Telling it otherwise would
+ * invite answers written as though the change had already been made.
+ */
+const SYSTEM_WRITE = `${SYSTEM.slice(0, SYSTEM.lastIndexOf("\n\n"))}
+
+You still cannot edit the document, but the writer can now apply what you offer
+with one press. So put prose you are offering in a blockquote of its own, with
+no commentary inside it, and keep the explanation outside the quote. Do not put
+a passage in a quote unless it is meant to go into the book as it stands.
+
+When the writer has selected a passage, offer a complete replacement for
+exactly that passage — the whole of it, ready to stand in its place — rather
+than notes on what to change. When they have not, offer the new prose on its
+own. Say so plainly if a request needs something you cannot see.`;
 
 export async function POST(request: Request) {
   /* The same check every model route makes, and the message names both keys
@@ -69,7 +106,12 @@ export async function POST(request: Request) {
   //
   // With no accounts or no payment gateway configured this passes everyone, so
   // a self-hosted copy running on its owner's key works as it always did.
-  let body: { messages?: ChatMessage[]; chapter?: string };
+  let body: {
+    messages?: ChatMessage[];
+    chapter?: string;
+    selection?: string;
+    write?: boolean;
+  };
   try {
     body = await request.json();
   } catch {
@@ -92,6 +134,29 @@ export async function POST(request: Request) {
     return Response.json({ error: "No message to answer." }, { status: 400 });
   }
 
+  /**
+   * **Write mode is the paid half, and it is checked here rather than in the
+   * panel.**
+   *
+   * The switch in the rail is locked on a free account, so a real writer never
+   * reaches this — it is the backstop for a request that did not come from the
+   * panel. Checked *before* the allowance is claimed, so a refusal costs nobody
+   * a reply out of their month.
+   *
+   * The gate is on the flag rather than on the route. An assistant that reads a
+   * chapter and answers about it is free on both plans and stays free; refusing
+   * the whole conversation because one field was set would take that away.
+   */
+  const write = body.write === true;
+  if (write) {
+    const denied = await requirePro({
+      signIn: "Sign in to let the assistant write into your chapter.",
+      upgrade:
+        "Letting the assistant write into your chapter is part of Pro. It can still read the chapter and offer you text.",
+    });
+    if (denied) return denied;
+  }
+
   const allowance = await claimAssistantReplyAllowance();
   if (!allowance.ok) return allowance.response;
 
@@ -99,16 +164,27 @@ export async function POST(request: Request) {
   // put as the prefix while the exchange grows, which is what lets it be cached
   // across turns. See `StreamAsk` for what each provider does with it.
   const chapter = (body.chapter ?? "").slice(0, MAX_CHAPTER_CHARS);
-  const context = chapter
+  const chapterContext = chapter
     ? `The chapter as it currently stands:\n\n${chapter}`
     : "The chapter is currently empty.";
+
+  /* Sent in write mode only, because it is only asked for there: it names
+     the range an offered replacement would land on. In suggest mode there is
+     nothing for a replacement to land on, so it does not leave the browser
+     at all. Named on /privacy beside the chapter. */
+  const selection = write
+    ? (body.selection ?? "").slice(0, MAX_SELECTION_CHARS).trim()
+    : "";
+  const context = selection
+    ? `${chapterContext}\n\nThe writer has selected this passage, and a replacement you offer will be put in its place:\n\n${selection}`
+    : chapterContext;
 
   /* Aborts the provider when the writer closes the panel or asks something
      else — the stream's `cancel` fires this. */
   const abort = new AbortController();
 
   const pieces = streamModel({
-    system: SYSTEM,
+    system: write ? SYSTEM_WRITE : SYSTEM,
     context,
     messages,
     maxTokens: MAX_OUTPUT_TOKENS,

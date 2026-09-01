@@ -179,6 +179,16 @@ const ROWS: {
   },
   {
     group: "AI and export",
+    /* **A capability row among the counts, and the wording is the whole of it.**
+       What Pro buys is the assistant *offering* a passage for the page; the
+       change is still the writer's press, and the row has to read that way or
+       it is selling something the app does not do. */
+    label: "The assistant writes into your chapter",
+    starter: "It offers text to copy",
+    pro: "Replace or insert, on your press",
+  },
+  {
+    group: "AI and export",
     /* **The same on both sides, and that is the row doing its job.** Export was
        the one thing Pro bought that a writer cannot do without, and charging
        for the door is the thing this trade's writers check for first. The row
@@ -428,8 +438,9 @@ export function Plans({
         <ComingSoonDialog title="Pro" onClose={() => setSoon(false)}>
           There is no payment gateway configured on this copy of OpenChapter, so
           there is nothing to buy and nothing is held back. Once billing is
-          configured, Pro unlocks unlimited books and more assistant replies.
-          Every export format is free either way.
+          configured, Pro unlocks unlimited books, more assistant replies, and
+          letting the assistant write into a chapter. Every export format is
+          free either way.
         </ComingSoonDialog>
       )}
     </main>

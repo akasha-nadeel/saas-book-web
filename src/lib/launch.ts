@@ -29,6 +29,24 @@ export const LAUNCH_LIMITS = {
    */
   freeExports: ["docx", "epub", "pdf"],
   proExports: ["docx", "epub", "pdf"],
+  /**
+   * **Whether the assistant may put a passage into the chapter.**
+   *
+   * The third thing Pro buys, after unlimited books and the larger reply
+   * allowance — and the first that is a capability rather than a number, which
+   * is why it is stated here rather than left to the switch in the panel.
+   *
+   * **What is sold is the model writing applicable prose, not the pressing of a
+   * button.** The manuscript is on the writer's own machine and the app says
+   * so everywhere else; no browser gate could keep somebody out of their own
+   * document, and none is claimed to. What the server actually decides is
+   * whether `/api/chat` answers in write mode at all — see `requirePro` in the
+   * route. That is a real gate on the thing that costs, which is the house rule
+   * for anything sold: no Pro row whose value depends on a browser gate being
+   * unbreakable.
+   */
+  freeAssistantWrite: false,
+  proAssistantWrite: true,
 } as const;
 
 export type LaunchExportFormat = (typeof LAUNCH_LIMITS.proExports)[number];
@@ -37,6 +55,13 @@ export function assistantReplyLimit(pro: boolean): number {
   return pro
     ? LAUNCH_LIMITS.proAssistantRepliesPerMonth
     : LAUNCH_LIMITS.freeAssistantRepliesPerMonth;
+}
+
+/** Whether this plan may let the assistant offer to write into the chapter. */
+export function assistantWriteAllowed(pro: boolean): boolean {
+  return pro
+    ? LAUNCH_LIMITS.proAssistantWrite
+    : LAUNCH_LIMITS.freeAssistantWrite;
 }
 
 export function exportAllowed(format: string, pro: boolean): boolean {
