@@ -69,15 +69,22 @@ is the draft or the candidate list, which already have their own controls, and a
 second button beside them would be two ways to take the same words, one of which
 does less.
 
-**One greyscale palette in two values.** No hue anywhere except the status
-family below. The dark set is the `@theme` block and the default — `surface`
-#000 → `panel` #0a0a0a → `raised` #1c1c1c, `line` #262626, `fg` #ededed, `muted`
-#8f8f8f — and the light set is the `:root[data-theme="light"]` block right under
-it, which re-points those same names. Dark inverts light's elevation logic: on
-black every surface above the ground is *lighter* and lifted by a hairline
-(a shadow on black is invisible), while on white the desk is grey, cards are
-white on it, and a hover *deepens*. That is why `raised` crosses over between
-the two blocks rather than swapping ends.
+**One palette in two values: greyscale by day, indigo by night.** The light set
+is the `:root[data-theme="light"]` block and is neutral, with no hue anywhere
+except the status family below. The dark set is the `@theme` block and the
+default, and **it stopped being greyscale on 2026-09-01** — `surface` #141b34 →
+`panel` and `nav` #080e26 → `raised` #212c4f, `line` #29335a, `fg` #f1f2fa,
+`muted` #bcc5de. Both blocks state the same names.
+
+**The two themes stack in opposite directions, and neither is arbitrary.** On
+white the desk is grey, cards are white on it, and a hover *deepens*. On the
+indigo the page is the **lightest** surface and every card, rail and panel is a
+darker well cut into it — which is why a *selected* row sinks into the chrome
+(`--color-selected` is a dark pill there) rather than lifting off it. This
+reverses what this file said while the ground was black, where a surface had to
+be lighter to be seen at all because a shadow on black is invisible. `raised`
+crosses over between the blocks in both readings: a hover comes towards the
+pointer whichever way the rest of the stack runs.
 
 Two rules keep the pair honest, and both are in the file:
 
@@ -146,13 +153,19 @@ Three more things follow from the palette, and each has bitten already:
   moment the theme moves and nothing invalidates it.
 - **In daylight the action colour is the brand ink, not near-black.**
   `--color-accent` is `#312e81` in the light block — the landing page's own
-  indigo, the fill under "Start free" — and stays white in the dark block. The
-  asymmetry is deliberate and documented at both ends: on black a hue has
-  nowhere to stand (dark enough to carry white text and it sinks, light enough
-  to read and it glows), so contrast is the only currency there. On white there
-  is room for both, so one hue is reserved for *"this is the way forward"* and
-  everything else stays grey. That is what lets a writer find the way on
-  without reading the screen. Nothing else in the chrome may spend a hue.
+  indigo, the fill under "Start free" — and `#8ab4ff` in the dark one. The
+  asymmetry is deliberate and documented at both ends. **One accent has to serve
+  as both a link and a fill**, and on the indigo ground those two pull apart: a
+  link needs a relative luminance near 0.30 to clear 4.5:1 against `surface`,
+  white ink on a fill needs that fill below 0.18, and no value is in both
+  ranges. Only a ground near #0d0d0d lets one colour do both — which is exactly
+  what the black set exploited when this token was plain white. So at night the
+  fill is bright and `--color-accent-ink` is near-black navy; by day it is the
+  other way round. One hue is reserved for *"this is the way forward"*, which is
+  what lets a writer find the way on without reading the screen. Past that the
+  chrome spends colour in one more place: the nav glyphs take the accent under
+  `dark:` (see `SideItem`), because on the indigo rail every row is white type
+  on one ground and the glyph is the only thing that separates them.
 - **The dashboard's colour ladder is four wide, and each one is a meaning.**
   Red is blocked (a shop would refuse this), amber is worth doing, green has
   passed or been earned, indigo is the road. So the Overview findings are toned

@@ -136,6 +136,15 @@ export function ResumeCard({
         aria-hidden
         className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.74)_0%,rgba(0,0,0,0.58)_48%,rgba(0,0,0,0.24)_100%)]"
       />
+      {/* A second, flat veil at night, matching the empty state of this card in
+          `bookshelf.tsx` — the two are deliberately indistinguishable in shape,
+          so a scrim on one is a scrim on both. The gradient above is a reading
+          ground for the words; this only brings the lit half of the photograph
+          down to where the rest of the dashboard sits on the indigo set. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 hidden bg-black/28 dark:block"
+      />
       {/* **The title takes the top left and the chapter line the top right, at
           both widths.** It was briefly stacked under the title across a banner;
           the corners are better — the heading and the small print are different

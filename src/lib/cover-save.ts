@@ -47,6 +47,22 @@ import {
  */
 export const PRINT_MAX_EDGE = 2560;
 
+/**
+ * The weight ceiling on that same copy.
+ *
+ * **A backstop rather than a target, and it is nearly never reached.** A
+ * 1600×2560 JPEG at the quality `originalImage` starts from lands around a
+ * megabyte, so an ordinary cover is kept exactly as the writer made it. What
+ * this stops is the file that used to go through whole: a 25MB export from a
+ * design tool, sitting in IndexedDB and then inside the writer's EPUB, where it
+ * is a download a reader waits on and a file some readers refuse outright.
+ *
+ * Four megabytes is deliberately generous — well above what any shop asks for
+ * a cover — because the writer's picture is the thing being protected here and
+ * the budget only exists to catch the extreme.
+ */
+export const PRINT_MAX_BYTES = 4_000_000;
+
 export type SaveCoverResult =
   | {
       ok: true;
@@ -102,7 +118,7 @@ export async function saveCover(
     ...(await contrastFor(file)),
   });
 
-  const full = await originalImage(file, PRINT_MAX_EDGE);
+  const full = await originalImage(file, PRINT_MAX_EDGE, PRINT_MAX_BYTES);
   const printStored = full
     ? await putPrintCover(bookId, {
         dataUrl: full.src,

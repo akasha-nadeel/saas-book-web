@@ -5,7 +5,7 @@ import {
   importImage,
   originalImage,
 } from "../image-import";
-import { PRINT_MAX_EDGE } from "../cover-save";
+import { PRINT_MAX_BYTES, PRINT_MAX_EDGE } from "../cover-save";
 import type { PrintCover } from "../cover-store";
 
 /**
@@ -70,7 +70,7 @@ export async function epubCover(
     });
     if (!result.ok) return null;
 
-    const full = await originalImage(file, PRINT_MAX_EDGE);
+    const full = await originalImage(file, PRINT_MAX_EDGE, PRINT_MAX_BYTES);
     return {
       thumb: result.src,
       print: full

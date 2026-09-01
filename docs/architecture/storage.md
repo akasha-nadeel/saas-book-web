@@ -20,7 +20,7 @@ is a bug even when it works.
 **The manuscript is on IndexedDB and the index is in `localStorage`, and which
 is which is the whole design.** Five megabytes is what a browser gives one
 origin for `localStorage`, and the library outgrew it: bodies run 20–40KB a
-chapter, cover thumbnails are capped at 250KB each, and a real library of 23
+chapter, cover thumbnails are held to 250KB each, and a real library of 23
 books and 298 chapters measured about nine megabytes. What fails first is an
 autosave — on a chapter that had nothing to do with whatever filled the room.
 No amount of sweeping fixes a ceiling, so the four unbounded stores (bodies,
@@ -72,6 +72,22 @@ Six things about it are load-bearing:
 synchronously with no gate: `checkup()` turns it straight into "No cover" on the
 dashboard, and a finding that appears on load and retracts itself is worse than
 a slow one.
+
+**The 250KB is met, never enforced against the writer** (2026-09-01).
+`importImage` used to encode a cover once at a fixed quality and refuse anything
+still over the budget — "too large to store in the browser. Try a smaller crop"
+— which handed a writer an image editor's job over a picture that was usually
+two quality points from fitting. It now walks `encodeAttempts`: every quality
+down to 0.6 at the full size, then the size down in 0.85 steps with the quality
+starting again from the top, stopping at the first encode that fits. The
+refusal still exists at the bottom of both ladders and no real photograph
+reaches it. Two consequences for anything reading this store: what lands here is
+still never more than 250KB, and `ImportResult.stored` can now be smaller than
+the caller's `maxEdge` — it has always meant "what was kept", so that is not a
+new contract. The **jacket** a cover-less book wears on screen
+(`src/lib/default-covers.ts`) touches none of this: it is a static file, nothing
+is written, and `hasCover` goes on answering false so the finding above stays
+correct.
 
 `src/lib/store-db.ts` is the transport — one database, one `openDb`, every store
 declared in its one `onupgradeneeded`, since two `indexedDB.open` calls on one

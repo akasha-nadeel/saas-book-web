@@ -703,11 +703,11 @@ function CoverChecker({ bookId }: { bookId: string }) {
    * Put the reshaped picture on the book, without a round trip through disk.
    *
    * **Through `importImage`, not straight into the store.** That is the same
-   * path the shelf's own cover picker uses, so this file gets the same
-   * shrinking to the same 250KB budget and the same refusal message when it
-   * cannot get there — rather than a second, slightly different upload route
-   * that drifts from the first. `setCover` returns false when the write fails
-   * and that is honoured rather than assumed.
+   * path the shelf's own cover picker uses, so this file is brought under the
+   * same 250KB budget by the same quality ladder — rather than by a second,
+   * slightly different upload route that drifts from the first. `setCover`
+   * returns false when the write fails and that is honoured rather than
+   * assumed.
    *
    * The full-resolution copy is still worth downloading: what lands on the book
    * is a compressed thumbnail for this app's own shelf, and the file a shop

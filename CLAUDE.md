@@ -1008,10 +1008,20 @@ surface has its own layer — a `[data-paper]` attribute re-points `--paper-*` �
 and `page-setup.ts` / `typography.ts` turn a book's settings into `--ms-*`
 custom properties the editor and the reading view both read.
 
-- **One greyscale palette in two values.** The dark set is the `@theme` block and
-  the default; `:root[data-theme="light"]` re-points the same names. Dark inverts
-  light's elevation logic (lifted by a hairline, since a shadow on black is
-  invisible), which is why `raised` crosses over between the blocks.
+- **One palette in two values — greyscale by day, indigo by night.** The dark
+  set is the `@theme` block and the default; `:root[data-theme="light"]`
+  re-points the same names. **The dark set stopped being greyscale on
+  2026-09-01**: `surface` #141b34 → `panel`/`nav` #080e26 → `raised` #212c4f,
+  `line` #29335a, `fg` #f1f2fa, `muted` #bcc5de. The light set is untouched and
+  still neutral.
+- **At night the page is the *lightest* surface and every panel sinks into it**,
+  which reverses the rule that stood here while the ground was black — where
+  everything above it had to be lighter, lifted by a hairline, since a shadow on
+  black is invisible. On a coloured ground the opposite reads better: cards,
+  rails and the sidebar are darker wells cut into the page, and a *selected* row
+  sinks rather than lifts (`--color-selected` is a dark pill on the chrome, an
+  accent wash by day). `raised` still lifts, because a hover has to come towards
+  the pointer whichever way the rest of the stack runs.
 - **Every token stated in one block must be stated in the other.** A name in only
   one keeps its dark value in daylight, and it will be a hairline nobody notices
   for a month.
@@ -1032,11 +1042,22 @@ custom properties the editor and the reading view both read.
   invented for one call site — and never as a way to sneak in a sixth exception
   to the closed list below.
 - **A filled action carries `text-accent-ink`**, never a literal `text-white`:
-  the fill is white at night and near-black by day. `bg-danger` and the matter
-  fills each carry their own `-ink` token for the same reason.
-- **In daylight the accent is the brand indigo; at night it is white.** One hue
-  is reserved for *"this is the way forward"* and **nothing else in the chrome
-  may spend a hue.**
+  the fill is a bright periwinkle at night and the brand indigo by day, so the
+  ink on it is near-black navy at night and white by day. `bg-danger` and the
+  matter fills each carry their own `-ink` token for the same reason.
+- **The accent is the brand indigo by day and #8ab4ff by night**, and **one
+  accent has to be both a link and a fill** — `text-accent` on 158 call sites,
+  `bg-accent` under `text-accent-ink` on 184. On the indigo ground that pairing
+  is *forced*, and the arithmetic is written down so it is not re-litigated: a
+  link needs a relative luminance around 0.30 to clear 4.5:1 against `surface`,
+  and white ink needs the fill *below* 0.18 to clear 4.5:1 the other way. No
+  value is in both ranges — only a ground near #0d0d0d lets one colour do both,
+  which is why the greyscale set could use plain white. **So the fill is bright
+  and the ink on it is dark.** A reference design showing white on a deep blue
+  button is 3.7:1 and is not copied.
+- **One hue is reserved for *"this is the way forward"***, and past that the
+  chrome spends colour in exactly two more places: the nav glyphs, which take
+  the accent under `dark:` only (`SideItem`), and the status family below.
 - **The status family keeps its colour on purpose** — `ok` / `note` / `stop`,
   each a `-bg`, `-line` and `-fg` token, because there the colour *is* the
   information. The dashboard's ladder is four wide: red is blocked, amber is
@@ -1048,9 +1069,14 @@ custom properties the editor and the reading view both read.
   (paper, stated identically in both blocks because a picture of paper stays
   literal), and the landing page's `lp-*` set.
 - **`--color-tremor-*` is the sixth, added 2026-08-31, and it is the last.** It
-  is Tremor's own palette, adopted deliberately for the *dialog system* after
-  the trade-off was put and accepted: it is a second greyscale beside the
-  app's, which is the thing this list exists to prevent. **What keeps it from
+  is Tremor's *structure* — its names, its ladder — adopted deliberately for the
+  dialog system after the trade-off was put and accepted: a second palette
+  beside the app's, which is the thing this list exists to prevent. **Its values
+  are no longer Tremor's.** They were the library's blue-grey until 2026-09-01,
+  and once the app itself went indigo that stopped being *a* different ground
+  and became a stale one — near enough to the navy to read as a mistake rather
+  than as a modal. They are now the app's own navy, one step darker than the
+  page. **What keeps it from
   becoming two designs is that it is scoped to dialogs and nothing else.** A
   modal sits on a scrim, so a different ground inside it reads as a surface of
   its own; on an ordinary screen it would read as another product. `ui/button.tsx`,
@@ -1159,15 +1185,35 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
     reachable path again rather than tested against a callerless file.
   - **`ChapterMeta.matterKey`**, left over from the one-page matter design and
     read by nothing — books written before the change still carry a combined page.
-- Storage limits are real: covers capped at 250KB, inline images at 900KB,
-  import at 8MB. `setCover` and `createBookFromImport` fail cleanly and return a
-  signal; honour it. **The caps stayed after the manuscript moved to IndexedDB**
-  and are no longer about the origin's five megabytes — they are about what
-  belongs in a manuscript. A cover is re-encoded to 700px for the shelf whatever
-  the source, so a bigger upload buys nothing there (the full-size copy has its
-  own store); a 900KB picture inline is a picture that makes the file slow to
-  open in a reader; and an 8MB import is well past any real novel and is the
-  line between a manuscript and a mistake.
+- Storage limits are real: covers 250KB, inline images 900KB, import 8MB.
+  `setCover` and `createBookFromImport` fail cleanly and return a signal;
+  honour it. **The caps stayed after the manuscript moved to IndexedDB** and are
+  no longer about the origin's five megabytes — they are about what belongs in a
+  manuscript. A cover is re-encoded to 700px for the shelf whatever the source,
+  so a bigger upload buys nothing there (the full-size copy has its own store);
+  a 900KB picture inline is a picture that makes the file slow to open in a
+  reader; and an 8MB import is well past any real novel and is the line between
+  a manuscript and a mistake.
+- **The two picture caps are budgets that get met, not sizes that get
+  refused** (2026-09-01). `importImage` walks a ladder — **quality first, then
+  pixels** (`encodeAttempts`, pure and tested) — until the file is under its
+  budget, so no upload is turned away for being large; the refusal survives at
+  the bottom of both ladders, where no real photograph reaches it. It decodes
+  through `createImageBitmap` with `imageOrientation: "from-image"`, which is
+  what keeps a phone photograph upright and lets a fifty-megapixel file be
+  closed the moment it has been drawn. The **export** copy has its own pair,
+  `PRINT_MAX_EDGE` / `PRINT_MAX_BYTES` (2560px / 4MB) in `cover-save.ts`: a
+  writer's own JPEG or PNG inside both is kept byte-for-byte, and the ladder
+  only ever meets the 25MB master that would otherwise sit inside somebody's
+  EPUB.
+- **A book with no cover wears a default jacket, and a jacket is not a cover.**
+  Seven pictures in `public/default-covers/`, chosen by book id in
+  `src/lib/default-covers.ts` and drawn by `BookCover` with the title over
+  them. Nothing is stored, nothing syncs, and `hasCover()` still answers false —
+  so the dashboard keeps its "No cover" finding, `storeReadiness()` keeps
+  reporting it, and the EPUB has no cover page. **Do not "fix" that finding**;
+  `TODO.md` records why the roadmap's "get a cover made" step must never be
+  ticked by a picture nobody chose.
 - `TODO.md` tracks pending work and records *why* things were cut (e.g. front/back
   matter, per-chapter status). Read it before rebuilding something that looks
   missing — it may have been removed on purpose.

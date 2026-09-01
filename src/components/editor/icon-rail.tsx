@@ -91,7 +91,11 @@ export function RailButton({
                      outline-none transition-colors focus-visible:ring-2
                      focus-visible:ring-accent/60 ${
                        active
-                         ? "bg-accent/10 text-fg"
+                         ? /* The `dark:` pair is `SideItem`'s — on the navy
+                              set selected *sinks* into the rail rather than
+                              lifting off it. Two navigations in one product
+                              still agree about what selected looks like. */
+                           "bg-accent/10 text-fg dark:bg-selected dark:text-selected-fg"
                          : "text-fg/80 hover:bg-raised/70 hover:text-fg"
                      } ${disabled ? "opacity-50" : ""}`;
 

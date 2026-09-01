@@ -4,6 +4,7 @@ import { Fragment, createContext, type ReactNode, useCallback, useContext, useEf
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
+import { RailMark, useMarkHandle, type MarkName } from "@/components/editor/rail-mark";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CollabArea } from "@/components/collab/collab-area";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
@@ -243,6 +244,14 @@ const VIEW_ICON: Record<ShelfView, ReactNode> = {
   favourite: shelfIcons.heart,
   archived: shelfIcons.archive,
   trashed: shelfIcons.trash,
+};
+
+/* The one of the four the animated set can already draw — and it draws the
+   same bin, so nothing about the rail's language changes, it only moves. The
+   other three would need a pencil, a heart and an archive box added to
+   `src/components/icons/`; see the `mark` prop on `SideItem`. */
+const VIEW_MARK: Partial<Record<ShelfView, MarkName>> = {
+  trashed: "trash",
 };
 
 /* **`SIDEBAR_ICONS` is gone, and must not come back as bitmaps.**
@@ -674,15 +683,11 @@ export function Bookshelf({
                         the list below it. It is not an area of the dashboard —
                         it opens a panel over whatever you are on — and a row
                         among Overview and Write claimed it was one. */}
-                    <button
-                      type="button"
+                    <HeaderMark
+                      mark="search"
+                      label="Search books and chapters"
                       onClick={() => setSearchOpen(true)}
-                      title="Search books and chapters"
-                      aria-label="Search books and chapters"
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
-                    >
-                      {shelfIcons.search}
-                    </button>
+                    />
                     <button
                       type="button"
                       onClick={() => setSidebarCollapsed(true)}
@@ -704,6 +709,7 @@ export function Bookshelf({
                 {sidebarCollapsed && (
                   <SideItem
                     icon={shelfIcons.search}
+                    mark="search"
                     collapsed
                     onClick={() => setSearchOpen(true)}
                   >
@@ -738,6 +744,7 @@ export function Bookshelf({
                         <SideItem
                           key={v}
                           icon={VIEW_ICON[v]}
+                          mark={VIEW_MARK[v]}
                           collapsed={sidebarCollapsed}
                           active={area === "write" && view === v}
                           onClick={() => showShelf(v)}
@@ -1655,7 +1662,12 @@ function CurrentBookCard({
     <>
 
       {book ? (
-        <section className="overflow-hidden rounded-2xl border border-line bg-panel">
+        <section className="overflow-hidden rounded-2xl border border-line">
+          {/* **The page's own ground, held by its border alone.** This carried
+              `bg-panel` — a second, darker value — and on the indigo set that
+              read as a slab laid on the page rather than as a region of it.
+              The border does the separating; a panel does not need to be a
+              different colour to be a panel. */}
           <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-x-4 p-4 sm:flex sm:flex-wrap sm:gap-5 sm:p-5">
             {/* **The cover edits the book, it no longer opens it.** It was a
                 `<Link>` to `/book/<id>`, and the two cannot both live on one
@@ -2061,31 +2073,39 @@ function Overview({
             names the count rather than merely decorating it.
 
             Night is not the day's colour darkened — it is a near-black wash of
-            the hue (`-950` at 40%, so the app's own ground shows through) with
-            the border carrying the hue instead. That is what stops three dark
-            cards reading as three empty holes. */}
+            the hue with the border carrying the hue instead. That is what stops
+            three dark cards reading as three empty holes.
+
+            **The night values are stated rather than mixed from a Tailwind
+            shade**, and that changed on 2026-09-01 with the indigo ground. The
+            old `-950/40` was a *blend with whatever was underneath*, so all
+            three moved every time the ground did — and against a much darker
+            page they came out as three lit panels rather than as three washes.
+            A stated hex is one decision instead of three that drift; each is a
+            step below `surface` in its own hue, which is what the rest of the
+            night set does. */}
         <Figure
           icon={shelfIcons.overview}
           label={books === 1 ? "book" : "books"}
           value={books.toLocaleString()}
-          cardBg="bg-blue-100 border-blue-200 dark:bg-blue-950/40 dark:border-blue-900/70"
-          iconBg="bg-blue-200/70 dark:bg-blue-500/15"
+          cardBg="bg-blue-100 border-blue-200 dark:bg-[#0b1330] dark:border-[#1b2a5e]"
+          iconBg="bg-blue-200/70 dark:bg-blue-500/12"
           iconColor="text-blue-700 dark:text-blue-400"
         />
         <Figure
           icon={shelfIcons.write}
           label={nounFor(words, "word")}
           value={words.toLocaleString()}
-          cardBg="bg-emerald-100 border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-800/70"
-          iconBg="bg-emerald-200/70 dark:bg-emerald-500/15"
+          cardBg="bg-emerald-100 border-emerald-200 dark:bg-[#05191a] dark:border-[#10403c]"
+          iconBg="bg-emerald-200/70 dark:bg-emerald-500/12"
           iconColor="text-emerald-700 dark:text-emerald-400"
         />
         <Figure
           icon={shelfIcons.prepare}
           label={nounFor(chapters, "chapter")}
           value={chapters.toLocaleString()}
-          cardBg="bg-orange-100 border-orange-200 dark:bg-orange-950/40 dark:border-orange-800/70"
-          iconBg="bg-orange-200/70 dark:bg-orange-500/15"
+          cardBg="bg-orange-100 border-orange-200 dark:bg-[#1a1108] dark:border-[#4a2a10]"
+          iconBg="bg-orange-200/70 dark:bg-orange-500/12"
           iconColor="text-orange-700 dark:text-orange-400"
         />
       </div>
@@ -2590,6 +2610,15 @@ function ResumeSlot({
         aria-hidden
         className="absolute inset-0 -z-10 bg-[linear-gradient(105deg,rgba(0,0,0,0.74)_0%,rgba(0,0,0,0.58)_48%,rgba(0,0,0,0.24)_100%)]"
       />
+      {/* A second, flat veil at night — see the note on the upgrade card. The
+          gradient above it is a *reading* scrim, angled so the words at the
+          left have a ground and the picture is still a picture at the right;
+          this one is even, and only there to bring the lit half down to where
+          the rest of the dashboard now sits. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 hidden bg-black/28 dark:block"
+      />
       {/* Title left, the book's name right, at both widths — the same
           arrangement as the written card. See the note there. */}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -2657,9 +2686,28 @@ function ProCard({ plan }: { plan: PlanState }) {
        placed drawing and a hand-tuned measure would do on the one column this
        card is narrowest in. */
     <section
-      className="flex gap-4 overflow-hidden rounded-lg bg-linear-to-r
-                 from-upgrade-from to-upgrade-to p-5 sm:min-h-52"
+      className="relative isolate flex gap-4 overflow-hidden rounded-lg
+                 bg-linear-to-r from-upgrade-from to-upgrade-to p-5 sm:min-h-52"
     >
+      {/* **A thin veil, at night only.**
+​
+          `--color-upgrade-*` is the app's one licensed gradient and it is
+          stated identically in both themes on purpose — it is a brand mark,
+          not a surface, so it must not drift between them. That was fine
+          beside a near-white page and beside a near-black one; against the
+          indigo it is the brightest thing on the dashboard by a distance, and
+          the eye goes to the advertisement rather than to the work.
+​
+          So the hue is left exactly as it is and a scrim is laid over it. The
+          card keeps its identity, loses about a fifth of its glare, and the
+          light theme is untouched — a veil there would only make the purple
+          muddy against white. `-z-10` under an `isolate` root puts it over the
+          gradient and under every word and the figure. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-10 hidden bg-black/22 dark:block"
+      />
+
       <div className="min-w-0 flex-1">
         <h3 className="text-base font-bold text-white">Room for the next book</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
@@ -3528,10 +3576,18 @@ function Write({
                  shadow on the card underneath made two things move for one
                  pointer, and the jacket is the thing the writer is reaching
                  for. */
-              className={`group relative rounded-xl border transition-colors ${
+              /* **In a grid there is no card any more — only the book.**
+                 A jacket is already an object with an edge, a spine and a
+                 shadow, and putting it inside a bordered box of a second
+                 colour drew a rectangle around a rectangle. The books sit on
+                 the page's own ground now, the way they do on a shelf. The
+                 *list* keeps its rows exactly as they were: there a book is a
+                 line of text and the box is what separates one line from the
+                 next. */
+              className={`group relative transition-colors ${
                 listed
-                  ? "flex items-center gap-3 p-2.5 sm:gap-4 sm:p-3"
-                  : "flex flex-col p-3"
+                  ? "rounded-xl border p-2.5 sm:gap-4 sm:p-3 flex items-center gap-3"
+                  : "flex flex-col rounded-xl"
               } ${
                 selected.has(book.id)
                   /* **A ring on top of the border, not a thicker border.**
@@ -3539,9 +3595,16 @@ function Write({
                      card by a pixel as it is ticked, and in a grid that reads
                      as the whole shelf twitching. A ring is drawn outside the
                      box and takes no space, so the edge reads as three pixels
-                     of accent and nothing reflows. */
-                  ? "border-accent ring-2 ring-accent bg-accent/5"
-                  : "border-line bg-panel"
+                     of accent and nothing reflows. In the grid it is now the
+                     *only* mark of selection, which is why it is offset — with
+                     no card under it, a ring on the box would sit on the
+                     jacket's own edge. */
+                  ? listed
+                    ? "border-accent ring-2 ring-accent bg-accent/5"
+                    : "ring-2 ring-accent ring-offset-2 ring-offset-surface"
+                  : listed
+                    ? "border-line bg-panel"
+                    : ""
               }`}
             >
               {/* A real checkbox, not a styled div: the space bar, the label
@@ -3556,8 +3619,8 @@ function Write({
                   cover most of a 40px jacket. */}
               {selecting && (
                 <label
-                  className={`z-10 flex cursor-pointer items-center justify-center ${
-                    listed ? "shrink-0" : "absolute left-5 top-5"
+                  className={`z-20 flex cursor-pointer items-center justify-center ${
+                    listed ? "shrink-0" : "absolute left-2.5 top-2.5"
                   }`}
                   onClick={(e) => {
                     // Shift-click is read here: the change event has no
@@ -3635,6 +3698,7 @@ function Write({
                     onClosed(book);
                   }
                 }}
+                aria-label={listed ? undefined : book.title}
                 className={`min-w-0 rounded-lg outline-none focus-visible:ring-2
                             focus-visible:ring-accent/60 ${
                               listed
@@ -3673,35 +3737,19 @@ function Write({
                     </span>
                   </>
                 ) : (
-                  <>
-                    <CoverOf book={book} />
-
-                    <div className="pt-3 text-center">
-                      <span className="block text-sm leading-snug font-bold text-balance text-fg">
-                        {book.title}
-                      </span>
-
-                      {/* Small, letterspaced and quiet, which is the slot a shop
-                          grid gives its genre line. Nothing goes under it where
-                          that grid puts a star rating — see the house rule about
-                          invented numbers. `span`, not `p`: this is inside an
-                          anchor, and a paragraph there is invalid markup. */}
-                      <span className="mt-1.5 block font-sans text-[0.6875rem] font-semibold tracking-[0.06em] text-muted uppercase">
-                        {/* **A book somebody shared reads as one of yours
-                            without this**, which is how two of them landing
-                            on a shelf looks like books appearing from
-                            nowhere. The Collaborators area is where the
-                            detail is; this is only the mark that sends
-                            somebody there. */}
-                        {isSharedBook(book) && <>Shared · </>}
-                        {plural(bookChapterCount(book), "chapter")} ·{" "}
-                        {plural(bookWordCount(book), "word")}
-                      </span>
-                      <span className="mt-0.5 block font-sans text-xs text-muted">
-                        Opened {relativeTime(book.lastOpenedAt)}
-                      </span>
-                    </div>
-                  </>
+                  /* **The jacket alone.** The title, the counts and the
+                      "opened" line used to sit under it, centred — three lines
+                      of chrome under every cover, which on a shelf of them was
+                      more text than picture. `BookCover` already prints the
+                      title, subtitle and byline *on* the jacket, so the words
+                      were being said twice; what is lost is the chapter and
+                      word count, which the list view carries in full and the
+                      hero panel above shows for the book in hand.
+​
+                      The link keeps an `aria-label` because its only child is
+                      now a picture with an empty `alt` — without it the shelf
+                      is a column of unnamed links to a screen reader. */
+                  <CoverOf book={book} />
                 )}
               </Link>
 
@@ -3746,7 +3794,7 @@ function Write({
                                   the cover and there is nowhere else; in the
                                   row's own flow in a list, where floating it
                                   would land it on the title. */
-                               listed ? "" : "absolute top-5 right-5"
+                               listed ? "" : "absolute top-2.5 right-2.5 z-20"
                              } ${
                                book.favourite
                                  ? "text-danger"
@@ -3757,12 +3805,37 @@ function Write({
                 </button>
               )}
 
-              {/* The link above is `flex-1`, so this row sits on the floor of
-                  every card and a two-line title never pushes one card's
-                  buttons below its neighbour's. */}
+              {/* **On the jacket in a grid, at the end of the row in a list.**
+​
+                  They sat under the words, which gave every card a permanent
+                  strip of chrome under a picture — twenty of them on a shelf,
+                  competing with the covers this layout exists to show. Over the
+                  jacket and only on hover, the shelf is books until the writer
+                  reaches for one.
+​
+                  The overlay is `aspect-[2/3]` pinned to the top, which is
+                  exactly the cover's own box: the jacket is `aspect-[2/3]
+                  w-full` and this is the same width, so the two agree without
+                  anything measuring anything.
+​
+                  **`pointer-events-none` on the frame, `auto` on the buttons.**
+                  A transparent element still takes clicks, so an invisible
+                  frame over the jacket would swallow the press that opens the
+                  book. Only the buttons themselves are clickable, and they are
+                  only there once they can be seen — `focus-within` brings them
+                  up for a keyboard, which has no hover to reveal them with. */}
+              <div
+                className={
+                  listed
+                    ? "shrink-0"
+                    : `pointer-events-none absolute inset-x-0 top-0 z-10 flex
+                       aspect-[2/3] items-end p-2.5 opacity-0 transition-opacity
+                       duration-150 group-hover:opacity-100 focus-within:opacity-100`
+                }
+              >
               <div
                 className={`flex items-center gap-2 ${
-                  listed ? "shrink-0" : "mt-3"
+                  listed ? "" : "pointer-events-auto w-full"
                 }`}
               >
                   {view === "active" || view === "favourite" ? (
@@ -3773,12 +3846,22 @@ function Write({
                           primaries, and the accent goes back to meaning New
                           book. Width rather than colour is what gives this its
                           weight in a narrow card. */}
+                      {/* **Filled on the jacket, outlined in the row**, and the
+                          argument that kept it outlined has been answered rather
+                          than overruled: it was "twenty filled blue buttons is a
+                          grid of primaries". Over the cover there is only ever
+                          one on screen, because it appears under the pointer —
+                          so the accent can mean *this book, now* without the
+                          shelf turning into a wall of them. */}
                       <Link
                         href={`/book/${book.id}`}
-                        className="flex flex-1 items-center justify-center gap-1.5
-                                   rounded-lg border border-line bg-surface px-3 py-1.5
-                                   text-sm font-semibold text-fg transition-colors
-                                   hover:bg-raised"
+                        className={`flex flex-1 items-center justify-center gap-1.5
+                                    rounded-lg px-3 py-1.5 text-sm font-semibold
+                                    transition-colors ${
+                                      listed
+                                        ? "border border-line bg-surface text-fg hover:bg-raised"
+                                        : "bg-accent text-accent-ink shadow-lg hover:bg-accent-strong"
+                                    }`}
                       >
                         {shelfIcons.write}
                         Write
@@ -3787,9 +3870,11 @@ function Write({
                         label={`More for ${book.title}`}
                         align="end"
                         width={244}
-                        triggerClassName="flex shrink-0 items-center rounded-lg border
-                                          border-line bg-surface px-2 py-1.5 text-fg
-                                          transition-colors hover:bg-raised"
+                        triggerClassName={`flex shrink-0 items-center rounded-lg border
+                                           border-line px-2 py-1.5 text-fg
+                                           transition-colors hover:bg-raised ${
+                                             listed ? "bg-surface" : "bg-panel shadow-lg"
+                                           }`}
                         trigger={shelfIcons.more}
                       >
                         {(close) => (
@@ -3886,6 +3971,7 @@ function Write({
                     </>
                   )}
                 </div>
+              </div>
             </li>
           ))}
         </ul>
@@ -4852,6 +4938,41 @@ function Stat({
  * on the screen and pulls the eye away from the work; the tint is enough to
  * answer "where am I" without competing with the page.
  */
+/**
+ * A header control whose glyph is an animated mark.
+ *
+ * `SideItem`'s pattern at the size the two buttons beside the wordmark use:
+ * the button owns the pointer and focus events and drives the mark's handle,
+ * because the glyph is 18px inside a 32px target and most of a hover never
+ * touches it. See the note in `rail-mark.tsx`.
+ */
+function HeaderMark({
+  mark,
+  label,
+  onClick,
+}: {
+  mark: MarkName;
+  label: string;
+  onClick: () => void;
+}) {
+  const handle = useMarkHandle();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      onPointerEnter={handle.onEnter}
+      onPointerLeave={handle.onLeave}
+      onFocus={handle.onEnter}
+      onBlur={handle.onLeave}
+      className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer dark:text-accent"
+    >
+      <RailMark mark={mark} markRef={handle.ref} size={18} />
+    </button>
+  );
+}
+
 function SideItem({
   icon,
   active,
@@ -4860,6 +4981,7 @@ function SideItem({
   badge,
   children,
   collapsed = false,
+  mark,
 }: {
   icon: ReactNode;
   active?: boolean;
@@ -4869,25 +4991,98 @@ function SideItem({
   badge?: ReactNode;
   children: ReactNode;
   collapsed?: boolean;
+  /**
+   * An animated mark from `src/components/icons/`, in place of `icon`.
+   *
+   * **Only where the drawing is already the right one.** The set is the
+   * editor rail's (`RailMark`), and most of this rail's metaphors — a pencil,
+   * a heart, an archive box, a chat bubble, a paper plane, a price tag — have
+   * no equivalent in it. `rail-mark.tsx` already writes the rule this follows:
+   * a wrong metaphor that happened to animate would be worse than a right one
+   * that sits still. The rows without one are not left inert either; every
+   * glyph in this rail takes the same hover motion `RailMark` gives its own.
+   */
+  mark?: MarkName;
 }) {
   const labelText = typeof children === "string" ? children : undefined;
-  const className = `group relative flex min-h-10 items-center rounded-lg transition-colors ${
+
+  /* Held whether or not there is a mark to drive — hooks cannot be
+     conditional, and an unused handle costs a ref and a memo. The events are
+     on the row rather than on the glyph for `RailMark`'s own reason: the mark
+     is 18px inside a 40px target, so most of a hover never touches it. */
+  const handle = useMarkHandle();
+
+  /* **The row collapses; it is not swapped for a different row.**
+​
+     Both halves used to be rendered by a ternary, so pressing Hide unmounted
+     eight labels in the same frame the rail began its 200ms width transition:
+     the rail slid, the words were already gone, and the whole thing read as a
+     jump followed by an animation of nothing. The label now stays mounted and
+     collapses with it — `max-width` to zero and opacity with it, on the same
+     duration and easing as the rail — so one gesture moves one distance.
+​
+     The padding and the gap are in the transition for the same reason: at 200ms
+     they are the difference between the glyph sliding to the centre of the rail
+     and jumping there. */
+  const className = `group relative flex min-h-10 items-center rounded-lg
+    transition-[background-color,color,padding,column-gap] duration-200 ease-in-out ${
     collapsed
-      ? "justify-center p-2.5"
-      : "gap-2.5 px-3 py-2 text-left text-sm font-medium"
-  } ${
+      ? "justify-center gap-0 px-2.5 py-2"
+      : "gap-2.5 px-3 py-2 text-left"
+  } text-sm font-medium ${
     active
       ? /* `accent/10`, and the same string `RailButton` uses in
            `icon-rail.tsx` — the note there records why both moved off a
-           literal blue together. */
-        "bg-accent/10 font-semibold text-fg"
+           literal blue together.
+​
+           **The `dark:` pair is the navy set, where selected sinks.** By day
+           the rail is white and an active row has to come forward, so the
+           accent wash stands. At night the rail is a dark well below the
+           lightest surface on screen, and a wash *lifting* off it reads as a
+           hover that got stuck — the darker pill is what says "you are here".
+           A token would have to be invented for one call site to say this,
+           which is the case `docs/styling.md` keeps `dark:` for. */
+        "bg-accent/10 font-semibold text-fg dark:bg-selected dark:text-selected-fg"
       : "text-fg/80 hover:bg-raised/70 hover:text-fg"
   }`;
 
-  const body = collapsed ? (
+  /* **The glyphs take the accent at night, and only at night.** On the navy
+     rail every row is white type on one ground and the icons were the only
+     thing that could differentiate them without adding a second weight; by
+     day the rail is white and blue glyphs on it read as fifteen links.
+​
+     The motion is `RailMark`'s own — one rail should not answer differently
+     from the other about what a glyph does under the pointer — and it stands
+     down for a writer who has asked their machine for less of it. */
+  const glyph =
+    `flex shrink-0 items-center justify-center transition-transform duration-150 ` +
+    `ease-out group-hover:scale-[1.12] motion-reduce:transition-none ` +
+    `motion-reduce:group-hover:scale-100 dark:text-accent`;
+
+  const body = (
     <>
-      <span className="shrink-0">{icon}</span>
-      {labelText && (
+      <span className={glyph}>
+        {mark ? <RailMark mark={mark} markRef={handle.ref} size={18} /> : icon}
+      </span>
+
+      {/* The label and its count travel together, and the clip lives *here*
+          rather than on the row — the tooltip below is `absolute left-full`
+          and an `overflow-hidden` row would cut it off at the rail's edge. */}
+      <span
+        aria-hidden={collapsed}
+        className={`flex min-w-0 items-center gap-2 overflow-hidden
+                    transition-[max-width,opacity] duration-200 ease-in-out ${
+                      collapsed
+                        ? "max-w-0 opacity-0"
+                        : "max-w-[11rem] flex-1 opacity-100"
+                    }`}
+      >
+        <span className="min-w-0 flex-1 truncate">{children}</span>
+        {badge}
+      </span>
+
+      {/* Only once the rail is narrow enough for the label to have gone. */}
+      {collapsed && labelText && (
         <span
           role="tooltip"
           className="pointer-events-none absolute left-full top-1/2 ml-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
@@ -4896,13 +5091,14 @@ function SideItem({
         </span>
       )}
     </>
-  ) : (
-    <>
-      <span className="shrink-0">{icon}</span>
-      <span className={badge ? "mr-auto truncate" : "truncate"}>{children}</span>
-      {badge}
-    </>
   );
+
+  const motion = {
+    onPointerEnter: handle.onEnter,
+    onPointerLeave: handle.onLeave,
+    onFocus: handle.onEnter,
+    onBlur: handle.onLeave,
+  };
 
   if (href) {
     return (
@@ -4911,6 +5107,7 @@ function SideItem({
         title={collapsed ? undefined : labelText}
         aria-label={labelText}
         className={className}
+        {...motion}
       >
         {body}
       </Link>
@@ -4924,6 +5121,7 @@ function SideItem({
       aria-label={labelText}
       aria-current={active ? "page" : undefined}
       className={className}
+      {...motion}
     >
       {body}
     </button>

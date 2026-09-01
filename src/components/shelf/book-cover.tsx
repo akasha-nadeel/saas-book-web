@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { defaultJacketFor, seedIndex } from "@/lib/default-covers";
+
 /**
  * Cloth-cover palettes for books with no artwork of their own.
  *
@@ -15,6 +18,11 @@
  *
  * Each still carries its own ink and muted, for the reason it always did: a
  * flat black title on every cover is a swatch card, not a shelf.
+ *
+ * **Since the default jacket arrived this is the ground rather than the face.**
+ * A book with no artwork now wears one of the seven pictures in
+ * `default-covers.ts`, and the palette is what sits under it — the colour that
+ * shows while the file loads, and the whole face again if it never does.
  */
 const COVER_PALETTES: {
   from: string;
@@ -33,11 +41,10 @@ const COVER_PALETTES: {
 ];
 
 function coverPalette(seed: string) {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash * 31 + seed.charCodeAt(i)) | 0;
-  }
-  return COVER_PALETTES[Math.abs(hash) % COVER_PALETTES.length];
+  // The fold itself now lives in `default-covers.ts`, so the ground and the
+  // jacket are chosen by one function rather than by two copies of one. The
+  // arithmetic is unchanged — a book keeps the colour it already had.
+  return COVER_PALETTES[seedIndex(seed, COVER_PALETTES.length)];
 }
 
 /**
@@ -66,10 +73,18 @@ export const BOOK_SHADOW =
  * loses subpixel antialiasing and goes soft, and the title is the one thing on
  * a shelf that has to stay readable.
  *
- * An image-less book wears a muted cloth colour of its own rather than plain
- * white — see COVER_PALETTES. The colours are desaturated and share a weight,
- * so a shelf of them still reads as a shelf, not a paint chart, while giving
- * each book a little identity. A book with its own artwork keeps it.
+ * A book with its own artwork keeps it. **A book without one wears a default
+ * jacket** — one of the seven pictures in `default-covers.ts`, fixed by its id
+ * — with its title printed over it, over the cloth colour it has always had.
+ *
+ * **The jacket is decoration and is never the book's cover.** `getCover` and
+ * `hasCover` go on answering null and false for a book wearing one, which is
+ * what keeps the dashboard's "No cover" finding, `storeReadiness()`, the export
+ * and the cover dialog's "Choose image" all correct without any of them
+ * knowing this exists. Do not "fix" the finding that now looks wrong beside a
+ * good-looking card: `TODO.md` explains, under the roadmap's "get a cover
+ * made", that a placeholder attached like a real cover would tick off the most
+ * expensive step in the list on the strength of a picture nobody chose.
  */
 export function BookCover({
   title,
@@ -86,12 +101,19 @@ export function BookCover({
   author?: string;
   /** Drives how thick the page block looks. A long book is a fat book. */
   words: number;
-  /** Cover art as a data URL. Replaces the typeset face when present. */
+  /** Cover art as a data URL. Replaces the default jacket when present. */
   image?: string | null;
-  /** Show artwork bare: no caption, no scrim. Ignored without artwork. */
+  /**
+   * Show artwork bare: no caption, no scrim.
+   *
+   * **The writer's own artwork only.** It means *the picture already carries
+   * the title*, which can only ever be true of a file somebody chose; the
+   * default jacket carries no words, so a bare one would be an untitled book.
+   */
   bare?: boolean;
-  /** Stable key — the book id — that fixes which muted palette an image-less
-   *  cover wears. Falls back to the title when a book has no id yet. */
+  /** Stable key — the book id — that fixes which jacket and which muted palette
+   *  a cover-less book wears. Falls back to the title when a book has no id
+   *  yet. */
   seed?: string;
   /**
    * Draw the page block down the right edge. On by default, because on a shelf
@@ -110,6 +132,19 @@ export function BookCover({
   // Its own muted colour, fixed by the book so it never changes under it.
   const palette = coverPalette(seed ?? title);
 
+  /*
+   * A jacket that would not load, so the typeset cloth face can take over.
+   *
+   * Reachable rather than defensive: the jackets are static files, and a
+   * browser offline, an extension blocking images, or a bad deploy all end the
+   * same way. Without this the caption's white type would be left on a pale
+   * grey box, which is the one state it cannot be read on.
+   */
+  const [jacketGone, setJacketGone] = useState(false);
+
+  const jacket = image || jacketGone ? null : defaultJacketFor(seed ?? title);
+  const art = image ?? jacket;
+
   return (
     <div
       className={`book-face relative aspect-[2/3] w-full rounded-l-[3px] rounded-r-md
@@ -117,21 +152,32 @@ export function BookCover({
                  transition-[transform,box-shadow] duration-200
                  group-hover:-translate-y-1.5
                  group-hover:shadow-[0_3px_8px_-2px_rgba(0,0,0,0.4),0_28px_52px_-12px_rgba(0,0,0,0.95)]`}
-      // The cloth-cover colour. Covered by artwork when a book has its own,
-      // so it only shows on the typeset face — which is the point.
+      // The cloth-cover colour, under whichever picture is on top of it: the
+      // ground while a jacket loads, and the whole face again if it never does.
       style={{
         background: `linear-gradient(140deg, ${palette.from}, ${palette.to})`,
       }}
     >
       {/* Artwork sits under the spine and page-block shading, so a cover with
           a picture on it still reads as an object rather than a flat image. A
-          plain <img>: these are data URLs already resized on import, so
-          next/image has nothing left to optimise. */}
-      {image ? (
+          plain <img>: the writer's own cover is a data URL already resized on
+          import, so next/image has nothing left to optimise, and a jacket is a
+          fixed static file drawn at a dozen different widths — which is the
+          one shape `next/image` cannot size for.
+
+          `object-cover` on a 2:3 box is what makes both of them right on every
+          screen: a jacket is 9:16 and a writer's file is whatever their
+          designer handed them, and neither is ever stretched. */}
+      {art ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={image}
+          src={art}
           alt=""
+          // The jacket alone: a writer's own cover is already in memory, and
+          // lazily loading it would blank the card it is the whole point of.
+          loading={jacket ? "lazy" : undefined}
+          decoding="async"
+          onError={jacket ? () => setJacketGone(true) : undefined}
           className="absolute inset-0 h-full w-full rounded-l-[3px] rounded-r-md object-cover"
         />
       ) : null}
@@ -141,9 +187,15 @@ export function BookCover({
           it. Only for covers that have a picture: a typeset face is already
           the text, and a second copy over it would just double up.
 
+          `bare` is honoured for the writer's own file and ignored on a default
+          jacket, because it means *the picture already has the words on it* —
+          which the seven never do. Left to apply to both, a book that had
+          artwork with its title on it, then had it removed, would sit on the
+          shelf as an untitled picture.
+
           The caption hides itself on covers too narrow to read it — see
           .book-face-caption. */}
-      {image && !bare ? (
+      {art && !(image && bare) ? (
         <div className="book-face-caption absolute inset-0 flex-col rounded-l-[3px] rounded-r-md">
           {/* No scrim over the artwork — it shows at full strength. The type
               carries its own legibility instead: a tight dark halo for edge
@@ -198,7 +250,11 @@ export function BookCover({
         />
       ) : null}
 
-      {image ? null : (
+      {/* The typeset cloth face, now the fallback rather than the usual state:
+          it is what a cover-less book shows when its jacket will not load. The
+          ink comes from the palette, which is the half that keeps it readable
+          on a light ground as well as a dark one. */}
+      {art ? null : (
         <div className="book-face-inner relative flex h-full flex-col">
           <h3
             // Clamped, so a long title wraps like a title and then stops rather

@@ -754,10 +754,17 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
                   </button>
                 )}
 
+                {/* **`image/*`, not a list of three types.** The picker
+                    used to name png/jpeg/webp, which greyed out a writer's own
+                    file for no reason they could see — a `.jfif` off a phone,
+                    an `.avif` off a design tool. `importImage` shrinks whatever
+                    it is handed and says plainly when a browser cannot decode
+                    it, so refusing files at the picker only hid the ones that
+                    would have worked. */}
                 <input
                   ref={coverInput}
                   type="file"
-                  accept="image/png,image/jpeg,image/webp"
+                  accept="image/*"
                   aria-label="Choose a cover image"
                   className="sr-only"
                   onChange={async (e) => {

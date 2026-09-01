@@ -392,10 +392,15 @@ export function CoverDialog({
           </button>
         )}
 
+        {/* **`image/*`, not a list of three types.** The picker used to
+            name png/jpeg/webp, which greyed out a writer's own file for no
+            reason they could see — a `.jfif` off a phone, an `.avif` off a
+            design tool. `importImage` shrinks whatever it is handed and says
+            plainly when a browser cannot decode it. */}
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp"
+          accept="image/*"
           aria-label="Choose a cover image"
           className="sr-only"
           onChange={async (e) => {

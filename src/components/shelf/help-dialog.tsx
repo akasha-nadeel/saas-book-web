@@ -47,7 +47,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Covers",
-        desc: "Add your own cover art, or edit the title, subtitle, and author printed on a typeset cover. Your artwork is kept at full size for your exports — upload it at 1600×2560 and that is exactly what goes into your EPUB — while a small copy is what the shelf draws. The full-size copy stays on this machine and is not synced, so if you sign in on another computer, upload the artwork again there before exporting.",
+        desc: "Add your own cover art, or edit the title, subtitle, and author printed over it. Until you do, a book wears one of seven default jackets with its own title on it — that is the shelf giving your book a face rather than a cover: it is never part of your exported file, and the pre-upload check goes on telling you the cover is still to come. Any size of picture is fine. Whatever you choose is resized and compressed here in your browser until it fits, so a 30MB photograph is taken rather than refused, and a photo off a phone comes out the right way up. Your artwork is kept at full size for your exports — upload it at 1600×2560 and that is exactly what goes into your EPUB — while a small copy is what the shelf draws. The full-size copy stays on this machine and is not synced, so if you sign in on another computer, upload the artwork again there before exporting.",
       },
     ],
   },

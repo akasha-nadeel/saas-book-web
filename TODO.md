@@ -1548,6 +1548,33 @@ Ranked. The first and third together are most of it.
       skipped the shared `ToolHeader` when the other fourteen took it. Decide
       whether it joins them or stays deliberately its own thing.
 
+- [x] **A default jacket for a book with no cover.** Done 2026-09-01. A
+      cover-less book wore a seeded grey cloth face with its title typeset on
+      it, and a shelf of them was eight shades of one idea — the opposite of
+      what a shelf is for, which is finding a book by its face across a room.
+      It now wears one of seven pictures from `public/default-covers/`, chosen
+      by book id in `src/lib/default-covers.ts`, with the title, subtitle and
+      author printed over it in the same treatment real artwork gets.
+
+      **A jacket is not a cover, and that is the load-bearing part.** Nothing is
+      written to the store, nothing syncs, and `hasCover()` goes on answering
+      false — so the dashboard keeps its "No cover" finding, `storeReadiness()`
+      goes on reporting what a shop would refuse, the export has no cover page,
+      and the cover dialog still reads "Choose image". That is the same rule as
+      the roadmap's "get a cover made" step a few hundred lines up: a
+      placeholder attached like a real cover would tick off the most expensive
+      step in the list on the strength of a picture nobody chose. **Do not
+      "fix" the finding that now looks wrong beside a good-looking card.**
+
+      Three details. `bare` — *the artwork already has the words on it* — is
+      honoured for the writer's own file and ignored on a jacket, or a book that
+      once had lettered artwork would sit on the shelf untitled. The seeded
+      palette stays as the ground under the picture and as the whole face again
+      if the file will not load, which is what keeps the white caption off a
+      pale grey box. And the fold that picks both moved into
+      `default-covers.ts`, pinned by a test, so lifting it out of
+      `coverPalette` could not quietly repaint every existing shelf.
+
 **Not checked, so not claimed.** Mobile at any width, keyboard and screen-reader
 flow, and whether the tool pages survive a narrow window. The dashboard rail is
 `hidden md:flex` with a `<select>` fallback that has never been looked at.
@@ -2691,6 +2718,41 @@ should either ship or lose the card.
       is now a much smaller gap — the wall is gigabytes away — but a writer with
       a genuinely full device still meets it for the first time at the moment of
       failure.
+
+- [x] **Any size of picture, brought under the budget rather than refused.**
+      Done 2026-09-01. `importImage` encoded once at a fixed quality and refused
+      whatever was still over the cap — *"Still 312KB after resizing — too large
+      to store in the browser. Try a smaller crop."* The cap was right; the
+      refusal was not. It handed a writer an image editor's job over a picture
+      that was usually two quality points from fitting, and there was no way
+      forward inside the app at all.
+
+      It now walks `encodeAttempts` (pure, tested): **quality first, pixels
+      second** — every quality down to 0.6 at the full size, then the size down
+      in 0.85 steps with the quality starting again from the top, stopping at
+      the first encode that fits. Quality before pixels because
+      over-compression blur reads worse at these sizes than a slightly smaller
+      picture; the restart because a smaller picture at 0.9 both weighs less and
+      looks better than a larger one at 0.6. **The budgets did not move** —
+      250KB for the synced thumbnail, 900KB inline — they are met by
+      construction now instead of being enforced against the writer. The refusal
+      survives at the bottom of both ladders, where no real photograph reaches
+      it.
+
+      Two things came with it. Decoding goes through `createImageBitmap` with
+      `imageOrientation: "from-image"`, which keeps a phone photograph upright
+      and lets a fifty-megapixel file be `close()`d the moment it has been
+      drawn rather than whenever the collector feels like it — the `<img>` path
+      stays underneath for browsers that refuse. And the **export** copy gained
+      a weight ceiling to match its edge one, `PRINT_MAX_BYTES` (4MB) beside
+      `PRINT_MAX_EDGE` (2560px) in `cover-save.ts`: a writer's own JPEG or PNG
+      inside both is still kept byte-for-byte, and the ladder only ever meets
+      the 25MB master that would otherwise sit inside somebody's EPUB as a
+      download a reader waits on.
+
+      The two cover pickers also stopped naming three media types and take
+      `image/*`, which is what let a `.jfif` off a phone through in the first
+      place.
 
 ## Editor
 
