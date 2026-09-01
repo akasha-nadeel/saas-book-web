@@ -4,6 +4,10 @@ import { Fragment, createContext, type ReactNode, useCallback, useContext, useEf
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
+import {
+  SectionBanner,
+  type SectionBannerProps,
+} from "@/components/shelf/section-banner";
 import { RailMark, useMarkHandle, type MarkName } from "@/components/editor/rail-mark";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
 import { CollabArea } from "@/components/collab/collab-area";
@@ -15,7 +19,7 @@ import { FeedbackDialog } from "@/components/shelf/feedback-dialog";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import { ConfirmDialog } from "@/components/ui/dialog";
 import { LoadingScreen } from "@/components/loading-screen";
-import { type Account } from "@/lib/account";
+import { displayName, firstNameOf, type Account } from "@/lib/account";
 import {
   archiveBook,
   bookChapterCount,
@@ -51,7 +55,11 @@ import {
 import { targetShare } from "@/lib/target";
 import { resumeChapter } from "@/lib/resume";
 import { ResumeCard } from "@/components/editor/resume-card";
-import { WritingPerformanceCard } from "@/components/shelf/writing-performance-card";
+import {
+  DaysOfWeekCard,
+  WordsByBookCard,
+  WritingPerformanceCard,
+} from "@/components/shelf/writing-performance-card";
 import { SearchDialog } from "@/components/shelf/search-dialog";
 import { BookThumb } from "@/components/shelf/book-thumb";
 import {
@@ -878,24 +886,54 @@ export function Bookshelf({
                 It stacks below `sm`, where the two halves will not sit side by
                 side without the title truncating to nothing. */}
             <div className="mt-6 mb-6 flex flex-col gap-4 border-b border-line pb-5 sm:mt-8 sm:flex-row sm:items-center sm:gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                {/* No glyph beside the title. The rail already names the area
-                    and lights the row the writer is on, so a second copy of
-                    the same icon two inches away labelled the same word
-                    twice. */}
-                <h1 className="min-w-0 truncate text-2xl font-extrabold text-fg">
-                  {area === "write" ? VIEW_LABEL[view] : meta.label}
-                </h1>
-                {!meta.live && <Badge>Not built yet</Badge>}
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex min-w-0 items-center gap-3">
+                  {/* No glyph beside the title. The rail already names the area
+                      and lights the row the writer is on, so a second copy of
+                      the same icon two inches away labelled the same word
+                      twice. */}
+                  {/* **Overview greets; the other five name themselves.**
+                      A dashboard opening with the word "Overview" tells the
+                      writer where they are, which the lit rail row already
+                      told them. It is the one area that is a *landing*, so it
+                      says hello and then says what is on the shelf. The rest
+                      are lists and reports, and a greeting on each of them
+                      would be five hellos in one session. */}
+                  <h1 className="min-w-0 truncate text-2xl font-extrabold text-fg">
+                    {area === "overview"
+                      ? `Hello ${firstNameOf(displayName(account))} !`
+                      : area === "write"
+                        ? VIEW_LABEL[view]
+                        : meta.label}
+                  </h1>
+                  {!meta.live && <Badge>Not built yet</Badge>}
 
-                {/* Only where there is no rail to hold them. The wordmark and
-                    the account both live in the sidebar from `md` up; below it
-                    this is the one way to reach sign-out, and dropping it
-                    would strand exactly the writers least able to work
-                    around it. */}
-                <div className="ml-auto flex items-center gap-2 md:hidden">
-                  <AccountMenu account={account} />
+                  {/* Only where there is no rail to hold them. The wordmark and
+                      the account both live in the sidebar from `md` up; below it
+                      this is the one way to reach sign-out, and dropping it
+                      would strand exactly the writers least able to work
+                      around it. */}
+                  <div className="ml-auto flex items-center gap-2 md:hidden">
+                    <AccountMenu account={account} />
+                  </div>
                 </div>
+
+                {/* **Counted, never flattering.** "You are doing great" is the
+                    invented verdict this app refuses everywhere else; what is
+                    here is the shelf, read off the same totals the cards below
+                    are drawn from. An empty shelf says so rather than reading
+                    "0 books · 0 chapters", which is a scoreboard nobody asked
+                    to be on. */}
+                {area === "overview" && (
+                  <p className="truncate font-sans text-sm text-muted">
+                    {active.length === 0
+                      ? "Nothing on the shelf yet — the first book starts here."
+                      : `Welcome back — ${plural(active.length, "book")}, ${plural(
+                          totals.chapters,
+                          "chapter",
+                        )} on the shelf.`}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-stretch sm:ml-auto">
@@ -976,15 +1014,23 @@ export function Bookshelf({
                    are lists a writer came to *manage*, and a card about the
                    book they are drafting is an interruption on all three. */
                 banner={
-                  view === "active" ? (
-                    <CurrentBookCard
-                      current={current}
-                      all={active}
-                      onDetails={setEditing}
-                      onCover={setCovering}
-                      onPrepare={showInPrepare}
-                    />
-                  ) : null
+                  <>
+                    {/* The list's own banner, then the book in hand. The card
+                        is only over the active list: it is about the
+                        manuscript being written, and above Archived or Trash
+                        it would be an interruption in a list somebody came to
+                        manage. */}
+                    <SectionBanner {...VIEW_BANNERS[view]} />
+                    {view === "active" ? (
+                      <CurrentBookCard
+                        current={current}
+                        all={active}
+                        onDetails={setEditing}
+                        onCover={setCovering}
+                        onPrepare={showInPrepare}
+                      />
+                    ) : null}
+                  </>
                 }
                 visible={visible}
                 view={view}
@@ -2047,21 +2093,46 @@ function Overview({
    * check in particular has to live beside the chart it suppresses.
    */
 
-  /**
-   * Whether the plan card is going to draw itself.
-   *
-   * The same three-part test `ProCard` makes — through `onFreePlan`, the one
-   * statement of it — read once here because two things depend on the answer:
-   * whether the row has a second column, and whether the card in the first one
-   * lays itself out as a banner. Kept while the plan is still *unknown*, which
-   * is the rule the limit gates follow: a free writer is the common case, so
-   * reserving the column means their card never moves once the answer lands,
-   * and a Pro writer sees it widen once.
-   */
-  const offering = plan.loading || onFreePlan(plan);
+  /* `offering` stood here and is gone with the row it shaped. It decided
+     whether the resume card shared a line with the plan card; the resume card
+     is in the rail now and the plan card has the main column's full width, so
+     neither has a shape that depends on the other. `ProCard`'s own guard is
+     unchanged and is still the one statement of the test. */
 
   return (
-    <div className="flex flex-col gap-5">
+    /* **Two columns from `xl`, and the rail is the second.**
+​
+       Below that they stack in source order — banner, counters, chart, books,
+       plan, then the rail's two cards — which is the order they are wanted in
+       on a phone as much as on a laptop. `minmax(0,1fr)` on the first track
+       rather than `1fr`: the chart inside it is a flex child that will
+       otherwise refuse to shrink and push the rail off the screen. */
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* **The first column stops at the chart, and that is what makes the two
+          bottoms meet.** It used to hold everything, so the rail shared a grid
+          row with the whole page and the only floor it could reach was the plan
+          card's — the rail ran out level with the counters and left a screen
+          and a half of empty column beside the chart.
+
+          No `items-start`: the row stretches, this column is the taller of the
+          two, and the rail grows to its floor. What is under the chart moves
+          into a third child that spans both tracks. */}
+      <div className="flex min-w-0 flex-col gap-4">
+        <SectionBanner
+          image="/overview-banner.jpg"
+          eyebrow="Write it, then leave with it"
+          title="Your book, in the shops&rsquo; own formats"
+          subtitle={overviewBannerLine()}
+          ink="dark"
+          action={{
+            /* Straight to the export wizard when there is a book to export,
+               and to the one screen that makes one when there is not. Both are
+               live under the launch flag — check `HIDDEN_BOOK_TOOL_PATHS`
+               before changing either. */
+            label: current ? "Export a book" : "Start a book",
+            href: current ? `/book/${current.id}/export` : "/book/new",
+          }}
+        />
       {/* ---- What is on the shelf ----------------------------------------
 
           Three cards rather than three rows in one panel. As rows they read as
@@ -2069,98 +2140,68 @@ function Overview({
           this kind opens with, and they are the only figures on this screen
           that are true of the whole library rather than of one manuscript. */}
       <div className="grid gap-4 sm:grid-cols-3">
-        {/* The tint matches the icon each card already carried, so the colour
-            names the count rather than merely decorating it.
+        {/* **A label and a number, and nothing else.**
 
-            Night is not the day's colour darkened — it is a near-black wash of
-            the hue with the border carrying the hue instead. That is what stops
-            three dark cards reading as three empty holes.
+            These carried a tinted ground, then a glyph in a coloured disc,
+            then a bar and a legend under it — three passes of adding, each
+            reasonable on its own, ending in a chart with a key on a card whose
+            whole job is to say how many books there are. The colour went
+            first, then the rest: what is left is the count and the word for
+            it, with air under them.
 
-            **The night values are stated rather than mixed from a Tailwind
-            shade**, and that changed on 2026-09-01 with the indigo ground. The
-            old `-950/40` was a *blend with whatever was underneath*, so all
-            three moved every time the ground did — and against a much darker
-            page they came out as three lit panels rather than as three washes.
-            A stated hex is one decision instead of three that drift; each is a
-            step below `surface` in its own hue, which is what the rest of the
-            night set does. */}
+            The three breakdowns and the pure module that counted them
+            (`shelf-stats.ts`, with its tests) were deleted rather than left
+            for a caller that no longer exists. */}
+        <Figure label={books === 1 ? "book" : "books"} value={books.toLocaleString()} />
+        <Figure label={nounFor(words, "word")} value={words.toLocaleString()} />
         <Figure
-          icon={shelfIcons.overview}
-          label={books === 1 ? "book" : "books"}
-          value={books.toLocaleString()}
-          cardBg="bg-blue-100 border-blue-200 dark:bg-[#0b1330] dark:border-[#1b2a5e]"
-          iconBg="bg-blue-200/70 dark:bg-blue-500/12"
-          iconColor="text-blue-700 dark:text-blue-400"
-        />
-        <Figure
-          icon={shelfIcons.write}
-          label={nounFor(words, "word")}
-          value={words.toLocaleString()}
-          cardBg="bg-emerald-100 border-emerald-200 dark:bg-[#05191a] dark:border-[#10403c]"
-          iconBg="bg-emerald-200/70 dark:bg-emerald-500/12"
-          iconColor="text-emerald-700 dark:text-emerald-400"
-        />
-        <Figure
-          icon={shelfIcons.prepare}
           label={nounFor(chapters, "chapter")}
           value={chapters.toLocaleString()}
-          cardBg="bg-orange-100 border-orange-200 dark:bg-[#1a1108] dark:border-[#4a2a10]"
-          iconBg="bg-orange-200/70 dark:bg-orange-500/12"
-          iconColor="text-orange-700 dark:text-orange-400"
         />
       </div>
 
-      {/* ---- The book, and the figures beside it --------------------------
+        <WritingPerformanceCard words={words} />
+      </div>
 
-          The book takes the wide column because it is what the screen is for:
-          a diagnosis, with the controls that answer it. The four counts are a
-          margin note and read as one — stacked in a single panel rather than
-          scattered as four cards, which is what they were, and which gave a
-          rounding error the same weight as the manuscript. */}
-      {/* ---- The week, the plan, and the target ---------------------------
+      {/* ---- The rail ----------------------------------------------------
 
-          Two columns of equal weight, which is the shape the reference uses
-          and the right one here now that the book has moved: what is left are
-          three cards about the *writer* rather than about one manuscript, and
-          none of them outranks the others enough to take the wide side.
+          A way back into the book, then the two lists that came out of the
+          writing card. They are a narrow `name → value` shape and were taking
+          half the wide column each; here they read better and they fill a
+          column that used to run out level with the counters.
 
-          The book card that stood on the left is at the top of Write, where a
-          card about one book belongs among the books. */}
-      {/* No `items-start`: the two columns run to the same floor, which is
-          what the reference does and what stops a short card leaving a step
-          across the middle of the screen. The week card is the one that
-          stretches — its chart has somewhere to grow into, where the dial and
-          the plan card are the size they are. */}
-      <div className="grid gap-5">
-        <WritingPerformanceCard books={bookList} words={words} />
+          What is *not* here is worth writing down, because both were the
+          obvious fills and both are unusable: the roadmap's next steps and the
+          book's readiness findings. Every destination either would offer —
+          comps, covers, listing, the roadmap itself — is in
+          `HIDDEN_BOOK_TOOL_PATHS` and redirects home. See the note in the Write
+          hero, which is where the readiness panel was taken off this screen for
+          exactly that reason: a finding nobody can act on is worse than none.
 
-        {/* **The writer's own work on the left, the offer on the right — and
-            the whole width once there is no offer.**
+          A "Jump into a chapter" card stood in the second slot for a day. It
+          went because it was nearly empty until a book had chapters in it —
+          a card whose usual state is one row and a rule. */}
+      <div className="flex min-w-0 flex-col gap-4">
+        <ResumeSlot book={current} wide={false} />
+        {/* The one that grows. Between a resume card and seven weekdays, both
+            of which are the size they are, this is the card with a list in it
+            — so it takes the difference and scrolls rather than the column
+            ending short of the chart beside it. */}
+        <WordsByBookCard books={bookList} className="xl:min-h-0 xl:flex-1" />
+        <DaysOfWeekCard />
+      </div>
 
-            The dial that stood here is on the book card in Write, where the
-            book it counts is. What takes its place is the one thing this
-            screen had no answer for once the dial left: a way back into the
-            manuscript.
+      {/* ---- Under both columns ------------------------------------------
 
-            `ProCard` draws nothing for somebody already paying, and a two
-            column grid with one child in it left a Pro writer looking at a
-            half card beside a hole. So the *row* asks the same question the
-            card asks itself — through `onFreePlan`, which is the one statement
-            of it — and drops to a single column when there is nothing to put
-            in the second.
-
-            **The slot is kept while the plan is still unknown**, which is the
-            same rule the limit gates follow one screen over: `usePlan()` starts
-            at UNKNOWN, and a free writer is the common case, so reserving the
-            column means their card never moves once the answer lands. A Pro
-            writer sees it widen once, which is the cheaper of the two jumps. */}
-        <div className={`grid gap-5 ${offering ? "lg:grid-cols-2" : ""}`}>
-          <ResumeSlot book={current} wide={!offering} />
-          {/* Its own guard stays: this decides the *shape of the row*, and a
-              card that draws itself only when it should is what makes a
-              disagreement between the two harmless. */}
-          <ProCard plan={plan} />
-        </div>
+          The shelf and the offer run the full width. They were in the first
+          column, which left them beside an empty rail — and neither is a
+          margin note: the strip is every book the writer has. */}
+      <div className="flex min-w-0 flex-col gap-4 xl:col-span-2">
+        <BookStrip books={bookList} />
+        {/* It draws nothing at all for somebody already paying — its own
+            guard, unchanged — and a card that removes itself is why nothing
+            here has to ask whether it is going to. */}
+        <ProCard plan={plan} />
       </div>
 
 
@@ -2192,6 +2233,99 @@ function Overview({
     </div>
   );
 }
+
+/**
+ * The shelf, in the one place that is not the shelf.
+ *
+ * The reference this screen follows puts a row of what you are working on
+ * under the chart, with a way through to the full list. This is that row: the
+ * jackets, and **View all** into Write, which is where a book is managed.
+ *
+ * **One link per book, and the chip is inside it.** The Write grid's jacket
+ * carries two controls that do two different things, so those are buttons over
+ * the cover. Here there is one destination — open the book — so a second
+ * anchor pointing at the same URL would be a duplicate tab stop and a second
+ * thing for a screen reader to announce. The chip is a `span` inside the one
+ * link, `aria-hidden`, which is what makes it a hover *state* rather than a
+ * second control.
+ */
+function BookStrip({ books }: { books: Book[] }) {
+  /* Nothing rather than an empty row under a heading. The greeting above
+     already says the shelf is empty, and the banner's button already offers
+     the one thing to do about it. */
+  if (books.length === 0) return null;
+
+  /* Enough to fill the row at the widths this column takes, and no more — the
+     full list is one press away and is the screen built for it. Eight, not six,
+     since these are the shelf's *small* jackets and eight fit across a wide
+     screen. */
+  const shown = books.slice(0, 8);
+
+  return (
+    <section>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="min-w-0 truncate text-base font-bold text-fg">
+          Your books
+          <span className="ml-2 font-sans text-sm font-medium text-muted tabular-nums">
+            {books.length}
+          </span>
+        </h2>
+        {/* Always, not only when the row is cut short. It is the way to the
+            screen that *manages* books — select, archive, restore, the ⋯ menu
+            — none of which this row offers however many jackets fit in it. */}
+        <Link
+          href="/?area=write"
+          className="shrink-0 font-sans text-sm font-semibold text-accent
+                     outline-none hover:underline focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          View all →
+        </Link>
+      </div>
+
+      {/* **The shelf's own "Small covers" class, not a second set of column
+          counts.** `gridClassFor` spells every mode out in full — a class
+          assembled at runtime is generated by nothing and silently dropped —
+          and borrowing it means this strip and the shelf cannot disagree about
+          what small means. */}
+      <ul className={gridClassFor("small")}>
+        {shown.map((book) => (
+          <li key={book.id} className="group relative">
+            <Link
+              href={`/book/${book.id}`}
+              aria-label={book.title}
+              className="block rounded-lg outline-none focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+            >
+              <CoverOf book={book} />
+
+              {/* The same overlay the Write grid draws, at the same inset and
+                  on the same aspect box — the two screens must not disagree
+                  about what a book looks like under the pointer. */}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-x-0 top-0 flex
+                           aspect-[2/3] items-end p-2 opacity-0
+                           transition-opacity duration-150
+                           group-hover:opacity-100 group-focus-visible:opacity-100"
+              >
+                <span
+                  className="flex w-full items-center justify-center gap-1.5
+                             rounded-lg bg-accent px-2 py-1.5 text-xs
+                             font-semibold text-accent-ink shadow-lg"
+                >
+                  {shelfIcons.write}
+                  Write
+                </span>
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 
 // `CoverShelf` is gone. Two rows of covers stood between the band and the book
 // for an afternoon, and they pushed the diagnosis — the thing this screen is
@@ -2587,7 +2721,9 @@ function ResumeSlot({
   if (resumeChapter(book)) return <ResumeCard book={book} wide={wide} />;
 
   return (
-    /* `rounded-lg` and `sm:min-h-52` to match `ProCard` beside it, and the same
+    /* `rounded-lg` and `sm:min-h-64` to match the banner above it — see the
+       note on the written card in `resume-card.tsx`, whose floor this follows
+       so the two states stay indistinguishable. The rest is the same
        row-when-wide treatment — see the notes on the written card in
        `resume-card.tsx`. The two states of this card are held to one another;
        a writer should not be able to tell which one they are looking at from
@@ -2595,7 +2731,7 @@ function ResumeSlot({
     <section
       className={`relative isolate flex flex-col overflow-hidden rounded-lg
                   border border-white/15 bg-panel p-5 text-white shadow-sm
-                  sm:min-h-52 ${wide ? "" : "justify-center"}`}
+                  sm:min-h-64 ${wide ? "" : "justify-center"}`}
     >
       <div
         aria-hidden
@@ -2603,7 +2739,10 @@ function ResumeSlot({
         style={{
           backgroundImage: "url('/resume-card-background.jpg')",
           /* The same crop as the written card — see the note there. */
-          backgroundPosition: "center 78%",
+          /* Held right of centre, which slides the figure left in the frame.
+             `cover` on a card this shape crops the sides, so the X is the pan.
+             The written card in `resume-card.tsx` carries the same pair. */
+          backgroundPosition: "70% 78%",
         }}
       />
       <div
@@ -2632,11 +2771,14 @@ function ResumeSlot({
         writing rather than with remembering.
       </p>
 
+      {/* The written card's own button — see the note in `resume-card.tsx`.
+          The two states of this card are deliberately indistinguishable in
+          shape, so a change to one is a change to both. */}
       <Link
         href={`/book/${book.id}`}
-        className={`rounded-lg bg-white px-5 py-2.5 text-sm font-semibold
-                   text-neutral-950 shadow-sm outline-none transition
-                   hover:bg-white/90 focus-visible:ring-2
+        className={`rounded-lg bg-neutral-950 px-5 py-2.5 text-sm font-semibold
+                   text-white shadow-sm outline-none transition
+                   hover:bg-neutral-950/90 focus-visible:ring-2
                    focus-visible:ring-white/70 ${
                      wide ? "mt-auto self-end" : "mt-4 self-start"
                    }`}
@@ -2775,41 +2917,13 @@ function ProCard({ plan }: { plan: PlanState }) {
  * ground, border, icon, label and value. A dark ground with the day's
  * near-black type on it is the failure this shape invites.
  */
-function Figure({
-  icon,
-  label,
-  value,
-  cardBg = "bg-panel border-line",
-  iconColor = "text-fg",
-  iconBg = "bg-black/5 dark:bg-white/10",
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-  cardBg?: string;
-  iconColor?: string;
-  /**
-   * The disc behind the icon.
-   *
-   * A wash of the card's own hue rather than a grey, so it reads as part of
-   * the card instead of a plate set on it — and stated per theme like
-   * everything else here, because a 10% white disc is invisible on a pale
-   * ground and a 5% black one is invisible on a dark one.
-   */
-  iconBg?: string;
-}) {
+function Figure({ label, value }: { label: string; value: string }) {
   return (
     /* A `<dl>` per card, not one list split across three. Each of these is a
        single name and its value, and a description list with one pair in it is
        exactly that — where three cards sharing one `<dl>` would tell a screen
        reader they were three parts of one thing. */
-    <dl
-      className={`flex min-h-28 gap-4 rounded-[8px] border px-6 py-6 sm:min-h-32 sm:py-7 ${cardBg}`}
-    >
-      {/* The label above the number, left-aligned, with the icon out of the
-          way in the corner. Side by side the icon read as the subject of the
-          card and the words as a caption on it; stacked, the eye lands on the
-          count, which is the thing the card is for. */}
+    <dl className="flex min-h-28 flex-col justify-center rounded-lg border border-line px-5 py-5 sm:min-h-32">
       <div className="flex min-w-0 flex-1 flex-col justify-center">
         {/* `capitalize`, not `uppercase`. The label is stored lowercase and
             pluralised by `nounFor`, so the case is set here — and setting it in
@@ -2823,14 +2937,6 @@ function Figure({
           {value}
         </dd>
       </div>
-      {/* `h-11 w-11` against the icon's own `h-[22px]`, so the glyph sits in
-          the disc with a ring of ground around it rather than filling it.
-          `self-start` pins it to the top corner however tall the card grows. */}
-      <span
-        className={`flex h-11 w-11 shrink-0 self-start items-center justify-center rounded-full [&>svg]:h-[22px] [&>svg]:w-[22px] [&>svg]:stroke-[2] ${iconBg} ${iconColor}`}
-      >
-        {icon}
-      </span>
     </dl>
   );
 }
@@ -3093,6 +3199,100 @@ function FixLink({
 // `lib/target.ts`, where they are tested and where `TargetGauge` reads them.
 // The bar had one caller — the book card on this screen — and the gauge in the
 // column beside it replaced that. The Progress tool draws its own.
+
+/* --------------------------------------------------------------------------
+   The banner over each list.
+
+   One row per view, so a sixth list is an entry here rather than a component.
+   Two things in each row are measurements rather than taste:
+
+   **`ink` is read off the picture, not off the theme.** A photograph is the
+   same picture by day and by night, so the type on it cannot invert. Each was
+   sampled across the region the words sit on:
+
+     write       mean L 0.089, brightest 0.102  -> white at 6.9:1 worst
+     archived    mean L 0.382, darkest   0.260  -> black at 5.4:1 worst
+     favourite   mean L 0.824, darkest   0.511  -> black at 9.8:1 worst
+     trashed     mean L 0.059, brightest 0.202  -> white at 4.2:1 worst
+
+   **`scrim` is on for exactly one of them**, and the table above says why: the
+   trash picture is comfortable at 9.6:1 on average but has a bright passage
+   where white falls to 4.17:1, just under the line. The other three clear it
+   everywhere, so they show as they are — a scrim on a picture that does not
+   need one is only a dimmer picture.
+   -------------------------------------------------------------------------- */
+/**
+ * The export formats, counted rather than typed.
+ *
+ * `LAUNCH_LIMITS.freeExports` is the list the product actually sells, so a
+ * format added or taken away cannot leave the banner making a claim nothing
+ * backs — the same rule the landing page follows for every figure on it.
+ */
+const FORMAT_NAMES: Record<string, string> = {
+  epub: "EPUB",
+  pdf: "PDF",
+  docx: "Word",
+};
+
+function overviewBannerLine(): string {
+  const names = LAUNCH_LIMITS.freeExports.map((f) => FORMAT_NAMES[f] ?? f);
+  const list =
+    names.length <= 1
+      ? (names[0] ?? "")
+      : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `${list} — free on both plans, and the file is yours.`;
+}
+
+const VIEW_BANNERS: Record<ShelfView, SectionBannerProps> = {
+  active: {
+    image: "/write-banner.jpg",
+    title: "The books you're writing",
+    subtitle: "Open one to carry on, or start another.",
+    ink: "light",
+    /* Held low, because `cover` on a band this wide shows a 64% slice of a 16:9
+       picture and the middle of it is the empty half. Scanning each image row
+       by row for detail put this one's subject — the sill, the cat, the house —
+       at 77% of its height, so the window is dropped to take 26–90% rather
+       than 18–82%. The same reading set the other two. */
+    crop: "center 72%",
+  },
+  favourite: {
+    image: "/favourites-banner.jpg",
+    title: "The ones you keep going back to",
+    /* Favouriting is a filter and not a move — the book is still on the shelf
+       either way — and the sentence says so rather than implying a second
+       place books can live. */
+    subtitle:
+      "Every book you have starred. They are still on your shelf; this is the short list.",
+    ink: "dark",
+    /* Her head and shoulders run from about 68% to 90% of the frame. */
+    crop: "center 88%",
+  },
+  archived: {
+    image: "/archived-banner.jpg",
+    title: "Put away, still yours",
+    /* Deliberately not "frees up a slot". The free book limit has counted
+       everything but the trash since 2026-08-26, so archiving does not make
+       room and unarchiving is never gated — see `booksAgainstPlan`. */
+    subtitle:
+      "An archived book keeps every chapter and every word. Bring it back whenever you want it.",
+    ink: "dark",
+  },
+  trashed: {
+    image: "/trash-banner.jpg",
+    title: "Nothing here is gone yet",
+    /* Deliberately not "restore one whenever you like": restoring *from the
+       trash* is still gated on the free plan when the shelf is full. */
+    subtitle:
+      "A book in the trash keeps every chapter until you delete it for good.",
+    ink: "light",
+    /* Everything in this one is in the bottom third — the top 60% is empty sky,
+       which is also why it reads at 9.6:1 on average and needs the scrim only
+       where the stars brighten. */
+    crop: "center bottom",
+    scrim: true,
+  },
+};
 
 function Write({
   banner,
@@ -4966,7 +5166,7 @@ function HeaderMark({
       onPointerLeave={handle.onLeave}
       onFocus={handle.onEnter}
       onBlur={handle.onLeave}
-      className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer dark:text-accent"
+      className="group flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-raised hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/50 cursor-pointer"
     >
       <RailMark mark={mark} markRef={handle.ref} size={18} />
     </button>
@@ -5046,18 +5246,18 @@ function SideItem({
       : "text-fg/80 hover:bg-raised/70 hover:text-fg"
   }`;
 
-  /* **The glyphs take the accent at night, and only at night.** On the navy
-     rail every row is white type on one ground and the icons were the only
-     thing that could differentiate them without adding a second weight; by
-     day the rail is white and blue glyphs on it read as fifteen links.
-​
+  /* The glyph takes the row's own colour rather than a tint of its own — near
+     white on the dark rail, near black on the light one, and full white on the
+     selected row. It wore the accent for a while, which made the rail a column
+     of blue marks.
+
      The motion is `RailMark`'s own — one rail should not answer differently
      from the other about what a glyph does under the pointer — and it stands
      down for a writer who has asked their machine for less of it. */
   const glyph =
     `flex shrink-0 items-center justify-center transition-transform duration-150 ` +
     `ease-out group-hover:scale-[1.12] motion-reduce:transition-none ` +
-    `motion-reduce:group-hover:scale-100 dark:text-accent`;
+    `motion-reduce:group-hover:scale-100`;
 
   const body = (
     <>

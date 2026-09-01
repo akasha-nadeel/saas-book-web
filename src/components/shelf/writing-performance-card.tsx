@@ -17,6 +17,7 @@ import {
   pace,
   runningTotal,
 } from "@/lib/activity";
+import { BookThumb } from "@/components/shelf/book-thumb";
 import { bookWordCount, type Book } from "@/lib/library-store";
 import { plural } from "@/lib/plural";
 import { useActivity } from "@/lib/use-library";
@@ -36,8 +37,17 @@ import { useActivity } from "@/lib/use-library";
  * `tremor.tsx` had to stop clamping its floor to zero before it could.
  *
  * **Facts, never verdicts.** No score, no grade, no "you should write more".
- * The two figures and the two lists are counts, and a bad month is reported in
- * the same voice as a good one.
+ * The figures here are counts, and a bad month is reported in the same voice
+ * as a good one.
+ *
+ * **The two lists moved into Overview's rail on 2026-09-01** and are exported
+ * from this file — `WordsByBookCard` and `DaysOfWeekCard`, at the foot. They
+ * are a narrow `name → value` shape and were taking half the wide column each;
+ * in a 20rem rail they read better and they fill a column that ran out two
+ * cards in. They stayed *here* rather than moving to their own file because
+ * `WINDOW_DAYS`, `format` and `signed` are theirs as much as this card's, and a
+ * second copy of any of them is how two screens start disagreeing about what
+ * thirty days means.
  *
  * **A shelf with nothing on it still gets the whole card.** It drew a single
  * explanatory paragraph in place of the chart until 2026-08-31, on the reading
@@ -55,8 +65,9 @@ import { useActivity } from "@/lib/use-library";
 
 const WINDOW_DAYS = 30;
 
-/** Top five, because a sixth row is a list rather than a ranking. */
-const TOP_BOOKS = 5;
+/* `TOP_BOOKS = 5` stood here — "a sixth row is a list rather than a ranking".
+   It went with the move into the rail, where the card is tall and scrolls; see
+   the note in `WordsByBookCard`. */
 
 const format = (n: number) => Intl.NumberFormat("us").format(n);
 
@@ -72,11 +83,12 @@ function signed(n: number): string {
   return format(n);
 }
 
+/* `books` came off this card's props when `byBook` left it: the chart is drawn
+   from the day log and the shelf's own total, and nothing above needs to hand
+   it the library any more. `WordsByBookCard` takes it instead. */
 export function WritingPerformanceCard({
-  books,
   words,
 }: {
-  books: Book[];
   /** The shelf's own total, so this card and the tiles above it agree. */
   words: number;
 }) {
@@ -124,26 +136,6 @@ export function WritingPerformanceCard({
     }
     return written.map((d) => ({ date: d.date, Manuscript: words }));
   }, [activity, words, written]);
-
-  const weekdays = useMemo(() => byWeekday(activity, WINDOW_DAYS), [activity]);
-
-  /**
-   * Where the words live.
-   *
-   * Current size per book rather than the window's change, because the day log
-   * is kept across the whole shelf and cannot be split by book — see the note
-   * on `Activity` in `activity.ts`. So this answers "which manuscript is the
-   * big one", which is a different and still useful question.
-   */
-  const byBook = useMemo(
-    () =>
-      books
-        .map((book) => ({ name: book.title, value: bookWordCount(book) }))
-        .filter((b) => b.value > 0)
-        .sort((a, b) => b.value - a.value)
-        .slice(0, TOP_BOOKS),
-    [books],
-  );
 
   const tabs = [
     {
@@ -263,43 +255,112 @@ export function WritingPerformanceCard({
           </TabPanels>
         </Card>
 
-        {/* Below the tabs rather than inside a panel: neither list changes
-            with the tab — one is the shelf as it stands, the other is the
-            window — and two identical panels that redraw on a press would
-            promise a change that never comes. */}
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <Card>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="min-w-0 truncate text-sm font-semibold text-fg">
-                Words by book
-              </p>
-              <span className="shrink-0 text-xs font-medium text-muted">
-                Now
-              </span>
-            </div>
-            {byBook.length > 0 ? (
-              <BarList data={byBook} valueFormatter={format} />
-            ) : (
-              <p className="text-sm text-muted">No words on the shelf yet.</p>
-            )}
-          </Card>
-
-          <Card>
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <p className="min-w-0 truncate text-sm font-semibold text-fg">
-                Days of the week
-              </p>
-              <span className="shrink-0 text-xs font-medium text-muted">
-                {WINDOW_DAYS} days
-              </span>
-            </div>
-            {/* Which day you actually write on is a thing you cannot see
-                from the inside. A weekday that comes out negative is left
-                negative — it reads as "that is when I cut". */}
-            <BarList data={weekdays} valueFormatter={signed} />
-          </Card>
-        </div>
       </TabGroup>
     </div>
+  );
+}
+
+/**
+ * Which manuscript is the big one.
+ *
+ * **Current size per book, not the window's change** — the day log is kept
+ * across the whole shelf and cannot be split by book, see the note on
+ * `Activity` in `activity.ts`. That is what the "Now" badge is saying, and it
+ * is why this card can sit beside a thirty-day chart without the two being
+ * read as the same measure.
+ *
+ * **Each book wears its own cover**, through `BookThumb` — the same component
+ * the search results and the ⋯ menus use, which mounts the same `BookCover`
+ * the shelf draws. A book's face is the same picture everywhere it appears,
+ * jacket and all, rather than a second idea of one per screen.
+ *
+ * Neither this nor `DaysOfWeekCard` changes with the chart's tab, which is why
+ * they are cards of their own rather than panels inside it: two panels that
+ * redraw on a press promise a change that never comes.
+ */
+export function WordsByBookCard({
+  books,
+  className = "",
+}: {
+  books: Book[];
+  /** Overview passes the grow, so this card fills the rail. */
+  className?: string;
+}) {
+  /* **Every book, not the top five.** `TOP_BOOKS` capped this at five with the
+     note that "a sixth row is a list rather than a ranking" — right for the
+     short card this used to be at the foot of the chart, and the reason it
+     could never need a scrollbar. In a rail-height card that scrolls, the cap
+     is the thing that would leave a writer's sixth book off their dashboard
+     with no way to see it, so the ranking becomes a list on purpose. */
+  const byBook = useMemo(
+    () =>
+      books
+        .map((book) => ({
+          name: book.title,
+          value: bookWordCount(book),
+          leading: (
+            <BookThumb
+              book={book}
+              width="w-5"
+              /* Tighter than the shelf's. `rounded-r-md` is 6px, which on a
+                 20px jacket is a lozenge rather than a book. */
+              radius="rounded-l-[1px] rounded-r-[3px]"
+            />
+          ),
+        }))
+        .filter((b) => b.value > 0)
+        .sort((a, b) => b.value - a.value),
+    [books],
+  );
+
+  return (
+    /* A flex column so the list, and not the card, is what scrolls: the header
+       stays put and the rows move under it. */
+    <Card padding="sm" className={`flex flex-col ${className}`}>
+      <div className="mb-4 flex shrink-0 items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-sm font-semibold text-fg">
+          Words by book
+        </p>
+        <span className="shrink-0 text-xs font-medium text-muted">Now</span>
+      </div>
+      {byBook.length > 0 ? (
+        /* `min-h-0` is what lets a flex child be *shorter* than its content —
+           without it the list sets the card's height and the scrollbar never
+           appears. `scroll-slim` is the thin bar the sidebar already uses. */
+        <div className="scroll-slim min-h-0 flex-1 overflow-y-auto">
+          <BarList data={byBook} valueFormatter={format} />
+        </div>
+      ) : (
+        <p className="text-sm text-muted">No words on the shelf yet.</p>
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Which day you actually write on — a thing you cannot see from the inside.
+ *
+ * Reads the day log itself rather than being handed it: it is the only thing
+ * this card needs, and a prop threaded from Overview would make the shelf
+ * responsible for a number it does not otherwise touch.
+ */
+export function DaysOfWeekCard() {
+  const activity = useActivity();
+  const weekdays = useMemo(() => byWeekday(activity, WINDOW_DAYS), [activity]);
+
+  return (
+    <Card padding="sm">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <p className="min-w-0 truncate text-sm font-semibold text-fg">
+          Days of the week
+        </p>
+        <span className="shrink-0 text-xs font-medium text-muted">
+          {WINDOW_DAYS} days
+        </span>
+      </div>
+      {/* A weekday that comes out negative is left negative — it reads as
+          "that is when I cut". */}
+      <BarList data={weekdays} valueFormatter={signed} />
+    </Card>
   );
 }

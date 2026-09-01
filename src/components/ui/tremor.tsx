@@ -12,15 +12,31 @@ export function classNames(
    Card Component
    -------------------------------------------------------------------------- */
 
+const CARD_PADDING = { md: "p-6", sm: "p-4", none: "p-0" } as const;
+
+/**
+ * `padding` is a prop rather than something a caller adds to `className`, and
+ * that is a bug fix rather than a nicety.
+ *
+ * `classNames` below is a plain join — no Tailwind merge — so `<Card
+ * className="p-4">` rendered `… p-6 … p-4` and left the cascade to pick. It
+ * picked `p-6`: the card measured 24px when it had been asked for 16, silently,
+ * on every caller that tried. Selecting the class here means there is only ever
+ * one padding utility on the element and nothing to lose a fight to.
+ */
 export function Card({
   className,
+  padding = "md",
   children,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  padding?: keyof typeof CARD_PADDING;
+}) {
   return (
     <div
       className={classNames(
-        "rounded-lg border border-line bg-panel p-6 transition-colors",
+        "rounded-lg border border-line bg-panel transition-colors",
+        CARD_PADDING[padding],
         className
       )}
       {...props}
@@ -180,6 +196,16 @@ export interface BarListItem {
   name: string;
   value: number;
   icon?: React.ComponentType<{ className?: string }>;
+  /**
+   * Anything to draw before the name, sized by the caller.
+   *
+   * `icon` above is a component rendered at `h-4 w-4`, which is right for a
+   * glyph and wrong for the one thing this list had to show: a book's cover,
+   * which is 2:3 and would be squashed into a square. A node rather than a
+   * second component type, because the caller already has the element — see
+   * `WordsByBookCard`, which hands it a `BookThumb`.
+   */
+  leading?: React.ReactNode;
   href?: string;
   target?: string;
 }
@@ -224,9 +250,11 @@ export function BarList({
 
             {/* Item Content */}
             <div className="relative z-10 flex min-w-0 items-center gap-2.5 py-2 pl-3 pr-4">
-              {Icon && (
+              {item.leading ? (
+                item.leading
+              ) : Icon ? (
                 <Icon className="h-4 w-4 shrink-0 text-muted transition-colors group-hover:text-fg" />
-              )}
+              ) : null}
               <span className="truncate font-medium text-fg">{item.name}</span>
             </div>
 

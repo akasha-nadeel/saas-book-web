@@ -25,9 +25,12 @@ export function BookThumb({
   book,
   /** Tailwind width class. The cover is 2:3, so height follows from it. */
   width = "w-8",
+  radius,
 }: {
   book: Book;
   width?: string;
+  /** Passed straight to `BookCover` — see the note on its own `radius`. */
+  radius?: string;
 }) {
   const cover = useCover(book.id);
   return (
@@ -41,6 +44,7 @@ export function BookThumb({
         bare={book.bareCover}
         seed={book.id}
         pageBlock={false}
+        radius={radius}
       />
     </span>
   );

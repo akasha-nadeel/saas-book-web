@@ -103,7 +103,15 @@ export function ResumeCard({
        side by side in the same row on Overview, and two radii on one row read
        as two components borrowed from different places. */
     <section
-      /* `sm:min-h-52` is `ProCard`'s own floor, not a number picked to look
+      /* **`sm:min-h-64` is the banner's floor, so the two cards at the top of
+         Overview are the same height.** It was `sm:min-h-52`, which was
+         `ProCard`'s own floor — right while these two shared a row, and 30px
+         short of the banner once this card moved into the rail beside it. The
+         written card's prose is a `tail()`-clamped excerpt, so it does not
+         outgrow the floor and the two stay level.
+​
+         The old note, still true of why a floor exists at all: it is not a
+         number picked to look
          right: the two share a row, the grid stretches them to match, and
          spanning the width must not make this one shorter than it is when the
          banner is beside it.
@@ -116,7 +124,7 @@ export function ResumeCard({
          `justify-*` here, since an auto margin takes the free space first. */
       className={`relative isolate flex flex-col overflow-hidden rounded-lg
                   border border-white/15 bg-panel p-5 text-white shadow-sm
-                  sm:min-h-52 ${wide ? "" : "justify-center"}`}
+                  sm:min-h-64 ${wide ? "" : "justify-center"}`}
     >
       <div
         aria-hidden
@@ -129,7 +137,9 @@ export function ResumeCard({
              this short crops a band out of the middle, and at 48% that band
              stopped at the top of his head. Down here the whole of him lands
              inside it, with a little floor left under his feet. */
-          backgroundPosition: "center 78%",
+          /* Held right of centre, which slides the figure left in the frame:
+             `cover` on a card this shape crops the sides, so the X is the pan. */
+          backgroundPosition: "70% 78%",
         }}
       />
       <div
@@ -202,9 +212,12 @@ export function ResumeCard({
           puts it on the floor rather than directly under the prose. `self-start`
           in the narrow layout does the same job in reverse — without it the
           button would run the full width of the column. */}
+      {/* Dark in both themes, at the owner's request. The card is a
+          photograph and does not follow the theme, so this pill is read by its
+          own edge and its label rather than by contrast with the picture. */}
       <Link
         href={`/book/${book.id}/chapter/${chapter.id}`}
-        className={`rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-neutral-950 shadow-sm outline-none transition hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/70 ${
+        className={`rounded-lg bg-neutral-950 px-5 py-2.5 text-sm font-semibold text-white shadow-sm outline-none transition hover:bg-neutral-950/90 focus-visible:ring-2 focus-visible:ring-white/70 ${
           wide ? "mt-auto self-end" : "mt-4 self-start"
         }`}
       >

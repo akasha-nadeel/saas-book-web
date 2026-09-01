@@ -95,6 +95,7 @@ export function BookCover({
   bare,
   seed,
   pageBlock = true,
+  radius = "rounded-l-[3px] rounded-r-md",
 }: {
   title: string;
   subtitle?: string;
@@ -115,6 +116,16 @@ export function BookCover({
    *  a cover-less book wears. Falls back to the title when a book has no id
    *  yet. */
   seed?: string;
+  /**
+   * The corner, as the class pair it is drawn with.
+   *
+   * A jacket's rounding is proportional to nothing — it is a fixed few pixels,
+   * which reads as a book at card size and as a lozenge at 20px. So the row
+   * thumbs pass a tighter pair. A class string rather than a size token because
+   * `BookThumb` already takes its `width` that way, and one convention in a
+   * component beats two.
+   */
+  radius?: string;
   /**
    * Draw the page block down the right edge. On by default, because on a shelf
    * it is what gives a book thickness.
@@ -147,7 +158,7 @@ export function BookCover({
 
   return (
     <div
-      className={`book-face relative aspect-[2/3] w-full rounded-l-[3px] rounded-r-md
+      className={`book-face relative aspect-[2/3] w-full ${radius}
                  ${BOOK_SHADOW}
                  transition-[transform,box-shadow] duration-200
                  group-hover:-translate-y-1.5
@@ -178,7 +189,7 @@ export function BookCover({
           loading={jacket ? "lazy" : undefined}
           decoding="async"
           onError={jacket ? () => setJacketGone(true) : undefined}
-          className="absolute inset-0 h-full w-full rounded-l-[3px] rounded-r-md object-cover"
+          className={`absolute inset-0 h-full w-full object-cover ${radius}`}
         />
       ) : null}
 
@@ -196,7 +207,7 @@ export function BookCover({
           The caption hides itself on covers too narrow to read it — see
           .book-face-caption. */}
       {art && !(image && bare) ? (
-        <div className="book-face-caption absolute inset-0 flex-col rounded-l-[3px] rounded-r-md">
+        <div className={`book-face-caption absolute inset-0 flex-col ${radius}`}>
           {/* No scrim over the artwork — it shows at full strength. The type
               carries its own legibility instead: a tight dark halo for edge
               definition plus a soft spread for contrast, so white words hold

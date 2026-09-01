@@ -86,10 +86,10 @@
      does: the page is the lightest surface and every card, panel and rail is
      a darker well cut into it. `raised` still lifts, because a hover has to
      come *towards* the pointer whichever way the rest of the stack runs. */
-  --color-surface: #141b34; /* the page — the desk everything sits on */
-  --color-panel: #080e26; /* cards, sidebars, the content well */
-  --color-raised: #212c4f; /* hover, inputs, pressed states */
-  --color-line: #29335a; /* hairlines and dividers */
+  --color-surface: #13171e; /* the page — the desk everything sits on */
+  --color-panel: #070a11; /* cards, sidebars, the content well */
+  --color-raised: #1e252e; /* hover, inputs, pressed states */
+  --color-line: #262c38; /* hairlines and dividers */
 
   --color-fg: #f1f2fa; /* body text — near-white, not a hard white */
   --color-muted: #bcc5de; /* labels, metadata, anything secondary */
@@ -114,7 +114,7 @@
      top of the range. See the light block, which carries the brand indigo. */
   --color-accent: #8ab4ff; /* actions: New book, Send, chosen menu rows — 5.0:1 as text */
   --color-accent-strong: #a3c4ff; /* its hover — brightens */
-  --color-accent-deep: #101a3a; /* selected nav: the open chapter, active tab */
+  --color-accent-deep: #0f141d; /* selected nav: the open chapter, active tab */
 
   /* The ink that sits on a filled action. Near-black navy, because the fill is
      bright — this is the token to reach for instead of `text-white` on any
@@ -343,12 +343,12 @@
      button you should press, and these only say "you are here". Mixed from the
      accent rather than from white now that there is a hue to spend — a white
      wash on navy greys the ground it sits on. */
-  --color-selected: color-mix(in srgb, #02040f 62%, transparent);
+  --color-selected: color-mix(in srgb, #030507 62%, transparent);
   --color-selected-fg: #ffffff; /* its text */
 
   /* Backs the shelf chrome and — so its rounded corner nests into the chrome
      rather than the page — the content area behind it. See .nav-chrome. */
-  --color-nav: #080e26;
+  --color-nav: #070a11;
 
   /* The three parts a book is bound in. These used to be green / purple /
      black, where the colour *was* the meaning; one palette has no three hues
@@ -369,8 +369,8 @@
   --color-matter-body-strong: #8090c4;
   --color-matter-body-ink: #08122e;
 
-  --color-matter-back: #141f45;
-  --color-matter-back-strong: #1c2a58; /* lightens on hover — it is already ink */
+  --color-matter-back: #121924;
+  --color-matter-back-strong: #1a2230; /* lightens on hover — it is already ink */
   --color-matter-back-ink: #f1f2fa;
 
   /* The status family — the one place with hues, because here the colour *is*
@@ -773,20 +773,20 @@
      a modal. The names are Tremor's and the structure is Tremor's; the values
      are now this app's, one step darker than the page so a dialog reads as
      something laid on top of it. */
-  --color-tremor-brand-faint: #0e1636;
-  --color-tremor-brand-muted: #182350;
+  --color-tremor-brand-faint: #0d111a;
+  --color-tremor-brand-muted: #161d28;
   --color-tremor-brand-subtle: #3f57ab;
   --color-tremor-brand: #8ab4ff; /* the app's accent */
   --color-tremor-brand-emphasis: #a3c4ff;
   --color-tremor-brand-inverted: #08122e; /* the ink on the brand fill */
 
-  --color-tremor-background-muted: #0e1636;
-  --color-tremor-background-subtle: #1b2650;
-  --color-tremor-background: #080e26; /* the dialog itself */
+  --color-tremor-background-muted: #0d111a;
+  --color-tremor-background-subtle: #1a212c;
+  --color-tremor-background: #070a11; /* the dialog itself */
   --color-tremor-background-emphasis: #c6cee8;
 
-  --color-tremor-border: #202c58;
-  --color-tremor-ring: #202c58;
+  --color-tremor-border: #1d2430;
+  --color-tremor-ring: #1d2430;
 
   --color-tremor-content-subtle: #7683b0;
   --color-tremor-content: #bcc5de; /* 7.4:1 on the dialog ground */
@@ -1218,15 +1218,15 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
-  --color-surface: #141b34;
-  --color-panel: #080e26;
-  --color-raised: #212c4f;
-  --color-line: #29335a;
+  --color-surface: #13171e;
+  --color-panel: #070a11;
+  --color-raised: #1e252e;
+  --color-line: #262c38;
   --color-fg: #f1f2fa;
   --color-muted: #bcc5de;
   --color-accent: #8ab4ff;
   --color-accent-strong: #a3c4ff;
-  --color-accent-deep: #101a3a;
+  --color-accent-deep: #0f141d;
   --color-accent-ink: #08122e;
   --color-upgrade-from: #9333ea;
   --color-upgrade-to: #4f46e5;
@@ -1253,17 +1253,17 @@
   --color-brand-fill: #146ef5;
   --color-brand-ink: #ffffff;
   --color-danger: #fa8080;
-  --color-selected: color-mix(in srgb, #02040f 62%, transparent);
+  --color-selected: color-mix(in srgb, #030507 62%, transparent);
   --color-selected-fg: #ffffff;
-  --color-nav: #080e26;
+  --color-nav: #070a11;
   --color-matter-front: #c9d4f2;
   --color-matter-front-strong: #b6c3e9;
   --color-matter-front-ink: #0c1430;
   --color-matter-body: #6f7eb4;
   --color-matter-body-strong: #8090c4;
   --color-matter-body-ink: #08122e;
-  --color-matter-back: #141f45;
-  --color-matter-back-strong: #1c2a58;
+  --color-matter-back: #121924;
+  --color-matter-back-strong: #1a2230;
   --color-matter-back-ink: #f1f2fa;
   --color-ok-bg: #0a2f2c;
   --color-ok-line: #065f46;
@@ -1331,20 +1331,20 @@
   --color-lp-device-edge: #14141a;
 
   /* The dialog palette, dark. Same names as @theme. */
-  --color-tremor-brand-faint: #0e1636;
-  --color-tremor-brand-muted: #182350;
+  --color-tremor-brand-faint: #0d111a;
+  --color-tremor-brand-muted: #161d28;
   --color-tremor-brand-subtle: #3f57ab;
   --color-tremor-brand: #8ab4ff;
   --color-tremor-brand-emphasis: #a3c4ff;
   --color-tremor-brand-inverted: #08122e;
 
-  --color-tremor-background-muted: #0e1636;
-  --color-tremor-background-subtle: #1b2650;
-  --color-tremor-background: #080e26;
+  --color-tremor-background-muted: #0d111a;
+  --color-tremor-background-subtle: #1a212c;
+  --color-tremor-background: #070a11;
   --color-tremor-background-emphasis: #c6cee8;
 
-  --color-tremor-border: #202c58;
-  --color-tremor-ring: #202c58;
+  --color-tremor-border: #1d2430;
+  --color-tremor-ring: #1d2430;
 
   --color-tremor-content-subtle: #7683b0;
   --color-tremor-content: #bcc5de;
@@ -1681,10 +1681,10 @@ body {
 }
 
 [data-paper="slate"] {
-  --paper-bg: #0e1836;
+  --paper-bg: #0e1218;
   --paper-fg: #f1f2fa;
   --paper-muted: #bcc5de;
-  --paper-rule: #27355f;
+  --paper-rule: #242a35;
 
   /* Lifted off the dark sheet: on black, the edge runs the other way up. */
   --paper-edge-on: #ffffff;
@@ -1697,10 +1697,10 @@ body {
      same value as the desk — a sheet that matches what it lies on is not a
      sheet, it is a hole — and not black either, which on indigo reads as a
      gap in the render rather than as paper. */
-  --paper-bg: #060c20;
+  --paper-bg: #07090d;
   --paper-fg: #f1f2fa;
   --paper-muted: #bcc5de;
-  --paper-rule: #1d2950;
+  --paper-rule: #1b202a;
 
   --paper-edge-on: #ffffff;
 }
@@ -2183,7 +2183,7 @@ body {
      navy set the rail is already a well and the page above it is the lightest
      surface, so "you are here" reads as a darker pill cut into the rail —
      which is what the design this palette follows does. */
-  --color-selected: #02040f;
+  --color-selected: #030507;
   --color-selected-fg: #ffffff;
 }
 
@@ -2215,7 +2215,7 @@ body {
   /* Selected nav — the open chapter — sinks with white text, like the rail's
      rows. Kept a touch stronger than the shelf's, which carry an edge bar this
      list does not. */
-  --color-selected: #01020a;
+  --color-selected: #020304;
   --color-selected-fg: #ffffff;
 }
 
@@ -2244,7 +2244,7 @@ body {
   --color-muted: #bcc5de; /* nav labels and tools */
   --color-line: color-mix(in srgb, #ffffff 12%, transparent);
   --color-raised: color-mix(in srgb, #ffffff 8%, transparent);
-  --color-selected: #02040f;
+  --color-selected: #030507;
   --color-selected-fg: #ffffff;
 }
 
@@ -2276,7 +2276,7 @@ body {
       rgba(255, 255, 255, 0.09) 0%,
       rgba(255, 255, 255, 0) 55%
     ),
-    linear-gradient(115deg, #1a2440 0%, #090e22 100%);
+    linear-gradient(115deg, #1b202b 0%, #090c11 100%);
 }
 
 /* --------------------------------------------------------------------------
