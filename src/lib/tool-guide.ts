@@ -1,9 +1,14 @@
 /**
  * Long-form descriptions for launch-visible tools.
  *
- * The launch MVP exposes only Export from the old tool catalogue. The hidden
- * tool pages remain in the repo, but the public guide must describe only what
- * users can reach.
+ * The hidden tool pages remain in the repo, but the public guide must describe
+ * only what users can reach — `tool-guide.test.ts` walks `ALL_TOOLS` in both
+ * directions so neither list can drift from the other.
+ *
+ * Three as of 2026-09-03: the title check, the consistency check and Export.
+ * Comp titles was the fourth and went back behind the launch gate; its guide
+ * went with it, because a guide for a tool the product does not list fails
+ * the test in the other direction.
  */
 
 export interface ToolGuide {
@@ -16,6 +21,29 @@ export interface ToolGuide {
 }
 
 export const TOOL_GUIDES: ToolGuide[] = [
+  {
+    path: "title-check",
+    headline: "Whether a reader searching for your title finds somebody else first",
+    claim: "Who else is publishing under this name",
+    lead: " — with how close each one is, and no verdict.",
+    points: [
+      {
+        term: "No title is taken",
+        detail:
+          "Titles cannot be copyrighted, so nothing here is about permission. The useful question is whether you are publishing into somebody else's shadow, and that is the question this answers.",
+      },
+      {
+        term: "Graded by how near it is",
+        detail:
+          "An exact match, the same words in another order, and a title that merely contains yours are three different problems. Each match is placed on that scale so you can see which kind you are looking at.",
+      },
+      {
+        term: "An empty result is never read as a good one",
+        detail:
+          "A search that could not reach a catalogue returns nothing, and nothing rendered as an all-clear would be a confident answer produced by a search that never ran. Which services replied is shown beside the result.",
+      },
+    ],
+  },
   {
     path: "consistency",
     headline: "The mistakes that only show up when the whole book is read at once",

@@ -223,7 +223,7 @@ export function ProsePage({ bookId }: { bookId: string }) {
 
             {!showing && (
               <section className="mt-6 rounded-xl border border-line bg-panel p-5">
-                <LimitBanner allowance={gate.allowance} className="mb-4" />
+                <LimitBanner allowance={gate.allowance} refused={gate.refused} className="mb-4" />
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"

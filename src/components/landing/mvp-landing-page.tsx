@@ -41,6 +41,14 @@ import { MAX_SNAPSHOTS } from "@/lib/history";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { CONTACT_EMAIL, LEGAL_PAGES, REFUND_DAYS } from "@/lib/legal";
 import { plural } from "@/lib/plural";
+/* Aliased: this page already has a `ROWS` of its own — the feature rows
+   further up — and the two are unrelated lists. */
+import { ROWS as PLAN_ROWS } from "@/lib/billing/plan-rows";
+import {
+  PenIcon,
+  PlanCard,
+  StackIcon,
+} from "@/components/upgrade/plan-card";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { signInWithGoogle } from "@/app/auth/actions";
 
@@ -944,38 +952,72 @@ export function MvpLandingPage() {
               </p>
             </div>
 
-            <div className="mx-auto mt-12 grid max-w-4xl gap-5 md:grid-cols-2">
+            {/* ---- The same two cards `/upgrade` draws -------------------
+
+                **One component, not a second set of claims.** This page used to
+                carry its own `PlanCard` with hand-written bullets, which named
+                different things in different words from the comparison table on
+                `/upgrade` — two lists about one product, free to drift apart on
+                the two pages a buyer reads back to back.
+
+                `plan-card.tsx` carries no `"use client"` for exactly this: it
+                holds no state, so a Server Component can draw it. What differs
+                between the two pages goes in through `action`, which is a node —
+                a checkout button there, a plain link here.
+
+                No period toggle on this page. The monthly figure with the yearly
+                one underneath is the whole of what a visitor needs before they
+                have an account; choosing a cycle is a decision for the page that
+                takes the money. */}
+            <div className="mx-auto mt-10 grid max-w-4xl gap-5 text-left md:grid-cols-2 md:items-start">
               <PlanCard
-                title="Free"
-                price="$0"
-                cadence="for good"
+                mark={<PenIcon className="h-6 w-6" />}
+                name="Free"
                 blurb="Write the whole book and take the file with you. No card, and no clock on it."
-                lines={[
-                  `${plural(LAUNCH_LIMITS.freeBooks, "book")}, unlimited chapters and words`,
-                  "Import Word, EPUB, Markdown, text and HTML",
-                  "Sync across your devices",
-                  `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant replies a month`,
-                  "Word, EPUB and PDF export",
-                ]}
-                href="/signup"
-                cta="Start writing free"
+                price="$0"
+                rows={PLAN_ROWS.map((r) => ({
+                  group: r.group,
+                  label: r.label,
+                  detail: r.detail,
+                  value: r.starter,
+                }))}
+                action={
+                  <Link
+                    href="/signup"
+                    className="block rounded-xl border border-line bg-surface px-5 py-3
+                               text-center font-sans text-sm font-semibold text-fg
+                               outline-none transition-colors hover:bg-raised
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    Start writing free
+                  </Link>
+                }
               />
               <PlanCard
                 featured
                 badge={`${saving}% off yearly`}
-                title="Pro"
-                price={`${monthly}`}
-                cadence="a month"
+                mark={<StackIcon className="h-6 w-6" />}
+                name="Pro"
                 blurb="For a shelf that keeps growing, and the assistant to hand while it does."
-                lines={[
-                  "Unlimited books",
-                  "Everything on Free",
-                  `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} assistant replies a month`,
-                  "The assistant can write into your chapter",
-                ]}
+                price={monthly}
                 note={`Or ${annualTotal} a year — about ${annualPerMonth} a month.`}
-                href="/upgrade"
-                cta="See the plans"
+                rows={PLAN_ROWS.map((r) => ({
+                  group: r.group,
+                  label: r.label,
+                  detail: r.detail,
+                  value: r.pro,
+                }))}
+                action={
+                  <Link
+                    href="/upgrade"
+                    className="block rounded-xl bg-accent px-5 py-3 text-center
+                               font-sans text-sm font-semibold text-accent-ink
+                               outline-none transition-opacity hover:opacity-90
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    See the plans
+                  </Link>
+                }
               />
             </div>
 
@@ -1131,194 +1173,15 @@ export function MvpLandingPage() {
   );
 }
 
-/**
- * One plan.
+/*
+ * **`PlanCard` was here, and the pricing section now draws the one from
+ * `components/upgrade/plan-card.tsx`.**
  *
- * **The shape is the reference's and the order with it**: the figure first,
- * then the name, then the sentence, then what is in it, then the press. That
- * is not the order a spec sheet uses and it is the right one here — the two
- * things a reader is comparing are the price and the list, so the price opens
- * the card and the list is the last thing before the button.
+ * It was a second card with hand-written bullet lines, naming different
+ * things in different words from the comparison on `/upgrade` — two lists of
+ * claims about one product, on the two pages a buyer reads back to back.
  *
- * **Two cards, one shape, told apart by the fill.** Free is white with a
- * hairline; Pro is the accent, solid, with the button inverted to white inside
- * it. Everything else — radius, padding, the type scale, the gaps, the pill —
- * is identical, so the pair reads as one design with one of them turned up
- * rather than as two cards.
- *
- * **The hue is the page's own accent, not the reference's periwinkle**, and
- * that is the one place this departs from it. `globals.css` reserves a single
- * hue for "this is the way forward" and says nothing else in the chrome may
- * spend one; an upgrade card is exactly that, so it takes the accent already
- * on the page rather than introducing a second blue beside it. It is one token
- * to change if the periwinkle is wanted.
- *
- * It takes `lp-accent-deep` rather than `lp-accent`, and that is a contrast
- * result rather than a preference: on the bright accent, white is 4.59:1 and
- * *nothing dimmer than white passes at all*, so the card could carry no
- * sentence under its name. The deeper shade of the same hue takes white to
- * 6.8:1 and the dimmed line under the name to 5.7:1. The working is beside the
- * token.
- *
- * **The two buttons were rebuilt when the page went dark, and both had
- * failed.** On a light page an accent label on a pale tint is the quiet half
- * of the pair; on this one `lp-tint` and `lp-ground` are both near-black, so
- * the free card's button was `#1355bf` on `#14141b` at **2.7:1** and Pro's was
- * the same blue on near-black at **2.9:1** — a dark label on a dark pill,
- * twice. They are inverted now: the quiet one is white on `lp-raised`
- * (14.7:1), the loud one is the accent on a white pill (6.1:1). The pairing a
- * reader sees is unchanged; only which side of it carries the ink.
- *
- * **The badge carries a fact.** The reference's slot says MOST POPULAR, which
- * is the invented claim this page refuses everywhere else — there is no such
- * measurement. It carries the yearly saving instead, which `plans.ts` computes
- * and the page has to state somewhere anyway.
- *
- * Nothing here states a figure of its own; every number arrives as a prop from
- * the modules that enforce it.
+ * What it got right and the shared one keeps: the featured card carries the
+ * emphasis rather than a badge doing it, and the buttons sit on one line
+ * whichever card holds the yearly note.
  */
-function PlanCard({
-  title,
-  price,
-  cadence,
-  blurb,
-  lines,
-  note,
-  badge,
-  href,
-  cta,
-  featured = false,
-}: {
-  title: string;
-  price: string;
-  /** The unit beside the figure — "/month", "for good". Kept short by design. */
-  cadence: string;
-  /** The one sentence under the name saying who the plan is for. */
-  blurb: string;
-  lines: string[];
-  note?: string;
-  badge?: string;
-  href: string;
-  cta: string;
-  featured?: boolean;
-}) {
-  return (
-    <article
-      className={`relative flex flex-col rounded-[2rem] p-8 sm:p-9 ${
-        featured
-          ? "bg-lp-accent-deep shadow-[0_26px_60px_-30px_rgb(19_85_191_/_0.7)]"
-          : "border border-lp-line bg-lp-tint"
-      }`}
-    >
-      {/* Top-right, and inside the padding rather than straddling the edge:
-          the reference sets it in the corner of the card, not on its rule. */}
-      {badge && (
-        <p
-          className={`mb-6 self-end rounded-full px-4 py-1.5 text-[0.6875rem] font-semibold tracking-[0.1em] uppercase ${
-            featured
-              ? "bg-lp-accent-ink/15 text-lp-accent-ink"
-              : "bg-lp-raised text-lp-accent-text"
-          }`}
-        >
-          {badge}
-        </p>
-      )}
-
-      {/* The figure opens the card. `tabular-nums` so $0 and $5.98 sit on the
-          same baseline grid across the two cards. */}
-      <p className="flex items-baseline gap-2">
-        <span
-          className={`font-serif text-[2.75rem] leading-none font-semibold tabular-nums ${
-            featured ? "text-lp-accent-ink" : "text-lp-ink"
-          }`}
-        >
-          {price}
-        </span>
-        <span
-          className={`text-[0.9375rem] ${
-            featured ? "text-lp-accent-pale" : "text-lp-body"
-          }`}
-        >
-          {cadence}
-        </span>
-      </p>
-
-      <h3
-        className={`oc-heading mt-5 font-serif text-[1.375rem] font-semibold ${
-          featured ? "text-lp-accent-ink" : "text-lp-ink"
-        }`}
-      >
-        {title}
-      </h3>
-
-      <p
-        className={`mt-2.5 text-[0.9375rem] leading-[1.5] ${
-          featured ? "text-lp-accent-pale" : "text-lp-body"
-        }`}
-      >
-        {blurb}
-      </p>
-
-      <ul className="mt-7 space-y-3.5 text-[0.9375rem] leading-[1.45]">
-        {lines.map((line) => (
-          <li key={line} className="flex items-start gap-3">
-            {/* A tick in a disc rather than a bare tick — the disc is what
-                makes five rows read as a list at a glance, and it is the one
-                piece of the reference that is doing real work rather than
-                decoration. */}
-            <span
-              className={`mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
-                featured
-                  ? "bg-lp-accent-ink/15 text-lp-accent-ink"
-                  : "bg-lp-raised text-lp-accent-text"
-              }`}
-            >
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-3 w-3"
-              >
-                <path d="M4.5 10.5l3.5 3.5 7-7.5" />
-              </svg>
-            </span>
-            <span className={featured ? "text-lp-accent-ink" : "text-lp-soft"}>
-              {line}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {note && (
-        <p
-          className={`mt-6 text-[0.875rem] ${
-            featured ? "text-lp-accent-pale" : "text-lp-body"
-          }`}
-        >
-          {note}
-        </p>
-      )}
-
-      {/* `mt-auto` on the wrapper rather than on the link, so the two cards'
-          buttons sit on one line whichever of them carries the yearly note —
-          the padding above it is then a constant instead of a second margin
-          fighting the first. */}
-      <div className="mt-auto pt-8">
-        <Link
-          href={href}
-          className={`block rounded-full px-6 py-3.5 text-center text-[1.0625rem] font-semibold transition-opacity hover:opacity-90 ${
-            featured
-              ? "bg-lp-ground text-lp-accent-deep"
-              : "bg-lp-raised text-lp-ink"
-          }`}
-        >
-          {cta}
-        </Link>
-      </div>
-    </article>
-  );
-}

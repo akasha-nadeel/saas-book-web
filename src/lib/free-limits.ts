@@ -111,9 +111,25 @@ export type Limited =
  * in any of them: the same rule the prices follow, one number in one place.
  */
 export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> = {
-  comps: { free: 2, pro: null },
+  /*
+   * **Three each, raised from two on 2026-09-02**, when these two screens
+   * came back out from behind the launch gate and became the first tools a
+   * writer meets that are not the editor.
+   *
+   * The number follows the cost, which here is nothing: both run on two
+   * keyless catalogues behind a day-long shared cache, so a free writer
+   * spending their three costs us no more than a writer spending none. What
+   * the ceiling is actually for is the shape of the thing — a daily pause
+   * that says the tool is real and there is more of it — and two was one
+   * search short of that: the seeded search runs on arrival, so a writer who
+   * then edited the query and ran it once had spent the day.
+   *
+   * Three is one arrival, one correction and one second thought. Pro is
+   * `null`, which is no ceiling at all rather than a larger one.
+   */
+  comps: { free: 3, pro: null },
   covers: { free: 3, pro: null },
-  titleCheck: { free: 2, pro: null },
+  titleCheck: { free: 3, pro: null },
   blurb: { free: 5, pro: null },
   prose: { free: 6, pro: null },
   track: { free: 2, pro: null },
@@ -350,6 +366,23 @@ export function seatAllowance(people: number, pro: boolean): Allowance {
 // ---------------------------------------------------------------------------
 
 type Shape = "daily" | "book" | "item" | "total" | "seat";
+
+/**
+ * Whether this limit comes back tomorrow.
+ *
+ * **Read by `LimitBanner` to decide when it may appear**, which is the one
+ * place the shape changes what a writer sees rather than only how it is
+ * worded. A daily allowance spent is not a refusal — the writer had three and
+ * used three, which is the plan working; the standing purple block belongs to
+ * the shapes that do not reset, where being full is a fact about the account
+ * rather than about today.
+ *
+ * Over `SHAPE` rather than a second list, so a new limit cannot be daily in
+ * the words and not-daily in the banner.
+ */
+export function resetsDaily(action: Limited): boolean {
+  return SHAPE[action] === "daily";
+}
 
 const SHAPE: Record<Limited, Shape> = {
   comps: "daily",

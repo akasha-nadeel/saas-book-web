@@ -565,9 +565,17 @@ export function openLibraryQuery(query: string): string {
  *
  * Google's `totalItems` is an estimate and wobbles between identical requests
  * — so it is reported as an approximation and never used in arithmetic.
+ *
+ * **Both catalogues, under their own field names.** It read `totalItems` only,
+ * which is Google's; Open Library says `numFound` and was therefore reported as
+ * "no figure at all" — on the source that carries the deep sweep, and so on the
+ * one screen that has to say what fraction of the shelf it read. One function
+ * because the two are the same fact, and a caller holding a payload should not
+ * have to know which service handed it over.
  */
 export function reportedTotal(payload: unknown): number | null {
-  const total = (payload as { totalItems?: unknown })?.totalItems;
+  const record = payload as { totalItems?: unknown; numFound?: unknown };
+  const total = record?.totalItems ?? record?.numFound;
   return typeof total === "number" && Number.isFinite(total) && total >= 0
     ? total
     : null;

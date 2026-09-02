@@ -331,7 +331,7 @@ export function BlurbPage({ bookId, embedded, heading }: ToolPageProps) {
               {embedded ? (
                 <LimitNote allowance={gate.allowance} className="mb-4" />
               ) : (
-                <LimitBanner allowance={gate.allowance} className="mb-4" />
+                <LimitBanner allowance={gate.allowance} refused={gate.refused} className="mb-4" />
               )}
               <LeftPill allowance={gate.allowance} className="mb-4" />
               {/* **A fixed height, shared with the conversation beside it.**

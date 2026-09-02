@@ -3277,6 +3277,19 @@ export interface Prefs {
    * dense grid meant it for their shelf, not for one visit to it.
    */
   shelfLayout: ShelfLayout;
+  /**
+   * How the two searches draw the books they find — same four modes, same
+   * words, `resultsGridClass` rather than `gridClassFor`.
+   *
+   * **One pref for both tools, not one each.** "How do I want found books
+   * drawn" is not a different question on the comps shelf than on the title
+   * check's matches, and two settings would let the same writer's answer
+   * disagree with itself when the segmented control switches between them.
+   *
+   * Stored for the reason `shelfLayout` is: a writer who chose the list meant
+   * it for looking things up, not for one search.
+   */
+  researchLayout: ShelfLayout;
   /** The colour of the page under the prose. */
   paper: PaperColor;
   /**
@@ -3383,6 +3396,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   panelTab: "search",
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
+  // Covers, like the shelf. A search answers with jackets, and the eye reads a
+  // wall of them faster than it reads a column of titles.
+  researchLayout: DEFAULT_SHELF_LAYOUT,
   // Black by default, because the chrome around it is. A white sheet on a black
   // app is the one combination that glares, and a writer arriving for the first
   // time should not have to go and fix that. The other four sheets are still
@@ -3458,6 +3474,9 @@ function parsePrefs(raw: string | null): Prefs {
       // fall out of `gridClassFor`'s switch and draw an unstyled column.
       shelfLayout: isShelfLayout(parsed.shelfLayout)
         ? parsed.shelfLayout
+        : DEFAULT_SHELF_LAYOUT,
+      researchLayout: isShelfLayout(parsed.researchLayout)
+        ? parsed.researchLayout
         : DEFAULT_SHELF_LAYOUT,
       paper: paperFrom(parsed),
       theme: THEMES.includes(parsed.theme as Theme)

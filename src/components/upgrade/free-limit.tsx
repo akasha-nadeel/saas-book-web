@@ -11,6 +11,7 @@ import {
   leftBadge,
   leftLine,
   reachedHeadline,
+  resetsDaily,
   SEATS_PER_BOOK,
   spentLine,
   totalAllowance,
@@ -331,19 +332,47 @@ function proLine(allowance: Allowance): string {
 
 export function LimitBanner({
   allowance,
+  refused,
   className = "",
 }: {
   allowance: Allowance;
+  /**
+   * Whether a press has actually been turned away — `useLimitGate`'s own flag.
+   *
+   * **Required, not optional with a default.** Getting this wrong is invisible
+   * on the screen that forgets it, so the compiler is the thing that has to
+   * notice. Nine call sites pass `gate.refused`.
+   */
+  refused: boolean;
   className?: string;
 }) {
   const line = spentLine(allowance);
-  /* **Shown for as long as the limit lasts, not just after a refusal.** The
-     *dialog* is the thing that waits for the eleventh press — it interrupts,
-     so it has to be earned. This does not interrupt: it is the standing state
-     of the screen while the free plan has nothing left, and a writer coming
-     back tomorrow should be told where they are rather than have to press a
-     dead button to find out. It goes when the plan changes. */
   if (!allowance.blocked || !line) return null;
+
+  /* ---- When this may appear, and it is not the same for every limit -------
+
+     **A daily allowance waits for a refused press; every other shape stands.**
+
+     The rule used to be "shown for as long as the limit lasts, not just after
+     a refusal", on the reasoning that the *dialog* interrupts and so has to be
+     earned while this does not — and that a writer coming back should be told
+     where they are rather than press a dead button to find out. That argument
+     survives intact for the shapes that do not reset. A book at 2 of 2 seats,
+     or five of five keyword suggestions spent for good, is a standing fact
+     about the account, and saying so before it is bumped into is help.
+
+     It is wrong for a daily one. Three checks a day means the *third* press
+     spends the last, so the banner landed on the search a writer was entitled
+     to — a purple upgrade block over a result they had just paid for, telling
+     them they had run out at the moment they had not been refused anything.
+     Nothing has been denied until a fourth press, and that is when this
+     speaks. The cost is that a reload while blocked shows nothing until the
+     next press; a daily limit is gone by tomorrow, so that is a smaller
+     unfairness than the one it replaces.
+
+     `LimitDialog` is unchanged — it has always fired on the refused press, and
+     this brings the banner into line with it rather than the other way. */
+  if (resetsDaily(allowance.action) && !refused) return null;
 
   return (
     <section

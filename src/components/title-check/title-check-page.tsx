@@ -1,23 +1,31 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { LoadingScreen } from "@/components/loading-screen";
 import { ToolHeader } from "@/components/tool-header";
 import { BookCover } from "@/components/ui/book-cover";
 import { Spinner } from "@/components/ui/spinner";
-import type { CompTitle } from "@/lib/comps/comps";
-import { findClashes, type TitleClash } from "@/lib/comps/title-check";
-import { ToolStepDone } from "@/components/ui/tool-save";
+import { BROWSE_SHELVES, type CompTitle } from "@/lib/comps/comps";
+import {
+  findClashes,
+  suggestSpelling,
+  titleKey,
+  type TitleClash,
+} from "@/lib/comps/title-check";
 import {
   LeftPill,
   LimitBanner,
   LimitDialog,
   useLimitGate,
 } from "@/components/upgrade/free-limit";
-import { findBook, setBookDetails } from "@/lib/library-store";
-import { useHydrated, useShelf } from "@/lib/use-library";
-import { useToolSave } from "@/lib/use-tool-save";
+import { findBook, setPref } from "@/lib/library-store";
+import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
+import { ViewMenu } from "@/components/ui/view-menu";
+import {
+  isGrid,
+  resultsGridClass,
+  type ShelfLayout,
+} from "@/lib/shelf-layout";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -35,10 +43,51 @@ import { toolShell, type ToolPageProps } from "@/lib/tool-page";
  * same genre is a real problem, and the writer can tell which of those they are
  * looking at faster than any rule we could write.
  */
-export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
+/**
+ * **`bookId` is optional here, where every other tool requires one**, and the
+ * difference is the whole design of this screen since 2026-09-03: it checks
+ * *any* title, not this writer's.
+ *
+ * It used to open holding `book.title`, fill its empty state with covers from
+ * `book.genre`, and offer to rename the book from the result. All three are
+ * gone. What is left needs nothing but the words in the box, so the dashboard
+ * mounts it with no book at all.
+ *
+ * The book is still read when an id is given, for exactly one thing — the
+ * breadcrumb and cover chip `ToolHeader` draws at `/book/<id>/title-check`.
+ * That is frame, not feature, so the two ways in still show the same screen
+ * below the header and `embedded` keeps meaning only what it has always meant.
+ *
+ * A component taking `bookId?: string` is assignable wherever `ToolPageProps`
+ * is expected, so the roadmap's registry needs no change.
+ */
+/**
+ * A shelf to browse while the box is empty.
+ *
+ * **A function rather than an expression in the effect**, so the effect body
+ * contains no branch and no `setState`: an index into a constant is
+ * `string | undefined` to the compiler, and guarding that inline meant clearing
+ * the loading flag synchronously, which `react-hooks/set-state-in-effect`
+ * rightly refuses. `BROWSE_SHELVES` is a non-empty literal, so the fallback is
+ * unreachable and exists only to make the type definite.
+ */
+function randomShelf(): string {
+  const i = Math.floor(Math.random() * BROWSE_SHELVES.length);
+  return BROWSE_SHELVES[i] ?? BROWSE_SHELVES[0] ?? "Fiction";
+}
+
+export function TitleCheckPage({
+  bookId,
+  embedded,
+  heading,
+}: Omit<ToolPageProps, "bookId"> & { bookId?: string }) {
   const hydrated = useHydrated();
   const shelf = useShelf();
-  const book = findBook(shelf, bookId);
+  const book = bookId ? findBook(shelf, bookId) : null;
+
+  /* Shared with the comps screen — see the note on `researchLayout`. The two
+     are switched between by one control, so one setting between them. */
+  const layout = usePrefs().researchLayout;
 
   const [title, setTitle] = useState("");
   const [clashes, setClashes] = useState<TitleClash[] | null>(null);
@@ -58,16 +107,50 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
   } | null>(null);
 
   /**
-   * Real titles from this book's own shelf, for when the box is empty.
+   * What the sweep actually read, and what the catalogue says is there.
    *
-   * The screen used to answer a cleared box with a dashed panel and half a
-   * page of nothing. This is a naming screen, and the most useful thing to
-   * look at while deciding on a name is what the books beside yours are
-   * actually called — so the space carries that instead of an apology. They
-   * are **not** clashes and the heading says so; nothing here has been
-   * compared to anything.
+   * **Kept because the honest sentence needs both numbers.** The sweep reads
+   * 500 Open Library records of a reported 4,072 for a name like "spiderman" —
+   * more than enough to be useful and nowhere near the shelf. Printing "12
+   * books share your title" off that is a count of a sample presented as a
+   * count of the world, which is the invented number this app refuses
+   * everywhere else. So the screen says how many it read and how many exist,
+   * and lets the writer put the two together.
+   */
+  const [depth, setDepth] = useState<{
+    scanned: number;
+    reported: number | null;
+  } | null>(null);
+
+  /** Set when a catalogue refused our API key, which is nobody's weather. */
+  const [keyRefused, setKeyRefused] = useState(false);
+
+  /**
+   * A published title the writer may have been reaching for, or null.
+   *
+   * Only ever set when a check found **nothing at all**, and only ever a title
+   * a catalogue handed back. See `suggestSpelling`.
+   */
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+
+  /**
+   * Real published titles to look at while the box is still empty.
+   *
+   * **The screen used to answer an empty box with half a page of nothing.**
+   * This is a naming screen, and the most useful thing to look at while
+   * deciding on a name is what real books are actually called — so the space
+   * carries that instead of an apology. They are **not** clashes, and the line
+   * above them says so; nothing here has been compared to anything.
+   *
+   * **The shelf is picked at random, and it used to be the book's own genre.**
+   * With no book there is no genre to ask for. A fixed shelf would be this
+   * app choosing somebody's neighbourhood for them, and would show every
+   * writer the same thirty covers for ever; a random one is plainly a sample,
+   * changes on every visit, and is named on screen so nobody mistakes it for
+   * a search they ran.
    */
   const [genreShelf, setGenreShelf] = useState<CompTitle[]>([]);
+  const [shelfName, setShelfName] = useState<string | null>(null);
   /**
    * The title the result on screen belongs to.
    *
@@ -82,32 +165,6 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
-
-  /**
-   * The genre shelf, fetched once and only when it is about to be needed.
-   *
-   * Not on mount: the box arrives holding this book's title, so this would be a
-   * request for something nothing is showing. It loads the first time the writer
-   * clears the box, which is the only way to reach the state that draws it.
-   */
-  const askedShelf = useRef(false);
-  useEffect(() => {
-    if (askedShelf.current || title.trim() !== "" || !book?.genre) return;
-    askedShelf.current = true;
-    void fetch(`/api/comps?q=${encodeURIComponent(`subject:"${book.genre}"`)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        // The search returns fifty-odd; this takes most of them. It is a
-        // shelf to browse rather than a figure to read, so the useful amount
-        // is however many fit without the page becoming a scroll.
-        if (data)
-          setGenreShelf(((data.books ?? []) as CompTitle[]).slice(0, 32));
-      })
-      .catch(() => {
-        // A shelf that will not load leaves the space as it was. Nothing on
-        // this screen depends on it.
-      });
-  }, [title, book?.genre]);
 
   /**
    * The free plan's five tooled books.
@@ -128,54 +185,110 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
    * a new check writes a new `checked`, which no longer matches this, and the
    * banner comes back on its own.
    */
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  /** So "Try another" can leave the caret where the next title goes. */
-  const fieldRef = useRef<HTMLInputElement>(null);
+  const [dismissed] = useState<string | null>(null);
 
   /**
-   * Put this book's title in the box, and **do not search**.
+   * The browsing shelf, fetched once on arrival.
    *
-   * The screen used to arrive having already checked, on the reasoning that it
-   * knows which title the writer most likely means and making them press for it
-   * is asking them to prove they meant it. The cost of that is a verdict nobody
-   * asked for: a green bar declaring the name clear is the loudest thing on the
-   * page, delivered before the reader has decided they were asking, and a red
-   * one lands harder still. A finding is an answer, and an answer to an unasked
-   * question reads as a claim rather than a result.
+   * **The random pick happens in the effect, not in a `useState` initialiser**,
+   * and that is not a style choice: this screen is server-rendered at
+   * `/book/<id>/title-check`, so a `Math.random()` read during the first render
+   * would give the server one shelf and the browser another, and React would
+   * report a hydration mismatch. An effect runs on the client only, after the
+   * markup has settled.
    *
-   * The field is still seeded, which is the half worth keeping: the title is one
-   * press away rather than something to retype, and this is the same split the
-   * comps screen already makes with its shelf chips — picking one fills the
-   * field and does not spend a search.
+   * A shelf that will not load leaves the space as it was. Nothing on this
+   * screen depends on it.
    */
-  const seeded = useRef(false);
+  const askedShelf = useRef(false);
+  const [shelfLoading, setShelfLoading] = useState(true);
   useEffect(() => {
-    if (!book || seeded.current) return;
-    seeded.current = true;
-    setTitle(book.title);
-  }, [book]);
+    if (askedShelf.current) return;
+    askedShelf.current = true;
+
+    const shelf = randomShelf();
+
+    /* **`sweep=1`, the same five-page fetch a check runs.** One page is 40 per
+       source and about 55 once merged and de-duplicated, which is not a
+       hundred. The sweep is cached per URL for a day and there are only two
+       dozen shelves, so the second writer onto a given one pays nothing.
+       Measured: a subject sweep returns 500 Open Library records, every one
+       with an author and a cover, before Google is merged in. */
+    void fetch(`/api/comps?sweep=1&q=${encodeURIComponent(`subject:"${shelf}"`)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        /* **A hundred, out of the several hundred the sweep returns.** This is
+           a shelf to browse rather than a figure to read, so the number is
+           chosen for the eye: enough that it reads as a wall of what is out
+           there rather than a sample, and short of the point where nobody
+           reaches the end. The View menu is there for anybody who wants them
+           denser, and the caption says how many there are. */
+        if (!data) return;
+        const books = ((data.books ?? []) as CompTitle[]).slice(0, 100);
+        if (books.length === 0) return;
+        setGenreShelf(books);
+        setShelfName(shelf);
+      })
+      .catch(() => {
+        // Nothing to say: the box is still there and still works.
+      })
+      /* Cleared either way. A shelf that will not load leaves the space as it
+         was — which means the placeholders have to stop, or a failed fetch
+         would pulse under the box for ever. */
+      .finally(() => setShelfLoading(false));
+  }, []);
 
   /*
-   * Nothing to save: this screen stores no result and changes no field — a
-   * checked title is a thing the writer now *knows*.
+   * **The box opens empty, and nothing is searched on arrival.**
    *
-   * That is exactly why "Check the title" carries no detector on the road.
-   * Having read the shelf and decided, they say so here rather than going to
-   * the roadmap to say it, which was the errand this control removes.
+   * It used to arrive holding `book.title`. The older rule it replaced is the
+   * one still worth keeping: the screen must not arrive having already
+   * *checked*. A verdict nobody asked for is the loudest thing on the page —
+   * a green bar declaring a name clear, or a red one, delivered before the
+   * reader has decided they were asking — and an answer to an unasked question
+   * reads as a claim rather than a result.
+   *
+   * Seeding the field survived that as the harmless half. It does not survive
+   * a checker with no book: there is no one title it could mean. A placeholder
+   * says what to type instead, which is the honest version of the same help.
    */
-  const save = useToolSave({ book, tool: "title-check" });
+
+  /*
+   * **No "Mark step done", and no `useToolSave` behind it.**
+   *
+   * It ticked "Check the title" on the publishing roadmap, and the reasoning
+   * for that step having no detector still stands — this screen stores no
+   * result and changes no field, because a checked title is a thing the writer
+   * now *knows*. What changed is that the roadmap is in
+   * `HIDDEN_BOOK_TOOL_PATHS`: the button ticked a step on a screen nobody can
+   * open, and its own tooltip pointed at that screen.
+   *
+   * It comes back with the road. See the same note in `comps-page.tsx`.
+   */
 
   async function check(candidate: string) {
     if (candidate.trim().length < 2) return;
     setState("loading");
     setError(null);
+    // Belongs to the search that produced it, like `clashes`.
+    setSuggestion(null);
     try {
       // Searched as the title itself, unlike every other screen here — the
       // comps query deliberately leaves the writer's title out, because comps
       // are books *like* yours. This is the one question where finding a book
       // with the same name is the whole point.
+      /* **`sweep=1`, and this screen is the only one that sends it** — twice,
+         here and for the browsing shelf above, and for different reasons.
+         Here it is correctness: one page of forty is an arbitrary sample,
+         because neither catalogue orders by title match, so the records that
+         come back first are not the ones sharing the name. Measured on Open
+         Library for "spiderman" — 4,072 records reported — forty found 2 exact
+         matches and five hundred found 12. Comps stays shallow on purpose; see
+         `SWEEP_PAGES` in the route for why the two screens want opposite
+         things. */
+      const asked = candidate.trim();
       const response = await fetch(
-        `/api/comps?q=${encodeURIComponent(`intitle:"${candidate.trim()}"`)}`,
+        `/api/comps?sweep=1&q=${encodeURIComponent(`intitle:"${asked}"`)}`,
       );
       const data = await response.json();
       if (!response.ok) {
@@ -183,10 +296,113 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
         setState("error");
         return;
       }
-      setClashes(findClashes(candidate, (data.books ?? []) as CompTitle[]));
+
+      let books = (data.books ?? []) as CompTitle[];
+      let scanned = typeof data.scanned === "number" ? data.scanned : 0;
+
+      /* ---- The same name, spelled without the gaps ----------------------
+
+         **A phrase query does not find a title that is written as one word.**
+         `titleKey` makes "grand father" and "Grandfather" compare equal, and
+         that alone changes nothing here, because the one-word records are
+         never fetched: `title:"grand father"` returns 58 records and Open
+         Library holds 3,383 under `title:"grandfather"`, three of them titled
+         exactly that. Measured 2026-09-03. So the comparison needs the records
+         as much as the records need the comparison.
+
+         **Only when it can change the answer.** A title with no space has no
+         joined form to try, and a search that already found an exact match has
+         nothing to gain — "salt and pepper" comes back with sixteen and this
+         never fires. That keeps the ordinary check at one sweep.
+
+         **It works one way, and that is a limit rather than an oversight.**
+         Given "Grandfather" there is no way to guess where a split belongs, so
+         a writer who types the joined spelling is not shown the spaced one.
+         Splitting would need a dictionary and would invent boundaries the
+         writer did not.
+
+         A second sweep that fails costs nothing: the first result stands. */
+      const joined = asked.replace(/\s+/g, "");
+      const noneExact = !books.some((b) => titleKey(b.title) === titleKey(asked));
+
+      if (joined !== asked && joined.length >= 2 && noneExact) {
+        try {
+          const alt = await fetch(
+            `/api/comps?sweep=1&q=${encodeURIComponent(`intitle:"${joined}"`)}`,
+          );
+          if (alt.ok) {
+            const more = await alt.json();
+            const extra = (more.books ?? []) as CompTitle[];
+            if (extra.length > 0) {
+              /* Keyed on the catalogue's own id, which is what `mergeComps`
+                 does across pages and sources — the two searches overlap by
+                 design and a book found twice is one book. */
+              const seen = new Set(books.map((b) => b.key));
+              books = [...books, ...extra.filter((b) => !seen.has(b.key))];
+              scanned += typeof more.scanned === "number" ? more.scanned : 0;
+            }
+          }
+        } catch {
+          // The first answer is a real answer. Nothing to say.
+        }
+      }
+
+      const found = findClashes(candidate, books);
+      setClashes(found);
+
+      /* ---- "Did you mean …?" ---------------------------------------------
+
+         **Only when the check found nothing at all.** A writer looking at
+         twenty near-matches has plenty to read; this is for the screen that
+         has just gone quiet, where a clean answer might be a clean name or
+         might be a typo — and the difference decides whether they keep the
+         title.
+
+         **A plain keyword search, not `intitle:` and not a phrase.** That is
+         the query Google spell-corrects: measured on 2026-09-03,
+         `intitle:"spidrmn"` returns nothing from either catalogue while a bare
+         `spidrmn` returns Spider-Man books. So the correction is the
+         catalogue's, never ours — `suggestSpelling` only picks from what came
+         back, and hands the title over verbatim.
+
+         No `sweep`: one page is plenty to find a title two keystrokes away,
+         and this fires on the searches that found nothing rather than on every
+         check. */
+      if (found.length === 0) {
+        try {
+          const near = await fetch(`/api/comps?q=${encodeURIComponent(asked)}`);
+          if (near.ok) {
+            const data = await near.json();
+            const titles = ((data.books ?? []) as CompTitle[]).map(
+              (b) => b.title,
+            );
+            setSuggestion(suggestSpelling(asked, titles));
+          }
+        } catch {
+          // A suggestion is a courtesy. Its absence is not a failure.
+        }
+      }
       setSources(
         data.sources && typeof data.sources === "object" ? data.sources : null,
       );
+      /* Narrowed on the way in like everything else read off a response: this
+         is JSON from a route, and a missing field must render as "not said"
+         rather than as `NaN` in a sentence about somebody's title.
+
+         `scanned` counts both sweeps where there were two, so the "checked
+         against N records" line stays true. `reported` is the first search's:
+         it is the catalogue's count for the name as the writer wrote it, which
+         is the number that sentence is about. */
+      setDepth({
+        scanned,
+        reported:
+          typeof data.reportedOpenLibrary === "number"
+            ? data.reportedOpenLibrary
+            : typeof data.reported === "number"
+              ? data.reported
+              : null,
+      });
+      setKeyRefused(data?.why?.google === "key");
       setChecked(candidate.trim());
       setState("done");
     } catch {
@@ -205,18 +421,9 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
       <LoadingScreen />
     );
 
-  if (!book) {
-    return (
-      <div className="grid h-[var(--oc-layout-height)] place-items-center bg-surface p-8 text-center">
-        <div>
-          <p className="text-lg font-bold text-fg">That book is not here.</p>
-          <Link href="/" className="mt-3 inline-block text-accent">
-            Back to your books
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  /* No "that book is not here" any more. Nothing below needs a book, so a
+     missing one is not a failure — it is the ordinary case in the dashboard.
+     A bad id in the URL costs the header's chip and nothing else. */
 
   /**
    * Whether what is on screen still answers what is in the box.
@@ -225,26 +432,46 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
    * title brings the answer back instead of demanding another search — and so
    * a stray keypress does not throw away a result the writer is reading.
    */
+  /**
+   * Whether what is on screen still answers something the writer asked.
+   *
+   * **It used to require the box to match the finding exactly**, so a single
+   * backspace threw away thirteen covers and a verdict — and the browsing
+   * shelf flooded back under a half-typed name. Editing the box is how
+   * somebody tries the next candidate; it should not cost them the answer they
+   * are still reading.
+   *
+   * What the old rule was protecting is real and is kept: *a result must not
+   * sit under an empty field, naming a title that is no longer anywhere on
+   * screen.* Emptying the box still clears everything. Nothing short of empty
+   * does — and where the box has drifted, `stale` says which title the finding
+   * belongs to, which is what makes the looser rule honest rather than merely
+   * convenient.
+   */
   const answered =
-    state === "done" && checked !== null && title.trim() === checked;
+    state === "done" && checked !== null && title.trim() !== "";
+
+  /** The box no longer says what the finding below it is about. */
+  const stale = answered && title.trim() !== checked;
+
+  /** Nothing has been asked yet, so the box is the whole screen. */
+  const asking = !answered && !error && state !== "loading";
 
   /**
-   * Whether the box is standing in for an answer with the genre's shelf.
+   * Whether the browsing shelf is standing in for an answer.
    *
-   * One flag because the heading, the note and the covers have to appear and
-   * disappear together — they were two `&&` chains in two places before the
-   * heading moved to the top of the box, which is one edit away from a box
-   * titled after a shelf it is not showing.
+   * One flag because the line and the covers have to appear and disappear
+   * together — as two `&&` chains in two places it is one edit away from a
+   * caption describing a shelf that is not on screen.
    */
-  /** Whether the checked title is the one the book already carries. */
-  const isOwnTitle = (checked ?? "").trim() === book?.title.trim();
-
-  const showShelf =
-    !answered && !error && state !== "loading" && genreShelf.length > 0;
+  const showShelf = asking && genreShelf.length > 0;
 
   return (
     <div className={toolShell(embedded)}>
-      {!embedded && (
+      {/* `book &&` as well as `!embedded`: the header is the one thing on
+          this screen that still needs one, and an id that matches nothing now
+          costs the chip rather than the page. */}
+      {!embedded && book && (
         <ToolHeader
           book={book}
           tool="Title check"
@@ -254,7 +481,6 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
              same trade the comps deck makes. "Strictly" and the aside about
              trademarks were three lines in a narrow column beside an empty
              half-header; the point survives in one. */
-          action={<ToolStepDone state={save} />}
         >
           No title is taken — titles cannot be copyrighted. The useful question
           is whether somebody else&rsquo;s book turns up first when a reader
@@ -263,23 +489,19 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
       )}
 
       <div className="@container mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
-        {heading}
-
-        {/* `ToolHeader` is suppressed in the roadmap's panel and it was the
-            only place this screen said what the question actually is — so the
-            panel opened on "Check the title" and a text box, with the premise
-            missing. */}
+        {/* `ToolHeader` is suppressed in the roadmap's panel and in the
+            dashboard, and it was the only place this screen said what the
+            question actually is — so the panel opened on "Check the title" and
+            a text box, with the premise missing. */}
         {embedded && (
-          <div className="-mt-2 mb-2 flex items-start justify-between gap-4">
-            <p className="max-w-2xl text-sm text-muted">
-              {/* Explicit space: the one after `</em>` is swallowed when the
-                  line wraps, which set this as "taken— titles". */}
-              No title is <em>taken</em> &mdash; titles cannot be copyrighted.
-              The useful question is whether somebody else&rsquo;s book turns up
-              first when a reader searches for yours.
-            </p>
-            <ToolStepDone state={save} />
-          </div>
+          <p className="-mt-2 mb-2 max-w-2xl text-sm text-muted">
+            {/* Explicit space: the one after `</em>` is swallowed when the
+                line wraps, which set this as "taken— titles". */}
+            No title is <em>taken</em>
+            {" "}&mdash; titles cannot be copyrighted. The useful question is
+            whether somebody else&rsquo;s book turns up first when a reader
+            searches for yours.
+          </p>
         )}
         {/* ---- One box: the shelf's name, the search, and what it finds ---
 
@@ -295,22 +517,54 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
             putting the control under that name is the order the eye wants.
             Once there is an answer the heading is gone and the box opens on
             the field, which is then the only thing above the finding. */}
-        <section className="mt-6 rounded-2xl border border-line bg-panel p-5 @2xl:p-6">
-          {showShelf && (
-            <>
-              {/* The same two lines the shelf used to carry under it, now at
-                  the top of the box it lives in. */}
-              <h2 className="text-2xl font-bold tracking-tight text-fg">
-                Titles on the {book.genre?.toLowerCase()} shelf
-                <span className="ml-3 text-lg font-normal text-muted">
-                  {genreShelf.length}
-                </span>
-              </h2>
-              <p className="mt-1 mb-4 max-w-prose text-sm text-muted">
-                Not a check — just what the books beside yours are called, while
-                you decide.
-              </p>
-            </>
+        {/* `mt-6` only when nothing is above it. With a heading the card is
+            the first thing in the column and the area's own title is already
+            three lines up; the gap read as a dropped element. */}
+        <section
+          className={`rounded-2xl border border-line bg-panel p-5 @2xl:p-6 ${
+            heading ? "" : "mt-6"
+          }`}
+        >
+          {/* ---- Whose book, and which search ---------------------------
+
+              The caller's chrome, inside the instrument. See the same block in
+              `comps-page.tsx` — the two screens are switched between by one
+              control, so the control has to sit in the same place on both or
+              it appears to move when you use it. */}
+          {heading && (
+            <div className="mb-5 border-b border-line pb-5">{heading}</div>
+          )}
+
+          {/* ---- What this box is for ------------------------------------
+
+              **What the screen does, not a label for what is under it.** It
+              read "Titles on the fantasy shelf" with a count beside it, which
+              names the covers below and says nothing about the tool — and in
+              the dashboard this is the card's only heading, because
+              `ToolHeader` is suppressed there.
+
+              *Commit* rather than *publish* or *print*: the moment this is
+              useful is the one where a writer stops trying names and settles
+              on one, which happens long before anything is printed and is not
+              a step in any shop's process. `asking` is the whole condition —
+              once there is a finding, `Result` names itself. */}
+          {asking && (
+            <h2 className="text-2xl font-bold tracking-tight text-fg">
+              Check a title before you commit to it
+            </h2>
+          )}
+
+          {/* Names the shelf, so a wall of covers nobody asked for cannot read
+              as a result. "Not a check *yet*" — a stage rather than a denial —
+              and the count is here rather than beside the heading, because it
+              counts what is below it. */}
+          {showShelf ? (
+            <p className="mt-1 mb-4 max-w-prose text-sm text-muted">
+              Not a check yet &mdash; just {genreShelf.length} titles from the{" "}
+              {shelfName?.toLowerCase()} shelf, while you decide.
+            </p>
+          ) : (
+            asking && <div className="mb-4" />
           )}
 
           <form
@@ -343,6 +597,20 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
               {state === "loading" ? "Looking…" : "Check it"}
             </button>
           </form>
+
+          {/* **Which title the finding is about, when the box no longer says.**
+              The result now survives an edit, so the box and the answer can
+              disagree — and "Under this exact name 13" over a field reading
+              "spider ma" would read as a claim about "spider ma". Naming it is
+              what keeps the looser rule honest. Same shape as the comps
+              screen's "Showing Fantasy, from this book's genre". */}
+          {stale && (
+            <p className="mt-3 text-sm text-muted">
+              Showing the check for &ldquo;{checked}&rdquo;. Press Check it for
+              what is in the box.
+            </p>
+          )}
+
           {answered &&
             clashes &&
             sources &&
@@ -359,50 +627,36 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
                "everything you have already found stays where it is", which that
                made a lie. */
             (
-              <VerdictBanner
-                tone={verdictLine(clashes).tone}
-                /* **Only on the amber one.** A finding of "nothing uses this
-                   name" leaves nothing to decide — a pair of buttons under it
-                   would be asking a question that has already been answered.
-                   The decision belongs to the banner that raises a problem. */
-                actions={
-                  verdictLine(clashes).tone !== "note" ? null : (
-                    <VerdictActions
-                      tone={verdictLine(clashes).tone}
-                      primary={isOwnTitle ? "Try another" : "Use this title"}
-                      onPrimary={() => {
-                        if (isOwnTitle) {
-                          setTitle("");
-                          fieldRef.current?.focus();
-                          return;
-                        }
-                        setBookDetails(book.id, {
-                          title: checked ?? "",
-                          // Handed back unchanged: this setter clears any field
-                          // it is not given, so renaming here would quietly drop
-                          // the subtitle, the byline and the genre.
-                          subtitle: book.subtitle ?? "",
-                          author: book.author ?? "",
-                          genre: book.genre,
-                        });
-                      }}
-                      secondary={
-                        isOwnTitle ? "Keep it" : `Keep “${book.title}”`
-                      }
-                      onSecondary={() => {
-                        if (!isOwnTitle) setTitle(book.title);
-                        setDismissed(checked);
-                      }}
-                    />
-                  )
-                }
-              >
+              /* ---- The two buttons that were here -----------------------
+
+                 The amber banner carried a pair: *Use this title*, which
+                 renamed the book to the one just checked through
+                 `setBookDetails`, and *Keep "<the book's name>"*, which put the
+                 field back and closed the finding. When the checked title was
+                 already the book's own, they became *Try another* and *Keep
+                 it*.
+
+                 They went on 2026-09-03 with the book. A checker that takes any
+                 title has nothing to rename, and a rename button that acts on a
+                 book the writer never chose is worse than no button.
+
+                 What a restoration needs, if the tool is ever made book-aware
+                 again: `isOwnTitle`, a `setBookDetails` call that hands back
+                 `subtitle`, `author` and `genre` unchanged — that setter clears
+                 any field it is not given, so renaming quietly dropped all
+                 three — and the rule that the pair appears on the amber tone
+                 only. A finding of "nothing uses this name" leaves nothing to
+                 decide, and buttons under it ask a question already answered.
+
+                 `dismissed` stays: the writer can still wave a finding away,
+                 which is now what closing it means. */
+              <VerdictBanner tone={verdictLine(clashes).tone}>
                 {verdictLine(clashes).headline}
               </VerdictBanner>
             )}
 
           <LeftPill allowance={checks} className="mt-3" />
-          <LimitBanner allowance={checks} className="mt-4" />
+          <LimitBanner allowance={checks} refused={gate.refused} className="mt-4" />
 
           {error && (
             <p className="mt-6 rounded-lg border border-line bg-panel p-4 text-sm text-fg">
@@ -416,7 +670,22 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
               describing. A control that needs a paragraph about what it does is
               usually a control in the wrong place; this one is in the right
               place, so the paragraph was just words. */}
-          {showShelf && <Shelf books={genreShelf} />}
+
+          {/* No View control on this one: it is what is on screen *before* a
+              check, and the menu belongs on the answer. It follows the same
+              stored setting. */}
+          {showShelf && <Shelf books={genreShelf} layout={layout} />}
+
+          {/* **The browsing shelf is a five-page sweep, so its wait is real.**
+              It arrives on mount and used to leave the whole space under the
+              box blank until a hundred covers appeared at once — which reads
+              as a screen that has finished and has nothing on it, rather than
+              as one still working. Same placeholders as a check, without the
+              finding-shaped block above them: nothing is being *answered*
+              here, so nothing should be shaped like an answer. */}
+          {asking && shelfLoading && (
+            <CoverSkeleton layout={layout} className="mt-4" />
+          )}
 
           {/* **The blank page was the bug, not the missing spinner.**
 
@@ -426,9 +695,9 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
               had just been full of covers reads as the results being *cleared*
               rather than replaced.
 
-              So the space keeps the shape it is about to hold: a heading and a
-              grid of cover-shaped blocks, at the same size and gap as the real
-              ones, so nothing moves when they arrive. */}
+              So the space keeps the shape it is about to hold: a finding, a
+              heading, and a grid of cover-shaped blocks at the same size and
+              gap as the real ones, so nothing moves when they arrive. */}
           {state === "loading" && (
             <section className="mt-8" aria-hidden>
               <div className="animate-pulse rounded-xl border border-line bg-panel px-5 py-4">
@@ -439,19 +708,7 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
 
               <div className="mt-8 h-4 w-40 animate-pulse rounded bg-raised" />
 
-              {/* The same track rule as the real shelf, or the page jumps
-                  when the covers land. */}
-              {/* The same track rule as the real shelf, or the page jumps
-                  when the covers land. */}
-              <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-4 gap-y-6">
-                {Array.from({ length: 16 }, (_, i) => (
-                  <li key={i} className="animate-pulse">
-                    <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
-                    <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
-                    <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
-                  </li>
-                ))}
-              </ul>
+              <CoverSkeleton layout={layout} className="mt-4" />
             </section>
           )}
 
@@ -469,7 +726,64 @@ export function TitleCheckPage({ bookId, embedded, heading }: ToolPageProps) {
             clashes &&
             sources &&
             (sources.google || sources.openLibrary) && (
-              <Result title={checked ?? ""} clashes={clashes} />
+              <>
+                <Result
+                  title={checked ?? ""}
+                  clashes={clashes}
+                  layout={layout}
+                  onLayout={(next) => setPref("researchLayout", next)}
+                  suggestion={suggestion}
+                  onTrySuggestion={(next) => {
+                    setTitle(next);
+                    // A press is a press: this runs a check and spends one of
+                    // the day's, like the button beside the box. A free search
+                    // reachable by mistyping is not a limit.
+                    if (!gate.spend()) return;
+                    void check(next);
+                  }}
+                />
+
+                {/* ---- What this was checked against -----------------------
+
+                    **The denominator, under the finding rather than beside
+                    it.** Everything above is counted from the records the
+                    sweep read, and the sweep is deep rather than exhaustive —
+                    so a writer reading "nothing under this exact name" is
+                    owed the size of the thing that nothing was found in. It
+                    is the same rule the rest of the app follows for a figure:
+                    say how many records carried it.
+
+                    Only when the catalogue gave a total. A sentence with a
+                    blank in it where the number should be is worse than the
+                    shorter sentence. */}
+                {depth && depth.scanned > 0 && (
+                  <p className="mt-6 border-t border-line pt-5 text-xs text-muted">
+                    {/* **The catalogues are named here now.** The banner used
+                        to carry them and no longer does, and a figure without
+                        its provenance is the thing this app refuses
+                        everywhere else — so the sentence that reports the
+                        count is the sentence that says whose records were
+                        counted. */}
+                    Checked against {depth.scanned.toLocaleString()} records
+                    from Google Books and Open Library
+                    {depth.reported && depth.reported > depth.scanned
+                      ? `, of about ${depth.reported.toLocaleString()} they report under this name — a deep look, not the whole shelf.`
+                      : "."}
+                  </p>
+                )}
+
+                {/* Not weather, and the only failure here somebody has to go
+                    and fix. An invalid key answers 400 for good, so "try again
+                    shortly" would be a promise that cannot come true — and
+                    without this line the screen simply showed half a search as
+                    though it were a whole one. */}
+                {keyRefused && (
+                  <p className="mt-3 text-xs text-muted">
+                    Google Books refused the API key, so only Open Library
+                    answered. The results are real; there are fewer of them.
+                  </p>
+                )}
+              </>
             )}
 
           {/* Only alongside results. It is advice about *reading* a list, and
@@ -587,70 +901,63 @@ function VerdictBanner({
 }
 
 /**
- * The two ways out of a finding, in the banner that made it.
+ * Cover-shaped placeholders, in whatever mode the writer is reading in.
  *
- * **A check ends in a decision, and the screen used to leave the writer to
- * make it somewhere else.** They read "at least eighteen books use this exact
- * title", agreed with it, and then had to go to the listing screen to change
- * the name — a trip that loses the shelf they were looking at. So the decision
- * is offered where it is made, and both answers do something real:
+ * **The grid class is `resultsGridClass`, the same call the real shelf makes.**
+ * It was a hard-coded `auto-fill,minmax(11rem,1fr)` track — right when it was
+ * written, and wrong the moment the View menu arrived, because the covers then
+ * landed in five fixed columns under a placeholder grid that had drawn as many
+ * as would fit. Its own comment already said what it needed: *the same track
+ * rule as the real shelf, or the page jumps when the covers land.*
  *
- * - **The title in the box is not the book's.** Then the choice is whether to
- *   adopt it: *Use this title* renames the book, *Keep "…"* puts the field
- *   back to the book's own name and closes the finding.
- * - **The title in the box *is* the book's.** Adopting it is a no-op, so the
- *   pair becomes *Try another* — which empties the field and puts the caret in
- *   it — and *Keep it*, which closes the finding.
+ * Sixteen, not a hundred. It stands for the wait; it is not a preview of the
+ * count, and a hundred pulsing rectangles is a page that looks broken rather
+ * than busy.
  *
- * Neither is styled as the recommended one. This screen reports and does not
- * advise: sharing a title with an obscure book from 1974 is nothing and
- * sharing one with a bestseller in the same genre is a real problem, and only
- * the writer can see which they are looking at.
+ * In List mode the rows are short and horizontal, because a column of tall
+ * jacket-shaped blocks would be a wait shaped like the wrong answer.
  */
-function VerdictActions({
-  tone,
-  primary,
-  onPrimary,
-  secondary,
-  onSecondary,
+function CoverSkeleton({
+  layout,
+  className = "",
 }: {
-  tone: "ok" | "note";
-  primary: string;
-  onPrimary: () => void;
-  secondary: string;
-  onSecondary: () => void;
+  layout: ShelfLayout;
+  className?: string;
 }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
-      <button
-        type="button"
-        onClick={onPrimary}
-        /* White fill, the banner's own colour as its ink — the same pairing
-           the upgrade banner uses, and the reason `*-solid` is a token: it is
-           dark enough to read on white as well as to carry white. */
-        className={`rounded-lg bg-white px-3.5 py-1.5 font-sans text-xs
-                    font-semibold outline-none transition-opacity
-                    hover:opacity-90 focus-visible:ring-2
-                    focus-visible:ring-white/70 ${
-                      tone === "note" ? "text-note-solid" : "text-ok-solid"
-                    }`}
-      >
-        {primary}
-      </button>
-      <button
-        type="button"
-        onClick={onSecondary}
-        className="rounded-lg border border-white/40 px-3.5 py-1.5 font-sans
-                   text-xs font-semibold text-white outline-none
-                   transition-colors hover:bg-white/15 focus-visible:ring-2
-                   focus-visible:ring-white/70"
-      >
-        {secondary}
-      </button>
-    </div>
+    <ul className={`${resultsGridClass(layout)} ${className}`} aria-hidden>
+      {Array.from({ length: 16 }, (_, i) =>
+        isGrid(layout) ? (
+          <li key={i} className="animate-pulse">
+            <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
+            <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
+            <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
+          </li>
+        ) : (
+          <li key={i} className="flex animate-pulse items-center gap-3 py-1.5">
+            <div className="h-12 w-8 shrink-0 rounded bg-raised" />
+            <div className="h-3.5 w-1/3 rounded bg-raised" />
+          </li>
+        ),
+      )}
+    </ul>
   );
 }
 
+/*
+ * **`VerdictActions` was here, and went on 2026-09-03 with the book.**
+ *
+ * It drew the pair under the amber banner — *Use this title* / *Keep "…"* —
+ * and the note at its old call site says what a restoration has to put back.
+ * Deleted rather than left callerless: an unused component is lint this repo
+ * holds to a baseline, and the reasoning is the part worth keeping.
+ *
+ * The rule it was built on outlives it and belongs to the whole screen:
+ * **neither action was styled as the recommended one.** This screen reports
+ * and does not advise. Sharing a title with an obscure book from 1974 is
+ * nothing; sharing one with a bestseller in the same genre is a real problem;
+ * only the writer can see which they are looking at.
+ */
 /**
  * The one line the toast carries.
  *
@@ -698,24 +1005,81 @@ function verdictLine(clashes: TitleClash[]): {
   return { tone: "ok", headline: "Nothing published under this exact name" };
 }
 
-function Result({ title, clashes }: { title: string; clashes: TitleClash[] }) {
+function Result({
+  title,
+  clashes,
+  layout,
+  onLayout,
+  suggestion,
+  onTrySuggestion,
+}: {
+  title: string;
+  clashes: TitleClash[];
+  layout: ShelfLayout;
+  onLayout: (next: ShelfLayout) => void;
+  /** A published title this one may be a misspelling of. See `suggestSpelling`. */
+  suggestion: string | null;
+  onTrySuggestion: (title: string) => void;
+}) {
   const exact = clashes.filter((c) => c.match === "exact");
   const near = clashes.filter((c) => c.match !== "exact");
 
   return (
     <section className="mt-8">
+      {/* The control goes on whichever shelf is first, so it is always at the
+          top of the answer and never drawn twice. */}
       {exact.length > 0 && (
         <Shelf
           heading="Under this exact name"
           books={exact.map((c) => c.book)}
+          layout={layout}
+          onLayout={onLayout}
         />
       )}
       {near.length > 0 && (
-        <Shelf heading="Close to it" books={near.map((c) => c.book)} />
+        <Shelf
+          heading="Close to it"
+          books={near.map((c) => c.book)}
+          layout={layout}
+          onLayout={exact.length > 0 ? undefined : onLayout}
+        />
       )}
 
       {clashes.length === 0 && (
-        <p className="mt-4 text-sm text-muted">Searched “{title}”.</p>
+        <div className="mt-4">
+          <p className="text-sm text-muted">Searched “{title}”.</p>
+
+          {/* ---- The other thing worth knowing about a clean answer -------
+
+              **Offered, never asserted, and the green bar above stays green.**
+              Nothing *is* published under this name, which is what was asked
+              and what was answered. This is a second fact beside it: a
+              catalogue holds a title two keystrokes away, so a reader
+              searching for this one may well be shown that one instead.
+
+              It may equally be a name the writer chose precisely because it is
+              uncrowded, which is why `suggestSpelling` stays quiet unless the
+              neighbour is very close indeed — and why this is a question with
+              a button rather than a correction applied for them. */}
+          {suggestion && (
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-fg">
+              <span>
+                Did you mean “<strong className="font-semibold">{suggestion}</strong>
+                ”?
+              </span>
+              <button
+                type="button"
+                onClick={() => onTrySuggestion(suggestion)}
+                className="rounded-lg border border-line px-3 py-1.5 text-sm
+                           font-semibold text-fg outline-none transition-colors
+                           hover:border-accent/60 hover:bg-raised
+                           focus-visible:ring-2 focus-visible:ring-accent/50"
+              >
+                Check that instead
+              </button>
+            </p>
+          )}
+        </div>
       )}
     </section>
   );
@@ -739,6 +1103,8 @@ function Shelf({
   heading,
   books,
   note,
+  layout,
+  onLayout,
 }: {
   /**
    * Absent when the section around it is already named — the genre shelf's
@@ -749,6 +1115,16 @@ function Shelf({
   books: CompTitle[];
   /** One line under the heading, where the shelf needs explaining. */
   note?: string;
+  layout: ShelfLayout;
+  /**
+   * Draw the View control on this shelf's heading row.
+   *
+   * **One menu per screen, not one per shelf.** A result can show three walls
+   * at once — under this exact name, close to it, and the genre shelf — and
+   * they all read one setting, so three copies of the control would be three
+   * ways to change one thing sitting inches apart. The first shelf carries it.
+   */
+  onLayout?: (next: ShelfLayout) => void;
 }) {
   return (
     <>
@@ -763,12 +1139,15 @@ function Shelf({
           be its name. The count stays a step down and in the muted grey — it
           is a figure about the heading, not part of it. */}
       {heading && (
-        <h2 className="mt-10 text-2xl font-bold tracking-tight text-fg">
-          {heading}
-          <span className="ml-3 text-lg font-normal text-muted">
-            {books.length}
-          </span>
-        </h2>
+        <div className="mt-10 flex items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold tracking-tight text-fg">
+            {heading}
+            <span className="ml-3 text-lg font-normal text-muted">
+              {books.length}
+            </span>
+          </h2>
+          {onLayout && <ViewMenu value={layout} onChange={onLayout} />}
+        </div>
       )}
       {note && <p className="max-w-prose mt-1 text-sm text-muted">{note}</p>}
 
@@ -790,16 +1169,24 @@ function Shelf({
 
           No breakpoints and no container queries — the track size decides, so
           this needs no separate answer for the roadmap's half-width panel. */}
-      {/* **`auto-fill` with a `1fr` ceiling, not `auto-fit` with a fixed one.**
-          The tracks used to stop at 13rem, so on a wide page five covers ended
-          a long way short of the right edge and the shelf sat in a box it did
-          not fill — the imbalance was the cap, not the alignment. `1fr` lets
-          the tracks share what is there, and `auto-fill` keeps the empty ones,
-          which is what stops a four-book answer stretching each cover into a
-          poster. That was the fixed cap's job and it is still done. */}
-      <ul className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-x-4 gap-y-6">
+      {/* **The writer's chosen mode, out of `resultsGridClass`, replacing the
+          `auto-fill` track this drew for itself.**
+
+          The old note argued for `auto-fill,minmax(11rem,1fr)` on the grounds
+          that the track size should decide and a four-book answer should not
+          stretch each cover into a poster. Both halves still hold — and they
+          are what a fixed column count gives you outright, at a width the
+          writer picked rather than one the content bargained for. Sharing the
+          map with the comps wall matters more: they are two answers to one
+          question and are switched between by one control, so they may not
+          disagree about how wide a jacket is. */}
+      <ul className={`mt-4 ${resultsGridClass(layout)}`}>
         {books.map((other) => {
-          const inner = (
+          /* Standing up or lying down, as one branch rather than two
+             components — the same trade `CompCard` makes, and for the same
+             reason: both show the title, the year and the author, so two
+             copies would be two places to change what a match tells you. */
+          const inner = isGrid(layout) ? (
             <>
               <BookCover src={other.coverUrl} />
               <span className="mt-2 block truncate text-sm font-medium text-fg">
@@ -813,6 +1200,21 @@ function Shelf({
                 {other.authors[0] ?? ""}
               </span>
             </>
+          ) : (
+            <span className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-raised">
+              <span className="w-8 shrink-0">
+                <BookCover src={other.coverUrl} />
+              </span>
+              <span className="min-w-0 flex-[2] truncate text-sm font-medium text-fg">
+                {other.title}
+              </span>
+              <span className="hidden min-w-0 flex-1 truncate text-xs text-muted @sm:block">
+                {other.authors[0] ?? ""}
+              </span>
+              <span className="shrink-0 text-xs tabular-nums text-muted">
+                {other.year ?? ""}
+              </span>
+            </span>
           );
 
           return (

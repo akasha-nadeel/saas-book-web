@@ -114,6 +114,49 @@ export function trashedBookClosed(
   return !!book?.trashedAt && onFreePlan(plan);
 }
 
+/**
+ * **Whether the model steps around the comps search are reachable.**
+ *
+ * The catalogue search itself is live: `/api/comps` is free, keyless and
+ * answers again as of 2026-09-02. The two routes that put a model over it are
+ * not — `/api/comps/query`, which turns a plain sentence into a catalogue
+ * query, and `/api/comps/rank`, which reads the manuscript's opening and says
+ * which of the results are actually like it. Both still answer 404 through
+ * `launchFeatureEnabled()`.
+ *
+ * **This is here rather than in `launch-server.ts` because a component has to
+ * read it.** That module touches `process.env` and cannot be imported by a
+ * client screen; this one reads no environment at all, which is exactly what
+ * makes it safe to import anywhere. Same reasoning as
+ * `HIDDEN_BOOK_TOOL_PATHS` below.
+ *
+ * **What it buys is the house rule about dead UI.** `comps-page.tsx` draws a
+ * "Rank these" button and a paragraph listing the prose that press would send.
+ * With the route gated that button cannot do anything but fail, and a control
+ * that always errors is worse than one that is not there. The query
+ * translation needs no such care — its failure is already swallowed on
+ * purpose — so the flag only saves it a guaranteed 404 on every search.
+ *
+ * Flip it to `true` the day those two routes are un-gated. Nothing else needs
+ * editing: `ResultsBar`, `rank()` and the whole ranking path are untouched in
+ * the page, kept whole for exactly that.
+ */
+export const COMPS_RANKING_LIVE: boolean = false;
+
+/**
+ * The book-tool segments the proxy sends home, plus `read`.
+ *
+ * **`title-check` came off this list on 2026-09-02 and `comps` went back on it
+ * on 2026-09-03.** Both are catalogue-backed searches over Google Books merged
+ * with Open Library, neither of which needs a key to answer, and both are
+ * built and tested. Only the title check is wanted for now, so the dashboard
+ * holds it alone and comps waits here — which is what this list is for.
+ *
+ * **`/api/comps` stays open**, because it is the route the title check runs on.
+ * Gating a screen and gating the data behind it are separate decisions, and
+ * this is the case that shows why they have to be. `COMPS_RANKING_LIVE` above
+ * covers the model routes over that data, which stay shut.
+ */
 const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "arc",
   "blurb",
@@ -129,7 +172,6 @@ const HIDDEN_BOOK_TOOL_PATHS = new Set([
   "read",
   "roadmap",
   "structure",
-  "title-check",
   "track",
 ]);
 
@@ -149,7 +191,6 @@ export const LAUNCH_POST_BACKLOG = [
   "Blurb workshop",
   "Categories and keyword tools",
   "Cover checker",
-  "Title check",
   "Structure report",
   "Prose report",
   "Progress and writing record",

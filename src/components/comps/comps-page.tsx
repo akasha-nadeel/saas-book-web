@@ -15,15 +15,9 @@ import { BookCover } from "@/components/ui/book-cover";
 import {
   BROWSE_SHELVES,
   buildQuery,
-  type CompSummary,
   type CompTitle,
 } from "@/lib/comps/comps";
 import { looksPlain } from "@/lib/comps/query";
-import {
-  compareLength,
-  lengthFromPages,
-  WORDS_PER_PAGE,
-} from "@/lib/comps/length";
 import { subjectParts } from "@/lib/comps/subjects";
 import {
   openingFrom,
@@ -34,23 +28,26 @@ import {
 import { plural } from "@/lib/plural";
 import { toBlocks } from "@/lib/export/blocks";
 import {
-  bookWordCount,
   chapterMatterOf,
   findBook,
   getBody,
   orderedChapters,
-  setTargetWords,
 } from "@/lib/library-store";
-import { suggestTarget } from "@/lib/book-kinds";
-import { ToolStepDone } from "@/components/ui/tool-save";
 import {
   LeftPill,
   LimitBanner,
   LimitDialog,
   useLimitGate,
 } from "@/components/upgrade/free-limit";
-import { useHydrated, useShelf } from "@/lib/use-library";
-import { useToolSave } from "@/lib/use-tool-save";
+import { useHydrated, usePrefs, useShelf } from "@/lib/use-library";
+import { setPref } from "@/lib/library-store";
+import { ViewMenu } from "@/components/ui/view-menu";
+import {
+  isGrid,
+  resultsGridClass,
+  type ShelfLayout,
+} from "@/lib/shelf-layout";
+import { COMPS_RANKING_LIVE } from "@/lib/launch";
 import { toolShell, type ToolPageProps } from "@/lib/tool-page";
 
 /**
@@ -96,26 +93,33 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
   const book = findBook(shelf, bookId);
 
   /*
-   * Nothing here is a draft — a search is not an edit, and "Use this target"
-   * writes the moment it is pressed.
+   * **There is no "Mark step done" here any more, and no `useToolSave`.**
    *
-   * Two road steps land on this screen and they are ticked in opposite ways.
-   * "Set a length to aim at" is detected from `book.targetWords`, so pressing
-   * that button ticks it. "Find your comp titles" cannot be detected: the two
-   * or three a writer settles on are copied into a query letter and a shop's
-   * form, and nothing in the library records that they chose them. So it is
-   * this press.
+   * It ticked "Find your comp titles" on the publishing roadmap — a step with
+   * no detector, because nothing in a library records which two comps a writer
+   * settled on. That reasoning still holds and the machinery is untouched
+   * (`use-tool-save.ts`, `tool-steps.ts`, `ToolStepDone` are all still there);
+   * what changed is that the roadmap is in `HIDDEN_BOOK_TOOL_PATHS`, so the
+   * button ticked a step on a screen nobody can open and then said so in a
+   * tooltip pointing at it.
+   *
+   * It comes back with the road, and restoring it is three edits: this hook,
+   * the `action` on the header, and the row under it — all three, or the
+   * control exists in one frame and not the other.
    */
-  const save = useToolSave({ book, tool: "comps" });
 
   /* Generated, not a literal: the roadmap mounts this tool in a panel, so the
      page can hold this screen and the road at once and a hard-coded id would
      be a duplicate the label points at by chance. */
   const queryId = useId();
 
+  /* Shared with the title check — one answer to "how do I want found books
+     drawn", not one per screen, or the segmented control between them would
+     appear to change the setting. */
+  const layout = usePrefs().researchLayout;
+
   const [query, setQuery] = useState("");
   const [books, setBooks] = useState<CompTitle[]>([]);
-  const [summary, setSummary] = useState<CompSummary | null>(null);
   const [sources, setSources] = useState<{
     google: boolean;
     openLibrary: boolean;
@@ -198,7 +202,13 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
     setRankError(null);
 
     let asked = q;
-    if (looksPlain(q)) {
+    /* **The translation is skipped outright while the model routes are gated**,
+       rather than left to fail into the catch below. The catch is still the
+       right behaviour and stays — a translation that errors must never cost a
+       writer their search — but firing a request we already know answers 404,
+       on every search, is a round trip spent to reach a `catch` block. The flag
+       is the one place that knows; see `COMPS_RANKING_LIVE`. */
+    if (COMPS_RANKING_LIVE && looksPlain(q)) {
       try {
         const response = await fetch("/api/comps/query", {
           method: "POST",
@@ -253,7 +263,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
         }
       }
       setBooks(data.books ?? []);
-      setSummary(data.summary ?? null);
       setSources(data.sources ?? null);
       setGoogleKeyed(data.googleKeyed !== false);
       setWhy(data.why ?? null);
@@ -432,7 +441,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
              long. Shortened first: the aside about reaching for a bestseller
              was the best-written part of it and the least useful, since the
              two shelves below make the same point by showing it. */
-          action={<ToolStepDone state={save} />}
         >
           {/* **The problem before the definition.** This used to open on what
               a comp title *is*, which is a definition read by somebody who
@@ -448,16 +456,6 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           actually has rather than on the window's — it opens in the roadmap's
           panel at about half a screen. See the note in `blurb-page.tsx`. */}
       <div className="@container mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
-        {heading}
-
-        {/* The panel draws no `ToolHeader`, and `embedded` may hide the frame
-            but never a feature. */}
-        {embedded && (
-          <div className="-mt-2 mb-4 flex justify-end">
-            <ToolStepDone state={save} />
-          </div>
-        )}
-
         {/* ---- The bench, and everything it produces --------------------
 
             **One box: the shelves, the box you type in, and the books.** They
@@ -479,6 +477,24 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
             they keep their own cards, or this box would be the whole page and
             stop meaning anything. */}
         <section className="rounded-2xl border border-line bg-panel p-5 @2xl:p-6">
+          {/* ---- Whose book, and which search ---------------------------
+
+              **The caller's own chrome, inside the instrument rather than
+              stacked above it.** `heading` has always been drawn "in the page
+              rather than on a bar above it"; the dashboard's Research area
+              passes the book chip and the two-way switch down through it, and
+              they belong in the same frame as the field they act on. A chip, a
+              toggle and then the search, as three boxes down the screen, read
+              as three separate things when they are one question asked in
+              three parts.
+
+              The rule under it is the only thing this file adds. Nothing at
+              all is drawn when no heading is passed, which is every use of
+              this screen as a whole window. */}
+          {heading && (
+            <div className="mb-5 border-b border-line pb-5">{heading}</div>
+          )}
+
           {/* **The shelves live in the box now.** They were a section of their
               own under it — a heading, a caption and twenty-six chips — which
               asked the same question the box asks and pushed the covers a
@@ -489,14 +505,26 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
               for how the two fit in one control. */}
           <label
             htmlFor={queryId}
-            /* **An instruction, not a question.** "What is your book about?"
-               was the wrong shape for a label over an empty field: a question
-               invites an answer in the writer's head, where what is needed is
-               the one thing to do next. It also duplicated the page's `h1`,
-               which is already a question. */
+            /* **What the screen is for, then what to do about it** — and it
+               has to be both, because in the dashboard's Research area this is
+               the only heading the card has. `ToolHeader` carries the page's
+               question when the tool owns the window; embedded it is
+               suppressed, so a line reading only "Type a few words about your
+               book" left a first-time writer with an instruction and no idea
+               why they were following it.
+
+               The need first and the action second. "Agents and shops ask for
+               books like yours" is the reason anybody is on this screen — it
+               is a field on a form they are already staring at — and "find
+               them" is the one thing to do next. An em dash rather than a
+               comma: they are two complete clauses, and a comma between them
+               is a splice.
+
+               Still the field's `<label>`, so the box below keeps a proper
+               accessible name; the sentence under it says what to type. */
             className="block text-lg font-semibold tracking-tight text-fg"
           >
-            Type a few words about your book, or pick a shelf
+            Agents and shops ask for books like yours &mdash; find them.
           </label>
 
           {/* **Says what to type, not what the machine does with it.** The
@@ -544,7 +572,7 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
           <LeftPill allowance={comps} className="mt-2" />
 
           {/* True of the shelves too: they are searches, and they go with it. */}
-          <LimitBanner allowance={comps} className="mt-5" />
+          <LimitBanner allowance={comps} refused={gate.refused} className="mt-5" />
 
           {/* ---- What came back ---------------------------------------- */}
           <div className="mt-7 border-t border-line pt-7">
@@ -559,17 +587,24 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
                 most writers have never opened before. Shaped like the rows that
                 replace them, so nothing jumps when they do. */}
             {state === "loading" && (
-              <ul
-                className="grid grid-cols-2 gap-x-4 gap-y-6 @sm:grid-cols-3 @lg:grid-cols-4 @2xl:grid-cols-5"
-                aria-hidden
-              >
-                {Array.from({ length: 10 }, (_, i) => (
-                  <li key={i} className="animate-pulse">
-                    <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
-                    <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
-                    <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
-                  </li>
-                ))}
+              /* The same class the answer will take, so nothing jumps when the
+                 covers land — including in List, where a column of placeholder
+                 jackets would be a wait shaped like the wrong answer. */
+              <ul className={resultsGridClass(layout)} aria-hidden>
+                {Array.from({ length: 10 }, (_, i) =>
+                  isGrid(layout) ? (
+                    <li key={i} className="animate-pulse">
+                      <div className="aspect-[2/3] w-full rounded-lg bg-raised" />
+                      <div className="mt-2 h-3.5 w-4/5 rounded bg-raised" />
+                      <div className="mt-1.5 h-3 w-3/5 rounded bg-raised" />
+                    </li>
+                  ) : (
+                    <li key={i} className="flex animate-pulse items-center gap-3 py-2">
+                      <div className="h-12 w-8 shrink-0 rounded bg-raised" />
+                      <div className="h-3.5 w-1/3 rounded bg-raised" />
+                    </li>
+                  ),
+                )}
               </ul>
             )}
 
@@ -602,7 +637,21 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
               </p>
             )}
 
-            {books.length > 0 && (
+            {/* ---- The ranking card, and why it may not be here -------------
+
+                `ResultsBar` is the whole model half of this screen: "Rank
+                these", its disabled states, and the paragraph naming the prose
+                that press would send. `/api/comps/rank` is still gated, so with
+                the card drawn the only thing that button could do is fail —
+                which is the dead UI the house rules refuse. One flag hides the
+                card; nothing below it is touched, and `ResultsBar`, `rank()`,
+                `picks` and `pattern` are all still here, finished and tested,
+                for the day `COMPS_RANKING_LIVE` goes true.
+
+                What is left is the search, which is the free half and the
+                larger one: the shelf of covers, the median length, the subject
+                counts and the two catalogues' own account of themselves. */}
+            {COMPS_RANKING_LIVE && books.length > 0 && (
               <ResultsBar
                 picks={picks}
                 pattern={pattern}
@@ -638,8 +687,30 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
                 </p>
               )}
 
+            {/* ---- How the wall is drawn --------------------------------
+
+                Over the covers rather than up beside the search box: it acts
+                on what came back, and a control for the answer belongs with
+                the answer. Only once there is something to redraw — a View
+                menu above an empty page is a setting for nothing. */}
+            {books.length > 0 && (
+              <div className="mt-6 flex items-center justify-between gap-3">
+                <p className="text-sm text-muted">
+                  {plural(books.length, "book")}
+                </p>
+                <ViewMenu
+                  value={layout}
+                  onChange={(next) => setPref("researchLayout", next)}
+                />
+              </div>
+            )}
+
             {picks && picks.length > 0 && (
-              <CompGrid comps={picks.map((p) => p.book)} reasons={picks} />
+              <CompGrid
+                comps={picks.map((p) => p.book)}
+                reasons={picks}
+                layout={layout}
+              />
             )}
 
             {books.length > 0 && (
@@ -649,57 +720,31 @@ export function CompsPage({ bookId, embedded, heading }: ToolPageProps) {
                     The rest of what came back
                   </h2>
                 )}
-                <CompGrid comps={picks ? restOf(books, picks) : books} />
+                <CompGrid
+                  comps={picks ? restOf(books, picks) : books}
+                  layout={layout}
+                />
               </>
             )}
           </div>
         </section>
-        {/* ---- What the shelf adds up to ---------------------------------
+        {/* ---- What the shelf added up to, and why it is gone -------------
 
-            After the covers, because it is a reading *of* them. A writer who
-            wants the median page count has already seen the books it was
-            counted from, which is the order in which the number means
-            anything.
+            Three figure cards — median pages, median blurb characters, Filed
+            under — and a length panel that read them back as a word range with
+            a "Set my target" button under it.
+
+            They were readings *of* the covers and they took up more of the
+            screen than the covers did, on a page whose one question is what
+            this book sits beside. The shelf is the answer to that; the
+            arithmetic was a second screen underneath it, answering a question
+            nobody had reached yet.
+
+            `lib/comps/length.ts` is untouched, pure and still tested — it is
+            what this would be rebuilt from, and TODO.md records the trade. The
+            one loose end is `checkup.ts`'s "No length to aim at" finding, whose
+            fix routes here for a button that is no longer on the page.
         ---------------------------------------------------------------- */}
-
-        {summary && books.length > 0 && (
-          <section className="mt-12 grid gap-3 @md:grid-cols-3">
-            <Figure
-              value={summary.medianPages ? `${summary.medianPages}` : "—"}
-              label="median pages"
-              from={summary.pagesFrom}
-              total={books.length}
-            />
-            <Figure
-              value={
-                summary.medianBlurbChars ? `${summary.medianBlurbChars}` : "—"
-              }
-              label="median blurb characters"
-              from={summary.blurbsFrom}
-              total={books.length}
-            />
-            <div className="rounded-xl border border-line bg-panel px-5 py-4">
-              <p className="text-sm font-bold text-fg">Filed under</p>
-              <p className="mt-1.5 text-sm text-muted">
-                {summary.subjects
-                  .slice(0, 5)
-                  .map((s) => `${s.name} (${s.count})`)
-                  .join(", ") || "—"}
-              </p>
-            </div>
-          </section>
-        )}
-
-        {summary && books.length > 0 && (
-          <LengthPanel
-            medianPages={summary.medianPages}
-            from={summary.pagesFrom}
-            words={bookWordCount(book)}
-            target={book.targetWords}
-            folklore={suggestTarget(book.genre ?? "Other")}
-            onUseTarget={(words) => setTargetWords(book.id, words)}
-          />
-        )}
 
         {/* Cut from four sentences to one. Three of them were restating what
             the cards above already say at the moment it matters — the ranking
@@ -1184,16 +1229,23 @@ function ResultsBar({
 function CompGrid({
   comps,
   reasons,
+  layout,
 }: {
   comps: CompTitle[];
   reasons?: RankedComp[];
+  layout: ShelfLayout;
 }) {
   const reasonFor = new Map((reasons ?? []).map((r) => [r.book.key, r.reason]));
 
   return (
-    <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-6 @sm:grid-cols-3 @lg:grid-cols-4 @2xl:grid-cols-5">
+    <ul className={`mt-4 ${resultsGridClass(layout)}`}>
       {comps.map((comp) => (
-        <CompCard key={comp.key} comp={comp} reason={reasonFor.get(comp.key)} />
+        <CompCard
+          key={comp.key}
+          comp={comp}
+          reason={reasonFor.get(comp.key)}
+          layout={layout}
+        />
       ))}
     </ul>
   );
@@ -1210,7 +1262,15 @@ function CompGrid({
  * broken image; a tile with the title set into it reads as a book whose
  * picture nobody uploaded, which is what it is.
  */
-function CompCard({ comp, reason }: { comp: CompTitle; reason?: string }) {
+function CompCard({
+  comp,
+  reason,
+  layout,
+}: {
+  comp: CompTitle;
+  reason?: string;
+  layout: ShelfLayout;
+}) {
   /**
    * What this one is filed under, cleaned.
    *
@@ -1231,7 +1291,7 @@ function CompCard({ comp, reason }: { comp: CompTitle; reason?: string }) {
    */
   const filed = comp.subjects.flatMap(subjectParts)[0];
 
-  const inner = (
+  const inner = isGrid(layout) ? (
     <>
       <BookCover src={comp.coverUrl} />
 
@@ -1253,6 +1313,39 @@ function CompCard({ comp, reason }: { comp: CompTitle; reason?: string }) {
           .join(" \u00b7 ")}
       </span>
     </>
+  ) : (
+    /**
+     * The same record lying down.
+     *
+     * **A branch, not a second component.** Both show the same five things —
+     * jacket, shelf, title, author, year and length — and two components would
+     * be two places to add the sixth. What differs is the arrangement; the
+     * link, the drawn missing cover and the ranked reason are shared.
+     *
+     * The small print runs on one line rather than stacking, because a column
+     * of three-line entries is a one-column grid. This mode exists to put more
+     * titles on the screen at once, and the author and the shelf drop out as
+     * the container narrows rather than wrapping the row to two lines.
+     */
+    <span className="flex items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-raised">
+      <span className="w-8 shrink-0">
+        <BookCover src={comp.coverUrl} />
+      </span>
+      <span className="min-w-0 flex-[2] truncate text-sm font-bold text-fg">
+        {comp.title}
+      </span>
+      <span className="hidden min-w-0 flex-1 truncate text-xs text-muted @sm:block">
+        {comp.authors.join(", ")}
+      </span>
+      <span className="hidden shrink-0 truncate text-[0.625rem] tracking-[0.08em] text-muted uppercase @lg:block">
+        {filed}
+      </span>
+      <span className="shrink-0 text-xs tabular-nums text-muted">
+        {[comp.year, comp.pageCount ? `${comp.pageCount}pp` : null]
+          .filter(Boolean)
+          .join(" · ")}
+      </span>
+    </span>
   );
 
   return (
@@ -1279,121 +1372,18 @@ function CompCard({ comp, reason }: { comp: CompTitle; reason?: string }) {
   );
 }
 
-/**
- * A word range from the page counts of real books, against the writer's own
- * count and against the folklore number `book-kinds.ts` would have suggested.
+/*
+ * **`LengthPanel` and `Figure` were here, and both went on 2026-09-02.**
  *
- * The folklore is shown rather than replaced. "110,000 for a fantasy novel" is
- * roughly right and nobody can say which books it came from; putting it beside
- * a figure that names its twenty is the whole argument for this feature, and
- * hiding it would be claiming a victory over a number the writer never saw.
+ * They drew the block below the covers — three figures with their
+ * denominators, and a word range read off the median page count with a
+ * "Set my target" button under it. See the note at their old call site for
+ * why: they were a second screen of arithmetic under the one screen this
+ * page is for.
  *
- * "Under" and "over" are stated as positions, never as verdicts. A book is
- * finished when it is finished, and a tool that tells a writer their novel is
- * too short is doing the thing this product exists not to do.
+ * Deleted rather than left callerless, because the *reasoning* worth keeping
+ * is in `lib/comps/length.ts` — pure, tested, and still here — rather than in
+ * the markup that printed it. The rule they were built on is the one to
+ * rebuild from: the folklore number is shown beside the counted one rather
+ * than replaced by it, and "under" and "over" are positions, never verdicts.
  */
-function LengthPanel({
-  medianPages,
-  from,
-  words,
-  target,
-  folklore,
-  onUseTarget,
-}: {
-  medianPages?: number;
-  from: number;
-  words: number;
-  target?: number;
-  folklore: number;
-  onUseTarget: (words: number) => void;
-}) {
-  const range = lengthFromPages(medianPages, from);
-
-  if (!range) {
-    return (
-      <section className="mt-4 rounded-xl border border-line bg-panel px-5 py-4">
-        <p className="text-sm font-bold text-fg">
-          How long is a book like this?
-        </p>
-        <p className="mt-1.5 text-sm text-muted">
-          Not enough of these results carried a page count to say. Your setup
-          suggests {folklore.toLocaleString()} words, which is the figure
-          everybody repeats for this genre — roughly right, and from books
-          nobody can name.
-        </p>
-      </section>
-    );
-  }
-
-  const where = compareLength(words, range);
-
-  return (
-    <section className="mt-4 rounded-xl border border-line bg-panel px-5 py-4">
-      <p className="text-sm font-bold text-fg">How long is a book like this?</p>
-      <p className="mt-1.5 text-fg">
-        <strong>
-          {range.low.toLocaleString()}–{range.high.toLocaleString()} words
-        </strong>
-        , from a median of {plural(range.medianPages, "page")} across{" "}
-        {plural(range.from, "book")}.
-      </p>
-      <p className="mt-1.5 text-xs text-muted">
-        Pages, not words — catalogues record pages, and a trade paperback runs
-        somewhere between {WORDS_PER_PAGE.low} and {WORDS_PER_PAGE.high} words a
-        page depending on trim size and type. That is why this is a range.
-      </p>
-
-      <p className="mt-3 text-sm text-muted">
-        You have {words.toLocaleString()} words
-        {where === "inside"
-          ? ", which is inside that range."
-          : where === "under"
-            ? ", which is below it. That is a position, not a problem."
-            : ", which is above it. Long books get published all the time."}
-      </p>
-
-      <p className="mt-3 text-sm text-muted">
-        The suggested target for this genre is {folklore.toLocaleString()} — the
-        number everybody repeats, from books nobody can name.
-        {target ? ` Yours is set to ${target.toLocaleString()}.` : ""}
-      </p>
-
-      <button
-        type="button"
-        onClick={() => onUseTarget(range.middle)}
-        className="mt-3 rounded-lg border border-line px-4 py-2 text-sm font-semibold text-fg"
-      >
-        Set my target to {range.middle.toLocaleString()}
-      </button>
-    </section>
-  );
-}
-
-/**
- * A figure, and how many books it was drawn from.
- *
- * The denominator is not decoration. "The median is 320 pages" from three of
- * twenty books is a different statement from the same figure from eighteen,
- * and a writer about to set their own length off it needs to know which.
- */
-function Figure({
-  value,
-  label,
-  from,
-  total,
-}: {
-  value: string;
-  label: string;
-  from: number;
-  total: number;
-}) {
-  return (
-    <div className="rounded-xl border border-line bg-panel px-5 py-4">
-      <p className="text-2xl font-extrabold text-fg">{value}</p>
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-1 text-xs text-muted">
-        from {from} of {plural(total, "book")}
-      </p>
-    </div>
-  );
-}

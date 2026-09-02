@@ -1,5 +1,5 @@
 /**
- * The dashboard's five areas, by id, and what to call them.
+ * The dashboard's areas, by id, and what to call them.
  *
  * A tool screen fills the window with none of the dashboard around it, so the
  * only way back is whatever the tool draws — and until now that was "All
@@ -11,12 +11,14 @@
  * So a link into a tool may carry `?from=<area>`, and the tool offers a way
  * back to it. This module is what turns that id into a word, and it lives on
  * its own because both ends need it: the dashboard is one enormous client
- * component, and importing it into every tool header to read five labels would
+ * component, and importing it into every tool header to read a handful of
+ * labels would
  * pull the whole shelf into every tool page.
  */
 export type AreaId =
   | "overview"
   | "write"
+  | "title-check"
   | "prepare"
   | "track"
   | "tools"
@@ -25,6 +27,7 @@ export type AreaId =
 export const AREA_LABELS: Record<AreaId, string> = {
   overview: "Overview",
   write: "Write",
+  "title-check": "Title check",
   prepare: "Prepare",
   track: "Track",
   tools: "Tools",

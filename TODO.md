@@ -1581,6 +1581,109 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **Comp titles, put back behind the launch gate** on **2026-09-03**, one day
+  after it came out. Built, tested, and reachable from nothing on purpose —
+  which is what `HIDDEN_BOOK_TOOL_PATHS` is for, and the reason it went there
+  rather than being deleted.
+
+  It keeps every fix from the two days it was live: the five-across Covers
+  grid, the shared View menu, the heading, and the removed arithmetic block.
+  **`/api/comps` stays open**, because the title check runs on it — gating a
+  screen and gating the data behind it are separate decisions, and this is the
+  case that shows why they have to be.
+
+  **Coming back is five edits**: off `HIDDEN_BOOK_TOOL_PATHS`, off
+  `LAUNCH_POST_BACKLOG`, an entry in `book-tools.ts`, a guide in
+  `tool-guide.ts` — and `TitleCheckArea` in `bookshelf.tsx` needs its segmented
+  control and book chip back to hold two tools rather than one. Git has that
+  component; see the commit that cut it down.
+
+- **The title check stopped being about your book**, same day. Three things
+  went with it:
+
+  **The seeded field.** It opened holding `book.title`. The older rule that
+  replaced — the screen must not arrive having already *checked* — still
+  stands and is written where the seeding was: a verdict nobody asked for is
+  the loudest thing on a page, and an answer to an unasked question reads as a
+  claim rather than a result.
+
+  **The genre shelf.** The empty box used to fill with covers from
+  `book.genre`. It is back, but the shelf is now picked at random from
+  `BROWSE_SHELVES` and named in the caption, because there is no book to take a
+  genre from and a shelf chosen silently would be an invented answer. A hundred
+  covers, off a `sweep=1` fetch.
+
+  **The rename buttons** — *Use this title* / *Keep "…"* — on the amber
+  banner, and `VerdictActions` with them. What a restoration needs is written
+  at the call site in `title-check-page.tsx` rather than repeated here.
+  `setBookDetails` is untouched and still used elsewhere.
+
+  `bookId` is now optional on `TitleCheckPage`, and the book feeds nothing but
+  `ToolHeader`'s chip at `/book/<id>/title-check`. That route still works and
+  is identical below the header.
+
+- **The 40-record window on the title check** — widened **2026-09-02**, and
+  worth recording because the old behaviour looked like a working feature.
+
+  `/api/comps` fetched one page of 40 per source. Neither catalogue orders by
+  title match, so those 40 were an arbitrary sample of a result that can run to
+  thousands — Open Library reports 4,072 records for `title:"spiderman"`. The
+  screen graded the sample and announced **2 books under this exact name**. A
+  five-page sweep of the same query finds **16**.
+
+  A truncated sample is a looser answer to the comps question, which is always
+  a proportion — and a *wrong* answer to the title check's, which is an
+  existence question. That is why `?sweep=1` is a parameter the title check
+  sends rather than a bigger `PER_SOURCE`: comps stays shallow on purpose, and
+  the route's own note explains why depth makes it worse.
+
+  What follows from it: the result now says how many records it read against
+  how many the catalogue reports, because a deep sweep is still not the shelf,
+  and a confident all-clear from 12% of it is the invented verdict this app
+  refuses everywhere else.
+
+- **The comps screen's arithmetic — three figures and the length panel** —
+  removed on **2026-09-02** at the owner's request, on the day comps came out
+  from behind the launch gate.
+
+  **What it was.** Under the wall of covers: `Figure` cards for median pages,
+  median blurb characters and *Filed under*, each carrying the denominator it
+  was counted from; then `LengthPanel`, which read the median page count back
+  as a word range, set it beside the writer's own count and beside the folklore
+  number `book-kinds.ts` would have suggested, with a *Set my target to N*
+  button under it.
+
+  **Why it went.** It was a reading *of* the covers that took up more of the
+  screen than the covers did. The one question this page answers is what your
+  book sits beside; the shelf is the answer, and the arithmetic was a second
+  screen underneath it answering a question nobody had reached yet.
+
+  **What did not go, and is what it would be rebuilt from.**
+  `src/lib/comps/length.ts` — `compareLength`, `lengthFromPages`,
+  `WORDS_PER_PAGE` — is untouched, pure and still tested, along with
+  `suggestTarget` in `book-kinds.ts` and `setTargetWords` in the store. The two
+  components were deleted rather than left callerless because the reasoning
+  worth keeping was never in the markup. Two rules to rebuild on, both of which
+  the deleted code got right: the folklore number is shown *beside* the counted
+  one rather than replaced by it, and "under" and "over" are stated as
+  positions, never as verdicts.
+
+  **The loose end.** `checkup.ts` raises *"No length to aim at"* with a fix that
+  routes to `comps` for a *Set my target* button that is no longer on the page.
+  It renders nowhere today — the Prepare area is not mounted — but that finding
+  needs a new destination before it is, or the dashboard sends a writer to a
+  screen that cannot do what it promised.
+
+- **"Mark step done" on the comps and title-check screens** — removed
+  **2026-09-02**. Both ticked a step on the publishing roadmap, and the roadmap
+  is in `HIDDEN_BOOK_TOOL_PATHS`: the button wrote a tick on a screen nobody
+  can open, and its own tooltip named that screen. `ToolStepDone`,
+  `use-tool-save.ts` and `tool-steps.ts` are all untouched and still used by
+  the export screen. Putting it back on either tool is three edits — the
+  `useToolSave` call, the `action` on `ToolHeader`, and the row under the
+  premise when `embedded` — and it has to be all three, or the control exists
+  in one frame and not the other.
+
 - **Book View, and with it the book overview** — removed on **2026-09-01** at
   the owner's request, and **deleted rather than unhooked**, which is the part
   worth knowing before anyone rebuilds it.

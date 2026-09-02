@@ -4,6 +4,7 @@ import {
   gridClassFor,
   isGrid,
   isShelfLayout,
+  resultsGridClass,
   SHELF_LAYOUTS,
   type ShelfLayout,
 } from "@/lib/shelf-layout";
@@ -54,6 +55,20 @@ describe("gridClassFor", () => {
     expect(gridClassFor("small")).toContain("lg:grid-cols-6");
   });
 
+  /*
+   * **The default mode stops at four, and nothing else would notice it
+   * moving.** It ran to five at `2xl`, which on a wide monitor is a jacket
+   * narrow enough for the title under it to wrap — the job `small` already
+   * does. A fifth column is one class away from coming back, and it would come
+   * back on the mode every writer sees first.
+   */
+  it("keeps the default mode at four columns across", () => {
+    const covers = gridClassFor(DEFAULT_SHELF_LAYOUT);
+    expect(covers).toContain("lg:grid-cols-4");
+    expect(covers).not.toContain("grid-cols-5");
+    expect(covers).not.toContain("grid-cols-6");
+  });
+
   it("keeps every grid mode on a different column count", () => {
     const grids: ShelfLayout[] = ["large", "covers", "small"];
     const classes = grids.map(gridClassFor);
@@ -94,5 +109,57 @@ describe("isShelfLayout", () => {
     expect(isShelfLayout(null)).toBe(false);
     expect(isShelfLayout(3)).toBe(false);
     expect(isShelfLayout({ id: "covers" })).toBe(false);
+  });
+});
+
+describe("resultsGridClass", () => {
+  /* The same guard `gridClassFor` carries: add a mode to `SHELF_LAYOUTS`,
+     forget this switch, and the new entry falls through returning `undefined`
+     — a menu item that draws an unstyled column of search results rather than
+     throwing. */
+  it("gives every listed mode a container class", () => {
+    for (const { id } of SHELF_LAYOUTS) {
+      expect(resultsGridClass(id), `no classes for "${id}"`).toBeTruthy();
+    }
+  });
+
+  /*
+   * **Container queries, not breakpoints, and this is the test that says so.**
+   *
+   * Both search screens sit inside an `@container` and open at about half a
+   * window in the roadmap's panel. A `lg:` class there asks how wide the
+   * *window* is, which is a question about the wrong box — six columns drawn
+   * into a half-width sheet. The classes look almost identical either way, so
+   * nothing but this would notice one being copied across from `gridClassFor`.
+   */
+  it("measures its container rather than the window", () => {
+    for (const { id } of SHELF_LAYOUTS) {
+      const cls = resultsGridClass(id);
+      expect(cls, id).not.toMatch(/(^| )(sm|md|lg|xl|2xl):/);
+    }
+    expect(resultsGridClass("covers")).toContain("@lg:grid-cols-4");
+    expect(resultsGridClass("small")).toContain("@lg:grid-cols-6");
+  });
+
+  /*
+   * **Five, where the shelf's own Covers stops at four**, and the difference is
+   * deliberate rather than drift: a shelf book carries a word count and a ⋯
+   * menu under it, a search result carries a jacket and two lines of small
+   * print. Pinned because the two functions look alike enough that somebody
+   * tidying them together would make one of them wrong.
+   */
+  it("puts five search results across at the top end", () => {
+    expect(resultsGridClass("covers")).toContain("@4xl:grid-cols-5");
+    expect(gridClassFor("covers")).not.toContain("grid-cols-5");
+  });
+
+  it("keeps every grid mode on a different column count", () => {
+    const grids: ShelfLayout[] = ["large", "covers", "small"];
+    expect(new Set(grids.map(resultsGridClass)).size).toBe(grids.length);
+  });
+
+  it("does not lay the list out as a grid", () => {
+    expect(resultsGridClass("list")).not.toContain("grid-cols");
+    expect(resultsGridClass("list")).toContain("flex");
   });
 });

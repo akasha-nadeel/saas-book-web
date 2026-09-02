@@ -2,6 +2,7 @@
 
 import { Fragment, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { BookCover } from "@/components/shelf/book-cover";
 import {
@@ -77,7 +78,6 @@ import {
 import {
   gridClassFor,
   isGrid,
-  SHELF_LAYOUTS,
   type ShelfLayout,
 } from "@/lib/shelf-layout";
 import {
@@ -100,6 +100,7 @@ import { storeReadiness, type ReadinessIssue } from "@/lib/publishing";
 import { progressOf, roadmapFor, type Phase } from "@/lib/roadmap";
 import { shelfIcons } from "@/components/shelf/shelf-icons";
 import { ToolGrid } from "@/components/shelf/tool-grid";
+import { ViewMenu } from "@/components/ui/view-menu";
 import {
   Menu,
   MenuButton,
@@ -166,7 +167,14 @@ import {
  * rather than glimpsed as a grey card.
  */
 
-type Area = "overview" | "write" | "prepare" | "track" | "tools" | "collab";
+type Area =
+  | "overview"
+  | "write"
+  | "title-check"
+  | "prepare"
+  | "track"
+  | "tools"
+  | "collab";
 
 /**
  * The one element the six areas scroll inside, by id.
@@ -196,6 +204,28 @@ const AREAS: {
     label: "Write",
     live: true,
     icon: shelfIcons.write,
+    stage: true,
+  },
+  /*
+   * **Title check** — added 2026-09-02 as "Research", holding two catalogue
+   * searches behind a segmented control, and cut back to one on 2026-09-03.
+   *
+   * Comparable titles went back behind `HIDDEN_BOOK_TOOL_PATHS` until it is
+   * wanted again, and with one tool left the toggle, the book chip and the
+   * picker were all chrome around nothing. The area is named for what is in it
+   * rather than for the shelf it was going to hold: an area called Research
+   * containing one lookup promises more than it has.
+   *
+   * The glyph moved with the name. A compass reads as *looking outward across
+   * a field*, which is what two searches were; a magnifier is what one lookup
+   * is. Both come from `shelf-icons.tsx`, so it stays the same alphabet as the
+   * rest of the column.
+   */
+  {
+    id: "title-check",
+    label: "Title check",
+    live: true,
+    icon: shelfIcons.search,
     stage: true,
   },
 ];
@@ -229,16 +259,63 @@ const SHELF_VIEWS: readonly ShelfView[] = [
   "trashed",
 ];
 
-/**
- * The three the rail lists under Write, which is `SHELF_VIEWS` without
- * `active`.
+/*
+ * **`RAIL_VIEWS` was here and `RAIL` below replaced it.**
  *
- * Write *is* the active list — pressing it opens exactly what a "Books" row
- * would have — so naming it twice in one column was two doors into one room.
- * The segmented control below `md` keeps all four, because there is no rail
- * there and it is the only way to reach any of them.
+ * It held the three lists the rail draws under Write — `SHELF_VIEWS` without
+ * `active`, because Write *is* the active list and naming it twice in one
+ * column was two doors into one room. That is still true and `RAIL` still says
+ * it, by listing the three and not the fourth.
+ *
+ * What it could not say is where anything else goes: it was emitted inside the
+ * Write row's fragment, so an area could only ever land before or after the
+ * whole group of them. The segmented control below `md` keeps all four views,
+ * because there is no rail there and it is the only way to reach any of them.
  */
-const RAIL_VIEWS: readonly ShelfView[] = ["favourite", "archived", "trashed"];
+
+/**
+ * By id, for the rail — `AREAS` stays the one description of each area.
+ *
+ * `Partial`, and read through a guard below, because `Area` names all seven
+ * areas the dashboard can render while `AREAS` lists only the ones the launch
+ * MVP leaves reachable. A cast to the full record would type-check and then
+ * hand `undefined.icon` to the rail the day somebody puts a gated area in
+ * `RAIL`; missing from the rail is the right failure for that.
+ */
+const AREA_BY_ID: Partial<Record<Area, (typeof AREAS)[number]>> =
+  Object.fromEntries(AREAS.map((a) => [a.id, a]));
+
+/**
+ * The rail, in the order it is drawn — each row either an area or one of the
+ * shelf's lists.
+ *
+ * **One list, because the order is a decision and should be readable as one.**
+ * It used to be implied by two arrays and a conditional: `AREAS` mapped over,
+ * with `RAIL_VIEWS` emitted inside the `write` row's fragment. That shape can
+ * only ever put a new area *after* the whole Write group, which is how Research
+ * ended up below the bin — not by anybody choosing it.
+ *
+ * Two things it now says outright. **Research sits with the book lists**, since
+ * it is a place a writer goes about a book rather than a fourth kind of shelf.
+ * And **Trash is last**, which is where every application puts a bin and where
+ * a row nobody is looking for belongs.
+ *
+ * `AREAS` is still the source of each area's label, icon and `live` flag; this
+ * only decides sequence. `RAIL_VIEWS` is gone — it was the other half of the
+ * old construction and said nothing this does not.
+ */
+const RAIL: readonly ({ area: Area } | { view: ShelfView })[] = [
+  { area: "overview" },
+  { area: "write" },
+  /* Above the three lists rather than among them, and that placement is the
+     argument: Favourites, Archived and Trash are all filters over the shelf,
+     and this is not one. Sat below them it read as a fourth kind of book
+     list. */
+  { area: "title-check" },
+  { view: "favourite" },
+  { view: "archived" },
+  { view: "trashed" },
+];
 
 const VIEW_LABEL: Record<ShelfView, string> = {
   active: "Books",
@@ -724,49 +801,51 @@ export function Bookshelf({
                     Search
                   </SideItem>
                 )}
-                {AREAS.filter((a) => a.stage).map((a) => (
-                  <Fragment key={a.id}>
+                {/* Straight down `RAIL`. The two kinds of row are drawn
+                    alike on purpose — a writer reading this column is picking
+                    a place, and which of them happens to be an area and which
+                    a filter over one is our bookkeeping, not theirs. */}
+                {RAIL.map((row) =>
+                  "view" in row ? (
                     <SideItem
-                      icon={a.icon}
+                      key={row.view}
+                      icon={VIEW_ICON[row.view]}
+                      mark={VIEW_MARK[row.view]}
+                      collapsed={sidebarCollapsed}
+                      active={area === "write" && view === row.view}
+                      onClick={() => showShelf(row.view)}
+                      badge={
+                        <span className="text-xs tabular-nums text-muted">
+                          {counts[row.view]}
+                        </span>
+                      }
+                    >
+                      {VIEW_LABEL[row.view]}
+                    </SideItem>
+                  ) : !AREA_BY_ID[row.area] ? null : (
+                    <SideItem
+                      key={row.area}
+                      icon={AREA_BY_ID[row.area]!.icon}
                       collapsed={sidebarCollapsed}
                       /* Write is the *active list*, not merely the area.
                          Asking `area === "write"` alone lit Write and Trash at
                          once, which is a rail claiming the writer is in two
                          places. Everywhere else the area is the whole of it. */
                       active={
-                        a.id === "write"
+                        row.area === "write"
                           ? area === "write" && view === "active"
-                          : area === a.id
+                          : area === row.area
                       }
                       onClick={() =>
-                        a.id === "write" ? showShelf("active") : goToArea(a.id)
+                        row.area === "write"
+                          ? showShelf("active")
+                          : goToArea(row.area)
                       }
                     >
-                      {a.label}
+                      {AREA_BY_ID[row.area]!.label}
                     </SideItem>
-
-                    {/* The other three lists, as rows exactly like the one
-                        above them. */}
-                    {a.id === "write" &&
-                      RAIL_VIEWS.map((v) => (
-                        <SideItem
-                          key={v}
-                          icon={VIEW_ICON[v]}
-                          mark={VIEW_MARK[v]}
-                          collapsed={sidebarCollapsed}
-                          active={area === "write" && view === v}
-                          onClick={() => showShelf(v)}
-                          badge={
-                            <span className="text-xs tabular-nums text-muted">
-                              {counts[v]}
-                            </span>
-                          }
-                        >
-                          {VIEW_LABEL[v]}
-                        </SideItem>
-                      ))}
-                  </Fragment>
-                ))}
+                  ),
+                )}
               </nav>
 
               {AREAS.some((a) => !a.stage) && (
@@ -1054,6 +1133,8 @@ export function Bookshelf({
                 onLayout={(next) => setPref("shelfLayout", next)}
               />
             )}
+
+            {area === "title-check" && <TitleCheckArea />}
 
             {area === "prepare" && (
               <Prepare books={active} onCover={setCovering} focus={focus} />
@@ -3611,53 +3692,15 @@ function Write({
             then, which is more than it can carry with these still on it. */}
         {!selecting && (
           <>
-          {/* **A menu, not a row of icon buttons.** Four modes is past what an
-              unlabelled icon strip can carry — "small covers" and "list" are the
-              same two lines to anyone who has not learned the set — and a menu
-              names each one and ticks the current. Explorer's View, in shape;
-              not in length. */}
-          <Menu
-            label="View"
-            align="end"
-            width={220}
-            triggerClassName="flex shrink-0 items-center gap-1.5 rounded-lg border
-                              border-line bg-panel px-3 py-1.5 text-sm text-muted
-                              transition-colors hover:bg-raised hover:text-fg
-                              focus-visible:outline-none focus-visible:ring-2
-                              focus-visible:ring-accent/50"
-            trigger={
-              <>
-                <span className="[&>svg]:h-4 [&>svg]:w-4">{shelfIcons.tools}</span>
-                View
-                <span className="[&>svg]:h-4 [&>svg]:w-4">
-                  {shelfIcons.chevron}
-                </span>
-              </>
-            }
-          >
-            {(close) => (
-              <>
-                <MenuLabel>Show books as</MenuLabel>
-                {SHELF_LAYOUTS.map((option) => (
-                  <MenuButton
-                    key={option.id}
-                    /* The tick on the right, as the book picker does it — the
-                       left slot stays empty on every row so the labels line up
-                       whichever one is current. */
-                    badge={
-                      option.id === layout ? shelfIcons.check : undefined
-                    }
-                    onClick={() => {
-                      onLayout(option.id);
-                      close();
-                    }}
-                  >
-                    {option.label}
-                  </MenuButton>
-                ))}
-              </>
-            )}
-          </Menu>
+          {/* Lifted into `ui/view-menu.tsx` on its third call site — the two
+              searches in Research draw the same four modes over their own
+              results. The words and the order are `SHELF_LAYOUTS` in all
+              three; only the noun in the heading changes. */}
+          <ViewMenu
+            value={layout}
+            onChange={onLayout}
+            label="Show books as"
+          />
           <label className="flex items-center gap-2 text-sm text-muted">
             Sort
             <select
@@ -4560,6 +4603,112 @@ function Flag({
   );
 }
 
+/**
+ * What the tool shows while its chunk arrives: a box of about the right size
+ * and nothing in it.
+ *
+ * The same judgement as the roadmap's `Pending`. A spinner or a mark here is a
+ * placeholder louder than the thing it stands in for, for a chunk that is
+ * cached after the first visit and arrives in a frame or two.
+ */
+function ToolPending() {
+  return <div className="h-[28rem]" aria-busy="true" />;
+}
+
+/**
+ * Loaded on demand, in its own chunk.
+ *
+ * **The same shape `roadmap/step-panel.tsx` uses, for the same reason.**
+ * Importing the screen at the top of this file would put it — and everything
+ * it reaches for — into the bundle of a dashboard most writers open to look at
+ * their shelf. `ssr: false` because it reads a preference out of
+ * `localStorage`, which the server cannot see.
+ */
+const TitleCheck = dynamic(
+  () =>
+    import("@/components/title-check/title-check-page").then(
+      (m) => m.TitleCheckPage,
+    ),
+  { ssr: false, loading: ToolPending },
+);
+
+/**
+ * Title check — is anybody already publishing under this name?
+ *
+ * **This was Research, and it held two searches.** Comparable titles sat beside
+ * the title check behind a segmented control, with a "Working on <book>" chip
+ * and a book picker above them both. Comps went back behind
+ * `HIDDEN_BOOK_TOOL_PATHS` on 2026-09-03 until it is wanted again, and one tool
+ * does not need a switch between two. The chip went with it for a better
+ * reason than tidiness: **the checker is no longer about a particular book.**
+ * It takes any title a writer types, so there is nothing for a book picker to
+ * pick and nothing an empty shelf should stop.
+ *
+ * What is left is a frame: the section's picture band, and the tool. Everything
+ * else on the screen belongs to the tool, which is how it should read — the
+ * same component runs at `/book/<id>/title-check`.
+ */
+function TitleCheckArea() {
+  return (
+    <div className="flex flex-col gap-5">
+      {/* **`scrim` with `ink="light"` is the left-only darkening**, and it is a
+          prop rather than new CSS: the gradient runs at 105° from 0.72 black at
+          the left edge to nothing by 55%, so the type sits on a dark ground and
+          the right half of the picture shows at full strength. See the note in
+          `section-banner.tsx`.
+
+          The picture is dark to begin with — 85/255 mean under the type band —
+          so `#f6f6f8` clears 4.5:1 on it before the scrim is counted. The scrim
+          is what holds that at the corner and on any crop.
+
+          **The words carry no figure on purpose.** "Millions" is the largest
+          true word: Open Library publishes 20 million records and its API
+          returns 5,600,812 with full text, Google Books has scanned tens of
+          millions more, and Google's own `totalItems` is unusable — it answers
+          300 for every query. Billions would be wrong by two orders of
+          magnitude, and a hundred million is near the estimate for every book
+          ever published anywhere. A stated number would also be one nobody can
+          keep current. */}
+      <SectionBanner
+        image="/title-check-banner.webp"
+        ink="light"
+        scrim
+        /* The picture is 16:9 and the band is nearer 4:1, so `cover` crops it
+           top and bottom; centred, that cut the cat off at the paws. `crop` is
+           the pan for exactly this — 68% shows the lower part of the frame,
+           where the subject is. */
+        crop="center 68%"
+        title="Millions of books, millions of published names"
+        subtitle="Searched in one go, before you settle on a title."
+      />
+
+      {/* ---- The tool ------------------------------------------------------
+
+          **The child override is what makes this scroll.** `toolShell` gives
+          every tool `h-full overflow-y-auto overscroll-contain`, which is right
+          in the roadmap's panel — a flex child with a real height that wants
+          its own scroller. Here the dashboard already has one, so the tool
+          became a second scroll container nested inside it, and
+          `overscroll-contain` is precisely the rule that stops a wheel or a
+          trackpad chaining out of the inner box: scrolling stuck the moment the
+          pointer was over the results.
+
+          Undone from the outside rather than by touching `toolShell` or adding
+          a third meaning to `embedded`. The screen renders exactly one root
+          `<div>` — the not-hydrated early return included — so `&>div` reaches
+          it and nothing else. The tool then grows to its content and
+          `AREA_SCROLLER` does all the scrolling: one scrollbar, and the
+          trackpad works because there is no inner scrollport to trap it.
+
+          No `bookId` and no `heading`. The tool needs neither: it checks any
+          title rather than this writer's, and its own card carries the
+          heading. */}
+      <div className="[&>div]:h-auto [&>div]:overflow-visible [&>div]:overscroll-auto">
+        <TitleCheck embedded />
+      </div>
+    </div>
+  );
+}
 /**
  * Tools — what the product can do, rather than a grid of ways to reach it.
  *

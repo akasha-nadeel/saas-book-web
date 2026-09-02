@@ -417,7 +417,7 @@ export function ShareDialog({
                 {spentLine(allowance)} Remove somebody to make room.
               </p>
             ) : (
-              <LimitBanner allowance={allowance} />
+              <LimitBanner allowance={allowance} refused={showLimit} />
             ))}
 
           {/* Who is on it */}

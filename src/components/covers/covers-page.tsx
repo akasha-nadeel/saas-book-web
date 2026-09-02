@@ -2144,7 +2144,7 @@ export function CoversPage({ bookId, embedded, heading }: ToolPageProps) {
                 have — is not counted and not affected, which is why these sit
                 under this form rather than under the tabs. */}
               <LeftPill allowance={shelfSearches} className="mt-2" />
-              <LimitBanner allowance={shelfSearches} className="mt-4" />
+              <LimitBanner allowance={shelfSearches} refused={gate.refused} className="mt-4" />
 
               {/* Only when the wall is *not* this book's shelf. A caption naming
                 the obvious case is furniture; this one has something to

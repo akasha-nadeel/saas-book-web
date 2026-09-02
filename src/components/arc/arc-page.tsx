@@ -431,7 +431,7 @@ export function ArcPage({ bookId }: { bookId: string }) {
         {/* The standing state of the limit, on the page rather than only in
             the sheet: a writer who comes back tomorrow should be told where
             they are before they open a form they cannot submit. */}
-        <LimitBanner allowance={gate.allowance} className="mt-4" />
+        <LimitBanner allowance={gate.allowance} refused={gate.refused} className="mt-4" />
 
         {sorted.length > 0 ? (
           <ul className="mt-4 flex flex-col gap-2">

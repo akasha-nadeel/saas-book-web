@@ -1,4 +1,3 @@
-import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
 import { NextResponse } from "next/server";
 import {
   mergeComps,
@@ -37,6 +36,15 @@ import {
  * therefore optional in the way everything else here is optional: set it and
  * the Google half keeps working, leave it and that half degrades to nothing
  * while Open Library carries the feature. Open Library needs no key at all.
+ *
+ * **No launch gate, as of 2026-09-02.** This route answered 404 through
+ * `launchFeatureEnabled()` while the whole comps cluster was hidden. The
+ * search half is live again and this is the route it runs on; the two model
+ * routes over it (`query` and `rank`) keep theirs — which is the split three
+ * paragraphs up doing the job it was built for: the free half ships without
+ * the paid one. `COMPS_RANKING_LIVE` in `launch.ts` is the client-side half
+ * of the same fact, and is what keeps the page from drawing a button those
+ * gated routes would refuse.
  */
 
 /** Optional. See the note above: without it, Google answers 429 under load. */
@@ -63,6 +71,44 @@ const CACHE_SECONDS = 60 * 60 * 24;
  * about the whole genre. The covers wall has the same problem in pictures.
  */
 const PER_SOURCE = 40;
+
+/**
+ * **The deep sweep, and why it is a parameter rather than a bigger
+ * `PER_SOURCE`.**
+ *
+ * Everything the note above says about depth is true *of comps*. Every answer
+ * on that screen is a proportion — "17 of 34 are filed under Mystery" — so a
+ * larger, looser sample does not sharpen the figure, it drags it toward a fact
+ * about the whole genre, and at offset 400 a mystery search really is returning
+ * children's series books.
+ *
+ * The title check asks a different question, and one page is the wrong answer
+ * to it. *Who else has published under this name* is an existence question,
+ * where a truncated sample is not a looser answer but a wrong one — and the
+ * catalogues do not order by title match, so the forty records are effectively
+ * arbitrary. Measured against Open Library on 2026-09-02, for
+ * `title:"spiderman"` (4,072 records reported):
+ *
+ * | records read | exact | close |
+ * |---|---|---|
+ * | 40 | 2 | 5 |
+ * | 200 | 6 | 6 |
+ * | 500 | **12** | **27** |
+ *
+ * Six times the exact matches, and the curve was still climbing. A screen that
+ * answers "2 books share your title" when the number is at least 12 is not
+ * being conservative; it is wrong, and wrong in the direction that costs a
+ * writer the decision the screen exists to inform.
+ *
+ * So `?sweep=1`, sent by the title check and by nothing else.
+ *
+ * **The page counts are each service's own ceiling, not a preference.** Open
+ * Library takes `limit` up to 100; Google's `maxResults` stops at 40 and it
+ * runs dry around `startIndex` 200 anyway, so five pages each is as deep as
+ * either will usefully go.
+ */
+const SWEEP_PAGES = 5;
+const OPEN_LIBRARY_SWEEP_PER_PAGE = 100;
 
 /**
  * One source, and its failure is its own.
@@ -134,7 +180,21 @@ const STRAGGLER_MS = 2500;
  * where trying again shortly is exactly right. Collapsing them into "did not
  * answer" is what taught a writer to click five times into a rate limit.
  */
-export type SourceFailure = "limited" | "slow" | "down" | null;
+/**
+ * `key` is the fourth, and it is the one failure here that is nobody's weather.
+ *
+ * A wrong `GOOGLE_BOOKS_API_KEY` answers **400** with "API key not valid",
+ * which the retry rule below correctly treats as *the request is wrong, asking
+ * again changes nothing* — so Google silently contributes no records at all,
+ * and without this the screen reported it as `down`: try again shortly. Nobody
+ * is going to try again into a permanent 400. `googleKeyed` does not catch it
+ * either, because it only asks whether a key is *set*.
+ *
+ * Told apart so the screen can say the key was refused. Every other failure
+ * here is something to wait out; this one is something to go and fix, and the
+ * two want opposite sentences.
+ */
+export type SourceFailure = "limited" | "slow" | "down" | "key" | null;
 
 async function fetchSource(
   url: string,
@@ -178,6 +238,24 @@ async function fetchSource(
       // response. Recorded so the screen can say "wait" instead of "retry".
       why = response.status === 429 ? "limited" : "down";
 
+      /* A 400 is usually the query, but from Google it is most often the key,
+         and the two want opposite things said. The body is read rather than
+         the status guessed from, because "your key is wrong" and "your search
+         is wrong" are both 400 and only one of them is the operator's to fix.
+         Read defensively: this is an error path, and failing to parse an error
+         must not throw a second one. */
+      if (response.status === 400) {
+        try {
+          const body = await response.json();
+          const message = String(body?.error?.message ?? "");
+          if (/api key not valid|invalid.{0,10}api key/i.test(message)) {
+            why = "key";
+          }
+        } catch {
+          // Not JSON, or not shaped like Google's error. `down` stands.
+        }
+      }
+
       // Refused rather than overloaded: the query is the problem, so the same
       // query will be refused again.
       if (response.status !== 429 && response.status < 500) {
@@ -200,9 +278,44 @@ async function fetchSource(
   return { books: [], ok: false, reported: null, why };
 }
 
+/**
+ * One source, however many pages of it, as a single result.
+ *
+ * **Pages in parallel, and a page that fails costs its own records only.** The
+ * alternative — sequential, stopping at the first failure — turns one slow page
+ * into five times the wait and one 429 into a truncated sweep that looks like a
+ * short shelf. Every page keeps the retry, the timeout and the `why` that
+ * `fetchSource` already gives it; the source is `ok` if any page was, and its
+ * `why` is the first real complaint any page made.
+ *
+ * `reported` comes from the first page, since it is the catalogue's count of
+ * the whole result and does not change as you walk it.
+ */
+async function fetchPages(
+  urls: string[],
+  parse: (payload: unknown) => CompTitle[],
+): Promise<{
+  books: CompTitle[];
+  ok: boolean;
+  reported: number | null;
+  why: SourceFailure;
+}> {
+  const pages = await Promise.all(urls.map((url) => fetchSource(url, parse)));
+  return {
+    books: pages.flatMap((page) => page.books),
+    ok: pages.some((page) => page.ok),
+    reported: pages[0]?.reported ?? null,
+    why: pages.find((page) => page.why)?.why ?? null,
+  };
+}
+
 export async function GET(request: Request) {
-  if (!launchFeatureEnabled()) return hiddenLaunchApiResponse("Comp title search");
-  const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+  const params = new URL(request.url).searchParams;
+  const query = params.get("q")?.trim() ?? "";
+  /* Asked for, never assumed. Comps is deliberately shallow — see
+     `SWEEP_PAGES` — so this is opt-in and the title check is the only caller
+     that opts in. */
+  const sweep = params.get("sweep") === "1";
 
   if (query.length < 2) {
     return NextResponse.json(
@@ -250,29 +363,41 @@ export async function GET(request: Request) {
     ]);
   };
 
+  /* One page each, or five. Each page is its own URL, so each caches on its
+     own under `revalidate` and a repeated sweep costs nothing. */
+  const googlePages = Array.from(
+    { length: sweep ? SWEEP_PAGES : 1 },
+    (_, page) =>
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
+        query,
+      )}&maxResults=${PER_SOURCE}&startIndex=${page * PER_SOURCE}` +
+      `&printType=books&orderBy=relevance` +
+      (GOOGLE_KEY ? `&key=${encodeURIComponent(GOOGLE_KEY)}` : ""),
+  );
+
+  const openLibraryPerPage = sweep
+    ? OPEN_LIBRARY_SWEEP_PER_PAGE
+    : PER_SOURCE;
+  const openLibraryPages = Array.from(
+    { length: sweep ? SWEEP_PAGES : 1 },
+    (_, page) =>
+      // Translated, not passed through: the two catalogues use different
+      // field prefixes and Open Library answers one it does not know with
+      // zero results rather than an error. See `openLibraryQuery`.
+      `https://openlibrary.org/search.json?q=${encodeURIComponent(
+        openLibraryQuery(query),
+      )}&limit=${openLibraryPerPage}&offset=${page * openLibraryPerPage}` +
+      `&fields=key,title,author_name,first_publish_year,publisher,number_of_pages_median,subject,isbn,cover_i`,
+  );
+
   const [google, openLibrary] = await Promise.all([
-    raced(
-      fetchSource(
-        `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(
-          query,
-        )}&maxResults=${PER_SOURCE}&printType=books&orderBy=relevance` +
-          (GOOGLE_KEY ? `&key=${encodeURIComponent(GOOGLE_KEY)}` : ""),
-        parseGoogle,
-      ),
-    ),
-    raced(
-      fetchSource(
-        // Translated, not passed through: the two catalogues use different
-        // field prefixes and Open Library answers one it does not know with
-        // zero results rather than an error. See `openLibraryQuery`.
-        `https://openlibrary.org/search.json?q=${encodeURIComponent(
-          openLibraryQuery(query),
-        )}&limit=${PER_SOURCE}&fields=key,title,author_name,first_publish_year,publisher,number_of_pages_median,subject,isbn,cover_i`,
-        parseOpenLibrary,
-      ),
-    ),
+    raced(fetchPages(googlePages, parseGoogle)),
+    raced(fetchPages(openLibraryPages, parseOpenLibrary)),
   ]);
 
+  // Across pages as well as across sources: the same book turning up on page
+  // one and page three is one book, and `mergeComps` already knew how to say
+  // so.
   const books = mergeComps(google.books, openLibrary.books);
 
   return NextResponse.json(
@@ -296,6 +421,15 @@ export async function GET(request: Request) {
       // Without it a screen counting what it fetched reads as counting the
       // world, which is the invented-number problem arriving by accident.
       reported: google.reported,
+      // What the *other* catalogue says exists, which is the one that carries
+      // a sweep. Without it the title check can say how many records it read
+      // and not how many there were, and a 12% sweep reading as the whole
+      // shelf is exactly the invented verdict this app refuses elsewhere.
+      reportedOpenLibrary: openLibrary.reported,
+      // How many records were actually read, before merging. The honest
+      // denominator for anything counted off `books`.
+      scanned: google.books.length + openLibrary.books.length,
+      swept: sweep,
     },
     {
       headers: {

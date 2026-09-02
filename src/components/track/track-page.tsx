@@ -210,7 +210,7 @@ export function TrackPage({ bookId }: { bookId: string }) {
 
         {/* ---- Add by hand -------------------------------------------- */}
         <h2 className="mt-10 text-xl font-extrabold text-fg">Add a line</h2>
-        <LimitBanner allowance={gate.allowance} className="mt-8" />
+        <LimitBanner allowance={gate.allowance} refused={gate.refused} className="mt-8" />
         <LeftPill allowance={gate.allowance} className="mt-4" />
         <form
           className="mt-4 flex flex-wrap items-end gap-3 rounded-xl border border-line bg-panel p-5"

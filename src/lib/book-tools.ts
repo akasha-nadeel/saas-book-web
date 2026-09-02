@@ -2,7 +2,7 @@
  * Every per-book tool, named and explained, in one list.
  *
  * Two screens need this: the sheet a book card's ⋯ menu opens, and the Tools
- * area of the dashboard. They were about to hold two copies of the same sixteen
+ * area of the dashboard. They were about to hold two copies of the same
  * descriptions, which is two copies to keep in step and one to forget — the
  * kind of duplication that goes stale silently and then tells a writer a
  * feature does something it stopped doing a release ago.
@@ -47,6 +47,31 @@ export interface ToolGroup {
  */
 
 /**
+ * Naming the book, which comes before everything else here.
+ *
+ * First in the list because the question comes first: a title is settled long
+ * before there is a file to export. It is also the only tool here that leaves
+ * the machine at all — what goes is a query, never the manuscript.
+ *
+ * **Comp titles was the second entry and came off on 2026-09-03**, back behind
+ * `HIDDEN_BOOK_TOOL_PATHS` until it is wanted. The group kept its shape rather
+ * than folding into another, because what returns is a second search asking
+ * the same catalogues the same kind of question.
+ */
+export const LOOK_OUTWARD: ToolGroup = {
+  title: "Before you name it",
+  note: "What is already published under the name you are considering.",
+  tools: [
+    {
+      path: "title-check",
+      icon: "search",
+      name: "Title check",
+      what: "Whether somebody else's book turns up first when a reader searches for yours, and how close each one is. Titles cannot be copyrighted, so this reports rather than advises.",
+    },
+  ],
+};
+
+/**
  * The three tools that get a finished book out.
  *
  * Named, and part of `TOOL_GROUPS` below rather than a copy of it, because the
@@ -82,14 +107,24 @@ export const READ_IT_BACK: ToolGroup = {
   tools: [
     {
       path: "consistency",
-      icon: "search",
+      /* **`quote`, not `search`.** It borrowed the magnifier while it was
+         the only tool of its kind in the launch MVP; the magnifier was drawn
+         for the title check — "where a title wins or loses" — which is live
+         again as of 2026-09-02. Two identical marks in a catalogue of four
+         is a catalogue that has stopped distinguishing anything. Curly
+         quotation marks are one of the three things this check finds. */
+      icon: "quote",
       name: "Consistency check",
       what: "A name spelled two ways, British and American spellings side by side, straight quotation marks among curly ones — across every chapter at once.",
     },
   ],
 };
 
-export const TOOL_GROUPS: ToolGroup[] = [READ_IT_BACK, GET_IT_OUT];
+export const TOOL_GROUPS: ToolGroup[] = [
+  LOOK_OUTWARD,
+  READ_IT_BACK,
+  GET_IT_OUT,
+];
 
 /** Flat, for anything that needs a count or a lookup rather than the grouping. */
 export const ALL_TOOLS: BookTool[] = TOOL_GROUPS.flatMap((g) => g.tools);

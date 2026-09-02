@@ -8,6 +8,7 @@ import {
   openLibraryQuery,
   parseGoogle,
   parseOpenLibrary,
+  reportedTotal,
   coversOf,
   summarise,
   yearOf,
@@ -455,5 +456,43 @@ describe("BROWSE_SHELVES", () => {
 
   it("has no duplicates, which would draw two identical chips", () => {
     expect(new Set(BROWSE_SHELVES).size).toBe(BROWSE_SHELVES.length);
+  });
+});
+
+describe("reportedTotal", () => {
+  /*
+   * **Both catalogues, under their own field names — and the second one was
+   * missing for the life of the function.**
+   *
+   * It read Google's `totalItems` only. Open Library says `numFound`, so it
+   * reported "no figure" for the source that carries the deep sweep, on the one
+   * screen that has to say what fraction of the shelf it read. Nothing in a
+   * build would notice: `null` is a legal answer and the sentence simply went
+   * missing.
+   */
+  it("reads Google's count and Open Library's alike", () => {
+    expect(reportedTotal({ totalItems: 312 })).toBe(312);
+    expect(reportedTotal({ numFound: 4072 })).toBe(4072);
+  });
+
+  it("takes Google's field first where a payload somehow carries both", () => {
+    expect(reportedTotal({ totalItems: 7, numFound: 9 })).toBe(7);
+  });
+
+  /* A network payload is not a message: anything that is not a real count has
+     to come back as "not said" rather than reaching a sentence about somebody's
+     title as NaN. */
+  it("refuses anything that is not a count", () => {
+    expect(reportedTotal({})).toBe(null);
+    expect(reportedTotal(null)).toBe(null);
+    expect(reportedTotal(undefined)).toBe(null);
+    expect(reportedTotal({ numFound: "4072" })).toBe(null);
+    expect(reportedTotal({ totalItems: -1 })).toBe(null);
+    expect(reportedTotal({ numFound: Number.NaN })).toBe(null);
+    expect(reportedTotal({ totalItems: Number.POSITIVE_INFINITY })).toBe(null);
+  });
+
+  it("keeps a genuine zero, which is not the same as no answer", () => {
+    expect(reportedTotal({ numFound: 0 })).toBe(0);
   });
 });

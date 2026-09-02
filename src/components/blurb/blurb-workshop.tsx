@@ -395,7 +395,7 @@ export function BlurbWorkshop({
         {narrow ? (
           <LimitNote allowance={gate.allowance} className="mb-3" />
         ) : (
-          <LimitBanner allowance={gate.allowance} className="mb-3" />
+          <LimitBanner allowance={gate.allowance} refused={gate.refused} className="mb-3" />
         )}
 
         <form
