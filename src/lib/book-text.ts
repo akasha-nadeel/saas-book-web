@@ -2,7 +2,7 @@ import type { JSONContent } from "@tiptap/react";
 
 import { proseFrom } from "@/lib/comps/rank";
 import type { BookText } from "@/lib/consistency";
-import { toBlocks } from "@/lib/export/blocks";
+import { toBlocks, type Block } from "@/lib/export/blocks";
 import {
   chapterMatterOf,
   chapterNumberOf,
@@ -68,8 +68,70 @@ export function bookTextOf(book: Book): BookText[] {
       title: chapter.title,
       number: chapterNumberOf(book, chapter.id),
       text: proseFrom(blocks),
+      breaks: breaksIn(blocks),
     };
   }).filter((chapter) => chapter.text.trim() !== "");
+}
+
+/**
+ * Characters a scene break is drawn out of, and nothing else.
+ *
+ * A full stop is deliberately not here: a paragraph of `...` is a writer
+ * trailing off, not a divider, and it is the commonest thing that would be
+ * caught by a looser rule.
+ */
+const SEPARATOR = /^[*#~•·§◆❖❦❧⁂✦◇▪◈✳\s‐-―-]+$/;
+
+/**
+ * Marks that are a divider on their own.
+ *
+ * The length rule below wants three characters, which is right for the ones
+ * that are *repeated* to make a divider — `***`, `---`, `~~~`. These are not
+ * repeated, because they are ornaments: one is the whole mark. They are also
+ * the ones with no other job in prose, which is why `*` and `-` are not here —
+ * a lone asterisk is an emphasis somebody left behind and a lone hyphen is a
+ * typo, and reading either as a scene break would report a book that has none.
+ */
+const ORNAMENTS = new Set([
+  "#", "§", "◆", "❖", "❦", "❧", "⁂", "✦", "◇", "▪", "◈", "✳",
+]);
+
+/**
+ * Every scene break in a chapter — the real ones, and the ones only drawn.
+ *
+ * **The two arrive by different routes and only one survives into prose.**
+ * `toBlocks` turns a Tiptap horizontal rule into a `sceneBreak` with no runs,
+ * and `proseFrom` drops it, so the check that reads `text` cannot see a real
+ * break at all. The importer meanwhile has no separator handling — no
+ * `thematicBreak`, no `<hr>`, nothing for `***` — so a divider that came in
+ * from a Word file is still an ordinary paragraph of asterisks.
+ *
+ * That asymmetry is worth reporting rather than papering over: a typed divider
+ * is *words*, and the exporter sets it as a centred line in the body face
+ * instead of as a break. It looks right in the editor and wrong in the file.
+ *
+ * Tuned to be quiet. Three characters or more once the spaces are taken out, or
+ * one of the single-character ornaments — so `***`, `* * *`, `---` and a lone
+ * `◆` are breaks, and a lone em dash used as a beat is not.
+ */
+export function breaksIn(blocks: readonly Block[]): (string | null)[] {
+  const out: (string | null)[] = [];
+
+  for (const block of blocks) {
+    if (block.kind === "sceneBreak") {
+      out.push(null);
+      continue;
+    }
+    if (block.kind !== "paragraph") continue;
+
+    const text = block.runs.map((run) => run.text).join("").trim();
+    if (!text || text.length > 12 || !SEPARATOR.test(text)) continue;
+
+    const bare = text.replace(/\s+/g, "");
+    if (bare.length >= 3 || ORNAMENTS.has(bare)) out.push(text);
+  }
+
+  return out;
 }
 
 /**

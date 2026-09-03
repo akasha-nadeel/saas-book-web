@@ -192,6 +192,13 @@ export const config = {
      * page produces a baffling parse error rather than a 401, so routes answer
      * for themselves — see app/api/chat/route.ts.
      */
-    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)",
+    /*
+     * `txt` is here for `public/typo-words.txt`, the word list the consistency
+     * check fetches — and it was not, so the gate answered a **307 to
+     * `/signin`** for a static file. Anything served out of `public/` that is
+     * not one of the extensions above needs its own entry, or it is guarded
+     * like a page.
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico|icon.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?|txt)$).*)",
   ],
 };

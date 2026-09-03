@@ -83,8 +83,13 @@ export function ListGroup({
    * `ul` when the rows are genuinely a list of things.
    *
    * Not cosmetic: a screen reader announces "list, 6 items" for a set of
-   * findings and nothing at all for six divs, and the findings are the case
-   * this was added for. The styling is identical either way.
+   * findings and nothing at all for six divs. The styling is identical either
+   * way.
+   *
+   * The consistency findings were the case this was added for and are no longer
+   * drawn with it — they are cards now (`consistency/finding-card.tsx`), in a
+   * plain `<ul>` that keeps the semantics and none of the chrome. Versions,
+   * chapters and search results are what it holds today.
    */
   as?: "div" | "ul";
   className?: string;
@@ -107,10 +112,12 @@ export function ListGroup({
  * that does something should be reachable from a keyboard without a caller
  * having to remember either fact.
  *
- * **`leading` is where a category's colour goes.** The consistency panel used
- * to wash each card with the hue of its check; a glyph carries the same
- * information without six competing backgrounds, which is how Settings tells
- * one category from another.
+ * **`leading` is where a category's colour goes**, which is how Settings tells
+ * one category from another. The example this was written from — the
+ * consistency panel's per-check hue — has since gone back to being the ground
+ * of a card of its own; see the amendment in `docs/styling.md` for why that is
+ * not a reversal of this rule. It still holds for a list of peers, which is
+ * what this component is for.
  */
 export function ListRow({
   leading,

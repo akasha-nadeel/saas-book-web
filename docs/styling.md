@@ -304,8 +304,48 @@ as a screen, and the thing the writer came for is the third or fourth box down.
 - **Colour that carries information keeps carrying it, but moves to a glyph.**
   The consistency panel washed each finding card with a hue per check; six
   competing card backgrounds is the pile again. The hue moved to a leading glyph
-  on a neutral row, which is how Settings tells one category from another. The
-  `HUES` map is unchanged — what changed is where it is painted.
+  on a neutral row, which is how Settings tells one category from another.
+
+### Amendment, 2026-09-03: the consistency check is a card again
+
+The two paragraphs above name that screen twice — as the offender that "nested
+cards two deep", and as the place a per-check hue was taken off a card and put
+on a dot. **Both were undone on purpose**, and the reasoning is here rather than
+only in `finding-card.tsx` so this section is not read as still describing it.
+
+- **A finding is not a peer of the finding under it.** The pile rule is about
+  boxes that are peers and look identical — six grey bordered cards down a rail,
+  where the border is spent drawing a separation the eye already had. A finding
+  is a small document about one word, and its nesting *is* the thing: a spelling
+  contains its chapters, a chapter contains its sentence. So it gets a card and
+  one box per spelling. **Two levels, and the chapters inside a box are divided
+  by a hairline rather than boxed again** — three levels is the pile arriving by
+  another door, and was drawn once before being cut.
+- **The grouped list is unchanged everywhere it was written for**: chapters,
+  versions, search results, settings rows — lists of genuine peers. Nothing in
+  `ui/list.tsx` moved.
+- **The hue came back as the card's ground**, where the dot had been. Six of
+  them are legible rather than a pile precisely because the card is a document
+  and not a row: the ground says which check without spending a glyph, and the
+  eyebrow says it again in words for anyone who cannot use the colour.
+  `consistency-checks.ts` holds the six.
+- **The ink is set by the palest hue, not by each.** One mix for all six is what
+  keeps them a family, so amber — the weakest against a white ground — decides
+  the numbers, with teal and emerald just behind it. `finding-card.tsx` carries
+  the two percentages and the measurements; a hue changed there or here means
+  re-measuring, in daylight, which is the half that fails.
+- **The card's colour is `color-mix` into theme tokens, not a token of its own**,
+  so it is a pale card by day and a deep one at night with no second table, and
+  it adds no seventh entry to the closed list of exceptions above. Same trick as
+  the tool marks.
+- **Three tokens are not what they seem inside the editor's panel.**
+  `--color-surface`, `--color-raised` and `--color-line` are re-pointed there to
+  translucent washes of `fg` so a panel layers over whatever it is dropped onto.
+  That is right for panels and quietly wrong for anything supplying its own
+  ground: the finding card's white boxes came out as a 5% black veil over the
+  tint, correct on the full screen and wrong in the rail. **`--color-panel`,
+  `--color-fg` and the status family are the same in both places**; build on
+  those, or on a translucent hue that needs no token at all.
 
 ## The editor's rail icons
 
