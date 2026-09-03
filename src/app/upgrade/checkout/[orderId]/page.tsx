@@ -18,6 +18,7 @@ import {
   payhereAmount,
   recurrenceOf,
 } from "@/lib/billing/plans";
+import { asPaidTier } from "@/lib/billing/tiers";
 import { checkoutHash } from "@/lib/billing/signature";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
@@ -69,6 +70,12 @@ export default async function CheckoutPage(
   if (!order || order.status !== "pending") redirect("/upgrade");
 
   const period = asPeriod(order.period) ?? "monthly";
+
+  /* The plan is read back off our own order row rather than defaulted: this
+     page signs the amount and names the item, and a wrong name on a real charge
+     is worse than sending the writer back to pick again. */
+  const tier = asPaidTier(order.plan);
+  if (!tier) redirect("/upgrade");
   const amount = payhereAmount(Number(order.amount));
   const currency = String(order.currency);
 
@@ -87,8 +94,8 @@ export default async function CheckoutPage(
       action={checkoutUrl()}
       sandbox={SANDBOX}
       summary={{
-        item: itemNameOf(period),
-        price: displayPrice(Number(order.amount), currency === "LKR" ? "LKR" : "USD"),
+        item: itemNameOf(tier, period),
+        price: displayPrice(Number(order.amount)),
         cycle: cycleLabel(period),
       }}
       email={typeof claims.email === "string" ? claims.email : ""}
@@ -102,7 +109,7 @@ export default async function CheckoutPage(
         cancel_url: `${base}/upgrade?cancelled=1`,
         notify_url: notifyUrl(),
         order_id: orderId,
-        items: itemNameOf(period),
+        items: itemNameOf(tier, period),
         currency,
         amount,
         hash,

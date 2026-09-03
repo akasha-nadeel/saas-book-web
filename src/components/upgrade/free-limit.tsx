@@ -706,8 +706,8 @@ export function LimitDialog({
             {/* Read from the price table, never restated — the same rule the
               pricing page follows, so the two cannot disagree. */}
             <p className="mt-4 font-sans text-sm text-muted">
-              {displayPrice(priceOf("monthly"))} a month, or{" "}
-              {displayPrice(priceOf("annual"))} a year.
+              From {displayPrice(priceOf("draft", "monthly"))} a month, or{" "}
+              {displayPrice(priceOf("draft", "annual"))} a year.
             </p>
 
             {/* Full width, as the reference has it: at the foot of a column of

@@ -3,9 +3,14 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
-import { IMPORT_FORMATS } from "@/lib/import";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
+import { NOT_INCLUDED, ROWS } from "@/lib/billing/plan-rows";
+import {
+  TIER_LIMITS,
+  TIER_NAMES,
+  type PaidTier,
+  type PlanTier,
+} from "@/lib/billing/tiers";
 import { DialogClose } from "@/components/ui/dialog";
 
 /**
@@ -43,23 +48,50 @@ import { DialogClose } from "@/components/ui/dialog";
  * on both plans now, so the refusal it headlined cannot happen. Gone rather
  * than left as a dialog for a state the app has no way to reach.
  */
-export type UpgradeReason = "books" | "restore" | "assistant-write";
+export type UpgradeReason =
+  | "books"
+  | "restore"
+  | "assistant"
+  | "assistant-write";
 
+/**
+ * Which plan each refusal is answered by.
+ *
+ * **The whole point of the map.** Every one of these used to sell the single
+ * paid plan, because there was one. Selling the $14.98 plan to somebody who
+ * wanted a sixth book reads as a paywall rather than an answer — the sixth book
+ * is $5.98, and saying so is both cheaper for them and more likely to convert.
+ *
+ * So a shelf problem sells Draft and an assistant problem sells Writer, and the
+ * dialog's right-hand column is that plan's own rows out of `ROWS`.
+ */
+const SELLS: Record<UpgradeReason, PaidTier> = {
+  books: "draft",
+  restore: "draft",
+  assistant: "writer",
+  "assistant-write": "writer",
+};
+
+/* **Each headline names the plan it is selling.** They said "Pro" while there
+   was one paid plan; with four, a writer refused the assistant and told about
+   book limits has been answered by the wrong door — and a Draft writer told
+   "Free carries five books" has been told something that is not about them. */
 const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
   books: {
     lead: "Your shelf is full.",
-    title: `Free carries ${plural(LAUNCH_LIMITS.freeBooks, "book")}. Pro carries as many as you write.`,
+    title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.draft} carries as many as you write.`,
   },
   restore: {
     lead: "There is no room to put this one back.",
-    title: `Free carries ${plural(LAUNCH_LIMITS.freeBooks, "book")}. Pro carries as many as you write.`,
+    title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.draft} carries as many as you write.`,
   },
-  /* **The headline is about the switch, not about the shelf.** The other two
-     reasons land here from a full shelf and the rows below answer them; this
-     one lands from the assistant panel, and a writer told about book limits
-     when they asked about the assistant has been answered by the wrong door. */
+  assistant: {
+    lead: `The writing assistant is part of ${TIER_NAMES.writer}.`,
+    title:
+      "It reads the chapter you are in and answers about it, without the manuscript leaving your machine for anything else.",
+  },
   "assistant-write": {
-    lead: "The assistant can read your chapter. Writing into it is Pro.",
+    lead: `The assistant can read your chapter. Writing into it is ${TIER_NAMES.writer}.`,
     title:
       "Offer a passage, see exactly what would change, and put it in with one press.",
   },
@@ -153,60 +185,50 @@ const icons = {
   ),
 };
 
-/* Both columns read from the modules that enforce them, so no row here can
-   promise something the server does not keep. */
-const FREE: Row[] = [
-  {
-    icon: icons.books,
-    name: plural(LAUNCH_LIMITS.freeBooks, "book"),
-    detail: "No cap on chapters or words.",
-  },
-  {
-    icon: icons.importing,
-    name: "Import what you have written",
-    detail: `${IMPORT_FORMATS.map((f) => f.label).join(", ")}.`,
-  },
-  {
-    icon: icons.sync,
-    name: "Sync across your devices",
-    detail: "Your shelf follows you everywhere.",
-  },
-  {
-    icon: icons.assistant,
-    name: `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant replies a month`,
-    detail: "It reads the chapter and offers you text.",
-  },
-  {
-    icon: icons.word,
-    /* On the Free column because it *is* free, and named in full so the two
-       columns cannot be read as Word here and the real formats over there. */
-    name: "Word, EPUB and PDF export",
-    detail: "Every format, on either plan. Take the book and go.",
-  },
-];
+/**
+ * A row's mark, matched on its label.
+ *
+ * Matched rather than stored on `ROWS`, because that array is read by two
+ * Server Components and must stay free of JSX. A label with no entry takes the
+ * tick — every row in a column is something the plan includes, so a tick is
+ * never wrong, only less specific.
+ */
+const ROW_ICON: Record<string, React.ReactNode> = {
+  Books: icons.books,
+  "Chapters and words": icons.infinite,
+  "Autosave and sync": icons.sync,
+  Export: icons.word,
+  "Title check": icons.books,
+  "Consistency check": icons.everything,
+  "Writing assistant": icons.assistant,
+  "Quick replies": icons.assistant,
+  "Careful replies": icons.assistant,
+  "Writes into your chapter": icons.assistant,
+};
 
-const PRO: Row[] = [
-  {
-    icon: icons.infinite,
-    name: "Unlimited books",
-    detail: "Never choose between them again.",
-  },
-  {
-    icon: icons.assistant,
-    name: `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} assistant replies a month`,
-    detail: "Twelve times what Free carries.",
-  },
-  {
-    icon: icons.assistant,
-    name: "The assistant can write into your chapter",
-    detail: "You see the change and press. One undo takes it back.",
-  },
-  {
-    icon: icons.everything,
-    name: "Everything on Free",
-    detail: "Nothing you have is taken away.",
-  },
-];
+/**
+ * One plan's column, out of the array the pricing cards read.
+ *
+ * **This is the whole reason for the change.** The dialog carried two
+ * hand-written lists — its own words, its own order, its own claims — beside a
+ * `plan-rows.ts` written expressly to stop that happening. They described two
+ * plans in a four-plan product, and would have gone on disagreeing with
+ * `/upgrade` on the two screens a buyer reads back to back.
+ *
+ * Rows the plan does not include are dropped rather than crossed: a column
+ * headed "what it adds" is a list of what you get, and the cards are where the
+ * full comparison lives.
+ */
+function rowsFor(tier: PlanTier): Row[] {
+  return ROWS.filter((row) => row.values[tier] !== NOT_INCLUDED).map((row) => ({
+    icon: ROW_ICON[row.label] ?? icons.everything,
+    name: row.label,
+    /* The value carries the detail — "Unlimited", "25 a day". Where it is
+       merely "Included" the mark has already said so, so the line stays empty
+       rather than printing a word that repeats a glyph. */
+    detail: row.values[tier] === "Included" ? "" : row.values[tier],
+  }));
+}
 
 function Column({
   label,
@@ -261,9 +283,11 @@ function Column({
               <span className="block font-sans text-sm leading-tight font-semibold text-tremor-content-strong">
                 {row.name}
               </span>
-              <span className="mt-1 block font-sans text-xs leading-relaxed text-tremor-content">
-                {row.detail}
-              </span>
+              {row.detail && (
+                <span className="mt-1 block font-sans text-xs leading-relaxed text-tremor-content">
+                  {row.detail}
+                </span>
+              )}
             </span>
           </li>
         ))}
@@ -274,9 +298,19 @@ function Column({
 
 export function UpgradeDialog({
   reason,
+  tier = "free",
   onClose,
 }: {
   reason: UpgradeReason;
+  /**
+   * What the writer is on now. The left column is their own plan rather than
+   * always Free — a Draft writer refused the assistant is not being shown what
+   * Free carries.
+   *
+   * Defaults to `free` so a caller that has not got a plan yet still renders
+   * something true rather than nothing.
+   */
+  tier?: PlanTier;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -285,7 +319,8 @@ export function UpgradeDialog({
   }, []);
 
   const { lead, title } = HEADLINES[reason];
-  const monthly = displayPrice(priceOf("monthly"));
+  const selling = SELLS[reason];
+  const monthly = displayPrice(priceOf(selling, "monthly"));
 
   return (
     <dialog
@@ -327,8 +362,16 @@ export function UpgradeDialog({
         </h2>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
-          <Column label="Free — what you have" rows={FREE} tone="free" />
-          <Column label="Pro — what it adds" rows={PRO} tone="pro" />
+          <Column
+            label={`${TIER_NAMES[tier]} — what you have`}
+            rows={rowsFor(tier)}
+            tone="free"
+          />
+          <Column
+            label={`${TIER_NAMES[selling]} — what it adds`}
+            rows={rowsFor(selling)}
+            tone="pro"
+          />
         </div>
 
         <Link
@@ -339,7 +382,7 @@ export function UpgradeDialog({
                      transition-opacity hover:opacity-90
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          See what Pro costs
+          See what {TIER_NAMES[selling]} costs
         </Link>
 
         {/* Not "Upgrade now" over a button that opens a price list — the press

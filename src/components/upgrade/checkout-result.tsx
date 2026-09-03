@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { usePlan } from "@/lib/use-plan";
 
@@ -26,6 +27,10 @@ const GIVE_UP_AFTER = 60;
 
 export function CheckoutResult({ orderId }: { orderId: string | null }) {
   const plan = usePlan(orderId ?? undefined);
+
+  /* The plan's own name, so the confirmation names what was actually
+     bought rather than a plan the product retired. */
+  const planName = plan.tier ? TIER_NAMES[plan.tier] : "your plan";
   const { refresh } = plan;
   const [tries, setTries] = useState(0);
 
@@ -57,7 +62,7 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
         ) : plan.pro ? (
           <Result
             tone="good"
-            title="You're on Pro"
+            title={`You're on ${planName}`}
             body="Unlimited books and more assistant replies are switched on. PayHere has emailed your receipt."
             action={{ href: "/", label: "Back to writing" }}
           />
@@ -93,7 +98,7 @@ export function CheckoutResult({ orderId }: { orderId: string | null }) {
           <Result
             tone="idle"
             title="Still waiting on PayHere"
-            body="The payment may have gone through — PayHere sometimes takes a few minutes to confirm. Your receipt email is the thing to trust; if it arrives and Pro is still off in an hour, send us that receipt."
+            body="The payment may have gone through — PayHere sometimes takes a few minutes to confirm. Your receipt email is the thing to trust; if it arrives and the plan is still off in an hour, send us that receipt."
             action={{
               label: "Check again",
               onClick: () => {

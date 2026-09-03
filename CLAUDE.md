@@ -43,10 +43,20 @@ assuming a screen or a route is live.
   screen still redirecting home. **To work on a gated tool locally, take its
   segment out of `HIDDEN_BOOK_TOOL_PATHS`** — the env var will not do it.
 - **What is live**: the shelf, `/book/new`, `/book/import`, the editor,
-  `/book/[bookId]/export`, the assistant, upgrade/billing and the legal pages.
-  **What is gated**: every model route including the two comps routes this file
-  calls free and keyless, `/api/narrate`, `/api/transcribe`, and the fifteen
-  other tool screens.
+  `/book/[bookId]/export`, `/book/[bookId]/consistency`,
+  `/book/[bookId]/title-check`, the assistant, upgrade/billing and the legal
+  pages — and `/api/comps`, which was un-gated on 2026-09-02 because it is the
+  route the title check runs on.
+  **What is gated**: every other model route, `/api/comps/subjects` included,
+  `/api/narrate`, `/api/transcribe`, and the fourteen other tool screens.
+- **`launch.ts` holds three more decisions this file used not to name.**
+  `COMPS_RANKING_LIVE` is the client-side half of the comps gate — false, so
+  `comps-page.tsx` draws no Rank button the gated route would refuse (the house
+  rule about dead UI, pointed at a flag). `onFreePlan(plan)` is the one
+  three-part test for *known to be metered* — `!loading && billing && !pro` —
+  written once so it cannot go missing a part in a fourth call site.
+  `trashedBookClosed()` reads the **book**, never the shelf view, so a pasted
+  editor URL and a card press answer the same question.
 - **`LAUNCH_POST_BACKLOG` is the list of what comes back**, in the order it is
   meant to. Adding a feature to the MVP means taking it off both that list and
   `HIDDEN_BOOK_TOOL_PATHS`, not deleting the gate.
@@ -112,8 +122,8 @@ do not treat its absence of a subject as a gap to fill unless somebody asks.
   tree, and it needs `sharp`, which is **not a dependency** — install it by hand
   to run this.
 
-The suite is 104 files / 2,000 tests and takes about a hundred seconds (measured
-2026-08-31, all green); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 111 files / 2,133 tests and takes about 95 seconds (measured
+2026-09-02, all green); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
 from the routing tests — both are expected, not failures.
 
@@ -147,8 +157,8 @@ thousands of bundled files, and `npm run lint` reports thousands of problems.
 count is still noise rather than news.
 
 **`src/` no longer lints clean, and the doc used to say it did.** As of
-2026-09-01 `npm run lint` reports **7 errors and 11 warnings**, all in four
-files: `components/ui/tremor.tsx` (six `no-explicit-any`),
+2026-09-01, re-measured 2026-09-02, `npm run lint` reports **7 errors and 11
+warnings**, all in four files: `components/ui/tremor.tsx` (six `no-explicit-any`),
 `components/editor/search-panel.tsx` (one `set-state-in-effect` error plus three
 warnings, all in its head), `components/shelf/bookshelf.tsx` (four unused-var
 warnings — the banner sections `95386a2` removed and left behind) and
@@ -283,16 +293,20 @@ wrong with this book, worst first, each carrying the control that fixes it).
 
 **The tool catalogue is declared once** in `src/lib/book-tools.ts` (path, name,
 one-line description, grouped). Nothing in that list is a preview: a tool that
-is not finished does not go in it. **It holds two entries in two groups** —
-the Consistency check and Export — because the list is what the dashboard, the
-book card's ⋯ sheet and the landing page all read, and the MVP may only name
-what is reachable. (`1daca70` cut it to Export alone; the consistency check was
-added on 2026-08-27 as the second live tool, and is the only one of the
-seventeen that was written *for* the MVP rather than un-gated into it.)
-`src/lib/tool-guide.ts` carries one guide per entry. The sixteen older tool *screens*
-are all still in the tree under `src/app/book/[bookId]/` and
-`src/components/`; bringing one back is an entry here, an entry there, and a
-line off `HIDDEN_BOOK_TOOL_PATHS`. Its file comment still says sixteen.
+is not finished does not go in it. **It holds three entries in three groups** —
+the Title check (`LOOK_OUTWARD`), the Consistency check (`READ_IT_BACK`) and
+Export (`GET_IT_OUT`) — because the list is what the dashboard, the book card's
+⋯ sheet and the landing page all read, and the MVP may only name what is
+reachable. (`1daca70` cut it to Export alone; the consistency check was added
+on 2026-08-27 as the second live tool, and is the only one of the seventeen
+written *for* the MVP rather than un-gated into it; the title check was
+un-gated on 2026-09-02 as the third.) **`GET_IT_OUT` is exported by name as
+well as through `TOOL_GROUPS`**, because Overview shows that one group on its
+own and a lookup by title would have made the block vanish silently the day
+somebody renamed it. `src/lib/tool-guide.ts` carries one guide per entry. The
+fourteen older tool *screens* are all still in the tree under
+`src/app/book/[bookId]/` and `src/components/`; bringing one back is an entry
+here, an entry there, and a line off `HIDDEN_BOOK_TOOL_PATHS`.
 **Each tool is the same three pieces** — a pure, tested module in `src/lib/`;
 a thin
 `src/app/book/[bookId]/<tool>/page.tsx` that awaits `params`; a client component
@@ -666,10 +680,12 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **eight**; the first seven were applied live as of
-  2026-08-20 and the eighth
+  dashboard. There are **twelve**; the first seven were applied live as of
+  2026-08-20 and the last three have not been confirmed here — the eighth
   (`20260822071735_launch_mvp_entitlements.sql` — `ai_usage`, the assistant
-  claim/refund RPCs and the free-book trigger) has not been confirmed here, so
+  claim/refund RPCs and the free-book trigger), the ninth
+  (`20260824000000_free_book_limit_five.sql`) and the tenth
+  (`20260826000000_free_book_limit_counts_archived.sql`) — so
   check before blaming a 502 from the assistant on the route —
   `20260801000000_feedback.sql` had been outstanding since it was written and
   the feedback dialog failed for every writer until it went in, and
@@ -746,12 +762,34 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 - **Neither checkout lets the browser say what it is buying** — the transaction
   is created server-side, so the price comes from `plans.ts` and the buyer's id
   from their own session.
-- Prices live once in `plans.ts` (**$5.98 monthly, $53.99 a year** at the launch
-  MVP — 25% off, displayed as about $4.50/month, and the per-month figure is
-  divided from the total rather than typed, with a test on it). `launch.ts`
-  carries the same two figures for the marketing copy. **A price change is three
-  edits**: this table, two *new* prices in Paddle's catalog (never an edit of a
-  live one), and the resulting env ids.
+- **There are four plans, and `src/lib/billing/tiers.ts` is where they are
+  named.** `PlanTier` is `free | draft | writer | studio`, cheapest first —
+  `tierAtLeast` compares positions in `TIER_ORDER`, so a tier inserted in the
+  wrong place opens or shuts every gate above it. `TIER_LIMITS` is the one
+  TypeScript statement of what each plan gives (books, chat, the two reply
+  allowances, write mode); `TIER_NAMES` is the one place the words are written.
+  The module is pure and imports nothing, so a Server Component, a client
+  component and `library-store.ts` can all read it.
+- **Free and Draft carry no assistant at all.** That is the line the product is
+  drawn on: everything else — imports, sync, all three export formats, unlimited
+  words and chapters, the title and consistency checks — is on every plan
+  including Free. **`onFreePlan` is the wrong test for anything AI** from the
+  moment Draft exists: Draft is *paid*, so `pro` is true for a writer who may
+  not use the assistant. `aiChatClosed()` in `launch.ts` is its sibling and the
+  one `chat-panel.tsx` reads; `launch.test.ts` pins the Draft row, which is the
+  one that would regress silently.
+- Prices live once in `plans.ts`, keyed **tier × period**: Draft $5.98/$53.99,
+  Writer $14.98/$134.99, Studio $24.98/$224.99 — all three 25% off annually, and
+  the per-month figure divided from the total rather than typed, with a test on
+  it. **USD only**; the LKR table came out when the plans went to four, because
+  three tiers × two cycles × two currencies is twelve figures to keep true and
+  eleven were never rendered. `uniformAnnualSaving()` is what lets the period
+  toggle print one "Save 25%" badge above three columns — it answers null when
+  the three stop agreeing, so the badge disappears rather than lying. **A price
+  change is three edits**: this table, *new* prices in Paddle's catalog (never an
+  edit of a live one), and the resulting env ids — **six of them now**,
+  `PADDLE_PRICE_<TIER>_<CYCLE>`, and `isPaddleConfigured()` requires all six
+  rather than selling one plan and hiding the others.
 - **Export is free on both plans, and *export must never move behind the plan*
   is the rule again.** The launch MVP sold EPUB and PDF as the two things Pro
   bought; that was undone on 2026-08-27, because a writer has to be able to take
@@ -759,25 +797,51 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   trade's writers check for first. `freeExports` and `proExports` now carry the
   same three formats, and the pair stays as a pair so the decision has somewhere
   to live and narrowing it is still one edit. **`launch.test.ts` pins it** —
-  nothing else would notice the array changing. What is free is **five books**,
-  unlimited words and chapters, imports, sync and every export format; **Pro
-  buys two things**: unlimited books, and sixty assistant replies a month
-  against five.
-- **What the launch MVP meters, it meters on the server**, because it costs
-  model time: `billing/launch-entitlements.ts` claims an assistant reply through
-  the `claim_assistant_reply` RPC against the `ai_usage` table (UTC calendar
-  month, **402** unpaid / **429** Pro, and a `refund()` if the reply never
-  lands), `requireLaunchExport()` now only checks for a session — free is not
+  nothing else would notice the array changing, and `exportAllowed(format, pro)`
+  keeps its **boolean** signature deliberately — teaching it what a tier is would
+  make narrowing it a plausible edit again. What is free is **five books**,
+  unlimited words and chapters, imports, sync and every export format. **Draft
+  ($5.98) buys two things**: unlimited books, and unlimited title checks — the
+  second falls out of `FREE_LIMITS.titleCheck` reading against `pro`, and it is
+  what keeps that card from being a sixth book slot for $5.98. **Writer
+  ($14.98) buys the assistant** — 25 Quick a day, 100 Careful a month, and write
+  mode. **Studio ($24.98) buys more of it** — 40 and 300.
+- **Two meters, two windows, and the window follows the cost.** Quick refills
+  **daily** and Careful **monthly**: a monthly cap on the cheap model teaches a
+  writer to hoard something that costs almost nothing, and a daily cap on the
+  dear one is either uselessly small or ruinous in a busy week. Both are UTC,
+  which is *not* the writer's midnight — `resetAt` is an instant and every screen
+  renders it in local time rather than saying "tomorrow".
+- **The status codes mean one thing each now.** `requireTier("writer", …)` in
+  `/api/chat` refuses a plan without the assistant **before** the meter is
+  touched, so **402 always means "your plan does not include this"** and **429
+  always means "you have spent this allowance"**. The panel branches on that
+  pair, offers the other model when one runs out, and reads the structured
+  `usage` it used to throw away.
+- **What costs model time is metered on the server**:
+  `billing/launch-entitlements.ts` claims a reply through the
+  `claim_assistant_reply(p_kind)` RPC against `ai_usage` (with a `refund(model)`
+  if the reply never lands), `requireLaunchExport()` now only checks for a session — free is not
   anonymous, since `/api/export/pdf` launches a browser on markup a caller sent —
   and the free book limit is
   a **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
   count. `new-book-form.tsx` mirrors it in the UI; the trigger is what enforces
-  it. **The count is stated twice and both have to move** — `freeBooks` in
-  `launch.ts` and the trigger body, whose current value is set by the ninth
+  it. **Every limit is stated twice and both have to move** — `TIER_LIMITS` in
+  `billing/tiers.ts` and the SQL. Two is the floor, because SQL cannot import
+  TypeScript; it was three until the hardcoded `pro ? 60 : 5` came out of
+  `launch-entitlements.ts`. The book count lives in `TIER_LIMITS.free.books` and
+  the trigger body, whose current value is set by the ninth
   migration (`20260824000000_free_book_limit_five.sql`) rather than by the
   eighth, because the eighth may already have been applied. The tenth
   (`20260826000000_free_book_limit_counts_archived.sql`) changes *what* is
-  counted, not how many.
+  counted, not how many. The eleventh and twelfth
+  (`20260902000000_plan_tiers.sql`, `20260902000100_plan_tier_entitlements.sql`)
+  are the four tiers: the CHECK constraints that make `subscriptions.plan`
+  mean something, the two-window `claim_assistant_reply(p_kind)`, and
+  `openchapter_internal_plan_tier` replacing `openchapter_internal_is_pro`.
+  **They must be applied before the app that calls them** — a route asking for
+  `claim_assistant_reply('quick')` against the old zero-argument function is a
+  502 on every send.
 - **The book limit counts everything but the trash**, so the archive is not a
   way round it and **unarchiving is never gated**. It was the active shelf alone
   until 2026-08-26, on the Trello/Figma convention where archiving opens a slot
@@ -863,8 +927,14 @@ over an empty column — **the proxy redirects it home under the launch flag**.
   a sentence to this page.**
 - **Its figures are five drawn screens** in `mvp-screens.tsx` — shelf, editor,
   versions, import, assistant — plus the export wizard's own `ExportScreen`. All
-  six are markup at a fixed design mapped onto `cqw`, so the page ships no
-  script beyond the header. **The drawn design is ~770px wide, not the 1000px
+  six are markup at a fixed design mapped onto `cqw`, so no figure on the page
+  ships a line of script. **The page itself now ships two islands, not one** —
+  `landing-header.tsx` and, since the plans went to four, `pricing-cards.tsx`,
+  which holds the cycle toggle and the four cards. The section carried a monthly
+  figure with the yearly one written underneath and no toggle at all, on the
+  reasoning that choosing a cycle is a decision for the page that takes the
+  money; four plans is eight prices, and reading half of them out of a note
+  under the other half is work a toggle does better. **The drawn design is ~770px wide, not the 1000px
   `export-screen.tsx` uses**, and the note on `W` in that file records why: a
   1000px design in this page's figure column renders its body text at 8.5px.
   The hero is capped at `max-w-4xl` and the export at `max-w-5xl` for the same
@@ -976,10 +1046,12 @@ The seventeen tools all hang off `/book/[bookId]/`: `export`, `roadmap`,
 `title-check` · `structure`, `prose`, `progress`, `provenance` · `money`,
 `track`, `arc` · and `consistency`, the seventeenth, written for the MVP rather
 than un-gated into it — grouped the way `book-tools.ts` groups them. **Under the
-launch flag the proxy redirects all of them home but `export` and
-`consistency`**, along with `/book/[bookId]/read`, `/tools` and
+launch flag the proxy redirects all of them home but `export`, `consistency`
+and `title-check`**, along with `/book/[bookId]/read`, `/tools` and
 `/invite/[token]`; `HIDDEN_BOOK_TOOL_PATHS` in `launch.ts` is the list, and it
-holds sixteen entries — the fifteen hidden tools plus `read`.
+holds **fifteen** entries — the fourteen hidden tools plus `read`. **Read the
+set rather than this sentence**: `comps` came off it on 2026-09-02 and went
+back on 2026-09-03, so the count is the thing that moves most often here.
 
 **API routes:** `/api/chat` · `/api/narrate` · `/api/transcribe` · `/api/comps` ·
 `/api/comps/subjects` · `/api/comps/query` · `/api/comps/rank` ·
@@ -989,8 +1061,11 @@ holds sixteen entries — the fifteen hidden tools plus `read`.
 `paddle/checkout`, `paddle/notify`, `paddle/update-payment-method`). All except
 `/api/comps`, `/api/comps/subjects` and `/api/export/pdf` are metered and gated
 by `requirePro()`. **Under the launch flag every model route answers 404
-first**, the two free comps routes included — the paragraph below describes the
-design, not what is currently reachable. The first two are
+first**, `/api/comps/subjects` included — the paragraph below describes the
+design, not what is currently reachable. **`/api/comps` itself is the one
+exception and is live** as of 2026-09-02, because the title check runs on it:
+gating a screen and gating the data behind it are separate decisions, and this
+is the case that shows why they have to be. The first two are
 free, keyless and stay that way; the third is free **on purpose and for good** —
 export must never move behind the plan — but it is not anonymous, since it
 launches a browser on markup a caller supplied: it takes `requireSignedIn`

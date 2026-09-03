@@ -23,7 +23,7 @@ import { CONTACT_EMAIL, REFUND_DAYS, REPLY_DAYS, TRADING_NAME } from "@/lib/lega
 export const metadata: Metadata = {
   title: "Refunds & cancellation · OpenChapter",
   description:
-    "How to cancel OpenChapter Pro, what happens when you do, and when we refund.",
+    "How to cancel a paid OpenChapter plan, what happens when you do, and when we refund.",
 };
 
 export default function RefundsPage() {
@@ -59,13 +59,14 @@ export default function RefundsPage() {
 
       <Section title={`Refund on a first payment — ${REFUND_DAYS} days`}>
         <p>
-          If {TRADING_NAME} Pro is not what you expected, ask within{" "}
+          If your {TRADING_NAME} plan is not what you expected, ask within{" "}
           {REFUND_DAYS} days of your <em>first</em> payment and we will refund
           it in full. You do not have to give a reason.
         </p>
         <p>
-          That applies to both cycles — {displayPrice(priceOf("monthly"))}{" "}
-          monthly and {displayPrice(priceOf("annual"))} annual.
+          That applies to every paid plan and both cycles, from{" "}
+          {displayPrice(priceOf("draft", "monthly"))} monthly up to{" "}
+          {displayPrice(priceOf("studio", "annual"))} annual.
         </p>
       </Section>
 

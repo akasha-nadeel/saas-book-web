@@ -8,6 +8,7 @@ import {
   paddlePriceId,
 } from "@/lib/billing/paddle";
 import { asPeriod, priceOf } from "@/lib/billing/plans";
+import { asPaidTier } from "@/lib/billing/tiers";
 import { CONTACT_EMAIL } from "@/lib/legal";
 import { currentSubscription } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
@@ -55,12 +56,22 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => null)) as {
+    tier?: unknown;
     period?: unknown;
   } | null;
 
   const period = asPeriod(body?.period);
   if (!period) {
     return Response.json({ error: "Pick a monthly or annual plan." }, { status: 400 });
+  }
+
+  /* Narrowed rather than trusted, and `free` is refused with the rubbish: this
+     route creates a charge, and there is nothing to charge for a plan that
+     costs nothing. The price itself still comes from our own table below, so
+     the worst a bad value can do is fail here. */
+  const tier = asPaidTier(body?.tier);
+  if (!tier) {
+    return Response.json({ error: "Pick a plan." }, { status: 400 });
   }
 
   const paddle = new Paddle(PADDLE_API_KEY, {
@@ -70,10 +81,10 @@ export async function POST(request: Request) {
   let transaction;
   try {
     transaction = await paddle.transactions.create({
-      items: [{ priceId: paddlePriceId(period), quantity: 1 }],
+      items: [{ priceId: paddlePriceId(tier, period), quantity: 1 }],
       // What the webhook reads to know whose subscription this is. Written
       // from the session, so it cannot name anybody else.
-      customData: { userId, period },
+      customData: { userId, tier, period },
     });
   } catch (error) {
     // The code is logged next to the error because it is the part an operator
@@ -121,9 +132,9 @@ export async function POST(request: Request) {
       order_id: transaction.id,
       owner: userId,
       provider: "paddle",
-      plan: "pro",
+      plan: tier,
       period,
-      amount: priceOf(period),
+      amount: priceOf(tier, period),
       currency: "USD",
       status: "pending",
     });

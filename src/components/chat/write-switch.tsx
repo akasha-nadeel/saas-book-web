@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { SwitchTrack } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
 
@@ -68,7 +69,7 @@ export function WriteSwitch({
           align="start"
           label={
             locked
-              ? "Letting the assistant write into your chapter is part of Pro."
+              ? `Letting the assistant write into your chapter is part of ${TIER_NAMES.writer}.`
               : on
                 ? "The assistant may offer to put a passage into this chapter."
                 : "The assistant will only offer you text to copy."
@@ -99,7 +100,7 @@ export function WriteSwitch({
                      transition-opacity hover:opacity-90
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          Pro
+          {TIER_NAMES.writer}
         </Link>
       )}
     </div>

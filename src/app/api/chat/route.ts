@@ -1,11 +1,13 @@
 import {
   ModelError,
+  asChatModel,
   modelProvider,
   streamModel,
   type ChatMessage,
 } from "@/lib/ai";
 import { claimAssistantReplyAllowance } from "@/lib/billing/launch-entitlements";
-import { requirePro } from "@/lib/billing/server";
+import { requireTier } from "@/lib/billing/server";
+import { TIER_NAMES, assistantWriteAllowed } from "@/lib/billing/tiers";
 
 /**
  * The assistant behind the editor's right-hand panel.
@@ -111,6 +113,7 @@ export async function POST(request: Request) {
     chapter?: string;
     selection?: string;
     write?: boolean;
+    model?: string;
   };
   try {
     body = await request.json();
@@ -135,29 +138,72 @@ export async function POST(request: Request) {
   }
 
   /**
-   * **Write mode is the paid half, and it is checked here rather than in the
-   * panel.**
+   * **Which of the two models to ask — narrowed here, and defaulted to the
+   * cheap one.**
    *
-   * The switch in the rail is locked on a free account, so a real writer never
-   * reaches this — it is the backstop for a request that did not come from the
-   * panel. Checked *before* the allowance is claimed, so a refusal costs nobody
-   * a reply out of their month.
+   * This narrows; it does not authorise. Both models are on both plans that
+   * have the assistant at all, so there is no per-plan allowlist to check —
+   * what differs is the *allowance*, and Postgres claims that a few lines
+   * below.
    *
-   * The gate is on the flag rather than on the route. An assistant that reads a
-   * chapter and answers about it is free on both plans and stays free; refusing
-   * the whole conversation because one field was set would take that away.
+   * **The default matters more than the narrowing does.** A body that names
+   * nothing, or names rubbish, gets Quick: the daily meter, the cheap model.
+   * Defaulting the other way would let a malformed request spend a reply out of
+   * the scarce monthly allowance, which is the one mistake here that costs a
+   * writer something they would notice.
+   */
+  const model = asChatModel(body.model) ?? "quick";
+
+  /**
+   * **The plan gate, and it is the broadest refusal here so it goes first.**
+   *
+   * The assistant is what Writer and Studio buy. Free and Draft carry the whole
+   * of the rest of OpenChapter — every import, sync, all three export formats,
+   * unlimited words, the title and consistency checks — and no assistant at
+   * all, so a request from one of those plans is refused entirely rather than
+   * being asked the narrower question about write mode.
+   *
+   * **Before the allowance is claimed**, which is the rule the write gate
+   * already followed: a refusal must cost nobody a reply out of their day or
+   * their month.
+   *
+   * It answers with the *tier* rather than a boolean because the two questions
+   * below need it — whether the assistant may write into the chapter, and which
+   * allowance to spend — and one subscription read is better than three.
+   *
+   * The message names the plan rather than the paywall, and reads the name out
+   * of `TIER_NAMES` so it cannot drift from the card.
+   */
+  const gate = await requireTier("writer", {
+    signIn: "Sign in to use the writing assistant.",
+    upgrade: `The writing assistant is part of ${TIER_NAMES.writer} and ${TIER_NAMES.studio}. ${TIER_NAMES.draft} carries unlimited books, every export format and unlimited title checks.`,
+  });
+  if (!gate.ok) return gate.response;
+
+  /**
+   * **Write mode is a second question, asked of the same answer.**
+   *
+   * Folded into the tier above rather than a second `requirePro` — that was a
+   * second subscription read for a question the first one could already answer.
+   * It stays stated separately from the chat rule so that a future plan with
+   * the assistant but not the writing already has its shape here.
+   *
+   * The switch in the panel is locked where this would refuse, so a real writer
+   * never reaches it; this is the backstop for a request that did not come from
+   * the panel.
    */
   const write = body.write === true;
-  if (write) {
-    const denied = await requirePro({
-      signIn: "Sign in to let the assistant write into your chapter.",
-      upgrade:
-        "Letting the assistant write into your chapter is part of Pro. It can still read the chapter and offer you text.",
-    });
-    if (denied) return denied;
+  if (write && !assistantWriteAllowed(gate.tier)) {
+    return Response.json(
+      {
+        error: `Letting the assistant write into your chapter is part of ${TIER_NAMES.writer} and ${TIER_NAMES.studio}. It can still read the chapter and offer you text.`,
+        upgrade: true,
+      },
+      { status: 402 },
+    );
   }
 
-  const allowance = await claimAssistantReplyAllowance();
+  const allowance = await claimAssistantReplyAllowance(model);
   if (!allowance.ok) return allowance.response;
 
   // The chapter is `context` rather than part of the conversation so it stays
@@ -187,6 +233,7 @@ export async function POST(request: Request) {
     system: write ? SYSTEM_WRITE : SYSTEM,
     context,
     messages,
+    model,
     maxTokens: MAX_OUTPUT_TOKENS,
     signal: abort.signal,
   })[Symbol.asyncIterator]();

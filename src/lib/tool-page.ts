@@ -10,8 +10,8 @@ import type { ReactNode } from "react";
  * viewport cannot do that. Hence one flag rather than six copies of each
  * screen, which is the version of this that goes stale.
  *
- * `embedded` says two things and only two, and both are about the *frame*
- * rather than the work:
+ * `embedded` says three things, and all three are about the *frame* rather
+ * than the work:
  *
  * - **No `ToolHeader`.** It draws the breadcrumb, the book chip and the tool's
  *   name as the page's `h1`. Inside a panel that is a second heading under the
@@ -21,8 +21,16 @@ import type { ReactNode } from "react";
  *   a child claiming the whole viewport inside it overflows by exactly the
  *   height of the title bar, which reads as a rendering bug rather than a
  *   layout one.
+ * - **The host owns the measure.** A whole window centres itself and pays its
+ *   own gutter; embedded, the frame around it has already done both. Applying
+ *   them again paid the gutter twice and inset the tool inside its own host —
+ *   which is what put the dashboard's banner and the tool's card on two
+ *   different widths, visibly, on the one screen where they sit above each
+ *   other. See `toolMeasure`.
  *
- * Nothing else may hang off it. The moment `embedded` starts hiding *features*
+ * Nothing else may hang off it, and the line is *features* rather than a
+ * count: all three above are about the frame the work sits in. The moment
+ * `embedded` starts hiding *features*
  * — a control here, a section there — there are two products in one file and
  * the panel becomes the lesser one, which is precisely the thing that makes a
  * writer navigate away to "the real screen".
@@ -58,4 +66,21 @@ export interface ToolPageProps {
  */
 export function toolShell(embedded: boolean | undefined, extra = "bg-surface") {
   return `${embedded ? "h-full" : "h-[var(--oc-visual-height)]"} min-w-0 overflow-y-auto overscroll-contain ${extra}`;
+}
+
+/**
+ * The horizontal measure for a tool screen, in either frame.
+ *
+ * **Embedded, it contributes nothing** — the dashboard's `<main>` or the
+ * roadmap's panel has already set a width and a gutter, and a second `mx-auto
+ * max-w-* px-*` inside the first does not narrow the cap (the outer one is
+ * smaller) but does pay the gutter twice. The tool then sits inset from the
+ * banner directly above it, which is the misalignment this was written for.
+ *
+ * `min-w-0` rather than an empty string: the wrapper is a flex/grid child on
+ * some of these screens, and without it a wide table or a long word pushes the
+ * column past its track instead of scrolling inside it.
+ */
+export function toolMeasure(embedded: boolean | undefined) {
+  return embedded ? "min-w-0" : "mx-auto max-w-7xl px-(--oc-page-gutter)";
 }

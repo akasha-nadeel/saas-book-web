@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, createContext, type ReactNode, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -11,7 +12,6 @@ import {
 } from "@/components/shelf/section-banner";
 import { RailMark, useMarkHandle, type MarkName } from "@/components/editor/rail-mark";
 import { BookDetailsDialog } from "@/components/shelf/book-details-dialog";
-import { CollabArea } from "@/components/collab/collab-area";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { AccountMenu } from "@/components/auth/account-menu";
 import { HelpDialog } from "@/components/shelf/help-dialog";
@@ -935,7 +935,28 @@ export function Bookshelf({
 
         {/* ---- The area ------------------------------------------------ */}
         {/* Named so `goToArea` can put it back to the top on a switch. */}
-        <div id={AREA_SCROLLER} className="flex-1 overflow-y-auto">
+        {/* **The areas' measure lives here, and it moves with the sidebar.**
+
+            Collapsing the rail frees 10rem — and bought nothing, because
+            `<main>` below is `mx-auto` at a fixed cap: at any wide window the
+            content was already at its ceiling and the freed space went into the
+            auto margins. The grid never got wider, so no container query could
+            fire and no extra column could appear.
+
+            One custom property rather than a prop threaded through every area:
+            they all read it through `<main>`, so Title check, Consistency and
+            the shelf's own views widen together and stay aligned with the
+            banner above them. 84rem is a step rather than a removal — this
+            widens text-heavy screens too, where a longer measure reads worse. */}
+        <div
+          id={AREA_SCROLLER}
+          className="flex-1 overflow-y-auto"
+          style={
+            {
+              "--oc-area-max": sidebarCollapsed ? "84rem" : "72rem",
+            } as React.CSSProperties
+          }
+        >
           {/* **The top bar is gone.**
 
             It held a search field and the New book button across the full
@@ -953,7 +974,7 @@ export function Bookshelf({
           {/* Capped, so the cards do not stretch to a metre wide on a desktop
             monitor and leave the eye travelling between a number and its
             label. */}
-          <main className="mx-auto max-w-6xl px-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 md:pb-16">
+          <main className="@container mx-auto max-w-(--oc-area-max) px-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:px-6 md:pb-16">
             {/* ---- The section, and the one action it takes -------------
 
                 The name of the area with its own rail icon beside it, and New
@@ -1150,7 +1171,21 @@ export function Bookshelf({
               server and handed down with the page — so the disc that leads
               every pile paints with the first frame instead of waiting on a
               round trip for something we were already holding. */}
-            {area === "collab" && <CollabArea account={account} />}
+            {/* **Collaboration is off, and this is the last way in.**
+
+                The nav lost its Collaborators row when `AREAS` was cut to the
+                launch three, and the editor's Share button is behind a
+                `canShare` that is hardcoded false — but `?area=collab` still
+                rendered the whole area to anybody who typed it. It was also
+                half a feature: `/invite/[token]` goes home under
+                `HIDDEN_BOOK_TOOL_PATHS`, so a writer could send an invitation
+                that nobody could accept.
+
+                Commented rather than deleted. `CollabArea`, `ShareDialog`, the
+                Server Actions, the RLS and the email path are all built and
+                tested; see TODO.md under "Taken out on purpose" for what comes
+                back with them. */}
+            {/* {area === "collab" && <CollabArea account={account} />} */}
           </main>
         </div>
 
@@ -1289,11 +1324,11 @@ export function Bookshelf({
                     ? "no more"
                     : plural(noRoomForBatch.room, "more book")}
                 </span>
-                . Nothing has been restored — choose fewer, or go Pro for
-                unlimited books.
+                . Nothing has been restored — choose fewer, or take{" "}
+                {TIER_NAMES.draft} for unlimited books.
               </>
             }
-            confirmLabel="See Pro"
+            confirmLabel={`See ${TIER_NAMES.draft}`}
             onConfirm={() => router.push("/upgrade")}
             onClose={() => setNoRoomForBatch(null)}
           />
@@ -1304,7 +1339,11 @@ export function Bookshelf({
              limit — two screens wording one refusal differently is how a plan
              stops being legible. `restore` only changes the line above the
              headline. */
-          <UpgradeDialog reason="restore" onClose={() => setNoRoomFor(null)} />
+          <UpgradeDialog
+            reason="restore"
+            tier={plan.tier ?? "free"}
+            onClose={() => setNoRoomFor(null)}
+          />
         )}
 
         {closedBook && (
@@ -2206,12 +2245,15 @@ function Overview({
           subtitle={overviewBannerLine()}
           ink="dark"
           action={{
-            /* Straight to the export wizard when there is a book to export,
-               and to the one screen that makes one when there is not. Both are
-               live under the launch flag — check `HIDDEN_BOOK_TOOL_PATHS`
-               before changing either. */
-            label: current ? "Export a book" : "Start a book",
-            href: current ? `/book/${current.id}/export` : "/book/new",
+            /* **One destination, whether or not there is a book.** It used to
+               fork — the export wizard when a book existed, the new-book screen
+               when none did — so the banner's own button changed meaning under
+               a writer between one visit and the next. Export has its own way
+               in from the book card and the tool list; the thing a dashboard
+               banner is for is the next book. Live under the launch flag; check
+               `HIDDEN_BOOK_TOOL_PATHS` before changing it. */
+            label: "Start a book",
+            href: "/book/new",
           }}
         />
       {/* ---- What is on the shelf ----------------------------------------
@@ -2934,17 +2976,16 @@ function ProCard({ plan }: { plan: PlanState }) {
       <div className="min-w-0 flex-1">
         <h3 className="text-base font-bold text-white">Room for the next book</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-          Pro takes the shelf from {plural(LAUNCH_LIMITS.freeBooks, "book")} to
-          unlimited, the assistant from{" "}
-          {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies a month to{" "}
-          {LAUNCH_LIMITS.proAssistantRepliesPerMonth}. Every export format is
-          free on either plan.
+          {TIER_NAMES.draft} takes the shelf from{" "}
+          {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and{" "}
+          {TIER_NAMES.writer} brings the writing assistant. Every export format
+          is free on every plan, this one included.
         </p>
         <Link
           href="/upgrade"
           className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-upgrade-ink"
         >
-          See what Pro adds
+          See what {TIER_NAMES.draft} adds
         </Link>
       </div>
 
@@ -3321,7 +3362,7 @@ function overviewBannerLine(): string {
     names.length <= 1
       ? (names[0] ?? "")
       : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-  return `${list} — free on both plans, and the file is yours.`;
+  return `${list} — free on every plan, and the file is yours.`;
 }
 
 const VIEW_BANNERS: Record<ShelfView, SectionBannerProps> = {

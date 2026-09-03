@@ -1581,6 +1581,37 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
 
 ## Taken out on purpose
 
+- **Collaboration, hidden on 2026-09-03** at the owner's request — *"no need
+  collaborating tool for this web app right now, I will tell you if I want to."*
+  Built, tested, and reachable from nothing rather than deleted.
+
+  **It was already half a feature, which is the part worth remembering.**
+  `ShareDialog` opened from the editor and from a Collaborators area, but
+  `/invite/[token]` redirects home under `HIDDEN_BOOK_TOOL_PATHS` — so a writer
+  could send an invitation that nobody on earth could accept. Two of the three
+  ways in had already gone quiet on their own: `AREAS` lost its Collaborators
+  row when the nav was cut to the launch three, and the editor's Share button
+  sits behind a `canShare` that is hardcoded `false`. What this removed was the
+  last one, `?area=collab`, which still drew the whole area to anybody who
+  typed it.
+
+  **What comes back with it**, so this is not rebuilt from scratch:
+
+  - The commented mount in `bookshelf.tsx` — search for `area === "collab"`.
+  - `canShare` in `chapter-editor.tsx` back to a real condition.
+  - A `collab` entry in `AREAS` (`areas.ts` still names it; only the nav list
+    dropped it).
+  - `invite` off `HIDDEN_BOOK_TOOL_PATHS` in `launch.ts`, or the link still
+    cannot be accepted.
+  - **The seats question, which is genuinely open.** `free-limits.ts` has
+    `SEATS_PER_BOOK` at 2 free / 10 "pro", written when there was one paid
+    plan. With four, seats are not an AI cost — they cost nothing per use — so
+    gating them behind Writer would charge the assistant price for something
+    free to run. Any paid tier is the answer that was reached but not shipped.
+
+  `collab-area.tsx`, `share-dialog.tsx`, the Server Actions, the RLS policies
+  and the email path are all untouched and all still tested.
+
 - **Comp titles, put back behind the launch gate** on **2026-09-03**, one day
   after it came out. Built, tested, and reachable from nothing on purpose —
   which is what `HIDDEN_BOOK_TOOL_PATHS` is for, and the reason it went there

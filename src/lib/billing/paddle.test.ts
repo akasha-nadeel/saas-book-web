@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   isPaddleSetupFault,
   paddleErrorCode,
@@ -134,5 +134,94 @@ describe("paddleErrorCode / isPaddleSetupFault", () => {
     expect(isPaddleSetupFault({ code: "internal_error" })).toBe(false);
     expect(isPaddleSetupFault({ code: "too_many_requests" })).toBe(false);
     expect(isPaddleSetupFault(undefined)).toBe(false);
+  });
+});
+
+/**
+ * **The function that decides which plan a webhook just paid for.**
+ *
+ * `paddle/notify` has no other way to know. It deliberately does *not* read
+ * Paddle's own billing interval — that would work today and break the day
+ * somebody adds a quarterly price, because `period` and `plan` are both CHECK
+ * constraints and a row that fails one aborts the write for money already
+ * taken. So it maps the returned price ids back through our own table, and this
+ * is the test that map has never had.
+ *
+ * `PRICE_IDS` is captured at module load, so every case resets the registry and
+ * re-imports rather than sharing one instance.
+ */
+describe("paddlePlanFrom", () => {
+  const IDS = {
+    PADDLE_PRICE_DRAFT_MONTHLY: "pri_draft_m",
+    PADDLE_PRICE_DRAFT_ANNUAL: "pri_draft_a",
+    PADDLE_PRICE_WRITER_MONTHLY: "pri_writer_m",
+    PADDLE_PRICE_WRITER_ANNUAL: "pri_writer_a",
+    PADDLE_PRICE_STUDIO_MONTHLY: "pri_studio_m",
+    PADDLE_PRICE_STUDIO_ANNUAL: "pri_studio_a",
+  } as const;
+
+  async function withPrices() {
+    const saved = Object.fromEntries(
+      Object.keys(IDS).map((k) => [k, process.env[k]]),
+    );
+    for (const [key, value] of Object.entries(IDS)) process.env[key] = value;
+
+    vi.resetModules();
+    const mod = await import("./paddle");
+
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    return mod;
+  }
+
+  it("names the plan and the cycle behind each of the six prices", async () => {
+    const { paddlePlanFrom } = await withPrices();
+
+    expect(paddlePlanFrom(["pri_draft_m"])).toEqual({
+      tier: "draft",
+      period: "monthly",
+    });
+    expect(paddlePlanFrom(["pri_writer_a"])).toEqual({
+      tier: "writer",
+      period: "annual",
+    });
+    expect(paddlePlanFrom(["pri_studio_m"])).toEqual({
+      tier: "studio",
+      period: "monthly",
+    });
+  });
+
+  it("refuses a price it does not recognise", async () => {
+    const { paddlePlanFrom } = await withPrices();
+
+    // Somebody else's price, or one made in the dashboard and never wired up.
+    expect(paddlePlanFrom(["pri_somebody_elses"])).toBeNull();
+    expect(paddlePlanFrom([])).toBeNull();
+    expect(paddlePlanFrom([undefined])).toBeNull();
+  });
+
+  /**
+   * **Two of ours at once is the case a naive version guesses at**, and the one
+   * that would grant a plan nobody bought. A subscription naming both Draft and
+   * Studio is a shape this app does not sell; the honest answer is "I do not
+   * know", which the route already handles by logging and granting nothing.
+   */
+  it("refuses to choose when two of our prices arrive together", async () => {
+    const { paddlePlanFrom } = await withPrices();
+
+    expect(paddlePlanFrom(["pri_draft_m", "pri_studio_a"])).toBeNull();
+    expect(paddlePlanFrom(["pri_writer_m", "pri_writer_a"])).toBeNull();
+  });
+
+  it("ignores unknown ids travelling beside a known one", async () => {
+    const { paddlePlanFrom } = await withPrices();
+
+    // One of ours plus an add-on we do not sell is still unambiguous.
+    expect(paddlePlanFrom(["pri_addon", "pri_writer_m"])).toEqual({
+      tier: "writer",
+      period: "monthly",
+    });
   });
 });

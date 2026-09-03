@@ -1,5 +1,5 @@
 /**
- * Every line the two plans are compared on, and what each one gives.
+ * Every line the four plans are compared on, and what each one gives.
  *
  * **Its own module, with no `"use client"` on it, and that is load-bearing.**
  * The pricing cards are drawn on `/upgrade`, which is a client component, and
@@ -8,14 +8,21 @@
  * this array would get `.map` of a reference object and the page would 500.
  * The rule is written down in CLAUDE.md; this is the file it was written for.
  *
- * **Every number is read, never typed.** The counts come from `LAUNCH_LIMITS`
- * and `FREE_LIMITS`, which are the same constants the gates enforce, so the
- * pricing page cannot promise something the app then refuses.
+ * **Every number is read, never typed.** The counts come from `TIER_LIMITS` and
+ * `FREE_LIMITS`, which are the same constants the gates enforce, so the pricing
+ * page cannot promise something the app then refuses.
+ *
+ * **The order of this array is the order on the card**, and there are no
+ * headings above it any more. Two headings ("Core workspace", "AI and export")
+ * used to file these rows into blocks; with four columns and four crossed rows
+ * they were separating a list short enough to read straight through, and the
+ * second heading was announcing the boundary that the crosses already draw far
+ * more plainly. So: one flat list, and the sequence carries the argument.
  */
 
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import { FREE_LIMITS } from "@/lib/free-limits";
 import { plural } from "@/lib/plural";
+import { TIER_LIMITS, TIER_ORDER, type PlanTier } from "./tiers";
 
 /**
  * The one value that means "no". Named, because the mark in front of a row is
@@ -24,124 +31,121 @@ import { plural } from "@/lib/plural";
  */
 export const NOT_INCLUDED = "Not included";
 
-/**
- * The three headings the rows are filed under, in the order a book is made.
- *
- * **Twenty-two rows in one column is a list nobody finishes.** That was the
- * shape of this card until now, and the order inside it had no argument at all
- * — the three Pro-only rows sat in the middle, "Prose report" came after
- * "Audiobook", and the writing record landed under the sales curve. A reader
- * scanning for the one thing they came to check had to read every line.
- *
- * Grouping is what the pricing pages that carry this many rows do (Airtable and
- * Notion both file theirs under headings), and for a measurable reason: nobody
- * reads a long feature list, they scan for their own question, and a heading is
- * what tells them which ten lines to look at. It also stops the list reading as
- * a boast — clarity over completeness.
- *
- * **The headings are the job, not the software's parts.** "Writing the book",
- * "Getting it ready", "Selling it" is the same order the roadmap walks and the
- * same claim the landing page makes: nobody tells you the order. A reader who
- * has only written should be able to see where they are on this card.
- */
-export const GROUPS = ["Core workspace", "AI and export"] as const;
+const UNLIMITED = "Unlimited";
+const INCLUDED = "Included";
 
-export type Group = (typeof GROUPS)[number];
+/** Every tier answers the same, which is what a row of ticks is for. */
+function everywhere(value: string): Record<PlanTier, string> {
+  return Object.fromEntries(
+    TIER_ORDER.map((tier) => [tier, value]),
+  ) as Record<PlanTier, string>;
+}
+
+/** Included on the plans with the assistant, crossed on the two without it. */
+function withAssistant(value: Record<PlanTier, string> | string) {
+  const paid = typeof value === "string" ? everywhere(value) : value;
+  return Object.fromEntries(
+    TIER_ORDER.map((tier) => [
+      tier,
+      TIER_LIMITS[tier].chat ? paid[tier] : NOT_INCLUDED,
+    ]),
+  ) as Record<PlanTier, string>;
+}
 
 export const ROWS: {
-  group: Group;
   label: string;
-  detail?: string;
-  starter: string;
-  pro: string;
+  values: Record<PlanTier, string>;
 }[] = [
+  /* **Line one, because it is the only row where Free differs from Draft** —
+     the whole of what the cheapest paid plan buys, said first. */
   {
-    group: "Core workspace",
     label: "Books",
-    starter: plural(LAUNCH_LIMITS.freeBooks, "book"),
-    pro: "Unlimited",
+    values: {
+      free: plural(TIER_LIMITS.free.books ?? 0, "book"),
+      draft: UNLIMITED,
+      writer: UNLIMITED,
+      studio: UNLIMITED,
+    },
   },
+  /* Qualifies the row above it: five books, but nothing inside them counted. */
   {
-    group: "Core workspace",
     label: "Chapters and words",
-    starter: "Unlimited",
-    pro: "Unlimited",
+    values: everywhere(UNLIMITED),
   },
   {
-    group: "Core workspace",
     label: "Autosave and sync",
-    starter: "Included",
-    pro: "Included",
+    /* Matched by string in `STARTER_HIGHLIGHT` — renaming silently drops it. */
+    values: everywhere(INCLUDED),
   },
+  /* **The wedge, and it is read before the AI boundary rather than after it.**
+     Export was the one thing the paid plan used to buy that a writer cannot do
+     without, and charging for the door is what this trade's writers check for
+     first. Four identical values *is* the argument; the row stays for exactly
+     that reason. Matched by string in `STARTER_HIGHLIGHT`. */
   {
-    group: "Core workspace",
-    /* **Filed here rather than under a heading of its own.** It is research
-       rather than workspace, strictly — but a third heading on a card this
-       tall costs more than the tidiness is worth, and the row reads perfectly
-       well beside the other things a writer gets a fixed amount of.
-
-       Both numbers are read from `FREE_LIMITS`, which is what `useLimitGate`
-       spends, so this page cannot promise a count the screen then refuses.
-       `pro: null` there means no ceiling, which is the one value `badgeTone`
-       paints gold. */
-    label: "Title check",
-    detail: "Search millions of published titles.",
-    starter: `${FREE_LIMITS.titleCheck.free} a day`,
-    pro: "Unlimited",
-  },
-  {
-    group: "AI and export",
-    label: "Writing assistant",
-    starter: `${LAUNCH_LIMITS.freeAssistantRepliesPerMonth} replies / month`,
-    pro: `${LAUNCH_LIMITS.proAssistantRepliesPerMonth} replies / month`,
-  },
-  {
-    group: "AI and export",
-    /* **A capability row among the counts, and the wording is the whole of it.**
-       What Pro buys is the assistant *offering* a passage for the page; the
-       change is still the writer's press, and the row has to read that way or
-       it is selling something the app does not do. */
-    /* Plain, and the same sentence on both cards — the mark in front is what
-       differs. "The assistant writes into your chapter" read as a description
-       of something happening on its own; "can write in" is the permission it
-       actually is, which is also the honest word: nothing goes into the page
-       without the writer pressing for it. */
-    label: "The assistant can write in your chapter",
-    /* **The one cross on the page, and it used to be a tick.**
-
-       This row carried a green mark on the free card with the value "It offers
-       text to copy" — which is a true sentence about the free assistant and a
-       false answer to the row it is answering. `LAUNCH_LIMITS.freeAssistantWrite`
-       is `false` and `/api/chat` gates write mode with `requirePro()`: the free
-       plan does not write into the chapter, and a tick beside a line saying it
-       does is the worst claim this app can make, on the page a sceptical reader
-       checks hardest.
-
-       `NOT_INCLUDED` is what the card compares against to draw a cross instead,
-       and it prints no badge — see the note on `ValueBadge`. One cross across
-       two columns is what makes it impossible to miss. */
-    starter: NOT_INCLUDED,
-    /* **"Included", so the tick carries it and no badge is drawn.** The value
-       was "Replace or insert, on your press" — accurate, and a sentence where
-       every other badge on the card is a count. A badge is for a *figure* a
-       reader scans for; a capability that is simply present is what the mark in
-       front of the label already says, which is why "Included" is dropped
-       rather than printed. The cross opposite is what makes the row land. */
-    pro: "Included",
-  },
-  {
-    group: "AI and export",
-    /* **The same on both sides, and that is the row doing its job.** Export was
-       the one thing Pro bought that a writer cannot do without, and charging
-       for the door is the thing this trade's writers check for first. The row
-       stays rather than coming out: a reader comparing the columns should be
-       able to see that the file is not what they are paying for.
-
-       The label is matched by string in `STARTER_HIGHLIGHT` below — renaming it
-       silently drops the highlight. */
     label: "Export",
-    detail: "Word, EPUB and PDF, on either plan.",
-    starter: "Word, EPUB, PDF",
-    pro: "Word, EPUB, PDF",
+    values: everywhere("Word, EPUB, PDF"),
+  },
+  /* The second thing Draft buys, and worth its place for that alone. Both
+     numbers come from `FREE_LIMITS`, which is what `useLimitGate` spends, so
+     this cannot promise a count the screen then refuses. `pro: null` there means
+     no ceiling, which is the one value `badgeTone` paints gold. */
+  {
+    label: "Title check",
+    values: {
+      free: `${FREE_LIMITS.titleCheck.free} a day`,
+      draft: UNLIMITED,
+      writer: UNLIMITED,
+      studio: UNLIMITED,
+    },
+  },
+  {
+    label: "Consistency check",
+    values: everywhere(INCLUDED),
+  },
+  /* ── The boundary. Everything below is crossed on Free and Draft. ────── */
+  {
+    label: "Writing assistant",
+    values: withAssistant(INCLUDED),
+  },
+  /* **The two counts, and the wording is deliberately about the allowance
+     rather than the model.**
+
+     A card may not imply one model is cleverer than another: on an Anthropic
+     deployment Quick is Haiku and Careful is Sonnet, but on a Google one they
+     are the same model, and "thinks harder" would be a claim the code cannot
+     back on half the installations. What is true everywhere is how many you
+     get and how often they come back — which is also the actual difference a
+     buyer is choosing between. The behavioural description lives in the
+     panel's own tooltip, where the deployment knows its provider. */
+  {
+    label: "Quick replies",
+    values: withAssistant({
+      free: "",
+      draft: "",
+      writer: `${TIER_LIMITS.writer.quickPerDay} a day`,
+      studio: `${TIER_LIMITS.studio.quickPerDay} a day`,
+    }),
+  },
+  {
+    label: "Careful replies",
+    values: withAssistant({
+      free: "",
+      draft: "",
+      writer: `${TIER_LIMITS.writer.carefulPerMonth} a month`,
+      studio: `${TIER_LIMITS.studio.carefulPerMonth} a month`,
+    }),
+  },
+  {
+    /* **A capability row among the counts, and the wording is the whole of it.**
+       What the paid plans buy is the assistant *offering* a passage for the
+       page; the change is still the writer's press, and the row has to read
+       that way or it is selling something the app does not do.
+
+       "can write in" is the permission it actually is — "the assistant writes
+       into your chapter" read as a description of something happening on its
+       own. */
+    label: "Writes into your chapter",
+    values: withAssistant(INCLUDED),
   },
 ];

@@ -25,7 +25,10 @@ import {
 } from "@/lib/editor/assistant-write";
 import { useDictation } from "@/lib/editor/use-dictation";
 import { usePreservedEditorSelection } from "@/lib/editor/preserved-selection";
-import { onFreePlan } from "@/lib/launch";
+import { aiChatClosed } from "@/lib/launch";
+import Link from "next/link";
+import { asChatModel, type ChatModel } from "@/lib/chat-model";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { blockText, type Block } from "@/lib/markdown";
 import { useAccount } from "@/lib/use-account";
 import { useAutoGrow } from "@/lib/use-auto-grow";
@@ -129,7 +132,15 @@ export function ChatPanel({
   const setMessages = setLive;
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /**
+   * Why the last send failed, kept structured rather than as one sentence.
+   *
+   * The panel used to hold `error: string` and read only `d.error` off the
+   * body, which threw away everything that made a refusal actionable — whether
+   * it was the plan or the allowance, which allowance, and when it comes back.
+   * Every failure rendered as the same grey line.
+   */
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
 
   const prefs = usePrefs();
   const plan = usePlan();
@@ -142,12 +153,15 @@ export function ChatPanel({
    * **Write mode is three conditions, and all three are about capability rather
    * than about the switch.**
    *
-   * `canWrite` is the book's answer and `onFreePlan` the plan's — false while
+   * `canWrite` is the book's answer and `aiChatClosed` the plan's — false while
    * the plan is still unknown, because *not knowing yet is not a reason to
    * refuse*, and the server is the real gate either way. The editor is the
    * third: with no surface there is nowhere for a passage to land.
    */
-  const locked = onFreePlan(plan);
+  const locked = aiChatClosed(plan);
+  /* The picker's answer. Stored in prefs because the panel unmounts on close;
+     `asChatModel` has already narrowed whatever was on disk. */
+  const model = prefs.assistantModel;
   const canOfferWrites = canWrite && !!editor && !locked;
   const writeOn = canOfferWrites && prefs.assistantWrite;
 
@@ -303,7 +317,7 @@ export function ChatPanel({
     abortRef.current?.abort();
     setLive(null);
     clearChat(chapterId);
-    setError(null);
+    setRefusal(null);
     setApplied(null);
   };
 
@@ -363,7 +377,7 @@ export function ChatPanel({
     setMessages([...history, { role: "assistant", content: "" }]);
     setInput("");
     setBusy(true);
-    setError(null);
+    setRefusal(null);
     setApplied(null);
 
     const controller = new AbortController();
@@ -382,16 +396,29 @@ export function ChatPanel({
              route checks the plan for itself before honouring either. */
           write: writeOn,
           selection: writeOn && selected ? selected.text : undefined,
+          /* Narrowed again server-side. This names a preference, not a
+             permission — both models are on both plans that have the assistant
+             at all, and what differs is which meter the reply is taken from. */
+          model,
         }),
         signal: controller.signal,
       });
 
       if (!response.ok || !response.body) {
-        const detail = await response
+        const body = await response
           .json()
-          .then((d: { error?: string }) => d.error)
-          .catch(() => null);
-        setError(detail ?? "The assistant is unavailable.");
+          .then((d: Record<string, unknown>) => d)
+          .catch(() => ({}) as Record<string, unknown>);
+
+        setRefusal({
+          status: response.status,
+          error:
+            typeof body.error === "string"
+              ? body.error
+              : "The assistant is unavailable.",
+          upgrade: body.upgrade === true,
+          kind: asChatModel(body.kind),
+        });
         // Drop the empty assistant bubble — there is nothing to show in it.
         setMessages(history);
         return;
@@ -422,7 +449,7 @@ export function ChatPanel({
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       console.error("[chat] failed", err);
-      setError("Could not reach the assistant.");
+      setRefusal({ status: 0, error: "Could not reach the assistant." });
       setMessages(history);
     } finally {
       setBusy(false);
@@ -569,11 +596,7 @@ export function ChatPanel({
           </ol>
         )}
 
-        {error && (
-          <p className="mt-4 rounded-md border border-accent/40 px-3 py-2 font-sans text-sm text-muted">
-            {error}
-          </p>
-        )}
+        {refusal && <RefusalNote refusal={refusal} plan={plan} />}
       </div>
 
       {/* **What the assistant is pointed at, said before it is asked anything.**
@@ -618,176 +641,225 @@ export function ChatPanel({
         </div>
       )}
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send(input);
-        }}
-        className="border-t border-line px-3 pt-1.5 pb-2"
-      >
-        {/* **Clear sits above the box and outside it**, because it is the one
-            control here that does not act on what is being typed: Send and the
-            microphone are about this question, and Clear is about the
-            conversation behind it. Inside the box it read as a third way to
-            deal with the draft. No border out here — it is alone on its row and
-            does not need one to be found. */}
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={() => setClearing(true)}
-            disabled={messages.length === 0}
-            className="rounded-md px-2 py-1 font-sans text-xs text-muted
-                       outline-none transition-colors disabled:opacity-30
-                       hover:text-fg focus-visible:ring-2
+      {/* **A plan without the assistant gets a way in, not a dead composer.**
+
+          Free and Draft carry the whole of the rest of OpenChapter and no
+          assistant at all, and `/api/chat` refuses them with a 402. A live
+          composer here would be a control that fails on every press, which the
+          house rule says is worse than one that is not there.
+
+          What it is *not* is a hidden tab. The rail keeps its assistant button
+          and this panel still opens — a feature nobody can find is a feature
+          nobody upgrades for, which is the same argument `ProGate` makes for
+          the tool screens.
+
+          `aiChatClosed` and not `onFreePlan`: Draft is paid, so `pro` is true
+          for a writer who may not use this at all. And it answers false while
+          the plan is still loading, because not knowing yet is not a reason to
+          refuse. */}
+      {locked ? (
+        <div className="border-t border-line px-4 py-5 text-center">
+          <p className="font-sans text-sm font-semibold text-fg">
+            The writing assistant is part of {TIER_NAMES.writer} and{" "}
+            {TIER_NAMES.studio}
+          </p>
+          <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
+            It reads the chapter you are in and answers about it — and on your
+            press, offers prose to put into the page.
+          </p>
+          <Link
+            href="/upgrade"
+            className="mt-3 inline-block rounded-lg bg-accent px-4 py-2 font-sans
+                       text-sm font-semibold text-accent-ink outline-none
+                       transition-opacity hover:opacity-90 focus-visible:ring-2
                        focus-visible:ring-accent/60"
           >
-            Clear
-          </button>
+            See the plans
+          </Link>
         </div>
-
-        {/* **One box, not a field and a loose row under it.** The border, the
-            radius and the ground are here rather than on the textarea, and the
-            controls sit inside at the foot — so the whole thing reads as one
-            surface a question is composed on, and `focus-within` lights all of
-            it rather than just the words.
-
-            `@container` so the switch's label can stand down on the narrowest
-            panel: at `--sidebar-width: 15rem` the switch, its label, the chip,
-            the microphone and Send do not fit on one line together. */}
-        {/* **White, and lifted off the panel with a shadow.**
-
-            `bg-surface` was the panel's own field treatment, and inside
-            `.panel-chrome` in daylight that token is re-pointed to a 5% dark
-            tint — fields there "lift *down* into the page, because a lighter
-            box on a white ground is not a box at all". A shadow is the other
-            way to make it one, and it is the one this composer wants: it is not
-            a field in a list of fields, it is the surface the whole panel is
-            for.
-
-            So `panel` (white in daylight) with the shadow, and `surface` at
-            night — where that token is an 8% white lift and the hairline does
-            the work, since a shadow on near-black is invisible. Same rule the
-            theme blocks follow everywhere else: light lifts with shadow, dark
-            lifts with a line. */}
-        <div
-          className="@container rounded-lg border border-line bg-panel
-                     shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_14px_rgba(0,0,0,0.07)]
-                     transition-colors focus-within:border-accent
-                     dark:bg-surface dark:shadow-none"
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(input);
+          }}
+          className="border-t border-line px-3 pt-1.5 pb-2"
         >
-          {/* **One line to start, growing to about ten.** It was `rows={3}`:
-              three lines of empty box at the foot of a 240px rail, for a
-              question most writers type in one — and still three lines for the
-              writer who types eight, which scrolls a box they are looking at
-              instead of opening it. `useAutoGrow` measures on every change of
-              the value, so it also shrinks back when `send` empties the field. */}
-          <textarea
-            ref={grow}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              // Enter sends; Shift+Enter is a newline, as in every chat box.
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                void send(input);
-              }
-            }}
-            placeholder="Ask about this chapter…"
-            rows={1}
-            /* Borderless and transparent: the box around it owns all of that
-               now, and a second border here would draw a field inside a field.
+          {/* **Clear sits above the box and outside it**, because it is the one
+              control here that does not act on what is being typed: Send and the
+              microphone are about this question, and Clear is about the
+              conversation behind it. Inside the box it read as a third way to
+              deal with the draft. No border out here — it is alone on its row and
+              does not need one to be found. */}
+          {/* **The picker sits out here with Clear, not inside the box.**
 
-               No `overflow-` class either — the hook owns it, so the scrollbar
-               arrives in the same frame the box stops growing and never before.
-               `scroll-slim` is what it arrives as: the app's own thin bar, a
-               floating pale thumb on no track at all, the same one the message
-               list above uses. Without it the browser draws its native bar — on
-               Windows a wide grey gutter with arrow buttons at both ends, the
-               loudest thing in a panel whose subject is prose. */
-            className="scroll-slim w-full resize-none bg-transparent px-3 pt-2
-                       pb-1 font-sans text-sm text-fg placeholder:text-muted
-                       focus:outline-none"
-          />
+              The box's own row is already tight — the write switch drops its
+              label at `@[15rem]` to fit — and this is a setting for the question
+              rather than a control on the draft, which is the same argument that
+              put Clear here. */}
+          <div className="flex items-center justify-between gap-2">
+            <ModelPicker
+              value={model}
+              allowance={plan.assistant}
+              onChange={(next) => setPref("assistantModel", next)}
+            />
+            <button
+              type="button"
+              onClick={() => setClearing(true)}
+              disabled={messages.length === 0}
+              className="rounded-md px-2 py-1 font-sans text-xs text-muted
+                         outline-none transition-colors disabled:opacity-30
+                         hover:text-fg focus-visible:ring-2
+                         focus-visible:ring-accent/60"
+            >
+              Clear
+            </button>
+          </div>
 
-          <div className="flex items-center justify-between gap-2 px-2 pt-0.5 pb-2">
-            {/* Absent rather than locked for a reader on somebody else's book:
-                a plan is something you can buy your way past and a viewer role
-                is not, so offering the upgrade there would be a false way
-                out. */}
-            <div className="flex min-w-0 items-center">
-              {canWrite && editor && (
-                <WriteSwitch
-                  on={prefs.assistantWrite}
-                  locked={locked}
-                  onToggle={toggleWrite}
-                />
-              )}
-            </div>
+          {/* **One box, not a field and a loose row under it.** The border, the
+              radius and the ground are here rather than on the textarea, and the
+              controls sit inside at the foot — so the whole thing reads as one
+              surface a question is composed on, and `focus-within` lights all of
+              it rather than just the words.
 
-            <div className="flex shrink-0 items-center gap-1.5">
-              {/* **Dictation, and hidden outright where it cannot work.** The
-                  engine is the browser's own — Chrome and Edge only — so a
-                  control that could never work on this machine is not drawn at
-                  all rather than drawn dead.
+              `@container` so the switch's label can stand down on the narrowest
+              panel: at `--sidebar-width: 15rem` the switch, its label, the chip,
+              the microphone and Send do not fit on one line together. */}
+          {/* **White, and lifted off the panel with a shadow.**
 
-                  This is deliberately not `/api/transcribe`: that one takes a
-                  finished file and costs per minute, and streaming a live
-                  microphone at it to watch words appear would be the wrong
-                  trade in both directions. */}
-              {dictation.supported && (
+              `bg-surface` was the panel's own field treatment, and inside
+              `.panel-chrome` in daylight that token is re-pointed to a 5% dark
+              tint — fields there "lift *down* into the page, because a lighter
+              box on a white ground is not a box at all". A shadow is the other
+              way to make it one, and it is the one this composer wants: it is not
+              a field in a list of fields, it is the surface the whole panel is
+              for.
+
+              So `panel` (white in daylight) with the shadow, and `surface` at
+              night — where that token is an 8% white lift and the hairline does
+              the work, since a shadow on near-black is invisible. Same rule the
+              theme blocks follow everywhere else: light lifts with shadow, dark
+              lifts with a line. */}
+          <div
+            className="@container rounded-lg border border-line bg-panel
+                       shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_14px_rgba(0,0,0,0.07)]
+                       transition-colors focus-within:border-accent
+                       dark:bg-surface dark:shadow-none"
+          >
+            {/* **One line to start, growing to about ten.** It was `rows={3}`:
+                three lines of empty box at the foot of a 240px rail, for a
+                question most writers type in one — and still three lines for the
+                writer who types eight, which scrolls a box they are looking at
+                instead of opening it. `useAutoGrow` measures on every change of
+                the value, so it also shrinks back when `send` empties the field. */}
+            <textarea
+              ref={grow}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter sends; Shift+Enter is a newline, as in every chat box.
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              placeholder="Ask about this chapter…"
+              rows={1}
+              /* Borderless and transparent: the box around it owns all of that
+                 now, and a second border here would draw a field inside a field.
+
+                 No `overflow-` class either — the hook owns it, so the scrollbar
+                 arrives in the same frame the box stops growing and never before.
+                 `scroll-slim` is what it arrives as: the app's own thin bar, a
+                 floating pale thumb on no track at all, the same one the message
+                 list above uses. Without it the browser draws its native bar — on
+                 Windows a wide grey gutter with arrow buttons at both ends, the
+                 loudest thing in a panel whose subject is prose. */
+              className="scroll-slim w-full resize-none bg-transparent px-3 pt-2
+                         pb-1 font-sans text-sm text-fg placeholder:text-muted
+                         focus:outline-none"
+            />
+
+            <div className="flex items-center justify-between gap-2 px-2 pt-0.5 pb-2">
+              {/* Absent rather than locked for a reader on somebody else's book:
+                  a plan is something you can buy your way past and a viewer role
+                  is not, so offering the upgrade there would be a false way
+                  out. */}
+              <div className="flex min-w-0 items-center">
+                {canWrite && editor && (
+                  <WriteSwitch
+                    on={prefs.assistantWrite}
+                    locked={locked}
+                    onToggle={toggleWrite}
+                  />
+                )}
+              </div>
+
+              <div className="flex shrink-0 items-center gap-1.5">
+                {/* **Dictation, and hidden outright where it cannot work.** The
+                    engine is the browser's own — Chrome and Edge only — so a
+                    control that could never work on this machine is not drawn at
+                    all rather than drawn dead.
+
+                    This is deliberately not `/api/transcribe`: that one takes a
+                    finished file and costs per minute, and streaming a live
+                    microphone at it to watch words appear would be the wrong
+                    trade in both directions. */}
+                {dictation.supported && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      dictation.listening ? dictation.stop() : dictation.start()
+                    }
+                    aria-pressed={dictation.listening}
+                    /* **No tooltip on this one, so the label has to be here.**
+                       The card is gone by choice — the microphone is a familiar
+                       glyph and a hover panel over the composer was more than it
+                       needed — but a button with no text and no `aria-label` is
+                       announced to a screen reader as a button called nothing.
+                       Same reason `icon-rail.tsx` gives for its own. */
+                    aria-label={
+                      dictation.listening
+                        ? "Stop dictating"
+                        : "Dictate — speak and the words are typed"
+                    }
+                    className={`group relative flex h-8 w-8 items-center justify-center
+                                rounded-md outline-none transition-colors
+                                focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                                  dictation.listening
+                                    ? "bg-danger/15 text-danger"
+                                    : "text-muted hover:bg-raised hover:text-fg"
+                                }`}
+                  >
+                    {/* A ring while it is live, so the state is visible from
+                        across the room — this is a control a writer turns on and
+                        then stops looking at. */}
+                    <span className="relative flex items-center justify-center">
+                      {dictation.listening && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute -inset-1.5 animate-ping rounded-full bg-danger/40"
+                        />
+                      )}
+                      <RailMark mark="mic" size={18} />
+                    </span>
+                  </button>
+                )}
                 <button
-                  type="button"
-                  onClick={() =>
-                    dictation.listening ? dictation.stop() : dictation.start()
-                  }
-                  aria-pressed={dictation.listening}
-                  /* **No tooltip on this one, so the label has to be here.**
-                     The card is gone by choice — the microphone is a familiar
-                     glyph and a hover panel over the composer was more than it
-                     needed — but a button with no text and no `aria-label` is
-                     announced to a screen reader as a button called nothing.
-                     Same reason `icon-rail.tsx` gives for its own. */
-                  aria-label={
-                    dictation.listening
-                      ? "Stop dictating"
-                      : "Dictate — speak and the words are typed"
-                  }
-                  className={`group relative flex h-8 w-8 items-center justify-center
-                              rounded-md outline-none transition-colors
-                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                                dictation.listening
-                                  ? "bg-danger/15 text-danger"
-                                  : "text-muted hover:bg-raised hover:text-fg"
-                              }`}
+                  type="submit"
+                  disabled={busy || !input.trim()}
+                  className="rounded-md bg-accent px-3 py-1.5 font-sans text-sm
+                             font-semibold text-accent-ink outline-none transition-colors
+                             disabled:opacity-30 hover:bg-accent-strong
+                             focus-visible:ring-2 focus-visible:ring-accent/60"
                 >
-                  {/* A ring while it is live, so the state is visible from
-                      across the room — this is a control a writer turns on and
-                      then stops looking at. */}
-                  <span className="relative flex items-center justify-center">
-                    {dictation.listening && (
-                      <span
-                        aria-hidden="true"
-                        className="absolute -inset-1.5 animate-ping rounded-full bg-danger/40"
-                      />
-                    )}
-                    <RailMark mark="mic" size={18} />
-                  </span>
+                  {busy ? "…" : "Send"}
                 </button>
-              )}
-              <button
-                type="submit"
-                disabled={busy || !input.trim()}
-                className="rounded-md bg-accent px-3 py-1.5 font-sans text-sm
-                           font-semibold text-accent-ink outline-none transition-colors
-                           disabled:opacity-30 hover:bg-accent-strong
-                           focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                {busy ? "…" : "Send"}
-              </button>
+              </div>
             </div>
           </div>
-        </div>
-      </form>
+        </form>
+      )}
 
       {pending && (
         <ApplyReview
@@ -818,6 +890,7 @@ export function ChatPanel({
       {upgrading && (
         <UpgradeDialog
           reason="assistant-write"
+          tier={plan.tier ?? "free"}
           onClose={() => setUpgrading(false)}
         />
       )}
@@ -847,5 +920,149 @@ function ActionButton({
     >
       {children}
     </button>
+  );
+}
+
+
+/** What the last send was refused for, as the route reported it. */
+interface Refusal {
+  status: number;
+  error: string;
+  upgrade?: boolean;
+  kind?: ChatModel | null;
+}
+
+/**
+ * A refusal, said in the terms the reader can act on.
+ *
+ * **402 and 429 mean two different things and must not read alike.** 402 is
+ * "your plan does not include this" and the way out is a plan; 429 is "you have
+ * spent this allowance" and the way out is the other model, or tomorrow. The
+ * route's contract makes the pair clean — a plan with no assistant is refused
+ * before the meter is touched, so a 429 always means the writer *has* the
+ * assistant and has simply run one side of it out.
+ *
+ * `resetAt` is rendered in the reader's own time zone. The daily window turns
+ * over at 00:00 UTC, which is half past five in the morning in Colombo — a word
+ * like "tomorrow" would be wrong for most of the people reading it.
+ */
+function RefusalNote({
+  refusal,
+  plan,
+}: {
+  refusal: Refusal;
+  plan: ReturnType<typeof usePlan>;
+}) {
+  const spent = refusal.kind ?? null;
+  const other = spent === "quick" ? "careful" : "quick";
+  const otherLeft =
+    spent && plan.assistant ? plan.assistant[other].remaining : null;
+  const back =
+    spent && plan.assistant ? plan.assistant[spent].resetAt : null;
+
+  return (
+    <div
+      role="alert"
+      className="mt-4 rounded-md border border-accent/40 px-3 py-2
+                 font-sans text-sm text-muted"
+    >
+      <p>{refusal.error}</p>
+
+      {refusal.status === 429 && back && (
+        <p className="mt-1">
+          {MODEL_LABEL[spent!]} replies come back{" "}
+          {new Date(back).toLocaleString(undefined, {
+            month: "short",
+            day: "numeric",
+            hour: "numeric",
+            minute: "2-digit",
+          })}
+          .
+          {otherLeft !== null && otherLeft > 0 && (
+            <> You have {otherLeft} {MODEL_LABEL[other].toLowerCase()} left.</>
+          )}
+        </p>
+      )}
+
+      {refusal.upgrade && (
+        <Link
+          href="/upgrade"
+          className="mt-2 inline-block font-semibold text-accent
+                     outline-none hover:underline focus-visible:ring-2
+                     focus-visible:ring-accent/60"
+        >
+          See the plans
+        </Link>
+      )}
+    </div>
+  );
+}
+
+const MODEL_LABEL: Record<ChatModel, string> = {
+  quick: "Quick",
+  careful: "Careful",
+};
+
+/**
+ * Which model the next question goes to.
+ *
+ * **A radiogroup, because it is one choice with two answers** — the same shape
+ * as the period toggle on the pricing page, and what a screen reader needs to
+ * hear rather than two unrelated buttons.
+ *
+ * The counts come from the server's own meters, so the control cannot offer a
+ * number the route then refuses. The titles describe the wait and the
+ * allowance and say nothing about cleverness: on a Google deployment both
+ * segments are the same model, and a tooltip claiming otherwise would be false
+ * on that half of the installations.
+ */
+function ModelPicker({
+  value,
+  allowance,
+  onChange,
+}: {
+  value: ChatModel;
+  allowance: ReturnType<typeof usePlan>["assistant"];
+  onChange: (next: ChatModel) => void;
+}) {
+  const options: { model: ChatModel; title: string }[] = [
+    { model: "quick", title: "Answers straight away. Refills every day." },
+    { model: "careful", title: "Thinks first, so it takes longer. Refills every month." },
+  ];
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Assistant model"
+      className="flex items-center gap-0.5 rounded-md bg-raised p-0.5"
+    >
+      {options.map(({ model, title }) => {
+        const on = value === model;
+        const left = allowance ? allowance[model].remaining : null;
+
+        return (
+          <button
+            key={model}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            title={title}
+            onClick={() => onChange(model)}
+            className={`cursor-pointer rounded px-2 py-1 font-sans text-xs
+                        outline-none transition-colors
+                        focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                          on
+                            ? "bg-panel font-semibold text-fg shadow-sm"
+                            : "text-muted hover:text-fg"
+                        }`}
+          >
+            {MODEL_LABEL[model]}
+            {left !== null && (
+              <span className="ml-1 font-normal text-muted">{left}</span>
+            )}
+          </button>
+        );
+      })}
+    </div>
   );
 }

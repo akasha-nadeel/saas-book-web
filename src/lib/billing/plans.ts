@@ -1,3 +1,5 @@
+import { PAID_TIERS, TIER_NAMES, type PaidTier } from "./tiers";
+
 /**
  * What Pro costs, and how often.
  *
@@ -25,52 +27,66 @@
  */
 export type Period = "monthly" | "annual";
 
-/**
- * The currencies PayHere will take on a *recurring* payment. It settles more
- * than these one-off, but a subscription is LKR or USD, so those are the two
- * this app offers.
- */
-export type Currency = "LKR" | "USD";
+export type { PaidTier, PlanTier } from "./tiers";
 
 /**
- * Which one this deployment charges in. Public because the pricing page renders
- * the figure and the pricing page runs in the browser; Next only inlines a
- * NEXT_PUBLIC_ name written out literally, hence no dynamic lookup.
- */
-export const CURRENCY: Currency =
-  process.env.NEXT_PUBLIC_PAYHERE_CURRENCY === "LKR" ? "LKR" : "USD";
-
-/**
- * The launch-MVP prices. `total` is what the payment provider charges on each
- * cycle; `perMonth` is what the pricing card shows for comparison.
+ * What a charge is denominated in.
  *
- * The annual USD price is 25% below paying monthly for twelve months:
- * $5.98/month versus $53.99/year, displayed as about $4.50/month.
+ * **One member, and that is the decision rather than an oversight.** There used
+ * to be an LKR table beside the USD one, priced for its own market rather than
+ * converted, selected by `NEXT_PUBLIC_PAYHERE_CURRENCY`. It came out when the
+ * plans went to four: three tiers times two cycles times two currencies is
+ * twelve figures to keep true, and eleven of them were never rendered — this
+ * deployment charges in USD, and only PayHere could have shown the others.
+ *
+ * The type survives the table because PayHere's payload carries the string and
+ * ought to be typed. Putting a second currency back means restoring the record
+ * shape here and the `FORMAT` entry below; nothing else reads it.
  */
-const PRICES: Record<Currency, Record<Period, { total: number; perMonth: number }>> = {
-  USD: {
+export type Currency = "USD";
+
+/** Which one this deployment charges in. */
+export const CURRENCY: Currency = "USD";
+
+/**
+ * What each plan costs. `total` is what the gateway charges on a cycle;
+ * `perMonth` is what a card shows for comparison.
+ *
+ * Every annual price is 25% below paying monthly for twelve months. That the
+ * three agree is what lets the period toggle print one badge over three
+ * columns — and because it is a coincidence of the numbers rather than a rule,
+ * `uniformAnnualSaving()` below checks it rather than assuming it.
+ *
+ * **`perMonth` is divided, never typed.** A hand-written figure drifts from the
+ * charge the first time a total moves, and the drift is invisible: both numbers
+ * look plausible. `plans.test.ts` pins this.
+ */
+const PRICES: Record<PaidTier, Record<Period, { total: number; perMonth: number }>> = {
+  draft: {
     monthly: { total: 5.98, perMonth: 5.98 },
-    // Divided rather than typed so display rounding cannot drift from the charge.
     annual: { total: 53.99, perMonth: 53.99 / 12 },
   },
-  LKR: {
-    monthly: { total: 2900, perMonth: 2900 },
-    annual: { total: 23400, perMonth: 1950 },
+  writer: {
+    monthly: { total: 14.98, perMonth: 14.98 },
+    annual: { total: 134.99, perMonth: 134.99 / 12 },
+  },
+  studio: {
+    monthly: { total: 24.98, perMonth: 24.98 },
+    annual: { total: 224.99, perMonth: 224.99 / 12 },
   },
 };
 
-/** How the figure is written. LKR takes no decimals; nobody prices in cents. */
+/** How the figure is written. */
 const FORMAT: Record<Currency, { symbol: string; decimals: number }> = {
   USD: { symbol: "$", decimals: 2 },
-  LKR: { symbol: "Rs ", decimals: 0 },
 };
 
-export function priceOf(period: Period, currency: Currency = CURRENCY): number {
-  return PRICES[currency][period].total;
+export function priceOf(tier: PaidTier, period: Period): number {
+  return PRICES[tier][period].total;
 }
 
-export function perMonthOf(period: Period, currency: Currency = CURRENCY): number {
-  return PRICES[currency][period].perMonth;
+export function perMonthOf(tier: PaidTier, period: Period): number {
+  return PRICES[tier][period].perMonth;
 }
 
 /**
@@ -83,16 +99,32 @@ export function perMonthOf(period: Period, currency: Currency = CURRENCY): numbe
  * printed to a decimal: a badge saying "Save 24.9%" reads as arithmetic rather
  * than as an offer.
  *
- * Currency-aware, because the LKR table is priced for its own market and its
- * saving need not match the USD one. Today both come to 25%.
+ * Per tier, because three ladders need not agree — see `uniformAnnualSaving`
+ * for the one place that cares whether they do.
  */
-export function annualSavingPercent(currency: Currency = CURRENCY): number {
-  const monthly = PRICES[currency].monthly.perMonth;
-  const annual = PRICES[currency].annual.perMonth;
+export function annualSavingPercent(tier: PaidTier): number {
+  const monthly = PRICES[tier].monthly.perMonth;
+  const annual = PRICES[tier].annual.perMonth;
   return Math.round(((monthly - annual) / monthly) * 100);
 }
 
-/** For a card, not for PayHere. `$5.00`, `Rs 1,990`. */
+/**
+ * The saving all three paid plans share, or null when they do not share one.
+ *
+ * **The period toggle prints one badge above three columns**, and a single
+ * percentage over three different savings is the same stale claim
+ * `annualSavingPercent` was written to prevent, one level up. So the badge asks
+ * this first and renders nothing when the answer is null, rather than picking a
+ * tier's figure and hoping.
+ *
+ * Today all three round to 25%.
+ */
+export function uniformAnnualSaving(): number | null {
+  const [first, ...rest] = PAID_TIERS.map(annualSavingPercent);
+  return rest.every((saving) => saving === first) ? first : null;
+}
+
+/** For a card, not for PayHere. `$5.98`. */
 export function displayPrice(amount: number, currency: Currency = CURRENCY): string {
   const { symbol, decimals } = FORMAT[currency];
   return (
@@ -136,9 +168,16 @@ export function durationOf(): string {
   return "Forever";
 }
 
-/** What the writer is buying, shown on PayHere's own page. */
-export function itemNameOf(period: Period): string {
-  return `OpenChapter Pro (${period === "annual" ? "annual" : "monthly"})`;
+/**
+ * What the writer is buying, shown on PayHere's own page.
+ *
+ * The plan's name comes from `TIER_NAMES` rather than being written here, so
+ * the words on the receipt cannot disagree with the words on the card.
+ */
+export function itemNameOf(tier: PaidTier, period: Period): string {
+  return `OpenChapter ${TIER_NAMES[tier]} (${
+    period === "annual" ? "annual" : "monthly"
+  })`;
 }
 
 /** How the cycle reads in a sentence, on the checkout summary. */

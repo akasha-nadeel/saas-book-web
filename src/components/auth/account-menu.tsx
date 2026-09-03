@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { TIER_NAMES, chatAllowed } from "@/lib/billing/tiers";
+import { UsageDialog } from "@/components/billing/usage-dialog";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { signOut } from "@/app/auth/actions";
@@ -79,7 +81,17 @@ export function AccountMenu({
   // flash under their own name on every load is worse than a line that arrives
   // a moment late — and with no gateway configured there are no plans to name.
   const planLabel =
-    plan.loading || !plan.billing ? null : plan.pro ? "Pro plan" : "Free plan";
+    plan.loading || !plan.billing
+      ? null
+      : plan.tier
+        ? `${TIER_NAMES[plan.tier]} plan`
+        : "Free plan";
+
+  /* **Above the menu, not inside it.** `MenuBody` unmounts the moment the menu
+     closes — and the press that opens this dialog is also a press on a menu
+     item, which closes it. Held here, the dialog outlives the menu that asked
+     for it. */
+  const [usageOpen, setUsageOpen] = useState(false);
 
   const close = (returnFocus = true) => {
     setOpen(false);
@@ -272,10 +284,20 @@ export function AccountMenu({
             className="z-50 overflow-hidden rounded-xl border border-line
                        bg-panel shadow-xl"
           >
-            <MenuBody account={account} plan={plan} onClose={close} />
+            <MenuBody
+              account={account}
+              plan={plan}
+              onClose={close}
+              onUsage={() => {
+                close(false);
+                setUsageOpen(true);
+              }}
+            />
           </div>,
           document.body,
         )}
+
+      {usageOpen && <UsageDialog onClose={() => setUsageOpen(false)} />}
     </>
   );
 }
@@ -292,11 +314,14 @@ function MenuBody({
   account,
   plan,
   onClose,
+  onUsage,
 }: {
   account: Account | null;
   /** Asked once by the menu above, so the chip and this cannot disagree. */
   plan: ReturnType<typeof usePlan>;
   onClose: (returnFocus?: boolean) => void;
+  /** Asked of the parent: this dialog has to outlive the menu that opens it. */
+  onUsage: () => void;
 }) {
   /*
    * Cancelling is not offered here.
@@ -376,7 +401,7 @@ function MenuBody({
                     className="rounded-full bg-accent/15 px-2 py-0.5 font-sans
                                text-[0.6875rem] font-semibold text-accent"
                   >
-                    Pro
+                    {plan.tier ? TIER_NAMES[plan.tier] : "Paid"}
                   </span>
                   <span className="font-sans text-xs text-muted">
                     {plan.period === "annual" ? "Annual" : "Monthly"}
@@ -410,6 +435,21 @@ function MenuBody({
           <MenuLink href="/billing" onSelect={() => onClose(false)} icon={icons.billing}>
             Billing
           </MenuLink>
+        )}
+
+        {/* **Only where there is an allowance to report.** Free and Draft have
+            no assistant, so the two meters would both read "Not on this plan" —
+            a row that opens to say nothing.
+
+            `chatAllowed` and not `plan.pro`: Draft is paid, and this is the
+            same predicate the chat panel gates itself on. `plan.tier` is null
+            while `usePlan()` is still asking, and the guard fails closed there
+            on purpose — a row that appears a beat after the menu opens is
+            worse than one that was never in it. */}
+        {plan.tier && chatAllowed(plan.tier) && (
+          <MenuButton onSelect={onUsage} icon={icons.usage}>
+            Usage
+          </MenuButton>
         )}
 
         <Rule className="my-1.5" />
@@ -449,6 +489,7 @@ function MenuBody({
           </button>
         </form>
       </div>
+
     </>
   );
 }
@@ -460,6 +501,36 @@ function Rule({ className = "" }: { className?: string }) {
 const ITEM = `flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left
   font-sans text-sm text-fg outline-none transition-colors hover:bg-raised
   focus-visible:ring-2 focus-visible:ring-accent/60`;
+
+/**
+ * The same row as `MenuLink`, for the one that opens something instead of
+ * going somewhere.
+ *
+ * Shares `ITEM` rather than restating it: Sign out already hand-copied those
+ * classes once, and a third copy is how one row ends up a pixel taller than
+ * its neighbours.
+ */
+function MenuButton({
+  onSelect,
+  icon,
+  children,
+}: {
+  onSelect: () => void;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onSelect}
+      className={`${ITEM} cursor-pointer`}
+    >
+      <span className="shrink-0 [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+      {children}
+    </button>
+  );
+}
 
 function MenuLink({
   href,
@@ -554,6 +625,21 @@ const icons = {
       <rect x="2.5" y="4" width="15" height="12" rx="2" strokeLinejoin="round" />
       <path d="M2.5 8.5h15" strokeLinecap="round" />
       <path d="M6 12.5h3" strokeLinecap="round" />
+    </svg>
+  ),
+  /* A gauge — a dial with a needle. The set is stroked at 1.8 on a 24 grid;
+     anything filled here would read as a different family. */
+  usage: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.5 17a8 8 0 1 1 15 0" />
+      <path d="M12 13.5 15.5 10" />
     </svg>
   ),
   signOut: (

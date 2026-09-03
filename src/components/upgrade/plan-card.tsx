@@ -12,8 +12,7 @@
  * Anything stateful a caller needs goes in through `action`, which is a node.
  */
 
-import { Fragment } from "react";
-import { GROUPS, NOT_INCLUDED, type Group } from "@/lib/billing/plan-rows";
+import { NOT_INCLUDED } from "@/lib/billing/plan-rows";
 
 /**
  * One plan, as a card.
@@ -57,9 +56,9 @@ const STARTER_HIGHLIGHT = new Set(["Autosave and sync", "Export"]);
  * anything else. After that the card decides — Pro is purple throughout, and
  * Starter is blue except for the two rows above.
  */
-function badgeTone(label: string, value: string, pro: boolean): Tone {
+function badgeTone(label: string, value: string, paid: boolean): Tone {
   if (value === "Unlimited") return "gold";
-  if (pro) return "purple";
+  if (paid) return "purple";
   return STARTER_HIGHLIGHT.has(label) ? "purple" : "blue";
 }
 
@@ -105,9 +104,9 @@ function ValueBadge({ value, tone }: { value: string; tone: Tone }) {
 
   return (
     <span
-      className={`inline-flex items-center rounded-lg border px-2.5 py-1
-                  font-sans text-[0.9375rem] leading-tight font-semibold
-                  tracking-tight ${skin}`}
+      className={`inline-flex items-center rounded-lg border px-2 py-0.5
+                  font-sans text-sm leading-tight font-semibold
+                  tracking-tight whitespace-nowrap ${skin}`}
     >
       {value}
     </span>
@@ -138,18 +137,19 @@ export function PlanCard({
   price: string;
   /** Shown under the price when the cycle needs explaining. */
   note?: string;
-  rows: { group: Group; label: string; detail?: string; value: string }[];
+  /** In `ROWS` order — which, with the headings gone, is the card's order. */
+  rows: { label: string; value: string }[];
   action: React.ReactNode;
 }) {
   const card = (
     <section
-      className={`flex h-full flex-col bg-panel p-6 text-fg ${
+      className={`flex h-full flex-col bg-panel p-4 text-fg ${
         featured
           ? // Inside the shell, so it carries no border of its own and takes a
             // tighter radius — a card curving as hard as the thing holding it
             // leaves a crescent of colour showing at every corner.
             "rounded-xl"
-          : "rounded-2xl border border-line shadow-sm"
+          : "rounded-2xl border border-line shadow-md"
       }`}
     >
       <div className="flex items-center gap-3">
@@ -173,14 +173,22 @@ export function PlanCard({
           side and their blurbs are different lengths, so without this the two
           prices land at different heights and the comparison reads as sloppy
           before it reads as anything. */}
-      <p className="mt-3 min-h-10 font-sans text-sm leading-relaxed text-muted">
+      {/* Reserved to three lines rather than two: at four columns every blurb
+          runs to three, and a well shorter than the tallest of them leaves the
+          four prices on four different baselines — which is the one row a
+          reader compares across before anything else. */}
+      <p className="mt-3 min-h-[4.75rem] font-sans text-sm leading-relaxed text-muted">
         {blurb}
       </p>
 
       {/* The number, at the size the reference sets it: big enough to be the
           thing you land on after the name, with the unit small beside it so the
           figure keeps the weight. */}
-      <p className="mt-4 font-display text-5xl font-bold tracking-tight">
+      {/* 40px rather than 48. The figure is still the thing the eye lands on
+          after the name, but at four columns `$24.98 /month` at `text-5xl` ran
+          past the card and clipped its own unit — and a price that does not fit
+          is the one number on this page that has to. */}
+      <p className="mt-4 font-display text-[2.5rem] leading-none font-bold tracking-tight">
         {price}
         <span className="ml-1.5 text-base font-medium text-muted">/month</span>
       </p>
@@ -206,115 +214,98 @@ export function PlanCard({
           through the same walk, so a heading falls at the same point in each
           and every row stays on one line across the pair — which is the whole
           reason the two columns can be compared at a glance. */}
+      {/* **One flat list, in `ROWS` order.**
+
+          Two uppercase headings used to file these rows into blocks. They went
+          when the cards went to four: with four columns and four crossed rows
+          the list is short enough to read straight through, and the second
+          heading was announcing a boundary that the column of crosses already
+          draws far more plainly than a word does.
+
+          What that costs is that the array's *order* is now load-bearing — it
+          is the only thing sequencing the card. `plan-rows.ts` says so at the
+          top, and the reasoning for the order lives there rather than here.
+
+          Every card walks the same array, so a row falls at the same height in
+          each and the four columns can be compared at a glance. That is the
+          whole reason the reserved strip below exists. */}
       <dl className="mt-5 space-y-3">
-        {GROUPS.map((group) => (
-          <Fragment key={group}>
-            {/* Small, uppercase and muted: it separates the blocks without
-                competing with the labels under it, which are the thing being
-                scanned. The hairline does the separating — the words only say
-                which block this is.
+        {rows.map((row) => {
+          // What the plan gives you is set in the card's own ink — mark, label
+          // and value alike — and what it withholds is the only thing faded.
+          const has = row.value !== NOT_INCLUDED;
 
-                `first:mt-0` because the list already opens directly under the
-                card's own rule, and a second gap there would leave the first
-                block floating.
+          return (
+            /* **One line per row, and that is the whole shape.**
 
-                `aria-hidden`, because a screen reader is walking a definition
-                list term by term and a bare heading spliced between the pairs
-                announces itself as another term. The labels underneath are
-                self-describing; the heading is a scanning aid for the eye. */}
-            <div
-              className="mt-6 flex items-center gap-3 first:mt-0"
-              aria-hidden="true"
-            >
-              <span className="font-sans text-xs font-semibold tracking-[0.12em] text-muted uppercase">
-                {group}
-              </span>
-              <span className="h-px flex-1 bg-line" />
-            </div>
-            {rows
-              .filter((row) => row.group === group)
-              .map((row) => {
-                // What the plan gives you is set in the card's own ink — mark,
-                // label and value alike — and what it withholds is the only
-                // thing faded.
-                const has = row.value !== NOT_INCLUDED;
+               This was a wrapping flex holding a tick, a label with its
+               explanation inline in brackets, and a badge. At two cards it
+               read; at four it came apart — the label ran to two lines, the
+               bracket broke across them, `items-center` floated the tick down
+               beside the middle of the pair, and a `shrink-0` badge next to a
+               `<dt>` that could not shrink went straight over the card's edge.
+               On the featured column that overflow printed a blue bar through
+               the middle of the list.
 
-                return (
-                  <div
-                    key={row.label}
-                    className={`flex items-center gap-2.5 ${has ? "" : "text-muted"}`}
-                  >
+               So: every row is a tick, a label short enough to sit on one line,
+               and a value against the right edge. The explanations went with
+               the second line — a card is a comparison, and eleven rows of
+               parenthetical prose is a page. `min-w-0` stays as the guard that
+               keeps a long label wrapping rather than shoving the badge out. */
+            <div key={row.label} className="flex items-center gap-2.5">
               {/* The same circle either way, so the column of marks stays a
                   column. Only what is inside it changes: a tick for a line the
                   plan gives you, a cross for one it does not — because a tick
                   against the words "Not included" is a yes drawn on top of a
                   no.
 
+                  Four rows carry the cross on the two plans without the
+                  assistant, where there used to be one. They fall together at
+                  the foot of the list rather than scattered through it, which
+                  is what makes them read as a boundary rather than as four
+                  separate refusals.
+
                   Both take the status family's own tokens rather than literal
                   shades — `ok-fg` and `stop-fg` — which is what makes them
                   legible in both themes: saturated ink at night, darker ink by
-                  day. A hex green tuned against black is a smudge on white.
-
-                  Drawn at 24px and a heavier stroke than the card marks above
-                  them, because these are read as a column at a glance rather
-                  than looked at one at a time, and at 16px and hairline weight
-                  the tick and the cross are the same grey smudge until you
-                  lean in.
-
-                  **Sized with the row rather than fixed.** They were 20px
-                  against a 14px label; the values became 15px badges, and a mark
-                  that stays put while everything beside it grows stops reading
-                  as the anchor of its line and starts reading as a bullet
-                  somebody forgot to scale. Now 24px against a 16px label. */}
+                  day. A hex green tuned against black is a smudge on white. */}
               {has ? (
-                <CheckIcon className="h-6 w-6 shrink-0 text-ok-fg" />
+                <CheckIcon className="h-5 w-5 shrink-0 text-ok-fg" />
               ) : (
-                <CrossIcon className="h-6 w-6 shrink-0 text-stop-fg" />
+                <CrossIcon className="h-5 w-5 shrink-0 text-stop-fg" />
               )}
-              {/* 16px and medium.
 
-                  The label used to stay regular so the semibold badge had
-                  something to win against — but the badges carry a *hue* now,
-                  gold or blue, and hue outranks weight by a distance. So the
-                  hierarchy survives the label getting heavier, and the row stops
-                  reading as a caption with a button stuck on the end.
-
-                  Medium rather than semibold, though: one step below the badge
-                  keeps the order of the two, which is the part that matters. */}
-              <dt className="font-sans text-base leading-snug font-medium">
+              <dt
+                /* 14px, level with the badge beside it rather than a step
+                   above. "Chapters and words" was the one label that still
+                   took two lines at four columns, and the row's whole shape
+                   depends on none of them doing that. The hierarchy survives
+                   the change because the badge carries a hue, and hue outranks
+                   size by a distance. */
+                className={`min-w-0 font-sans text-sm leading-snug
+                            font-medium ${has ? "" : "text-muted"}`}
+              >
                 {row.label}
-                {/* A size down, regular weight, muted — three steps back, so it
-                    reads as an aside to the label rather than competing with it.
-                    Inline rather than on its own line: a parenthesis opening at
-                    the end of one line and closing on the next is a bracket the
-                    eye has to hold open. */}
-                {row.detail && (
-                  <span className="ml-1.5 text-xs font-normal text-muted">
-                    ({row.detail})
-                  </span>
-                )}
               </dt>
+
               {/* ml-auto rather than a two-column grid: the value is set
-                  against the right edge the way a price list is, and a long one
-                  wraps under itself instead of squeezing the label.
+                  against the right edge the way a price list is.
 
                   "Included" and "Not included" are dropped rather than printed:
                   the mark in front has already said both, and a word repeating
                   a glyph is the kind of line a reader learns to skip — which
                   costs the rows that do carry a value. */}
-                    {row.value !== "Included" && !has === false && (
-                      <dd className="ml-auto shrink-0 pl-2 text-right">
-                        <ValueBadge
-                          value={row.value}
-                          tone={badgeTone(row.label, row.value, Boolean(featured))}
-                        />
-                      </dd>
-                    )}
-                  </div>
-                );
-              })}
-          </Fragment>
-        ))}
+              {has && row.value !== "Included" && (
+                <dd className="ml-auto shrink-0">
+                  <ValueBadge
+                    value={row.value}
+                    tone={badgeTone(row.label, row.value, Boolean(featured))}
+                  />
+                </dd>
+              )}
+            </div>
+          );
+        })}
       </dl>
     </section>
   );
@@ -374,7 +365,7 @@ export function PlanCard({
    * three sides.
    */
   return (
-    <div className="rounded-2xl bg-brand-fill p-1.5 pt-0 shadow-md">
+    <div className="rounded-2xl bg-brand-fill p-1.5 pt-0 shadow-lg">
       <p className="py-2.5 text-center font-sans text-xs font-medium text-brand-ink">
         {badge}
       </p>

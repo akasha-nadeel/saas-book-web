@@ -4,10 +4,9 @@ import {
   PADDLE_SANDBOX,
   PADDLE_WEBHOOK_SECRET,
   isPaddleConfigured,
-  paddlePriceId,
+  paddlePlanFrom,
   paddleStatus,
 } from "@/lib/billing/paddle";
-import type { Period } from "@/lib/billing/plans";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 /**
@@ -42,19 +41,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 
-/**
- * Which cycle this is, decided by the price id we sent rather than by the
- * billing interval Paddle reports back.
- *
- * The interval would work today and would quietly break the day somebody adds a
- * quarterly price: `period` is a CHECK constraint of two values, and a row that
- * fails it aborts the write for a payment that has already been taken.
- */
-function periodFrom(priceIds: (string | undefined)[]): Period | null {
-  if (priceIds.includes(paddlePriceId("annual"))) return "annual";
-  if (priceIds.includes(paddlePriceId("monthly"))) return "monthly";
-  return null;
-}
+/* Which plan and cycle this is, decided by the price ids we sent rather than by
+   anything Paddle reports back. The billing interval would work today and would
+   quietly break the day somebody adds a quarterly price: `period` and `plan` are
+   both CHECK constraints, and a row that fails one aborts the write for a
+   payment that has already been taken. Lives in `paddle.ts` beside the table it
+   walks, and is tested there. */
 
 export async function POST(request: Request) {
   if (!isPaddleConfigured()) {
@@ -135,14 +127,14 @@ export async function POST(request: Request) {
 
     const status = paddleStatus(String(data.status), scheduledAction);
     const items = Array.isArray(data.items) ? data.items : [];
-    const period = periodFrom(
+    const bought = paddlePlanFrom(
       items.map((item) => {
         const price = (item as { price?: { id?: unknown } }).price;
         return typeof price?.id === "string" ? price.id : undefined;
       }),
     );
 
-    if (!status || !period) {
+    if (!status || !bought) {
       // A status or a price this version does not know about. Recorded rather
       // than guessed at — writing a row that fails a CHECK would abort the
       // whole request for a payment already taken.
@@ -176,8 +168,8 @@ export async function POST(request: Request) {
       {
         owner,
         provider: "paddle",
-        plan: "pro",
-        period,
+        plan: bought.tier,
+        period: bought.period,
         status,
         paddle_subscription_id: typeof data.id === "string" ? data.id : null,
         paddle_customer_id: customerId,

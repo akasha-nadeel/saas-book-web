@@ -11,23 +11,47 @@ import {
   periodEnd,
   priceOf,
   recurrenceOf,
+  uniformAnnualSaving,
 } from "./plans";
+import { PAID_TIERS, TIER_NAMES } from "./tiers";
 
 describe("prices", () => {
   it("charges a year up front at twelve times the annual monthly rate", () => {
     // The card shows a per-month figure on both cycles; the annual one is only
     // honest if the total is exactly twelve of them.
-    expect(priceOf("annual", "USD")).toBeCloseTo(perMonthOf("annual", "USD") * 12, 2);
-    expect(priceOf("annual", "LKR")).toBeCloseTo(perMonthOf("annual", "LKR") * 12, 2);
+    for (const tier of PAID_TIERS) {
+      expect(priceOf(tier, "annual")).toBeCloseTo(
+        perMonthOf(tier, "annual") * 12,
+        2,
+      );
+    }
   });
 
   it("charges the monthly cycle its own rate", () => {
-    expect(priceOf("monthly", "USD")).toBe(perMonthOf("monthly", "USD"));
+    for (const tier of PAID_TIERS) {
+      expect(priceOf(tier, "monthly")).toBe(perMonthOf(tier, "monthly"));
+    }
   });
 
   it("makes the annual cycle the cheaper of the two by the month", () => {
-    expect(perMonthOf("annual", "USD")).toBeLessThan(perMonthOf("monthly", "USD"));
-    expect(perMonthOf("annual", "LKR")).toBeLessThan(perMonthOf("monthly", "LKR"));
+    for (const tier of PAID_TIERS) {
+      expect(perMonthOf(tier, "annual")).toBeLessThan(
+        perMonthOf(tier, "monthly"),
+      );
+    }
+  });
+
+  /**
+   * **A hand-edited three-tier table gets transposed, and both orders look
+   * plausible.** Nothing else in the tree would notice Studio priced below
+   * Writer — the cards would render it, the checkout would charge it, and the
+   * only symptom is revenue.
+   */
+  it("makes each plan dearer than the one below it", () => {
+    for (const period of ["monthly", "annual"] as const) {
+      expect(priceOf("draft", period)).toBeLessThan(priceOf("writer", period));
+      expect(priceOf("writer", period)).toBeLessThan(priceOf("studio", period));
+    }
   });
 });
 
@@ -35,19 +59,24 @@ describe("displayPrice", () => {
   it("writes dollars with cents", () => {
     // Cents shown even when they are zero: "$9" beside "$0" on the other card
     // is two different shapes of number for one comparison.
-    expect(displayPrice(5.98, "USD")).toBe("$5.98");
-    expect(displayPrice(53.99, "USD")).toBe("$53.99");
+    expect(displayPrice(5.98)).toBe("$5.98");
+    expect(displayPrice(53.99)).toBe("$53.99");
   });
 
-  it("uses the launch MVP USD prices", () => {
-    expect(priceOf("monthly", "USD")).toBe(5.98);
-    expect(priceOf("annual", "USD")).toBe(53.99);
-    expect(displayPrice(perMonthOf("annual", "USD"), "USD")).toBe("$4.50");
+  it("uses the three ladders the cards print", () => {
+    expect(priceOf("draft", "monthly")).toBe(5.98);
+    expect(priceOf("writer", "monthly")).toBe(14.98);
+    expect(priceOf("studio", "monthly")).toBe(24.98);
+
+    expect(priceOf("draft", "annual")).toBe(53.99);
+    expect(priceOf("writer", "annual")).toBe(134.99);
+    expect(priceOf("studio", "annual")).toBe(224.99);
   });
 
-  it("writes rupees whole, with a separator", () => {
-    expect(displayPrice(2900, "LKR")).toBe("Rs 2,900");
-    expect(displayPrice(23400, "LKR")).toBe("Rs 23,400");
+  it("divides the annual total rather than printing a typed figure", () => {
+    expect(displayPrice(perMonthOf("draft", "annual"))).toBe("$4.50");
+    expect(displayPrice(perMonthOf("writer", "annual"))).toBe("$11.25");
+    expect(displayPrice(perMonthOf("studio", "annual"))).toBe("$18.75");
   });
 });
 
@@ -57,6 +86,7 @@ describe("payhereAmount", () => {
   it("is always two decimals and never separated", () => {
     expect(payhereAmount(9)).toBe("9.00");
     expect(payhereAmount(72)).toBe("72.00");
+    expect(payhereAmount(224.99)).toBe("224.99");
     expect(payhereAmount(23400)).toBe("23400.00");
   });
 });
@@ -70,9 +100,20 @@ describe("what PayHere is told", () => {
     expect(durationOf()).toBe("Forever");
   });
 
+  /**
+   * The plan's name on the receipt comes from the same table the cards read,
+   * so a rename cannot leave a writer paying for "OpenChapter Pro" on a page
+   * that offers no such thing.
+   */
   it("names what is being bought, on PayHere's own page", () => {
-    expect(itemNameOf("annual")).toBe("OpenChapter Pro (annual)");
-    expect(itemNameOf("monthly")).toBe("OpenChapter Pro (monthly)");
+    for (const tier of PAID_TIERS) {
+      for (const period of ["monthly", "annual"] as const) {
+        expect(itemNameOf(tier, period)).toBe(
+          `OpenChapter ${TIER_NAMES[tier]} (${period})`,
+        );
+      }
+    }
+    expect(itemNameOf("writer", "annual")).toBe("OpenChapter Writer (annual)");
   });
 
   it("reads the cycle as a phrase for the checkout summary", () => {
@@ -123,20 +164,19 @@ describe("periodEnd", () => {
 });
 
 describe("annualSavingPercent", () => {
-  it("is the saving the pricing page prints, in both currencies", () => {
+  it("is the saving the pricing page prints, on every plan", () => {
     // The badge on the cycle toggle says this number. It is derived rather
     // than typed precisely so that moving a price moves the badge — the
     // previous hand-written figure survived a price change and became a false
     // claim on the one page a customer reads before paying.
-    expect(annualSavingPercent("USD")).toBe(25);
-    expect(annualSavingPercent("LKR")).toBe(33);
+    for (const tier of PAID_TIERS) expect(annualSavingPercent(tier)).toBe(25);
   });
 
   it("agrees with the two prices it describes", () => {
-    for (const currency of ["USD", "LKR"] as const) {
-      const monthly = perMonthOf("monthly", currency);
-      const annual = perMonthOf("annual", currency);
-      expect(annualSavingPercent(currency)).toBe(
+    for (const tier of PAID_TIERS) {
+      const monthly = perMonthOf(tier, "monthly");
+      const annual = perMonthOf(tier, "annual");
+      expect(annualSavingPercent(tier)).toBe(
         Math.round(((monthly - annual) / monthly) * 100),
       );
     }
@@ -147,8 +187,29 @@ describe("annualSavingPercent", () => {
     // usual band is 15-20%, and past 30% the annual plan is quietly cheaper
     // than the business intends rather than deliberately generous. The USD
     // annual sat at 34% for a week on exactly that mistake.
-    expect(annualSavingPercent("USD")).toBeGreaterThanOrEqual(10);
-    expect(annualSavingPercent("USD")).toBeLessThanOrEqual(30);
+    for (const tier of PAID_TIERS) {
+      expect(annualSavingPercent(tier)).toBeGreaterThanOrEqual(10);
+      expect(annualSavingPercent(tier)).toBeLessThanOrEqual(30);
+    }
+  });
+});
+
+/**
+ * **The badge's precondition, and the reason it is a function rather than an
+ * assumption.**
+ *
+ * One "Save 25%" chip now sits above three columns. That it is true of all
+ * three today is arithmetic that happens to work out, not a rule anybody
+ * enforces — so the toggle asks before printing, and this asserts the answer it
+ * currently gets. If a price moves and the three stop agreeing, the badge
+ * disappears rather than lying, and this test says so out loud.
+ */
+describe("uniformAnnualSaving", () => {
+  it("is the one figure the period toggle may print", () => {
+    expect(uniformAnnualSaving()).toBe(25);
+    for (const tier of PAID_TIERS) {
+      expect(annualSavingPercent(tier)).toBe(uniformAnnualSaving());
+    }
   });
 });
 

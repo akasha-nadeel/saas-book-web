@@ -30,25 +30,13 @@ import {
   SECTION_LEAD,
   SECTION_TITLE,
 } from "@/components/landing/type";
-import {
-  annualSavingPercent,
-  displayPrice,
-  perMonthOf,
-  priceOf,
-} from "@/lib/billing/plans";
+
 import { IMPORT_FORMATS } from "@/lib/import";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { CONTACT_EMAIL, LEGAL_PAGES, REFUND_DAYS } from "@/lib/legal";
 import { plural } from "@/lib/plural";
-/* Aliased: this page already has a `ROWS` of its own — the feature rows
-   further up — and the two are unrelated lists. */
-import { ROWS as PLAN_ROWS } from "@/lib/billing/plan-rows";
-import {
-  PenIcon,
-  PlanCard,
-  StackIcon,
-} from "@/components/upgrade/plan-card";
+import { PricingCards } from "@/components/landing/pricing-cards";
 import { GoogleButton } from "@/components/auth/auth-shell";
 import { signInWithGoogle } from "@/app/auth/actions";
 
@@ -611,12 +599,8 @@ const FAQ: [question: string, answer: ReactNode][] = [
    The page
    -------------------------------------------------------------------------- */
 
-export function MvpLandingPage() {
-  const monthly = displayPrice(perMonthOf("monthly"));
-  const annualPerMonth = displayPrice(perMonthOf("annual"));
-  const annualTotal = displayPrice(priceOf("annual"));
-  const saving = annualSavingPercent();
 
+export function MvpLandingPage() {
   return (
     /* `<body>` is `overflow-hidden` for the editor shell, so this page owns its
        own scrolling — `min-h-dvh` would put the footer out of reach.
@@ -830,7 +814,7 @@ export function MvpLandingPage() {
           id="inside"
           className="scroll-mt-20 border-b border-lp-line bg-lp-ground px-6 py-14 sm:py-20"
         >
-          <div className="mx-auto max-w-[88rem]">
+          <div className="mx-auto max-w-[96rem]">
             <div className="mx-auto max-w-3xl text-center">
               <h2
                 className={`oc-display font-serif text-lp-ink ${SECTION_TITLE}`}
@@ -945,85 +929,36 @@ export function MvpLandingPage() {
                 Start free. Pay when the book is going out.
               </h2>
               <p className={`oc-lead mx-auto mt-6 max-w-2xl ${SECTION_LEAD}`}>
-                One price, two cycles, and nothing held hostage.{" "}
+                Four plans, two cycles, and nothing held hostage.{" "}
                 <strong className={LEAD_EM}>
-                  Every export format is free, on both plans, for good.
+                  Every export format is free, on every plan, for good.
                 </strong>
               </p>
             </div>
 
-            {/* ---- The same two cards `/upgrade` draws -------------------
+            {/* ---- The same four cards `/upgrade` draws ------------------
 
                 **One component, not a second set of claims.** This page used to
                 carry its own `PlanCard` with hand-written bullets, which named
                 different things in different words from the comparison table on
                 `/upgrade` — two lists about one product, free to drift apart on
-                the two pages a buyer reads back to back.
+                the two pages a buyer reads back to back. Every claim now comes
+                out of `ROWS`; only the chrome differs.
 
-                `plan-card.tsx` carries no `"use client"` for exactly this: it
-                holds no state, so a Server Component can draw it. What differs
-                between the two pages goes in through `action`, which is a node —
-                a checkout button there, a plain link here.
-
-                No period toggle on this page. The monthly figure with the yearly
-                one underneath is the whole of what a visitor needs before they
-                have an account; choosing a cycle is a decision for the page that
-                takes the money. */}
-            <div className="mx-auto mt-10 grid max-w-4xl gap-5 text-left md:grid-cols-2 md:items-start">
-              <PlanCard
-                mark={<PenIcon className="h-6 w-6" />}
-                name="Free"
-                blurb="Write the whole book and take the file with you. No card, and no clock on it."
-                price="$0"
-                rows={PLAN_ROWS.map((r) => ({
-                  group: r.group,
-                  label: r.label,
-                  detail: r.detail,
-                  value: r.starter,
-                }))}
-                action={
-                  <Link
-                    href="/signup"
-                    className="block rounded-xl border border-line bg-surface px-5 py-3
-                               text-center font-sans text-sm font-semibold text-fg
-                               outline-none transition-colors hover:bg-raised
-                               focus-visible:ring-2 focus-visible:ring-accent/60"
-                  >
-                    Start writing free
-                  </Link>
-                }
-              />
-              <PlanCard
-                featured
-                badge={`${saving}% off yearly`}
-                mark={<StackIcon className="h-6 w-6" />}
-                name="Pro"
-                blurb="For a shelf that keeps growing, and the assistant to hand while it does."
-                price={monthly}
-                note={`Or ${annualTotal} a year — about ${annualPerMonth} a month.`}
-                rows={PLAN_ROWS.map((r) => ({
-                  group: r.group,
-                  label: r.label,
-                  detail: r.detail,
-                  value: r.pro,
-                }))}
-                action={
-                  <Link
-                    href="/upgrade"
-                    className="block rounded-xl bg-accent px-5 py-3 text-center
-                               font-sans text-sm font-semibold text-accent-ink
-                               outline-none transition-opacity hover:opacity-90
-                               focus-visible:ring-2 focus-visible:ring-accent/60"
-                  >
-                    See the plans
-                  </Link>
-                }
-              />
-            </div>
+                **It is a client island now, and it did not used to be.** The
+                section shipped no script: a monthly figure with the yearly one
+                written underneath, on the reasoning that choosing a cycle is a
+                decision for the page that takes the money. Four plans is eight
+                prices, and reading half of them out of a note under the other
+                half is work a toggle does better. `pricing-cards.tsx` holds the
+                cycle state; the heading, the lead and the refund line stay out
+                here on the server. */}
+            <PricingCards />
 
             <p className="mt-8 text-center text-[0.9375rem] text-lp-body">
-              Cancel from your billing page at any time; Pro runs to the end of
-              the period you have paid for. Refunds within {REFUND_DAYS} days.
+              Cancel from your billing page at any time; a paid plan runs to the
+              end of the period you have paid for. Refunds within {REFUND_DAYS}{" "}
+              days.
             </p>
           </div>
         </section>

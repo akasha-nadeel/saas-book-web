@@ -7,6 +7,31 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
+> ## ⚠️ There are four plans now, not two (2026-09-03)
+>
+> This file was written when a writer was either Free or Pro, and most of it
+> still reads that way. **`src/lib/billing/tiers.ts` is the current statement**
+> of what a plan is; where this file says "Pro", read "one of the three paid
+> plans" and check that module for the specifics. What changed:
+>
+> - **`PlanTier` is `free | draft | writer | studio`**, cheapest first, with
+>   `TIER_LIMITS` holding what each one gives and `TIER_NAMES` the words.
+>   `subscriptions.plan` — written since the first billing migration and never
+>   once read back — is now the column that carries it, under a CHECK.
+> - **Free and Draft have no writing assistant at all.** That is the line the
+>   product is drawn on. `onFreePlan()` is therefore the *wrong* test for
+>   anything AI, because Draft is paid: `aiChatClosed()` in `launch.ts` is its
+>   sibling and the one to use.
+> - **Two meters on two windows**, not one monthly count: Quick refills daily,
+>   Careful monthly, both claimed by `claim_assistant_reply(p_kind)`.
+> - **Six Paddle price ids**, one per plan per cycle, and `paddlePlanFrom()`
+>   maps them back on the way in. `isPaddleConfigured()` requires all six.
+> - **`/api/billing/paddle/change-plan`** moves an existing subscription between
+>   plans with `prorationBillingMode: "prorated_immediately"`. The two 409
+>   guards on the *checkout* routes stay — they protect one authorisation per
+>   writer, which was never meant to mean "cannot change plan".
+> - **USD only.** The LKR table came out with the fourth plan.
+
 **Payments are Paddle *or* PayHere, one at a time, and optional in the same way
 everything else is.** Configure either gateway and the app grows plans; leave
 both unset and there are no plans *and nothing is held back* — every paid
@@ -59,10 +84,14 @@ signed out, **402** when signed in and unpaid,
 and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
 
-**Two cycles, and both renew.** The launch MVP is $5.98 monthly and $53.99 a
-year. The annual plan is about 25% off the monthly plan and displays as about
-$4.50/month. The exact total is stored in `plans.ts`; the displayed monthly
+**Two cycles, and both renew.** Three paid plans across them: Draft
+$5.98/$53.99, Writer $14.98/$134.99, Studio $24.98/$224.99. Every annual price
+is 25% below twelve monthly ones and displays as about $4.50, $11.25 and $18.75
+a month. The exact total is stored in `plans.ts`; the displayed monthly
 equivalent is derived from that total so rounding happens once.
+`uniformAnnualSaving()` is what lets the period toggle print one "Save 25%"
+badge over three columns — it answers null when the three stop agreeing, so the
+badge disappears rather than lying.
 
 This lower first-launch price is deliberate: the public MVP now sells a focused
 book-writing workspace, a monthly writing-assistant allowance, five Free
@@ -72,10 +101,13 @@ are paying subscribers, a price change is an announcement rather than an edit,
 and Paddle leaves an existing subscription on the price it was bought at
 regardless. **A price change is three edits, not one:** this table, two *new*
 prices in Paddle's catalog (never an edit of the live ones), and the resulting
-`PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` ids in the environment � and
+six `PADDLE_PRICE_<TIER>_<CYCLE>` ids in the environment — and
 Paddle checks that the site's prices match the live catalog, so the two must
 not sit out of step across a review.
-The LKR table is priced for its own market and is not the USD one converted. A lifetime tier was
+The LKR table came out on 2026-09-03: three plans times two cycles times two
+currencies is twelve figures to keep true and eleven were never rendered, since
+this deployment charges in USD. Putting a second currency back means restoring
+the record shape in `plans.ts` and its `FORMAT` entry; nothing else reads it. A lifetime tier was
 built on 2026-08-03 and removed the same day — worth knowing only because the
 removal is a decision rather than an omission: selling outright is what this
 market mostly does, and it trades recurring revenue for a support obligation
@@ -86,9 +118,11 @@ one-off price every month, that there is no period end to store, and that
 
 **What is free is enough to understand the product.** Free includes five books,
 unlimited chapters and words, autosave/sync where accounts are configured,
-**every export format**, and five writing-assistant replies each calendar
-month. Pro unlocks unlimited books and sixty assistant replies each calendar
-month — two things, not three. EPUB and PDF were Pro until 2026-08-27; see the
+**every export format**, and the title and consistency checks. It has **no
+writing assistant**. Draft ($5.98) adds unlimited books and unlimited title
+checks; Writer ($14.98) adds the assistant — 25 Quick replies a day, 100
+Careful a month, and letting it write into the chapter; Studio ($24.98) carries
+40 and 300. EPUB and PDF were Pro until 2026-08-27; see the
 note in `launch.ts` for why that was the wrong thing to charge for, and
 `launch.test.ts` for what now stops it drifting back. The backend enforces expensive or paid limits: the book limit is in the
 database trigger (which counts the active shelf only, and fires on the
@@ -411,7 +445,7 @@ collects billing details. Paddle is an **overlay** opened over the pricing page
 price comes from `plans.ts` and the buyer's id from their own session. Handed a
 bare price id and a `customData` object, Paddle's overlay would let the person
 paying choose both the price and the name on the receipt; the route is what
-stops that, the same reasoning `payment_orders` was built on. `periodFrom()`
+stops that, the same reasoning `payment_orders` was built on. `paddlePlanFrom()`
 in the webhook decides the cycle from **the price id we sent**, not the billing
 interval Paddle reports, because `period` is a CHECK constraint of two values
 and a quarterly price would otherwise abort the write for a payment already

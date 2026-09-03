@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { isBillingConfigured, NOT_CONFIGURED } from "@/lib/billing/payhere";
 import { CURRENCY, asPeriod, priceOf } from "@/lib/billing/plans";
+import { asPaidTier } from "@/lib/billing/tiers";
 import { subscriptionFor } from "@/lib/billing/server";
 import { isPro } from "@/lib/billing/subscription";
 import { isAdminConfigured } from "@/lib/supabase/admin";
@@ -35,6 +36,15 @@ export async function startCheckout(
   formData: FormData,
 ): Promise<CheckoutState> {
   const period = asPeriod(formData.get("period")) ?? "monthly";
+
+  /* No default. The cycle can fall back to monthly because both cost the writer
+     something and the cheaper one is the safer guess; the *plan* cannot, since
+     every fallback is either giving away the dearest tier or charging for a
+     cheaper one than was pressed. */
+  const tier = asPaidTier(formData.get("tier"));
+  if (!tier) {
+    return { error: "Pick a plan." };
+  }
 
   if (!isSupabaseConfigured()) {
     return { error: "Accounts aren't configured, so there is nothing to bill." };
@@ -79,9 +89,9 @@ export async function startCheckout(
   const { error } = await supabase.from("payment_orders").insert({
     order_id: orderId,
     owner: userId,
-    plan: "pro",
+    plan: tier,
     period,
-    amount: priceOf(period),
+    amount: priceOf(tier, period),
     currency: CURRENCY,
   });
 

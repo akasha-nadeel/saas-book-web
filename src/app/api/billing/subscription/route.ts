@@ -1,9 +1,10 @@
+import { TIER_LIMITS } from "@/lib/billing/tiers";
+import { planTierOf } from "@/lib/billing/subscription";
 import { isPaddleConfigured } from "@/lib/billing/paddle";
 import { canManageSubscriptions } from "@/lib/billing/payhere";
 import { billingConfigured } from "@/lib/billing/provider";
 import { assistantUsageFor } from "@/lib/billing/launch-entitlements";
 import { currentSubscription } from "@/lib/billing/server";
-import { isPro } from "@/lib/billing/subscription";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { createClient } from "@/lib/supabase/server";
 
@@ -64,20 +65,24 @@ export async function GET(request: Request) {
     if (data) order = { id: String(data.order_id), status: String(data.status) };
   }
 
-  const pro = isPro(subscription);
+  const tier = planTierOf(subscription);
+  /* Kept alongside `tier` and derived from it, so the nine screens that only
+     ever asked "is this a paid plan" need no edit. Its meaning is now exactly
+     that — *any* paid tier — which is the right question for books, the trash,
+     the hidden tools and export, and the wrong one for the assistant. Anything
+     gating AI reads `tier`. */
+  const pro = tier !== "free";
+
+  const shut = { used: 0, limit: 0, remaining: 0, resetAt: null };
   const assistant =
     supabase && userId
       ? await assistantUsageFor(supabase, userId, subscription)
-      : {
-          used: 0,
-          limit: LAUNCH_LIMITS.freeAssistantRepliesPerMonth,
-          remaining: LAUNCH_LIMITS.freeAssistantRepliesPerMonth,
-          resetAt: null,
-        };
+      : { quick: shut, careful: shut };
 
   return Response.json({
     billing: true,
     signedIn: Boolean(userId),
+    tier,
     pro,
     order,
     status: subscription?.status ?? null,
@@ -101,7 +106,7 @@ export async function GET(request: Request) {
             : subscription.payhereSubscriptionId && canManageSubscriptions()),
     ),
     assistant,
-    books: { limit: pro ? null : LAUNCH_LIMITS.freeBooks },
+    books: { limit: TIER_LIMITS[tier].books },
     exports: { free: LAUNCH_LIMITS.freeExports, pro: LAUNCH_LIMITS.proExports },
   });
 }

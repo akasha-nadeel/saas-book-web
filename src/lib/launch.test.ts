@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
 import {
   LAUNCH_LIMITS,
-  assistantWriteAllowed,
+  aiChatClosed,
   exportAllowed,
   onFreePlan,
   trashedBookClosed,
@@ -27,20 +27,6 @@ it("puts every export format on the free plan", () => {
   expect([...LAUNCH_LIMITS.freeExports]).toEqual([
     ...LAUNCH_LIMITS.proExports,
   ]);
-});
-
-/**
- * **The assistant writing into the chapter is Pro, and only Pro.**
- *
- * The mirror of the test above, and here for the same reason: the decision is
- * a boolean in a frozen object, and nothing else in the tree would notice it
- * being flipped. The free plan keeps the assistant it always had — it reads the
- * chapter and offers text — and buying Pro is what makes that text applicable.
- */
-it("keeps writing into the chapter on the paid plan", () => {
-  expect(assistantWriteAllowed(true)).toBe(true);
-  expect(assistantWriteAllowed(false)).toBe(false);
-  expect(LAUNCH_LIMITS.freeAssistantWrite).toBe(false);
 });
 
 it("still refuses a format that is not an export at all", () => {
@@ -90,4 +76,33 @@ it("holds nothing back where no gateway is configured", () => {
   expect(
     trashedBookClosed({ trashedAt: Date.now() }, { ...FREE, billing: false }),
   ).toBe(false);
+});
+
+/**
+ * **Draft is the plan this rule was written for.**
+ *
+ * It is paid — so `pro` is true and `onFreePlan` answers false — and carries no
+ * assistant at all. Every AI gate written against `pro` unlocks for a Draft
+ * writer, silently, and a paid feature whose gate is visibly decorative teaches
+ * a reader that the rest are too. `chat-panel.tsx` is the one call site, and
+ * nothing else in the tree would notice it going back to `onFreePlan`.
+ */
+it("shuts the assistant on the two plans without it", () => {
+  const known = { loading: false, billing: true };
+  expect(aiChatClosed({ ...known, tier: "free" })).toBe(true);
+  expect(aiChatClosed({ ...known, tier: "draft" })).toBe(true);
+  expect(aiChatClosed({ ...known, tier: "writer" })).toBe(false);
+  expect(aiChatClosed({ ...known, tier: "studio" })).toBe(false);
+});
+
+/** The same loading-window rule as `onFreePlan`, and for the same reason. */
+it("refuses no assistant while the plan is still unknown", () => {
+  expect(aiChatClosed({ loading: true, billing: true, tier: null })).toBe(false);
+  expect(aiChatClosed({ loading: true, billing: true, tier: "free" })).toBe(false);
+  expect(aiChatClosed({ loading: false, billing: true, tier: null })).toBe(false);
+});
+
+/** Configure no gateway and there are no plans, so nothing is held back. */
+it("leaves the assistant open where no gateway is configured", () => {
+  expect(aiChatClosed({ loading: false, billing: false, tier: "free" })).toBe(false);
 });

@@ -21,6 +21,7 @@
  */
 
 import type { CollabRole } from "./collab";
+import { asChatModel, type ChatModel } from "@/lib/chat-model";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
 import {
   DEFAULT_SHELF_LAYOUT,
@@ -3259,6 +3260,18 @@ export interface Prefs {
    */
   assistantWrite: boolean;
   /**
+   * Which of the assistant's two models the writer last asked for.
+   *
+   * Stored rather than held in the panel, because the panel unmounts every time
+   * it is closed — a writer who chose Careful, shut the rail and came back
+   * would find themselves back on Quick, having asked for nothing of the sort.
+   * The same reasoning as `panelTab` two fields down.
+   *
+   * Defaults to `quick`: the cheap model on the daily meter. Whatever this is
+   * unsure about, it must not be the one that spends the scarcer allowance.
+   */
+  assistantModel: ChatModel;
+  /**
    * Which of the rail's panels is showing.
    *
    * Stored, with `leftPanel`, because **a navigation is not a decision.**
@@ -3393,6 +3406,9 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   searchTab: "find",
   // Off: the assistant offers text and puts none of it in until asked to.
   assistantWrite: false,
+  // The daily meter, so a writer who never touches the picker never quietly
+  // spends the monthly one.
+  assistantModel: "quick",
   panelTab: "search",
   // The grid the shelf has always drawn; a writer who wants another says so.
   shelfLayout: DEFAULT_SHELF_LAYOUT,
@@ -3467,6 +3483,10 @@ function parsePrefs(raw: string | null): Prefs {
       chapterSectionOpen: parsed.chapterSectionOpen === true,
       searchTab: parsed.searchTab === "replace" ? "replace" : "find",
       assistantWrite: parsed.assistantWrite === true,
+      // Narrowed like `panelTab`: a value written by an older version — or by
+      // hand — must not reach `modelName` as a model id nobody sells.
+      assistantModel:
+        asChatModel(parsed.assistantModel) ?? DEFAULT_PREFS.assistantModel,
       panelTab: isPanelTab(parsed.panelTab)
         ? parsed.panelTab
         : DEFAULT_PREFS.panelTab,

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import type { ReactNode } from "react";
 import { ToolHeader } from "@/components/tool-header";
 import { toolShell } from "@/lib/tool-page";
@@ -54,7 +55,7 @@ export function ProGate({
   return (
     <section className="rounded-xl border border-line bg-panel p-6">
       <p className="font-sans text-xs tracking-wide text-muted uppercase">
-        Part of Pro
+        Part of {TIER_NAMES.draft}
       </p>
       <h2 className="mt-2 text-lg font-bold text-fg">{title}</h2>
       <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-muted">
@@ -66,7 +67,7 @@ export function ProGate({
                    font-semibold text-accent-ink outline-none
                    focus-visible:ring-2 focus-visible:ring-accent/50"
       >
-        See what Pro adds
+        See what {TIER_NAMES.draft} adds
       </Link>
       <p className="mt-3 text-xs text-muted">
         Nothing you have already recorded is touched, and it is all still on

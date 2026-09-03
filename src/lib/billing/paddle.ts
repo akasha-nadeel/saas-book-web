@@ -1,3 +1,6 @@
+import type { Period } from "./plans";
+import { PAID_TIERS, type PaidTier } from "./tiers";
+
 /**
  * Where Paddle is, and whether this deployment has one at all.
  *
@@ -88,34 +91,82 @@ export const PADDLE_SANDBOX = paddleSandboxFrom(
 );
 
 /**
- * The two prices, made once in the Paddle dashboard.
+ * The six prices — one per paid plan per cycle — made once in the Paddle
+ * dashboard.
  *
  * Server-side on purpose. The transaction is created by our own route rather
  * than by the browser (see `/api/billing/paddle/checkout`), so the price the
  * writer is charged is chosen here and cannot be swapped for a cheaper one by
  * anybody reading the page source.
+ *
+ * **The old two-name pair is gone rather than kept as a fallback.** A
+ * deployment still carrying `PADDLE_PRICE_MONTHLY` and none of the six must
+ * fail `isPaddleConfigured()` loudly — falling back would sell Studio at the
+ * Draft price, and nothing on either side would say so.
  */
-const PRICE_IDS = {
-  monthly: process.env.PADDLE_PRICE_MONTHLY ?? "",
-  annual: process.env.PADDLE_PRICE_ANNUAL ?? "",
-} as const;
+const PRICE_IDS: Record<PaidTier, Record<Period, string>> = {
+  draft: {
+    monthly: process.env.PADDLE_PRICE_DRAFT_MONTHLY ?? "",
+    annual: process.env.PADDLE_PRICE_DRAFT_ANNUAL ?? "",
+  },
+  writer: {
+    monthly: process.env.PADDLE_PRICE_WRITER_MONTHLY ?? "",
+    annual: process.env.PADDLE_PRICE_WRITER_ANNUAL ?? "",
+  },
+  studio: {
+    monthly: process.env.PADDLE_PRICE_STUDIO_MONTHLY ?? "",
+    annual: process.env.PADDLE_PRICE_STUDIO_ANNUAL ?? "",
+  },
+};
 
-export function paddlePriceId(period: "monthly" | "annual"): string {
-  return PRICE_IDS[period];
+export function paddlePriceId(tier: PaidTier, period: Period): string {
+  return PRICE_IDS[tier][period];
 }
 
 /**
- * True once Paddle can actually take money. All four are required: a client
- * token with no API key opens a checkout nothing can create, and an API key
- * with no webhook secret takes payments nobody is granted for.
+ * Which plan and cycle a set of price ids names, decided by the ids we sent
+ * rather than by anything Paddle reports back about the billing interval.
+ *
+ * **Exactly one match, or nothing.** A subscription naming two of our prices is
+ * a shape we do not sell, and guessing between them would grant a plan nobody
+ * bought. The caller treats null as "unknown shape" and grants nothing, which
+ * is the same thing it already did for an unrecognised cycle.
+ */
+export function paddlePlanFrom(
+  priceIds: (string | undefined)[],
+): { tier: PaidTier; period: Period } | null {
+  const named = new Set(priceIds.filter((id): id is string => !!id));
+  const matches: { tier: PaidTier; period: Period }[] = [];
+
+  for (const tier of PAID_TIERS) {
+    for (const period of ["monthly", "annual"] as const) {
+      const id = PRICE_IDS[tier][period];
+      if (id && named.has(id)) matches.push({ tier, period });
+    }
+  }
+
+  return matches.length === 1 ? matches[0] : null;
+}
+
+/**
+ * True once Paddle can actually take money. All nine are required: a client
+ * token with no API key opens a checkout nothing can create, an API key with no
+ * webhook secret takes payments nobody is granted for, and a missing price id
+ * is a card on the pricing page that cannot be bought.
+ *
+ * **All six prices or none**, rather than per-plan availability — that would
+ * mean the pricing page hiding a card, which is a product decision hidden
+ * inside a configuration check.
  */
 export function isPaddleConfigured(): boolean {
   return (
     PADDLE_API_KEY.length > 0 &&
     PADDLE_WEBHOOK_SECRET.length > 0 &&
     PADDLE_CLIENT_TOKEN.length > 0 &&
-    PRICE_IDS.monthly.length > 0 &&
-    PRICE_IDS.annual.length > 0
+    PAID_TIERS.every(
+      (tier) =>
+        PRICE_IDS[tier].monthly.length > 0 && PRICE_IDS[tier].annual.length > 0,
+    )
   );
 }
 

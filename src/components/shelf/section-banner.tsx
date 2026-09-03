@@ -128,9 +128,15 @@ export function SectionBanner({
            owner's request; the shadow is what lifts it off the picture. */
         <Link
           href={action.href}
+          /* **It lifts rather than fades.** `hover:opacity-90` on a coloured
+             fill over a photograph is close to invisible — and fading a button
+             *into* the picture behind it is the one direction that reads as
+             less pressable, not more. Coming toward the pointer with a deeper
+             shadow is the opposite, and costs the fill nothing. */
           className="mt-5 inline-flex w-fit items-center gap-2 rounded-lg
                      bg-[#febc8c] px-4 py-2 text-sm font-semibold text-[#2a1a0e]
-                     shadow-md transition-opacity hover:opacity-90"
+                     shadow-md transition-[transform,box-shadow] duration-150
+                     hover:-translate-y-0.5 hover:shadow-lg"
         >
           {action.label}
           <span aria-hidden="true">→</span>

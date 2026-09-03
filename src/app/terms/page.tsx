@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
+import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
 import { displayPrice, priceOf } from "@/lib/billing/plans";
-import { LAUNCH_LIMITS } from "@/lib/launch";
 import { plural } from "@/lib/plural";
 import {
   CONTACT_EMAIL,
@@ -15,14 +15,14 @@ import {
 export const metadata: Metadata = {
   title: "Terms · OpenChapter",
   description:
-    "The terms of using OpenChapter: your account, your book, the Free and Pro plans, and what each side is responsible for.",
+    "The terms of using OpenChapter: your account, your book, the four plans, and what each side is responsible for.",
 };
 
 export default function TermsPage() {
   return (
     <LegalPage
       title="Terms of service"
-      intro="The agreement between you and us. These terms describe the launch MVP: a focused book-writing workspace with Free and Pro plans."
+      intro="The agreement between you and us. These terms describe the launch MVP: a focused book-writing workspace, free to write in, with three paid plans above it."
     >
       <Section title="1. Who you are agreeing with">
         <p>
@@ -66,22 +66,32 @@ export default function TermsPage() {
         </Note>
       </Section>
 
-      <Section title="5. Free and Pro">
+      <Section title="5. The plans">
         <p>
-          The Free plan includes {plural(LAUNCH_LIMITS.freeBooks, "book")},
+          The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
           unlimited chapters and words, autosave and sync where accounts are
-          configured,{" "}
-          {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} writing-assistant
-          replies per month, and Word, EPUB and PDF export.
+          configured, and Word, EPUB and PDF export. It does not include the
+          writing assistant.
         </p>
         <p>
-          Pro includes unlimited books and{" "}
-          {LAUNCH_LIMITS.proAssistantRepliesPerMonth} writing-assistant replies
-          per month. Every export format is included on both plans.
+          {TIER_NAMES.draft} adds unlimited books. {TIER_NAMES.writer} adds the
+          writing assistant — {TIER_LIMITS.writer.quickPerDay} quick replies a
+          day and {TIER_LIMITS.writer.carefulPerMonth} careful replies a month —
+          and lets it write into your chapter on your approval.{" "}
+          {TIER_NAMES.studio} carries {TIER_LIMITS.studio.quickPerDay} and{" "}
+          {TIER_LIMITS.studio.carefulPerMonth}. Every export format is included
+          on every plan, paid or not.
         </p>
         <p>
-          {TRADING_NAME} Pro is {displayPrice(priceOf("monthly"))} a month or{" "}
-          {displayPrice(priceOf("annual"))} a year. Both renew automatically
+          {TRADING_NAME} paid plans run from{" "}
+          {displayPrice(priceOf("draft", "monthly"))} to{" "}
+          {displayPrice(priceOf("studio", "monthly"))} a month, or{" "}
+          {displayPrice(priceOf("draft", "annual"))} to{" "}
+          {displayPrice(priceOf("studio", "annual"))} a year; the{" "}
+          <Link href="/upgrade" className="text-lp-accent-text hover:underline">
+            plans page
+          </Link>{" "}
+          carries each one. Both cycles renew automatically
           until cancelled. You can cancel at any time from the account menu; the
           plan then runs to the end of the period you have paid for. Refunds are
           set out on the{" "}

@@ -26,7 +26,7 @@ import {
   resultsGridClass,
   type ShelfLayout,
 } from "@/lib/shelf-layout";
-import { toolShell, type ToolPageProps } from "@/lib/tool-page";
+import { toolShell, type ToolPageProps, toolMeasure } from "@/lib/tool-page";
 
 /**
  * Whether anything is already published under this title.
@@ -488,7 +488,9 @@ export function TitleCheckPage({
         </ToolHeader>
       )}
 
-      <div className="@container mx-auto max-w-7xl px-(--oc-page-gutter) pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6">
+      <div
+        className={`@container ${toolMeasure(embedded)} pt-4 pb-[calc(4rem+var(--oc-safe-bottom))] sm:pt-6`}
+      >
         {/* `ToolHeader` is suppressed in the roadmap's panel and in the
             dashboard, and it was the only place this screen said what the
             question actually is — so the panel opened on "Check the title" and

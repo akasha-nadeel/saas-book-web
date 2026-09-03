@@ -5,14 +5,25 @@ import Link from "next/link";
 import { startCheckout, type CheckoutState } from "@/app/upgrade/actions";
 import { ComingSoonDialog } from "@/components/shelf/coming-soon-dialog";
 import {
-  annualSavingPercent,
   displayPrice,
   perMonthOf,
   priceOf,
 } from "@/lib/billing/plans";
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
+import { ChangePlanButton } from "@/components/upgrade/change-plan-button";
 import { PaddleInlineCheckout } from "@/components/upgrade/paddle-inline-checkout";
 import { ROWS } from "@/lib/billing/plan-rows";
+import { PeriodToggle } from "@/components/upgrade/period-toggle";
+import {
+  PLAN_BUTTON_PLAIN,
+  planButton,
+} from "@/components/upgrade/plan-button";
+import {
+  TIER_NAMES,
+  tierAtLeast,
+  type PaidTier,
+  type PlanTier,
+} from "@/lib/billing/tiers";
 import {
   PenIcon,
   PlanCard,
@@ -69,27 +80,6 @@ import type { Period } from "@/lib/billing/plans";
 
 
 /**
- * The Pro card's button, in whichever of its three forms.
- *
- * Written once because it is a link in one state and a submit in two others,
- * and the three have to be indistinguishable — a button that changes shape as
- * the page learns what plan you are on reads as a glitch.
- *
- * **Filled with the accent, which is what now separates the two cards.** The
- * Pro card used to be inverted — near-black ground, pale button — and both
- * cards are the same card now, so the hierarchy has to come from somewhere
- * that means something. The accent is the app's one reserved hue and it means
- * exactly this: the way forward. The free card's button is an outline, because
- * two filled buttons side by side ask the reader to choose between two equals.
- *
- * `text-accent-ink` rather than a fixed white: the fill is white at night and
- * near-black by day, so a hardcoded colour is invisible in exactly one theme.
- */
-const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
-  text-sm font-semibold text-accent-ink outline-none transition-opacity
-  hover:opacity-90 focus-visible:ring-2 focus-visible:ring-accent/60`;
-
-/**
  * The comparison, read across a line: label, what Starter gives, what Pro does.
  *
  * **The split is by what a row costs to run and who it is for**, not by what
@@ -121,6 +111,51 @@ const PRO_BUTTON = `block rounded-xl bg-accent px-5 py-3 text-center font-sans
  * this is the page a sceptical reader checks hardest.
  */
 
+
+/**
+ * The three paid cards, in the order they are read.
+ *
+ * Data rather than three hand-written blocks, because four columns of the same
+ * shape written out four times is four places for one of them to drift — which
+ * is the drift `plan-rows.ts` already exists to prevent one level down.
+ *
+ * **Writer is the featured one**, not Studio: it is where the assistant first
+ * appears, which is the decision this page is actually asking a visitor to
+ * make. Anchoring on the dearest card instead would make the ask $24.98 for an
+ * audience that mostly has not decided whether it wants an assistant at all.
+ */
+const PAID_CARDS: {
+  tier: PaidTier;
+  mark: React.ReactNode;
+  blurb: string;
+  featured?: boolean;
+}[] = [
+  {
+    tier: "draft",
+    mark: <StackIcon className="h-6 w-6" />,
+    blurb: "The whole of OpenChapter without the assistant. Unlimited books, every export.",
+  },
+  {
+    tier: "writer",
+    mark: <PenIcon className="h-6 w-6" />,
+    blurb: "Everything in Draft, and the writing assistant beside the chapter.",
+    featured: true,
+  },
+  {
+    tier: "studio",
+    mark: <StackIcon className="h-6 w-6" />,
+    blurb: "For a writer who leans on the assistant daily. Three times the careful replies.",
+  },
+];
+
+/** One column of `ROWS`, shaped for the card. */
+function rowsFor(tier: PlanTier) {
+  return ROWS.map((row) => ({
+    label: row.label,
+    value: row.values[tier],
+  }));
+}
+
 export function Plans({
   /** Decides where the starter card's button goes — the shelf, or the way in. */
   signedIn,
@@ -135,18 +170,26 @@ export function Plans({
   provider,
   /** Paddle's client-side token and environment, when Paddle is the gateway. */
   paddle,
-  /** Already paying. The card stops selling and starts confirming. */
-  pro: alreadyPro,
+  /** What they are on now, or null for a writer with no subscription. */
+  current,
   /** Set when the gateway sent the writer back without taking anything. */
   cancelled = false,
 }: {
   signedIn: boolean;
   provider: "paddle" | "payhere" | null;
   paddle?: { token: string; environment: "sandbox" | "production" };
-  pro: boolean;
+  current: {
+    tier: PaidTier;
+    period: Period;
+    /** The row's own gateway. Paddle can swap a price; PayHere cannot. */
+    provider: "paddle" | "payhere";
+  } | null;
   cancelled?: boolean;
 }) {
-  const [period, setPeriod] = useState<Period>("monthly");
+  /* **Annual, not monthly.** The toggle's own badge says a year saves 25%, and
+     opening on the cycle that badge is about means the first figure a reader
+     sees is the one being recommended. Switching to monthly is one press. */
+  const [period, setPeriod] = useState<Period>("annual");
 
   /*
    * The transaction being paid for, once there is one.
@@ -172,12 +215,6 @@ export function Plans({
 
   // Both cycles show a per-month rate, because a reader compares plans by the
   // month whatever they are billed on. The annual one names the real total.
-  const headline = displayPrice(perMonthOf(period));
-  const note =
-    period === "annual"
-      ? `${displayPrice(priceOf("annual"))} billed annually`
-      : undefined;
-
   if (checkoutTransaction && paddle) {
     return (
       <main className="scroll-slim h-[var(--oc-layout-height)] overflow-y-auto bg-surface pb-(--oc-safe-bottom)">
@@ -215,7 +252,14 @@ export function Plans({
           to reach the thing they came for. The rows are unchanged; only the
           air around them is. The prices stay large — that is the one figure
           on this page anybody is looking for. */}
-      <div className="mx-auto max-w-4xl px-5 pt-6 pb-14 text-center sm:pt-8">
+      {/* **Wider than the words it opens with, because four cards live in it.**
+
+          This was `max-w-4xl` — 896px, which is the right measure for a
+          headline and a lead, and 224px a card once four of them are sharing
+          it. Every badge on every row ran off its card at that width. The
+          block keeps its measure by putting it back on the headline itself;
+          the grid below gets the room. */}
+      <div className="mx-auto max-w-[96rem] px-4 pt-6 pb-14 text-center sm:pt-8">
         <p
           className="inline-block rounded-full border border-line bg-panel px-4
                      py-1.5 font-sans text-xs font-medium text-muted"
@@ -223,7 +267,7 @@ export function Plans({
           Pricing
         </p>
 
-        <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">
+        <h1 className="mx-auto mt-4 max-w-3xl font-display text-3xl font-bold tracking-tight text-fg sm:text-4xl">
           Simple pricing for writing your book
         </h1>
         {/* Not `text-muted`: this is the sentence the headline is asking to be
@@ -234,9 +278,9 @@ export function Plans({
           className="mx-auto mt-3 max-w-2xl font-sans text-base leading-relaxed
                      font-medium text-fg/80"
         >
-          Every format is free, on both plans — take your book and go whenever
-          you like. Pro is for when you need more books than five, or more of
-          the assistant.
+          Every format is free, on every plan — take your book and go whenever
+          you like. {TIER_NAMES.draft} is for more than five books;{" "}
+          {TIER_NAMES.writer} and {TIER_NAMES.studio} add the writing assistant.
         </p>
 
         <PeriodToggle period={period} onChange={setPeriod} />
@@ -254,99 +298,162 @@ export function Plans({
           </p>
         )}
 
-        {/* items-start so the raised card grows upward on its own rather than
-            stretching its neighbour to match. */}
-        <div className="mt-8 grid gap-5 text-left sm:grid-cols-2 sm:items-start">
+        {/* **Four cards, one array, one component.**
+
+            `xl:grid-cols-4` rather than four across from `sm`: four columns at
+            768px is 190px each and every row in them wraps. The 2×2 in between
+            falls as (Free, Draft) and (Writer, Studio) — the half without the
+            assistant and the half with it — which is the right seam for the
+            pair to break on.
+
+            items-start so the featured card grows upward on its own rather
+            than stretching its neighbours to match. */}
+        <div className="mt-8 grid gap-2 text-left sm:grid-cols-2 sm:items-start xl:grid-cols-4">
           <PlanCard
             mark={<PenIcon className="h-6 w-6" />}
-            name="Free"
-            blurb="For writing a book and getting it out — every export format, and a small assistant allowance."
+            name={TIER_NAMES.free}
+            blurb="Write the whole book and take the file with you. No card, and no clock on it."
             price="$0"
-            rows={ROWS.map((r) => ({
-              group: r.group,
-              label: r.label,
-              detail: r.detail,
-              value: r.starter,
-            }))}
+            rows={rowsFor("free")}
             action={
               // Not a disabled "current plan" chip: a writer who is already in
               // has somewhere to be, and one who is not has an account to make.
               // Both are real destinations, which is more use than a label.
               <Link
                 href={signedIn ? "/" : "/signup"}
-                className="block rounded-xl border border-line bg-surface px-5 py-3
-                           text-center font-sans text-sm font-semibold text-fg
-                           outline-none transition-colors hover:bg-raised
-                           focus-visible:ring-2 focus-visible:ring-accent/60"
+                className={PLAN_BUTTON_PLAIN}
               >
                 {signedIn ? "Keep writing" : "Start writing"}
               </Link>
             }
           />
 
-          <PlanCard
-            featured
-            badge="Best for serious writers"
-            mark={<StackIcon className="h-6 w-6" />}
-            name="Pro"
-            blurb="For a shelf that keeps growing, and the assistant to hand."
-            price={headline}
-            note={note}
-            rows={ROWS.map((r) => ({
-              group: r.group,
-              label: r.label,
-              detail: r.detail,
-              value: r.pro,
-            }))}
-            action={
-              alreadyPro ? (
-                // Nothing to sell someone who has already bought it. A disabled
-                // "current plan" chip would be a dead control on the one card
-                // that most needs to say something useful.
-                <Link href="/" className={PRO_BUTTON}>
-                  You&rsquo;re on Pro — keep writing
-                </Link>
-              ) : provider === "paddle" && paddle ? (
-                <PaddleUpgradeButton
-                  period={period}
-                  onTransaction={setCheckoutTransaction}
-                  className={PRO_BUTTON}
-                />
-              ) : provider === "payhere" ? (
-                <form action={checkout}>
-                  {/* The cycle is read from the toggle at submit time rather
-                      than from a second piece of state on the server. */}
-                  <input type="hidden" name="period" value={period} />
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className={`w-full cursor-pointer disabled:cursor-default
-                                disabled:opacity-70 ${PRO_BUTTON}`}
+          {PAID_CARDS.map(({ tier, mark, blurb, featured }) => (
+            <PlanCard
+              key={tier}
+              featured={featured}
+              badge={featured ? "Most popular" : undefined}
+              mark={mark}
+              name={TIER_NAMES[tier]}
+              blurb={blurb}
+              price={displayPrice(perMonthOf(tier, period))}
+              note={
+                period === "annual"
+                  ? `${displayPrice(priceOf(tier, "annual"))} billed annually`
+                  : undefined
+              }
+              rows={rowsFor(tier)}
+              action={
+                /* **Every card answers for itself now.**
+
+                   It used to be one boolean: already paying meant "Keep
+                   writing" on all three, so a Draft customer looking at Studio
+                   was told there was nothing to do — the dearest plan reading
+                   as unavailable to the person most likely to buy it.
+
+                   Four answers instead. On the plan already held, the card
+                   confirms and points at `/billing`. Above or below it, a
+                   change. With nothing held, the checkout that was always
+                   there. And on a PayHere subscription, a sentence rather than
+                   a button, because that gateway has no call that swaps a plan
+                   and a control that always fails is worse than none. */
+                current && current.tier === tier ? (
+                  /* **The plan they are on says so, whichever cycle is showing.**
+
+                     This compared the cycle too, so a Writer on monthly who
+                     flicked the toggle to annual saw "Switch to Writer" on
+                     their own plan — which reads as though they are not on it.
+                     The tier is the plan; the cycle is how it is paid for, and
+                     conflating the two put the wrong words on the one card a
+                     subscriber looks at first. */
+                  current.period === period ? (
+                    <Link href="/billing" className={planButton(featured)}>
+                      Your plan
+                    </Link>
+                  ) : current.provider === "paddle" ? (
+                    /* Same plan, other cycle. A real change, and named as the
+                       cycle change it is rather than as a plan change. */
+                    <ChangePlanButton
+                      tier={tier}
+                      period={period}
+                      label={`Switch to ${period === "annual" ? "annual" : "monthly"}`}
+                      className={planButton(featured)}
+                    />
+                  ) : (
+                    <Link href="/billing" className={planButton(featured)}>
+                      Your plan
+                    </Link>
+                  )
+                ) : current && current.provider === "paddle" ? (
+                  <ChangePlanButton
+                    tier={tier}
+                    period={period}
+                    label={`${
+                      tierAtLeast(tier, current.tier) ? "Upgrade to" : "Switch to"
+                    } ${TIER_NAMES[tier]}`}
+                    className={planButton(featured)}
+                  />
+                ) : current ? (
+                  /* PayHere. Honest about what it cannot do, and pointed at the
+                     one place the writer can act. */
+                  <p
+                    className={`font-sans text-xs leading-relaxed ${
+                      featured ? "text-surface/75" : "text-muted"
+                    }`}
                   >
-                    {pending ? "Starting checkout…" : "Upgrade"}
-                  </button>
-                  {state.error && (
-                    // On the card's own ink, not text-red: the ground here is
-                    // bg-fg, and a red that reads on paper disappears on it.
-                    <p
-                      role="alert"
-                      className="mt-3 font-sans text-xs leading-relaxed text-surface/75"
+                    To move to {TIER_NAMES[tier]}, cancel your current plan from{" "}
+                    <Link href="/billing" className="underline">
+                      billing
+                    </Link>{" "}
+                    first — it runs to the end of the period you have paid for.
+                  </p>
+                ) : provider === "paddle" && paddle ? (
+                  <PaddleUpgradeButton
+                    tier={tier}
+                    period={period}
+                    onTransaction={setCheckoutTransaction}
+                    className={planButton(featured)}
+                  />
+                ) : provider === "payhere" ? (
+                  <form action={checkout}>
+                    {/* Both read from the controls at submit time rather than
+                        from a second piece of state on the server. */}
+                    <input type="hidden" name="tier" value={tier} />
+                    <input type="hidden" name="period" value={period} />
+                    <button
+                      type="submit"
+                      disabled={pending}
+                      className={`w-full cursor-pointer disabled:cursor-default
+                                  disabled:opacity-70 ${planButton(featured)}`}
                     >
-                      {state.error}
-                    </p>
-                  )}
-                </form>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setSoon(true)}
-                  className={`w-full cursor-pointer ${PRO_BUTTON}`}
-                >
-                  Upgrade
-                </button>
-              )
-            }
-          />
+                      {pending ? "Starting checkout…" : `Get ${TIER_NAMES[tier]}`}
+                    </button>
+                    {state.error && (
+                      // On the card's own ink, not text-red: the featured
+                      // ground is bg-fg, and a red that reads on paper
+                      // disappears on it.
+                      <p
+                        role="alert"
+                        className={`mt-3 font-sans text-xs leading-relaxed ${
+                          featured ? "text-surface/75" : "text-muted"
+                        }`}
+                      >
+                        {state.error}
+                      </p>
+                    )}
+                  </form>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setSoon(true)}
+                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                  >
+                    Get {TIER_NAMES[tier]}
+                  </button>
+                )
+              }
+            />
+          ))}
         </div>
 
         <p className="mx-auto mt-10 max-w-xl font-sans text-sm leading-relaxed text-muted">
@@ -357,97 +464,14 @@ export function Plans({
       </div>
 
       {soon && (
-        <ComingSoonDialog title="Pro" onClose={() => setSoon(false)}>
+        <ComingSoonDialog title="Plans" onClose={() => setSoon(false)}>
           There is no payment gateway configured on this copy of OpenChapter, so
           there is nothing to buy and nothing is held back. Once billing is
-          configured, Pro unlocks unlimited books, more assistant replies, and
-          letting the assistant write into a chapter. Every export format is
+          configured, {TIER_NAMES.draft} unlocks unlimited books, and{" "}
+          {TIER_NAMES.writer} adds the writing assistant. Every export format is
           free either way.
         </ComingSoonDialog>
       )}
     </main>
-  );
-}
-
-/**
- * Monthly / Annually.
- *
- * A radiogroup rather than two buttons with `aria-pressed`: these are one
- * choice with two answers, and a screen reader should hear it that way — which
- * is also how the tab key then behaves, landing on the group once instead of
- * on each half.
- *
- * The chosen half is a filled pill on a light track, so the state is carried by
- * the fill and not by a weight change that only sighted readers catch.
- */
-function PeriodToggle({
-  period,
-  onChange,
-}: {
-  period: Period;
-  onChange: (next: Period) => void;
-}) {
-  const saving = annualSavingPercent();
-
-  const options: { value: Period; label: string }[] = [
-    { value: "monthly", label: "Monthly" },
-    { value: "annual", label: "Annually" },
-  ];
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Billing period"
-      className="mt-8 inline-flex items-center gap-1 rounded-full border
-                 border-line bg-panel p-1"
-    >
-      {options.map((option) => {
-        const on = period === option.value;
-        /* The saving rides *on the control that switches to it*, which is
-           where every subscription page puts it and the only place it is an
-           answer rather than a fact: the reader is deciding between two
-           buttons and this is the difference between them. On the price
-           beneath it, it would be arriving after the decision.
-
-           The percentage is computed from the two prices (see
-           `annualSavingPercent`) rather than written here — a badge is a claim
-           about figures that live somewhere else, and the last hand-typed one
-           in this codebase went stale the day a price moved. */
-        const badge = option.value === "annual" && saving > 0;
-
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => onChange(option.value)}
-            className={`flex cursor-pointer items-center gap-2 rounded-full py-2
-                        font-sans text-sm font-medium outline-none
-                        transition-colors focus-visible:ring-2
-                        focus-visible:ring-accent/60 ${badge ? "pr-2 pl-5" : "px-5"} ${
-                          on
-                            ? "bg-fg text-surface"
-                            : "text-muted hover:text-fg"
-                        }`}
-          >
-            {option.label}
-            {badge && (
-              /* `ok`, the status family's green, because a saving is money
-                 kept rather than a feature — the same ink the readiness
-                 badges use for "nothing owed here". It keeps its own ground
-                 on both sides of the toggle, so the figure stays legible when
-                 the pill behind it inverts. */
-              <span
-                className="rounded-md border border-ok-line bg-ok-bg px-2 py-0.5
-                           font-sans text-[0.6875rem] font-semibold text-ok-fg"
-              >
-                Save {saving}%
-              </span>
-            )}
-          </button>
-        );
-      })}
-    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { PaidTier } from "@/lib/billing/tiers";
 import type { Period } from "@/lib/billing/plans";
 
 /**
@@ -29,10 +30,13 @@ import type { Period } from "@/lib/billing/plans";
  */
 
 export function PaddleUpgradeButton({
+  tier,
   period,
   onTransaction,
   className,
 }: {
+  /** Which plan the press is buying. Re-narrowed server-side. */
+  tier: PaidTier;
   period: Period;
   /** Handed the transaction to check out. The page decides where to show it. */
   onTransaction: (transactionId: string) => void;
@@ -49,7 +53,7 @@ export function PaddleUpgradeButton({
       const response = await fetch("/api/billing/paddle/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ period }),
+        body: JSON.stringify({ tier, period }),
       });
 
       const data = (await response.json().catch(() => null)) as {

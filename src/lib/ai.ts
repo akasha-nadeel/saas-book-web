@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { ChatModel } from "@/lib/chat-model";
 
 /**
  * One way to ask a model a question, whichever model is configured.
@@ -31,43 +32,99 @@ import Anthropic from "@anthropic-ai/sdk";
 export type Provider = "anthropic" | "google";
 
 /**
- * What each provider is asked by default, and there are two tiers because the
- * callers are two different jobs.
+ * What each provider is asked by default, and there are three jobs because the
+ * callers want three different things.
  *
- * **`task`** is the cheap, fast tier: bounded classification over a couple of
- * dozen short records, which is what the comps, categories, keyword and blurb
- * routes do.
+ * **`task`** is the cheap, bounded one: classification over a couple of dozen
+ * short records, which is what the comps, categories, keyword and blurb routes
+ * do.
  *
- * **`chat`** is the assistant, which is open-ended reasoning about somebody's
- * prose and the one place here worth a larger model. Keeping it a separate
- * entry is not tidiness — folding it in would have quietly moved the assistant
- * from Opus to Sonnet when it came through this file, since the route named its
- * own model before and `DEFAULTS` was written for the other callers.
+ * **`quick`** and **`careful`** are the assistant, and they are what the writer
+ * chooses between in the panel. Quick answers straight away; Careful thinks
+ * first and costs about three times as much a reply, which is why the two are
+ * metered separately and on different windows.
  *
- * **Google is the same model in both tiers, deliberately.** The obvious move is
+ * **Google is the same model in all three, deliberately.** The obvious move is
  * to name a Pro here, and the reason not to is that a wrong model id fails at
  * request time as a 404 on a screen that says the assistant is unavailable —
  * so this stays on the id the six working routes already prove is good, and
- * anyone wanting a bigger one names it themselves. Flash also streams quickly,
- * which suits a panel somebody is watching fill in.
+ * anyone wanting a bigger one names it themselves. It has a product consequence
+ * worth stating: **on a Google deployment Quick and Careful are the same
+ * model.** Which is exactly why the picker and the pricing cards describe the
+ * allowance and the wait, never the model's cleverness — that wording is true
+ * on both providers.
  *
- * `OPENCHAPTER_MODEL` overrides the task tier and `OPENCHAPTER_CHAT_MODEL` the
- * assistant, so either can be tried without a deploy and without the other
- * moving.
+ * `OPENCHAPTER_MODEL`, `OPENCHAPTER_QUICK_MODEL` and `OPENCHAPTER_CAREFUL_MODEL`
+ * override one job each, so any of them can be tried without a deploy and
+ * without the others moving.
  */
-const DEFAULTS: Record<Tier, Record<Provider, string>> = {
+const DEFAULTS: Record<ModelJob, Record<Provider, string>> = {
   task: {
     anthropic: "claude-sonnet-5",
     google: "gemini-3.6-flash",
   },
-  chat: {
+  quick: {
+    anthropic: "claude-haiku-4-5",
+    google: "gemini-3.6-flash",
+  },
+  careful: {
     anthropic: "claude-sonnet-5",
     google: "gemini-3.6-flash",
   },
 };
 
 /** Which job the model is being asked to do — see `DEFAULTS`. */
-export type Tier = "task" | "chat";
+export type ModelJob = "task" | "quick" | "careful";
+
+/**
+ * The two the assistant offers, re-exported from `chat-model.ts`.
+ *
+ * The union itself lives there rather than here because `library-store.ts`
+ * stores the writer's choice and would otherwise have to import this file —
+ * which pulls the Anthropic SDK into the browser bundle for a two-member type.
+ * Same reasoning as `panel-tabs.ts`.
+ *
+ * The `satisfies` is the guard that keeps the two files honest: if `ChatModel`
+ * ever names something `ModelJob` does not, `DEFAULTS[model]` stops resolving
+ * and this line is what says so.
+ */
+export type { ChatModel } from "@/lib/chat-model";
+export { asChatModel } from "@/lib/chat-model";
+
+const _chatModelsAreJobs = ["quick", "careful"] satisfies ModelJob[];
+void _chatModelsAreJobs;
+
+/**
+ * The thinking settings for one assistant model — **and the reason Quick sends
+ * none.**
+ *
+ * `claude-haiku-4-5` is a pre-4.6 model. `output_config: { effort }` is
+ * *rejected* by it, and `{ type: "adaptive" }` is not its thinking mode: pre-4.6
+ * models take `{ type: "enabled", budget_tokens: N }` or nothing at all. These
+ * were two literals written straight into the request, which was right while
+ * the assistant was Sonnet on both sides and would have 400'd on every Quick
+ * reply the moment Haiku arrived — a `ModelError("other")`, a 502, and a panel
+ * saying "The assistant is unavailable" for a reason nothing on screen would
+ * explain.
+ *
+ * **Keyed off the job, not off a parsed model id, and that direction is one-way
+ * safe.** Omitting these fields is legal on every model in the table; sending
+ * them is not. So an `OPENCHAPTER_QUICK_MODEL` pointed at something newer
+ * simply runs it without thinking rather than erroring.
+ *
+ * Omitting them is also the honest description of Quick: it answers straight
+ * away. And it makes Quick cheaper than the arithmetic that sized the plans,
+ * since thinking bills at the output rate.
+ */
+export function chatTuning(model: ChatModel): {
+  thinking?: { type: "adaptive" };
+  output_config?: { effort: "medium" };
+} {
+  // Prose problems are worth thinking about — but only on the model that can.
+  return model === "careful"
+    ? { thinking: { type: "adaptive" }, output_config: { effort: "medium" } }
+    : {};
+}
 
 /** Which provider this deployment can use, or null for none. */
 export function modelProvider(): Provider | null {
@@ -76,12 +133,14 @@ export function modelProvider(): Provider | null {
   return null;
 }
 
-export function modelName(provider: Provider, tier: Tier = "task"): string {
+export function modelName(provider: Provider, job: ModelJob = "task"): string {
   const override =
-    tier === "chat"
-      ? process.env.OPENCHAPTER_CHAT_MODEL
-      : process.env.OPENCHAPTER_MODEL;
-  return override || DEFAULTS[tier][provider];
+    job === "quick"
+      ? process.env.OPENCHAPTER_QUICK_MODEL
+      : job === "careful"
+        ? process.env.OPENCHAPTER_CAREFUL_MODEL
+        : process.env.OPENCHAPTER_MODEL;
+  return override || DEFAULTS[job][provider];
 }
 
 /** What every caller here needs, and nothing else. */
@@ -228,9 +287,21 @@ export interface StreamAsk {
    * time the writer types. Concatenated, the cache breakpoint would sit at the
    * end of the whole thing and the instruction above it could never be varied
    * without invalidating the chapter behind it.
+   *
+   * **Caches are model-scoped**, so switching between Quick and Careful inside
+   * one conversation writes a fresh entry rather than reading the old one.
+   * Worth knowing before anybody turns the picker into an automatic switcher.
    */
   context?: string;
   messages: ChatMessage[];
+  /**
+   * Which of the two the writer asked for.
+   *
+   * **Required, with no default.** A default here would let a caller that
+   * forgot the field spend the scarce Careful allowance without meaning to.
+   * The route defaults instead, and it defaults to the cheap one.
+   */
+  model: ChatModel;
   maxTokens: number;
   /**
    * Aborts the request at the provider.
@@ -265,6 +336,7 @@ async function* streamAnthropic({
   system,
   context,
   messages,
+  model,
   maxTokens,
   signal,
 }: StreamAsk): AsyncGenerator<string> {
@@ -282,13 +354,12 @@ async function* streamAnthropic({
 
   const stream = client.messages.stream(
     {
-      model: modelName("anthropic", "chat"),
+      model: modelName("anthropic", model),
       max_tokens: maxTokens,
       system: blocks,
-      // Adaptive is the only on-mode on Opus 4.8, and it is off unless asked
-      // for. Prose problems are worth thinking about.
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
+      // Both fields together, or neither — see `chatTuning`. Sending them to
+      // Haiku is a 400, so this may not become two literals again.
+      ...chatTuning(model),
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     },
     { signal },
@@ -340,6 +411,7 @@ async function* streamGoogle({
   system,
   context,
   messages,
+  model,
   maxTokens,
   signal,
 }: StreamAsk): AsyncGenerator<string> {
@@ -348,7 +420,7 @@ async function* streamGoogle({
 
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
-      modelName("google", "chat"),
+      modelName("google", model),
     )}:streamGenerateContent?alt=sse`,
     {
       method: "POST",

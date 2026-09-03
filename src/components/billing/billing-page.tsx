@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import type { PaymentTone } from "@/lib/billing/history";
 import { LAUNCH_LIMITS } from "@/lib/launch";
@@ -145,6 +146,11 @@ export function BillingPage({
     );
   }
 
+  /* The plan's own name, read rather than typed. `TIER_NAMES` is the one place
+     these words exist, so a rename cannot leave `/billing` disagreeing with the
+     pricing cards about what somebody bought. */
+  const planName = plan.tier ? TIER_NAMES[plan.tier] : "Free";
+
   const periodLabel = plan.period === "annual" ? "Annual" : "Monthly";
   const renewDate = plan.currentPeriodEnd ? shortDate(plan.currentPeriodEnd) : null;
   const cancelled = plan.status === "cancelled";
@@ -177,7 +183,7 @@ export function BillingPage({
               </span>
               <div>
                 <h2 className="font-sans text-base font-bold text-fg">
-                  {plan.pro ? "Pro plan" : "Free plan"}
+                  {planName} plan
                 </h2>
                 {plan.pro && (
                   <p className="font-sans text-sm text-muted">{periodLabel}</p>
@@ -191,9 +197,8 @@ export function BillingPage({
                 )}
                 {!plan.pro && (
                   <p className="mt-0.5 font-sans text-xs text-muted">
-                    {plural(LAUNCH_LIMITS.freeBooks, "book")},{" "}
-                    {LAUNCH_LIMITS.freeAssistantRepliesPerMonth} assistant
-                    replies/month, every export format
+                    {plural(TIER_LIMITS.free.books ?? 0, "book")}, every
+                    export format, no writing assistant
                   </p>
                 )}
               </div>
@@ -239,58 +244,6 @@ export function BillingPage({
                 <span className="font-sans text-xs text-muted">
                   Update from your Paddle receipt email
                 </span>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* ── Usage ────────────────────────────────────────────────── */}
-        {plan.assistant && (
-          <section className="mt-6">
-            <h2 className="font-sans text-base font-bold text-fg">Usage</h2>
-            <p className="mt-1 font-sans text-sm text-muted">
-              Assistant replies used this month.
-            </p>
-            <div className="mt-3 rounded-2xl border border-line bg-panel p-6">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="font-display text-3xl font-bold text-fg">
-                    {plan.assistant.used}
-                    {plan.assistant.limit !== null && (
-                      <span className="ml-1 text-base font-medium text-muted">
-                        / {plan.assistant.limit}
-                      </span>
-                    )}
-                  </p>
-                  <p className="mt-1 font-sans text-xs text-muted">
-                    {plan.assistant.remaining !== null
-                      ? `${plan.assistant.remaining} remaining`
-                      : "Unlimited"}
-                    {plan.assistant.resetAt &&
-                      ` · Resets ${new Date(plan.assistant.resetAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`}
-                  </p>
-                </div>
-                {!plan.pro && (
-                  <Link
-                    href="/upgrade"
-                    className="shrink-0 rounded-lg bg-accent px-4 py-2
-                               font-sans text-sm font-semibold text-accent-ink
-                               outline-none transition-opacity hover:opacity-90
-                               focus-visible:ring-2 focus-visible:ring-accent/60"
-                  >
-                    Get more
-                  </Link>
-                )}
-              </div>
-              {plan.assistant.limit !== null && plan.assistant.limit > 0 && (
-                <div className="mt-4 h-2 overflow-hidden rounded-full bg-raised">
-                  <div
-                    className="h-full rounded-full bg-accent transition-all"
-                    style={{
-                      width: `${Math.min(100, (plan.assistant.used / plan.assistant.limit) * 100)}%`,
-                    }}
-                  />
-                </div>
               )}
             </div>
           </section>
@@ -412,7 +365,8 @@ export function BillingPage({
                   Subscription cancelled
                 </p>
                 <p className="mt-0.5 font-sans text-xs text-muted">
-                  Pro access continues until {renewDate ?? "the end of the paid period"}.
+                  {planName} access continues until{" "}
+                  {renewDate ?? "the end of the paid period"}.
                 </p>
               </div>
               <button
@@ -479,8 +433,8 @@ export function BillingPage({
 
             <h2 className="font-display text-2xl font-bold text-fg">Cancel plan</h2>
             <p className="mt-2 font-sans text-sm text-muted">
-              Cancel to stop recurring billing. You keep OpenChapter Pro until{" "}
-              {renewDate ?? "the end of your billing period"}.
+              Cancel to stop recurring billing. You keep OpenChapter{" "}
+              {planName} until {renewDate ?? "the end of your billing period"}.
             </p>
 
             <div className="mt-6">
@@ -506,7 +460,7 @@ export function BillingPage({
                 onClick={() => setCancelModalOpen(false)}
                 className="rounded-lg bg-raised px-4 py-2 font-sans text-sm font-medium text-fg transition-colors hover:bg-line"
               >
-                Keep your Pro plan
+                Keep your {planName} plan
               </button>
               <button
                 type="button"
@@ -557,3 +511,4 @@ function PaddleIcon({ className }: { className?: string }) {
     </svg>
   );
 }
+

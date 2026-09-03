@@ -1,4 +1,5 @@
 import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { gateway, generateSpeech } from "ai";
 import { MAX_SPEECH_CHARS } from "@/lib/export/narrate";
 import { requirePro } from "@/lib/billing/server";
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   // stops it, which is the behaviour you want from a metered call.
   const denied = await requirePro({
     signIn: "Sign in to export an audiobook.",
-    upgrade: "Audiobooks are part of Pro. Upgrade to switch them on.",
+    upgrade: `Audiobooks are part of ${TIER_NAMES.writer}. Upgrade to switch them on.`,
   });
   if (denied) return denied;
 

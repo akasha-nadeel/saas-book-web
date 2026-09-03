@@ -1,4 +1,5 @@
 import { hiddenLaunchApiResponse, launchFeatureEnabled } from "@/lib/launch-server";
+import { TIER_NAMES } from "@/lib/billing/tiers";
 import { gateway, transcribe } from "ai";
 import { transcriptToProse } from "@/lib/import/transcript";
 import { requirePro } from "@/lib/billing/server";
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   // them everywhere else.
   const denied = await requirePro({
     signIn: "Sign in to import an audiobook.",
-    upgrade: "Audiobooks are part of Pro. Upgrade to switch them on.",
+    upgrade: `Audiobooks are part of ${TIER_NAMES.writer}. Upgrade to switch them on.`,
   });
   if (denied) return denied;
 

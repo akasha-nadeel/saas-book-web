@@ -1,10 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { modelName, modelProvider, splitSse, textFromGemini } from "./ai";
+import {
+  asChatModel,
+  chatTuning,
+  modelName,
+  modelProvider,
+  splitSse,
+  textFromGemini,
+} from "./ai";
 
 const KEYS = [
   "ANTHROPIC_API_KEY",
   "GOOGLE_GENERATIVE_AI_API_KEY",
   "OPENCHAPTER_MODEL",
+  "OPENCHAPTER_QUICK_MODEL",
+  "OPENCHAPTER_CAREFUL_MODEL",
 ] as const;
 
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
@@ -56,6 +65,98 @@ describe("modelName", () => {
     only({ OPENCHAPTER_MODEL: "something-else" });
     expect(modelName("google")).toBe("something-else");
     expect(modelName("anthropic")).toBe("something-else");
+  });
+
+  /**
+   * **Quick is a cheaper model, not the same one asked politely.** If these two
+   * ever return the same id on Anthropic the plans stop meaning anything: the
+   * whole difference between Writer and Studio is how much of the dearer one
+   * you get, and the meters would be counting one model under two names.
+   */
+  it("asks Anthropic for a different model per assistant job", () => {
+    only({});
+    expect(modelName("anthropic", "quick")).toBe("claude-haiku-4-5");
+    expect(modelName("anthropic", "careful")).toBe("claude-sonnet-5");
+    expect(modelName("anthropic", "quick")).not.toBe(
+      modelName("anthropic", "careful"),
+    );
+  });
+
+  it("overrides one assistant job without moving the other", () => {
+    only({ OPENCHAPTER_QUICK_MODEL: "mine" });
+    expect(modelName("anthropic", "quick")).toBe("mine");
+    expect(modelName("anthropic", "careful")).toBe("claude-sonnet-5");
+    expect(modelName("anthropic", "task")).toBe("claude-sonnet-5");
+
+    only({ OPENCHAPTER_CAREFUL_MODEL: "yours" });
+    expect(modelName("anthropic", "careful")).toBe("yours");
+    expect(modelName("anthropic", "quick")).toBe("claude-haiku-4-5");
+  });
+});
+
+describe("asChatModel", () => {
+  it("narrows the two the assistant offers", () => {
+    expect(asChatModel("quick")).toBe("quick");
+    expect(asChatModel("careful")).toBe("careful");
+  });
+
+  it("refuses everything else, including a model id", () => {
+    for (const junk of [
+      "task",
+      "haiku",
+      "claude-haiku-4-5",
+      "",
+      "Quick",
+      null,
+      undefined,
+      1,
+      {},
+    ]) {
+      expect(asChatModel(junk)).toBeNull();
+    }
+  });
+});
+
+/**
+ * **The assertion standing between Haiku and a 502 nobody can explain.**
+ *
+ * `claude-haiku-4-5` is a pre-4.6 model: `output_config: { effort }` is rejected
+ * by it and `{ type: "adaptive" }` is not its thinking mode. Both fields used to
+ * be written straight into the request, which was correct while the assistant
+ * was Sonnet on both sides — and would 400 on every Quick reply now, surfacing
+ * as `ModelError("other")`, a 502, and a panel saying "The assistant is
+ * unavailable" with nothing on screen to explain it.
+ *
+ * Nothing else in the tree would notice these fields being made unconditional
+ * again. There is no test of `streamAnthropic` — it needs a live key — so this
+ * is the only guard.
+ */
+describe("chatTuning", () => {
+  it("sends Quick neither thinking nor effort", () => {
+    const tuning = chatTuning("quick");
+    expect(tuning.thinking).toBeUndefined();
+    expect(tuning.output_config).toBeUndefined();
+    // Not merely undefined — absent, because the SDK reads the keys.
+    expect(Object.keys(tuning)).toEqual([]);
+  });
+
+  it("keeps Careful thinking, as the assistant always has", () => {
+    expect(chatTuning("careful")).toEqual({
+      thinking: { type: "adaptive" },
+      output_config: { effort: "medium" },
+    });
+  });
+
+  /* The pair travels together: adaptive thinking with no effort is a different
+     request from the one this was tuned against, and effort with no thinking is
+     rejected outright. */
+  it("sends both fields or neither", () => {
+    for (const model of ["quick", "careful"] as const) {
+      const tuning = chatTuning(model);
+      expect(tuning.thinking === undefined).toBe(
+        tuning.output_config === undefined,
+      );
+    }
   });
 });
 

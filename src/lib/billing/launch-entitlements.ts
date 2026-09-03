@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LAUNCH_LIMITS, exportAllowed } from "@/lib/launch";
+import { TIER_LIMITS, type PlanTier } from "@/lib/billing/tiers";
+import type { ChatModel } from "@/lib/ai";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { billingConfigured } from "./provider";
 import { subscriptionFor } from "./server";
-import { isPro, type Subscription } from "./subscription";
+import { isPro, planTierOf, type Subscription } from "./subscription";
 
 export interface AssistantUsage {
   used: number;
@@ -15,16 +17,54 @@ export interface AssistantUsage {
 
 interface AssistantClaimRow {
   allowed?: unknown;
-  pro?: unknown;
+  tier?: unknown;
   used?: unknown;
   limit_count?: unknown;
   remaining?: unknown;
   reset_at?: unknown;
 }
 
-const ASSISTANT_USAGE_KEY = "assistant_reply";
+/**
+ * The two meters, and the row each one counts in `ai_usage`.
+ *
+ * Separate keys rather than one with a kind column, because the primary key is
+ * `(owner, usage_key, period_start)` and the two windows differ: Quick's
+ * `period_start` is a day and Careful's is a month. One key would collide the
+ * moment both were used in the same hour.
+ */
+const USAGE_KEY: Record<ChatModel, string> = {
+  quick: "assistant_quick",
+  careful: "assistant_careful",
+};
 
-function monthWindow(now = new Date()): { start: string; reset: string } {
+/** What each meter is capped at, and how far back its window reaches. */
+function allowanceOf(tier: PlanTier, model: ChatModel): number {
+  return model === "quick"
+    ? TIER_LIMITS[tier].quickPerDay
+    : TIER_LIMITS[tier].carefulPerMonth;
+}
+
+/**
+ * The window one meter counts in, matching `claim_assistant_reply` exactly.
+ *
+ * **UTC, which is not the writer's midnight.** A daily reset at 00:00 UTC is
+ * 05:30 in Colombo and 7pm the previous day in Los Angeles, so `reset` is
+ * returned as an instant and every screen renders it in local time rather than
+ * calling it "tomorrow".
+ */
+function windowFor(
+  model: ChatModel,
+  now = new Date(),
+): { start: string; reset: string } {
+  if (model === "quick") {
+    const start = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+    );
+    const reset = new Date(start.getTime());
+    reset.setUTCDate(reset.getUTCDate() + 1);
+    return { start: start.toISOString(), reset: reset.toISOString() };
+  }
+
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   return { start: start.toISOString(), reset: reset.toISOString() };
@@ -49,23 +89,26 @@ function usageFromClaim(row: AssistantClaimRow): AssistantUsage {
   return { used, limit, remaining, resetAt };
 }
 
-export async function assistantUsageFor(
+/** Both meters, as `/billing` and the assistant panel show them. */
+export interface AssistantMeters {
+  quick: AssistantUsage;
+  careful: AssistantUsage;
+}
+
+async function meterFor(
   supabase: SupabaseClient,
   owner: string,
-  subscription: Subscription | null,
+  tier: PlanTier,
+  model: ChatModel,
 ): Promise<AssistantUsage> {
-  const pro = isPro(subscription);
-  if (!billingConfigured()) {
-    return { used: 0, limit: null, remaining: null, resetAt: null };
-  }
+  const { start, reset } = windowFor(model);
+  const limit = allowanceOf(tier, model);
 
-  const { start, reset } = monthWindow();
-  const limit = pro ? 60 : 5;
   const { data } = await supabase
     .from("ai_usage")
     .select("used")
     .eq("owner", owner)
-    .eq("usage_key", ASSISTANT_USAGE_KEY)
+    .eq("usage_key", USAGE_KEY[model])
     .gte("period_start", start)
     .lt("period_start", reset)
     .maybeSingle();
@@ -75,13 +118,43 @@ export async function assistantUsageFor(
       ? (data as { used: number }).used
       : 0;
 
-  return {
-    used,
-    limit,
-    remaining: Math.max(limit - used, 0),
-    resetAt: reset,
-  };
+  return { used, limit, remaining: Math.max(limit - used, 0), resetAt: reset };
 }
+
+/**
+ * What both meters stand at.
+ *
+ * **The limits are read from `TIER_LIMITS`, never typed here.** They used to be
+ * `pro ? 60 : 5` written into this function, which made three copies of two
+ * numbers — this file, `launch.ts`, and the SQL. Two is the floor, because SQL
+ * cannot import TypeScript; three was a drift waiting to happen.
+ */
+export async function assistantUsageFor(
+  supabase: SupabaseClient,
+  owner: string,
+  subscription: Subscription | null,
+): Promise<AssistantMeters> {
+  const unmetered: AssistantUsage = {
+    used: 0,
+    limit: null,
+    remaining: null,
+    resetAt: null,
+  };
+
+  if (!billingConfigured()) {
+    return { quick: unmetered, careful: unmetered };
+  }
+
+  const tier = planTierOf(subscription);
+  const [quick, careful] = await Promise.all([
+    meterFor(supabase, owner, tier, "quick"),
+    meterFor(supabase, owner, tier, "careful"),
+  ]);
+
+  return { quick, careful };
+}
+
+
 
 export type AssistantClaim =
   | {
@@ -91,7 +164,9 @@ export type AssistantClaim =
     }
   | { ok: false; response: Response };
 
-export async function claimAssistantReplyAllowance(): Promise<AssistantClaim> {
+export async function claimAssistantReplyAllowance(
+  model: ChatModel,
+): Promise<AssistantClaim> {
   if (!isSupabaseConfigured() || !billingConfigured()) {
     return {
       ok: true,
@@ -115,7 +190,9 @@ export async function claimAssistantReplyAllowance(): Promise<AssistantClaim> {
     };
   }
 
-  const { data, error } = await supabase.rpc("claim_assistant_reply");
+  const { data, error } = await supabase.rpc("claim_assistant_reply", {
+    p_kind: model,
+  });
   if (error) {
     console.error("[assistant-usage] claim failed", error);
     return {
@@ -140,20 +217,27 @@ export async function claimAssistantReplyAllowance(): Promise<AssistantClaim> {
 
   const usage = usageFromClaim(row);
   const allowed = row.allowed === true;
-  const pro = row.pro === true;
 
+  /**
+   * **429 always means "out of this allowance", never "wrong plan".**
+   *
+   * A plan with no assistant is refused by the route before it reaches this
+   * claim, so anything arriving here is on a plan that has the assistant and
+   * has simply spent one of its two meters. That makes the pair of codes clean
+   * for the panel to branch on: 402 is "your plan does not include this", 429 is
+   * "come back when it refills".
+   */
   if (!allowed) {
+    const window = model === "quick" ? "today" : "this month";
     return {
       ok: false,
       response: Response.json(
         {
-          error: pro
-            ? "You've used your Pro assistant allowance for this month."
-            : "You've used your free assistant replies for this month. Upgrade to Pro for more assistant help.",
-          upgrade: !pro,
+          error: `You've used your ${model} assistant replies for ${window}.`,
+          kind: model,
           usage,
         },
-        { status: pro ? 429 : 402 },
+        { status: 429 },
       ),
     };
   }
@@ -162,9 +246,13 @@ export async function claimAssistantReplyAllowance(): Promise<AssistantClaim> {
     ok: true,
     usage,
     refund: async () => {
-      await supabase.rpc("refund_assistant_reply").then(({ error: refundError }) => {
-        if (refundError) console.error("[assistant-usage] refund failed", refundError);
-      });
+      await supabase
+        .rpc("refund_assistant_reply", { p_kind: model })
+        .then(({ error: refundError }) => {
+          if (refundError) {
+            console.error("[assistant-usage] refund failed", refundError);
+          }
+        });
     },
   };
 }

@@ -2,7 +2,7 @@ import { Plans } from "@/components/upgrade/plans";
 import { paddleClientConfig } from "@/lib/billing/paddle";
 import { activeProvider } from "@/lib/billing/provider";
 import { currentSubscription } from "@/lib/billing/server";
-import { isPro } from "@/lib/billing/subscription";
+import { planTierOf } from "@/lib/billing/subscription";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 /**
@@ -34,18 +34,44 @@ export default async function UpgradePage(props: PageProps<"/upgrade">) {
   // button points at says so itself, so there is nothing to branch on here.
   if (!isSupabaseConfigured()) {
     return (
-      <Plans signedIn={false} provider={provider} paddle={paddle} pro={false} />
+      <Plans
+        signedIn={false}
+        provider={provider}
+        paddle={paddle}
+        current={null}
+      />
     );
   }
 
   const { userId, subscription } = await currentSubscription();
+
+  /* **The whole subscription, not `pro: boolean`.**
+     Every card has to answer for itself now — the plan they are on says "Your
+     plan", the ones above say "Upgrade", the ones below say "Switch". A boolean
+     could only say "already paying", which is what put "Keep writing" on the
+     Studio card in front of a Draft customer and made the dearest plan look
+     unavailable to the person most likely to buy it.
+
+     The subscription's *own* provider travels with it, not the deployment's:
+     Paddle can swap a price on a live subscription and PayHere cannot, and a
+     writer who subscribed through PayHere is still a PayHere subscriber after
+     new checkouts have moved to Paddle. */
+  const tier = planTierOf(subscription);
 
   return (
     <Plans
       signedIn={Boolean(userId)}
       provider={provider}
       paddle={paddle}
-      pro={isPro(subscription)}
+      current={
+        tier === "free" || !subscription
+          ? null
+          : {
+              tier,
+              period: subscription.period,
+              provider: subscription.provider,
+            }
+      }
       cancelled={cancelled === "1"}
     />
   );

@@ -76,13 +76,13 @@ export default function PrivacyPage() {
               another one.
             </>,
             <>
-              <Term>Your subscription</Term> — whether you are on Pro, the
+              <Term>Your subscription</Term> — which plan you are on, the
               billing cycle, payment provider identifiers and the paid-up
               period end. We do not receive or store card numbers.
             </>,
             <>
-              <Term>Usage counters</Term> — monthly assistant usage so Free and
-              Pro limits can be enforced.
+              <Term>Usage counters</Term> — how many assistant replies you have
+              used, daily and monthly, so each plan&rsquo;s allowance can be enforced.
             </>,
             <>
               <Term>Feedback you send</Term> — the message, topic and account it

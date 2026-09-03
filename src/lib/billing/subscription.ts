@@ -1,3 +1,4 @@
+import type { PaidTier, PlanTier } from "./tiers";
 import type { Period } from "./plans";
 import type { Provider } from "./provider";
 
@@ -54,6 +55,20 @@ export function paymentStatusFromCode(code: number): PaymentStatus {
  */
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
 
+/**
+ * Which plan a subscription entitles its owner to *right now*.
+ *
+ * `isPro`'s date arithmetic decides whether the row still counts; the row's own
+ * `tier` decides what it counts *as*. One rule, one place — a second date
+ * comparison here would be a second answer to "is this still paid for".
+ */
+export function planTierOf(
+  subscription: Subscription | null,
+  now: Date = new Date(),
+): PlanTier {
+  return isPro(subscription, now) ? subscription!.tier : "free";
+}
+
 export interface Subscription {
   /**
    * Which gateway this one was bought through, and it is a fact about the row
@@ -63,6 +78,16 @@ export interface Subscription {
    * their card goes on being charged.
    */
   provider: Provider;
+  /**
+   * Which of the three paid plans this row bought.
+   *
+   * Narrowed on the way in, so nothing downstream has to wonder what a `plan`
+   * column might hold. A row whose plan does not narrow is refused entirely by
+   * `toSubscription` — the same treatment an unknown status or period already
+   * gets, and for the same reason: a subscription that cannot be described is
+   * not one to act on.
+   */
+  tier: PaidTier;
   status: SubscriptionStatus;
   period: Period;
   /** The end of the cycle that has been paid for. */

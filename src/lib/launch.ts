@@ -1,17 +1,12 @@
+import { chatAllowed, type PlanTier } from "@/lib/billing/tiers";
+
 /**
  * Launch-MVP product decisions that must stay consistent across marketing,
  * pricing, entitlement checks, and upgrade prompts.
  */
 
-export const LAUNCH_PRICING = {
-  monthlyUsd: 5.98,
-  annualUsd: 53.99,
-} as const;
-
 export const LAUNCH_LIMITS = {
   freeBooks: 5,
-  freeAssistantRepliesPerMonth: 5,
-  proAssistantRepliesPerMonth: 60,
   /**
    * **Every format, on both plans, and the two arrays being identical is the
    * point rather than an oversight.**
@@ -45,24 +40,9 @@ export const LAUNCH_LIMITS = {
    * for anything sold: no Pro row whose value depends on a browser gate being
    * unbreakable.
    */
-  freeAssistantWrite: false,
-  proAssistantWrite: true,
 } as const;
 
 export type LaunchExportFormat = (typeof LAUNCH_LIMITS.proExports)[number];
-
-export function assistantReplyLimit(pro: boolean): number {
-  return pro
-    ? LAUNCH_LIMITS.proAssistantRepliesPerMonth
-    : LAUNCH_LIMITS.freeAssistantRepliesPerMonth;
-}
-
-/** Whether this plan may let the assistant offer to write into the chapter. */
-export function assistantWriteAllowed(pro: boolean): boolean {
-  return pro
-    ? LAUNCH_LIMITS.proAssistantWrite
-    : LAUNCH_LIMITS.freeAssistantWrite;
-}
 
 export function exportAllowed(format: string, pro: boolean): boolean {
   const allowed = pro ? LAUNCH_LIMITS.proExports : LAUNCH_LIMITS.freeExports;
@@ -91,6 +71,32 @@ export function onFreePlan(plan: {
   pro: boolean;
 }): boolean {
   return !plan.loading && plan.billing && !plan.pro;
+}
+
+/**
+ * Whether the reader is *known* to be on a plan without the writing assistant.
+ *
+ * **The sibling of `onFreePlan`, and the reason it needs one is Draft.** That
+ * plan is paid — so `pro` is true and `onFreePlan` answers false — and carries
+ * no assistant at all. Every AI gate written against `pro` therefore unlocks
+ * for a Draft writer, silently, with nothing on screen to say it should not
+ * have. A paid feature whose gate is visibly decorative teaches a reader that
+ * the rest are too.
+ *
+ * So: `onFreePlan` is the right question for books, the trash and the tools;
+ * this is the right question for the assistant, and the two are not
+ * interchangeable from the moment a paid tier exists that does not include it.
+ *
+ * The same three parts as `onFreePlan`, for the same reasons — and `tier: null`
+ * is the loading state, which must never refuse.
+ */
+export function aiChatClosed(plan: {
+  loading: boolean;
+  billing: boolean;
+  tier: PlanTier | null;
+}): boolean {
+  if (plan.loading || !plan.billing || plan.tier === null) return false;
+  return !chatAllowed(plan.tier);
 }
 
 /**

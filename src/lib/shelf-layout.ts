@@ -39,10 +39,25 @@ export const DEFAULT_SHELF_LAYOUT: ShelfLayout = "covers";
  * `list` is not a grid at all: one row per book, so the rows set their own
  * height rather than being squared into a cell.
  */
+/**
+ * **Container queries, not viewport ones, and that is the whole of the change.**
+ *
+ * These read `sm:` / `lg:` / `2xl:` — the *window* — so collapsing the sidebar
+ * did nothing to them: the window had not moved. The column beside the rail is
+ * what actually changes width, and `@`-prefixed variants ask that instead. The
+ * shelf's grid wrapper carries the `@container` they measure against.
+ *
+ * **The counts themselves are unchanged**, and Covers deliberately does not
+ * gain a column here. Collapsing the rail moves the *results* grid to six, and
+ * the temptation is to move this one with it — but the reason Covers stops at
+ * four is about the jacket, not about the window: past four the title under it
+ * wraps, which is the job `small` already does. `shelf-layout.test.ts` pins it,
+ * and it caught exactly this edit being made.
+ */
 export function gridClassFor(layout: ShelfLayout): string {
   switch (layout) {
     case "large":
-      return "grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3";
+      return "grid grid-cols-1 gap-5 @sm:grid-cols-2 @lg:grid-cols-3";
     case "covers":
       /* **Four across at the widest, not five.** It ran to `2xl:grid-cols-5`,
          and on a wide monitor that is a jacket narrow enough that the title
@@ -50,13 +65,13 @@ export function gridClassFor(layout: ShelfLayout): string {
          mode, so it is the one that has to be the comfortable answer rather
          than the dense one; anybody who wants more books on the screen has
          two modes below it that say so. */
-      return "grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4";
+      return "grid grid-cols-2 gap-4 @sm:grid-cols-3 @lg:grid-cols-4";
     case "small":
       /* Three across on a phone rather than six: past that a jacket is 90px
          wide and the title under it wraps to four lines, which is denser
          without being more readable. The point of this mode is fitting a big
          shelf on a big screen. */
-      return "grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6 2xl:grid-cols-8";
+      return "grid grid-cols-3 gap-3 @sm:grid-cols-4 @lg:grid-cols-6 @6xl:grid-cols-8";
     case "list":
       return "flex flex-col gap-2";
   }
@@ -95,7 +110,7 @@ export function resultsGridClass(layout: ShelfLayout): string {
          width these screens actually run at, and a wall of comps is read by
          sweeping it rather than by reading each entry. `@4xl` is 56rem of
          *container*, not window — see the note above. */
-      return "grid grid-cols-2 gap-x-4 gap-y-6 @sm:grid-cols-3 @lg:grid-cols-4 @4xl:grid-cols-5";
+      return "grid grid-cols-2 gap-x-4 gap-y-6 @sm:grid-cols-3 @lg:grid-cols-4 @4xl:grid-cols-5 @6xl:grid-cols-6";
     case "small":
       /* Three on a phone rather than six, exactly as the shelf argues: past
          that a jacket is 90px wide and the title under it wraps to four lines,

@@ -992,7 +992,11 @@ function NewBookFields({ mounted }: { mounted: boolean }) {
       </div>
 
       {showUpgrade && (
-        <UpgradeDialog reason="books" onClose={() => setShowUpgrade(false)} />
+        <UpgradeDialog
+          reason="books"
+          tier={plan.tier ?? "free"}
+          onClose={() => setShowUpgrade(false)}
+        />
       )}
     </main>
   );
