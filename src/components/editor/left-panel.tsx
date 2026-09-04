@@ -179,6 +179,24 @@ export function LeftPanel({
    */
   const panelRef = useRef<HTMLElement>(null);
   const dismissRef = useRef<HTMLButtonElement>(null);
+
+  /**
+   * Whether the panel is a modal over the page rather than a neighbour of it.
+   *
+   * Read into state rather than off the DOM at render, because it decides
+   * *what is rendered* — and it changes on a resize, which React has to be
+   * told about. The same classifier every other piece of editor chrome reads,
+   * through the same event, so the panel and the page can never disagree
+   * about which mode they are in.
+   */
+  const [overlay, setOverlay] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setOverlay(root.dataset.editorLayout === "continuous");
+    read();
+    root.addEventListener(EDITOR_LAYOUT_EVENT, read);
+    return () => root.removeEventListener(EDITOR_LAYOUT_EVENT, read);
+  }, []);
   const close = useRef(onClose);
   useEffect(() => {
     close.current = onClose;
@@ -297,7 +315,13 @@ export function LeftPanel({
         // `pointer-events-none` on the way out: it is still on screen for the
         // length of the slide, and a press that lands on a panel already
         // leaving is a press on something the writer has dismissed.
-        className={`oc-editor-panel panel-chrome fixed top-0 bottom-0 left-(--rail-width) z-40
+        // **It starts below the application bar, not at the top of the
+        // window.** `top-0` was right while the editor had no bar: it does
+        // now, and a full-height panel laid over it took the File menu and
+        // half the way home with it. `--oc-editor-bar-height` is 0 wherever
+        // there is no bar — a phone, where this is a full-screen overlay and
+        // the rule below overrides the box outright.
+        className={`oc-editor-panel panel-chrome fixed top-(--oc-editor-bar-height) bottom-0 left-(--rail-width) z-40
                     flex w-(--sidebar-width) max-w-[80vw] flex-col border-r
                     border-line shadow-2xl md:max-w-none ${
                       open
@@ -412,8 +436,13 @@ export function LeftPanel({
           <Tooltip label="Collapse" shortcut="Ctrl /" side="right" nowrap />
         </button>
 
-        {tab !== "chapters" && (
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
+        {/* **One header, and the chapters tab has one too now.** It was the
+            one tab drawn without it, because the navigator used to be a panel
+            in its own right that happened to be mountable in here. It is an
+            ordinary tab of this panel since 2026-09-05, and a panel whose top
+            edge moves depending on which tab is open is the thing this header
+            was written to stop. */}
+        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
             {/* The name never shrinks and the scope does. At 15rem a long chapter
                 title would otherwise eat the word telling you which panel you are
                 in, which is the half that has to survive. `title` carries the
@@ -443,6 +472,23 @@ export function LeftPanel({
                 </span>
               )}
             </h2>
+            {/* **One control, and it moves.** The handle straddling the
+                panel's outer edge is the way to shut it, so a second button up
+                here is two things to read and a question about whether they
+                differ — except where the handle is not reachable, and then
+                this is the only way out.
+
+                **It follows the layout, not a width breakpoint**, and the
+                difference is a real window rather than a pedantic one. In
+                continuous layout the panel is `width: 100vw`, which puts the
+                handle's `-right-3` off the screen, and the outside press
+                cannot fire either because everything is inside the panel. That
+                layout is reached by *height* as well as width — a short
+                landscape window is continuous at 900px wide — so `md:hidden`
+                left both controls gone and the writer shut in the panel. The
+                classifier the panel itself is laid out by is the one that
+                decides this. */}
+            {overlay && (
             <button
               ref={dismissRef}
               type="button"
@@ -467,12 +513,26 @@ export function LeftPanel({
                 {icons.panel}
               </svg>
             </button>
-          </header>
-        )}
+            )}
+        </header>
 
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
           {tab === "chapters" && (
-            <ChapterSidebar bookId={bookId} onNavigate={onClose} />
+            /* **Choosing a page does not close the panel here.** It did, and
+               it should: on a phone this fills the screen, so opening a
+               chapter from it has to get out of the way of the chapter. Beside
+               the page it is a neighbour, and a contents list that shuts
+               itself the moment you use it is a contents list you reopen after
+               every chapter — which is exactly the complaint. Same rule as the
+               outside press and Escape, both already scoped this way. */
+            <ChapterSidebar
+              bookId={bookId}
+              /* Not while the panel covers the page: the rules would run out
+                 to a sheet nobody can see, which is the diagram of nothing
+                 this flag exists to prevent. */
+              connectToPage={!overlay}
+              onNavigate={overlay ? onClose : undefined}
+            />
           )}
           {tab === "search" && (
             <SearchPanel

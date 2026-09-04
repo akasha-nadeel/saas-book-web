@@ -3228,7 +3228,20 @@ export type Theme = "system" | "light" | "dark";
 const THEMES: readonly Theme[] = ["system", "light", "dark"];
 
 export interface Prefs {
-  /** Dim every paragraph but the one being written. */
+  /**
+   * The editor with its chrome put away: no bar, no rail, no panel.
+   *
+   * **This key used to mean “dim every paragraph but the one being written”**
+   * and meant it to nobody — the setting was written by nothing and read by
+   * nothing, an orphan left behind when the control that set it went with the
+   * right-hand rail. It carries the mode a writer actually asked for now.
+   *
+   * Stored rather than held in the component, for two reasons. Moving between
+   * chapters remounts the editor, and a mode that fell out every time you
+   * turned a page would not be one; and a writer who chose quiet should get
+   * quiet again tomorrow. It cannot trap anybody: the one button that leaves
+   * it is on screen the whole time it is on.
+   */
   focusMode: boolean;
   /**
    * Show the paragraph marks, as Word's ¶ button does.
@@ -3255,8 +3268,6 @@ export interface Prefs {
   zoom: number;
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
-  /** Whether the manuscript chapter section is expanded beside the editor. */
-  chapterSectionOpen: boolean;
   /** Which sub-tab the find & replace panel is currently showing ("find" | "replace"). */
   searchTab: "find" | "replace";
   /**
@@ -3417,7 +3428,6 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   // Navigation is open by default; the assistant is opt-in, since it is the
   // only part of the app that talks to a server.
   leftPanel: true,
-  chapterSectionOpen: false,
   searchTab: "find",
   // Off: the assistant offers text and puts none of it in until asked to.
   assistantWrite: false,
@@ -3502,7 +3512,6 @@ function parsePrefs(raw: string | null): Prefs {
       ),
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
-      chapterSectionOpen: parsed.chapterSectionOpen === true,
       searchTab: parsed.searchTab === "replace" ? "replace" : "find",
       assistantWrite: parsed.assistantWrite === true,
       // Narrowed like `panelTab`: a value written by an older version — or by

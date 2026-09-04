@@ -41,7 +41,15 @@ export function ImportChapterButton({
   presentation = "rail",
 }: {
   book: Book;
-  presentation?: "rail" | "list";
+  /**
+   * Which of the three shapes this button takes.
+   *
+   * `rail` is a rail button, `list` a row in the phone’s More sheet, and
+   * `bar` the outlined twin of Export in the editor’s top bar. The bar wore
+   * `list` for a day and looked like a sheet row that had wandered onto a
+   * toolbar: an icon, a label and a trailing arrow beside a filled button.
+   */
+  presentation?: "rail" | "list" | "bar";
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -102,7 +110,26 @@ export function ImportChapterButton({
 
   return (
     <>
-      {presentation === "rail" ? (
+      {presentation === "bar" ? (
+        /* **Export’s own shape, outlined rather than filled.** They are the two
+           ends of the same errand and belong in one visual family; which of
+           them is filled says which is the one this product is finally for.
+           `border-fg` and not a literal white — the ink token is near-white at
+           night and near-black by day, so one class is the outline that was
+           asked for in the dark theme and still legible in daylight. */
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={importing}
+          className="rounded-lg border border-fg/60 px-3 py-1.5 font-sans
+                     text-sm font-semibold text-fg outline-none
+                     transition-colors hover:border-fg hover:bg-raised
+                     focus-visible:ring-2 focus-visible:ring-accent/60
+                     disabled:opacity-45"
+        >
+          {importing ? "Reading file…" : "Import"}
+        </button>
+      ) : presentation === "rail" ? (
         <RailButton
           label={importing ? "Reading file…" : "Import a file"}
           side="right"

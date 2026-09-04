@@ -4,9 +4,16 @@
  * Vendored from itshover (https://itshover.com, Apache-2.0) rather than pulled
  * with `shadcn add`: this repo has no `components.json`, and `shadcn init`
  * would rewrite `globals.css` with shadcn's own token set over the `@theme`
- * block the whole app is coloured from. The file is otherwise unedited beyond
- * this note and the directive above — the components use hooks and carry none
- * of their own.
+ * block the whole app is coloured from. The components use hooks and carry no
+ * directive of their own, so one is added above.
+ *
+ * **One behaviour is edited: every animation callback returns early on an empty
+ * scope.** Motion fires a hover-end on an element that is unmounting, and
+ * `animate` against a scope whose ref has already been cleared throws
+ * `Cannot read properties of null (reading 'querySelectorAll')`. Hovering a rail
+ * icon and then hiding the rail — entering focus mode, or leaving the editor —
+ * is all it takes. Nothing here can catch it from outside, since the throw is
+ * inside motion's own callback.
  */
 import { forwardRef, useImperativeHandle, useCallback } from "react";
 import type { AnimatedIconHandle, AnimatedIconProps } from "./types";
@@ -20,6 +27,10 @@ const HistoryCircleIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
     const [scope, animate] = useAnimate();
 
     const start = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       // rewind circle slightly
       animate(
         ".history-circle",
@@ -44,9 +55,13 @@ const HistoryCircleIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
           ease: "easeOut",
         },
       );
-    }, [animate]);
+    }, [animate, scope]);
 
     const stop = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       animate(
         ".history-circle, .clock-hand",
         {
@@ -58,7 +73,7 @@ const HistoryCircleIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
           ease: "easeInOut",
         },
       );
-    }, [animate]);
+    }, [animate, scope]);
 
     useImperativeHandle(ref, () => ({
       startAnimation: start,

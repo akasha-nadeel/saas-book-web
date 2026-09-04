@@ -19,7 +19,11 @@ import {
 } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
-import { ToolRail, useEditorState } from "@/components/editor/editor-toolbar";
+import { useEditorState } from "@/components/editor/editor-toolbar";
+import {
+  EditorTopBar,
+  FileMenuItem,
+} from "@/components/editor/editor-top-bar";
 import {
   FormatPill,
   useFormatPillVisible,
@@ -34,14 +38,12 @@ import {
 import { useStoredZoom } from "@/lib/editor/use-stored-zoom";
 import { suspendPagination } from "@/lib/editor/pagination";
 import {
-  Rail,
-  RailButton,
-  RailDivider,
-} from "@/components/editor/icon-rail";
-import {
   WorkspaceRail,
   selectPanel,
 } from "@/components/editor/workspace-rail";
+import { ToolsPopover } from "@/components/editor/tools-popover";
+import { icons } from "@/components/editor/icon-rail";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ImportChapterButton } from "@/components/editor/import-chapter-button";
 import { SelectionToolbar } from "@/components/editor/selection-toolbar";
 import { ImageToolbar } from "@/components/editor/image-toolbar";
@@ -78,7 +80,6 @@ import {
   useOpenPart,
   type OpenPart,
 } from "@/components/editor/book-panel";
-import { BookCover } from "@/components/shelf/book-cover";
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { ShareDialog } from "@/components/collab/share-dialog";
 import {
@@ -98,7 +99,6 @@ import {
   touchLastOpened,
   typographyOf,
   type Book,
-  type PaperColor,
   type Prefs,
 } from "@/lib/library-store";
 import { pageMetrics } from "@/lib/page-setup";
@@ -115,158 +115,6 @@ import { useTypewriter } from "@/lib/use-typewriter";
 import { useAutosave, type SaveStatus } from "@/lib/use-autosave";
 import { LoadingScreen } from "@/components/loading-screen";
 
-const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
-  { value: "white", label: "White", swatch: "#ffffff" },
-  { value: "cream", label: "Off-white", swatch: "#ededed" },
-  { value: "sepia", label: "Grey", swatch: "#d6d6d6" },
-  { value: "slate", label: "Charcoal", swatch: "#1c1c1c" },
-  { value: "black", label: "Black", swatch: "#0d0d0d" },
-];
-
-/**
- * A rail button that shows the current page colour as a swatch and opens a
- * small portal dropdown to switch it — same five options as the Aa flyout,
- * promoted here so they are one press away without opening the full type panel.
- */
-function PageColorButton({ paper }: { paper: PaperColor }) {
-  const [open, setOpen] = useState(false);
-  const [rect, setRect] = useState<DOMRect | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  const current = PAPERS.find((p) => p.value === paper) ?? PAPERS[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    const onPointer = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (
-        !triggerRef.current?.contains(t) &&
-        !panelRef.current?.contains(t)
-      ) {
-        setOpen(false);
-      }
-    };
-    const onResize = () => setOpen(false);
-    const onScroll = (e: Event) => {
-      if (panelRef.current?.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onPointer);
-    window.addEventListener("resize", onResize);
-    document.addEventListener("scroll", onScroll, true);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onPointer);
-      window.removeEventListener("resize", onResize);
-      document.removeEventListener("scroll", onScroll, true);
-    };
-  }, [open]);
-
-  return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        onClick={() => {
-          if (open) {
-            setOpen(false);
-          } else {
-            setRect(triggerRef.current?.getBoundingClientRect() ?? null);
-            setOpen(true);
-          }
-        }}
-        aria-haspopup="true"
-        aria-expanded={open}
-        aria-label="Page colour"
-        // `RailButton`'s own string, open standing in for active — this sits
-        // in the rail among them and must not be the one control that answers
-        // differently. See the note there.
-        className={`group relative flex h-12 w-12 shrink-0 items-center justify-center
-                    rounded-xl outline-none transition-colors
-                    focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                      open
-                        ? "bg-blue-500/15 text-fg dark:bg-blue-500/25"
-                        : "text-fg/80 hover:bg-raised/70 hover:text-fg"
-                    }`}
-      >
-        {/* The chosen paper itself rather than a picture of a paint pot: this
-            is the one button on the rail whose subject *is* a colour, so
-            showing which one is worth more than drawing an icon for it. The
-            ring is the rail's own ink, so a white sheet still reads as a
-            swatch on a light theme rather than disappearing into it. */}
-        <span
-          aria-hidden="true"
-          className="h-6 w-6 rounded-full border-2 border-current
-                     transition-transform duration-150 ease-out
-                     group-hover:scale-[1.08] motion-reduce:transition-none
-                     motion-reduce:group-hover:scale-100"
-          style={{ background: current.swatch }}
-        />
-        {!open && (
-          <span
-            role="tooltip"
-            className="pointer-events-none absolute right-full top-1/2 mr-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
-          >
-            Page colour
-          </span>
-        )}
-      </button>
-
-      {open && rect && (
-        <div
-          ref={panelRef}
-          style={{
-            position: "fixed",
-            top: rect.top,
-            left: rect.left,
-            transform: "translateX(-100%)",
-            paddingRight: 8,
-            zIndex: 50,
-          }}
-        >
-          <div className="flex flex-col gap-1 rounded-md border border-line bg-panel p-2 shadow-xl">
-            <p className="px-1 font-sans text-[0.62rem] tracking-wide text-muted uppercase">
-              Page colour
-            </p>
-            <div className="flex flex-col gap-1">
-              {PAPERS.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => {
-                    setPref("paper", p.value);
-                    setOpen(false);
-                  }}
-                  aria-label={p.label}
-                  title={p.label}
-                  className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-left
-                              font-sans text-xs outline-none transition-colors
-                              focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                                p.value === paper
-                                  ? "bg-accent text-accent-ink"
-                                  : "text-fg hover:bg-raised"
-                              }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="h-4 w-4 shrink-0 rounded-full border border-line"
-                    style={{ background: p.swatch }}
-                  />
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
 
 const STATUS_LABEL: Record<SaveStatus, string> = {
   saved: "Saved",
@@ -388,13 +236,28 @@ export function ChapterEditor({
     (open: boolean) => setPref("leftPanel", open),
     [],
   );
-  const chapterSectionOpen = prefs.chapterSectionOpen;
-  const setChapterSectionOpen = useCallback(
-    (open: boolean) => setPref("chapterSectionOpen", open),
-    [],
-  );
   const [mobileBookOpen, setMobileBookOpen] = useState(false);
-  const isLeftPanelOpen = Boolean(panelOpen && tab !== "chapters");
+
+  /**
+   * The chrome, put away.
+   *
+   * Nothing is *closed* when it goes on — `panelOpen` and `tab` are left
+   * exactly as they were, so coming back out puts the writer in front of the
+   * same panel they left. The same reasoning as the navigator staying open
+   * behind a tool panel: a mode that tidies up after you is a mode you have to
+   * rebuild your desk from.
+   */
+  const focus = prefs.focusMode;
+  const setFocus = useCallback((on: boolean) => setPref("focusMode", on), []);
+
+  /**
+   * Whether the panel is on screen.
+   *
+   * **It used to exclude the chapters tab**, because the navigator was a
+   * second panel in a slot of its own with its own stored flag. It is the
+   * `chapters` tab of this one now, so there is one question and one answer.
+   */
+  const isLeftPanelOpen = panelOpen && !focus;
 
   /**
    * Whether the panel and page should play their entrance.
@@ -441,6 +304,16 @@ export function ChapterEditor({
   // Page zoom: state at the speed of a gesture, storage at the speed of a
   // setting. See `useStoredZoom`.
   const [zoom, setZoom] = useStoredZoom();
+
+  /* Whether the work is safe, reported up from the surface that saves it so
+     the bar above the rails can say so. See `onSaveState`. */
+  const [saveState, setSaveState] = useState("");
+  /* And how much of it there is. Same round trip, same reason. */
+  const [words, setWords] = useState("");
+
+  /* Page & type, which is the one rail tab that is not the panel. It opens as
+     a card at the rail’s edge instead — see `ToolsPopover` for why. */
+  const [toolsOpen, setToolsOpen] = useState(false);
 
   // Opening a book is worth marking; it renders faster than the eye can catch,
   // so the loading screen is held for a beat, then faded. It plays only on the
@@ -642,10 +515,82 @@ export function ChapterEditor({
   if (!book || !chapter) return <MissingChapter />;
 
   return (
-    // No chrome bar across the top: the rail runs full height on the left, the
-    // panels and manuscript fill the rest, and the word count and save status
-    // float in the workspace's top-left corner (see EditorSurface).
-    <div className="editor-shell flex h-full min-w-0">
+    /* **A bar across the top, and the rails under it.** There was no header at
+       all: the way back to the shelf, the file-level actions and the save state
+       were spread between the two rails and a thin strip that only said the word
+       count. The bar spans the whole window, so the shell is a column now with
+       the rail-and-page row inside it. */
+    <div className="editor-shell flex h-full min-w-0 flex-col">
+      {focus ? (
+        /* **The whole of focus mode's chrome.**
+
+           Fixed at the top left, over the page and clear of it — the paper is
+           centred, so the corner is empty at every width. Always drawn and
+           never on a timer or a hover: a hidden way out of a mode that hid
+           everything else is exactly the trap the mode is worth avoiding.
+
+           The same glyph as the button that turned it on, because they are one
+           control saying *chrome on, chrome off* in the two places it can be
+           said from. */
+        <button
+          type="button"
+          onClick={() => setFocus(false)}
+          aria-label="Leave focus mode"
+          className="group fixed top-3 left-3 z-40 flex h-9 w-9 items-center
+                     justify-center rounded-lg text-fg/70 outline-none
+                     transition-colors hover:bg-raised hover:text-fg
+                     focus-visible:ring-2 focus-visible:ring-accent/60"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-[18px] w-[18px]"
+          >
+            {icons.panel}
+          </svg>
+          <Tooltip label="Leave focus mode" side="right" nowrap />
+        </button>
+      ) : (
+      <EditorTopBar
+        bookId={bookId}
+        bookTitle={book.title}
+        chapterTitle={chapter?.title ?? ""}
+        words={words}
+        saveState={saveState}
+        focus={focus}
+        onFocus={setFocus}
+        history={<HistoryControls editor={liveEditor} />}
+        /* **One row today, and that is the honest state of it.** A File menu
+           is the right home for what acts on the manuscript as a file, and of
+           those the book's own details is the only one that is not already a
+           control on this bar: Import and Export are the two buttons at its
+           right end, and putting them here as well would be one action with
+           two entrances. Page setup belongs here next — `page-menu.tsx` holds
+           it, and it draws its own menu, so it cannot simply be a row in this
+           one. */
+        fileActions={
+          <FileMenuItem
+            onClick={() => setEditingCover(true)}
+            hint="Title, author, and the cover"
+          >
+            Book details…
+          </FileMenuItem>
+        }
+        importControl={
+          canWriteThis ? (
+            <ImportChapterButton book={book} presentation="bar" />
+          ) : null
+        }
+      />
+      )}
+
+      <div className="flex min-h-0 min-w-0 flex-1">
+      {!focus && (
       <WorkspaceRail
         bookId={bookId}
         tab={tab}
@@ -653,14 +598,28 @@ export function ChapterEditor({
         leftPanel={panelOpen}
         onPanel={setEditorPanel}
         chapters
-        chapterSectionOpen={chapterSectionOpen}
-        onToggleChapters={setChapterSectionOpen}
-        // The manuscript's own right rail carries it now, beside the tools
-        // that act on the page it talks about. Two sparkles on two edges of
-        // one screen is the duplication the book panel already taught us to
-        // avoid — and the panel it opens is the same panel either way.
+        // There is one rail now, so there is one way in. The assistant used
+        // to be offered on both edges of the window — a sparkle on the right
+        // beside the tools, a tab on the left — for one panel that opened in
+        // the same place either way.
         assistant
+        toolsOpen={toolsOpen}
+        onTools={setToolsOpen}
         className="editor-workspace-rail hidden md:flex"
+      />
+      )}
+
+      {/* Portalled and `fixed`, so it is drawn here only because this is where
+          the state lives — on screen it stands at the rail’s edge. */}
+      <ToolsPopover
+        open={toolsOpen && !focus}
+        onClose={() => setToolsOpen(false)}
+        book={book}
+        editor={liveEditor}
+        paper={prefs.paper}
+        typewriter={prefs.typewriter}
+        dictation={dictation}
+        canWrite={canWriteThis}
       />
 
       {/* One continuous gradient wash behind the book panel and the paper — the
@@ -686,7 +645,7 @@ export function ChapterEditor({
             height, its own slide and a scrim on a phone — so the slot below
             holds the page's place for it. */}
         <LeftPanel
-          open={panelOpen && tab !== "chapters"}
+          open={isLeftPanelOpen}
           tab={tab}
           bookId={bookId}
           chapterId={chapterId}
@@ -718,7 +677,7 @@ export function ChapterEditor({
             it. `main` centres the paper in whatever is left (`.pageflow` is
             `margin: 0 auto`), and nothing here remounts — the pagination
             re-measures off its own ResizeObserver and the caret stays put. */}
-        {isLeftPanelOpen && !chapterSectionOpen && (
+        {isLeftPanelOpen && (
           <div
             aria-hidden="true"
             className="oc-panel-slot hidden w-(--sidebar-width) shrink-0
@@ -727,26 +686,14 @@ export function ChapterEditor({
           />
         )}
 
-        {chapterSectionOpen && (
-          <BookPanel
-            book={book}
-            chapterId={chapterId}
-            cover={cover}
-            paper={prefs.paper}
-            body={body}
-            entering={entering}
-            always
-            /* The rules say *this card and that page are the same thing*, so
-               they stand down when the card is not on screen to say it about.
-               The navigator stays mounted behind an open tool panel — that is
-               what puts the writer back where they were when the panel
-               closes — and its rules are drawn in a body-level portal, so
-               without this they went on running out from behind the panel and
-               across the desk, pointing at a card nobody could see. */
-            connectToPage={!isLeftPanelOpen}
-            onClose={() => setChapterSectionOpen(false)}
-          />
-        )}
+        {/* **The navigator is not here any more; it is the panel’s `chapters`
+            tab.** It used to be a second panel in a slot of its own, with its
+            own stored flag, its own dismiss and a special case in the rail for
+            the one button that opened it rather than the panel — so the
+            column made two different promises and nothing about a glyph said
+            which you were about to get. `LeftPanel` already knew how to draw
+            it (`ChapterSidebar` mounts the same `BookPanel`); the editor
+            simply was not going through it. */}
 
         <div className="editor-main flex min-w-0 flex-1 flex-col bg-white dark:bg-transparent">
           {/* Keyed on the id and a cross-tab reload counter — not the stored
@@ -767,6 +714,9 @@ export function ChapterEditor({
             prefs={prefs}
             zoom={zoom}
             onZoom={setZoom}
+            focus={focus}
+            onSaveState={setSaveState}
+            onWords={setWords}
             matter={selectedPart}
             entering={entering}
             dictation={dictation}
@@ -796,116 +746,7 @@ export function ChapterEditor({
           />
         </div>
 
-              {/* The right rail belongs to the manuscript, so it leaves with it.
-                  When the left panel expands, the right rail smoothly slides right
-                  and disappears, allowing the editor canvas to occupy the full remaining space. */}
-              <Rail
-                side="right"
-                // Hidden on phones: the formatting tools want a pointer and room.
-                className={`hidden lg:flex transition-all duration-300 ease-in-out ${
-                  isLeftPanelOpen
-                    ? "translate-x-full opacity-0 pointer-events-none !w-0 !border-l-0 overflow-hidden"
-                    : "translate-x-0 opacity-100 w-(--rail-width)"
-                }`}
-                footer={
-              <>
-                <RailDivider />
-                {/* **Share, beside Export, and the group is the argument.**
-
-                    Every product that does this well puts the control on the
-                    thing being shared while you are looking at it — Google
-                    Docs, Notion and Figma all carry it in the document's own
-                    chrome, and none of them make you go to a management page
-                    to add somebody. `ShareDialog`'s own note says the same
-                    thing and has said it since it was written; what was
-                    missing is that the only way to open it was the dashboard's
-                    Collaborators area, which is exactly the separate screen
-                    that argument rules out. A writer in chapter nine who wants
-                    their editor on the book had to leave the book to do it.
-
-                    It sits in the "leave" group rather than beside the writing
-                    tools because it does not act on the page: like Export, it
-                    is about handing the manuscript to somebody else. Export
-                    stays last — it is the end of the road, and Share is a
-                    thing you do while still on it. */}
-                {canShare && (
-                  <RailButton
-                    label="Share"
-                    side="right"
-                    mark="share"
-                    onClick={() => setSharing(true)}
-                  />
-                )}
-                {/* **Import, immediately above Export, because they are a
-                    pair.** It used to be a third button in the chapter list's
-                    header, which is a place you have to open a list to reach —
-                    and the two halves of moving a manuscript through this app
-                    then lived on opposite sides of the window. Neither acts on
-                    the sheet, which is what this last group is for. Hidden for
-                    a reader, like every other write: `canWrite` is the same
-                    test the chapter list used. */}
-                {canWriteThis && <ImportChapterButton book={book} />}
-                <RailButton
-                  label="Export"
-                  side="right"
-                  href={`/book/${bookId}/export`}
-                  mark="export"
-                />
-              </>
-            }
-          >
-            {/* Which book these tools act on, as the object rather than another
-              copy of its title — the running head already carries the words.
-
-              It is also the way in to changing it. A cover is the one thing
-              here you would click expecting to edit it, and there was nowhere
-              else in the editor to reach the title page from. */}
-            <div className="group relative flex justify-center">
-              <button
-                type="button"
-                onClick={() => setEditingCover(true)}
-                aria-label={`Edit the cover of ${book.title}`}
-                className="block w-10 shrink-0 rounded-md outline-none
-                         transition-transform hover:-translate-y-0.5
-                         focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                <BookCover
-                  title={book.title}
-                  subtitle={book.subtitle}
-                  author={book.author}
-                  words={bookWordCount(book)}
-                  image={cover}
-                  seed={book.id}
-                />
-              </button>
-              <span
-                role="tooltip"
-                className="pointer-events-none absolute right-full top-1/2 mr-3.5 -translate-y-1/2 z-50 whitespace-nowrap rounded-xl border border-line bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-900 shadow-[0_4px_20px_rgba(0,0,0,0.12)] opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 dark:border-white/10 dark:bg-[#212121] dark:text-white dark:shadow-[0_4px_20px_rgba(0,0,0,0.45)]"
-              >
-                Edit book details
-              </span>
-            </div>
-
-            <RailDivider />
-
-            <ToolRail
-              editor={liveEditor}
-              book={book}
-              paper={prefs.paper}
-              dictation={dictation}
-            />
-
-            <RailDivider />
-
-            <RailButton
-              label="Typewriter scrolling"
-              side="right"
-              active={prefs.typewriter}
-              onClick={() => setPref("typewriter", !prefs.typewriter)}
-              mark="typewriter"
-            />
-            <PageColorButton paper={prefs.paper} />
-        </Rail>
+      </div>
       </div>
 
       {/* Rendered on the press and never from an effect, like every other
@@ -1113,6 +954,9 @@ function EditorSurface({
   prefs,
   zoom,
   onZoom,
+  focus,
+  onSaveState,
+  onWords,
   matter,
   entering,
   dictation,
@@ -1139,6 +983,33 @@ function EditorSurface({
   prefs: Prefs;
   zoom: number;
   onZoom: (zoom: number) => void;
+  /**
+   * Whether the chrome is put away.
+   *
+   * The phone’s header and its writing dock belong to this component, so focus
+   * mode has to reach them here. Everything else it hides is a sibling of this
+   * surface and is simply not rendered.
+   */
+  focus: boolean;
+  /**
+   * Reports whether the work is safe, in the words this component already
+   * uses, so the bar above the rails can show it.
+   *
+   * A callback because the autosave lives down here with the editor it is
+   * saving, and the bar lives up there with the rails it spans. Hoisting the
+   * whole of `useAutosave` to reach it would move a hook to a component that
+   * needs nothing else from it; reporting one string upward is the smaller
+   * compromise.
+   */
+  onSaveState?: (label: string) => void;
+  /**
+   * How much has been written, in the words the bar prints verbatim.
+   *
+   * Reported rather than recomputed up there, for the reason the save state is:
+   * the count is the surface’s, and a second call to `bookWordCount` in the
+   * shell would be a second answer to one question the moment either changed.
+   */
+  onWords?: (label: string) => void;
   /** What the panel has selected — the sheet's edge takes its colour. */
   matter: "front" | "body" | "back";
   /** Play the page's entrance. Set only when the panel's face changes, never
@@ -1854,22 +1725,62 @@ function EditorSurface({
   const totalHeight = pageCount * geom.pageH + (pageCount - 1) * geom.gap;
   const mobileStatus = !canWrite ? "Read-only" : STATUS_LABEL[status];
 
+  /**
+   * The same sentence the bar above the rails shows.
+   *
+   * **A save indicator on a book that cannot be saved is a lie**, so a book
+   * somebody let a writer *read* reports the permission instead of a status —
+   * which is also the only place in the editor that explains why the page will
+   * not take a keystroke. That decision is made here, where the role is known,
+   * and the bar only draws what it is handed.
+   */
+  const saveState = !canWrite
+    ? "Read-only · shared with you"
+    : status === "saved" && lastSavedAt
+      ? `${STATUS_LABEL[status]} · ${lastSavedAt.toLocaleTimeString([], {
+          hour: "numeric",
+          minute: "2-digit",
+        })}`
+      : STATUS_LABEL[status];
+
+  useEffect(() => {
+    onSaveState?.(saveState);
+  }, [onSaveState, saveState]);
+
+  /** The same reading the strip below the bar used to carry, now in the bar. */
+  const wordLine = `${written.toLocaleString()}${
+    book.targetWords ? ` of ${book.targetWords.toLocaleString()}` : ""
+  } words`;
+
+  useEffect(() => {
+    onWords?.(wordLine);
+  }, [onWords, wordLine]);
+
   return (
     <>
-      <MobileEditorHeader
-        chapterTitle={chapterTitle}
-        status={mobileStatus}
-        onChapters={onOpenChapters}
-      />
-      <MobileWritingDock
-        editor={editor}
-        formatOpen={formatOpen}
-        assistantOpen={assistantOpen}
-        moreOpen={moreOpen}
-        onFormat={onFormat}
-        onAssistant={onAssistant}
-        onMore={onMore}
-      />
+      {/* **The phone’s chrome goes with the rest of it.** Focus mode means
+          the same thing on every screen — the page, the pill and the
+          selection bar, and one button out — or it means two things
+          depending on how wide the window is. Both come back untouched on the
+          way out, since neither holds any state of its own. */}
+      {!focus && (
+        <>
+          <MobileEditorHeader
+            chapterTitle={chapterTitle}
+            status={mobileStatus}
+            onChapters={onOpenChapters}
+          />
+          <MobileWritingDock
+            editor={editor}
+            formatOpen={formatOpen}
+            assistantOpen={assistantOpen}
+            moreOpen={moreOpen}
+            onFormat={onFormat}
+            onAssistant={onAssistant}
+            onMore={onMore}
+          />
+        </>
+      )}
       {/* The paper palette moves up here so the running head can share it.
           Every rule that depends on it is a descendant selector, so hoisting
           the class and both data attributes changes nothing below. */}
@@ -1915,120 +1826,40 @@ function EditorSurface({
         {/* Transparent, so the shared gradient on the row above shows through
             and the page sheets float on it. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {/* The strip of desk above the sheet, doing the work of a bar.
+          {/* **The dictation bar and the formatting pill, in the manuscript
+              column.**
 
-              Outside the scroller, not stuck to the top of it. Sticky, it stayed
-              put while the page slid up underneath — so it ended up lying across
-              the paper with the sheet's own top border above it, which reads as
-              a band drawn *on* the page rather than a bar above it. Out here the
-              page cannot reach it: the manuscript scrolls in the box below, and
-              this keeps its own line of desk however far down a writer goes.
+              They hung off a strip of desk that ran above the page carrying a
+              word count and a save status. Both readings are in the bar at the
+              top of the window now, and a full-width band drawn to hold nothing
+              is a second bar under the first — so the strip went and these two
+              moved out here.
 
-              No rule and no panel behind it either. The desk that was already
-              there is the bar; an edge would only have drawn a second one. */}
-          {/* `relative`, so the formatting pill can be centred on this strip.
-              The strip spans the manuscript area — the same box the page is
-              centred inside — so centring on it is centring on the paper, and
-              it follows the page sideways when the side panel opens. */}
-          <div className="editor-desk-strip relative shrink-0 bg-white dark:bg-accent/7 px-4 pt-3 pb-2">
-            <div
-              /* **The bar keeps its own size at every zoom**, which it did not
-                 until 2026-09-04: it was sized to `pageW × zoom` so the ends
-                 would line up with the sheet, and at 32% that squeezed a word
-                 count, a save status and two control groups into a couple of
-                 inches. A reading of the document is not part of the document,
-                 so it does not scale with it — and not resizing it every frame
-                 takes a layout pass out of the gesture as well.
+              **This wrapper and not the scroller below it**: inside that, the
+              pill would slide away with the page. Out here it holds its line,
+              and because the wrapper spans the same column the sheet is centred
+              in, centring on it is still centring on the paper.
 
-                 **Two readings and nothing else now.** Undo and redo moved into
-                 the pill, where they are wanted while typing; the zoom control
-                 went with the buttons that are no longer the way anybody zooms.
-                 What is left is what a writer glances at: how much they have
-                 written, and whether it is safe.
-
-                 The pair stand down while the pill is up — faded rather than
-                 unmounted, so the row keeps its height and nothing below it
-                 moves. */
-              className={`flex items-center justify-between gap-3 font-sans
-                          text-xs text-muted transition-opacity duration-150 ${
-                            pillVisible
-                              ? "pointer-events-none opacity-0"
-                              : "opacity-100"
-                          }`}
-            >
-              {/* The word count at the left edge of the bar and the save
-                  status at the right, with the whole width between them. They
-                  were a pair of equal flanks around a group of controls; with
-                  the controls gone there is nothing to balance, and pushing
-                  them to the two ends is what stops either drifting as its
-                  own number changes. */}
-              <span className="pointer-events-none min-w-0 truncate tabular-nums">
-                {written.toLocaleString()}
-                {book.targetWords
-                  ? ` of ${book.targetWords.toLocaleString()}`
-                  : ""}{" "}
-                words
-              </span>
-
-              {/* **A save indicator on a book that cannot be saved is a lie**, and
-                  this is the corner of the screen a writer checks to find out
-                  whether their work is safe. So for a book somebody let them
-                  *read*, it reports the permission instead of a status — which is
-                  also the only place in the editor that explains why the page will
-                  not take a keystroke. */}
-              <span
-                aria-live="polite"
-                /* Pinned to the right end, and never squeezed: `shrink-0` so a
-                   long word count cannot push "Saved · 8:16 pm" into an
-                   ellipsis, which is the one reading here that has to be
-                   readable at a glance. */
-                className="pointer-events-none shrink-0 text-right"
-                style={
-                  status === "error" && canWrite
-                    ? { color: "var(--color-danger)" }
-                    : undefined
-                }
-              >
-                {!canWrite ? (
-                  "Read-only · shared with you"
-                ) : (
-                  <>
-                    {STATUS_LABEL[status]}
-                    {status === "saved" && lastSavedAt
-                      ? ` · ${lastSavedAt.toLocaleTimeString([], {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}`
-                      : null}
-                  </>
-                )}
-              </span>
-            </div>
-
-            {/* Only while the microphone is live, and on its own line under the
-                readings rather than squeezed among them: this is a mode, not a
-                measurement, and it has a sentence to show. It appears inside
-                the desk strip, so it never covers the page — the reason the
-                floating microphone that used to do this job is gone. */}
+              `pointer-events-none` on the stack with it turned back on for each
+              child, so the empty space either side of the pill is not a lid over
+              the top of the page — a click there must reach the paper. */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center">
             {dictation.listening && (
-              <DictationBar
-                dictation={dictation}
-                width={geom.pageW * zoom * PAGE_SCALE}
-              />
+              <div className="pointer-events-auto w-full">
+                <DictationBar
+                  dictation={dictation}
+                  width={geom.pageW * zoom * PAGE_SCALE}
+                />
+              </div>
             )}
-
-            {/* **The formatting bar, in the strip's own place.** It was `fixed`
-                and centred on the window, which put it over the page's chrome
-                and off-centre the moment the side panel opened. In here it
-                inherits the page's column and the strip's line of desk, and the
-                two can never be on screen together — one fades as the other
-                arrives, in one row. */}
-            <FormatPill
-              editor={editor}
-              book={book}
-              visible={pillVisible}
-              history={<HistoryControls editor={editor} />}
-            />
+            <div className="pointer-events-auto">
+              <FormatPill
+                editor={editor}
+                book={book}
+                visible={pillVisible}
+                history={<HistoryControls editor={editor} />}
+              />
+            </div>
           </div>
 
           <main
@@ -2132,7 +1963,13 @@ function EditorSurface({
               ref={flowRef}
               onClick={handleSheetClick}
               onDoubleClick={handleSheetDoubleClick}
-              className="pageflow"
+              /* Above the two rules that run to it from the panel, so their
+                 3px overshoot finishes underneath the sheet and the join reads
+                 as continuous. `relative` is what makes the z-index apply; the
+                 continuous layout takes it straight back off, because there
+                 the panel is a full-screen overlay and paper above it would
+                 show through. */
+              className="pageflow relative z-[42]"
               style={{
                 width: `${geom.pageW}px`,
                 height: `${totalHeight}px`,

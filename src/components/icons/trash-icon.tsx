@@ -4,9 +4,16 @@
  * Vendored from itshover (https://itshover.com, Apache-2.0) rather than pulled
  * with `shadcn add`: this repo has no `components.json`, and `shadcn init`
  * would rewrite `globals.css` with shadcn's own token set over the `@theme`
- * block the whole app is coloured from. The file is otherwise unedited beyond
- * this note and the directive above — the components use hooks and carry none
- * of their own.
+ * block the whole app is coloured from. The components use hooks and carry no
+ * directive of their own, so one is added above.
+ *
+ * **One behaviour is edited: every animation callback returns early on an empty
+ * scope.** Motion fires a hover-end on an element that is unmounting, and
+ * `animate` against a scope whose ref has already been cleared throws
+ * `Cannot read properties of null (reading 'querySelectorAll')`. Hovering a rail
+ * icon and then hiding the rail — entering focus mode, or leaving the editor —
+ * is all it takes. Nothing here can catch it from outside, since the throw is
+ * inside motion's own callback.
  */
 import { forwardRef, useImperativeHandle, useCallback } from "react";
 import type { AnimatedIconHandle, AnimatedIconProps } from "./types";
@@ -34,6 +41,10 @@ const TrashIcon = forwardRef<AnimatedIconHandle, TrashIconProps>(
     const [scope, animate] = useAnimate();
 
     const openLid = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       await Promise.all([
         animate(
           ".trash-lid-lower",
@@ -46,9 +57,13 @@ const TrashIcon = forwardRef<AnimatedIconHandle, TrashIconProps>(
           { duration: 0.25, ease: "easeOut" },
         ),
       ]);
-    }, [animate]);
+    }, [animate, scope]);
 
     const closeLid = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       await Promise.all([
         animate(
           ".trash-lid-lower",
@@ -61,9 +76,13 @@ const TrashIcon = forwardRef<AnimatedIconHandle, TrashIconProps>(
           { duration: 0.2, ease: "easeInOut" },
         ),
       ]);
-    }, [animate]);
+    }, [animate, scope]);
 
     const dangerHoverAnimation = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       if (!dangerHover) return;
 
       await animate(
@@ -71,9 +90,13 @@ const TrashIcon = forwardRef<AnimatedIconHandle, TrashIconProps>(
         { stroke: "#ef4444" },
         { duration: 0.2, delay: 0.1, ease: "easeInOut" },
       );
-    }, [animate, dangerHover]);
+    }, [animate, dangerHover, scope]);
 
     const resetColor = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       if (!dangerHover) return;
 
       await animate(
@@ -81,19 +104,31 @@ const TrashIcon = forwardRef<AnimatedIconHandle, TrashIconProps>(
         { stroke: "currentColor" },
         { duration: 0.2, ease: "easeInOut" },
       );
-    }, [animate, dangerHover]);
+    }, [animate, dangerHover, scope]);
 
     const hoverAnimation = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       await openLid();
       await dangerHoverAnimation();
-    }, [openLid, dangerHoverAnimation]);
+    }, [openLid, dangerHoverAnimation, scope]);
 
     const hoverEndAnimation = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       resetColor();
       closeLid();
-    }, [resetColor, closeLid]);
+    }, [resetColor, closeLid, scope]);
 
     const clickAnimation = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       if (shakeOnClick) {
         await animate(
           ".trash-icon",
@@ -105,7 +140,7 @@ const TrashIcon = forwardRef<AnimatedIconHandle, TrashIconProps>(
       if (keepOpenOnDelete) {
         await openLid();
       }
-    }, [shakeOnClick, keepOpenOnDelete, animate, openLid]);
+    }, [shakeOnClick, keepOpenOnDelete, animate, openLid, scope]);
 
     useImperativeHandle(ref, () => ({
       startAnimation: openLid,

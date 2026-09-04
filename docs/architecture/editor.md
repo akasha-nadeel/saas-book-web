@@ -7,6 +7,131 @@ Read before touching `src/components/editor/`, `src/lib/editor/`, the workspace 
 > Cross-references reading "above", "below" or "the note in the styling section" may now
 > point at a sibling file in `docs/` -- see the table in CLAUDE.md.
 
+## One bar, one rail, one panel (2026-09-05)
+
+**The editor now has an application bar, and it used to have none.**
+`editor-top-bar.tsx` carries what a word processor puts along the top — the way
+out to the shelf, a File menu, undo and redo, how much has been written and
+whether it is saved, the book and chapter you are in, and Import and Export at
+the right. All of that used to be spread between two icon rails and a thin strip
+of desk above the page. Three things went in the same change, and each was
+paying for the bar’s absence:
+
+- **The right-hand rail is deleted.** Its controls opened portalled flyouts that
+  positioned themselves *leftwards*, for no reason except that the trigger sat
+  on the right edge of the window; `ToolRail` and `Flyout` are gone with it and
+  `editor-toolbar.tsx` is down to the two things other screens borrow,
+  `ALIGN_OPTIONS` and `useEditorState`. Its tools are now **Page & type**, one
+  tab on the left rail.
+- **The desk strip is deleted.** By the end it held a word count and a save
+  status, and both are in the bar; a full-width band drawn to hold two readings
+  is a second bar under the first. The formatting pill and the dictation bar
+  moved into the manuscript column, in the wrapper *above* the scroller — inside
+  it, the pill slides away with the page.
+- **The rail carries a word under each icon** and scrolls, with a bar that shows
+  on hover (`oc-rail-scroll`). A column of unlabelled glyphs was readable while
+  it held eight; it does not survive being the only rail. **The ground is on the
+  icon, not on the button**: a rounded tile behind the mark takes the hover and
+  the selection, with the word standing outside it, because at this width
+  lighting the whole control is a card-sized block of colour for something the
+  pointer is passing over. **And selected is the accent on the mark** rather
+  than a deeper ground — hover and selected then differ by what they mean
+  instead of by how deep they sit, which is a comparison you can only make with
+  both in front of you.
+- **Home is the bar's, and only the bar's.** The rail carried one too, which is
+  a question about whether the two differ rather than a way home. The survivor
+  wears the rail's own animated mark (`RailMark` + `useMarkHandle`, the same
+  four events `RailButton` wires), so the button that left and the button that
+  stayed are one drawing. The first rail group draws no divider now, because a
+  rule at the top of a list separates it from nothing.
+- **Import is Export's shape, outlined.** It wore the phone More sheet's row
+  style for a day — icon, label, trailing arrow — beside a filled button. They
+  are the two ends of one errand and belong in one family; which of them is
+  filled says which the product is finally for.
+
+**Every other tab is the panel, Manuscript included** (2026-09-05). The
+navigator used to be a second panel in a slot of its own on a stored flag of
+its own, so the one button that opened it did not select a tab at all — it
+toggled that flag, and had to know that a tool panel *covering* the navigator
+meant a press should close the cover rather than the thing beneath it. All of
+that existed to make one button behave like the other nine. `LeftPanel` already
+knew how to draw it (`ChapterSidebar` mounts the same `BookPanel`); the editor
+simply was not going through it, and `prefs.chapterSectionOpen` is gone with the
+special case. Two rules follow it into the panel:
+
+- **Choosing a page does not close the panel** unless the panel is a modal.
+  Beside the page it is a neighbour, and a contents list that shuts itself the
+  moment you use it is one you reopen after every chapter. Scoped by the layout
+  classifier, like the outside press and Escape before it.
+- **One dismiss, and it moves.** The handle straddling the panel's outer edge is
+  the control; the header's button appears only in continuous layout, where the
+  panel is `100vw` and that handle's `-right-3` is off the screen. It follows
+  the *layout* and not a width breakpoint, because continuous is reached by
+  height too — a 900×500 window is continuous, and `md:hidden` left a writer
+  with neither control and no way out of the panel.
+
+**Page & type opens as a card at the rail’s edge, not as the panel**
+(`tools-popover.tsx`), and it is the one exception in the column. Every other
+tab answers a question *about the manuscript* — where is this word, what did
+this chapter say last week — and the answer is a list long enough to read down,
+which is what the full-height sheet is for. These are a dozen short settings
+rows: in a 25rem column they opened three-quarters empty and pushed the page
+sideways to do it. So the rail keeps one promise — press a tab, get an answer at
+its edge — while the shape of the answer follows the question. Three details are
+load-bearing:
+
+- **It is portalled and `fixed`, measured from the rail’s own right edge.** The
+  rail scrolls now, and a card rendered inside it would be clipped at that edge.
+- **Its ceiling is the rail’s top, not the window’s.** Clamped to the viewport,
+  the round close button above the card rode up over the undo controls.
+- **Only one tab is ever lit.** The card stands in the panel's own slot at
+  near enough its width, so a panel open behind it is open and *not visible*.
+  Left to their flags, Page and Manuscript light together and the rail claims
+  the writer is in two places. The panel is deliberately not closed — putting
+  the card away gives it back — so what changes is which of the two the rail
+  says is on screen.
+- **Escape is tested in the capture phase.** Every picker in the card opens a
+  portalled menu with its own Escape handler on `document`, and neither stops
+  the event — so in the bubble phase one press closed the menu *and* the card.
+  React flushes a discrete event’s update at the end of the document handler,
+  so by then the menu is already out of the DOM and “is a menu open” always
+  answered no. Asked on the way down, it is still true.
+
+## Focus mode, and the two rules to the page (2026-09-05)
+
+**`prefs.focusMode` puts the chrome away** — no bar, no rail, no panel, no phone
+header or dock; the page, the formatting pill, the selection bar, and one
+`fixed` button at the top left to come back. The key already existed and meant
+*dim every paragraph but the one being written*, to nobody: it was written by
+nothing and read by nothing, an orphan of the deleted right-hand rail. Three
+things are load-bearing:
+
+- **Nothing is closed.** `panelOpen` and `tab` are left alone, so leaving puts
+  the writer in front of the panel they left.
+- **It is stored, not component state.** Moving between chapters remounts the
+  editor, and a mode that fell out every time you turned a page would not be
+  one.
+- **The way out is always drawn**, never on a hover or a timer. A hidden way out
+  of a mode that hid everything else is the trap the mode is worth avoiding.
+
+**The two rules from the open chapter's card run *between* the panel and the
+paper**, and the stack is exact: the panel at 40, the rules at 41, the sheet at
+42, the rail at 45. At the panel's own 40 they lay across the writing — a body
+portal beats a static manuscript column on document order whatever the number
+says. Dropped below the page they went under the panel too, hiding the first
+inch of the run, so they appeared to come out from under the panel rather than
+out of the card. `.pageflow` takes `z-index: auto` back in continuous layout,
+where the panel is a full-screen overlay and paper above it would show through,
+and the rules are not drawn there at all — a pair pointing at a sheet nobody can
+see is the diagram of nothing `connectToPage` exists to prevent.
+
+**They stop easing once they have arrived**, and that is the fast-zoom fix. The
+700ms travel is the entrance; left on, it applied to every later width too, so
+while a gesture moved the page the measurement followed frame by frame and the
+drawing trailed two-thirds of a second behind — the pair stretched off the
+paper's edge and floated. A rule that has arrived is not animating anywhere; it
+is stuck to the page.
+
 **The editor** (`src/components/editor/chapter-editor.tsx`) is Tiptap. **The
 surface is keyed on `${chapterId}:${reload}`, a counter rather than the stored
 text**, and that counter moves only for a write from *another* tab — so a save
@@ -78,11 +203,11 @@ sentence being previewed — and looking at their own prose in each face is the
 whole reason it was opened. Flipping to whichever side had more room was worse
 than useless: near the top of the page it chose down, covering the text. So it
 goes up, capped to the window and scrolling, and where the page runs out it goes
-over the manuscript's desk bar rather than turning round. That is why it is
-**portalled to the body and fixed** — it has to paint above that bar, and a
+over the bar at the top of the window rather than turning round. That is why it
+is **portalled to the body and fixed** — it has to paint above that bar, and a
 `z-index` on a descendant of the editor cannot escape the stacking contexts
 between it and the top, which is what put its first rows behind the bar. Same
-reason the Aa flyout in the rail is portalled; same consequence, that it shuts
+reason the tools card is portalled; same consequence, that it shuts
 on an outside scroll or a resize, since a fixed position from a rect goes stale
 the moment the page moves.
 
@@ -144,7 +269,7 @@ picture keeps its proportion whatever the trim size; `src/lib/image-import.ts`
 re-encodes on the way in, capped at 1400px on the longest edge and 900KB. (That
 last sentence said it "handles paste/drop" until 2026-08-18 and there is no
 paste or drop path in the tree at all — no `handlePaste`, no `handleDrop`. The
-file picker in the right rail is the only way in. Worth building; it is not
+file picker in the Page & type card is the only way in. Worth building; it is not
 built.)
 
 **Three things about handling one were wrong together**, all found 2026-08-18
@@ -224,7 +349,7 @@ pressing Manuscript while something covers it closes the cover rather than the
 navigator, because a plain toggle on a flag that is already true shuts the one
 thing the press was asking to see. The connector rules go the same way:
 `connectToPage` is false while a panel is over the navigator, or they carry on
-running out from behind it, across the desk, pointing at a card nobody can see.
+running out from behind it, past the panel, pointing at a card nobody can see.
 
 Four things follow. **One header for all nine tabs**, written by `LeftPanel`:
 four of them drew their own and five drew none, so the panel's top edge moved
@@ -272,10 +397,10 @@ what is kept beside the book (notes, ideas, bible, assistant), then the two
 safety nets — versions and the trash — pinned to the foot, where Material's own
 rail guidance puts this class of item and for the reason that matters here: the
 trash is the one button in the column nobody wants to press by accident, so it
-must never sit where the eye has learned to find something else. The right rail
-is the same idea read top to bottom: **write · view · leave** — type, image and
-dictation as one undivided group, the two view toggles, then the assistant and
-Export together at the foot, since neither acts on the page.
+must never sit where the eye has learned to find something else. **Page & type
+is its own group between those two**, because it is the one tab that changes the
+*book* rather than reporting on it: everything above reads the manuscript back
+to the writer, and this sets the type it is read in.
 
 Three of those tabs are writer-pain features, each a panel over a pure module:
 **ideas** (`ideas.ts`) is a parking lot for the shiny idea that would otherwise

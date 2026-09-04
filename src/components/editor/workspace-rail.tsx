@@ -3,6 +3,7 @@
 import { Rail, RailButton, RailDivider } from "@/components/editor/icon-rail";
 import type { MarkName } from "@/components/editor/rail-mark";
 import { PANEL_TITLES, type PanelTab } from "@/components/editor/left-panel";
+import { PANEL_RAIL_NAMES } from "@/lib/panel-tabs";
 
 /**
  * Picking a panel, from whichever control is asking.
@@ -54,6 +55,16 @@ export function selectPanel(
 const GROUPS: readonly (readonly PanelTab[])[] = [
   ["chapters", "search", "consistency"],
   ["notes", "assistant"],
+  /* **How the page looks, and what goes on it.** Its own group because it is
+     the one tab that changes the *book* rather than telling you about it —
+     everything above reads the manuscript back to the writer, and this sets
+     the type it is read in.
+
+     It is also what let the right-hand rail go. Those controls opened flyouts
+     over the page, so half this column would have opened the panel beside it
+     and half something over the manuscript, with nothing about a glyph to say
+     which. Behind a tab they are one kind of button again. */
+  ["page"],
 ];
 
 /** Below the rest, always. See the note above. */
@@ -72,6 +83,7 @@ const TAB_MARKS: Record<PanelTab, MarkName> = {
   ideas: "ideas",
   bible: "bible",
   assistant: "assistant",
+  page: "type",
   history: "history",
   trash: "trash",
 };
@@ -99,9 +111,9 @@ export function WorkspaceRail({
   leftPanel,
   onPanel,
   chapters = true,
-  chapterSectionOpen,
-  onToggleChapters,
   assistant = true,
+  toolsOpen = false,
+  onTools,
   className = "",
 }: {
   bookId: string;
@@ -112,68 +124,71 @@ export function WorkspaceRail({
   onPanel: (open: boolean) => void;
   /** Offer the chapter-list tab. False where a book panel already shows one. */
   chapters?: boolean;
-  /** Whether the manuscript chapter section is expanded beside the editor. */
-  chapterSectionOpen?: boolean;
-  /** Callback to toggle chapter section expansion. */
-  onToggleChapters?: (open: boolean) => void;
   /** Offer the assistant tab. False only on screens that intentionally omit AI. */
   assistant?: boolean;
+  /**
+   * Whether Page & type is on screen, and how to open it.
+   *
+   * **The one tab that does not open the panel**, and the rail has to know it:
+   * the settings come out as a card at this rail’s edge instead. It is still a
+   * tab and not a second kind of button — it lights when it is showing, its
+   * second press puts it away, and pressing anything else swaps to that — so
+   * the rail keeps its one promise. Only where the answer appears differs.
+   *
+   * Left out on a screen that passes neither, which is how the tab is offered
+   * only where something can host the card.
+   */
+  toolsOpen?: boolean;
+  onTools?: (open: boolean) => void;
   /** Responsive visibility supplied by the editor shell. */
   className?: string;
 }) {
   void bookId;
 
   const allowed = (value: PanelTab) =>
-    (chapters || value !== "chapters") && (assistant || value !== "assistant");
+    (chapters || value !== "chapters") &&
+    (assistant || value !== "assistant") &&
+    (!!onTools || value !== "page");
 
   /**
-   * Whether a *tool* panel is on screen — the drawer, not the navigator.
+   * **Every tab is an ordinary tab now, Manuscript included.**
    *
-   * The same expression the editor hands `LeftPanel` as its `open`, and it has
-   * to stay the same one: the navigator and the drawer share a slot, and this
-   * is what decides which of them the writer is actually looking at.
+   * It used to be the exception, and the exception was expensive. The
+   * navigator was a panel of its own in a slot of its own on a stored flag of
+   * its own, so this button did not select a tab at all — it toggled that
+   * flag, and had to know that a tool panel *covering* the navigator meant a
+   * press should close the cover rather than the thing under it, and that a
+   * lit Manuscript beside a lit Find & replace would be the rail claiming the
+   * writer was in two places. All of it existed to make one button behave like
+   * the other nine. It is the `chapters` tab of the one panel now, and none of
+   * it is needed.
    */
-  const toolPanelOpen = leftPanel && tab !== "chapters";
-
   const tabButton = (value: PanelTab) => {
-    const isChapterTab = value === "chapters";
-    /* **A tab is lit when it is what is on screen, not when its flag is set.**
-       The navigator stays open behind a tool panel — that is deliberate, so
-       closing the panel puts the writer back where they were — but it is not
-       *visible*, and a rail that lights Manuscript and Find & replace at once
-       is a rail claiming the writer is in two places. */
-    const isActive = isChapterTab
-      ? !!chapterSectionOpen && !toolPanelOpen
-      : leftPanel && tab === value;
+    /* **A tab is lit when it is what is on screen, not when its flag is
+       set.** Page & type is the one that answers somewhere else — a card at
+       the rail's edge rather than the panel — and the card stands in that same
+       slot, near enough the panel's own width, so an open panel behind it is
+       open and *not visible*. Left to their flags, Page and Manuscript would
+       light together and the rail would be claiming the writer is in two
+       places. The panel is deliberately not closed — putting the card away
+       gives them back the panel they left — so what changes is which of the
+       two the rail says they are looking at. */
+    const isActive =
+      value === "page" ? toolsOpen : !toolsOpen && leftPanel && tab === value;
     const handleClick = () => {
-      if (isChapterTab) {
-        /* **Manuscript means *show me the navigator*, not *flip a flag*.**
-           With a tool panel over it the navigator is open and hidden, so a
-           plain toggle shut the one thing the press was asking to see — the
-           writer pressed it, the panel stayed, and the cards behind it went
-           away. So a press while something is covering it closes the cover
-           instead, and only a press while the navigator is the visible thing
-           puts it away. Same rule as `selectPanel` above: one control, and its
-           second press undoes what its first press did. */
-        if (toolPanelOpen) {
-          onPanel(false);
-          if (!chapterSectionOpen) onToggleChapters?.(true);
-          return;
-        }
-        if (onToggleChapters) {
-          onToggleChapters(!chapterSectionOpen);
-        } else {
-          onPanel(!chapterSectionOpen);
-        }
-      } else {
-        selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel });
+      if (value === "page") {
+        /* Same second-press rule as every other tab, pointed at the card. */
+        onTools?.(!toolsOpen);
+        return;
       }
+      selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel });
     };
 
     return (
       <span key={value} data-panel-tab={value} className="contents">
         <RailButton
           label={PANEL_TITLES[value]}
+          name={PANEL_RAIL_NAMES[value]}
           active={isActive}
           onClick={handleClick}
           mark={TAB_MARKS[value]}
@@ -197,27 +212,13 @@ export function WorkspaceRail({
         </>
       }
     >
-      {/* **One control, and it moves.**
-​
-          Shut, the button is here: the rail is all there is. Open, it is at the
-          top right of the panel — beside the thing it closes, where a writer's
-          eye already is. It is never in both places at once, because two
-          buttons doing one job is two things to read and a question about
-          whether they differ.
 
-          **The slot is not reserved, and its rule goes with it.** Holding an
-          empty box here kept the icons below from shifting when the button left
-          — but an invisible 48px box plus the hairline under it is 60-odd
-          pixels of nothing at the top of a narrow column, which reads as a rail
-          that has failed to load rather than as a rail with a gap in it. The
-          rule leaves with the button for the same reason: a divider at the very
-          top of a list separates it from nothing. So the column closes up and
-          the tabs sit at the top, which is where a writer looks for them. */}
-      <RailButton label="All books" href="/" mark="home" />
-
+      {/* **The first group draws no rule.** A divider at the top of a list
+          separates it from nothing, and the way out to the shelf that used to
+          stand above this one is in the bar now — one home, not two. */}
       {groups.map((group, i) => (
-        <div key={i} className="flex flex-col items-center gap-2">
-          <RailDivider />
+        <div key={i} className="flex w-full flex-col items-center gap-1">
+          {i > 0 && <RailDivider />}
           {group.map(tabButton)}
         </div>
       ))}

@@ -1366,9 +1366,15 @@
      was painted on rather than declared. */
   color-scheme: dark;
 
+  /* How far down the window the editor's chrome starts.
+     The application bar is 3rem and the panel hangs below it; in continuous
+     layout there is no bar (the phone draws its own header) and this drops to
+     zero, which is the block further down that says so. */
+  --oc-editor-bar-height: 3rem;
+
   /* Phone-first: a narrower rail, and a panel that nearly fills the screen
      since it opens as an overlay there rather than sitting beside the page. */
-  --rail-width: 3.25rem;
+  --rail-width: 4rem;
   --sidebar-width: 15rem;
 
   /* ----------------------------------------------------------------------
@@ -1537,7 +1543,7 @@
    room for the large one. */
 @media (min-width: 768px) {
   :root {
-    --rail-width: 4rem;
+    --rail-width: 4.25rem;
     --sidebar-width: 20.5rem;
   }
 }
@@ -1551,7 +1557,7 @@
 
 @media (min-width: 1800px) {
   :root {
-    --rail-width: 5rem;
+    --rail-width: 4.75rem;
     --sidebar-width: 27rem;
   }
 }
@@ -1818,6 +1824,44 @@ body {
 /* The pair of arrow buttons Chrome puts at each end of the bar. */
 .scroll-slim::-webkit-scrollbar-button {
   display: none;
+}
+
+/* --------------------------------------------------------------------------
+   A bar that is only there while the pointer is.
+
+   For the editor's rail, which overflows on a short window and does not on a
+   tall one. `scroll-slim` alone would put a permanent grey line down a column
+   of buttons for an overflow most writers never reach — the rail is a thing
+   you glance at, and a scrollbar on it reads as clutter rather than as an
+   affordance.
+
+   Layered on top of `.scroll-slim` rather than replacing it, so the bar keeps
+   the app's own thin shape and only its *visibility* is conditional. The
+   thumb is transparent at rest and takes `scroll-slim`'s colour on hover;
+   nothing about the layout changes either way, so the buttons do not shift as
+   it appears.
+
+   `scrollbar-color` is the Firefox half and the `::-webkit-` rule is the
+   Chromium one; both are needed, and neither can be transitioned, so this
+   appears rather than fades.
+   -------------------------------------------------------------------------- */
+.oc-rail-scroll {
+  scrollbar-color: transparent transparent;
+}
+
+.oc-rail-scroll:hover,
+.oc-rail-scroll:focus-within {
+  scrollbar-color: rgb(127 139 153 / 0.45) transparent;
+}
+
+.oc-rail-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.oc-rail-scroll:hover::-webkit-scrollbar-thumb,
+.oc-rail-scroll:focus-within::-webkit-scrollbar-thumb {
+  background: rgb(127 139 153 / 0.45);
+  background-clip: padding-box;
 }
 
 /* --------------------------------------------------------------------------
@@ -3874,8 +3918,22 @@ body {
 /* The phone is one calm writing canvas. Inline page geometry remains present
    for the paged mode, but these rules remove it visually without remounting
    Tiptap; the pagination extension clears its own gaps at the same boundary. */
-:root[data-editor-layout="continuous"] .editor-desk-strip {
+:root[data-editor-layout="continuous"] .editor-desk-strip,
+:root[data-editor-layout="continuous"] .editor-top-bar {
   display: none;
+}
+
+/* No application bar on a phone, so nothing hangs below one. */
+:root[data-editor-layout="continuous"] {
+  --oc-editor-bar-height: 0px;
+}
+
+/* **And the paper stops clearing the panel.** Beside the page the panel is a
+   neighbour and the two never overlap, so the sheet's z-index only decides
+   whether it covers the rules running to it. Here the panel fills the screen,
+   and a page above it would show straight through. */
+:root[data-editor-layout="continuous"] .pageflow {
+  z-index: auto;
 }
 
 :root[data-editor-layout="continuous"] .scroll-paper {
@@ -4868,4 +4926,36 @@ body {
   background: var(--color-sheet) !important;
   border: 1px solid var(--color-sheet-edge);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.18);
+}
+
+/* --------------------------------------------------------------------------
+   The Page & type card
+   --------------------------------------------------------------------------
+   It comes out from behind the rail, so it enters travelling right rather than
+   fading in place: a card that simply appears reads as a dialog, and this one
+   is meant to read as the rail's own button unfolding. Short and eased out,
+   because it is opened to change one setting and closed again.
+
+   `prefers-reduced-motion` drops the travel and keeps the fade.
+   -------------------------------------------------------------------------- */
+@keyframes oc-tools-card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-0.75rem, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.oc-tools-card {
+  animation: oc-tools-card-in 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oc-tools-card {
+    animation-name: none;
+  }
 }

@@ -19,6 +19,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 
 export function RailButton({
   label,
+  name,
   active,
   onClick,
   href,
@@ -29,6 +30,13 @@ export function RailButton({
   children,
 }: {
   label: string;
+  /**
+   * The short word drawn under the icon. Omitted leaves the button uncaptioned.
+   *
+   * Separate from `label`, which stays the full name and is what a screen
+   * reader and the tooltip both use — see `PANEL_RAIL_NAMES`.
+   */
+  name?: string;
   active?: boolean;
   onClick?: () => void;
   href?: string;
@@ -87,19 +95,53 @@ export function RailButton({
 
      The icons themselves are `fg`, near-black by day and near-white at night,
      rather than `muted`: they are the controls, not their captions. */
-  const className = `group relative flex h-12 w-12 items-center justify-center rounded-xl
-                     outline-none transition-colors focus-visible:ring-2
-                     focus-visible:ring-accent/60 ${
-                       active
-                         ? /* The `dark:` pair is `SideItem`'s — on the navy
-                              set selected *sinks* into the rail rather than
-                              lifting off it. Two navigations in one product
-                              still agree about what selected looks like. */
-                           "bg-accent/10 text-fg dark:bg-selected dark:text-selected-fg"
-                         : "text-fg/80 hover:bg-raised/70 hover:text-fg"
+  /**
+   * **The tile is the button now, and the name sits under it.**
+   *
+   * The rail carried icons alone with the name in a tooltip, which works while
+   * a rail holds one kind of thing and a writer can learn eight shapes. It
+   * holds fifteen since the right-hand rail was folded into it, half of them
+   * tools rather than panels, and a column of unlabelled glyphs at that length
+   * is a memory test. Every application that got here first — Canva, Figma,
+   * VS Code — put the word under the icon, and the reason is the same in all
+   * of them: the icon is how you find it again, the word is how you find it
+   * the first time.
+   *
+   * The tooltip stays. It carries the *full* name where the label is a short
+   * form, so "Check" can still say Consistency check on hover.
+   */
+  /**
+   * **The ground is on the icon, not on the button.**
+   *
+   * The whole control used to light up — icon, word and the padding round
+   * both — which at this width is a block of colour the size of a small card
+   * for something the pointer is only passing over. What the eye is aiming at
+   * is the glyph, so that is what gets the plate: a rounded square behind the
+   * mark, with the word standing outside it.
+   *
+   * **And selected is a colour rather than a deeper ground.** This carried
+   * `dark:bg-selected` on the reasoning that on the navy set a selected row
+   * *sinks* into the chrome instead of lifting off it — true of a row in a
+   * list, and the wrong shape here: hover and selected then differed by how
+   * deep they sat, which is a comparison you can only make by having both in
+   * front of you. One plate for both, and the accent on the mark says which.
+   * That is the hue’s one job in this app, and a rail tab is exactly “this is
+   * where you are”.
+   */
+  const className = `group relative flex w-full flex-col items-center gap-1
+                     rounded-xl px-1 py-1.5 outline-none
+                     focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                       active ? "text-accent" : "text-fg/80 hover:text-fg"
                      } ${disabled ? "opacity-50" : ""}`;
 
-  const icon = mark ? (
+  /* The plate. `bg-raised` for both states, so the tile is the *target* and
+     never the answer to which tab is open. */
+  const tile = `flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl
+                transition-colors ${
+                  active ? "bg-raised" : "group-hover:bg-raised/70"
+                }`;
+
+  const drawing = mark ? (
     <RailMark mark={mark} markRef={handle.ref} />
   ) : glyph ? (
     <span
@@ -124,6 +166,15 @@ export function RailButton({
     </svg>
   );
 
+  /* The mark in its plate. Every one of the three drawings above goes in the
+     same tile, so a rail of marks, glyphs and raw paths still lights the same
+     shape whichever it happens to be. */
+  const icon = (
+    <span aria-hidden="true" className={tile}>
+      {drawing}
+    </span>
+  );
+
   /* **`ui/tooltip.tsx` draws this now**, and the card there was lifted from
      the one that used to live here — so nothing changed on screen. It went to
      the shelf because eight files had hand-rolled the same `role="tooltip"`
@@ -146,10 +197,38 @@ export function RailButton({
     onBlur: handle.onLeave,
   };
 
+  /**
+   * The word under the icon.
+   *
+   * `aria-hidden`, because the button already carries `aria-label` with the
+   * full name — a screen reader hearing "Check, Consistency check" is being
+   * read the same control twice, once badly.
+   *
+   * Given `name`, drawn; without it, nothing, so the handful of rail buttons
+   * that are genuinely self-evident (the book's own cover) are not forced to
+   * caption themselves.
+   */
+  const caption = name ? (
+    <span
+      aria-hidden="true"
+      /* **The word keeps its own ink**, and does not take the accent with the
+         mark. Colouring both would make the whole button the signal again,
+         which is what moving the ground onto the tile was for; the glyph is
+         the thing being pointed at and the word is what it is called. */
+      className={`w-full truncate text-center font-sans text-[0.625rem]
+                  leading-tight font-medium ${
+                    active ? "text-fg" : "text-inherit"
+                  }`}
+    >
+      {name}
+    </span>
+  ) : null;
+
   if (href) {
     return (
       <Link href={href} aria-label={label} className={className} {...moves}>
         {icon}
+        {caption}
         {tooltip}
       </Link>
     );
@@ -166,6 +245,7 @@ export function RailButton({
       {...moves}
     >
       {icon}
+      {caption}
       {tooltip}
     </button>
   );
@@ -230,8 +310,28 @@ export function Rail({
          and the rail's icons would flicker under a moving sheet. Above it, the
          panel appears from the rail's own edge, which is where it comes from.
          45 rather than 50: under the app's dialogs, over the panel at 40. */
-      className={`scroll-slim flex shrink-0 flex-col
-                  items-center gap-2 overflow-visible pt-4 pb-14 nav-chrome ${
+      /* **It scrolls, and it shows the bar only on hover.**
+
+         `overflow-visible` was right while the rail was eight icons that
+         always fitted; it now carries the tools the right-hand rail used to,
+         with a word under each, and on a laptop that column is taller than the
+         window. Left visible, the overflow simply ran off the bottom of the
+         screen with no way to reach it.
+
+         `oc-rail-scroll` is the hover reveal — the bar is transparent until the
+         pointer is in the rail, so a column of buttons is not permanently wearing
+         a scrollbar it needs twice a session. `scroll-slim` is the app's own
+         thin bar underneath it, the one the panels and the composer use.
+
+         **Both axes clip, and that is unavoidable**: a box that scrolls on one
+         axis cannot be `visible` on the other — the browser promotes it to
+         `auto`. What made `overflow-visible` necessary before was the tooltips
+         and the flyouts that open sideways out of this rail, and both are
+         portalled to `document.body` now (`ui/tooltip.tsx`, `Flyout`), so
+         neither is inside the box to be cut. Anything added here that opens
+         sideways must portal too. */
+      className={`oc-rail-scroll scroll-slim flex shrink-0 flex-col
+                  items-center gap-1 overflow-y-auto pt-4 pb-14 nav-chrome ${
                     side === "left"
                       ? "relative z-[45] border-r w-(--rail-width)"
                       : "relative z-[45] border-l w-(--rail-width)"

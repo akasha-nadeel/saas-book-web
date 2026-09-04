@@ -32,6 +32,10 @@ const FilePlusIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
     const isAnimatingRef = useRef(false);
 
     const start = useCallback(async () => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       if (isAnimatingRef.current) return;
       isAnimatingRef.current = true;
 
@@ -62,6 +66,10 @@ const FilePlusIcon = forwardRef<AnimatedIconHandle, AnimatedIconProps>(
     }, [animate, scope]);
 
     const stop = useCallback(() => {
+      // Nothing to animate once the icon has left the page: motion fires a
+      // hover-end on an unmounting element, and `animate` on an empty scope
+      // throws. See the note in `rail-mark.tsx`.
+      if (!scope.current) return;
       isAnimatingRef.current = false;
       if (!scope.current) return;
       animate(

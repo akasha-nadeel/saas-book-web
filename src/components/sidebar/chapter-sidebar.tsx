@@ -15,10 +15,19 @@ export function ChapterSidebar({
   bookId,
   onNavigate,
   onClose,
+  connectToPage = false,
 }: {
   bookId: string;
   onNavigate?: () => void;
   onClose?: () => void;
+  /**
+   * Whether the open chapter’s card runs its two rules out to the manuscript.
+   *
+   * Off unless asked for: this navigator is also mounted on screens with no
+   * page beside it for the rules to land on, and a pair of them pointing into
+   * empty space is a diagram of nothing.
+   */
+  connectToPage?: boolean;
 }) {
   const shelf = useShelf();
   const book = findBook(shelf, bookId);
@@ -43,8 +52,16 @@ export function ChapterSidebar({
         paper={prefs.paper}
         body={body}
         always
+        /* **The rules reach the paper from in here too.** They are drawn in a
+           body-level portal precisely so being inside a scrolling panel cannot
+           clip them, and this is where the navigator lives now. */
+        connectToPage={connectToPage}
         onNavigate={onNavigate}
-        onClose={onClose ?? onNavigate}
+        /* **No dismiss passed, so the navigator draws none.** The panel around
+           it already carries the control that shuts it, and two of them a foot
+           apart is a question about whether they differ. Where this component
+           is somebody’s only surface, the caller says so with `onClose`. */
+        onClose={onClose}
         className="flex h-full w-full flex-col bg-white dark:bg-transparent"
       />
     </div>

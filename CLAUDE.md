@@ -438,6 +438,47 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
 - **Inline images** store width as a percentage of the column; the resize
   arithmetic is the pure `image-resize.ts` and **must divide by the page zoom**
   (`PAGE_SCALE`) — the editor's other two measuring sites already do.
+- **There is one bar across the top and one rail down the side** (2026-09-05).
+  `editor-top-bar.tsx` is the application bar the editor never had: home, a
+  File menu, undo/redo, the word count and the save state, the book and chapter,
+  and Import/Export at the right. **The right-hand rail and the desk strip under
+  the bar are both deleted** — `ToolRail` and `Flyout` with them, leaving
+  `editor-toolbar.tsx` holding only `ALIGN_OPTIONS` and `useEditorState`, which
+  four other components borrow. The pill and the dictation bar moved into the
+  manuscript column *above* the scroller; inside it, the pill scrolls away with
+  the page. The rail is wider and carries a word under each icon.
+- **Manuscript is an ordinary tab of that panel** (2026-09-05), not a second
+  panel in a slot of its own — `prefs.chapterSectionOpen` and the rail's whole
+  chapter special case went with it. Choosing a page does not close the panel
+  unless the panel is a modal, and the header's dismiss appears only in
+  continuous layout, where the edge handle is off-screen at `100vw`; both are
+  scoped by the **layout classifier**, never by a width breakpoint, because
+  continuous is reached by height as well.
+- **The rail lights the icon, not the button**, and selected is the accent on
+  the mark rather than a deeper ground. **Only ever one tab at a time** — the
+  Page card stands in the panel's slot, so a panel open behind it is open and
+  not visible.
+- **`prefs.focusMode` hides the chrome** — bar, rail, panel and the phone's own
+  header and dock — leaving the page, the pill, the selection bar and one
+  `fixed` button top-left. It **closes nothing**, so leaving it gives the panel
+  back; it is stored, because a chapter change remounts the editor; and the way
+  out is always drawn. The key is repurposed: it used to mean *dim every
+  paragraph but the current one* and was written and read by nothing.
+- **The two rules to the page sit between the panel and the paper** — panel 40,
+  rules 41, `.pageflow` 42, rail 45 — and `.pageflow` gives its z-index back in
+  continuous layout, where the panel is a full-screen overlay. They also **stop
+  transitioning once they have arrived**: the 700ms ease is the entrance, and
+  left on it made them trail two-thirds of a second behind a zoom gesture and
+  float off the paper.
+- **Page & type is the one tab that is not the panel**
+  (`editor/tools-popover.tsx`). It opens as a card at the rail’s edge, because
+  a dozen short settings rows in a 25rem full-height column is a panel
+  three-quarters empty that pushes the manuscript sideways to be it. Portalled
+  and `fixed` (the rail scrolls, and would clip it), ceilinged at the **rail’s**
+  top rather than the window’s, and its Escape test runs in the **capture**
+  phase — the pickers’ own menus listen on `document`, React flushes their
+  close before a bubble-phase listener here runs, so asked on the way up
+  “is a menu open” always answered no and one press shut both.
 - **The left chrome is one slot, `--sidebar-width` wide, and the page stands
   beside it.** At most one thing in it is visible: the book navigator, a tool
   panel, or a tool panel over the navigator. `BookPanel` takes that width
@@ -461,7 +502,8 @@ is cosmetic, lost prose is not). Custom extensions live in `src/lib/editor/`.
 - One header for all ten tabs, four ways out that are one toggle, and
   `LeftPanel` owns its own mounting so it can animate out. **The tabs are named
   once, in `src/lib/panel-tabs.ts`** — chapters, search, consistency, notes,
-  ideas, bible, bookmarks, assistant, history, trash — and not in the panel,
+  ideas, bible, bookmarks, assistant, page, history, trash, of which `page` is
+  the card and the other ten are the panel — and not in the panel,
   because which tab is open is a stored preference and `library-store.ts` needs
   the type without importing a `"use client"` component. The rail owns the
   order; that module owns the words.
@@ -1052,7 +1094,7 @@ of components so they can be tested and changed in one place: `book-kinds.ts`,
 *parameter*, since English plurals are not derivable), `resume.ts` (which stores
 nothing: the "where you left off" card is read back out of what already exists),
 `account.ts` (a chain of fallbacks, taking whatever is in the JWT rather than a
-typed user), `auth-redirect.ts` (`safeNext()`), `panel-tabs.ts` (the ten left-panel
+typed user), `auth-redirect.ts` (`safeNext()`), `panel-tabs.ts` (the eleven left-rail
 tabs and their titles) and `areas.ts` (the six dashboard areas by id and by
 name). The last of those exists because a tool screen fills the window with none
 of the dashboard around it, so a link in may carry `?from=<area>` and the tool

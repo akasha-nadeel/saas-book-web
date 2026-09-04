@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { SharedBadge } from "@/components/collab/shared-badge";
 import { RailMark } from "@/components/editor/rail-mark";
+import { icons } from "@/components/editor/icon-rail";
 import { Tooltip } from "@/components/ui/tooltip";
 import { relativeTime } from "@/lib/relative-time";
 import {
@@ -601,18 +602,19 @@ export function BookPanel({
       )}
 
       <div className="flex h-full min-h-0 flex-col px-5 pt-4 pb-5">
-        {/* One control, and only when there is somewhere to put it.
+        {/* **A dismiss only where nothing else carries one**, which since
+            2026-09-05 means the phone’s full-screen navigator and nothing
+            else. Inside the tool panel this drew a second way to shut the
+            same panel, a foot below the panel’s own — two buttons doing one
+            job and a question about whether they differ — so
+            `ChapterSidebar` stops handing one down. The row is drawn only
+            when there is something to put in it.
 
-            This row used to hold four — a way back to Book View, a
-            microphone and an import button behind a spacer. The microphone
-            and Import were second copies of something the manuscript's own
-            rail already carried, and reaching them meant opening a list
-            first; Book View itself is gone, since a panel that could
-            describe the book while the middle of the window showed a page of
-            it was two screens pretending to be one. What is left is the way
-            to shut the panel, at the end of the row where a dismiss belongs. */}
-        <div className="flex items-center justify-end gap-2">
-          {onClose && (
+            It held four once: a way back to Book View, a microphone and an
+            import button behind a spacer, each a second copy of something the
+            manuscript’s own chrome carried. */}
+        {onClose && (
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -633,12 +635,11 @@ export function BookPanel({
                 strokeLinejoin="round"
                 className="h-5 w-5"
               >
-                <rect x="2.5" y="3.5" width="15" height="13" rx="2" />
-                <path d="M8 3.5v13" />
+                {icons.panel}
               </svg>
             </button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* The book's three parts, one card each. Front matter opens the
             book, the body is the story, back matter closes it — the order
@@ -908,6 +909,23 @@ function PageConnector({
   // card to the paper is the whole point of it.
   const [grown, setGrown] = useState(false);
 
+  /**
+   * Whether that entrance has finished — and, from then on, the end of the
+   * transition.
+   *
+   * **The rules came away from the paper on a fast zoom, and this is why.**
+   * The 700ms ease exists for the one moment above; left on, it applied to
+   * every later change of width too. So while a zoom gesture moved the page,
+   * the measurement followed it frame by frame and the *drawing* trailed
+   * two-thirds of a second behind — the rules stretched off the paper's edge
+   * and floated, which reads as a pair of lines pointing at nothing.
+   *
+   * A rule that has arrived is not animating anywhere; it is stuck to the
+   * page. So the transition is spent on the entrance and then dropped, and
+   * every width after that lands on the frame it was measured in.
+   */
+  const [arrived, setArrived] = useState(false);
+
   useEffect(() => {
     let frame = 0;
     let last = "";
@@ -975,6 +993,13 @@ function PageConnector({
     return () => cancelAnimationFrame(frame);
   }, [rules, grown]);
 
+  // The 700ms travel plus the lower rule's 110ms stagger, and then a beat.
+  useEffect(() => {
+    if (!grown || arrived) return;
+    const done = setTimeout(() => setArrived(true), 900);
+    return () => clearTimeout(done);
+  }, [grown, arrived]);
+
   if (!rules) return null;
 
   return createPortal(
@@ -983,9 +1008,26 @@ function PageConnector({
         <span
           key={i}
           aria-hidden="true"
-          className="pointer-events-none fixed z-40 h-1.5 -translate-y-1/2
-                     rounded-r-sm transition-[width,opacity] duration-700
-                     ease-out"
+          /* **Over the panel, under the paper**, and it has to be exactly
+             that. They start at the card's own right edge and finish 3px
+             inside the page, so they have one neighbour at each end and have
+             to be on the correct side of both.
+
+             At `z-40` — the panel's own — they were over it *and* over the
+             page, because a body portal beats a static manuscript column on
+             document order whatever the number says: the pair lay across the
+             writing. Dropped below the page they went under the panel too,
+             and the first inch of the run, the inch that leaves the card,
+             was hidden: they appeared to come out from under the panel rather
+             than out of the card they belong to. So: 41 clears the panel at
+             40, the page clears them at 42, and the rail at 45 clears the
+             lot. */
+          className={`pointer-events-none fixed z-[41] h-1.5 -translate-y-1/2
+                      rounded-r-sm ${
+                        arrived
+                          ? "transition-none"
+                          : "transition-[width,opacity] duration-700 ease-out"
+                      }`}
           style={{
             left: `${rules.x}px`,
             top: `${y}px`,
@@ -997,8 +1039,10 @@ function PageConnector({
             // only ever reading as a smear.
             backgroundColor: `var(${CARD_EDGE_VAR})`,
             // The lower one a beat behind the upper, so the pair draws itself
-            // rather than arriving.
-            transitionDelay: `${i * 110}ms`,
+            // rather than arriving. Only while it is being drawn: a delay on a
+            // rule that is following the page would be a second lag on top of
+            // the transition this one has already dropped.
+            transitionDelay: arrived ? undefined : `${i * 110}ms`,
           }}
         />
       ))}
