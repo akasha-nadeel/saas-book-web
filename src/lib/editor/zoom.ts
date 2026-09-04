@@ -117,52 +117,65 @@ export function zoomFromWheel(
   return clampZoom(zoom * Math.exp(-px * SENSITIVITY));
 }
 
-/** Where the scroller should be, to hold one point still. */
-export interface ScrollAt {
-  left: number;
-  top: number;
+/** A point, in client coordinates or in the page's own unzoomed ones. */
+export interface Point {
+  x: number;
+  y: number;
 }
 
 /**
- * The scroll offsets that keep the point under the pointer under the pointer.
+ * Where the pointer is, in the page's own unzoomed coordinates.
  *
- * **This is the whole difference between "it zooms" and "it feels right".**
- * Without it the page grows from its top-left corner and the paragraph a writer
- * was reading slides off the screen, so every zoom costs a scroll to find their
- * place again. With it, the word under the cursor does not move and the rest of
- * the page grows around it.
- *
- * The arithmetic: the point under the pointer, measured from the top of the
- * scrollable content, is `scroll + (pointer − edge)`. Scaling the content by
- * `ratio` moves that point to `ratio ×` itself. Putting it back under the same
- * pointer means scrolling to the difference.
- *
- * **Clamped at zero**, because a negative scroll offset is silently treated as
- * zero by the browser and would otherwise make the anchor drift at the top of
- * the document — where a writer spends most of their time. The far end needs no
- * clamp: the browser caps it against the real content size, which this cannot
- * know without measuring after the reflow.
+ * Taken *before* the zoom changes, and the pair to `anchorDelta` below.
+ * `scale` is what the page is drawn at now — its rendered width over its
+ * layout width — so this undoes it and leaves a coordinate that means the same
+ * thing at every zoom.
  */
-export function anchoredScroll({
-  scroll,
-  pointer,
-  edge,
-  ratio,
-}: {
-  /** Current `scrollLeft` / `scrollTop`. */
-  scroll: ScrollAt;
-  /** The pointer, in client coordinates. */
-  pointer: { x: number; y: number };
-  /** The scroller's top-left, in client coordinates. */
-  edge: { x: number; y: number };
-  /** New zoom over old zoom. */
-  ratio: number;
-}): ScrollAt {
-  const withinX = pointer.x - edge.x;
-  const withinY = pointer.y - edge.y;
-
+export function pagePointUnder(
+  pointer: Point,
+  pageEdge: Point,
+  scale: number,
+): Point {
+  const safe = scale > 0 ? scale : 1;
   return {
-    left: Math.max(0, (scroll.left + withinX) * ratio - withinX),
-    top: Math.max(0, (scroll.top + withinY) * ratio - withinY),
+    x: (pointer.x - pageEdge.x) / safe,
+    y: (pointer.y - pageEdge.y) / safe,
+  };
+}
+
+/**
+ * How far to scroll so a page point lands back under the pointer.
+ *
+ * **Measured after the reflow rather than predicted before it**, which is the
+ * whole reason this replaced an earlier version that scaled the scroll offsets
+ * by the zoom ratio. That arithmetic assumed the entire scrollable content
+ * scales about its own origin, and it does not: the desk has padding that does
+ * not scale, and the page is centred by margins that change with its width. The
+ * error was small per frame and the pointer holds still across a hundred of
+ * them, so it accumulated — the page crept, and correcting a crept value the
+ * next frame is what made it shake.
+ *
+ * Reading the page's real edge after the browser has re-laid it out costs one
+ * forced layout in an effect that has already caused one, and it cannot drift,
+ * because nothing is being predicted.
+ */
+export function anchorDelta({
+  pointer,
+  pagePoint,
+  pageEdge,
+  scale,
+}: {
+  /** Where the pointer is now, in client coordinates. */
+  pointer: Point;
+  /** The point that was under it, in the page's unzoomed coordinates. */
+  pagePoint: Point;
+  /** The page's top-left *after* the zoom, in client coordinates. */
+  pageEdge: Point;
+  /** What the page is drawn at now. */
+  scale: number;
+}): Point {
+  return {
+    x: pageEdge.x + pagePoint.x * scale - pointer.x,
+    y: pageEdge.y + pagePoint.y * scale - pointer.y,
   };
 }

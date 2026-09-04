@@ -25,11 +25,13 @@ import {
   useFormatPillVisible,
 } from "@/components/editor/format-pill";
 import {
-  anchoredScroll,
+  anchorDelta,
+  pagePointUnder,
   steppedZoom,
   zoomFromWheel,
 } from "@/lib/editor/zoom";
 import { useStoredZoom } from "@/lib/editor/use-stored-zoom";
+import { suspendPagination } from "@/lib/editor/pagination";
 import {
   Rail,
   RailButton,
@@ -1550,8 +1552,8 @@ function EditorSurface({
      effect below — which has to run *after* the reflow, since the content's new
      size is what the anchoring is against. */
   const anchorRef = useRef<{
-    pointer: Omit<Parameters<typeof anchoredScroll>[0], "ratio">;
-    ratio: number;
+    pointer: { x: number; y: number };
+    pagePoint: { x: number; y: number };
   } | null>(null);
   /* The zoom the page is actually drawn at, for the wheel handler to read
      without re-subscribing on every change — re-attaching a listener each
@@ -1588,17 +1590,31 @@ function EditorSurface({
       const next = zoomFromWheel(from, event.deltaY, event.deltaMode);
       if (next === from) return;
 
-      const box = scroller.getBoundingClientRect();
-      anchorRef.current = {
-        pointer: {
-          scroll: { left: scroller.scrollLeft, top: scroller.scrollTop },
-          pointer: { x: event.clientX, y: event.clientY },
-          edge: { x: box.left, y: box.top },
-        },
-        /* Against the value actually on screen, not the one queued: the ratio
-           has to describe the reflow that is about to happen. */
-        ratio: next / zoomRef.current,
-      };
+      /* **Hold pagination off for the length of the gesture.** Its measure
+         ends by putting the viewport back where it was — writing `scrollTop` —
+         and the anchoring below is writing `scrollTop` too. Two writers on one
+         property sixty times a second is the page shaking. */
+      suspendPagination();
+
+      /* **The point under the pointer, in the page's own coordinates**, taken
+         before anything moves. Only the first event of a frame records it: the
+         pointer has not moved between them, and re-reading the page's edge
+         after an earlier event of the same frame has already changed the zoom
+         would measure a page that is halfway to somewhere. */
+      if (!anchorRef.current) {
+        const page = flowRef.current?.getBoundingClientRect();
+        if (page && flowRef.current) {
+          const scale = page.width / flowRef.current.offsetWidth;
+          anchorRef.current = {
+            pointer: { x: event.clientX, y: event.clientY },
+            pagePoint: pagePointUnder(
+              { x: event.clientX, y: event.clientY },
+              { x: page.left, y: page.top },
+              scale,
+            ),
+          };
+        }
+      }
 
       queued = next;
       if (!frame) frame = requestAnimationFrame(commit);
@@ -1621,12 +1637,28 @@ function EditorSurface({
   useLayoutEffect(() => {
     const held = anchorRef.current;
     const scroller = scrollerRef.current;
+    const flow = flowRef.current;
     anchorRef.current = null;
-    if (!held || !scroller) return;
+    if (!held || !scroller || !flow) return;
 
-    const at = anchoredScroll({ ...held.pointer, ratio: held.ratio });
-    scroller.scrollLeft = at.left;
-    scroller.scrollTop = at.top;
+    /* Read the page where the browser has just put it, rather than working out
+       where it ought to be. Predicting it is what drifted: the desk's padding
+       does not scale and the page's centring margins change with its width, so
+       a ratio applied to the scroll offsets was always a little wrong — and a
+       little wrong, corrected against itself sixty times a second with the
+       pointer held still, is a shake. */
+    const page = flow.getBoundingClientRect();
+    const delta = anchorDelta({
+      pointer: held.pointer,
+      pagePoint: held.pagePoint,
+      pageEdge: { x: page.left, y: page.top },
+      scale: page.width / flow.offsetWidth,
+    });
+
+    /* Whole pixels, and only when it is worth moving. Sub-pixel corrections
+       are what a browser rounds inconsistently, which is its own jitter. */
+    if (Math.abs(delta.y) >= 1) scroller.scrollTop += delta.y;
+    if (Math.abs(delta.x) >= 1) scroller.scrollLeft += delta.x;
   }, [zoom]);
 
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {

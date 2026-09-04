@@ -3,8 +3,9 @@ import {
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
-  anchoredScroll,
+  anchorDelta,
   clampZoom,
+  pagePointUnder,
   steppedZoom,
   zoomFromWheel,
 } from "./zoom";
@@ -120,73 +121,49 @@ it("never leaves the range however hard the wheel is spun", () => {
 /**
  * **The point under the pointer stays under the pointer.**
  *
- * Without this the page grows from its top-left corner, so the paragraph being
- * read slides away and every zoom costs a scroll to find it again. The test
- * works the anchoring backwards: take a point in the content, scale it, and
- * check the new scroll puts it back at the same place on screen.
+ * Taken in the page's own unzoomed coordinates before the zoom, and put back
+ * against the page's real edge after it. Working the pair together is what
+ * proves the round trip: undo the scale, redo it, and the pointer has not
+ * moved.
  */
-it("keeps the point under the pointer where it is", () => {
-  const scroll = { left: 0, top: 1000 };
+it("puts the same page point back under the pointer", () => {
   const pointer = { x: 700, y: 400 };
-  const edge = { x: 100, y: 120 };
-  const ratio = 1.5;
+  const before = { x: 300, y: 120 };
 
-  const next = anchoredScroll({ scroll, pointer, edge, ratio });
+  const pagePoint = pagePointUnder(pointer, before, 1);
 
-  // Where the point sat in the content before, and after the content grew.
-  const withinY = pointer.y - edge.y;
-  const before = scroll.top + withinY;
-  const after = before * ratio;
+  // The page has been re-laid out larger, and its top-left has moved with it.
+  const after = { x: 210, y: 40 };
+  const delta = anchorDelta({ pointer, pagePoint, pageEdge: after, scale: 1.5 });
 
-  // On screen, measured from the scroller's edge: unchanged.
-  expect(after - next.top).toBeCloseTo(withinY, 10);
+  // Scrolling by that delta puts the point back under the pointer exactly.
+  expect(after.y + pagePoint.y * 1.5 - delta.y).toBeCloseTo(pointer.y, 10);
+  expect(after.x + pagePoint.x * 1.5 - delta.x).toBeCloseTo(pointer.x, 10);
 });
 
 /**
- * The same, zooming out — and scrolled far enough in that the answer is a real
- * offset rather than the zero clamp. Halving the content of a page scrolled
- * only a little asks for a negative offset, which is the *next* test.
+ * **Nothing to do when nothing moved**, which is the case that used to drift.
+ *
+ * The old arithmetic scaled the scroll offsets by the zoom ratio and assumed
+ * the whole scrollable content grew about its own origin. It does not — the
+ * desk has padding that does not scale — so even a ratio of one left a small
+ * remainder, and a remainder corrected against itself every frame with the
+ * pointer held still is what made the page shake.
  */
-it("holds the anchor when zooming out too", () => {
-  const scroll = { left: 2000, top: 900 };
-  const pointer = { x: 300, y: 500 };
-  const edge = { x: 0, y: 100 };
-  const ratio = 0.5;
+it("asks for no scroll when the page has not moved", () => {
+  const pointer = { x: 640, y: 300 };
+  const edge = { x: 200, y: 80 };
+  const pagePoint = pagePointUnder(pointer, edge, 2);
 
-  const next = anchoredScroll({ scroll, pointer, edge, ratio });
-  const withinX = pointer.x - edge.x;
-  const before = scroll.left + withinX;
+  const delta = anchorDelta({ pointer, pagePoint, pageEdge: edge, scale: 2 });
 
-  expect(before * ratio - next.left).toBeCloseTo(withinX, 10);
+  expect(delta.x).toBeCloseTo(0, 10);
+  expect(delta.y).toBeCloseTo(0, 10);
 });
 
-/**
- * **Never negative**, because a browser reads a negative offset as zero and the
- * anchor would then drift — at the top of the document, which is exactly where
- * a writer spends most of their time.
- */
-it("never asks for a negative scroll", () => {
-  const next = anchoredScroll({
-    scroll: { left: 0, top: 0 },
-    pointer: { x: 200, y: 300 },
-    edge: { x: 0, y: 0 },
-    ratio: 0.25,
-  });
-
-  expect(next.left).toBeGreaterThanOrEqual(0);
-  expect(next.top).toBeGreaterThanOrEqual(0);
-});
-
-/** A ratio of one is not a zoom, and must move nothing. */
-it("leaves the scroll alone when the zoom does not change", () => {
-  const scroll = { left: 33, top: 777 };
-  const next = anchoredScroll({
-    scroll,
-    pointer: { x: 400, y: 400 },
-    edge: { x: 20, y: 60 },
-    ratio: 1,
-  });
-
-  expect(next.left).toBeCloseTo(scroll.left, 10);
-  expect(next.top).toBeCloseTo(scroll.top, 10);
+/** A page drawn at no width cannot divide, and must not answer NaN. */
+it("survives a page that has not been laid out yet", () => {
+  const point = pagePointUnder({ x: 100, y: 100 }, { x: 0, y: 0 }, 0);
+  expect(Number.isFinite(point.x)).toBe(true);
+  expect(Number.isFinite(point.y)).toBe(true);
 });

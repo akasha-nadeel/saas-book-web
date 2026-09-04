@@ -42,6 +42,55 @@ export {
  * level — zoom only scales what is already laid out.
  */
 
+/**
+ * Until when measuring is held off, as a timestamp.
+ *
+ * **Module-level rather than an option, because the caller is not the editor.**
+ * The zoom gesture lives in `chapter-editor.tsx` and has no handle on the
+ * plugin instance — it is constructed inside Tiptap's extension list — so a
+ * prop would have to be threaded through the editor's whole configuration to
+ * reach here. There is one paginated surface on screen at a time, which is what
+ * makes a module-level flag honest rather than a shortcut.
+ */
+let suspendedUntil = 0;
+let resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Every paginated surface currently mounted, so a resume can reach them. */
+const live = new Set<PaginationView>();
+
+/** Whether measuring is currently held off. */
+function paginationSuspended(): boolean {
+  return suspendedUntil > 0 && Date.now() < suspendedUntil;
+}
+
+/**
+ * Hold off re-measuring for a moment — for the duration of a zoom gesture.
+ *
+ * Called on every wheel event of a pinch, each one pushing the window further
+ * out, so the suspension lasts as long as the gesture and lapses shortly after
+ * the writer stops. See the note in `schedule`.
+ */
+export function suspendPagination(ms = 250): void {
+  suspendedUntil = Date.now() + ms;
+
+  /**
+   * One measure once it lapses, and only one.
+   *
+   * Nothing else would ask for it: the observer fires *during* the gesture and
+   * is turned away, and a writer who is pinching is not typing, so no
+   * transaction arrives to schedule one either. Harmless for the zoom itself —
+   * breaks do not move — but a picture that finished loading mid-pinch would
+   * leave the pagination stale until the next keystroke. The timer is reset by
+   * each call, so a long gesture runs this once at the end rather than once
+   * per event.
+   */
+  if (resumeTimer !== null) clearTimeout(resumeTimer);
+  resumeTimer = setTimeout(() => {
+    resumeTimer = null;
+    for (const view of live) view.resume();
+  }, ms + 20);
+}
+
 export interface PaginationOptions {
   /** Latest geometry, read fresh each measure so a page-setup change is picked
    *  up without rebuilding the editor. Null disables pagination. */
@@ -175,6 +224,7 @@ class PaginationView {
       this.schedule();
     });
     this.observer.observe(view.dom);
+    live.add(this);
     this.schedule();
   }
 
@@ -282,6 +332,21 @@ class PaginationView {
    * of what you see.
    */
   private schedule() {
+    /**
+     * **Not while the page is being zoomed.**
+     *
+     * `measure()` ends by putting the viewport back where it was
+     * (`holdViewport`, which writes `scroller.scrollTop`), and a zoom gesture
+     * is *also* writing `scrollTop` every frame to hold the point under the
+     * pointer. Two writers on one property, sixty times a second, is the page
+     * visibly shaking — which is exactly what it did.
+     *
+     * Suspending is safe rather than a compromise: breaks are computed in
+     * unzoomed pixels, so the answer cannot change while only the zoom is
+     * moving. The gesture lifts the suspension when it settles and one measure
+     * runs then, which is the only one that was ever needed.
+     */
+    if (paginationSuspended()) return;
     if (this.queued) return;
     this.queued = true;
     queueMicrotask(() => {
@@ -692,6 +757,12 @@ class PaginationView {
     // A queued microtask cannot be cancelled, so it is flagged off instead.
     this.destroyed = true;
     this.observer.disconnect();
+    live.delete(this);
+  }
+
+  /** Re-measure now, if anything was missed while measuring was suspended. */
+  resume() {
+    this.schedule();
   }
 }
 
