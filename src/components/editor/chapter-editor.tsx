@@ -25,8 +25,6 @@ import {
   useFormatPillVisible,
 } from "@/components/editor/format-pill";
 import {
-  ZOOM_MAX,
-  ZOOM_MIN,
   anchoredScroll,
   steppedZoom,
   zoomFromWheel,
@@ -1806,55 +1804,49 @@ function EditorSurface({
 
               No rule and no panel behind it either. The desk that was already
               there is the bar; an edge would only have drawn a second one. */}
-          {/* `relative`, so the formatting pill can be centred on this strip —
-              which is centred on the page, because the row below sizes itself
-              to the sheet's own width. That is what puts the bar over the
-              middle of the paper at any zoom, and moves it sideways with the
-              page when the side panel opens, without measuring the sheet. */}
+          {/* `relative`, so the formatting pill can be centred on this strip.
+              The strip spans the manuscript area — the same box the page is
+              centred inside — so centring on it is centring on the paper, and
+              it follows the page sideways when the side panel opens. */}
           <div className="editor-desk-strip relative shrink-0 bg-white dark:bg-accent/7 px-4 pt-3 pb-2">
             <div
-              /* **The readings stand down while the pill is up.** They are two
-                 bars in one line otherwise, and none of what is here — a word
-                 count, the zoom, a save status — is wanted mid-sentence. Undo
-                 and redo are the exception and travel *into* the pill, because
-                 undo is the one control a writer wants most while typing.
-                 Faded rather than unmounted, so the row keeps its height and
-                 nothing below it moves. */
-              className={`mx-auto flex items-center justify-between gap-3
-                          font-sans text-xs text-muted transition-opacity
-                          duration-150 ${
+              /* **The bar keeps its own size at every zoom**, which it did not
+                 until 2026-09-04: it was sized to `pageW × zoom` so the ends
+                 would line up with the sheet, and at 32% that squeezed a word
+                 count, a save status and two control groups into a couple of
+                 inches. A reading of the document is not part of the document,
+                 so it does not scale with it — and not resizing it every frame
+                 takes a layout pass out of the gesture as well.
+
+                 **Two readings and nothing else now.** Undo and redo moved into
+                 the pill, where they are wanted while typing; the zoom control
+                 went with the buttons that are no longer the way anybody zooms.
+                 What is left is what a writer glances at: how much they have
+                 written, and whether it is safe.
+
+                 The pair stand down while the pill is up — faded rather than
+                 unmounted, so the row keeps its height and nothing below it
+                 moves. */
+              className={`flex items-center justify-between gap-3 font-sans
+                          text-xs text-muted transition-opacity duration-150 ${
                             pillVisible
                               ? "pointer-events-none opacity-0"
                               : "opacity-100"
                           }`}
-              style={{
-                width: `${geom.pageW * zoom * PAGE_SCALE}px`,
-                maxWidth: "100%",
-              }}
             >
-              {/* The two readings take equal, fixed shares of the bar, so the
-                  control between them sits on the middle of the sheet rather
-                  than wherever a word count of four digits happens to leave
-                  it — the number changes as a writer types, and a control that
-                  drifts while they work is a control they have to look for. */}
-              <span className="pointer-events-none flex-1 truncate tabular-nums">
+              {/* The word count at the left edge of the bar and the save
+                  status at the right, with the whole width between them. They
+                  were a pair of equal flanks around a group of controls; with
+                  the controls gone there is nothing to balance, and pushing
+                  them to the two ends is what stops either drifting as its
+                  own number changes. */}
+              <span className="pointer-events-none min-w-0 truncate tabular-nums">
                 {written.toLocaleString()}
                 {book.targetWords
                   ? ` of ${book.targetWords.toLocaleString()}`
                   : ""}{" "}
                 words
               </span>
-
-              {/* The centre is where the bar's controls live and the flanks
-                  are readings, so history joins the zoom here rather than
-                  crowding one of the two numbers. A hairline between the pair
-                  keeps them as two groups: what has happened to the document,
-                  and how large it is drawn. */}
-              <div className="flex shrink-0 items-center gap-1">
-                <HistoryControls editor={editor} />
-                <span aria-hidden="true" className="mx-1 h-4 w-px bg-line" />
-                <ZoomControl zoom={zoom} onZoom={onZoom} />
-              </div>
 
               {/* **A save indicator on a book that cannot be saved is a lie**, and
                   this is the corner of the screen a writer checks to find out
@@ -1864,7 +1856,11 @@ function EditorSurface({
                   not take a keystroke. */}
               <span
                 aria-live="polite"
-                className="pointer-events-none flex-1 truncate text-right"
+                /* Pinned to the right end, and never squeezed: `shrink-0` so a
+                   long word count cannot push "Saved · 8:16 pm" into an
+                   ellipsis, which is the one reading here that has to be
+                   readable at a glance. */
+                className="pointer-events-none shrink-0 text-right"
                 style={
                   status === "error" && canWrite
                     ? { color: "var(--color-danger)" }
@@ -2302,95 +2298,3 @@ function HistoryButton({
   );
 }
 
-/**
- * The page-zoom control, pinned to the bottom-right of the workspace the way a
- * word processor puts it in the status bar. Pinned to the workspace rather than
- * the scrolling page, so it stays in reach as the manuscript scrolls.
- */
-function ZoomControl({
-  zoom,
-  onZoom,
-}: {
-  zoom: number;
-  onZoom: (zoom: number) => void;
-}) {
-  /* The clamping and the rounding used to live here as one function. They are
-     two ideas and they parted when the page started answering a pinch:
-     `steppedZoom` rounds, because a button should land on a tidy number, and
-     `clampZoom` does not, because rounding a gesture to tenths is ratcheting
-     rather than zooming. Both are in `lib/editor/zoom.ts` with the tests. */
-
-  return (
-    <div
-      // In the bar now rather than floating at the foot of the page. It sat
-      // over the bottom-right corner of the paper, which is where the last
-      // lines of a chapter are — the one part of the page a writer is looking
-      // at. Up here it is on the bar's own ground, centred over the sheet, and
-      // never over the words.
-      //
-      // No card of its own any more: the bar is the ground, and a bordered box
-      // inside a bordered bar is one border too many.
-      className="flex shrink-0 items-center gap-0.5"
-    >
-      <button
-        type="button"
-        onClick={() => onZoom(steppedZoom(zoom, -1))}
-        disabled={zoom <= ZOOM_MIN}
-        aria-label="Zoom out"
-        title="Zoom out"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-muted
-                   outline-none transition-colors hover:bg-raised hover:text-fg
-                   focus-visible:ring-2 focus-visible:ring-accent/60
-                   disabled:opacity-40 disabled:hover:bg-transparent"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          className="h-4 w-4"
-        >
-          <path d="M5 10h10" />
-        </svg>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onZoom(1)}
-        aria-label="Reset zoom"
-        title="Reset zoom"
-        className="w-11 rounded-md py-1 text-center font-sans text-xs tabular-nums
-                   text-muted outline-none transition-colors hover:bg-raised
-                   hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        {Math.round(zoom * 100)}%
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onZoom(steppedZoom(zoom, 1))}
-        disabled={zoom >= ZOOM_MAX}
-        aria-label="Zoom in"
-        title="Zoom in"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-muted
-                   outline-none transition-colors hover:bg-raised hover:text-fg
-                   focus-visible:ring-2 focus-visible:ring-accent/60
-                   disabled:opacity-40 disabled:hover:bg-transparent"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          className="h-4 w-4"
-        >
-          <path d="M10 5v10M5 10h10" />
-        </svg>
-      </button>
-    </div>
-  );
-}

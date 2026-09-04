@@ -178,8 +178,25 @@ class PaginationView {
     this.schedule();
   }
 
+  /**
+   * The document's height in **layout** pixels, not painted ones.
+   *
+   * `offsetHeight` rather than `getBoundingClientRect().height`, and the
+   * difference is the whole of why zooming used to stutter. The page is scaled
+   * with the CSS `zoom` property, which a bounding rect reports and
+   * `offsetHeight` does not — so every step of a pinch changed the measured
+   * height, tripped the observer above, and re-paginated the entire chapter.
+   * Sixty times a second, and every one of them wasted: this file computes
+   * breaks in unzoomed pixels (see the note at the top), so the answer at 32%
+   * is the answer at 400%.
+   *
+   * Reading the layout height instead makes a pure zoom change invisible here,
+   * which is the truth of it — nothing about the document changed. A real
+   * change, from an image loading or a web font settling, still moves this and
+   * still re-measures.
+   */
   private height(): number {
-    return this.view.dom.getBoundingClientRect().height;
+    return this.view.dom.offsetHeight;
   }
 
   /**
