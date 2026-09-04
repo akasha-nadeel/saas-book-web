@@ -1574,6 +1574,7 @@ function EditorSurface({
     pointer: { x: number; y: number };
     from: number;
     live: number;
+    pageWidth: number;
   } | null>(null);
   /* The zoom the page is committed at, for the handler to read without
      re-subscribing on every change. Synced in an effect rather than during
@@ -1597,8 +1598,30 @@ function EditorSurface({
       const flow = flowRef.current;
       const gesture = gestureRef.current;
       if (!flow || !gesture) return;
-      flow.style.transformOrigin = `${gesture.origin.x}px ${gesture.origin.y}px`;
-      flow.style.transform = `scale(${gesture.live / gesture.from})`;
+
+      const scale = gesture.live / gesture.from;
+
+      /**
+       * **Horizontally the page is centred, so the gesture has to be too.**
+       *
+       * Anchoring the transform at the pointer is right for the axis that
+       * scrolls and wrong for the one that does not. While the page is
+       * narrower than the desk it has no horizontal scroll at all — it sits in
+       * the middle by its own margins — so a transform growing it *away* from a
+       * pointer at one side is showing something the committed layout will not
+       * agree with. At the hand-over the page is laid out centred again, there
+       * is no `scrollLeft` to correct with, and it jumps sideways.
+       *
+       * So: centre while it fits, follow the pointer once it does not and
+       * there is somewhere to scroll. The switch happens at the same width the
+       * browser's own centring gives up at, which is what keeps the two in
+       * step through the middle of a gesture.
+       */
+      const fits = gesture.pageWidth * scale <= scroller.clientWidth;
+      const originX = fits ? flow.offsetWidth / 2 : gesture.origin.x;
+
+      flow.style.transformOrigin = `${originX}px ${gesture.origin.y}px`;
+      flow.style.transform = `scale(${scale})`;
     };
 
     /** Hand the gesture's result to React, which lays it out properly. */
@@ -1653,6 +1676,9 @@ function EditorSurface({
           pointer: { x: event.clientX, y: event.clientY },
           from: zoomRef.current,
           live: zoomRef.current,
+          /* The page as drawn when the gesture began, so `paint` can tell
+             whether it still fits the desk without measuring every frame. */
+          pageWidth: page.width,
         };
       }
 
@@ -1712,7 +1738,17 @@ function EditorSurface({
     /* Whole pixels only — a sub-pixel correction is rounded inconsistently,
        which is jitter by another name. */
     if (Math.abs(delta.y) >= 1) scroller.scrollTop += delta.y;
-    if (Math.abs(delta.x) >= 1) scroller.scrollLeft += delta.x;
+
+    /* **Only when there is somewhere to scroll sideways.** While the page fits
+       the desk it is centred by its own margins and `scrollLeft` is pinned at
+       zero, so asking for a horizontal correction is asking for something the
+       browser will refuse — and the transform was centred through the gesture
+       for exactly that reason. Past that width the page really can be scrolled
+       across, and the pointer is the right thing to hold still. */
+    const scrollsSideways = scroller.scrollWidth > scroller.clientWidth;
+    if (scrollsSideways && Math.abs(delta.x) >= 1) {
+      scroller.scrollLeft += delta.x;
+    }
   }, [zoom]);
 
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
