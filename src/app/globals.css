@@ -91,6 +91,32 @@
   --color-raised: #1e252e; /* hover, inputs, pressed states */
   --color-line: #262c38; /* hairlines and dividers */
 
+  /* **The one place the ladder runs the other way: a surface that floats.**
+
+     The rule above is about surfaces cut *into* the page — a rail, a sidebar,
+     the content well — and for those, darker is what reads as set into the
+     ground. A sheet standing over the page is the opposite case, and every
+     elevation model in the trade agrees on it: something lifted catches more
+     light than what it covers, so it is lighter, and what sits on *it* is
+     lighter again.
+
+     Drawn dark, a floating card reads as a hole punched in the page. So the
+     ladder is three names and exactly two steps: the card takes "float", just
+     above "surface", and the groups of rows inside it take "lifted", above
+     that. A third step would be a gradient rather than a hierarchy.
+
+     "float" is its own token rather than "raised" — which sits at the same
+     sort of height — because "raised" is the app's hover and pressed state and
+     is read by a hundred call sites. A card wanting to be a shade darker must
+     not be able to move every hover in the product with it.
+
+     "lifted-line" goes with the pair because "line" is #262c38 and "lifted" is
+     #232a35: a hairline that close to its own ground is not a hairline.
+     Anything wearing the one wears the other. */
+  --color-float: #151920; /* a card standing over the page */
+  --color-lifted: #232a35; /* a group of rows on one */
+  --color-lifted-line: #3a4451; /* its hairlines, which "line" is too dark for */
+
   --color-fg: #f1f2fa; /* body text — near-white, not a hard white */
   --color-muted: #bcc5de; /* labels, metadata, anything secondary */
 
@@ -843,6 +869,12 @@
   --color-panel: #ffffff;
   --color-raised: #f4f4f5;
   --color-line: #d4d4d8;
+  /* Inverted, and it has to be: by day the card is the grey and the groups on
+     it are the white. Same ladder and the same direction of travel — lifted is
+     nearer the light — coming out the other way round because the ground did. */
+  --color-float: #f7f7f8;
+  --color-lifted: #ffffff;
+  --color-lifted-line: #e4e4e7;
 
   --color-fg: #17171a;
   --color-muted: #62626b;
@@ -1222,6 +1254,9 @@
   --color-panel: #070a11;
   --color-raised: #1e252e;
   --color-line: #262c38;
+  --color-float: #151920;
+  --color-lifted: #232a35;
+  --color-lifted-line: #3a4451;
   --color-fg: #f1f2fa;
   --color-muted: #bcc5de;
   --color-accent: #8ab4ff;

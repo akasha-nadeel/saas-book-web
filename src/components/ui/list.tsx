@@ -76,9 +76,24 @@ export function SectionHeader({
 export function ListGroup({
   children,
   as: Tag = "div",
+  tone = "sunken",
   className = "",
 }: {
   children: React.ReactNode;
+  /**
+   * Which way the group sits against whatever is behind it.
+   *
+   * `sunken` is the panel's own language and the default — a group of rows set
+   * *into* a surface, separated from it by a hairline. `lifted` is for the
+   * inside of a card that floats over the page, where the ladder runs the
+   * other way: the card is lighter than the page and the group is lighter
+   * again, so the step in tone does the separating and the outline comes off.
+   * The reasoning is beside `--color-lifted` in `globals.css`.
+   *
+   * Two values rather than a number. An elevation scale invites a third step,
+   * and a third step is a gradient rather than a hierarchy.
+   */
+  tone?: "sunken" | "lifted";
   /**
    * `ul` when the rows are genuinely a list of things.
    *
@@ -96,8 +111,13 @@ export function ListGroup({
 }) {
   return (
     <Tag
-      className={`flex flex-col divide-y divide-line overflow-hidden rounded-xl
-                  border border-line bg-raised/40 ${className}`}
+      className={`flex flex-col overflow-hidden rounded-xl ${
+        tone === "lifted"
+          ? /* No border: on a floating card the step in tone *is* the edge,
+               and an outline as well draws the box twice. */
+            "divide-y divide-lifted-line bg-lifted"
+          : "divide-y divide-line border border-line bg-raised/40"
+      } ${className}`}
     >
       {children}
     </Tag>

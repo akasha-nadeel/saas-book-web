@@ -134,7 +134,7 @@ export function ToolsPanel({
   return (
     <div className="scroll-slim flex-1 overflow-y-auto px-3 py-4">
       <SectionHeader>Type</SectionHeader>
-      <ListGroup>
+      <ListGroup tone="lifted">
         <ListRow
           title="Font"
           trailing={
@@ -235,7 +235,7 @@ export function ToolsPanel({
       </ListGroup>
 
       <SectionHeader className="mt-5">The page</SectionHeader>
-      <ListGroup>
+      <ListGroup tone="lifted">
         <ListRow
           title="Paper"
           trailing={
@@ -277,7 +277,7 @@ export function ToolsPanel({
       {canWrite && (
         <>
           <SectionHeader className="mt-5">Put on the page</SectionHeader>
-          <ListGroup>
+          <ListGroup tone="lifted">
             <ListRow
               title="A picture"
               detail={busy ? "Reading the file…" : "Placed where the caret is"}
@@ -311,7 +311,7 @@ export function ToolsPanel({
       )}
 
       <SectionHeader className="mt-5">While you write</SectionHeader>
-      <ListGroup>
+      <ListGroup tone="lifted">
         {/* Hidden outright where it cannot work — the engine is the browser's
             own, Chrome and Edge only, and a control that could never work on
             this machine is not drawn at all rather than drawn dead. */}

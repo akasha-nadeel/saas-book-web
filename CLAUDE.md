@@ -1234,6 +1234,19 @@ custom properties the editor and the reading view both read.
   information. The dashboard's ladder is four wide: red is blocked, amber is
   worth doing, green has passed, indigo is the road — and the button inside a red
   card stays indigo, because it is the way out.
+- **A surface that *floats* runs the ladder the other way** (2026-09-05), and
+  it is three tokens: `float` for the card's own ground, `lifted` for a group
+  of rows on it, `lifted-line` for that group's hairlines. The rule above is
+  about surfaces cut *into* the page; a sheet standing over the middle of one
+  is the opposite case, and drawn dark it reads as a hole punched in the page.
+  Two steps, never three — a third is a gradient rather than a hierarchy — and
+  the light set inverts, the card being the grey and the groups the white.
+  **`float` is its own token rather than `raised`** even though they sit at the
+  same sort of height: `raised` is the app's hover and pressed state on a
+  hundred call sites, and a card wanting to be a shade darker must not move
+  every hover in the product with it. `ListGroup` takes `tone="lifted"` for
+  this and drops its outline, since the step in tone is the edge. The Page &
+  type card is the only thing wearing it today.
 - **The documented exceptions are a closed list**, each with its reasoning in
   `docs/styling.md`: `--color-upgrade-*` (the one gradient), the pricing table's
   value badges, `--color-wordmark`, the sixteen tool marks, `--color-sheet`

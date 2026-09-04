@@ -145,9 +145,12 @@ export function ToolsPopover({
         type="button"
         onClick={onClose}
         aria-label="Close page and type"
+        /* The card's own ground, because it floats beside it and the two read
+           as one thing lifted off the page. Its hover goes a step further up
+           the same ladder rather than sideways into another colour. */
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full
-                   border border-line bg-panel text-fg/80 shadow-lg outline-none
-                   transition-colors hover:bg-raised hover:text-fg
+                   border border-line bg-float text-fg/80 shadow-lg outline-none
+                   transition-colors hover:bg-lifted hover:text-fg
                    focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         <svg
@@ -164,14 +167,20 @@ export function ToolsPopover({
       </button>
 
       <div
-        /* `nav-chrome` rather than the page's colours: it is a control surface
-           standing on the manuscript, and it belongs to the app the way both
-           rails do. */
-        className="nav-chrome flex w-full flex-col overflow-hidden rounded-2xl
-                   border border-line shadow-2xl"
+        /* **Lighter than the page it stands on, not darker.**
+
+           It wore `nav-chrome` — the rail's ground, the darkest surface in the
+           set — on the reasoning that a control surface belongs to the app
+           rather than to the manuscript. That is true of a rail, which is cut
+           into the window's edge, and wrong for a sheet floating over the
+           middle of it: drawn that way it read as a hole punched in the page.
+           `float` is one step above the desk and the groups inside take
+           `lifted`, one above that. See the note beside `--color-lifted`. */
+        className="flex w-full flex-col overflow-hidden rounded-2xl border
+                   border-line bg-float text-fg shadow-2xl"
         style={{ maxHeight: at.height }}
       >
-        <h2 className="shrink-0 border-b border-line px-4 py-3 font-sans text-sm font-semibold text-fg">
+        <h2 className="shrink-0 border-b border-lifted-line px-4 py-3 font-sans text-sm font-semibold text-fg">
           Page &amp; type
         </h2>
         <ToolsPanel
