@@ -21,6 +21,7 @@
  */
 
 import type { CollabRole } from "./collab";
+import { clampZoom } from "@/lib/editor/zoom";
 import { asChatModel, type ChatModel } from "@/lib/chat-model";
 import { isPanelTab, type PanelTab } from "./panel-tabs";
 import {
@@ -3240,6 +3241,18 @@ export interface Prefs {
   marks: boolean;
   /** Hold the caret at a fixed height instead of letting it sink. */
   typewriter: boolean;
+  /**
+   * How large the page is drawn, as a multiplier — 1 is 100%.
+   *
+   * **Stored, because it is a setting and not a view state.** It was per-session
+   * and reset to 100% on every reload, which is fine for a control nobody uses
+   * and wrong for one a writer reaches for constantly once it answers a pinch.
+   * Somebody who works at 125% because of their eyes or their screen means it
+   * every day, not until the next refresh.
+   *
+   * Narrowed through `clampZoom` on the way in — see the note there.
+   */
+  zoom: number;
   /** The chapters-and-notes panel. */
   leftPanel: boolean;
   /** Whether the manuscript chapter section is expanded beside the editor. */
@@ -3396,6 +3409,8 @@ export interface Prefs {
 const DEFAULT_PREFS: Prefs = Object.freeze({
   focusMode: false,
   typewriter: false,
+  // Full size. The one figure here a writer reads as a percentage.
+  zoom: 1,
   // Off, as in a word processor: shown when a writer goes looking for what is
   // taking up the space, not while they are simply writing.
   marks: false,
@@ -3478,6 +3493,13 @@ function parsePrefs(raw: string | null): Prefs {
     return {
       focusMode: parsed.focusMode === true,
       typewriter: parsed.typewriter === true,
+      // Narrowed like `panelTab`, and this one has teeth: a stored zero or
+      // NaN draws a page of no width — including the control that would put it
+      // back — so a bad value has to be caught here or the editor is unusable
+      // with no way out of it.
+      zoom: clampZoom(
+        typeof parsed.zoom === "number" ? parsed.zoom : DEFAULT_PREFS.zoom,
+      ),
       marks: parsed.marks === true,
       leftPanel: parsed.leftPanel !== false,
       chapterSectionOpen: parsed.chapterSectionOpen === true,

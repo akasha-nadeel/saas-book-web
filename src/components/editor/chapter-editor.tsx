@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -23,6 +24,13 @@ import {
   FormatPill,
   useFormatPillVisible,
 } from "@/components/editor/format-pill";
+import {
+  ZOOM_MAX,
+  ZOOM_MIN,
+  anchoredScroll,
+  steppedZoom,
+  zoomFromWheel,
+} from "@/lib/editor/zoom";
 import {
   Rail,
   RailButton,
@@ -428,10 +436,21 @@ export function ChapterEditor({
     const done = setTimeout(() => setEntering(false), 1100);
     return () => clearTimeout(done);
   }, [entering]);
-  // Page zoom. Held here rather than in the surface, which is remounted on every
-  // chapter change — so the level the writer set survives moving between
-  // chapters, the way it does in a word processor.
-  const [zoom, setZoom] = useState(1);
+  /**
+   * Page zoom, read from `prefs` rather than held here.
+   *
+   * It was `useState(1)`, which survived moving between chapters — the surface
+   * is remounted on every one — and reset on every reload. That was the right
+   * weight for a control nobody used; it is the wrong one now the page answers
+   * a pinch, because a writer who works at 125% for their eyes or their screen
+   * means it tomorrow as well.
+   *
+   * `setPref` writes through the store, so the value is narrowed by `clampZoom`
+   * coming back out — the guard that stops a stored zero rendering a page of
+   * no width.
+   */
+  const zoom = prefs.zoom;
+  const setZoom = useCallback((next: number) => setPref("zoom", next), []);
 
   // Opening a book is worth marking; it renders faster than the eye can catch,
   // so the loading screen is held for a beat, then faded. It plays only on the
@@ -571,6 +590,37 @@ export function ChapterEditor({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [setEditorPanel, panelOpen]);
+
+  /**
+   * ⌘= / ⌘− / ⌘0, the zoom shortcuts every application has.
+   *
+   * **`preventDefault` is the whole reason these exist as well as the wheel
+   * gesture.** Left alone, Ctrl+− shrinks the *browser* — chrome, panels and
+   * all — which is never what somebody looking at a page of prose meant. So the
+   * app has to claim them in order to do the right thing with them.
+   *
+   * `=` rather than `+`: the key is unshifted, and every application binds it
+   * that way. Both are accepted, since a numeric keypad sends `+`.
+   *
+   * Beside ⌘K and ⌘/ so the editor's shortcuts stay in one place.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return;
+      if (e.key === "=" || e.key === "+") {
+        e.preventDefault();
+        setZoom(steppedZoom(zoom, 1));
+      } else if (e.key === "-" || e.key === "_") {
+        e.preventDefault();
+        setZoom(steppedZoom(zoom, -1));
+      } else if (e.key === "0") {
+        e.preventDefault();
+        setZoom(1);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setZoom, zoom]);
 
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
@@ -1485,6 +1535,113 @@ function EditorSurface({
      of the test would disagree for a frame and the row would flicker. */
   const pillVisible = useFormatPillVisible(editor);
 
+  /**
+   * **Pinch and Ctrl+wheel zoom the page, and the point under the pointer
+   * stays under the pointer.**
+   *
+   * Without this a trackpad pinch zooms the *browser*, which scales the app's
+   * own chrome along with the manuscript and is never what a writer meant. The
+   * one test — `ctrlKey || metaKey` — covers both gestures, because every
+   * browser reports a pinch as a wheel event with `ctrlKey` set. A plain
+   * two-finger scroll has neither and stays a scroll.
+   *
+   * **`{ passive: false }` and a hand-attached listener**, not `onWheel`: React
+   * registers wheel listeners passively, and a passive listener may not call
+   * `preventDefault` — so the browser would go on zooming itself over the top
+   * of us.
+   *
+   * **One write per frame.** The page is scaled with CSS `zoom`, which reflows,
+   * and `pagination.ts` watches the editor's height with a `ResizeObserver` —
+   * so every change schedules a re-measure of the chapter. That work is wasted
+   * (page breaks are computed in unzoomed pixels and are identical at every
+   * zoom) but it is not free, and a trackpad emits far more than sixty events a
+   * second. Coalescing to one per animation frame puts the cost at what
+   * dragging a window edge already spends.
+   */
+  const scrollerRef = useRef<HTMLElement | null>(null);
+  /* Where the pointer was and how far the zoom moved, handed to the layout
+     effect below — which has to run *after* the reflow, since the content's new
+     size is what the anchoring is against. */
+  const anchorRef = useRef<{
+    pointer: Omit<Parameters<typeof anchoredScroll>[0], "ratio">;
+    ratio: number;
+  } | null>(null);
+  /* The zoom the page is actually drawn at, for the wheel handler to read
+     without re-subscribing on every change — re-attaching a listener each
+     frame of a pinch would drop events mid-gesture. Synced in an effect rather
+     than during render, which React forbids and which would be a lie anyway:
+     the ref must name what is on screen, and that is only true after paint. */
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    let frame = 0;
+    let queued: number | null = null;
+
+    const commit = () => {
+      frame = 0;
+      if (queued === null) return;
+      const next = queued;
+      queued = null;
+      onZoom(next);
+    };
+
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      // Before anything else, or a browser that has already decided to zoom
+      // itself will do both.
+      event.preventDefault();
+
+      const from = queued ?? zoomRef.current;
+      const next = zoomFromWheel(from, event.deltaY, event.deltaMode);
+      if (next === from) return;
+
+      const box = scroller.getBoundingClientRect();
+      anchorRef.current = {
+        pointer: {
+          scroll: { left: scroller.scrollLeft, top: scroller.scrollTop },
+          pointer: { x: event.clientX, y: event.clientY },
+          edge: { x: box.left, y: box.top },
+        },
+        /* Against the value actually on screen, not the one queued: the ratio
+           has to describe the reflow that is about to happen. */
+        ratio: next / zoomRef.current,
+      };
+
+      queued = next;
+      if (!frame) frame = requestAnimationFrame(commit);
+    };
+
+    scroller.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      scroller.removeEventListener("wheel", onWheel);
+    };
+  }, [onZoom]);
+
+  /**
+   * Put the anchor back, before the frame is painted.
+   *
+   * `useLayoutEffect` rather than `useEffect`: the browser has reflowed at the
+   * new zoom by the time this runs, so the scroll offsets it needs are real —
+   * and setting them here means the page never visibly jumps and settles back.
+   */
+  useLayoutEffect(() => {
+    const held = anchorRef.current;
+    const scroller = scrollerRef.current;
+    anchorRef.current = null;
+    if (!held || !scroller) return;
+
+    const at = anchoredScroll({ ...held.pointer, ratio: held.ratio });
+    scroller.scrollLeft = at.left;
+    scroller.scrollTop = at.top;
+  }, [zoom]);
+
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!editor || !editor.isEditable) return;
     if (draggedHere(e)) return;
@@ -1768,6 +1925,9 @@ function EditorSurface({
           </div>
 
           <main
+            /* The scroller the zoom gesture listens on, and the box the
+               anchoring measures the pointer against. */
+            ref={scrollerRef}
             /* **A grey desk, so the page reads as a page.** This was
                `bg-white` in daylight, which put a white sheet on a white
                ground — the paper had no edge but the hairline drawn round it,
@@ -1944,9 +2104,6 @@ function EditorSurface({
   );
 }
 
-const ZOOM_MIN = 0.5;
-const ZOOM_MAX = 2;
-const ZOOM_STEP = 0.1;
 
 /**
  * What the microphone is hearing, while it is on.
@@ -2136,8 +2293,11 @@ function ZoomControl({
   zoom: number;
   onZoom: (zoom: number) => void;
 }) {
-  const clamp = (z: number) =>
-    Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(z * 10) / 10));
+  /* The clamping and the rounding used to live here as one function. They are
+     two ideas and they parted when the page started answering a pinch:
+     `steppedZoom` rounds, because a button should land on a tidy number, and
+     `clampZoom` does not, because rounding a gesture to tenths is ratcheting
+     rather than zooming. Both are in `lib/editor/zoom.ts` with the tests. */
 
   return (
     <div
@@ -2153,7 +2313,7 @@ function ZoomControl({
     >
       <button
         type="button"
-        onClick={() => onZoom(clamp(zoom - ZOOM_STEP))}
+        onClick={() => onZoom(steppedZoom(zoom, -1))}
         disabled={zoom <= ZOOM_MIN}
         aria-label="Zoom out"
         title="Zoom out"
@@ -2189,7 +2349,7 @@ function ZoomControl({
 
       <button
         type="button"
-        onClick={() => onZoom(clamp(zoom + ZOOM_STEP))}
+        onClick={() => onZoom(steppedZoom(zoom, 1))}
         disabled={zoom >= ZOOM_MAX}
         aria-label="Zoom in"
         title="Zoom in"
