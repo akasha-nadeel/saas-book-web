@@ -644,8 +644,22 @@ export function ChapterEditor({
             See LeftPanel's `open`. It is `fixed` — it wants the window's full
             height, its own slide and a scrim on a phone — so the slot below
             holds the page's place for it. */}
+        {/* **The card covers the panel, so the panel stands down under it.**
+
+            Lighting only one rail tab was half the fix and looked like the
+            whole of it: the card is a little narrower than the panel, so the
+            panel's heading and the edges of its cards went on showing all
+            round it — two things on screen at once for a rail claiming one.
+
+            Open and *not visible*, not closed. `panelOpen` and `tab` are
+            untouched, so putting the card away gives back the panel that was
+            there — the same arrangement the navigator used to have behind a
+            tool panel, and the reason is the same: a writer who opens a
+            setting has not asked to lose their place. The slot below still
+            holds the page's width for both, so nothing moves as one replaces
+            the other. */}
         <LeftPanel
-          open={isLeftPanelOpen}
+          open={isLeftPanelOpen && !toolsOpen}
           tab={tab}
           bookId={bookId}
           chapterId={chapterId}
