@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LAUNCH_LIMITS, exportAllowed } from "@/lib/launch";
-import { TIER_LIMITS, type PlanTier } from "@/lib/billing/tiers";
+import { CREDIT_COST, monthlyCredits } from "@/lib/billing/credits";
+import { type PlanTier } from "@/lib/billing/tiers";
 import type { ChatModel } from "@/lib/ai";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
@@ -8,171 +9,151 @@ import { billingConfigured } from "./provider";
 import { subscriptionFor } from "./server";
 import { isPro, planTierOf, type Subscription } from "./subscription";
 
-export interface AssistantUsage {
-  used: number;
-  limit: number | null;
-  remaining: number | null;
+/**
+ * What a writer has left to spend on the assistant.
+ *
+ * **Two buckets, because they behave differently.** The monthly grant expires
+ * at the end of the month; bought credits do not. A screen prints `total`, and
+ * `/billing` prints the split so a writer can see what they will lose on the
+ * 1st and what they will not.
+ *
+ * `null` everywhere means *nothing is metered here* — no Supabase, or no
+ * payment gateway, which is the self-hosted case. It is `null` rather than
+ * `Infinity` because this crosses `/api/billing/subscription` as JSON.
+ */
+export interface CreditBalance {
+  /** Left in this UTC month's grant. */
+  grantLeft: number | null;
+  /** Bought credits, which do not expire. */
+  purchased: number | null;
+  /** The two together — what a writer can actually spend right now. */
+  total: number | null;
+  /** When the grant refills, as an instant. Rendered in local time. */
   resetAt: string | null;
 }
 
-interface AssistantClaimRow {
-  allowed?: unknown;
-  tier?: unknown;
-  used?: unknown;
-  limit_count?: unknown;
-  remaining?: unknown;
-  reset_at?: unknown;
-}
-
-/**
- * The two meters, and the row each one counts in `ai_usage`.
- *
- * Separate keys rather than one with a kind column, because the primary key is
- * `(owner, usage_key, period_start)` and the two windows differ: Quick's
- * `period_start` is a day and Careful's is a month. One key would collide the
- * moment both were used in the same hour.
- */
-const USAGE_KEY: Record<ChatModel, string> = {
-  quick: "assistant_quick",
-  careful: "assistant_careful",
+const UNMETERED: CreditBalance = {
+  grantLeft: null,
+  purchased: null,
+  total: null,
+  resetAt: null,
 };
 
-/** What each meter is capped at, and how far back its window reaches. */
-function allowanceOf(tier: PlanTier, model: ChatModel): number {
-  return model === "quick"
-    ? TIER_LIMITS[tier].quickPerDay
-    : TIER_LIMITS[tier].carefulPerMonth;
+interface CreditClaimRow {
+  allowed?: unknown;
+  tier?: unknown;
+  grant_left?: unknown;
+  purchased_left?: unknown;
+  reset_at?: unknown;
+  from_grant?: unknown;
+  from_purchased?: unknown;
+}
+
+function asCount(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
 /**
- * The window one meter counts in, matching `claim_assistant_reply` exactly.
+ * The window the grant runs on, matching `claim_credits` exactly.
  *
- * **UTC, which is not the writer's midnight.** A daily reset at 00:00 UTC is
- * 05:30 in Colombo and 7pm the previous day in Los Angeles, so `reset` is
- * returned as an instant and every screen renders it in local time rather than
- * calling it "tomorrow".
+ * **UTC, which is not the writer's midnight.** A reset at 00:00 UTC on the 1st
+ * is 05:30 in Colombo and 7pm on the last of the month in Los Angeles, so
+ * `resetAt` is returned as an instant and every screen renders it in local time
+ * rather than calling it "next month".
  */
-function windowFor(
-  model: ChatModel,
-  now = new Date(),
-): { start: string; reset: string } {
-  if (model === "quick") {
-    const start = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-    );
-    const reset = new Date(start.getTime());
-    reset.setUTCDate(reset.getUTCDate() + 1);
-    return { start: start.toISOString(), reset: reset.toISOString() };
-  }
-
+function monthWindow(now = new Date()): { start: Date; reset: string } {
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const reset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  return { start: start.toISOString(), reset: reset.toISOString() };
+  return { start, reset: reset.toISOString() };
 }
 
-function usageFromClaim(row: AssistantClaimRow): AssistantUsage {
-  const used = typeof row.used === "number" && Number.isFinite(row.used)
-    ? row.used
-    : 0;
-  const limit =
-    typeof row.limit_count === "number" && Number.isFinite(row.limit_count)
-      ? row.limit_count
-      : null;
-  const remaining =
-    typeof row.remaining === "number" && Number.isFinite(row.remaining)
-      ? row.remaining
-      : limit === null
-        ? null
-        : Math.max(limit - used, 0);
-  const resetAt = typeof row.reset_at === "string" ? row.reset_at : null;
-
-  return { used, limit, remaining, resetAt };
-}
-
-/** Both meters, as `/billing` and the assistant panel show them. */
-export interface AssistantMeters {
-  quick: AssistantUsage;
-  careful: AssistantUsage;
-}
-
-async function meterFor(
-  supabase: SupabaseClient,
-  owner: string,
-  tier: PlanTier,
-  model: ChatModel,
-): Promise<AssistantUsage> {
-  const { start, reset } = windowFor(model);
-  const limit = allowanceOf(tier, model);
-
-  const { data } = await supabase
-    .from("ai_usage")
-    .select("used")
-    .eq("owner", owner)
-    .eq("usage_key", USAGE_KEY[model])
-    .gte("period_start", start)
-    .lt("period_start", reset)
-    .maybeSingle();
-
-  const used =
-    typeof (data as { used?: unknown } | null)?.used === "number"
-      ? (data as { used: number }).used
-      : 0;
-
-  return { used, limit, remaining: Math.max(limit - used, 0), resetAt: reset };
+function balanceFrom(row: CreditClaimRow): CreditBalance {
+  const grantLeft = asCount(row.grant_left);
+  const purchased = asCount(row.purchased_left);
+  return {
+    grantLeft,
+    purchased,
+    total: grantLeft + purchased,
+    resetAt: typeof row.reset_at === "string" ? row.reset_at : null,
+  };
 }
 
 /**
- * What both meters stand at.
+ * What the balance stands at, without spending anything.
  *
- * **The limits are read from `TIER_LIMITS`, never typed here.** They used to be
- * `pro ? 60 : 5` written into this function, which made three copies of two
- * numbers — this file, `launch.ts`, and the SQL. Two is the floor, because SQL
- * cannot import TypeScript; three was a drift waiting to happen.
+ * Read rather than claimed, because `/billing` and the account menu ask this on
+ * every load and a claim would charge them for looking.
+ *
+ * **It re-derives the grant rather than trusting the stored count**, for the
+ * one case the stored row cannot answer: a writer whose last reply was in
+ * August has `grant_spent` from August still on the row, because nothing rolls
+ * it over until the next claim. Comparing the stamp to this month is what stops
+ * the panel showing an empty allowance on the 1st.
  */
-export async function assistantUsageFor(
+export async function creditBalanceFor(
   supabase: SupabaseClient,
   owner: string,
   subscription: Subscription | null,
-): Promise<AssistantMeters> {
-  const unmetered: AssistantUsage = {
-    used: 0,
-    limit: null,
-    remaining: null,
-    resetAt: null,
-  };
-
-  if (!billingConfigured()) {
-    return { quick: unmetered, careful: unmetered };
-  }
+): Promise<CreditBalance> {
+  if (!billingConfigured()) return UNMETERED;
 
   const tier = planTierOf(subscription);
-  const [quick, careful] = await Promise.all([
-    meterFor(supabase, owner, tier, "quick"),
-    meterFor(supabase, owner, tier, "careful"),
-  ]);
+  const { start, reset } = monthWindow();
+  const limit = monthlyCredits(tier);
 
-  return { quick, careful };
+  const { data } = await supabase
+    .from("ai_credits")
+    .select("grant_spent, grant_period_start, purchased")
+    .eq("owner", owner)
+    .maybeSingle();
+
+  const row = data as {
+    grant_spent?: unknown;
+    grant_period_start?: unknown;
+    purchased?: unknown;
+  } | null;
+
+  const stampedAt =
+    typeof row?.grant_period_start === "string"
+      ? Date.parse(row.grant_period_start)
+      : NaN;
+  const staleMonth = Number.isNaN(stampedAt) || stampedAt < start.getTime();
+
+  const spent = staleMonth ? 0 : asCount(row?.grant_spent);
+  const grantLeft = Math.max(limit - spent, 0);
+  const purchased = asCount(row?.purchased);
+
+  return { grantLeft, purchased, total: grantLeft + purchased, resetAt: reset };
 }
 
-
-
-export type AssistantClaim =
+export type CreditClaim =
   | {
       ok: true;
-      usage: AssistantUsage;
+      /** What this reply cost. Zero when nothing is metered. */
+      cost: number;
+      balance: CreditBalance;
+      /** Puts it back, to the buckets it came from, if the reply never lands. */
       refund: () => Promise<void>;
     }
   | { ok: false; response: Response };
 
-export async function claimAssistantReplyAllowance(
-  model: ChatModel,
-): Promise<AssistantClaim> {
+/**
+ * Spends one reply's worth of credits, or refuses.
+ *
+ * **Postgres decides.** `claim_credits` locks the row, rolls the month if it
+ * needs to, spends the expiring grant before the bought balance and refuses
+ * when the two together fall short — all inside one statement, which is what
+ * keeps two replies fired at once from both spending the last credit.
+ *
+ * With no Supabase or no payment gateway there is nothing to meter and this
+ * passes everyone: a self-hosted copy running on its owner's own API key keeps
+ * the assistant it always had.
+ */
+export async function claimCredits(model: ChatModel): Promise<CreditClaim> {
+  const cost = CREDIT_COST[model];
+
   if (!isSupabaseConfigured() || !billingConfigured()) {
-    return {
-      ok: true,
-      usage: { used: 0, limit: null, remaining: null, resetAt: null },
-      refund: async () => {},
-    };
+    return { ok: true, cost: 0, balance: UNMETERED, refund: async () => {} };
   }
 
   const supabase = await createClient();
@@ -190,67 +171,73 @@ export async function claimAssistantReplyAllowance(
     };
   }
 
-  const { data, error } = await supabase.rpc("claim_assistant_reply", {
-    p_kind: model,
+  const { data, error } = await supabase.rpc("claim_credits", {
+    p_cost: cost,
   });
   if (error) {
-    console.error("[assistant-usage] claim failed", error);
+    console.error("[credits] claim failed", error);
     return {
       ok: false,
       response: Response.json(
-        { error: "Could not check your assistant allowance." },
+        { error: "Could not check your credit balance." },
         { status: 502 },
       ),
     };
   }
 
-  const row = (Array.isArray(data) ? data[0] : data) as AssistantClaimRow | null;
+  const row = (Array.isArray(data) ? data[0] : data) as CreditClaimRow | null;
   if (!row) {
     return {
       ok: false,
       response: Response.json(
-        { error: "Could not check your assistant allowance." },
+        { error: "Could not check your credit balance." },
         { status: 502 },
       ),
     };
   }
 
-  const usage = usageFromClaim(row);
-  const allowed = row.allowed === true;
+  const balance = balanceFrom(row);
 
   /**
-   * **429 always means "out of this allowance", never "wrong plan".**
+   * **429 always means "out of credits", never "wrong plan".**
    *
    * A plan with no assistant is refused by the route before it reaches this
-   * claim, so anything arriving here is on a plan that has the assistant and
-   * has simply spent one of its two meters. That makes the pair of codes clean
-   * for the panel to branch on: 402 is "your plan does not include this", 429 is
-   * "come back when it refills".
+   * claim, so anything arriving here is entitled to the assistant and has
+   * simply spent what it had. That keeps the pair of codes clean for the panel
+   * to branch on: 402 is "your plan does not include this", 429 is "buy more or
+   * wait for the 1st".
    */
-  if (!allowed) {
-    const window = model === "quick" ? "today" : "this month";
+  if (row.allowed !== true) {
     return {
       ok: false,
       response: Response.json(
         {
-          error: `You've used your ${model} assistant replies for ${window}.`,
+          error: `That reply costs ${cost} credits and you have ${balance.total} left.`,
           kind: model,
-          usage,
+          cost,
+          credits: balance,
         },
         { status: 429 },
       ),
     };
   }
 
+  const fromGrant = asCount(row.from_grant);
+  const fromPurchased = asCount(row.from_purchased);
+
   return {
     ok: true,
-    usage,
+    cost,
+    balance,
     refund: async () => {
       await supabase
-        .rpc("refund_assistant_reply", { p_kind: model })
+        .rpc("refund_credits", {
+          p_from_grant: fromGrant,
+          p_from_purchased: fromPurchased,
+        })
         .then(({ error: refundError }) => {
           if (refundError) {
-            console.error("[assistant-usage] refund failed", refundError);
+            console.error("[credits] refund failed", refundError);
           }
         });
     },
@@ -293,3 +280,6 @@ export async function requireLaunchExport(format: string): Promise<Response | nu
     { status: 402 },
   );
 }
+
+/** Re-exported so callers that only want the tier type need not reach further. */
+export type { PlanTier };

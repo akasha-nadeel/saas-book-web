@@ -40,18 +40,20 @@ export const PAID_TIERS: readonly PaidTier[] = ["draft", "writer", "studio"];
 /**
  * What each plan gives.
  *
- * **`chat` is the line the product is drawn on.** Free and Draft get the whole
- * of OpenChapter except the assistant; Writer and Studio get the assistant.
- * Everything else — imports, sync, all three export formats, the title and
- * consistency checks, unlimited words and chapters — is on every tier including
- * Free, and that is not an oversight to be monetised later. *Export must never
- * move behind the plan.*
+ * **The assistant is where the plans differ, and it differs by amount rather
+ * than by kind.** Every paid plan gets all three models; what a plan buys is
+ * how many replies a month. Everything else — imports, sync, all three export
+ * formats, the title and consistency checks, unlimited words and chapters — is
+ * on every tier including Free, and that is not an oversight to be monetised
+ * later. *Export must never move behind the plan.*
  *
- * **Two meters, two windows, on purpose.** Quick resets daily and Careful
- * monthly. A monthly cap on the cheap model would teach a writer to hoard the
- * thing that costs almost nothing; a daily cap on the expensive one would be
- * either uselessly small or ruinous on a busy week. The window follows the
- * cost, not the calendar.
+ * **One credit balance, not two meters.** This carried `quickPerDay` and
+ * `carefulPerMonth` until 2026-09-04 — two allowances on two windows, which let
+ * a writer run out of the careful model on the 3rd with twenty-five daily quick
+ * replies going unused, gave them no way to buy more, and would have needed a
+ * third counter on a third window the moment a third model arrived. A month's
+ * credits are now spent however the writer likes; see `credits.ts` for what
+ * each model costs.
  *
  * `books: null` means unlimited. It is `null` rather than `Infinity` because
  * this value is serialised to the browser through `/api/billing/subscription`
@@ -61,29 +63,25 @@ export const TIER_LIMITS = {
   free: {
     books: 5 as number | null,
     chat: false,
-    quickPerDay: 0,
-    carefulPerMonth: 0,
+    creditsPerMonth: 0,
     assistantWrite: false,
   },
   draft: {
     books: null as number | null,
-    chat: false,
-    quickPerDay: 0,
-    carefulPerMonth: 0,
-    assistantWrite: false,
+    chat: true,
+    creditsPerMonth: 2_000,
+    assistantWrite: true,
   },
   writer: {
     books: null as number | null,
     chat: true,
-    quickPerDay: 25,
-    carefulPerMonth: 100,
+    creditsPerMonth: 5_000,
     assistantWrite: true,
   },
   studio: {
     books: null as number | null,
     chat: true,
-    quickPerDay: 40,
-    carefulPerMonth: 300,
+    creditsPerMonth: 10_000,
     assistantWrite: true,
   },
 } as const satisfies Record<PlanTier, TierLimits>;
@@ -91,12 +89,17 @@ export const TIER_LIMITS = {
 export interface TierLimits {
   /** How many books may be held. `null` is unlimited. */
   books: number | null;
-  /** Whether the writing assistant is reachable at all. */
+  /**
+   * Whether this plan is *granted* assistant credits each month.
+   *
+   * **Not the same question as whether the panel opens.** A Free account
+   * holding bought credits may use the assistant; what it does not have is a
+   * monthly grant. `aiChatClosed()` in `launch.ts` asks about the balance, and
+   * this asks about the plan.
+   */
   chat: boolean;
-  /** Replies on the quick model, per UTC day. */
-  quickPerDay: number;
-  /** Replies on the careful model, per UTC calendar month. */
-  carefulPerMonth: number;
+  /** Credits granted each UTC calendar month. Mirrored in `claim_credits`. */
+  creditsPerMonth: number;
   /** Whether the assistant may offer text to put into the chapter. */
   assistantWrite: boolean;
 }

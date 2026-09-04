@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogClose } from "@/components/ui/dialog";
+import { CREDIT_COST } from "@/lib/billing/credits";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import { ALL_CHECKS } from "@/lib/consistency";
 import { FREE_LIMITS } from "@/lib/free-limits";
@@ -73,11 +74,11 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "What it does",
-        desc: `It reads the chapter you are in and answers questions about it — what is not working in a scene, whether a passage is doing what you meant. Part of ${TIER_NAMES.writer} and ${TIER_NAMES.studio}.`,
+        desc: `It reads the chapter you are in and answers questions about it — what is not working in a scene, whether a passage is doing what you meant. On every paid plan, and on a free account holding credits.`,
       },
       {
-        name: "Quick and Careful",
-        desc: `Two models and two allowances. Quick answers straight away and refills every day; Careful thinks first, takes longer, and refills every month. ${TIER_NAMES.writer} carries ${TIER_LIMITS.writer.quickPerDay} quick a day and ${TIER_LIMITS.writer.carefulPerMonth} careful a month, ${TIER_NAMES.studio} ${TIER_LIMITS.studio.quickPerDay} and ${TIER_LIMITS.studio.carefulPerMonth}. Usage in the account menu shows what is left.`,
+        name: "Quick, Careful and Deep",
+        desc: `Three models, one balance. Quick answers straight away and costs ${CREDIT_COST.quick} credits; Careful thinks first, for ${CREDIT_COST.careful}; Deep takes the longest and costs ${CREDIT_COST.deep}. ${TIER_NAMES.draft} includes ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a month, ${TIER_NAMES.writer} ${TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US")} and ${TIER_NAMES.studio} ${TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")}. Spend them however you like. Unused credits do not carry over into the next month. Usage in the account menu shows what is left.`,
       },
       {
         name: "Letting it write into the chapter",
@@ -107,15 +108,15 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: TIER_NAMES.draft,
-        desc: "Everything on Free, with unlimited books and unlimited title checks.",
+        desc: `Everything on Free, with unlimited books, unlimited title checks, and the writing assistant on ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a month.`,
       },
       {
         name: TIER_NAMES.writer,
-        desc: "Everything in Draft, and the writing assistant beside the chapter.",
+        desc: `Everything in ${TIER_NAMES.draft}, with ${TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US")} credits a month.`,
       },
       {
         name: TIER_NAMES.studio,
-        desc: "Everything in Writer, with three times the careful replies — for a writer leaning on the assistant daily.",
+        desc: `Everything in ${TIER_NAMES.writer}, with ${TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")} — for a writer leaning on the assistant daily.`,
       },
       {
         name: "Cancelling",

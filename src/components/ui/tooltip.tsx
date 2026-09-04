@@ -34,6 +34,7 @@ export function Tooltip({
   side = "top",
   align = "center",
   nowrap = false,
+  shortcut,
   className = "",
 }: {
   label: string;
@@ -59,6 +60,18 @@ export function Tooltip({
    * belongs to.
    */
   nowrap?: boolean;
+  /**
+   * The keystroke that does the same thing, under the label.
+   *
+   * **A tooltip is where a shortcut is actually learned.** Nobody reads a
+   * shortcut list; they hover the control they are already reaching for. Drawn
+   * as a keycap rather than as more prose so the eye can tell "press this" from
+   * the sentence above it at a glance — the convention every app with
+   * shortcuts uses, and the one the panel's collapse control follows.
+   *
+   * Give it the keys as they are pressed: `"Ctrl /"`, not `"Control + Slash"`.
+   */
+  shortcut?: string;
   className?: string;
 }) {
   const probe = useRef<HTMLSpanElement>(null);
@@ -110,6 +123,23 @@ export function Tooltip({
       style={placement(box, side, align)}
     >
       {label}
+      {shortcut && (
+        /* Its own line, centred under the label. `font-normal` against the
+           card's `font-semibold`: the label is the thing being said and the
+           keys are a footnote to it. */
+        <span className="mt-1 flex justify-center gap-1">
+          {shortcut.split(" ").map((key: string) => (
+            <kbd
+              key={key}
+              className="rounded border border-line px-1.5 py-px font-sans
+                         text-[0.6875rem] font-normal text-neutral-600
+                         dark:border-white/15 dark:text-white/70"
+            >
+              {key}
+            </kbd>
+          ))}
+        </span>
+      )}
     </span>
   ) : null;
 

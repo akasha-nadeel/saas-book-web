@@ -1298,7 +1298,7 @@ Ranked. The first and third together are most of it.
         returns them to the launcher, which is the exact errand this removes.
       - **Some tools hold an unsaved draft** (blurb, listing, ARC). Switching
         book is leaving the screen as far as the writer's work is concerned, so
-        it must go through `confirmLeave` like the roadmap panel's Close, or a
+        it must go through `confirmLeave` like the roadmap panel's Careful, or a
         half-typed blurb vanishes with no question asked.
 
       Not in `ToolHeader`'s `embedded` mode: the roadmap panel opens a tool
@@ -2160,7 +2160,7 @@ flow, and whether the tool pages survive a narrow window. The dashboard rail is
   **And then it came back, greyscale, on 2026-08-02** — also at the owner's
   request, and in three steps in one sitting: the whole app was repainted black
   and white, then the status badges and the tool marks were given their colour
-  back, then a System / Light / Dark toggle went in and the light half was
+  back, then a System / Quick / Dark toggle went in and the light half was
   written to match.
 
   What is there now: one greyscale palette in two value-sets, the dark one in
@@ -2792,6 +2792,43 @@ should either ship or lose the card.
       check a reader cannot edit. A free-tier book limit on sync was considered
       for this and rejected: it undermines the one promise this product cannot
       afford to weaken, which is that your books are safe here.
+
+- [x] **The assistant runs on credits, not on two meters.** Done 2026-09-04.
+      `quickPerDay` and `carefulPerMonth` are gone; a plan is granted credits a
+      month and a reply costs **10 (Quick), 30 (Careful) or 100 (Deep)**, spent
+      however the writer likes. `src/lib/billing/credits.ts` is the whole
+      economy — pure, so the cards, the panel, `/billing` and the route that
+      spends them read one set of numbers — and `20260904000000_ai_credits.sql`
+      is the ledger.
+
+      **Why one balance.** Two meters on two windows let a writer run out of the
+      careful model on the 3rd with twenty-five daily quick replies going
+      unused, gave them no way to buy more, and wanted a third counter on a
+      third window the moment a third model arrived. Three windows is three
+      things to keep in your head about a product whose job is to be quiet.
+
+      **The ratio is arithmetic, not a ladder.** It is the published token
+      prices against the request shape `/api/chat` already caps — chapter
+      (cached across an exchange), history, 2,000 tokens out — which is what
+      makes a flat per-reply price safe rather than a bet. A credit is budgeted
+      at $0.0008, a little above Quick's true cost, so a long chapter or a cache
+      miss comes out of the margin.
+
+      **Draft gained the assistant, and that is the product change underneath
+      the plumbing.** The line used to be *paid-with-AI versus paid-without*;
+      it is now *paid versus free*, with the three paid plans differing only in
+      how many credits (2,000 / 5,000 / 10,000). A $5.98 plan whose only
+      content was "a sixth book" was thin, and a plan sold as paid-but-no-AI is
+      the one a buyer misreads.
+
+      *Left:* **nothing sells credits.** The ledger's second bucket
+      (`purchased`, spent after the expiring grant so a rollover cannot burn
+      something bought) is built and permanently zero, because retrofitting a
+      bought balance into a grant-only ledger is the change that goes wrong.
+      Until there is a price in `plans.ts`, a checkout and a webhook that
+      credits the row, **naming a credit pack to a writer is a claim the code
+      cannot back** — a "Starter Pass" was written into the refusal copy while
+      this was being built and taken back out.
 
 - [ ] **A receipt of their own.** PayHere emails one, and that is what a writer
       is told to trust. A payments list in the account dialog — read straight

@@ -39,24 +39,29 @@ export type Provider = "anthropic" | "google";
  * short records, which is what the comps, categories, keyword and blurb routes
  * do.
  *
- * **`quick`** and **`careful`** are the assistant, and they are what the writer
- * chooses between in the panel. Quick answers straight away; Careful thinks
- * first and costs about three times as much a reply, which is why the two are
- * metered separately and on different windows.
+ * **`quick`, `careful` and `deep`** are the assistant, and they are what the
+ * writer chooses between in the panel. They cost 10, 30 and 100 credits a
+ * reply, which is the published token prices against a measured request shape —
+ * see `billing/credits.ts`.
  *
  * **Google is the same model in all three, deliberately.** The obvious move is
  * to name a Pro here, and the reason not to is that a wrong model id fails at
  * request time as a 404 on a screen that says the assistant is unavailable —
  * so this stays on the id the six working routes already prove is good, and
- * anyone wanting a bigger one names it themselves. It has a product consequence
- * worth stating: **on a Google deployment Quick and Careful are the same
- * model.** Which is exactly why the picker and the pricing cards describe the
- * allowance and the wait, never the model's cleverness — that wording is true
- * on both providers.
+ * anyone wanting a bigger one names it themselves.
  *
- * `OPENCHAPTER_MODEL`, `OPENCHAPTER_QUICK_MODEL` and `OPENCHAPTER_CAREFUL_MODEL`
- * override one job each, so any of them can be tried without a deploy and
- * without the others moving.
+ * **That would make the credit ladder a lie, and the thing that stops it is
+ * that a Google deployment is never metered.** Credits are only claimed when
+ * `billingConfigured()` is true, which needs Paddle or PayHere keys, which the
+ * hosted deployment has and a self-hosted copy does not — and the hosted
+ * deployment runs on `ANTHROPIC_API_KEY`, where the three are three models.
+ * Anybody putting a Google key on a *billed* installation has to give the three
+ * jobs three real Gemini ids below first, or charge a writer a hundred credits
+ * for the reply that cost ten. Do not "fix" this by flattening the costs.
+ *
+ * `OPENCHAPTER_MODEL`, `OPENCHAPTER_QUICK_MODEL`, `OPENCHAPTER_CAREFUL_MODEL`
+ * and `OPENCHAPTER_DEEP_MODEL` override one job each, so any of them can be tried
+ * without a deploy and without the others moving.
  */
 const DEFAULTS: Record<ModelJob, Record<Provider, string>> = {
   task: {
@@ -71,27 +76,31 @@ const DEFAULTS: Record<ModelJob, Record<Provider, string>> = {
     anthropic: "claude-sonnet-5",
     google: "gemini-3.6-flash",
   },
+  deep: {
+    anthropic: "claude-opus-5",
+    google: "gemini-3.6-flash",
+  },
 };
 
 /** Which job the model is being asked to do — see `DEFAULTS`. */
-export type ModelJob = "task" | "quick" | "careful";
+export type ModelJob = "task" | "quick" | "careful" | "deep";
 
 /**
- * The two the assistant offers, re-exported from `chat-model.ts`.
+ * The three the assistant offers, re-exported from `chat-model.ts`.
  *
  * The union itself lives there rather than here because `library-store.ts`
  * stores the writer's choice and would otherwise have to import this file —
- * which pulls the Anthropic SDK into the browser bundle for a two-member type.
- * Same reasoning as `panel-tabs.ts`.
+ * which pulls the Anthropic SDK into the browser bundle for a three-member
+ * type. Same reasoning as `panel-tabs.ts`.
  *
  * The `satisfies` is the guard that keeps the two files honest: if `ChatModel`
  * ever names something `ModelJob` does not, `DEFAULTS[model]` stops resolving
  * and this line is what says so.
  */
 export type { ChatModel } from "@/lib/chat-model";
-export { asChatModel } from "@/lib/chat-model";
+export { asChatModel, CHAT_MODELS } from "@/lib/chat-model";
 
-const _chatModelsAreJobs = ["quick", "careful"] satisfies ModelJob[];
+const _chatModelsAreJobs = ["quick", "careful", "deep"] satisfies ModelJob[];
 void _chatModelsAreJobs;
 
 /**
@@ -113,17 +122,26 @@ void _chatModelsAreJobs;
  * simply runs it without thinking rather than erroring.
  *
  * Omitting them is also the honest description of Quick: it answers straight
- * away. And it makes Quick cheaper than the arithmetic that sized the plans,
- * since thinking bills at the output rate.
+ * away. And it makes Light cheaper than the arithmetic that sized the credit
+ * ladder, since thinking bills at the output rate.
+ *
+ * **Careful and Deep differ only in effort**, which is the one dial that is worth
+ * turning between two thinking models: Sonnet 5 at `medium` is the working
+ * read, Opus 5 at `high` is the one worth a hundred credits. Neither takes
+ * `budget_tokens` — it is *removed* on both, not merely deprecated, and sending
+ * it is a 400.
  */
 export function chatTuning(model: ChatModel): {
   thinking?: { type: "adaptive" };
-  output_config?: { effort: "medium" };
+  output_config?: { effort: "medium" | "high" };
 } {
-  // Prose problems are worth thinking about — but only on the model that can.
-  return model === "careful"
-    ? { thinking: { type: "adaptive" }, output_config: { effort: "medium" } }
-    : {};
+  // Prose problems are worth thinking about — but only on the models that can.
+  if (model === "quick") return {};
+
+  return {
+    thinking: { type: "adaptive" },
+    output_config: { effort: model === "deep" ? "high" : "medium" },
+  };
 }
 
 /** Which provider this deployment can use, or null for none. */
@@ -133,14 +151,15 @@ export function modelProvider(): Provider | null {
   return null;
 }
 
+const OVERRIDE_ENV: Record<ModelJob, string> = {
+  task: "OPENCHAPTER_MODEL",
+  quick: "OPENCHAPTER_QUICK_MODEL",
+  careful: "OPENCHAPTER_CAREFUL_MODEL",
+  deep: "OPENCHAPTER_DEEP_MODEL",
+};
+
 export function modelName(provider: Provider, job: ModelJob = "task"): string {
-  const override =
-    job === "quick"
-      ? process.env.OPENCHAPTER_QUICK_MODEL
-      : job === "careful"
-        ? process.env.OPENCHAPTER_CAREFUL_MODEL
-        : process.env.OPENCHAPTER_MODEL;
-  return override || DEFAULTS[job][provider];
+  return process.env[OVERRIDE_ENV[job]] || DEFAULTS[job][provider];
 }
 
 /** What every caller here needs, and nothing else. */
@@ -352,6 +371,26 @@ async function* streamAnthropic({
     });
   }
 
+  /**
+   * **A second breakpoint, on the conversation rather than the chapter.**
+   *
+   * The chapter block above holds across the turns of an exchange; the
+   * messages did not, so every turn re-read and re-billed the whole history at
+   * list price. On a ten-turn conversation — which is what brainstorming is —
+   * the history is the largest line on the bill and about 40% of it goes away
+   * here.
+   *
+   * **The mark goes on the *second to last* message.** Marking the newest one
+   * would cache a prefix ending in the question just asked, which never
+   * repeats: a cache write every turn and a cache read never. Ending it at the
+   * previous assistant turn is exactly the prefix the next turn opens with.
+   *
+   * Anthropic allows four breakpoints and this is the second. Entries live five
+   * minutes, so a rapid back-and-forth hits it every time and a writer who
+   * wanders off for ten minutes pays list price for one turn.
+   */
+  const cacheAt = messages.length - 2;
+
   const stream = client.messages.stream(
     {
       model: modelName("anthropic", model),
@@ -360,7 +399,19 @@ async function* streamAnthropic({
       // Both fields together, or neither — see `chatTuning`. Sending them to
       // Haiku is a 400, so this may not become two literals again.
       ...chatTuning(model),
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      messages: messages.map((m, index) => ({
+        role: m.role,
+        content:
+          index === cacheAt && cacheAt >= 0
+            ? [
+                {
+                  type: "text" as const,
+                  text: m.content,
+                  cache_control: { type: "ephemeral" as const },
+                },
+              ]
+            : m.content,
+      })),
     },
     { signal },
   );

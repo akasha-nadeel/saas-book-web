@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The landing page's four pricing cards, and the cycle toggle over them.
+ * The landing page's four pricing cards, the cycle toggle over them, and the
+ * comparison underneath.
  *
  * **An island, because the page around it is a Server Component.** The section
  * used to be drawn inline and shipped no script: a monthly figure with the
@@ -14,67 +15,73 @@
  * still come from `ROWS`, so this page and `/upgrade` cannot drift into two
  * lists about one product. Only the chrome differs — a link here, a checkout
  * there.
+ *
+ * **The card marks are imported now rather than redrawn.** This file kept its
+ * own `PenMark` and `StackMark` because `plan-card.tsx` only exported two and
+ * this needed the pair on different cards. It exports four as of 2026-09-04 —
+ * page, pencil, nib, shelf, the ladder the plans climb — so the second copy was
+ * two drawings of one alphabet waiting to drift apart at the stroke weight.
  */
 
 import { useState } from "react";
 import Link from "next/link";
-import { PlanCard } from "@/components/upgrade/plan-card";
+import {
+  KeyIcon,
+  NibIcon,
+  PenIcon,
+  PlanCard,
+  ShelfIcon,
+  StackIcon,
+} from "@/components/upgrade/plan-card";
+import { PlanTable } from "@/components/upgrade/plan-table";
 import { PeriodToggle } from "@/components/upgrade/period-toggle";
 import {
   PLAN_BUTTON_PLAIN,
   planButton,
 } from "@/components/upgrade/plan-button";
-import { ROWS } from "@/lib/billing/plan-rows";
+import {
+  BEST_FOR,
+  PASS_BEST_FOR,
+  PASS_HIGHLIGHTS,
+  highlightsFor,
+  replyCountsFor,
+} from "@/lib/billing/plan-highlights";
+import { STARTER_PASS, passReplyCounts } from "@/lib/billing/starter-pass";
 import {
   displayPrice,
   perMonthOf,
   priceOf,
   type PaidTier,
   type Period,
-  type PlanTier,
 } from "@/lib/billing/plans";
 import { TIER_NAMES } from "@/lib/billing/tiers";
 
 /**
  * The three paid cards, in reading order.
  *
- * A near-twin of `PAID_CARDS` in `plans.tsx`, and deliberately not shared with
- * it: the blurbs differ because the audiences do. A signed-out visitor is being
- * told what each plan *is*; somebody on `/upgrade` has already decided to buy
- * and is choosing between them. The rows — every actual claim — come from the
- * one `ROWS` array either way, which is the part that must not drift.
+ * **The near-twin of `PAID_CARDS` in `plans.tsx`, and it is now near enough to
+ * be worth saying why the two still exist.** They used to differ in their
+ * blurbs, on the argument that a signed-out visitor is being told what a plan
+ * *is* while somebody on `/upgrade` is choosing between them. Those words came
+ * out of both arrays on 2026-09-04 — the positioning line is `BEST_FOR` and the
+ * contents are `highlightsFor`, in one place for both pages — so what is left
+ * here is the mark, the featured flag, and a button that links instead of
+ * charging. Any *claim* that differed between the two would now be a bug.
  *
- * **Writer is the featured one**, not Studio: it is where the assistant first
- * appears, which is the decision this page is asking a visitor to make.
+ * **Writer is the featured one**, and the reason changed under it the same day:
+ * it used to be "where the assistant first appears", which stopped being true
+ * when every paid plan got credits. It stays featured as the middle anchor —
+ * see the fuller note over `PAID_CARDS` in `plans.tsx`.
  */
 const PAID: {
   tier: PaidTier;
   mark: React.ReactNode;
-  blurb: string;
   featured?: boolean;
 }[] = [
-  {
-    tier: "draft",
-    mark: <StackMark />,
-    blurb: "Unlimited books and every export format. No assistant.",
-  },
-  {
-    tier: "writer",
-    mark: <PenMark />,
-    blurb: "Everything in Draft, and the writing assistant beside the chapter.",
-    featured: true,
-  },
-  {
-    tier: "studio",
-    mark: <StackMark />,
-    blurb: "For a writer who leans on the assistant daily.",
-  },
+  { tier: "draft", mark: <PenIcon /> },
+  { tier: "writer", mark: <NibIcon />, featured: true },
+  { tier: "studio", mark: <ShelfIcon /> },
 ];
-
-/** One column of `ROWS`, shaped for the card. */
-function rowsFor(tier: PlanTier) {
-  return ROWS.map((row) => ({ label: row.label, value: row.values[tier] }));
-}
 
 export function PricingCards() {
   /* **Annual, not monthly.** The toggle's own badge says a year saves 25%, and
@@ -86,20 +93,19 @@ export function PricingCards() {
     <>
       <PeriodToggle period={period} onChange={setPeriod} />
 
-      {/* `xl:grid-cols-4` rather than four across from `sm`: four columns at
-          768px is 190px each and every row in them wraps. The 2×2 in between
-          falls as (Free, Draft) and (Writer, Studio) — the half without the
-          assistant and the half with it — which is the right seam to break on.
+      {/* `items-stretch` and `mt-auto` on each action are together what put the
+          five buttons on one line under lists of different lengths.
 
-          items-start so the featured card grows upward on its own rather than
-          stretching its neighbours to match. */}
-      <div className="mx-auto mt-10 grid max-w-[96rem] gap-2 text-left sm:grid-cols-2 sm:items-start xl:grid-cols-4">
+          `xl:grid-cols-5` rather than five across from `sm`: five columns at
+          768px is 150px each and every figure in them wraps. */}
+      <div className="mx-auto mt-10 grid max-w-[96rem] gap-3.5 sm:grid-cols-2 sm:items-stretch xl:grid-cols-5">
         <PlanCard
-          mark={<PenMark />}
+          mark={<StackIcon />}
           name={TIER_NAMES.free}
-          blurb="Write the whole book and take the file with you. No card, and no clock on it."
+          bestFor={BEST_FOR.free}
           price="$0"
-          rows={rowsFor("free")}
+          note="No card needed"
+          highlights={highlightsFor("free")}
           action={
             <Link href="/signup" className={PLAN_BUTTON_PLAIN}>
               Start writing free
@@ -107,69 +113,59 @@ export function PricingCards() {
           }
         />
 
-        {PAID.map(({ tier, mark, blurb, featured }) => (
+        {/* Second, between Free and the plans, because that is what it is for:
+            the step a reader takes when Free has shown them the tool and a
+            subscription is still a bigger decision than they are ready for.
+            Filed at the end of the row it would read as the cheapest plan,
+            which is the one thing it is not. */}
+        <PlanCard
+          tone="pass"
+          badge="New writers only"
+          mark={<KeyIcon />}
+          name="Starter Pass"
+          bestFor={PASS_BEST_FOR}
+          price={displayPrice(STARTER_PASS.price)}
+          note="Charged once, never renews"
+          highlights={PASS_HIGHLIGHTS}
+          replies={passReplyCounts()}
+          action={
+            <Link href="/upgrade" className={PLAN_BUTTON_PLAIN}>
+              Get the Starter Pass
+            </Link>
+          }
+        />
+
+        {PAID.map(({ tier, mark, featured }) => (
           <PlanCard
             key={tier}
-            featured={featured}
-            badge={featured ? "Most popular" : undefined}
+            tone={featured ? "featured" : "plain"}
+            badge={featured ? "Most chosen" : undefined}
             mark={mark}
             name={TIER_NAMES[tier]}
-            blurb={blurb}
+            bestFor={BEST_FOR[tier]}
             price={displayPrice(perMonthOf(tier, period))}
             note={
               period === "annual"
                 ? `${displayPrice(priceOf(tier, "annual"))} billed annually`
-                : undefined
+                : "Billed monthly"
             }
-            rows={rowsFor(tier)}
+            highlights={highlightsFor(tier)}
+            replies={replyCountsFor(tier)}
             action={
               <Link href="/upgrade" className={planButton(featured)}>
-                See the plans
+                Choose {TIER_NAMES[tier]}
               </Link>
             }
           />
         ))}
       </div>
+
+      {/* The contract under the pitch, and the same component `/upgrade`
+          draws — so a visitor who reads it here and again after signing in is
+          reading one table rather than two lists that agree today. */}
+      <div className="mx-auto max-w-[96rem]">
+        <PlanTable spotlight="writer" />
+      </div>
     </>
-  );
-}
-
-/* The two card marks, drawn here rather than imported from `plan-card.tsx`,
-   which exports them for `/upgrade`. Same alphabet: 20-grid, 1.5 weight. */
-
-function PenMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-6 w-6"
-    >
-      <path d="M13.5 3.5a1.77 1.77 0 0 1 2.5 2.5L7 15l-3.5 1L4.5 12.5Z" />
-      <path d="M12 5 15 8" />
-    </svg>
-  );
-}
-
-function StackMark() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-6 w-6"
-    >
-      <path d="M10 2.5 17.5 6 10 9.5 2.5 6Z" />
-      <path d="M2.5 10 10 13.5 17.5 10" />
-      <path d="M2.5 14 10 17.5 17.5 14" />
-    </svg>
   );
 }

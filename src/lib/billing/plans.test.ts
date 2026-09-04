@@ -64,19 +64,19 @@ describe("displayPrice", () => {
   });
 
   it("uses the three ladders the cards print", () => {
-    expect(priceOf("draft", "monthly")).toBe(5.98);
+    expect(priceOf("draft", "monthly")).toBe(7.98);
     expect(priceOf("writer", "monthly")).toBe(14.98);
-    expect(priceOf("studio", "monthly")).toBe(24.98);
+    expect(priceOf("studio", "monthly")).toBe(29.98);
 
-    expect(priceOf("draft", "annual")).toBe(53.99);
+    expect(priceOf("draft", "annual")).toBe(71.82);
     expect(priceOf("writer", "annual")).toBe(134.99);
-    expect(priceOf("studio", "annual")).toBe(224.99);
+    expect(priceOf("studio", "annual")).toBe(269.82);
   });
 
   it("divides the annual total rather than printing a typed figure", () => {
-    expect(displayPrice(perMonthOf("draft", "annual"))).toBe("$4.50");
+    expect(displayPrice(perMonthOf("draft", "annual"))).toBe("$5.98");
     expect(displayPrice(perMonthOf("writer", "annual"))).toBe("$11.25");
-    expect(displayPrice(perMonthOf("studio", "annual"))).toBe("$18.75");
+    expect(displayPrice(perMonthOf("studio", "annual"))).toBe("$22.49");
   });
 });
 

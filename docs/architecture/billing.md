@@ -18,12 +18,19 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 >   `TIER_LIMITS` holding what each one gives and `TIER_NAMES` the words.
 >   `subscriptions.plan` — written since the first billing migration and never
 >   once read back — is now the column that carries it, under a CHECK.
-> - **Free and Draft have no writing assistant at all.** That is the line the
->   product is drawn on. `onFreePlan()` is therefore the *wrong* test for
->   anything AI, because Draft is paid: `aiChatClosed()` in `launch.ts` is its
->   sibling and the one to use.
-> - **Two meters on two windows**, not one monthly count: Quick refills daily,
->   Careful monthly, both claimed by `claim_assistant_reply(p_kind)`.
+> - **Paying is the line, and above it the plans differ by amount.** Every paid
+>   plan carries the assistant and all three models; what a plan buys is credits
+>   a month. (This read "Free and Draft have no writing assistant at all" until
+>   2026-09-04.) `onFreePlan()` is still the *wrong* test for anything AI,
+>   because Draft is paid.
+> - **The gate is the balance, not the tier.** `aiChatClosed()` in `launch.ts`
+>   reads `credits.total`, so a Free account holding bought credits opens and a
+>   Writer who has spent the month does not. `chatAllowed(tier)` survives as the
+>   *pricing* question and is not the gate.
+> - **One credit balance on one window**, not two meters: a reply costs 10 / 30 /
+>   100 credits (Quick / Careful / Deep) out of a monthly grant, claimed by
+>   `claim_credits(p_cost)`. `src/lib/billing/credits.ts` is the whole economy
+>   and `20260904000000_ai_credits.sql` is its ledger.
 > - **Six Paddle price ids**, one per plan per cycle, and `paddlePlanFrom()`
 >   maps them back on the way in. `isPaddleConfigured()` requires all six.
 > - **`/api/billing/paddle/change-plan`** moves an existing subscription between
@@ -85,8 +92,8 @@ and the three are different messages because "sign in" shown to someone already
 signed in is a loop.
 
 **Two cycles, and both renew.** Three paid plans across them: Draft
-$5.98/$53.99, Writer $14.98/$134.99, Studio $24.98/$224.99. Every annual price
-is 25% below twelve monthly ones and displays as about $4.50, $11.25 and $18.75
+$7.98/$71.82, Writer $14.98/$134.99, Studio $29.98/$269.82. Every annual price
+is 25% below twelve monthly ones and displays as about $5.98, $11.25 and $22.49
 a month. The exact total is stored in `plans.ts`; the displayed monthly
 equivalent is derived from that total so rounding happens once.
 `uniformAnnualSaving()` is what lets the period toggle print one "Save 25%"
@@ -118,11 +125,11 @@ one-off price every month, that there is no period end to store, and that
 
 **What is free is enough to understand the product.** Free includes five books,
 unlimited chapters and words, autosave/sync where accounts are configured,
-**every export format**, and the title and consistency checks. It has **no
-writing assistant**. Draft ($5.98) adds unlimited books and unlimited title
-checks; Writer ($14.98) adds the assistant — 25 Quick replies a day, 100
-Careful a month, and letting it write into the chapter; Studio ($24.98) carries
-40 and 300. EPUB and PDF were Pro until 2026-08-27; see the
+**every export format**, and the title and consistency checks. It is granted
+**no assistant credits**. Draft ($7.98) adds unlimited books, unlimited title
+checks, 2,000 credits a month and letting the assistant write into the chapter;
+Writer ($14.98) is 5,000 credits and Studio ($29.98) 10,000 — nothing else
+separates those three. EPUB and PDF were Pro until 2026-08-27; see the
 note in `launch.ts` for why that was the wrong thing to charge for, and
 `launch.test.ts` for what now stops it drifting back. The backend enforces expensive or paid limits: the book limit is in the
 database trigger (which counts the active shelf only, and fires on the

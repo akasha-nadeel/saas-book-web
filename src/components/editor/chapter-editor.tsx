@@ -19,6 +19,7 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import { ToolRail, useEditorState } from "@/components/editor/editor-toolbar";
+import { FormatPill } from "@/components/editor/format-pill";
 import {
   Rail,
   RailButton,
@@ -543,6 +544,31 @@ export function ChapterEditor({
     return () => window.removeEventListener("keydown", onKey);
   }, [setEditorPanel, setTab]);
 
+  /**
+   * ⌘/ / Ctrl+/ shows and hides the panel.
+   *
+   * **A toggle, not a collapse.** The panel's handle only exists while the
+   * panel does, so a shortcut that could only close would be a one-way door:
+   * press it once and the keyboard has no way back. Both directions, from
+   * anywhere, including with the caret in the manuscript.
+   *
+   * It sits beside ⌘K rather than in the panel, because it has to work when
+   * the panel is not mounted — `LeftPanel` returns null until its first open.
+   *
+   * Registered on `keydown` with `preventDefault`, which is what stops Firefox
+   * opening its quick-find on a bare `/` reaching the page.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setEditorPanel(!panelOpen);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [setEditorPanel, panelOpen]);
+
   // Remembering the open chapter is what lets a book's route land the writer
   // back where they left off, so it is worth a write on every visit.
   useEffect(() => {
@@ -627,6 +653,16 @@ export function ChapterEditor({
           canWrite={canWriteThis}
           onClose={() => setEditorPanel(false)}
         />
+
+        {/* **The formatting bar, which arrives when the writing does.**
+
+            `fixed` and portalled by its own positioning rather than dropped
+            into the page's flex row, for the reason the panel is: it belongs to
+            the window rather than to whatever column it was declared in, and it
+            must not take part in the layout it floats over. Mounted here beside
+            the panel so the two are read together — they are the editor's two
+            floating surfaces and they share a stacking order. */}
+        <FormatPill editor={liveEditor} book={book} />
 
         {/* **The left chrome is one slot, and the page sits beside it rather
             than under it.**
@@ -821,7 +857,6 @@ export function ChapterEditor({
 
             <ToolRail
               editor={liveEditor}
-              book={book}
               paper={prefs.paper}
               dictation={dictation}
             />

@@ -11,29 +11,15 @@ import { ACCEPTED, importImage } from "@/lib/image-import";
 import { insertWidthPercent } from "@/lib/editor/image-resize";
 import {
   setPref,
-  setTypography,
-  typographyOf,
-  type Book,
   type PaperColor,
 } from "@/lib/library-store";
-import {
-  FONTS,
-  INDENTS,
-  LEADINGS,
-  PARAGRAPH_STYLES,
-  PARA_SPACINGS,
-  TEXT_SIZES,
-  paragraphStyleOf,
-  paragraphStyleSettings,
-  type ParagraphStyle,
-} from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 import type { Dictation } from "@/lib/editor/use-dictation";
-import { applyFormattingCommand } from "@/lib/editor/formatting-commands";
+
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 /** The four alignments, each with a small icon of ruled lines. */
-const ALIGN_OPTIONS: {
+export const ALIGN_OPTIONS: {
   value: TextAlignValue;
   label: string;
   icon: React.ReactNode;
@@ -157,7 +143,7 @@ const Icon = ({ children }: { children: React.ReactNode }) => (
 /** A labelled row in the Aa flyout: a name on the left, its control on the
  *  right. Every typography control is one row, so the panel stays a single
  *  narrow column with no sideways overflow. */
-function Field({
+export function Field({
   label,
   children,
 }: {
@@ -174,7 +160,7 @@ function Field({
   );
 }
 
-const SELECT_CLASS = `w-full cursor-pointer truncate rounded-md border
+export const SELECT_CLASS = `w-full cursor-pointer truncate rounded-md border
   border-line bg-raised px-2 py-1.5 font-sans text-xs text-fg outline-none
   transition-colors hover:border-muted focus-visible:ring-2
   focus-visible:ring-accent/60`;
@@ -337,12 +323,10 @@ const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
 
 export function ToolRail({
   editor,
-  book,
   paper,
   dictation,
 }: {
   editor: Editor | null;
-  book: Book;
   paper: PaperColor;
   /**
    * Passed in rather than started here, because the chapter list carries a
@@ -363,16 +347,14 @@ export function ToolRail({
      that runs on some renders and not others. */
   const [linkAsked, setLinkAsked] = useState<string | null>(null);
 
-  // The book's body typography — changed live from the Aa flyout below.
-  const type = typographyOf(book);
+  // The book's body typography moved to `format-pill.tsx` with the controls
+  // that set it. What is left in this flyout is page colour and theme, and
+  // neither is stored on the book.
 
   if (!editor) return null;
 
-  // The selected block's own alignment, or the book default when it has none —
-  // so the alignment buttons show what the paragraph is actually set to.
-  const blockAlign = (editor.getAttributes("paragraph").textAlign ??
-    editor.getAttributes("heading").textAlign) as TextAlignValue | undefined;
-  const activeAlign: TextAlignValue = blockAlign ?? type.align;
+  // The alignment reading moved to `format-pill.tsx` with the buttons it was
+  // for — the rail no longer draws them.
 
   const existingLink = editor.getAttributes("link").href as string | undefined;
 
@@ -388,245 +370,22 @@ export function ToolRail({
       // closer together than its neighbours reads as a sub-list of one of them.
       className="flex flex-col items-center gap-2"
     >
-      <Flyout label="Text & type" trigger={<RailMark mark="type" />}>
-        <div className="scroll-slim flex max-h-[78vh] w-64 flex-col gap-2 overflow-x-hidden overflow-y-auto pr-0.5">
-          <div className="flex gap-1">
-            {/* Normal text — turns a heading back into body prose. Its own
-                button so a paragraph accidentally made a heading is one click to
-                fix, rather than guessing which H toggles it off. */}
-            <ToolButton
-              label="Normal text"
-              active={editor.isActive("paragraph")}
-              onClick={() =>
-                applyFormattingCommand(editor, { type: "paragraph" })
-              }
-            >
-              <span className="font-serif text-sm">¶</span>
-            </ToolButton>
-            {([1, 2, 3] as const).map((level) => (
-              <ToolButton
-                key={level}
-                label={`Heading ${level}`}
-                active={editor.isActive("heading", { level })}
-                onClick={() =>
-                  applyFormattingCommand(editor, { type: "heading", level })
-                }
-              >
-                <span className="font-serif text-sm">H{level}</span>
-              </ToolButton>
-            ))}
-          </div>
+      {/* **What is left here is the page, not the prose.**
 
-          <div className="flex gap-1">
-            <ToolButton
-              label="Bold"
-              shortcut="Ctrl+B"
-              active={editor.isActive("bold")}
-              onClick={() => applyFormattingCommand(editor, { type: "bold" })}
-            >
-              <span className="font-bold">B</span>
-            </ToolButton>
-            <ToolButton
-              label="Italic"
-              shortcut="Ctrl+I"
-              active={editor.isActive("italic")}
-              onClick={() =>
-                applyFormattingCommand(editor, { type: "italic" })
-              }
-            >
-              <span className="font-serif italic">I</span>
-            </ToolButton>
-            <ToolButton
-              label="Underline"
-              shortcut="Ctrl+U"
-              active={editor.isActive("underline")}
-              onClick={() =>
-                applyFormattingCommand(editor, { type: "underline" })
-              }
-            >
-              <span className="underline">U</span>
-            </ToolButton>
-            <ToolButton
-              label="Strikethrough"
-              active={editor.isActive("strike")}
-              onClick={() =>
-                applyFormattingCommand(editor, { type: "strike" })
-              }
-            >
-              <span className="line-through">S</span>
-            </ToolButton>
-            <ToolButton
-              label="Inline code"
-              active={editor.isActive("code")}
-              onClick={() => applyFormattingCommand(editor, { type: "code" })}
-            >
-              <span className="font-mono text-xs">{"</>"}</span>
-            </ToolButton>
-            <ToolButton
-              label="Link"
-              active={editor.isActive("link")}
-              onClick={promptForLink}
-            >
-              <Icon>
-                <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
-                <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
-              </Icon>
-            </ToolButton>
-          </div>
+          This flyout held the whole formatting panel until 2026-09-04 — block
+          type, the marks, and eight typography rows — reachable only by finding
+          a "T" in a vertical rail and pressing it. All of that is the
+          `FormatPill` now, which arrives over the page when a writer clicks
+          into their prose and leaves when they click out.
 
-          <span aria-hidden="true" className="h-px w-full bg-line" />
-
-          {/* Body typography — the whole manuscript's face, size and spacing,
-              each a compact dropdown so the panel stays one narrow column. These
-              write to the book, so the writing surface and the export change
-              together. Page geometry stays in the ▤ menu. */}
-          <div className="flex flex-col gap-2">
-            <Field label="Font">
-              <select
-                aria-label="Font"
-                value={type.font}
-                onChange={(e) =>
-                  setTypography(book.id, { font: e.target.value })
-                }
-                className={SELECT_CLASS}
-              >
-                {FONTS.map((f) => (
-                  <option key={f.id} value={f.id} style={{ fontFamily: f.stack }}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Size (pt)">
-              <select
-                aria-label="Text size in points"
-                value={String(type.sizePt)}
-                onChange={(e) =>
-                  setTypography(book.id, { sizePt: Number(e.target.value) })
-                }
-                className={SELECT_CLASS}
-              >
-                {TEXT_SIZES.map((s) => (
-                  <option key={s} value={String(s)}>
-                    {s} pt
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Alignment">
-              {/* Per paragraph, applied to the selection — not the whole book.
-                  The book's default (type.align) shows as active on a paragraph
-                  that has no alignment of its own. */}
-              <div className="flex gap-1">
-                {ALIGN_OPTIONS.map((option) => (
-                  <button
-                    key={option.value}
-                    type="button"
-                    aria-label={option.label}
-                    aria-pressed={activeAlign === option.value}
-                    title={option.label}
-                    onClick={() =>
-                      applyFormattingCommand(editor, {
-                        type: "align",
-                        value: option.value,
-                      })
-                    }
-                    className={`flex h-8 flex-1 items-center justify-center
-                                rounded-md outline-none transition-colors
-                                focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                                  activeAlign === option.value
-                                    ? "bg-accent text-accent-ink"
-                                    : "text-fg hover:bg-raised"
-                                }`}
-                  >
-                    {option.icon}
-                  </button>
-                ))}
-              </div>
-            </Field>
-
-            <Field label="Line spacing">
-              <select
-                aria-label="Line spacing"
-                value={String(type.leading)}
-                onChange={(e) =>
-                  setTypography(book.id, { leading: Number(e.target.value) })
-                }
-                className={SELECT_CLASS}
-              >
-                {LEADINGS.map((l) => (
-                  <option key={l.value} value={String(l.value)}>
-                    {l.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {/* The one control that answers "where does a paragraph begin".
-                It sets the indent and the spacing together, because they are
-                one decision — see paragraphStyleSettings. The two below stay
-                for fine tuning, and follow whatever is chosen here. */}
-            <Field label="Paragraphs">
-              <select
-                aria-label="Paragraph style"
-                value={paragraphStyleOf(type)}
-                onChange={(e) =>
-                  setTypography(
-                    book.id,
-                    paragraphStyleSettings(e.target.value as ParagraphStyle),
-                  )
-                }
-                className={SELECT_CLASS}
-              >
-                {PARAGRAPH_STYLES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Indent">
-              <select
-                aria-label="First-line indent"
-                value={String(type.indentIn)}
-                onChange={(e) =>
-                  setTypography(book.id, { indentIn: Number(e.target.value) })
-                }
-                className={SELECT_CLASS}
-              >
-                {INDENTS.map((i) => (
-                  <option key={i.value} value={String(i.value)}>
-                    {i.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            <Field label="Para space">
-              <select
-                aria-label="Paragraph spacing"
-                value={String(type.paraSpacingPt)}
-                onChange={(e) =>
-                  setTypography(book.id, {
-                    paraSpacingPt: Number(e.target.value),
-                  })
-                }
-                className={SELECT_CLASS}
-              >
-                {PARA_SPACINGS.map((s) => (
-                  <option key={s.value} value={String(s.value)}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          </div>
-
-          <span aria-hidden="true" className="h-px w-full bg-line" />
-
+          These two stayed on purpose. Page colour and theme are settings about
+          the surface and the app rather than about the paragraph the caret is
+          in, so a bar that appears *because* you started writing is the wrong
+          home for them: they would be two controls that had nothing to do with
+          the reason the thing opened. They belong with the rail's other
+          standing settings. */}
+      <Flyout label="Page & theme" trigger={<RailMark mark="type" />}>
+        <div className="flex w-56 flex-col gap-2">
           <Field label="Page colour">
             <div
               role="radiogroup"
@@ -664,6 +423,26 @@ export function ToolRail({
           </Field>
         </div>
       </Flyout>
+
+      {/* **The link stayed behind when the rest of the marks left.**
+
+          Bold and its neighbours moved to the pill, which shows only while the
+          caret is collapsed — and a link applied to no selection has nothing to
+          attach to. On a *selection* the job is already the selection toolbar's,
+          which is where a writer reaches for it anyway, having just highlighted
+          the words they want linked. What is left is the case neither covers:
+          putting a link in deliberately, from the rail, next to the picture —
+          which is what it is, an insertion rather than an emphasis. */}
+      <ToolButton
+        label="Link"
+        active={editor.isActive("link")}
+        onClick={promptForLink}
+      >
+        <Icon>
+          <path d="M8.5 11.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1" />
+          <path d="M11.5 8.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1" />
+        </Icon>
+      </ToolButton>
 
       {/* No divider between these three. Type, a picture and dictation are one
           thing — putting words and marks on the page — and the rail already

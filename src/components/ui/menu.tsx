@@ -175,6 +175,29 @@ export function Menu({
       ) {
         return;
       }
+      /**
+       * **And except a scroll in a container the trigger is not inside.**
+       *
+       * The rule above is "anything that moves the trigger invalidates the
+       * position", and a container that does not *contain* the trigger cannot
+       * have moved it. Without this the assistant's model menu shuts on the
+       * next token of a streaming reply: `use-chat-scroll.ts` writes
+       * `scrollTop` on the transcript on every chunk, that fires a scroll
+       * event, and the capture-phase listener above took it as the page
+       * moving underneath.
+       *
+       * Safe for every call site — the trigger is either inside the scrolling
+       * container (still dismissed, as before) or in unrelated chrome that the
+       * scroll cannot have shifted.
+       */
+      if (
+        event.type === "scroll" &&
+        event.target instanceof Node &&
+        triggerRef.current &&
+        !event.target.contains(triggerRef.current)
+      ) {
+        return;
+      }
       setOpen(false);
     };
     window.addEventListener("scroll", onDismiss, true);
@@ -206,11 +229,53 @@ export function Menu({
     // Pointer-down rather than click: a click that started inside the menu and
     // ended outside it should not dismiss, and vice versa.
     document.addEventListener("mousedown", onDown);
+
+    /**
+     * **The first item, so the menu is reachable without a mouse.**
+     *
+     * The panel is portalled to `document.body`, which puts it *last* in DOM
+     * order — so without this, opening a menu leaves focus on the trigger and
+     * the items are reachable only by tabbing to the end of the document. The
+     * controls that sit next to the trigger come first, which is the opposite
+     * of what pressing it asked for.
+     *
+     * The pair completes with the Escape handler above, which puts focus back
+     * on the trigger. Lifted from `sidebar/row-menu.tsx`, which has had both
+     * since it was written.
+     */
+    const first = menuRef.current?.querySelector("button");
+    first?.focus();
+
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);
     };
   }, [open]);
+
+  /** Up and down through the items, wrapping at both ends. */
+  const onMenuKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    /* **Not while the caret is in a control that wants the arrows itself.** A
+       menu is usually rows of buttons, but nothing stops a caller putting a
+       select or a field in one — and up and down are how a select is opened
+       and walked. Stealing them there would make the control unusable by
+       keyboard, which is the opposite of what this handler is for. */
+    const from = event.target as HTMLElement | null;
+    if (from?.closest("select, input, textarea")) return;
+    event.preventDefault();
+
+    const items = Array.from(
+      menuRef.current?.querySelectorAll("button, a") ?? [],
+    ) as HTMLElement[];
+    if (!items.length) return;
+
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      event.key === "ArrowDown"
+        ? (at + 1) % items.length
+        : (at - 1 + items.length) % items.length;
+    items[next].focus();
+  };
 
   return (
     <>
@@ -238,6 +303,7 @@ export function Menu({
             id={id}
             role="menu"
             aria-label={label}
+            onKeyDown={onMenuKeyDown}
             style={{
               width,
               // Off-screen until measured, rather than at 0,0 — a menu that
@@ -328,12 +394,37 @@ export function MenuButton({
   danger,
   hint,
   badge,
+  checked,
+  disabled,
   children,
 }: {
   onClick: () => void;
   icon?: ReactNode;
   /** Destructive, so it reads differently before it is pressed. */
   danger?: boolean;
+  /**
+   * One of a set the menu is choosing between, and whether this is the choice.
+   *
+   * **Pass it and the row becomes a radio.** `menuitem` announces a *command*;
+   * a menu that is picking one of several settings is `menuitemradio` with
+   * `aria-checked`, or a screen reader is never told which is current — the
+   * tick in `badge` is drawing that fact for everyone else. Undefined leaves
+   * the row an ordinary command, so nothing that does not pass it changes.
+   *
+   * Precedents in the tree: `editor/page-menu.tsx` and the selection toolbar's
+   * pickers both use the radio role for exactly this.
+   */
+  checked?: boolean;
+  /**
+   * Present but not choosable, with the reason in `hint`.
+   *
+   * **`aria-disabled`, not the HTML attribute**, which is why this is a prop
+   * rather than a pass-through: a genuinely disabled button drops out of the
+   * tab order and out of the menu's own arrow-key walk, so the row a writer is
+   * being told about becomes the one row they cannot reach to read. It stays
+   * focusable and announces itself as unavailable; the press is a no-op.
+   */
+  disabled?: boolean;
   /**
    * A marker at the right end — "Soon" so far.
    *
@@ -358,14 +449,16 @@ export function MenuButton({
   return (
     <button
       type="button"
-      role="menuitem"
-      onClick={onClick}
+      role={checked === undefined ? "menuitem" : "menuitemradio"}
+      aria-checked={checked}
+      aria-disabled={disabled || undefined}
+      onClick={disabled ? undefined : onClick}
       // Top-aligned once there are two lines, or the icon and the label centre
       // themselves against the height of the pair and the label stops lining up
       // with the single-line items above it.
       className={`${ITEM} ${hint ? "items-start" : ""} ${
         danger ? "text-danger" : ""
-      }`}
+      } ${disabled ? "opacity-45" : ""}`}
     >
       {icon && (
         <span className={danger ? "text-current" : "text-muted"}>{icon}</span>

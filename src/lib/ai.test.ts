@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  CHAT_MODELS,
   asChatModel,
   chatTuning,
   modelName,
@@ -14,6 +15,7 @@ const KEYS = [
   "OPENCHAPTER_MODEL",
   "OPENCHAPTER_QUICK_MODEL",
   "OPENCHAPTER_CAREFUL_MODEL",
+  "OPENCHAPTER_DEEP_MODEL",
 ] as const;
 
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
@@ -68,36 +70,60 @@ describe("modelName", () => {
   });
 
   /**
-   * **Quick is a cheaper model, not the same one asked politely.** If these two
-   * ever return the same id on Anthropic the plans stop meaning anything: the
-   * whole difference between Writer and Studio is how much of the dearer one
-   * you get, and the meters would be counting one model under two names.
+   * **Three models, not one model asked in three different manners.** The
+   * credit ladder prices a reply at 10, 30 and 100 on the strength of that; if
+   * any two of these returned the same id on Anthropic a writer would be
+   * charged ten times over for the same answer, and nothing else in the tree
+   * would notice.
    */
   it("asks Anthropic for a different model per assistant job", () => {
     only({});
     expect(modelName("anthropic", "quick")).toBe("claude-haiku-4-5");
     expect(modelName("anthropic", "careful")).toBe("claude-sonnet-5");
-    expect(modelName("anthropic", "quick")).not.toBe(
-      modelName("anthropic", "careful"),
-    );
+    expect(modelName("anthropic", "deep")).toBe("claude-opus-5");
+
+    const ids = CHAT_MODELS.map((model) => modelName("anthropic", model));
+    expect(new Set(ids).size).toBe(CHAT_MODELS.length);
   });
 
-  it("overrides one assistant job without moving the other", () => {
+  it("overrides one assistant job without moving the others", () => {
     only({ OPENCHAPTER_QUICK_MODEL: "mine" });
     expect(modelName("anthropic", "quick")).toBe("mine");
     expect(modelName("anthropic", "careful")).toBe("claude-sonnet-5");
+    expect(modelName("anthropic", "deep")).toBe("claude-opus-5");
     expect(modelName("anthropic", "task")).toBe("claude-sonnet-5");
 
-    only({ OPENCHAPTER_CAREFUL_MODEL: "yours" });
-    expect(modelName("anthropic", "careful")).toBe("yours");
+    only({ OPENCHAPTER_DEEP_MODEL: "yours" });
+    expect(modelName("anthropic", "deep")).toBe("yours");
     expect(modelName("anthropic", "quick")).toBe("claude-haiku-4-5");
+    expect(modelName("anthropic", "careful")).toBe("claude-sonnet-5");
   });
 });
 
 describe("asChatModel", () => {
-  it("narrows the two the assistant offers", () => {
+  it("narrows the three the assistant offers", () => {
     expect(asChatModel("quick")).toBe("quick");
     expect(asChatModel("careful")).toBe("careful");
+    expect(asChatModel("deep")).toBe("deep");
+  });
+
+  /**
+   * **A stored preference outlives a rename, and this is the only thing that
+   * says so.**
+   *
+   * `prefs.assistantModel` is on disk in whatever vocabulary was canonical when
+   * the writer last touched the picker. `light` and `close` were canonical for
+   * part of 2026-09-04; dropping the map would reset those writers to the
+   * default silently, and one who had chosen the thinking model would be
+   * answered by the cheap one with nothing on screen to say why.
+   *
+   * `close` resolves to `careful` rather than `deep` because it was Sonnet
+   * under both names — the writer keeps the model they picked instead of being
+   * promoted into one that costs ten times as much.
+   */
+  it("carries a retired vocabulary forward", () => {
+    expect(asChatModel("light")).toBe("quick");
+    expect(asChatModel("close")).toBe("careful");
   });
 
   it("refuses everything else, including a model id", () => {
@@ -107,6 +133,7 @@ describe("asChatModel", () => {
       "claude-haiku-4-5",
       "",
       "Quick",
+      "Careful",
       null,
       undefined,
       1,
@@ -147,11 +174,25 @@ describe("chatTuning", () => {
     });
   });
 
+  /**
+   * **Deep is the same request at a higher effort**, which is the one dial
+   * worth turning between two thinking models. A Deep reply is billed a
+   * hundred credits against Careful's thirty; if the two sent identical tuning
+   * the whole difference would be the model id, and this is what says
+   * otherwise.
+   */
+  it("asks Deep for more effort than Careful", () => {
+    expect(chatTuning("deep")).toEqual({
+      thinking: { type: "adaptive" },
+      output_config: { effort: "high" },
+    });
+  });
+
   /* The pair travels together: adaptive thinking with no effort is a different
      request from the one this was tuned against, and effort with no thinking is
      rejected outright. */
   it("sends both fields or neither", () => {
-    for (const model of ["quick", "careful"] as const) {
+    for (const model of CHAT_MODELS) {
       const tuning = chatTuning(model);
       expect(tuning.thinking === undefined).toBe(
         tuning.output_config === undefined,

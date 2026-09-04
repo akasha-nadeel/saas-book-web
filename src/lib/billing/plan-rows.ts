@@ -22,6 +22,7 @@
 
 import { FREE_LIMITS } from "@/lib/free-limits";
 import { plural } from "@/lib/plural";
+import { repliesFrom } from "./credits";
 import { TIER_LIMITS, TIER_ORDER, type PlanTier } from "./tiers";
 
 /**
@@ -41,7 +42,34 @@ function everywhere(value: string): Record<PlanTier, string> {
   ) as Record<PlanTier, string>;
 }
 
-/** Included on the plans with the assistant, crossed on the two without it. */
+/**
+ * How a month's credits read in replies.
+ *
+ * Derived through `repliesFrom` rather than written out, so this card and the
+ * chat panel cannot print two different answers to "what does 2,000 buy". The
+ * names come from the model vocabulary, not from this file.
+ */
+function repliesLine(credits: number): string {
+  const replies = repliesFrom(credits);
+  return `${replies.quick} Quick · ${replies.careful} Careful · ${replies.deep} Deep`;
+}
+
+/**
+ * A plan's monthly grant, in words a card's prose can carry.
+ *
+ * **Exported because both pricing screens write this figure into a blurb**, and
+ * a blurb is the one place a number drifts with nothing failing to say so — the
+ * Studio card claimed "three times the careful replies" against an allowance
+ * that was twice, in the retired vocabulary, on a page a buyer reads before
+ * paying. Deriving it here is the same argument that made this whole module
+ * exist, applied one level up.
+ */
+export function creditsLine(tier: PlanTier): string {
+  const credits = TIER_LIMITS[tier].creditsPerMonth;
+  return `${credits.toLocaleString("en-US")} credits a month`;
+}
+
+/** Included on the plans with the assistant, crossed on the one without it. */
 function withAssistant(value: Record<PlanTier, string> | string) {
   const paid = typeof value === "string" ? everywhere(value) : value;
   return Object.fromEntries(
@@ -52,13 +80,31 @@ function withAssistant(value: Record<PlanTier, string> | string) {
   ) as Record<PlanTier, string>;
 }
 
+/**
+ * The three things a reader is comparing, in the order they are weighed.
+ *
+ * **Writing first, the assistant second, publishing last**, which is the order
+ * a book is actually made in — and it puts the one section the plans differ on
+ * in the middle, where a reader scanning down meets it after the rows that are
+ * the same everywhere and before the ones that are again.
+ *
+ * The groups exist for the comparison table; the cards carry a short list of
+ * their own. A row with no group would silently vanish from the table, so the
+ * field is required rather than optional.
+ */
+export const ROW_GROUPS = ["Writing", "The assistant", "Publishing"] as const;
+
+export type RowGroup = (typeof ROW_GROUPS)[number];
+
 export const ROWS: {
+  group: RowGroup;
   label: string;
   values: Record<PlanTier, string>;
 }[] = [
   /* **Line one, because it is the only row where Free differs from Draft** —
      the whole of what the cheapest paid plan buys, said first. */
   {
+    group: "Writing",
     label: "Books",
     values: {
       free: plural(TIER_LIMITS.free.books ?? 0, "book"),
@@ -69,10 +115,12 @@ export const ROWS: {
   },
   /* Qualifies the row above it: five books, but nothing inside them counted. */
   {
+    group: "Writing",
     label: "Chapters and words",
     values: everywhere(UNLIMITED),
   },
   {
+    group: "Writing",
     label: "Autosave and sync",
     /* Matched by string in `STARTER_HIGHLIGHT` — renaming silently drops it. */
     values: everywhere(INCLUDED),
@@ -83,6 +131,7 @@ export const ROWS: {
      first. Four identical values *is* the argument; the row stays for exactly
      that reason. Matched by string in `STARTER_HIGHLIGHT`. */
   {
+    group: "Publishing",
     label: "Export",
     values: everywhere("Word, EPUB, PDF"),
   },
@@ -91,6 +140,7 @@ export const ROWS: {
      this cannot promise a count the screen then refuses. `pro: null` there means
      no ceiling, which is the one value `badgeTone` paints gold. */
   {
+    group: "Publishing",
     label: "Title check",
     values: {
       free: `${FREE_LIMITS.titleCheck.free} a day`,
@@ -100,40 +150,53 @@ export const ROWS: {
     },
   },
   {
+    group: "Publishing",
     label: "Consistency check",
     values: everywhere(INCLUDED),
   },
-  /* ── The boundary. Everything below is crossed on Free and Draft. ────── */
+  /* ── The boundary. Everything below is crossed on Free alone now: Draft
+        gained the assistant when the plans went to credits, so the cheapest
+        paid plan is the first one that can use it. ─────────────────────── */
   {
+    group: "The assistant",
     label: "Writing assistant",
     values: withAssistant(INCLUDED),
   },
-  /* **The two counts, and the wording is deliberately about the allowance
+  /* **One count now, and the wording is deliberately about the allowance
      rather than the model.**
 
      A card may not imply one model is cleverer than another: on an Anthropic
-     deployment Quick is Haiku and Careful is Sonnet, but on a Google one they
-     are the same model, and "thinks harder" would be a claim the code cannot
-     back on half the installations. What is true everywhere is how many you
-     get and how often they come back — which is also the actual difference a
-     buyer is choosing between. The behavioural description lives in the
-     panel's own tooltip, where the deployment knows its provider. */
+     deployment Quick is Haiku, Careful is Sonnet and Deep is Opus, but on a
+     Google one all three are the same model, and "thinks harder" would be a
+     claim the code cannot back on half the installations. What is true
+     everywhere is how many credits you get and what a reply costs — which is
+     also the actual difference a buyer is choosing between. The behavioural
+     description lives in the panel's own tooltip, where the deployment knows
+     its provider.
+
+     This was two rows, "Quick replies a day" and "Careful replies a month",
+     against the two meters that no longer exist. One balance is also a shorter
+     thing to read across four columns. */
   {
-    label: "Quick replies",
+    group: "The assistant",
+    label: "Credits a month",
     values: withAssistant({
       free: "",
-      draft: "",
-      writer: `${TIER_LIMITS.writer.quickPerDay} a day`,
-      studio: `${TIER_LIMITS.studio.quickPerDay} a day`,
+      draft: TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US"),
+      writer: TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US"),
+      studio: TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US"),
     }),
   },
   {
-    label: "Careful replies",
+    /* Derived rather than typed, so the card and the panel cannot disagree
+       about what a month buys — the same reason `repliesFrom` exists at all. */
+    group: "The assistant",
+    label: "Replies a month",
     values: withAssistant({
       free: "",
-      draft: "",
-      writer: `${TIER_LIMITS.writer.carefulPerMonth} a month`,
-      studio: `${TIER_LIMITS.studio.carefulPerMonth} a month`,
+      draft: repliesLine(TIER_LIMITS.draft.creditsPerMonth),
+      writer: repliesLine(TIER_LIMITS.writer.creditsPerMonth),
+      studio: repliesLine(TIER_LIMITS.studio.creditsPerMonth),
     }),
   },
   {
@@ -145,6 +208,7 @@ export const ROWS: {
        "can write in" is the permission it actually is — "the assistant writes
        into your chapter" read as a description of something happening on its
        own. */
+    group: "The assistant",
     label: "Writes into your chapter",
     values: withAssistant(INCLUDED),
   },

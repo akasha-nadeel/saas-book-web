@@ -12,7 +12,15 @@ import {
 import { PaddleUpgradeButton } from "@/components/upgrade/paddle-checkout";
 import { ChangePlanButton } from "@/components/upgrade/change-plan-button";
 import { PaddleInlineCheckout } from "@/components/upgrade/paddle-inline-checkout";
-import { ROWS } from "@/lib/billing/plan-rows";
+import { PlanTable } from "@/components/upgrade/plan-table";
+import {
+  BEST_FOR,
+  PASS_BEST_FOR,
+  PASS_HIGHLIGHTS,
+  highlightsFor,
+  replyCountsFor,
+} from "@/lib/billing/plan-highlights";
+import { STARTER_PASS, passReplyCounts } from "@/lib/billing/starter-pass";
 import { PeriodToggle } from "@/components/upgrade/period-toggle";
 import {
   PLAN_BUTTON_PLAIN,
@@ -22,11 +30,13 @@ import {
   TIER_NAMES,
   tierAtLeast,
   type PaidTier,
-  type PlanTier,
 } from "@/lib/billing/tiers";
 import {
+  KeyIcon,
+  NibIcon,
   PenIcon,
   PlanCard,
+  ShelfIcon,
   StackIcon,
 } from "@/components/upgrade/plan-card";
 
@@ -119,42 +129,32 @@ import type { Period } from "@/lib/billing/plans";
  * shape written out four times is four places for one of them to drift — which
  * is the drift `plan-rows.ts` already exists to prevent one level down.
  *
- * **Writer is the featured one**, not Studio: it is where the assistant first
- * appears, which is the decision this page is actually asking a visitor to
- * make. Anchoring on the dearest card instead would make the ask $24.98 for an
- * audience that mostly has not decided whether it wants an assistant at all.
+ * **Writer is the featured one**, and the reason changed under it on
+ * 2026-09-04. It used to be "where the assistant first appears" — true while
+ * Draft had none, and false the moment every paid plan got credits. What is
+ * still true is that it is the middle anchor: featuring the dearest card would
+ * make the ask $29.98 of an audience that mostly has not decided whether it
+ * wants an assistant at all, and featuring the cheapest gives the page nothing
+ * to compare against.
+ *
+ * **The words are gone from this array**, which is the point of the 2026-09-04
+ * rebuild: the positioning line comes from `BEST_FOR`, the contents from
+ * `highlightsFor`, and every actual claim from `ROWS` through `PlanTable`
+ * below. What is left here is the mark and which card is featured — the two
+ * things that really are decisions about *this page*.
+ *
+ * **The four marks run page → pencil → nib → shelf**, which is the ladder the
+ * plans themselves climb.
  */
 const PAID_CARDS: {
   tier: PaidTier;
   mark: React.ReactNode;
-  blurb: string;
   featured?: boolean;
 }[] = [
-  {
-    tier: "draft",
-    mark: <StackIcon className="h-6 w-6" />,
-    blurb: "The whole of OpenChapter without the assistant. Unlimited books, every export.",
-  },
-  {
-    tier: "writer",
-    mark: <PenIcon className="h-6 w-6" />,
-    blurb: "Everything in Draft, and the writing assistant beside the chapter.",
-    featured: true,
-  },
-  {
-    tier: "studio",
-    mark: <StackIcon className="h-6 w-6" />,
-    blurb: "For a writer who leans on the assistant daily. Three times the careful replies.",
-  },
+  { tier: "draft", mark: <PenIcon /> },
+  { tier: "writer", mark: <NibIcon />, featured: true },
+  { tier: "studio", mark: <ShelfIcon /> },
 ];
-
-/** One column of `ROWS`, shaped for the card. */
-function rowsFor(tier: PlanTier) {
-  return ROWS.map((row) => ({
-    label: row.label,
-    value: row.values[tier],
-  }));
-}
 
 export function Plans({
   /** Decides where the starter card's button goes — the shelf, or the way in. */
@@ -207,6 +207,11 @@ export function Plans({
   // that a control either works or plainly says it does not, so the button
   // stays where it will always be and pressing it explains itself.
   const [soon, setSoon] = useState(false);
+  /* Its own flag rather than sharing `soon`: "no gateway is configured here"
+     and "the pass has no checkout yet" are different facts, and one dialog
+     answering both would be wrong for whichever reader it was not written
+     for. */
+  const [passSoon, setPassSoon] = useState(false);
 
   const [state, checkout, pending] = useActionState<CheckoutState, FormData>(
     startCheckout,
@@ -279,8 +284,9 @@ export function Plans({
                      font-medium text-fg/80"
         >
           Every format is free, on every plan — take your book and go whenever
-          you like. {TIER_NAMES.draft} is for more than five books;{" "}
-          {TIER_NAMES.writer} and {TIER_NAMES.studio} add the writing assistant.
+          you like. {TIER_NAMES.draft} is for more than five books; every paid
+          plan adds the writing assistant, and what differs is how many credits
+          a month you get to spend on it.
         </p>
 
         <PeriodToggle period={period} onChange={setPeriod} />
@@ -308,13 +314,23 @@ export function Plans({
 
             items-start so the featured card grows upward on its own rather
             than stretching its neighbours to match. */}
-        <div className="mt-8 grid gap-2 text-left sm:grid-cols-2 sm:items-start xl:grid-cols-4">
+        {/* **`items-stretch`, which the old grid did not do.** The four cards
+            carry lists of different lengths and their buttons are the row a
+            reader compares last; equal heights plus `mt-auto` on the action is
+            what puts those four on one line. Ragged card feet under a tidy row
+            of prices reads as a layout that gave up halfway.
+
+            `xl:grid-cols-4` rather than four across from `sm`: four columns at
+            768px is 190px each and every figure in them wraps. The 2×2 in
+            between falls as (Free, Draft) and (Writer, Studio). */}
+        <div className="mt-10 grid gap-3.5 sm:grid-cols-2 sm:items-stretch xl:grid-cols-5">
           <PlanCard
-            mark={<PenIcon className="h-6 w-6" />}
+            mark={<StackIcon />}
             name={TIER_NAMES.free}
-            blurb="Write the whole book and take the file with you. No card, and no clock on it."
+            bestFor={BEST_FOR.free}
             price="$0"
-            rows={rowsFor("free")}
+            note="No card needed"
+            highlights={highlightsFor("free")}
             action={
               // Not a disabled "current plan" chip: a writer who is already in
               // has somewhere to be, and one who is not has an account to make.
@@ -328,21 +344,60 @@ export function Plans({
             }
           />
 
-          {PAID_CARDS.map(({ tier, mark, blurb, featured }) => (
+          {/* **Second, between Free and Draft, because that is what it is
+              for.** The pass is the step a reader takes when Free has shown
+              them the tool and $7.98 a month is still a bigger decision than
+              they are ready to make. Putting it at the end of the row — with
+              the plans — would file it as the cheapest subscription, which is
+              the one thing it is not. */}
+          <PlanCard
+            tone="pass"
+            badge="New writers only"
+            mark={<KeyIcon />}
+            name="Starter Pass"
+            bestFor={PASS_BEST_FOR}
+            price={displayPrice(STARTER_PASS.price)}
+            note="Charged once, never renews"
+            highlights={PASS_HIGHLIGHTS}
+            replies={passReplyCounts()}
+            action={
+              /* **Honest about not being on sale yet.** The card draws because
+                 the pass is a decided product with settled numbers; the button
+                 says what is actually true, which is that there is no checkout
+                 behind it until a one-time price exists in Paddle and a webhook
+                 credits the ledger. A button that opened nothing would be the
+                 dead UI the house rules forbid, and a card quietly missing from
+                 the row would lose the argument the row is making.
+
+                 **The one-time checkout goes here** when `passOnSale()` starts
+                 answering true — one branch beside this one, the same shape as
+                 the plan buttons below. */
+              <button
+                type="button"
+                onClick={() => setPassSoon(true)}
+                className={`w-full cursor-pointer ${PLAN_BUTTON_PLAIN}`}
+              >
+                Get the Starter Pass
+              </button>
+            }
+          />
+
+          {PAID_CARDS.map(({ tier, mark, featured }) => (
             <PlanCard
               key={tier}
-              featured={featured}
-              badge={featured ? "Most popular" : undefined}
+              tone={featured ? "featured" : "plain"}
+              badge={featured ? "Most chosen" : undefined}
               mark={mark}
               name={TIER_NAMES[tier]}
-              blurb={blurb}
+              bestFor={BEST_FOR[tier]}
               price={displayPrice(perMonthOf(tier, period))}
               note={
                 period === "annual"
                   ? `${displayPrice(priceOf(tier, "annual"))} billed annually`
-                  : undefined
+                  : "Billed monthly"
               }
-              rows={rowsFor(tier)}
+              highlights={highlightsFor(tier)}
+              replies={replyCountsFor(tier)}
               action={
                 /* **Every card answers for itself now.**
 
@@ -456,8 +511,15 @@ export function Plans({
           ))}
         </div>
 
+        {/* **Every claim, in full, under the four cards that summarise them.**
+            The cards are the pitch and this is the contract — skim across the
+            top, read down when you are deciding. `spotlight` tints the column
+            the featured card names, so the two say the same thing about which
+            plan is being recommended. */}
+        <PlanTable spotlight="writer" />
+
         <p className="mx-auto mt-10 max-w-xl font-sans text-sm leading-relaxed text-muted">
-          Your manuscripts are yours on either plan. They are written to this
+          Your manuscripts are yours on every plan. They are written to this
           browser first and synced to your account, so nothing here decides
           whether you can open your own book.
         </p>
@@ -466,10 +528,25 @@ export function Plans({
       {soon && (
         <ComingSoonDialog title="Plans" onClose={() => setSoon(false)}>
           There is no payment gateway configured on this copy of OpenChapter, so
-          there is nothing to buy and nothing is held back. Once billing is
-          configured, {TIER_NAMES.draft} unlocks unlimited books, and{" "}
-          {TIER_NAMES.writer} adds the writing assistant. Every export format is
-          free either way.
+          there is nothing to buy and nothing is held back — the assistant is
+          unmetered here. Once billing is configured, {TIER_NAMES.draft} unlocks
+          unlimited books and the assistant runs on a monthly credit balance.
+          Every export format is free either way.
+        </ComingSoonDialog>
+      )}
+
+      {passSoon && (
+        <ComingSoonDialog
+          title="Starter Pass"
+          onClose={() => setPassSoon(false)}
+        >
+          The pass is not on sale yet — it needs a one-time price set up with
+          the payment gateway before it can be bought, and we would rather show
+          you what it will be than quietly leave it off the page.{" "}
+          {STARTER_PASS.credits.toLocaleString("en-US")} credits for{" "}
+          {displayPrice(STARTER_PASS.price)}, charged once, good for{" "}
+          {STARTER_PASS.days} days, one per writer. In the meantime{" "}
+          {TIER_NAMES.draft} is the cheapest way to the assistant.
         </ComingSoonDialog>
       )}
     </main>

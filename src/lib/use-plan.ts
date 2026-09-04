@@ -20,11 +20,22 @@ import type { PlanTier } from "@/lib/billing/tiers";
  * about their own account — which button to offer, which state to describe.
  */
 
-/** One meter: what has been spent, out of what, and when it refills. */
-export interface AssistantAllowance {
-  used: number;
-  limit: number | null;
-  remaining: number | null;
+/**
+ * What is left to spend on the assistant.
+ *
+ * **Two buckets, because they behave differently.** `grantLeft` is this
+ * month's allowance and disappears on the 1st; `purchased` was paid for and
+ * does not. A gate asks `total`; `/billing` prints the split, so a writer can
+ * see what they are about to lose and what they are not.
+ *
+ * `null` throughout means *nothing is metered here* — no payment gateway
+ * configured, which is the self-hosted case — and must read as unlimited
+ * rather than as empty.
+ */
+export interface CreditBalance {
+  grantLeft: number | null;
+  purchased: number | null;
+  total: number | null;
   /** ISO instant. Rendered in the reader's own time zone, never as a phrase. */
   resetAt: string | null;
 }
@@ -56,17 +67,17 @@ export interface PlanState {
   /** Present only when an order id was asked about. */
   order: { id: string; status: string } | null;
   /**
-   * The two writing-assistant meters reported by the backend.
+   * What is left to spend on the assistant, reported by the backend.
    *
-   * Two windows, not one: Quick refills daily and Careful monthly, and
-   * `resetAt` is an instant rather than a phrase because 00:00 UTC is 5:30am in
-   * Colombo — every screen renders it in the reader's own time rather than
-   * calling it "tomorrow".
+   * **This, not `tier`, is what gates the panel.** A Free account holding
+   * bought credits has some; a Writer who has spent the month has none. Both
+   * are facts about the balance rather than the plan, and `aiChatClosed()` in
+   * `launch.ts` reads `credits.total` for exactly that reason.
+   *
+   * `resetAt` is an instant rather than a phrase because 00:00 UTC on the 1st
+   * is 5:30am in Colombo — every screen renders it in the reader's own time.
    */
-  assistant: {
-    quick: AssistantAllowance;
-    careful: AssistantAllowance;
-  } | null;
+  credits: CreditBalance | null;
   /** Book allowance. `null` means unlimited. */
   books: { limit: number | null } | null;
   /** Export formats by plan. */
@@ -87,7 +98,7 @@ const UNKNOWN: PlanState = {
   currentPeriodEnd: null,
   canCancel: false,
   order: null,
-  assistant: null,
+  credits: null,
   books: null,
   exports: null,
 };

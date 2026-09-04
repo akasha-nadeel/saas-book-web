@@ -5,9 +5,9 @@ import {
   streamModel,
   type ChatMessage,
 } from "@/lib/ai";
-import { claimAssistantReplyAllowance } from "@/lib/billing/launch-entitlements";
+import { claimCredits } from "@/lib/billing/launch-entitlements";
 import { requireTier } from "@/lib/billing/server";
-import { TIER_NAMES, assistantWriteAllowed } from "@/lib/billing/tiers";
+import { TIER_LIMITS, TIER_NAMES, assistantWriteAllowed } from "@/lib/billing/tiers";
 
 /**
  * The assistant behind the editor's right-hand panel.
@@ -138,45 +138,45 @@ export async function POST(request: Request) {
   }
 
   /**
-   * **Which of the two models to ask — narrowed here, and defaulted to the
-   * cheap one.**
+   * **Which of the three models to ask — narrowed here, and defaulted to the
+   * cheapest.**
    *
-   * This narrows; it does not authorise. Both models are on both plans that
-   * have the assistant at all, so there is no per-plan allowlist to check —
-   * what differs is the *allowance*, and Postgres claims that a few lines
-   * below.
+   * This narrows; it does not authorise. All three are on every plan that has
+   * the assistant at all, so there is no per-plan allowlist to check — what
+   * differs is how many credits a writer holds, and Postgres decides that a few
+   * lines below.
    *
    * **The default matters more than the narrowing does.** A body that names
-   * nothing, or names rubbish, gets Quick: the daily meter, the cheap model.
-   * Defaulting the other way would let a malformed request spend a reply out of
-   * the scarce monthly allowance, which is the one mistake here that costs a
-   * writer something they would notice.
+   * nothing, or names rubbish, gets Quick at ten credits. Defaulting the other
+   * way would let a malformed request spend a hundred out of somebody's month,
+   * which is the one mistake here a writer would certainly notice.
+   *
+   * `asChatModel` also maps the retired `light`/`close` forward, so a stored
+   * preference written in that window still resolves.
    */
   const model = asChatModel(body.model) ?? "quick";
 
   /**
-   * **The plan gate, and it is the broadest refusal here so it goes first.**
+   * **The sign-in gate, which is all the plan gate is now.**
    *
-   * The assistant is what Writer and Studio buy. Free and Draft carry the whole
-   * of the rest of OpenChapter — every import, sync, all three export formats,
-   * unlimited words, the title and consistency checks — and no assistant at
-   * all, so a request from one of those plans is refused entirely rather than
-   * being asked the narrower question about write mode.
+   * The assistant used to be what Writer and Studio bought, so this asked for a
+   * tier. It no longer can: every paid plan carries the assistant, and the
+   * ledger lets a Free account hold credits too. Whether this reader may have a
+   * reply is a question about their balance, and `claimCredits` below is what
+   * asks it.
    *
-   * **Before the allowance is claimed**, which is the rule the write gate
-   * already followed: a refusal must cost nobody a reply out of their day or
-   * their month.
+   * `requireTier("free", …)` therefore reads as "signed in, on any plan" —
+   * which is exactly what it means, and it is kept rather than swapped for
+   * `requireSignedIn` because the *tier* it returns is what the write-mode
+   * question a few lines down needs, and one subscription read is better than
+   * two.
    *
-   * It answers with the *tier* rather than a boolean because the two questions
-   * below need it — whether the assistant may write into the chapter, and which
-   * allowance to spend — and one subscription read is better than three.
-   *
-   * The message names the plan rather than the paywall, and reads the name out
-   * of `TIER_NAMES` so it cannot drift from the card.
+   * **Before the credits are claimed**, which is the rule the write gate
+   * already followed: a refusal must cost nobody a credit.
    */
-  const gate = await requireTier("writer", {
+  const gate = await requireTier("free", {
     signIn: "Sign in to use the writing assistant.",
-    upgrade: `The writing assistant is part of ${TIER_NAMES.writer} and ${TIER_NAMES.studio}. ${TIER_NAMES.draft} carries unlimited books, every export format and unlimited title checks.`,
+    upgrade: `The writing assistant runs on credits. ${TIER_NAMES.draft} includes ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} a month.`,
   });
   if (!gate.ok) return gate.response;
 
@@ -196,15 +196,15 @@ export async function POST(request: Request) {
   if (write && !assistantWriteAllowed(gate.tier)) {
     return Response.json(
       {
-        error: `Letting the assistant write into your chapter is part of ${TIER_NAMES.writer} and ${TIER_NAMES.studio}. It can still read the chapter and offer you text.`,
+        error: `Letting the assistant write into your chapter starts at ${TIER_NAMES.draft}. It can still read the chapter and offer you text.`,
         upgrade: true,
       },
       { status: 402 },
     );
   }
 
-  const allowance = await claimAssistantReplyAllowance(model);
-  if (!allowance.ok) return allowance.response;
+  const claim = await claimCredits(model);
+  if (!claim.ok) return claim.response;
 
   // The chapter is `context` rather than part of the conversation so it stays
   // put as the prefix while the exchange grows, which is what lets it be cached
@@ -253,7 +253,7 @@ export async function POST(request: Request) {
   try {
     first = await pieces.next();
   } catch (err) {
-    await allowance.refund();
+    await claim.refund();
     if (err instanceof ModelError) {
       const status =
         err.kind === "auth" ? 401 : err.kind === "rate" ? 429 : 502;
@@ -305,8 +305,13 @@ export async function POST(request: Request) {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
-      ...(allowance.usage.remaining !== null
-        ? { "X-OpenChapter-AI-Remaining": String(allowance.usage.remaining) }
+      /* What the reply cost and what is left, so the panel can move its
+         balance without asking `/api/billing/subscription` again. Absent
+         entirely when nothing is metered, which is how the panel tells
+         "unlimited" from "zero". */
+      "X-OpenChapter-AI-Cost": String(claim.cost),
+      ...(claim.balance.total !== null
+        ? { "X-OpenChapter-AI-Remaining": String(claim.balance.total) }
         : {}),
     },
   });

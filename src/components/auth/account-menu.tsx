@@ -358,6 +358,25 @@ function MenuBody({
    */
   const planSection = plan.loading || !plan.billing || plan.pro;
 
+  /*
+   * Whether the Usage row has anything to open onto.
+   *
+   * **Two questions, not one, and the tier answers only the first.** A plan
+   * that is granted credits keeps the row even at zero — that is where the
+   * refill date is, and a writer who has just run out is the likeliest person
+   * to look for it. And a Free account holding bought credits keeps it too,
+   * because it has a balance to report while its plan grants nothing.
+   *
+   * `total === null` is the unmetered deployment, where the dialog says so
+   * outright. `plan.tier` is null while `usePlan()` is still asking and the
+   * guard fails closed there on purpose — a row that appears a beat after the
+   * menu opens is worse than one that was never in it.
+   */
+  const showUsage =
+    (plan.tier !== null && chatAllowed(plan.tier)) ||
+    plan.credits?.total === null ||
+    (plan.credits?.total ?? 0) > 0;
+
   const until = plan.currentPeriodEnd
     ? new Date(plan.currentPeriodEnd).toLocaleDateString(undefined, {
         day: "numeric",
@@ -437,16 +456,10 @@ function MenuBody({
           </MenuLink>
         )}
 
-        {/* **Only where there is an allowance to report.** Free and Draft have
-            no assistant, so the two meters would both read "Not on this plan" —
-            a row that opens to say nothing.
-
-            `chatAllowed` and not `plan.pro`: Draft is paid, and this is the
-            same predicate the chat panel gates itself on. `plan.tier` is null
-            while `usePlan()` is still asking, and the guard fails closed there
-            on purpose — a row that appears a beat after the menu opens is
-            worse than one that was never in it. */}
-        {plan.tier && chatAllowed(plan.tier) && (
+        {/* **Only where there is a balance to report** — see `showUsage`. On
+            Free with nothing bought the dialog would open to say the plan
+            includes no credits, which the plans page says better. */}
+        {showUsage && (
           <MenuButton onSelect={onUsage} icon={icons.usage}>
             Usage
           </MenuButton>

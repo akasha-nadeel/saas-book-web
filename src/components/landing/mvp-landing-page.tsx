@@ -485,7 +485,7 @@ const ROWS: Row[] = [
   {
     badge: "The assistant",
     title: "Ask about the chapter you are on",
-    lead: "It reads the chapter and answers about it. On Pro it can offer a passage for the page — you see exactly what would change before it goes in, and one undo takes it back.",
+    lead: "It reads the chapter and answers about it. On a paid plan it can offer a passage for the page — you see exactly what would change before it goes in, and one undo takes it back.",
     figure: (
       <AssistantScreen chrome={{ url: "openchapter.app/book/breathe-again/chapter/two" }} />
     ),
@@ -557,9 +557,10 @@ const FAQ: [question: string, answer: ReactNode][] = [
     <>
       Nothing is taken away and nothing is locked. Your books stay where they
       are, you keep writing in all of them, and every export format goes on
-      working. The larger assistant allowance is what stops, and the shelf goes
-      back to holding {plural(LAUNCH_LIMITS.freeBooks, "book")} — the rest are
-      kept safe and read-only rather than deleted.
+      working. The assistant is what stops — it runs on credits and a free
+      account is granted none — and the shelf goes back to holding{" "}
+      {plural(LAUNCH_LIMITS.freeBooks, "book")}, with the rest kept safe and
+      read-only rather than deleted.
     </>,
   ],
   [

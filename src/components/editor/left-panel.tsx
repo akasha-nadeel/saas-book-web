@@ -13,6 +13,7 @@ import { TrashPanel } from "@/components/editor/trash-panel";
 import { SearchPanel } from "@/components/editor/search-panel";
 import { ConsistencyPanel } from "@/components/editor/consistency-panel";
 import { icons } from "@/components/editor/icon-rail";
+import { Tooltip } from "@/components/ui/tooltip";
 import { EDITOR_LAYOUT_EVENT } from "@/lib/use-visual-viewport";
 import { PANEL_TITLES, type PanelTab } from "@/lib/panel-tabs";
 
@@ -137,13 +138,29 @@ export function LeftPanel({
     : PANEL_TITLES[tab];
 
   /*
-   * A press anywhere else puts it away.
+   * A press anywhere else puts it away — **on a phone, and nowhere else as of
+   * 2026-09-04.**
    *
-   * This is what a floating panel owes the page it is floating over: it is
-   * consulted and then dismissed, and the dismissal should be the gesture you
-   * were making anyway — reaching back into the manuscript. Hunting for a
-   * control to close a layer you have already stopped looking at is the part
-   * that made the pushed column feel like furniture.
+   * The argument for doing it everywhere was that a floating panel owes the
+   * page it floats over an easy dismissal, and that the dismissal should be the
+   * gesture you were making anyway: reaching back into the manuscript. That
+   * holds for a panel *over* the page. It stopped holding when the panel became
+   * a neighbour standing beside the page on a wide screen, and what it produced
+   * there was a writer losing their search results, their notes or their
+   * conversation by clicking into their own prose to keep typing — the single
+   * most likely thing they were about to do. A panel that closes itself because
+   * you used the thing it is open beside is not being tidy, it is being lost.
+   *
+   * So on a wide screen there are exactly two ways out and both are asked for:
+   * the header's own control, and `Ctrl /`. Below the continuous threshold the
+   * panel really is a modal over the page — it takes the whole screen and there
+   * is nothing else to reach — so the outside press stays, along with the scrim
+   * and Escape.
+   *
+   * `data-editor-layout` on the root is read rather than a media query of our
+   * own: `editor-layout.ts` already classifies this and the Tab trap below
+   * already reads it, so a second definition of "narrow" here would be a second
+   * answer waiting to disagree.
    *
    * **Both rails are excluded, and that is not a nicety.** They hold the
    * controls that open and close this thing, so a press on the tab you are
@@ -174,6 +191,8 @@ export function LeftPanel({
     if (!open) return;
 
     const onPointerDown = (e: PointerEvent) => {
+      // See above: a neighbour is not dismissed by using what it sits beside.
+      if (document.documentElement.dataset.editorLayout !== "continuous") return;
       const target = e.target;
       if (!(target instanceof Element)) return;
       if (
@@ -288,14 +307,23 @@ export function LeftPanel({
                         : "oc-drawer-out pointer-events-none"
                     }`}
         aria-label={fullName}
-        // Escape closes it, but only from inside: this is a layer over the
-        // manuscript rather than a modal, so a writer typing in the page must
-        // be able to press Escape without the panel they are reading from
-        // disappearing.
+        // Escape closes it from inside, and **only on a phone** as of
+        // 2026-09-04 — the same rule as the outside press above and for the
+        // same reason. Beside the page it is a neighbour, and a neighbour is
+        // dismissed on purpose: the header's control or `Ctrl /`. Over the page
+        // it is a modal, and a modal owes the keyboard a way out.
+        //
+        // It has always been scoped to presses *inside* the panel — a writer
+        // typing in the manuscript must be able to press Escape without the
+        // panel they are reading from disappearing — and that stays true.
         onKeyDown={(e) => {
           if (e.key === "Escape") {
-            e.stopPropagation();
-            onClose();
+            if (
+              document.documentElement.dataset.editorLayout === "continuous"
+            ) {
+              e.stopPropagation();
+              onClose();
+            }
             return;
           }
           if (
@@ -328,6 +356,56 @@ export function LeftPanel({
             way — but a writer whose eye is *in* the panel should not have to
             travel back to the edge of the window to be rid of it. The two
             controls are one toggle, so they can never disagree. */}
+        {/* **The collapse handle, straddling the panel's outer edge.**
+
+            The header's control is the one a writer finds when their eye is
+            already in the panel. This is the one they find when it is on the
+            page — a tab on the seam, at the height the eye is at, pointing the
+            way the panel will go. Canva's, and Figma's, and every IDE's: it is
+            the shape this gesture has, and a writer arrives knowing it.
+
+            It earns its place *now* rather than being a second copy of the same
+            button, because the outside press has just been taken away on wide
+            screens. That press was the way out nobody had to look for; without
+            a visible handle to replace it the panel would have exactly one exit,
+            tucked in a corner, and a writer who missed it would conclude the
+            thing cannot be closed at all.
+
+            Hidden below the continuous threshold, where the panel is a modal
+            over the page: there the scrim, Escape and the outside press are all
+            still live, and a handle hanging off the edge of a full-screen sheet
+            would point at nothing.
+
+            `-right-3` against a 6-unit button puts exactly half of it outside
+            the border — which is what makes it read as a handle on the seam
+            rather than a button in the panel. Nothing clips it: the
+            `overflow-hidden` in here is on the content column below, and the
+            `fixed` panel is its own containing block. */}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Collapse panel"
+          className="group absolute top-1/2 -right-3 z-10 hidden h-6 w-6
+                     -translate-y-1/2 items-center justify-center rounded-full
+                     border border-line bg-panel text-muted shadow-md
+                     outline-none transition-colors hover:bg-raised hover:text-fg
+                     focus-visible:ring-2 focus-visible:ring-accent/60 md:flex"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.75}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5"
+          >
+            <path d="m12 5-5 5 5 5" />
+          </svg>
+          <Tooltip label="Collapse" shortcut="Ctrl /" side="right" nowrap />
+        </button>
+
         {tab !== "chapters" && (
           <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
             {/* The name never shrinks and the scope does. At 15rem a long chapter

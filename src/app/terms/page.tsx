@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CREDIT_COST } from "@/lib/billing/credits";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import Link from "next/link";
 import { LegalPage, List, Note, Section, Term } from "@/components/legal/legal-shell";
@@ -74,13 +75,18 @@ export default function TermsPage() {
           writing assistant.
         </p>
         <p>
-          {TIER_NAMES.draft} adds unlimited books. {TIER_NAMES.writer} adds the
-          writing assistant — {TIER_LIMITS.writer.quickPerDay} quick replies a
-          day and {TIER_LIMITS.writer.carefulPerMonth} careful replies a month —
-          and lets it write into your chapter on your approval.{" "}
-          {TIER_NAMES.studio} carries {TIER_LIMITS.studio.quickPerDay} and{" "}
-          {TIER_LIMITS.studio.carefulPerMonth}. Every export format is included
-          on every plan, paid or not.
+          Every paid plan adds unlimited books and the writing assistant, which
+          runs on credits: a reply costs {CREDIT_COST.quick},{" "}
+          {CREDIT_COST.careful} or {CREDIT_COST.deep} credits depending on which
+          model you ask.{" "}
+          {TIER_NAMES.draft} includes{" "}
+          {TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a
+          month, {TIER_NAMES.writer}{" "}
+          {TIER_LIMITS.writer.creditsPerMonth.toLocaleString("en-US")} and{" "}
+          {TIER_NAMES.studio}{" "}
+          {TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")}. Unused
+          monthly credits do not carry over. Every export format is included on
+          every plan, paid or not.
         </p>
         <p>
           {TRADING_NAME} paid plans run from{" "}

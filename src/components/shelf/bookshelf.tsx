@@ -2977,9 +2977,10 @@ function ProCard({ plan }: { plan: PlanState }) {
         <h3 className="text-base font-bold text-white">Room for the next book</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-white/85">
           {TIER_NAMES.draft} takes the shelf from{" "}
-          {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and{" "}
-          {TIER_NAMES.writer} brings the writing assistant. Every export format
-          is free on every plan, this one included.
+          {plural(TIER_LIMITS.free.books ?? 0, "book")} to unlimited, and brings
+          the writing assistant with{" "}
+          {TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} credits a
+          month. Every export format is free on every plan, this one included.
         </p>
         <Link
           href="/upgrade"

@@ -1,4 +1,6 @@
-import { chatAllowed, type PlanTier } from "@/lib/billing/tiers";
+/* No import of `tiers.ts` any more: this file reads a balance rather than a
+   plan, and the one thing it used it for — `chatAllowed` — is now the pricing
+   screens' question rather than the gate's. */
 
 /**
  * Launch-MVP product decisions that must stay consistent across marketing,
@@ -74,29 +76,34 @@ export function onFreePlan(plan: {
 }
 
 /**
- * Whether the reader is *known* to be on a plan without the writing assistant.
+ * Whether the writing assistant is shut to this reader.
  *
- * **The sibling of `onFreePlan`, and the reason it needs one is Draft.** That
- * plan is paid — so `pro` is true and `onFreePlan` answers false — and carries
- * no assistant at all. Every AI gate written against `pro` therefore unlocks
- * for a Draft writer, silently, with nothing on screen to say it should not
- * have. A paid feature whose gate is visibly decorative teaches a reader that
- * the rest are too.
+ * **It asks about the balance, not about the plan**, and that is the whole of
+ * what changed when credits arrived. A Free account holding bought credits may
+ * use the assistant; a Writer who has spent their month may not, until the 1st.
+ * Neither of those is a fact about the tier, and a gate written against
+ * `chatAllowed` alone gets both of them wrong in opposite directions.
  *
- * So: `onFreePlan` is the right question for books, the trash and the tools;
- * this is the right question for the assistant, and the two are not
- * interchangeable from the moment a paid tier exists that does not include it.
+ * `credits` is the total a writer can spend right now — the month's grant plus
+ * anything bought. **`null` means nothing is metered here** (no gateway
+ * configured, the self-hosted case) and must open, not close.
  *
- * The same three parts as `onFreePlan`, for the same reasons — and `tier: null`
- * is the loading state, which must never refuse.
+ * The same loading rule as `onFreePlan`, for the same reason: `credits`
+ * undefined is the state before the server has answered, and not knowing yet
+ * is not a reason to refuse.
+ *
+ * `chatAllowed(tier)` still has a job — it is what the *pricing* screens ask,
+ * because "this plan grants credits" is a different question from "this reader
+ * has some". It is not the gate.
  */
 export function aiChatClosed(plan: {
   loading: boolean;
   billing: boolean;
-  tier: PlanTier | null;
+  credits?: number | null;
 }): boolean {
-  if (plan.loading || !plan.billing || plan.tier === null) return false;
-  return !chatAllowed(plan.tier);
+  if (plan.loading || !plan.billing) return false;
+  if (plan.credits === null || plan.credits === undefined) return false;
+  return plan.credits <= 0;
 }
 
 /**

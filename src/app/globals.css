@@ -1538,21 +1538,21 @@
 @media (min-width: 768px) {
   :root {
     --rail-width: 4rem;
-    --sidebar-width: 18.5rem;
+    --sidebar-width: 20.5rem;
   }
 }
 
 @media (min-width: 1280px) {
   :root {
     --rail-width: 4.5rem;
-    --sidebar-width: 21.5rem;
+    --sidebar-width: 23.5rem;
   }
 }
 
 @media (min-width: 1800px) {
   :root {
     --rail-width: 5rem;
-    --sidebar-width: 25rem;
+    --sidebar-width: 27rem;
   }
 }
 

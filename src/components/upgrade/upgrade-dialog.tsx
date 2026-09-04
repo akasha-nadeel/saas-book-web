@@ -62,14 +62,20 @@ export type UpgradeReason =
  * wanted a sixth book reads as a paywall rather than an answer — the sixth book
  * is $5.98, and saying so is both cheaper for them and more likely to convert.
  *
- * So a shelf problem sells Draft and an assistant problem sells Writer, and the
- * dialog's right-hand column is that plan's own rows out of `ROWS`.
+ * So every refusal sells Draft, and the dialog's right-hand column is that
+ * plan's own rows out of `ROWS`.
+ *
+ * **The two assistant reasons sold Writer until credits arrived**, when Draft
+ * gained a grant and write mode with it. Draft is now the cheapest answer to
+ * all four refusals — which is the point of the map rather than a collapse of
+ * it: `SELLS` exists so the answer follows the plan table, and it will part
+ * again the moment a tier is sold something Draft does not carry.
  */
 const SELLS: Record<UpgradeReason, PaidTier> = {
   books: "draft",
   restore: "draft",
-  assistant: "writer",
-  "assistant-write": "writer",
+  assistant: "draft",
+  "assistant-write": "draft",
 };
 
 /* **Each headline names the plan it is selling.** They said "Pro" while there
@@ -86,12 +92,11 @@ const HEADLINES: Record<UpgradeReason, { lead: string; title: string }> = {
     title: `Free carries ${plural(TIER_LIMITS.free.books ?? 0, "book")}. ${TIER_NAMES.draft} carries as many as you write.`,
   },
   assistant: {
-    lead: `The writing assistant is part of ${TIER_NAMES.writer}.`,
-    title:
-      "It reads the chapter you are in and answers about it, without the manuscript leaving your machine for anything else.",
+    lead: "The writing assistant runs on credits.",
+    title: `${TIER_NAMES.draft} includes ${TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} a month. It reads the chapter you are in and answers about it, without the manuscript leaving your machine for anything else.`,
   },
   "assistant-write": {
-    lead: `The assistant can read your chapter. Writing into it is ${TIER_NAMES.writer}.`,
+    lead: `The assistant can read your chapter. Writing into it starts at ${TIER_NAMES.draft}.`,
     title:
       "Offer a passage, see exactly what would change, and put it in with one press.",
   },
@@ -201,8 +206,8 @@ const ROW_ICON: Record<string, React.ReactNode> = {
   "Title check": icons.books,
   "Consistency check": icons.everything,
   "Writing assistant": icons.assistant,
-  "Quick replies": icons.assistant,
-  "Careful replies": icons.assistant,
+  "Credits a month": icons.assistant,
+  "Replies a month": icons.assistant,
   "Writes into your chapter": icons.assistant,
 };
 

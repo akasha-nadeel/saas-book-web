@@ -191,13 +191,38 @@ load-bearing:
   the first byte is out the status is spent, so a failure after that can only be
   a note in the stream — the two paths are the two halves of one failure, told
   apart by whether the writer has seen anything yet.
-- **There are two model tiers now** (`DEFAULTS.task` / `.chat`, and
-  `OPENCHAPTER_CHAT_MODEL` beside `OPENCHAPTER_MODEL`). Not tidiness: the route
-  named `claude-opus-4-8` itself and `ai.ts` defaulted to `claude-sonnet-5`, so
-  folding one into the other would have quietly downgraded the assistant.
-  Google is the same id in both tiers on purpose — a wrong model name fails as a
+- **There are four model jobs** (`DEFAULTS.task`, plus the assistant's `quick` /
+  `careful` / `deep`), each overridable on its own with `OPENCHAPTER_MODEL`,
+  `OPENCHAPTER_QUICK_MODEL`, `OPENCHAPTER_CAREFUL_MODEL` and
+  `OPENCHAPTER_DEEP_MODEL`. This began as a `task`/`chat` pair, and not out of
+  tidiness: the route named `claude-opus-4-8` itself and `ai.ts` defaulted to
+  `claude-sonnet-5`, so folding one into the other would have quietly
+  downgraded the assistant. It became three assistant jobs on 2026-09-04, when
+  the two reply meters became one credit balance — Haiku, Sonnet and Opus at 10,
+  30 and 100 credits a reply.
+  Google is the same id in all four on purpose — a wrong model name fails as a
   404 behind a screen that says the assistant is unavailable, so it stays on the
-  id the six working routes already prove.
+  id the six working routes already prove. **On a billed deployment that would
+  make the credit ladder a lie**, and what stops it is that credits are claimed
+  only where a payment gateway is configured, which is the Anthropic
+  deployment. Anyone putting a Google key on a billed installation names three
+  real Gemini ids first; do not instead flatten the costs.
+- **`chatTuning` is keyed off the job, never off a parsed model id.** Quick
+  sends *neither* `thinking` nor `output_config`: `claude-haiku-4-5` is pre-4.6
+  and rejects both — a 400 surfacing as `ModelError("other")`, a 502, and a
+  panel saying "The assistant is unavailable" with nothing on screen to explain
+  it. Careful and Deep differ only in effort (`medium` / `high`). Omitting the
+  fields is legal on every model in the table and sending them is not, so an
+  override pointed at something newer simply runs without thinking rather than
+  erroring. `ai.test.ts` is the only guard — there is no test of
+  `streamAnthropic`, which needs a live key.
+- **Two cache breakpoints on an Anthropic assistant request, not one.** The
+  chapter is one block and holds across the turns of an exchange; the
+  conversation is the second, marked on the **second to last** message. The
+  history was re-read at list price every turn, which on a ten-turn exchange is
+  the largest line on the bill. Marking the *newest* message would cache a
+  prefix ending in the question just asked — a write every turn and a read
+  never. Anthropic allows four; entries live five minutes.
 
 **Nor is the gateway used**, though narration and transcription go
 through it on `AI_GATEWAY_API_KEY` and it would have been the tidier home: it

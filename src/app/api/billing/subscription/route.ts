@@ -3,7 +3,7 @@ import { planTierOf } from "@/lib/billing/subscription";
 import { isPaddleConfigured } from "@/lib/billing/paddle";
 import { canManageSubscriptions } from "@/lib/billing/payhere";
 import { billingConfigured } from "@/lib/billing/provider";
-import { assistantUsageFor } from "@/lib/billing/launch-entitlements";
+import { creditBalanceFor } from "@/lib/billing/launch-entitlements";
 import { currentSubscription } from "@/lib/billing/server";
 import { LAUNCH_LIMITS } from "@/lib/launch";
 import { createClient } from "@/lib/supabase/server";
@@ -73,11 +73,13 @@ export async function GET(request: Request) {
      gating AI reads `tier`. */
   const pro = tier !== "free";
 
-  const shut = { used: 0, limit: 0, remaining: 0, resetAt: null };
-  const assistant =
+  /* A signed-out reader is told zero rather than null: null means *unmetered*,
+     and a visitor who has not signed in has no balance rather than an
+     unlimited one. `resetAt` stays null because there is no grant to refill. */
+  const credits =
     supabase && userId
-      ? await assistantUsageFor(supabase, userId, subscription)
-      : { quick: shut, careful: shut };
+      ? await creditBalanceFor(supabase, userId, subscription)
+      : { grantLeft: 0, purchased: 0, total: 0, resetAt: null };
 
   return Response.json({
     billing: true,
@@ -105,7 +107,7 @@ export async function GET(request: Request) {
           ? subscription.paddleSubscriptionId && isPaddleConfigured()
             : subscription.payhereSubscriptionId && canManageSubscriptions()),
     ),
-    assistant,
+    credits,
     books: { limit: TIER_LIMITS[tier].books },
     exports: { free: LAUNCH_LIMITS.freeExports, pro: LAUNCH_LIMITS.proExports },
   });

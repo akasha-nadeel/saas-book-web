@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { ApplyReview } from "@/components/chat/apply-review";
+import { ModelMenu } from "@/components/chat/model-menu";
 import { WriteSwitch } from "@/components/chat/write-switch";
 import { RailMark } from "@/components/editor/rail-mark";
 import {
@@ -27,8 +28,9 @@ import { useDictation } from "@/lib/editor/use-dictation";
 import { usePreservedEditorSelection } from "@/lib/editor/preserved-selection";
 import { aiChatClosed } from "@/lib/launch";
 import Link from "next/link";
-import { asChatModel, type ChatModel } from "@/lib/chat-model";
-import { TIER_NAMES } from "@/lib/billing/tiers";
+import { MODEL_NAMES, asChatModel, type ChatModel } from "@/lib/chat-model";
+import { CREDIT_COST, bestAffordable } from "@/lib/billing/credits";
+import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
 import { blockText, type Block } from "@/lib/markdown";
 import { useAccount } from "@/lib/use-account";
 import { useAutoGrow } from "@/lib/use-auto-grow";
@@ -150,15 +152,44 @@ export function ChatPanel({
   const [applied, setApplied] = useState<string | null>(null);
 
   /**
+   * **What is left, after everything this panel has spent.**
+   *
+   * `usePlan()` asks the server once, on mount. Every reply sent since then has
+   * cost credits it knows nothing about — so a panel reading it alone would
+   * gate on a balance that only ever gets staler, keep offering a model the
+   * writer can no longer afford, and let the refusal note say "Careful costs 30
+   * and you can still afford it" to somebody who cannot.
+   *
+   * So `/api/chat` returns what it charged and what remains, and this holds the
+   * later of the two readings. `null` is *no local news yet*, not zero — which
+   * is why the fall-through is `??` and a genuine zero from the server survives
+   * it. An unmetered deployment sends no header at all, so this stays null and
+   * `plan.credits.total` (also null) carries the "unlimited" reading through.
+   *
+   * A refund needs nothing here: it only happens on a response that carries no
+   * header, and it puts the balance back exactly where this still thinks it is.
+   */
+  const [spentDown, setSpentDown] = useState<number | null>(null);
+  const creditsLeft = spentDown ?? plan.credits?.total ?? null;
+
+  /**
    * **Write mode is three conditions, and all three are about capability rather
    * than about the switch.**
    *
-   * `canWrite` is the book's answer and `aiChatClosed` the plan's — false while
-   * the plan is still unknown, because *not knowing yet is not a reason to
+   * `canWrite` is the book's answer and `aiChatClosed` the balance's — false
+   * while it is still unknown, because *not knowing yet is not a reason to
    * refuse*, and the server is the real gate either way. The editor is the
    * third: with no surface there is nowhere for a passage to land.
    */
-  const locked = aiChatClosed(plan);
+  const locked = aiChatClosed({
+    loading: plan.loading,
+    billing: plan.billing,
+    credits: creditsLeft,
+  });
+  /* What this plan is *given* each month, which is a different question from
+     what is left — and the one that tells a writer who has run out apart from
+     one who was never sold any. Only the tier can answer it. */
+  const granted = plan.tier ? TIER_LIMITS[plan.tier].creditsPerMonth : 0;
   /* The picker's answer. Stored in prefs because the panel unmounts on close;
      `asChatModel` has already narrowed whatever was on disk. */
   const model = prefs.assistantModel;
@@ -383,6 +414,10 @@ export function ChatPanel({
     const controller = new AbortController();
     abortRef.current = controller;
 
+    /* Declared out here rather than beside the reader, so the abort handler
+       below can save what had arrived before the writer pressed Stop. */
+    let reply = "";
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -397,8 +432,8 @@ export function ChatPanel({
           write: writeOn,
           selection: writeOn && selected ? selected.text : undefined,
           /* Narrowed again server-side. This names a preference, not a
-             permission — both models are on both plans that have the assistant
-             at all, and what differs is which meter the reply is taken from. */
+             permission — all three models are on every plan that has the
+             assistant at all, and what differs is what the reply costs. */
           model,
         }),
         signal: controller.signal,
@@ -409,6 +444,12 @@ export function ChatPanel({
           .json()
           .then((d: Record<string, unknown>) => d)
           .catch(() => ({}) as Record<string, unknown>);
+
+        /* A 429 carries the balance that refused the reply — the one number
+           that makes the note underneath it useful rather than repetitive. */
+        const refusedAt = (body.credits as { total?: unknown } | undefined)
+          ?.total;
+        if (typeof refusedAt === "number") setSpentDown(refusedAt);
 
         setRefusal({
           status: response.status,
@@ -424,9 +465,16 @@ export function ChatPanel({
         return;
       }
 
+      /* **What the reply cost, taken off the balance before it is read.**
+         Absent on an unmetered deployment, where there is nothing to take. */
+      const remaining = response.headers.get("X-OpenChapter-AI-Remaining");
+      if (remaining !== null && remaining !== "") {
+        const left = Number(remaining);
+        if (Number.isFinite(left)) setSpentDown(left);
+      }
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let reply = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -447,7 +495,29 @@ export function ChatPanel({
       saveChat(chapterId, finished);
       setLive(null);
     } catch (err) {
-      if ((err as Error).name === "AbortError") return;
+      /**
+       * **A stopped reply is kept, not thrown away.**
+       *
+       * This used to `return` on the spot, which left the conversation in
+       * `live` only: `saveChat` never ran, `setLive(null)` never ran, and this
+       * panel unmounts every time it is closed — so an aborted reply took *the
+       * writer's own question* with it. Nothing noticed while the only two
+       * aborts were unmount and Clear, which discard anyway. The Stop button
+       * makes it a thing a writer does on purpose, and what they mean by it is
+       * "that is enough", not "forget I asked".
+       *
+       * Whatever arrived before the stop is worth keeping for the same reason:
+       * half an answer to a question you can still see beats an empty panel.
+       */
+      if ((err as Error).name === "AbortError") {
+        const stopped: Message[] = [
+          ...history,
+          { role: "assistant", content: reply },
+        ];
+        saveChat(chapterId, stopped);
+        setLive(null);
+        return;
+      }
       console.error("[chat] failed", err);
       setRefusal({ status: 0, error: "Could not reach the assistant." });
       setMessages(history);
@@ -596,7 +666,13 @@ export function ChatPanel({
           </ol>
         )}
 
-        {refusal && <RefusalNote refusal={refusal} plan={plan} />}
+        {refusal && (
+          <RefusalNote
+            refusal={refusal}
+            credits={creditsLeft}
+            resetAt={plan.credits?.resetAt ?? null}
+          />
+        )}
       </div>
 
       {/* **What the assistant is pointed at, said before it is asked anything.**
@@ -641,32 +717,68 @@ export function ChatPanel({
         </div>
       )}
 
-      {/* **A plan without the assistant gets a way in, not a dead composer.**
+      {/* **An empty balance gets a way in, not a dead composer.**
 
-          Free and Draft carry the whole of the rest of OpenChapter and no
-          assistant at all, and `/api/chat` refuses them with a 402. A live
-          composer here would be a control that fails on every press, which the
-          house rule says is worse than one that is not there.
+          `/api/chat` refuses a reader with nothing to spend, so a live composer
+          here would be a control that fails on every press — which the house
+          rule says is worse than one that is not there.
 
           What it is *not* is a hidden tab. The rail keeps its assistant button
           and this panel still opens — a feature nobody can find is a feature
           nobody upgrades for, which is the same argument `ProGate` makes for
           the tool screens.
 
-          `aiChatClosed` and not `onFreePlan`: Draft is paid, so `pro` is true
-          for a writer who may not use this at all. And it answers false while
-          the plan is still loading, because not knowing yet is not a reason to
-          refuse. */}
+          **Two ways to arrive here and they need different sentences.** A Free
+          account was never given credits and the way out is a plan; a paid
+          writer has spent the month and the way out is the 1st, which the
+          refill date is the only useful thing to say about. Telling the second
+          one to go and buy a plan they already have is the failure this branch
+          exists to avoid.
+
+          `aiChatClosed` reads the balance rather than the tier, and answers
+          false while the plan is still loading — not knowing yet is not a
+          reason to refuse. */}
       {locked ? (
         <div className="border-t border-line px-4 py-5 text-center">
-          <p className="font-sans text-sm font-semibold text-fg">
-            The writing assistant is part of {TIER_NAMES.writer} and{" "}
-            {TIER_NAMES.studio}
-          </p>
-          <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
-            It reads the chapter you are in and answers about it — and on your
-            press, offers prose to put into the page.
-          </p>
+          {granted > 0 ? (
+            <>
+              <p className="font-sans text-sm font-semibold text-fg">
+                You have spent this month&rsquo;s credits
+              </p>
+              <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
+                {plan.credits?.resetAt ? (
+                  <>
+                    {TIER_NAMES[plan.tier ?? "free"]} refills to{" "}
+                    {granted.toLocaleString("en-US")} on{" "}
+                    {new Date(plan.credits.resetAt).toLocaleDateString(
+                      undefined,
+                      { month: "long", day: "numeric" },
+                    )}
+                    .
+                  </>
+                ) : (
+                  <>
+                    {TIER_NAMES[plan.tier ?? "free"]} refills to{" "}
+                    {granted.toLocaleString("en-US")} credits at the start of
+                    each month.
+                  </>
+                )}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-sans text-sm font-semibold text-fg">
+                The writing assistant runs on credits
+              </p>
+              <p className="mt-1.5 font-sans text-xs leading-relaxed text-muted">
+                It reads the chapter you are in and answers about it — and on
+                your press, offers prose to put into the page.{" "}
+                {TIER_NAMES.draft} includes{" "}
+                {TIER_LIMITS.draft.creditsPerMonth.toLocaleString("en-US")} a
+                month.
+              </p>
+            </>
+          )}
           <Link
             href="/upgrade"
             className="mt-3 inline-block rounded-lg bg-accent px-4 py-2 font-sans
@@ -683,26 +795,43 @@ export function ChatPanel({
             e.preventDefault();
             void send(input);
           }}
-          className="border-t border-line px-3 pt-1.5 pb-2"
-        >
-          {/* **Clear sits above the box and outside it**, because it is the one
-              control here that does not act on what is being typed: Send and the
-              microphone are about this question, and Clear is about the
-              conversation behind it. Inside the box it read as a third way to
-              deal with the draft. No border out here — it is alone on its row and
-              does not need one to be found. */}
-          {/* **The picker sits out here with Clear, not inside the box.**
+          /* **The container, and it is the whole form rather than the box.**
 
-              The box's own row is already tight — the write switch drops its
-              label at `@[15rem]` to fit — and this is a setting for the question
-              rather than a control on the draft, which is the same argument that
-              put Clear here. */}
+             The write switch stands its label down below `@[15rem]`, and that
+             query has to resolve against something. It used to be the box, which
+             worked while the switch was inside it; the switch is on the row
+             above now, so the container moved out one level to cover both rows.
+             The form's content box is 216px against the box's 214px, so no
+             threshold shifts — and one container is one thing to keep in step
+             instead of two. */
+          className="@container border-t border-line px-3 pt-1.5 pb-2"
+        >
+          {/* **The row above the box holds what is not about the draft.**
+
+              Clear is about the conversation behind the question, and the write
+              switch is a standing permission rather than a control on what is
+              being typed — neither belongs inside the surface the question is
+              composed on. The model picker used to be here on the same
+              reasoning and has gone the other way, into the box's foot: it is
+              chosen *per question*, and the box's foot is where the reference
+              every writer already knows puts it.
+
+              No border out here — the row is alone and does not need one to be
+              found. */}
           <div className="flex items-center justify-between gap-2">
-            <ModelPicker
-              value={model}
-              allowance={plan.assistant}
-              onChange={(next) => setPref("assistantModel", next)}
-            />
+            {/* Absent rather than locked for a reader on somebody else's book:
+                a plan is something you can buy your way past and a viewer role
+                is not, so offering the upgrade there would be a false way
+                out. */}
+            <div className="flex min-w-0 items-center">
+              {canWrite && editor && (
+                <WriteSwitch
+                  on={prefs.assistantWrite}
+                  locked={locked}
+                  onToggle={toggleWrite}
+                />
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setClearing(true)}
@@ -722,9 +851,10 @@ export function ChatPanel({
               surface a question is composed on, and `focus-within` lights all of
               it rather than just the words.
 
-              `@container` so the switch's label can stand down on the narrowest
-              panel: at `--sidebar-width: 15rem` the switch, its label, the chip,
-              the microphone and Send do not fit on one line together. */}
+              **The `@container` is on the form now, not here** — the write
+              switch queries it from the row above, so it had to cover both. Two
+              containers two pixels apart would be two thresholds to keep in
+              step for no gain. */}
           {/* **White, and lifted off the panel with a shadow.**
 
               `bg-surface` was the panel's own field treatment, and inside
@@ -741,7 +871,7 @@ export function ChatPanel({
               theme blocks follow everywhere else: light lifts with shadow, dark
               lifts with a line. */}
           <div
-            className="@container rounded-lg border border-line bg-panel
+            className="rounded-lg border border-line bg-panel
                        shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_14px_rgba(0,0,0,0.07)]
                        transition-colors focus-within:border-accent
                        dark:bg-surface dark:shadow-none"
@@ -780,20 +910,18 @@ export function ChatPanel({
                          focus:outline-none"
             />
 
-            <div className="flex items-center justify-between gap-2 px-2 pt-0.5 pb-2">
-              {/* Absent rather than locked for a reader on somebody else's book:
-                  a plan is something you can buy your way past and a viewer role
-                  is not, so offering the upgrade there would be a false way
-                  out. */}
-              <div className="flex min-w-0 items-center">
-                {canWrite && editor && (
-                  <WriteSwitch
-                    on={prefs.assistantWrite}
-                    locked={locked}
-                    onToggle={toggleWrite}
-                  />
-                )}
-              </div>
+            {/* **One right-aligned group, and everything in it is about the
+                question being typed** — which model answers it, dictating it,
+                and sending it. The write switch used to hold a left group here
+                and has moved to the row above; nothing replaced it, because a
+                lone control on the left would read as a fourth action rather
+                than as the absence of one. */}
+            <div className="flex items-center justify-end gap-1.5 px-2 pt-0.5 pb-2">
+              <ModelMenu
+                value={model}
+                balance={creditsLeft}
+                onChange={(next) => setPref("assistantModel", next)}
+              />
 
               <div className="flex shrink-0 items-center gap-1.5">
                 {/* **Dictation, and hidden outright where it cannot work.** The
@@ -845,16 +973,53 @@ export function ChatPanel({
                     </span>
                   </button>
                 )}
-                <button
-                  type="submit"
-                  disabled={busy || !input.trim()}
-                  className="rounded-md bg-accent px-3 py-1.5 font-sans text-sm
-                             font-semibold text-accent-ink outline-none transition-colors
-                             disabled:opacity-30 hover:bg-accent-strong
-                             focus-visible:ring-2 focus-visible:ring-accent/60"
-                >
-                  {busy ? "…" : "Send"}
-                </button>
+                {/* **Present only when there is something to do with it.**
+
+                    It used to be a `Send` word drawn at all times and faded to
+                    30% for the whole of an empty box, which is most of the time
+                    a panel is open — a control saying "no" more often than it
+                    says anything else. Now it arrives with the first character.
+
+                    **And while a reply is coming it is Stop**, which is a
+                    control this panel did not have at all: stopping a Deep
+                    reply meant clearing the conversation or closing the panel.
+                    `type="button"`, deliberately — as a submit it would
+                    re-enter `send` with an empty box and refuse itself. */}
+                {(busy || input.trim()) && (
+                  <button
+                    type={busy ? "button" : "submit"}
+                    onClick={busy ? () => abortRef.current?.abort() : undefined}
+                    aria-label={busy ? "Stop generating" : "Send"}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center
+                               rounded-full bg-accent text-accent-ink outline-none
+                               transition-colors hover:bg-accent-strong
+                               focus-visible:ring-2 focus-visible:ring-accent/60"
+                  >
+                    {busy ? (
+                      /* A square, which is what stop has meant since tape
+                         decks. Filled rather than outlined so it reads at 12px
+                         against the round fill behind it. */
+                      <span
+                        aria-hidden="true"
+                        className="h-2.5 w-2.5 rounded-[2px] bg-current"
+                      />
+                    ) : (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-[18px] w-[18px]"
+                      >
+                        <path d="M10 16V4.5" />
+                        <path d="m5 9.5 5-5 5 5" />
+                      </svg>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -937,28 +1102,38 @@ interface Refusal {
  *
  * **402 and 429 mean two different things and must not read alike.** 402 is
  * "your plan does not include this" and the way out is a plan; 429 is "you have
- * spent this allowance" and the way out is the other model, or tomorrow. The
- * route's contract makes the pair clean — a plan with no assistant is refused
- * before the meter is touched, so a 429 always means the writer *has* the
- * assistant and has simply run one side of it out.
+ * spent your credits" and the way out is a cheaper model, more credits, or the
+ * 1st. The route's contract makes the pair clean — a reader with no session is
+ * refused before the balance is touched, so a 429 always means the writer is
+ * entitled to the assistant and has simply run out.
  *
- * `resetAt` is rendered in the reader's own time zone. The daily window turns
- * over at 00:00 UTC, which is half past five in the morning in Colombo — a word
- * like "tomorrow" would be wrong for most of the people reading it.
+ * **The way out is asked of the balance, not of "the other model".** It used to
+ * be `spent === "quick" ? "careful" : "quick"` — a sentence with no meaning
+ * once there are three, and one that could cheerfully offer a model dearer than
+ * the one just refused. `bestAffordable` answers correctly for any number of
+ * models, and answers *nothing* when nothing is affordable, which is when the
+ * refill date is the only useful thing left to say.
+ *
+ * `resetAt` is rendered in the reader's own time zone. The window turns over at
+ * 00:00 UTC on the 1st, which is half past five in the morning in Colombo — a
+ * word like "next month" would be wrong for most of the people reading it.
  */
 function RefusalNote({
   refusal,
-  plan,
+  credits,
+  resetAt,
 }: {
   refusal: Refusal;
-  plan: ReturnType<typeof usePlan>;
+  /**
+   * The balance *after* the refusal, not the one the panel opened on — the
+   * refusing 429 carries it, and a note working from the stale figure is how
+   * "you can still afford Close" gets said to somebody who cannot.
+   */
+  credits: number | null;
+  resetAt: string | null;
 }) {
-  const spent = refusal.kind ?? null;
-  const other = spent === "quick" ? "careful" : "quick";
-  const otherLeft =
-    spent && plan.assistant ? plan.assistant[other].remaining : null;
-  const back =
-    spent && plan.assistant ? plan.assistant[spent].resetAt : null;
+  const cheaper = credits === null ? null : bestAffordable(credits);
+  const back = resetAt;
 
   return (
     <div
@@ -968,19 +1143,25 @@ function RefusalNote({
     >
       <p>{refusal.error}</p>
 
-      {refusal.status === 429 && back && (
+      {refusal.status === 429 && (
         <p className="mt-1">
-          {MODEL_LABEL[spent!]} replies come back{" "}
-          {new Date(back).toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          })}
-          .
-          {otherLeft !== null && otherLeft > 0 && (
-            <> You have {otherLeft} {MODEL_LABEL[other].toLowerCase()} left.</>
-          )}
+          {cheaper ? (
+            <>
+              {MODEL_NAMES[cheaper]} costs {CREDIT_COST[cheaper]} and you can
+              still afford it.
+            </>
+          ) : back ? (
+            <>
+              Credits come back{" "}
+              {new Date(back).toLocaleString(undefined, {
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+              .
+            </>
+          ) : null}
         </p>
       )}
 
@@ -994,75 +1175,6 @@ function RefusalNote({
           See the plans
         </Link>
       )}
-    </div>
-  );
-}
-
-const MODEL_LABEL: Record<ChatModel, string> = {
-  quick: "Quick",
-  careful: "Careful",
-};
-
-/**
- * Which model the next question goes to.
- *
- * **A radiogroup, because it is one choice with two answers** — the same shape
- * as the period toggle on the pricing page, and what a screen reader needs to
- * hear rather than two unrelated buttons.
- *
- * The counts come from the server's own meters, so the control cannot offer a
- * number the route then refuses. The titles describe the wait and the
- * allowance and say nothing about cleverness: on a Google deployment both
- * segments are the same model, and a tooltip claiming otherwise would be false
- * on that half of the installations.
- */
-function ModelPicker({
-  value,
-  allowance,
-  onChange,
-}: {
-  value: ChatModel;
-  allowance: ReturnType<typeof usePlan>["assistant"];
-  onChange: (next: ChatModel) => void;
-}) {
-  const options: { model: ChatModel; title: string }[] = [
-    { model: "quick", title: "Answers straight away. Refills every day." },
-    { model: "careful", title: "Thinks first, so it takes longer. Refills every month." },
-  ];
-
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Assistant model"
-      className="flex items-center gap-0.5 rounded-md bg-raised p-0.5"
-    >
-      {options.map(({ model, title }) => {
-        const on = value === model;
-        const left = allowance ? allowance[model].remaining : null;
-
-        return (
-          <button
-            key={model}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            title={title}
-            onClick={() => onChange(model)}
-            className={`cursor-pointer rounded px-2 py-1 font-sans text-xs
-                        outline-none transition-colors
-                        focus-visible:ring-2 focus-visible:ring-accent/60 ${
-                          on
-                            ? "bg-panel font-semibold text-fg shadow-sm"
-                            : "text-muted hover:text-fg"
-                        }`}
-          >
-            {MODEL_LABEL[model]}
-            {left !== null && (
-              <span className="ml-1 font-normal text-muted">{left}</span>
-            )}
-          </button>
-        );
-      })}
     </div>
   );
 }

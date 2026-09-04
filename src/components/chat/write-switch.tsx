@@ -50,13 +50,25 @@ export function WriteSwitch({
                    hover:text-fg focus-visible:ring-2 focus-visible:ring-accent/60"
       >
         <SwitchTrack on={!locked && on} />
-        {/* **The words stand down on the narrowest panel.** At
-            `--sidebar-width: 15rem` the switch, this label, the chip, the
-            microphone and Send do not fit on one line of the composer, and a
-            wrapped control row is worse than a shorter one. The track, the
-            chip and the tooltip all survive it, so the control still says what
-            it is — the container query is on the composer box. */}
-        <span className="hidden @[15rem]:inline">Let it write</span>
+        {/* **The words stand down on the narrowest panel**, and the threshold
+            moved down with the switch on 2026-09-04.
+
+            It was `@[15rem]` against the composer *box*, back when this sat in
+            that box's foot beside the microphone and Send: five controls on one
+            line at `--sidebar-width: 15rem`, and a wrapped control row is worse
+            than a shorter one. The switch is on the row above now, sharing it
+            with nothing but Clear — about 164px of 216px — so it has room at a
+            width where it used to have none, and hiding the label there would
+            be standing down from a fight that is over.
+
+            **The container is the composer's `<form>`**, which is what both
+            rows are inside; the box below carries none of its own. Its content
+            box is ~216px at the narrowest rail, so a threshold above that never
+            matches there — which is the whole mechanism, and the reason the
+            model pill's cost uses `@[15rem]` while this uses `@[13rem]`. The
+            track, the chip and the tooltip all survive either way, so the
+            control still says what it is. */}
+        <span className="hidden @[13rem]:inline">Let it write</span>
         {/* **The app's own card, where a `title` used to be.** The browser's
             tooltip is an OS rectangle in the wrong font that takes a second to
             arrive, and this control is the one a writer has to understand
@@ -69,7 +81,7 @@ export function WriteSwitch({
           align="start"
           label={
             locked
-              ? `Letting the assistant write into your chapter is part of ${TIER_NAMES.writer}.`
+              ? `Letting the assistant write into your chapter starts at ${TIER_NAMES.draft}.`
               : on
                 ? "The assistant may offer to put a passage into this chapter."
                 : "The assistant will only offer you text to copy."
@@ -100,7 +112,7 @@ export function WriteSwitch({
                      transition-opacity hover:opacity-90
                      focus-visible:ring-2 focus-visible:ring-accent/60"
         >
-          {TIER_NAMES.writer}
+          {TIER_NAMES.draft}
         </Link>
       )}
     </div>

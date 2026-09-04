@@ -361,10 +361,30 @@ over the design, not a change to it.)
   JSON, `streamModel()` for the assistant and anything streaming.
   `ANTHROPIC_API_KEY` makes it Claude, `GOOGLE_GENERATIVE_AI_API_KEY` makes it
   Gemini, both set and Claude wins; `modelProvider()` returning null is how a
-  route answers **501** with a message saying so. Two model tiers
-  (`DEFAULTS.task` / `.chat`); the first chunk is pulled before the response is
-  returned so a rejected key is a 401 rather than an apology in the prose;
-  `splitSse` is pure and tested because a network chunk is not a message.
+  route answers **501** with a message saying so. **Four model jobs** in
+  `DEFAULTS` — `task` for the bounded routes, and the assistant's `quick` /
+  `careful` / `deep` (Haiku, Sonnet, Opus), each overridable on its own with
+  `OPENCHAPTER_{MODEL,QUICK_MODEL,CAREFUL_MODEL,DEEP_MODEL}`. The first chunk is
+  pulled before the response is returned so a rejected key is a 401 rather than
+  an apology in the prose; `splitSse` is pure and tested because a network chunk
+  is not a message.
+- **`chatTuning` is keyed off the job, never off a parsed model id.** Quick
+  sends *neither* `thinking` nor `output_config` — `claude-haiku-4-5` is pre-4.6
+  and rejects both, a 400 that surfaces as "The assistant is unavailable" with
+  nothing on screen to explain it — and Careful and Deep differ only in effort
+  (`medium` / `high`). Omitting the fields is legal on every model in the table
+  and sending them is not, so that direction is one-way safe. `ai.test.ts` is
+  the only guard; there is no test of `streamAnthropic`.
+- **The three assistant models must stay three real models on a billed
+  deployment**, because `credits.ts` charges 10 / 30 / 100 by job. Google's
+  three defaults are deliberately one id, which is safe *only* because credits
+  are claimed nowhere `billingConfigured()` is false. Do not "fix" the mismatch
+  by flattening the costs.
+- **Two cache breakpoints on an Anthropic assistant request, not one**: the
+  chapter block, which holds across the turns of an exchange, and the
+  conversation, marked on the **second to last** message. Marking the newest one
+  would cache a prefix ending in the question just asked — a write every turn
+  and a read never.
 - **Nothing here invents a book.** `/api/comps/rank` may only choose from books
   that were fetched, by numbered id, enforced **server-side**; there is no score
   field; generated text is treated as hostile input.
@@ -680,8 +700,8 @@ local-only, with the account menu saying why. Every entry point checks
   absent** — PostgREST refuses the whole select for one unknown column, so the
   entire library download would fail for everybody.
 - **Schema changes belong in `supabase/migrations/`**, not only in the
-  dashboard. There are **twelve**; the first seven were applied live as of
-  2026-08-20 and the last three have not been confirmed here — the eighth
+  dashboard. There are **thirteen**; the first seven were applied live as of
+  2026-08-20 and the last six have not been confirmed here — the eighth
   (`20260822071735_launch_mvp_entitlements.sql` — `ai_usage`, the assistant
   claim/refund RPCs and the free-book trigger), the ninth
   (`20260824000000_free_book_limit_five.sql`) and the tenth
@@ -766,20 +786,25 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   named.** `PlanTier` is `free | draft | writer | studio`, cheapest first —
   `tierAtLeast` compares positions in `TIER_ORDER`, so a tier inserted in the
   wrong place opens or shuts every gate above it. `TIER_LIMITS` is the one
-  TypeScript statement of what each plan gives (books, chat, the two reply
-  allowances, write mode); `TIER_NAMES` is the one place the words are written.
+  TypeScript statement of what each plan gives (books, chat, the monthly credit
+  grant, write mode); `TIER_NAMES` is the one place the words are written.
   The module is pure and imports nothing, so a Server Component, a client
   component and `library-store.ts` can all read it.
-- **Free and Draft carry no assistant at all.** That is the line the product is
-  drawn on: everything else — imports, sync, all three export formats, unlimited
-  words and chapters, the title and consistency checks — is on every plan
-  including Free. **`onFreePlan` is the wrong test for anything AI** from the
-  moment Draft exists: Draft is *paid*, so `pro` is true for a writer who may
-  not use the assistant. `aiChatClosed()` in `launch.ts` is its sibling and the
-  one `chat-panel.tsx` reads; `launch.test.ts` pins the Draft row, which is the
-  one that would regress silently.
-- Prices live once in `plans.ts`, keyed **tier × period**: Draft $5.98/$53.99,
-  Writer $14.98/$134.99, Studio $24.98/$224.99 — all three 25% off annually, and
+- **Paying is the line, and above it the plans differ by amount rather than by
+  kind** (2026-09-04). Every paid plan carries the assistant and all three
+  models; what a plan buys is how many credits a month. Everything else —
+  imports, sync, all three export formats, unlimited words and chapters, the
+  title and consistency checks — is on every plan including Free.
+- **`aiChatClosed()` asks about the balance, not the plan, and that is the one
+  thing to get right here.** It reads `credits.total` — so a Free account
+  holding bought credits opens and a Writer who has spent the month does not,
+  neither of which is a fact about the tier. `chatAllowed(tier)` is still the
+  *pricing* question ("does this plan come with credits") and is what
+  `account-menu.tsx` and the cards read; it is **not** the gate.
+  `onFreePlan` remains wrong for anything AI, for the older reason: Draft is
+  paid, so `pro` is true.
+- Prices live once in `plans.ts`, keyed **tier × period**: Draft $7.98/$71.82,
+  Writer $14.98/$134.99, Studio $29.98/$269.82 — all three 25% off annually, and
   the per-month figure divided from the total rather than typed, with a test on
   it. **USD only**; the LKR table came out when the plans went to four, because
   three tiers × two cycles × two currencies is twelve figures to keep true and
@@ -801,27 +826,47 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   keeps its **boolean** signature deliberately — teaching it what a tier is would
   make narrowing it a plausible edit again. What is free is **five books**,
   unlimited words and chapters, imports, sync and every export format. **Draft
-  ($5.98) buys two things**: unlimited books, and unlimited title checks — the
-  second falls out of `FREE_LIMITS.titleCheck` reading against `pro`, and it is
-  what keeps that card from being a sixth book slot for $5.98. **Writer
-  ($14.98) buys the assistant** — 25 Quick a day, 100 Careful a month, and write
-  mode. **Studio ($24.98) buys more of it** — 40 and 300.
-- **Two meters, two windows, and the window follows the cost.** Quick refills
-  **daily** and Careful **monthly**: a monthly cap on the cheap model teaches a
-  writer to hoard something that costs almost nothing, and a daily cap on the
-  dear one is either uselessly small or ruinous in a busy week. Both are UTC,
-  which is *not* the writer's midnight — `resetAt` is an instant and every screen
-  renders it in local time rather than saying "tomorrow".
-- **The status codes mean one thing each now.** `requireTier("writer", …)` in
-  `/api/chat` refuses a plan without the assistant **before** the meter is
-  touched, so **402 always means "your plan does not include this"** and **429
-  always means "you have spent this allowance"**. The panel branches on that
-  pair, offers the other model when one runs out, and reads the structured
-  `usage` it used to throw away.
+  ($7.98) buys three things**: unlimited books, unlimited title checks — which
+  falls out of `FREE_LIMITS.titleCheck` reading against `pro`, and is what keeps
+  that card from being a sixth book slot for $7.98 — and 2,000 assistant credits
+  a month with write mode. **Writer ($14.98) is 5,000** and **Studio ($29.98) is
+  10,000**; nothing else separates the three.
+- **One credit balance, not two meters** (2026-09-04), and
+  `src/lib/billing/credits.ts` is the whole economy: `CREDIT_COST` prices a
+  reply at **10 / 30 / 100** for Quick / Careful / Deep, `repliesFrom` turns a
+  balance into the count every screen actually prints, and `bestAffordable` is
+  what the panel offers after a refusal. It replaced `quickPerDay` and
+  `carefulPerMonth`, which let a writer run out of the careful model on the 3rd
+  with twenty-five daily quick replies going unused, gave them no way to buy
+  more, and would have wanted a third counter on a third window the moment a
+  third model arrived. **The ratio is the published token prices against the
+  request shape `/api/chat` already caps** (chapter, history, 2,000 out) — not a
+  marketing ladder — and a credit is budgeted at $0.0008.
+- **The grant is monthly and UTC**, which is *not* the writer's midnight —
+  `resetAt` is an instant and every screen renders it in local time rather than
+  saying "next month". **Unspent grant does not carry over**; the ledger's
+  second bucket (`purchased`) does not expire and is spent *after* the grant,
+  so a month's rollover cannot quietly burn something bought. **Nothing sells
+  credits yet** — the bucket is built because retrofitting one into a
+  grant-only ledger is the change that goes wrong, not because a pack is on
+  sale, so **naming one to a writer is a claim the code cannot back** until
+  there is a price, a checkout and a webhook that credits the row.
+- **The status codes mean one thing each.** `requireTier("free", …)` in
+  `/api/chat` is now the *sign-in* gate (kept over `requireSignedIn` because the
+  tier it returns is what the write-mode question needs), and it runs **before**
+  any credit is claimed. So **402 means "your plan does not include this"** —
+  write mode, in practice — and **429 always means "you have spent your
+  credits"**. The panel branches on that pair, offers the dearest model the
+  balance still covers, and reads the structured `credits` off the body; the
+  reply also carries `X-OpenChapter-AI-Cost` and `X-OpenChapter-AI-Remaining` so
+  the panel can move its own balance without asking `/api/billing/subscription`
+  again.
 - **What costs model time is metered on the server**:
   `billing/launch-entitlements.ts` claims a reply through the
-  `claim_assistant_reply(p_kind)` RPC against `ai_usage` (with a `refund(model)`
-  if the reply never lands), `requireLaunchExport()` now only checks for a session — free is not
+  `claim_credits(p_cost)` RPC against `ai_credits` (with a `refund_credits` that
+  takes **the split the claim returned** rather than working it out again, so a
+  reply that never lands goes back to the buckets it came from),
+  `requireLaunchExport()` now only checks for a session — free is not
   anonymous, since `/api/export/pdf` launches a browser on markup a caller sent —
   and the free book limit is
   a **Postgres trigger** (`enforce_launch_book_limit`) rather than a browser
@@ -838,9 +883,18 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   (`20260902000000_plan_tiers.sql`, `20260902000100_plan_tier_entitlements.sql`)
   are the four tiers: the CHECK constraints that make `subscriptions.plan`
   mean something, the two-window `claim_assistant_reply(p_kind)`, and
-  `openchapter_internal_plan_tier` replacing `openchapter_internal_is_pro`.
+  `openchapter_internal_plan_tier` replacing `openchapter_internal_is_pro`. The
+  thirteenth (`20260904000000_ai_credits.sql`) is the credit ledger: the
+  `ai_credits` table (**one row a writer**, not one a period, because a bought
+  balance outlives every period and one row means one lock),
+  `claim_credits(p_cost)`, `refund_credits(p_from_grant, p_from_purchased)`, and
+  the two retired reply functions dropped — **`ai_usage` itself stays**, unread,
+  because dropping it would throw away every writer's reply history to reclaim
+  nothing. The grant figures are in that function's `case` **and** in
+  `TIER_LIMITS`; `credits.test.ts` reads the migration and holds the two
+  together, which is the one thing in the tree that would notice them drifting.
   **They must be applied before the app that calls them** — a route asking for
-  `claim_assistant_reply('quick')` against the old zero-argument function is a
+  `claim_credits(10)` against a database that has never seen the thirteenth is a
   502 on every send.
 - **The book limit counts everything but the trash**, so the archive is not a
   way round it and **unarchiving is never gated**. It was the active shelf alone

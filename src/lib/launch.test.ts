@@ -79,30 +79,50 @@ it("holds nothing back where no gateway is configured", () => {
 });
 
 /**
- * **Draft is the plan this rule was written for.**
+ * **The balance is the gate, not the plan, and this is what says so.**
  *
- * It is paid — so `pro` is true and `onFreePlan` answers false — and carries no
- * assistant at all. Every AI gate written against `pro` unlocks for a Draft
- * writer, silently, and a paid feature whose gate is visibly decorative teaches
- * a reader that the rest are too. `chat-panel.tsx` is the one call site, and
- * nothing else in the tree would notice it going back to `onFreePlan`.
+ * It asked about the tier until 2026-09-04 — the right question while the
+ * assistant was what Writer and Studio bought. Credits make it the wrong one in
+ * both directions at once: a Free account holding bought credits is entitled to
+ * spend them, and a Writer who has spent the month is not entitled to more. A
+ * gate written against the tier gets one of those wrong whichever way it is
+ * written, and `chat-panel.tsx` is the one call site — nothing else in the tree
+ * would notice it going back.
  */
-it("shuts the assistant on the two plans without it", () => {
+it("shuts the assistant only when there is nothing left to spend", () => {
   const known = { loading: false, billing: true };
-  expect(aiChatClosed({ ...known, tier: "free" })).toBe(true);
-  expect(aiChatClosed({ ...known, tier: "draft" })).toBe(true);
-  expect(aiChatClosed({ ...known, tier: "writer" })).toBe(false);
-  expect(aiChatClosed({ ...known, tier: "studio" })).toBe(false);
+  expect(aiChatClosed({ ...known, credits: 0 })).toBe(true);
+  expect(aiChatClosed({ ...known, credits: 10 })).toBe(false);
+});
+
+/**
+ * **A free account holding credits may spend them**, which is the case the tier
+ * test could not express: there is no tier here at all, only a balance.
+ */
+it("opens on a balance regardless of where it came from", () => {
+  expect(aiChatClosed({ loading: false, billing: true, credits: 400 })).toBe(
+    false,
+  );
 });
 
 /** The same loading-window rule as `onFreePlan`, and for the same reason. */
-it("refuses no assistant while the plan is still unknown", () => {
-  expect(aiChatClosed({ loading: true, billing: true, tier: null })).toBe(false);
-  expect(aiChatClosed({ loading: true, billing: true, tier: "free" })).toBe(false);
-  expect(aiChatClosed({ loading: false, billing: true, tier: null })).toBe(false);
+it("refuses no assistant while the balance is still unknown", () => {
+  expect(aiChatClosed({ loading: true, billing: true })).toBe(false);
+  expect(aiChatClosed({ loading: true, billing: true, credits: 0 })).toBe(false);
+  expect(aiChatClosed({ loading: false, billing: true })).toBe(false);
+  expect(aiChatClosed({ loading: false, billing: true, credits: undefined })).toBe(
+    false,
+  );
 });
 
-/** Configure no gateway and there are no plans, so nothing is held back. */
-it("leaves the assistant open where no gateway is configured", () => {
-  expect(aiChatClosed({ loading: false, billing: false, tier: "free" })).toBe(false);
+/**
+ * Configure no gateway and there are no plans, so nothing is held back — and
+ * `null` says the same thing a second way, for the self-hosted copy running on
+ * its owner's own API key. Neither may read as an empty balance.
+ */
+it("leaves the assistant open where nothing is metered", () => {
+  expect(aiChatClosed({ loading: false, billing: false, credits: 0 })).toBe(false);
+  expect(aiChatClosed({ loading: false, billing: true, credits: null })).toBe(
+    false,
+  );
 });

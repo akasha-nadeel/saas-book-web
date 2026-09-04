@@ -71,21 +71,28 @@ it("gives every tier a limit set and a name", () => {
 });
 
 /**
- * **The assistant is the line the product is drawn on, and Draft is below it.**
+ * **Paying is the line, and the difference above it is amount rather than
+ * kind.**
  *
- * Draft is the tier this codebase has never had — paid, but with no AI — and it
- * is the one that regresses silently. Anything deriving "may use the assistant"
- * from "is on a paid plan" unlocks it for Draft, which is a paid feature whose
- * gate is visibly decorative.
+ * This read "the assistant is on the top two tiers only" until 2026-09-04, when
+ * the two reply meters became one credit balance and Draft gained a grant. What
+ * the test is protecting did not change: `chatAllowed` is the *pricing*
+ * question — does this plan come with credits — and Free is the one tier it
+ * must answer no for. A plan quietly granted credits it was never sold is the
+ * failure nothing on a screen would show.
+ *
+ * Note this is no longer the gate on the panel. `aiChatClosed()` in `launch.ts`
+ * reads the balance, because a Free account may hold bought credits and a
+ * Writer may have spent the month — neither of which is a fact about the tier.
  */
-it("keeps the assistant on the top two tiers only", () => {
+it("grants credits on every paid tier and none on free", () => {
   expect(chatAllowed("free")).toBe(false);
-  expect(chatAllowed("draft")).toBe(false);
+  expect(chatAllowed("draft")).toBe(true);
   expect(chatAllowed("writer")).toBe(true);
   expect(chatAllowed("studio")).toBe(true);
 
-  expect(assistantWriteAllowed("draft")).toBe(false);
-  expect(assistantWriteAllowed("writer")).toBe(true);
+  expect(assistantWriteAllowed("free")).toBe(false);
+  expect(assistantWriteAllowed("draft")).toBe(true);
 });
 
 /** Writing into the chapter is never offered where the chat itself is shut. */
@@ -97,24 +104,35 @@ it("never allows writing where the assistant is closed", () => {
 
 /**
  * **A hand-edited four-column table gets transposed**, and the numbers look
- * plausible either way round. These are the two orderings that would be wrong
- * in a way no screen would show.
+ * plausible either way round. The grant is now the *only* thing separating the
+ * three paid plans, so an ordering that slipped would make the dearest plan the
+ * meanest one with nothing else on the card to contradict it.
+ *
+ * Walked across `TIER_ORDER` rather than written as a pair, so a fifth tier
+ * inserted anywhere is covered the day it arrives.
  */
 it("gives the dearer plan the larger allowance", () => {
-  expect(TIER_LIMITS.studio.quickPerDay).toBeGreaterThan(
-    TIER_LIMITS.writer.quickPerDay,
-  );
-  expect(TIER_LIMITS.studio.carefulPerMonth).toBeGreaterThan(
-    TIER_LIMITS.writer.carefulPerMonth,
-  );
+  for (let i = 1; i < TIER_ORDER.length; i += 1) {
+    expect(TIER_LIMITS[TIER_ORDER[i]].creditsPerMonth).toBeGreaterThan(
+      TIER_LIMITS[TIER_ORDER[i - 1]].creditsPerMonth,
+    );
+  }
 });
 
-/** A tier with no chat has no allowance to spend, on either meter. */
-it("gives no replies to a tier without the assistant", () => {
+/**
+ * A tier granted no credits has no grant to spend.
+ *
+ * **`chat` and `creditsPerMonth` are two statements of one fact** — a plan is
+ * either sold assistant credits or it is not — and the pair drifting apart is
+ * how a card comes to promise an allowance the claim then refuses.
+ */
+it("gives no monthly credits to a tier without the assistant", () => {
   for (const tier of TIER_ORDER) {
-    if (chatAllowed(tier)) continue;
-    expect(TIER_LIMITS[tier].quickPerDay).toBe(0);
-    expect(TIER_LIMITS[tier].carefulPerMonth).toBe(0);
+    if (chatAllowed(tier)) {
+      expect(TIER_LIMITS[tier].creditsPerMonth).toBeGreaterThan(0);
+      continue;
+    }
+    expect(TIER_LIMITS[tier].creditsPerMonth).toBe(0);
   }
 });
 

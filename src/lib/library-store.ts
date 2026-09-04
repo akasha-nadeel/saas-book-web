@@ -3406,8 +3406,8 @@ const DEFAULT_PREFS: Prefs = Object.freeze({
   searchTab: "find",
   // Off: the assistant offers text and puts none of it in until asked to.
   assistantWrite: false,
-  // The daily meter, so a writer who never touches the picker never quietly
-  // spends the monthly one.
+  // The cheapest model, so a writer who never touches the picker never quietly
+  // spends ten replies' worth of credits on one.
   assistantModel: "quick",
   panelTab: "search",
   // The grid the shelf has always drawn; a writer who wants another says so.

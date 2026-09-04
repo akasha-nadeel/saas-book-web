@@ -62,17 +62,31 @@ export const CURRENCY: Currency = "USD";
  * look plausible. `plans.test.ts` pins this.
  */
 const PRICES: Record<PaidTier, Record<Period, { total: number; perMonth: number }>> = {
+  /**
+   * **Draft is priced backwards from a floor, not forwards from a cost**, and
+   * the arithmetic is written down so it is not re-litigated. The rule is at
+   * least $5.00 kept on every sale *after* Paddle's 5% + 50¢ and after all
+   * 2,000 credits have been spent. That floor sits at $7.47 —
+   * ($5.50 + $1.60) ÷ 0.95 — and the price is set above it at $7.98, which
+   * keeps $5.48. Move the grant and this moves with it.
+   */
   draft: {
-    monthly: { total: 5.98, perMonth: 5.98 },
-    annual: { total: 53.99, perMonth: 53.99 / 12 },
+    monthly: { total: 7.98, perMonth: 7.98 },
+    annual: { total: 71.82, perMonth: 71.82 / 12 },
   },
   writer: {
     monthly: { total: 14.98, perMonth: 14.98 },
     annual: { total: 134.99, perMonth: 134.99 / 12 },
   },
+  /**
+   * Twice Writer's credits at roughly twice the price. By the credit the ladder
+   * runs 0.40¢ on Draft and 0.30¢ on both Writer and Studio — the volume
+   * discount is spent between Draft and Writer, and Studio is simply more of
+   * the same rather than a third rate.
+   */
   studio: {
-    monthly: { total: 24.98, perMonth: 24.98 },
-    annual: { total: 224.99, perMonth: 224.99 / 12 },
+    monthly: { total: 29.98, perMonth: 29.98 },
+    annual: { total: 269.82, perMonth: 269.82 / 12 },
   },
 };
 
