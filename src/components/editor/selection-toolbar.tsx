@@ -294,6 +294,23 @@ export function SelectionToolbar({
       if (!editor.isFocused) return false;
       if (from === to) return false;
       if (!(state.selection instanceof TextSelection)) return false;
+
+      /**
+       * **Not for a select-all**, which is the one selection this bar cannot
+       * be about.
+       *
+       * It exists to sit on the words being changed, and it anchors to the top
+       * of the range — so on Ctrl+A it pins itself to the first line of the
+       * chapter, which on any real document is scrolled off the screen. The
+       * writer gets a bar they cannot see over a selection that is the whole
+       * book.
+       *
+       * The formatting pill covers this case and covers it better: it is
+       * always in the same place and it no longer stands down for a selection,
+       * which is what makes leaving this one out safe rather than a loss.
+       */
+      if (from <= 1 && to >= state.doc.content.size - 1) return false;
+
       return state.doc.textBetween(from, to).trim().length > 0;
     },
     [editor],

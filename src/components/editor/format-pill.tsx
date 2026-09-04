@@ -83,8 +83,22 @@ export function useFormatPillVisible(editor: Editor | null): boolean {
         const inChrome =
           active instanceof Element &&
           !!active.closest('[data-format-pill], [role="menu"]');
-        const { from, to } = editor.state.selection;
-        setShowing((editor.isFocused || inChrome) && from === to);
+        /**
+         * **Focus alone decides it, and a selection does not take it away.**
+         *
+         * This required a collapsed caret until 2026-09-04, so that the
+         * floating selection bar could have the field to itself over selected
+         * words. What that produced was Ctrl+A putting the formatting bar
+         * away — at the exact moment a writer has selected everything *in
+         * order to format it*. A persistent toolbar that disappears when you
+         * make a selection is not persistent.
+         *
+         * The two now share the screen on an ordinary selection, deliberately:
+         * this one never moves, and the floating one comes to the words. The
+         * selection bar stands down for a select-all, where it has nothing to
+         * point at — see `selection-toolbar.tsx`.
+         */
+        setShowing(editor.isFocused || inChrome);
       });
     };
 

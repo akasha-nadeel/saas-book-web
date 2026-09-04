@@ -31,6 +31,7 @@ import {
   steppedZoom,
   zoomFromWheel,
 } from "@/lib/editor/zoom";
+import { useStoredZoom } from "@/lib/editor/use-stored-zoom";
 import {
   Rail,
   RailButton,
@@ -436,21 +437,9 @@ export function ChapterEditor({
     const done = setTimeout(() => setEntering(false), 1100);
     return () => clearTimeout(done);
   }, [entering]);
-  /**
-   * Page zoom, read from `prefs` rather than held here.
-   *
-   * It was `useState(1)`, which survived moving between chapters — the surface
-   * is remounted on every one — and reset on every reload. That was the right
-   * weight for a control nobody used; it is the wrong one now the page answers
-   * a pinch, because a writer who works at 125% for their eyes or their screen
-   * means it tomorrow as well.
-   *
-   * `setPref` writes through the store, so the value is narrowed by `clampZoom`
-   * coming back out — the guard that stops a stored zero rendering a page of
-   * no width.
-   */
-  const zoom = prefs.zoom;
-  const setZoom = useCallback((next: number) => setPref("zoom", next), []);
+  // Page zoom: state at the speed of a gesture, storage at the speed of a
+  // setting. See `useStoredZoom`.
+  const [zoom, setZoom] = useStoredZoom();
 
   // Opening a book is worth marking; it renders faster than the eye can catch,
   // so the loading screen is held for a beat, then faded. It plays only on the
@@ -1971,6 +1960,38 @@ function EditorSurface({
               ) {
                 return;
               }
+
+              /**
+               * **The desk around the page is not a text target.**
+               *
+               * Click-and-type used to reach anywhere on this element, which
+               * includes the grey to the left and right of the paper and
+               * everything below the last page — so clicking *nothing* put the
+               * caret in the prose and left the formatting bar up. Word does
+               * not do that either: the surround is where the page sits, not
+               * part of it.
+               *
+               * Inside the column, including the blank lower half of a page,
+               * is unchanged. Outside it, the caret is put away — which is
+               * also what dismisses the formatting bar, now that it follows
+               * focus rather than the selection.
+               *
+               * `flowRef` is the page column and is already measured for the
+               * zoom, so this costs no new geometry.
+               */
+              const column = flowRef.current?.getBoundingClientRect();
+              const onPage =
+                column &&
+                e.clientX >= column.left &&
+                e.clientX <= column.right &&
+                e.clientY >= column.top &&
+                e.clientY <= column.bottom;
+
+              if (!onPage) {
+                editor.commands.blur();
+                return;
+              }
+
               const pos = nearestTextPos(editor, e.clientX, e.clientY);
               const chain = editor.chain();
               if (pos !== null) chain.setTextSelection(pos);

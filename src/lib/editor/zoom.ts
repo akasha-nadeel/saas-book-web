@@ -79,9 +79,15 @@ const PX_PER_PAGE = 400;
  *
  * Tuned against the two devices that differ most: a trackpad pinch arrives as a
  * stream of small deltas, a mouse notch as a single ±100. At this value a notch
- * is about 12%, which is a comfortable step, and a slow pinch is continuous.
+ * is about a quarter — the step Canva and Figma both take, and the one this was
+ * raised to on 2026-09-04 after 12% read as sluggish against them. A pinch is
+ * still continuous, because the deltas it sends are small.
+ *
+ * **Raising it is safe in a way a threshold would not be**: the curve below is
+ * exponential, so this scales every step proportionally and the round trip
+ * stays exact. `zoom.test.ts` proves that against whatever this is set to.
  */
-const SENSITIVITY = 0.0012;
+const SENSITIVITY = 0.003;
 
 /**
  * The zoom a wheel event asks for.
