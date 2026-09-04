@@ -166,23 +166,13 @@ export function ToolsPopover({
         </svg>
       </button>
 
-      <div
-        /* **Lighter than the page it stands on, not darker.**
-
-           It wore `nav-chrome` — the rail's ground, the darkest surface in the
-           set — on the reasoning that a control surface belongs to the app
-           rather than to the manuscript. That is true of a rail, which is cut
-           into the window's edge, and wrong for a sheet floating over the
-           middle of it: drawn that way it read as a hole punched in the page.
-           `float` is one step above the desk and the groups inside take
-           `lifted`, one above that. See the note beside `--color-lifted`. */
-        className="flex w-full flex-col overflow-hidden rounded-2xl border
-                   border-line bg-float text-fg shadow-2xl"
-        style={{ maxHeight: at.height }}
-      >
-        <h2 className="shrink-0 border-b border-lifted-line px-4 py-3 font-sans text-sm font-semibold text-fg">
-          Page &amp; type
-        </h2>
+      {/* **No card and no heading here any more.** This drew both, around a
+          320px sheet of labelled rows; what it holds now is a strip of tools
+          that brings its own ground and opens its own panel beside itself, so
+          a frame around that would be a box drawn round a box. What is left
+          for this component is placement, the way out, and the height it may
+          not exceed. */}
+      <div className="flex min-h-0 text-fg" style={{ maxHeight: at.height }}>
         <ToolsPanel
           book={book}
           editor={editor}

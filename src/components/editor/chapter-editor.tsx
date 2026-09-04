@@ -256,8 +256,18 @@ export function ChapterEditor({
    * **It used to exclude the chapters tab**, because the navigator was a
    * second panel in a slot of its own with its own stored flag. It is the
    * `chapters` tab of this one now, so there is one question and one answer.
-   */
-  const isLeftPanelOpen = panelOpen && !focus;
+   *
+   * The Page & type strip stands in the same place, so it takes the panel's
+   * turn rather than sitting on top of it — and **the slot that holds the
+   * page's width reads this same flag**, which is the half that was missed
+   * first time round: hiding the panel while a 25rem spacer stayed behind left
+   * a column of empty ground beside a 3rem strip. */
+  /* Page & type, the one rail tab that is not the panel: it opens as a strip
+     at the rail’s edge instead — see `ToolsPopover` for why. Declared above
+     the flag below, which reads it. */
+  const [toolsOpen, setToolsOpen] = useState(false);
+
+  const isLeftPanelOpen = panelOpen && !focus && !toolsOpen;
 
   /**
    * Whether the panel and page should play their entrance.
@@ -310,10 +320,6 @@ export function ChapterEditor({
   const [saveState, setSaveState] = useState("");
   /* And how much of it there is. Same round trip, same reason. */
   const [words, setWords] = useState("");
-
-  /* Page & type, which is the one rail tab that is not the panel. It opens as
-     a card at the rail’s edge instead — see `ToolsPopover` for why. */
-  const [toolsOpen, setToolsOpen] = useState(false);
 
   // Opening a book is worth marking; it renders faster than the eye can catch,
   // so the loading screen is held for a beat, then faded. It plays only on the
@@ -659,7 +665,7 @@ export function ChapterEditor({
             holds the page's width for both, so nothing moves as one replaces
             the other. */}
         <LeftPanel
-          open={isLeftPanelOpen && !toolsOpen}
+          open={isLeftPanelOpen}
           tab={tab}
           bookId={bookId}
           chapterId={chapterId}

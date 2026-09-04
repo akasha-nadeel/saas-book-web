@@ -436,42 +436,21 @@ export function LeftPanel({
           <Tooltip label="Collapse" shortcut="Ctrl /" side="right" nowrap />
         </button>
 
-        {/* **One header, and the chapters tab has one too now.** It was the
-            one tab drawn without it, because the navigator used to be a panel
-            in its own right that happened to be mountable in here. It is an
-            ordinary tab of this panel since 2026-09-05, and a panel whose top
-            edge moves depending on which tab is open is the thing this header
-            was written to stop. */}
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b border-line pr-1.5 pl-4">
-            {/* The name never shrinks and the scope does. At 15rem a long chapter
-                title would otherwise eat the word telling you which panel you are
-                in, which is the half that has to survive. `title` carries the
-                whole of it for anything the ellipsis takes. */}
-            <h2
-              title={fullName}
-              className="flex min-w-0 flex-1 items-baseline gap-1.5 font-sans text-base font-bold"
-            >
-              {/* The panel's own name reads as a heading rather than as a label.
-                  At `text-xs` in muted grey it was quieter than the findings
-                  under it, and a writer glancing at the column could not tell
-                  which panel they were in without reading the contents.
+        {/* **No heading, and the header only where it carries something.**
 
-                  **Uppercase and letter-spacing came off on the way up.** Both
-                  are small-label conventions: they earn their keep at 12px, and
-                  at 16px they only shout and eat width — "CONSISTENCY CHECK"
-                  spaced out is most of a 15rem column before the close button
-                  has had any. Sentence case at the larger size is narrower and
-                  reads as the heading it now is. */}
-              <span className="shrink-0 text-fg">
-                {PANEL_TITLES[tab]}
-              </span>
-              {scope && (
-                <span className="min-w-0 truncate font-medium text-muted/75">
-                  <span aria-hidden="true">· </span>
-                  {scope}
-                </span>
-              )}
-            </h2>
+            The panel used to name itself along the top — Find & replace,
+            Deleted chapters — on the reasoning that a writer glancing at the
+            column could not otherwise tell which panel they were in. The rail
+            answers that now: every tab wears its own word under its icon, and
+            the lit one is a foot to the left of the panel it opened. Saying it
+            twice cost a 3rem band across the top of every panel, which is the
+            most valuable strip of a column that scrolls.
+
+            What is left is the dismiss, and it is drawn only in the layout
+            that needs it — see the note on it. A header holding nothing would
+            be the same band with less in it. */}
+        {overlay && (
+        <header className="flex h-12 shrink-0 items-center justify-end gap-2 border-b border-line pr-1.5 pl-4">
             {/* **One control, and it moves.** The handle straddling the
                 panel's outer edge is the way to shut it, so a second button up
                 here is two things to read and a question about whether they
@@ -487,8 +466,8 @@ export function LeftPanel({
                 landscape window is continuous at 900px wide — so `md:hidden`
                 left both controls gone and the writer shut in the panel. The
                 classifier the panel itself is laid out by is the one that
-                decides this. */}
-            {overlay && (
+                decides this — and it is now the header's own test, since the
+                header exists for nothing else. */}
             <button
               ref={dismissRef}
               type="button"
@@ -513,8 +492,8 @@ export function LeftPanel({
                 {icons.panel}
               </svg>
             </button>
-            )}
         </header>
+        )}
 
         <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
           {tab === "chapters" && (
