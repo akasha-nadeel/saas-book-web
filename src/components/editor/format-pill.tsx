@@ -162,13 +162,19 @@ export function FormatPill({
       role="toolbar"
       aria-label="Formatting"
       aria-hidden={!visible}
-      className={`absolute top-1/2 left-1/2 z-20 hidden -translate-x-1/2
-                  -translate-y-1/2 items-center gap-1 rounded-2xl border
-                  border-line bg-panel px-2 py-1.5 shadow-lg
-                  transition-all duration-150 md:flex ${
+      /* **Below the bar, not on it.** It was centred on the desk strip, which
+         is a 36px row against a 50px bar — so it hung seven pixels over the
+         strip's top edge, and the strip is the first thing in the window, so
+         those seven pixels were cut off by the edge of the app. Hanging it
+         from the strip's underside puts the whole of it on screen and reads
+         as what it is: a bar floating over the page rather than one crammed
+         into the chrome above it. */
+      className={`absolute top-full left-1/2 z-20 mt-1 hidden -translate-x-1/2
+                  items-center gap-1 rounded-2xl border border-line bg-panel
+                  px-2 py-1.5 shadow-lg transition-all duration-150 md:flex ${
                     visible
-                      ? "translate-y-[-50%] opacity-100"
-                      : "pointer-events-none translate-y-[calc(-50%-4px)] opacity-0"
+                      ? "translate-y-0 opacity-100"
+                      : "pointer-events-none -translate-y-1 opacity-0"
                   }`}
     >
       <PillButton
