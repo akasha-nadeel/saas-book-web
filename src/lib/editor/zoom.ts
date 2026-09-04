@@ -117,6 +117,17 @@ export function zoomFromWheel(
   return clampZoom(zoom * Math.exp(-px * SENSITIVITY));
 }
 
+/**
+ * How long after the last wheel event a gesture is considered over.
+ *
+ * Long enough that the pauses inside one pinch do not end it — a trackpad's
+ * event stream is not perfectly even — and short enough that the page is laid
+ * out again by the time a writer has looked back at it. The transform holds
+ * the picture until then; this is only the wait before it becomes real text
+ * again.
+ */
+export const SETTLE_ZOOM_MS = 160;
+
 /** A point, in client coordinates or in the page's own unzoomed ones. */
 export interface Point {
   x: number;

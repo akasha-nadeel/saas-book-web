@@ -25,6 +25,7 @@ import {
   useFormatPillVisible,
 } from "@/components/editor/format-pill";
 import {
+  SETTLE_ZOOM_MS,
   anchorDelta,
   pagePointUnder,
   steppedZoom,
@@ -1525,41 +1526,59 @@ function EditorSurface({
   const pillVisible = useFormatPillVisible(editor);
 
   /**
-   * **Pinch and Ctrl+wheel zoom the page, and the point under the pointer
-   * stays under the pointer.**
+   * **Pinch and Ctrl+wheel zoom the page — painted during, laid out after.**
    *
    * Without this a trackpad pinch zooms the *browser*, which scales the app's
    * own chrome along with the manuscript and is never what a writer meant. The
-   * one test — `ctrlKey || metaKey` — covers both gestures, because every
-   * browser reports a pinch as a wheel event with `ctrlKey` set. A plain
+   * one test — \ — covers both gestures, because every
+   * browser reports a pinch as a wheel event with \ set. A plain
    * two-finger scroll has neither and stays a scroll.
    *
-   * **`{ passive: false }` and a hand-attached listener**, not `onWheel`: React
+   * **\ and a hand-attached listener**, not \: React
    * registers wheel listeners passively, and a passive listener may not call
-   * `preventDefault` — so the browser would go on zooming itself over the top
-   * of us.
+   * \, so the browser would go on zooming itself over the top of
+   * us.
    *
-   * **One write per frame.** The page is scaled with CSS `zoom`, which reflows,
-   * and `pagination.ts` watches the editor's height with a `ResizeObserver` —
-   * so every change schedules a re-measure of the chapter. That work is wasted
-   * (page breaks are computed in unzoomed pixels and are identical at every
-   * zoom) but it is not free, and a trackpad emits far more than sixty events a
-   * second. Coalescing to one per animation frame puts the cost at what
-   * dragging a window edge already spends.
+   * ## Why the gesture is a transform and only the result is a zoom
+   *
+   * The page is drawn with the CSS \ property, which **reflows**. That is
+   * the right choice for the settled state — a transform breaks the browser's
+   * scroll-the-caret-into-view arithmetic, which is what \ was chosen over
+   * it for — but it is the wrong thing to do sixty times a second. Every
+   * fractional value re-wraps the paragraphs and rounds every glyph to a
+   * slightly different position, so the prose *crawls* as it scales. That is
+   * the shaking, and no amount of correcting the scroll could have fixed it:
+   * the text was moving underneath, not the viewport.
+   *
+   * So a gesture scales the page with a **transform**, which only paints — no
+   * reflow, no re-wrap, no repagination, no React render, nothing written to
+   * storage. \ at the pointer is what keeps the point under
+   * it still, so the gesture needs no scroll arithmetic at all.
+   *
+   * When the writer stops, the transform is cleared and the real zoom is
+   * committed in the same frame — one reflow, one repagination, the text set
+   * properly for typing again — with the scroll corrected so nothing appears
+   * to move at the hand-over.
    */
   const scrollerRef = useRef<HTMLElement | null>(null);
-  /* Where the pointer was and how far the zoom moved, handed to the layout
-     effect below — which has to run *after* the reflow, since the content's new
-     size is what the anchoring is against. */
-  const anchorRef = useRef<{
+  /**
+   * The gesture in flight, or null between them.
+   *
+   * \ is the pointer in the page's own unzoomed coordinates, taken once
+   * at the start: it is both the transform's origin and, at the hand-over, the
+   * point the scroll is corrected against. Re-reading it mid-gesture would
+   * measure a page that is halfway to somewhere.
+   */
+  const gestureRef = useRef<{
+    origin: { x: number; y: number };
     pointer: { x: number; y: number };
-    pagePoint: { x: number; y: number };
+    from: number;
+    live: number;
   } | null>(null);
-  /* The zoom the page is actually drawn at, for the wheel handler to read
-     without re-subscribing on every change — re-attaching a listener each
-     frame of a pinch would drop events mid-gesture. Synced in an effect rather
-     than during render, which React forbids and which would be a lie anyway:
-     the ref must name what is on screen, and that is only true after paint. */
+  /* The zoom the page is committed at, for the handler to read without
+     re-subscribing on every change. Synced in an effect rather than during
+     render, which React forbids and which would be a lie anyway: the ref must
+     name what is on screen, and that is only true after paint. */
   const zoomRef = useRef(zoom);
   useEffect(() => {
     zoomRef.current = zoom;
@@ -1570,14 +1589,47 @@ function EditorSurface({
     if (!scroller) return;
 
     let frame = 0;
-    let queued: number | null = null;
+    let settle: number | null = null;
 
-    const commit = () => {
+    /** Paint the gesture's current scale. No layout, no React. */
+    const paint = () => {
       frame = 0;
-      if (queued === null) return;
-      const next = queued;
-      queued = null;
-      onZoom(next);
+      const flow = flowRef.current;
+      const gesture = gestureRef.current;
+      if (!flow || !gesture) return;
+      flow.style.transformOrigin = `${gesture.origin.x}px ${gesture.origin.y}px`;
+      flow.style.transform = `scale(${gesture.live / gesture.from})`;
+    };
+
+    /** Hand the gesture's result to React, which lays it out properly. */
+    const commit = () => {
+      settle = null;
+      const gesture = gestureRef.current;
+      if (!gesture) return;
+
+      /**
+       * **A gesture that ended where it started still has to be cleaned up.**
+       *
+       * The hand-over below runs on a change of `zoom`, and this is the one
+       * case where there is none: the wheel curve is exact both ways, so
+       * pinching in and back out by the same travel lands on the number it
+       * began with. React would render nothing, the layout effect would not
+       * fire, and the transform would stay on the page — the manuscript stuck
+       * at a scale with no state behind it and no way to shift it.
+       */
+      if (gesture.live === zoomRef.current) {
+        const flow = flowRef.current;
+        if (flow) {
+          flow.style.transform = "";
+          flow.style.transformOrigin = "";
+        }
+        gestureRef.current = null;
+        return;
+      }
+
+      /* Otherwise left set for the layout effect, which clears the transform
+         and puts the scroll right in the same frame the new zoom is laid out. */
+      onZoom(gesture.live);
     };
 
     const onWheel = (event: WheelEvent) => {
@@ -1586,77 +1638,79 @@ function EditorSurface({
       // itself will do both.
       event.preventDefault();
 
-      const from = queued ?? zoomRef.current;
-      const next = zoomFromWheel(from, event.deltaY, event.deltaMode);
-      if (next === from) return;
+      const flow = flowRef.current;
+      if (!flow) return;
 
-      /* **Hold pagination off for the length of the gesture.** Its measure
-         ends by putting the viewport back where it was — writing `scrollTop` —
-         and the anchoring below is writing `scrollTop` too. Two writers on one
-         property sixty times a second is the page shaking. */
-      suspendPagination();
-
-      /* **The point under the pointer, in the page's own coordinates**, taken
-         before anything moves. Only the first event of a frame records it: the
-         pointer has not moved between them, and re-reading the page's edge
-         after an earlier event of the same frame has already changed the zoom
-         would measure a page that is halfway to somewhere. */
-      if (!anchorRef.current) {
-        const page = flowRef.current?.getBoundingClientRect();
-        if (page && flowRef.current) {
-          const scale = page.width / flowRef.current.offsetWidth;
-          anchorRef.current = {
-            pointer: { x: event.clientX, y: event.clientY },
-            pagePoint: pagePointUnder(
-              { x: event.clientX, y: event.clientY },
-              { x: page.left, y: page.top },
-              scale,
-            ),
-          };
-        }
+      if (!gestureRef.current) {
+        const page = flow.getBoundingClientRect();
+        const scale = page.width / flow.offsetWidth;
+        gestureRef.current = {
+          origin: pagePointUnder(
+            { x: event.clientX, y: event.clientY },
+            { x: page.left, y: page.top },
+            scale,
+          ),
+          pointer: { x: event.clientX, y: event.clientY },
+          from: zoomRef.current,
+          live: zoomRef.current,
+        };
       }
 
-      queued = next;
-      if (!frame) frame = requestAnimationFrame(commit);
+      const gesture = gestureRef.current;
+      const next = zoomFromWheel(gesture.live, event.deltaY, event.deltaMode);
+      if (next === gesture.live) return;
+      gesture.live = next;
+      gesture.pointer = { x: event.clientX, y: event.clientY };
+
+      /* Pagination measures on a size change and ends by putting the viewport
+         back, which would fight the hand-over below. It has nothing to do here
+         anyway: breaks are computed in unzoomed pixels. */
+      suspendPagination();
+
+      if (!frame) frame = requestAnimationFrame(paint);
+      if (settle !== null) window.clearTimeout(settle);
+      settle = window.setTimeout(commit, SETTLE_ZOOM_MS);
     };
 
     scroller.addEventListener("wheel", onWheel, { passive: false });
     return () => {
       if (frame) cancelAnimationFrame(frame);
+      if (settle !== null) window.clearTimeout(settle);
       scroller.removeEventListener("wheel", onWheel);
     };
   }, [onZoom]);
 
   /**
-   * Put the anchor back, before the frame is painted.
+   * The hand-over: drop the transform, keep the view still.
    *
-   * `useLayoutEffect` rather than `useEffect`: the browser has reflowed at the
-   * new zoom by the time this runs, so the scroll offsets it needs are real —
-   * and setting them here means the page never visibly jumps and settles back.
+   * \, so all of it happens before the frame is painted — the
+   * transform coming off and the new zoom going on are never seen apart, which
+   * is what makes a gesture that has been painting at one scale and is now laid
+   * out at another look like nothing happened.
    */
   useLayoutEffect(() => {
-    const held = anchorRef.current;
+    const gesture = gestureRef.current;
     const scroller = scrollerRef.current;
     const flow = flowRef.current;
-    anchorRef.current = null;
-    if (!held || !scroller || !flow) return;
+    if (!gesture || !scroller || !flow) return;
+    gestureRef.current = null;
 
-    /* Read the page where the browser has just put it, rather than working out
-       where it ought to be. Predicting it is what drifted: the desk's padding
-       does not scale and the page's centring margins change with its width, so
-       a ratio applied to the scroll offsets was always a little wrong — and a
-       little wrong, corrected against itself sixty times a second with the
-       pointer held still, is a shake. */
+    flow.style.transform = "";
+    flow.style.transformOrigin = "";
+
+    /* Where the browser has actually put the page, rather than where it ought
+       to be: the desk's padding does not scale and the page's centring margins
+       change with its width, so anything predicted here is a little wrong. */
     const page = flow.getBoundingClientRect();
     const delta = anchorDelta({
-      pointer: held.pointer,
-      pagePoint: held.pagePoint,
+      pointer: gesture.pointer,
+      pagePoint: gesture.origin,
       pageEdge: { x: page.left, y: page.top },
       scale: page.width / flow.offsetWidth,
     });
 
-    /* Whole pixels, and only when it is worth moving. Sub-pixel corrections
-       are what a browser rounds inconsistently, which is its own jitter. */
+    /* Whole pixels only — a sub-pixel correction is rounded inconsistently,
+       which is jitter by another name. */
     if (Math.abs(delta.y) >= 1) scroller.scrollTop += delta.y;
     if (Math.abs(delta.x) >= 1) scroller.scrollLeft += delta.x;
   }, [zoom]);
