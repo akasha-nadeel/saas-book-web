@@ -19,7 +19,10 @@ import {
 import StarterKit from "@tiptap/starter-kit";
 import { CharacterCount, Placeholder } from "@tiptap/extensions";
 import { ToolRail, useEditorState } from "@/components/editor/editor-toolbar";
-import { FormatPill } from "@/components/editor/format-pill";
+import {
+  FormatPill,
+  useFormatPillVisible,
+} from "@/components/editor/format-pill";
 import {
   Rail,
   RailButton,
@@ -654,16 +657,6 @@ export function ChapterEditor({
           onClose={() => setEditorPanel(false)}
         />
 
-        {/* **The formatting bar, which arrives when the writing does.**
-
-            `fixed` and portalled by its own positioning rather than dropped
-            into the page's flex row, for the reason the panel is: it belongs to
-            the window rather than to whatever column it was declared in, and it
-            must not take part in the layout it floats over. Mounted here beside
-            the panel so the two are read together — they are the editor's two
-            floating surfaces and they share a stacking order. */}
-        <FormatPill editor={liveEditor} book={book} />
-
         {/* **The left chrome is one slot, and the page sits beside it rather
             than under it.**
 
@@ -857,6 +850,7 @@ export function ChapterEditor({
 
             <ToolRail
               editor={liveEditor}
+              book={book}
               paper={prefs.paper}
               dictation={dictation}
             />
@@ -1486,6 +1480,11 @@ function EditorSurface({
   const OWNS_ITS_CLICK =
     '.chapter-opener, button, input, textarea, select, a, [contenteditable="true"]';
 
+  /* One answer for two components: the formatting pill draws itself from this
+     and the desk strip stands its readings down on the same frame. Two copies
+     of the test would disagree for a frame and the row would flicker. */
+  const pillVisible = useFormatPillVisible(editor);
+
   const handleSheetClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!editor || !editor.isEditable) return;
     if (draggedHere(e)) return;
@@ -1661,10 +1660,27 @@ function EditorSurface({
 
               No rule and no panel behind it either. The desk that was already
               there is the bar; an edge would only have drawn a second one. */}
-          <div className="editor-desk-strip shrink-0 bg-white dark:bg-accent/7 px-4 pt-3 pb-2">
+          {/* `relative`, so the formatting pill can be centred on this strip —
+              which is centred on the page, because the row below sizes itself
+              to the sheet's own width. That is what puts the bar over the
+              middle of the paper at any zoom, and moves it sideways with the
+              page when the side panel opens, without measuring the sheet. */}
+          <div className="editor-desk-strip relative shrink-0 bg-white dark:bg-accent/7 px-4 pt-3 pb-2">
             <div
-              className="mx-auto flex items-center justify-between gap-3
-                         font-sans text-xs text-muted"
+              /* **The readings stand down while the pill is up.** They are two
+                 bars in one line otherwise, and none of what is here — a word
+                 count, the zoom, a save status — is wanted mid-sentence. Undo
+                 and redo are the exception and travel *into* the pill, because
+                 undo is the one control a writer wants most while typing.
+                 Faded rather than unmounted, so the row keeps its height and
+                 nothing below it moves. */
+              className={`mx-auto flex items-center justify-between gap-3
+                          font-sans text-xs text-muted transition-opacity
+                          duration-150 ${
+                            pillVisible
+                              ? "pointer-events-none opacity-0"
+                              : "opacity-100"
+                          }`}
               style={{
                 width: `${geom.pageW * zoom * PAGE_SCALE}px`,
                 maxWidth: "100%",
@@ -1736,6 +1752,19 @@ function EditorSurface({
                 width={geom.pageW * zoom * PAGE_SCALE}
               />
             )}
+
+            {/* **The formatting bar, in the strip's own place.** It was `fixed`
+                and centred on the window, which put it over the page's chrome
+                and off-centre the moment the side panel opened. In here it
+                inherits the page's column and the strip's line of desk, and the
+                two can never be on screen together — one fades as the other
+                arrives, in one row. */}
+            <FormatPill
+              editor={editor}
+              book={book}
+              visible={pillVisible}
+              history={<HistoryControls editor={editor} />}
+            />
           </div>
 
           <main

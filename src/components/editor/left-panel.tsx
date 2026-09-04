@@ -385,10 +385,16 @@ export function LeftPanel({
           type="button"
           onClick={onClose}
           aria-label="Collapse panel"
-          className="group absolute top-1/2 -right-3 z-10 hidden h-6 w-6
-                     -translate-y-1/2 items-center justify-center rounded-full
-                     border border-line bg-panel text-muted shadow-md
-                     outline-none transition-colors hover:bg-raised hover:text-fg
+          /* **A handle, not a button**, which is why it is a tall rounded
+             lozenge rather than a disc: the shape says "this edge moves". Half
+             out over the seam, opaque so the page behind it never shows
+             through, and with a shadow strong enough to read as sitting on top
+             of both surfaces rather than cut into either. */
+          className="group panel-chrome absolute top-1/2 -right-3 z-10 hidden
+                     h-12 w-6 -translate-y-1/2 items-center justify-center
+                     rounded-full border border-line bg-panel text-muted
+                     shadow-[0_2px_10px_rgba(0,0,0,0.18)] outline-none
+                     transition-colors hover:bg-raised hover:text-fg
                      focus-visible:ring-2 focus-visible:ring-accent/60 md:flex"
         >
           <svg

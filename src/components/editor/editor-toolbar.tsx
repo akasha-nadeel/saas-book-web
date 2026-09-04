@@ -11,8 +11,20 @@ import { ACCEPTED, importImage } from "@/lib/image-import";
 import { insertWidthPercent } from "@/lib/editor/image-resize";
 import {
   setPref,
+  setTypography,
+  typographyOf,
+  type Book,
   type PaperColor,
 } from "@/lib/library-store";
+import {
+  INDENTS,
+  LEADINGS,
+  PARAGRAPH_STYLES,
+  PARA_SPACINGS,
+  paragraphStyleOf,
+  paragraphStyleSettings,
+  type ParagraphStyle,
+} from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
 import type { Dictation } from "@/lib/editor/use-dictation";
 
@@ -323,10 +335,12 @@ const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
 
 export function ToolRail({
   editor,
+  book,
   paper,
   dictation,
 }: {
   editor: Editor | null;
+  book: Book;
   paper: PaperColor;
   /**
    * Passed in rather than started here, because the chapter list carries a
@@ -347,9 +361,9 @@ export function ToolRail({
      that runs on some renders and not others. */
   const [linkAsked, setLinkAsked] = useState<string | null>(null);
 
-  // The book's body typography moved to `format-pill.tsx` with the controls
-  // that set it. What is left in this flyout is page colour and theme, and
-  // neither is stored on the book.
+  // The book-wide typography the flyout below sets. Font and size are the
+  // pill's, since those are the two a writer reaches for while writing.
+  const type = typographyOf(book);
 
   if (!editor) return null;
 
@@ -384,8 +398,97 @@ export function ToolRail({
           home for them: they would be two controls that had nothing to do with
           the reason the thing opened. They belong with the rail's other
           standing settings. */}
-      <Flyout label="Page & theme" trigger={<RailMark mark="type" />}>
-        <div className="flex w-56 flex-col gap-2">
+      <Flyout label="Type & page" trigger={<RailMark mark="type" />}>
+        <div className="flex w-60 flex-col gap-2">
+          {/* **The book's own typography, set once for the whole manuscript.**
+
+              These four sat in the formatting bar until the bar became a pill
+              over the page. They do not belong there: the pill is about the
+              paragraph the caret is in, and these are about every paragraph in
+              the book — a writer sets them when they start and leaves them
+              alone. Beside page colour is where they read as what they are.
+
+              There is a mechanical reason too, and it is the harder one. A
+              styled picker inside a menu cannot work here: both portal to
+              `document.body`, so the inner panel is outside the outer one's
+              subtree and opening it registers as a press outside the parent,
+              closing both. Font and size escaped that by being in the pill
+              itself rather than in a menu opened from it. */}
+          <Field label="Line spacing">
+            <select
+              aria-label="Line spacing"
+              value={String(type.leading)}
+              onChange={(e) =>
+                setTypography(book.id, { leading: Number(e.target.value) })
+              }
+              className={SELECT_CLASS}
+            >
+              {LEADINGS.map((l) => (
+                <option key={l.value} value={String(l.value)}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Paragraphs">
+            <select
+              aria-label="Paragraph style"
+              value={paragraphStyleOf(type)}
+              onChange={(e) =>
+                setTypography(
+                  book.id,
+                  paragraphStyleSettings(e.target.value as ParagraphStyle),
+                )
+              }
+              className={SELECT_CLASS}
+            >
+              {PARAGRAPH_STYLES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Indent">
+            <select
+              aria-label="First-line indent"
+              value={String(type.indentIn)}
+              onChange={(e) =>
+                setTypography(book.id, { indentIn: Number(e.target.value) })
+              }
+              className={SELECT_CLASS}
+            >
+              {INDENTS.map((i) => (
+                <option key={i.value} value={String(i.value)}>
+                  {i.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Para space">
+            <select
+              aria-label="Paragraph spacing"
+              value={String(type.paraSpacingPt)}
+              onChange={(e) =>
+                setTypography(book.id, {
+                  paraSpacingPt: Number(e.target.value),
+                })
+              }
+              className={SELECT_CLASS}
+            >
+              {PARA_SPACINGS.map((s) => (
+                <option key={s.value} value={String(s.value)}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <span aria-hidden="true" className="h-px w-full bg-line" />
+
           <Field label="Page colour">
             <div
               role="radiogroup"

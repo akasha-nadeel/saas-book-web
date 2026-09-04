@@ -13,12 +13,28 @@ export type FormattingCommand =
   | { type: "orderedList" }
   | { type: "align"; value: TextAlignValue };
 
-/** The single command map used by persistent and overlay formatting UI. */
+/**
+ * The single command map used by persistent and overlay formatting UI.
+ *
+ * **`focus()` is asked for only when the editor has not got it**, and that is
+ * not a micro-optimisation. Tiptap's focus command sets the selection, and
+ * `tr.setSelection` clears ProseMirror's `storedMarks` — which is the entire
+ * mechanism behind "bold from here on": with a collapsed caret, toggling a mark
+ * stores it for the next thing typed rather than changing anything now. Calling
+ * focus on an editor that already has it puts a selection reset in front of
+ * every toggle, so the mark was set and dropped in the same transaction and the
+ * button went dark again the moment it was pressed.
+ *
+ * The callers that need the focus keep it: the mobile dock and the rail can
+ * both be pressed while the caret is elsewhere. The ones that already guard it
+ * — the format pill and the selection toolbar, which `preventDefault` on
+ * `mousedown` precisely so the editor never blurs — now get the toggle alone.
+ */
 export function applyFormattingCommand(
   editor: Editor,
   command: FormattingCommand,
 ): boolean {
-  const chain = editor.chain().focus();
+  const chain = editor.isFocused ? editor.chain() : editor.chain().focus();
 
   switch (command.type) {
     case "paragraph":

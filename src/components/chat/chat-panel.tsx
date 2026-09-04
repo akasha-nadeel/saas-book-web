@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { ApplyReview } from "@/components/chat/apply-review";
 import { ModelMenu } from "@/components/chat/model-menu";
+import { Tooltip } from "@/components/ui/tooltip";
 import { WriteSwitch } from "@/components/chat/write-switch";
 import { RailMark } from "@/components/editor/rail-mark";
 import {
@@ -548,7 +549,50 @@ export function ChatPanel({
     name === "Guest" ? "Back at it" : `Back at it, ${firstNameOf(name)}`;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
+      {/* **Start a new chat, in the corner it is looked for.**
+
+          The action is not new — the composer carried a `Clear` text button
+          over the same `clearChat` and the same confirmation. What was wrong
+          was where it sat and what it was called: down among the controls that
+          act on the question being typed, named after what it destroys rather
+          than what it begins.
+
+          Floated over the transcript rather than given a row of its own: the
+          panel already has one header (`left-panel.tsx` owns it for all ten
+          tabs) and a second bar under it would be two headers on a 240px
+          column. It is out of the text's way at the right margin, and the list
+          below scrolls under it.
+
+          Disabled on an empty conversation, as `Clear` was — there is nothing
+          to start away from. */}
+      <button
+        type="button"
+        onClick={() => setClearing(true)}
+        disabled={messages.length === 0}
+        aria-label="Start new chat"
+        className="group absolute top-2 right-3 z-10 flex h-8 w-8 items-center
+                   justify-center rounded-lg bg-panel text-muted outline-none
+                   transition-colors disabled:pointer-events-none
+                   disabled:opacity-0 hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-[18px] w-[18px]"
+        >
+          <path d="M13.5 3.5a1.77 1.77 0 0 1 2.5 2.5L7 15l-3.5 1L4.5 12.5Z" />
+          <path d="M12 5 15 8" />
+        </svg>
+        <Tooltip label="Start new chat" side="bottom" align="end" nowrap />
+      </button>
+
       <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-3 py-4">
         {messages.length === 0 ? (
           <div className="px-1">
@@ -832,17 +876,11 @@ export function ChatPanel({
                 />
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => setClearing(true)}
-              disabled={messages.length === 0}
-              className="rounded-md px-2 py-1 font-sans text-xs text-muted
-                         outline-none transition-colors disabled:opacity-30
-                         hover:text-fg focus-visible:ring-2
-                         focus-visible:ring-accent/60"
-            >
-              Clear
-            </button>
+            {/* **`Clear` used to sit here and has gone to the top of the
+                panel** as "Start new chat" — the corner every assistant puts it
+                in, and the words people use for it. Two controls for one
+                destructive action is how a writer ends up unsure which one they
+                pressed, so it moved rather than being duplicated. */}
           </div>
 
           {/* **One box, not a field and a loose row under it.** The border, the
