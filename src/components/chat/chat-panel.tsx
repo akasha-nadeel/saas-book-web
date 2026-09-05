@@ -204,7 +204,8 @@ export function ChatPanel({
      a paragraph they want looked at hit the ceiling halfway through it. Past
      ten the box is taking the panel from the conversation it is a question
      about, which is the other failure. */
-  const grow = useAutoGrow(input, 220);
+  /* Opens at about two lines and grows to about ten. See `useAutoGrow`. */
+  const grow = useAutoGrow(input, 220, 48);
 
   /**
    * Speak the question instead of typing it.
@@ -550,58 +551,7 @@ export function ChatPanel({
 
   return (
     <div className="relative flex h-full flex-col">
-      {/* **Start a new chat, in the corner it is looked for.**
-
-          The action is not new — the composer carried a `Clear` text button
-          over the same `clearChat` and the same confirmation. What was wrong
-          was where it sat and what it was called: down among the controls that
-          act on the question being typed, named after what it destroys rather
-          than what it begins.
-
-          **A row of its own, above the conversation.** It floated over the
-          transcript on the reasoning that the panel already had a header and a
-          second bar under it would be two headers on a 240px column. That
-          header came off every panel on 2026-09-05 — the rail names the tab
-          now — so the objection has expired, and floating cost what floating
-          costs: the button sat on top of the first reply, and the list scrolled
-          underneath it.
-
-          Out of the conversation entirely now. Nothing passes under it, and the
-          transcript starts below rather than behind it.
-
-          Disabled on an empty conversation, as `Clear` was — there is nothing
-          to start away from. The row keeps its height either way, so the
-          transcript does not jump the moment the first reply lands. */}
-      <div className="flex shrink-0 justify-end px-3 pt-2">
-      <button
-        type="button"
-        onClick={() => setClearing(true)}
-        disabled={messages.length === 0}
-        aria-label="Start new chat"
-        className="group relative flex h-8 w-8 items-center
-                   justify-center rounded-lg text-muted outline-none
-                   transition-colors disabled:pointer-events-none
-                   disabled:opacity-0 hover:bg-raised hover:text-fg
-                   focus-visible:ring-2 focus-visible:ring-accent/60"
-      >
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-[18px] w-[18px]"
-        >
-          <path d="M13.5 3.5a1.77 1.77 0 0 1 2.5 2.5L7 15l-3.5 1L4.5 12.5Z" />
-          <path d="M12 5 15 8" />
-        </svg>
-        <Tooltip label="Start new chat" side="bottom" align="end" nowrap />
-      </button>
-      </div>
-
-      <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-3 pt-1 pb-4">
+      <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-3 py-4">
         {messages.length === 0 ? (
           <div className="px-1">
             {/* **A greeting rather than an instruction.** The panel opened on
@@ -884,11 +834,49 @@ export function ChatPanel({
                 />
               )}
             </div>
-            {/* **`Clear` used to sit here and has gone to the top of the
-                panel** as "Start new chat" — the corner every assistant puts it
-                in, and the words people use for it. Two controls for one
-                destructive action is how a writer ends up unsure which one they
-                pressed, so it moved rather than being duplicated. */}
+            {/* **Start a new chat, at this row's right end.**
+
+                The action is not new — the composer carried a `Clear` text
+                button in this very slot, over the same `clearChat` and the same
+                confirmation. What was wrong was the word: it was named after
+                what it destroys rather than what it begins.
+
+                It spent a day at the top of the panel, floating over the
+                transcript and then in a row of its own, on the reasoning that
+                the corner is where every assistant puts it. Down here it shares
+                a row that already exists rather than adding one, and it sits
+                with the write switch — the two controls in this panel that are
+                about the *conversation* rather than about the question being
+                typed, which is what the box below is for.
+
+                Disabled on an empty conversation, as `Clear` was: there is
+                nothing to start away from. */}
+            <button
+              type="button"
+              onClick={() => setClearing(true)}
+              disabled={messages.length === 0}
+              aria-label="Start new chat"
+              className="group relative flex h-8 w-8 shrink-0 items-center
+                         justify-center rounded-lg text-muted outline-none
+                         transition-colors disabled:pointer-events-none
+                         disabled:opacity-0 hover:bg-raised hover:text-fg
+                         focus-visible:ring-2 focus-visible:ring-accent/60"
+            >
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-[18px] w-[18px]"
+              >
+                <path d="M13.5 3.5a1.77 1.77 0 0 1 2.5 2.5L7 15l-3.5 1L4.5 12.5Z" />
+                <path d="M12 5 15 8" />
+              </svg>
+              <Tooltip label="Start new chat" side="top" align="end" nowrap />
+            </button>
           </div>
 
           {/* **One box, not a field and a loose row under it.** The border, the

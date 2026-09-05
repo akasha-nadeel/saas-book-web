@@ -34,7 +34,7 @@ import { useLayoutEffect, useRef } from "react";
  * worse than the fixed three lines this replaces. Worth revisiting when they
  * ship it — this is a dozen lines and its removal is a one-line swap.
  */
-export function useAutoGrow(value: string, max: number) {
+export function useAutoGrow(value: string, max: number, min = 0) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useLayoutEffect(() => {
@@ -46,9 +46,13 @@ export function useAutoGrow(value: string, max: number) {
        collapsing first would let the box grow and never shrink. */
     field.style.height = "auto";
     const wanted = field.scrollHeight;
-    field.style.height = `${Math.min(wanted, max)}px`;
+    /* **A floor as well as a ceiling.** `rows` cannot set the resting height
+       here — this measures the *content*, so an empty box collapses to one line
+       whatever the attribute says. A composer that opens at a single line reads
+       as a search field rather than as somewhere to write a question. */
+    field.style.height = `${Math.max(Math.min(wanted, max), min)}px`;
     field.style.overflowY = wanted > max ? "auto" : "hidden";
-  }, [value, max]);
+  }, [value, max, min]);
 
   return ref;
 }
