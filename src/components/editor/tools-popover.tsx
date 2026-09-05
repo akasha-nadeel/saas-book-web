@@ -44,6 +44,7 @@ export function ToolsPopover({
   editor,
   paper,
   typewriter,
+  marks,
   dictation,
   canWrite,
 }: {
@@ -53,6 +54,7 @@ export function ToolsPopover({
   editor?: Editor | null;
   paper: PaperColor;
   typewriter: boolean;
+  marks: boolean;
   dictation: Dictation;
   canWrite: boolean;
 }) {
@@ -217,6 +219,7 @@ export function ToolsPopover({
           editor={editor}
           paper={paper}
           typewriter={typewriter}
+          marks={marks}
           dictation={dictation}
           canWrite={canWrite}
         />

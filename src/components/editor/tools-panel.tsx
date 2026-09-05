@@ -48,9 +48,9 @@ import { useEditorState } from "@/components/editor/editor-toolbar";
  * job on the press or opening a small panel beside it with *only* its own
  * rows. Nothing but the tool you asked for is on screen.
  *
- * **Six, and the count is the point.** Type, the paper (with the theme, which
- * is the same question), a picture, a link, dictation and typewriter
- * scrolling. A column of unlabelled glyphs is a memory test past about eight —
+ * **Seven, and the count is the point.** Type, the paper (with the theme,
+ * which is the same question), a picture, a link, dictation, typewriter
+ * scrolling and the paragraph marks. A column of unlabelled glyphs is a memory test past about eight —
  * the argument that put a word under every icon on the rail — so this one
  * stops well short of that, and each carries a tooltip.
  *
@@ -81,6 +81,7 @@ export function ToolsPanel({
   editor,
   paper,
   typewriter,
+  marks,
   dictation,
   canWrite,
 }: {
@@ -88,6 +89,8 @@ export function ToolsPanel({
   editor?: Editor | null;
   paper: PaperColor;
   typewriter: boolean;
+  /** Whether the ¶ is shown at the end of every paragraph. */
+  marks: boolean;
   dictation: Dictation;
   /** A viewer gets to *look* at the settings and change none of them. */
   canWrite: boolean;
@@ -212,6 +215,18 @@ export function ToolsPanel({
             label="Typewriter scrolling"
             active={typewriter}
             onClick={() => setPref("typewriter", !typewriter)}
+          />
+          {/* **Reachable on a desktop again**, and for a long time it was not:
+              `prefs.marks` was read by the manuscript and set only from the
+              phone's More sheet, so a writer at a laptop had no way to turn
+              paragraph marks on at all. It sits with the other two that act
+              where they stand — it is a view of the page, like the typewriter
+              scroll, not a setting that opens anything. */}
+          <Tool
+            glyph="¶"
+            label="Paragraph marks"
+            active={marks}
+            onClick={() => setPref("marks", !marks)}
           />
         </div>
 
@@ -453,12 +468,21 @@ export function ToolsPanel({
  */
 function Tool({
   mark,
+  glyph,
   label,
   active = false,
   disabled = false,
   onClick,
 }: {
-  mark: MarkName;
+  mark?: MarkName;
+  /**
+   * A typographic character in place of a drawn mark.
+   *
+   * `RailButton` has had this escape hatch all along and its note says why:
+   * ¶ *is* the control. A drawn pilcrow would be a picture of a character that
+   * the character itself says better, and the manuscript prints the same one.
+   */
+  glyph?: string;
   label: string;
   active?: boolean;
   disabled?: boolean;
@@ -485,7 +509,13 @@ function Tool({
                       : "text-fg/80 hover:bg-lifted hover:text-fg"
                   } ${disabled ? "opacity-40" : ""}`}
     >
-      <RailMark mark={mark} markRef={handle.ref} size={20} />
+      {mark ? (
+        <RailMark mark={mark} markRef={handle.ref} size={20} />
+      ) : (
+        <span aria-hidden="true" className="font-serif text-lg leading-none">
+          {glyph}
+        </span>
+      )}
       <Tooltip label={label} side="right" nowrap />
     </button>
   );

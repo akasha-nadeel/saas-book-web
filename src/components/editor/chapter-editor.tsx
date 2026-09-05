@@ -628,6 +628,7 @@ export function ChapterEditor({
         editor={liveEditor}
         paper={prefs.paper}
         typewriter={prefs.typewriter}
+        marks={prefs.marks}
         dictation={dictation}
         canWrite={canWriteThis}
       />
