@@ -26,6 +26,24 @@ import type { Editor } from "@tiptap/react";
  * for the same reason.
  */
 
+/**
+ * Where a change landed, so the caller can take the writer to it.
+ *
+ * Returned rather than a boolean because with no button to press, the writer's
+ * only evidence that anything happened is seeing it happen: the panel scrolls
+ * the page here and holds the passage lit until the next keystroke. Null is the
+ * old `false` — nothing was written.
+ *
+ * **Measured from the document's size, not from the content that went in.**
+ * `insertContentAt` reports neither, and counting the JSON would be counting
+ * the wrong thing: a paragraph node is two positions more than its text, and
+ * smart quotes and the input rules can change the length on the way in.
+ */
+export interface WrittenRange {
+  from: number;
+  to: number;
+}
+
 export type WriteAnchor =
   | { kind: "selection"; from: number; to: number; text: string }
   | { kind: "caret"; pos: number };
@@ -117,49 +135,69 @@ export function insertBelowPos(editor: Editor | null | undefined): number | null
   }
 }
 
-/** Put `text` in place of `range`. One transaction, so one undo takes it back. */
+/**
+ * Put `text` in place of `range`. One transaction, so one undo takes it back.
+ *
+ * Answers the range the new prose occupies, or null if nothing was written.
+ */
 export function applyReplacement(
   editor: Editor | null | undefined,
   range: { from: number; to: number },
   text: string,
-): boolean {
-  if (!editor || editor.isDestroyed || !editor.isEditable) return false;
+): WrittenRange | null {
+  if (!editor || editor.isDestroyed || !editor.isEditable) return null;
 
   const paragraphs = textToParagraphs(text);
-  if (paragraphs.length === 0) return false;
+  if (paragraphs.length === 0) return null;
 
   try {
-    return editor
+    const before = editor.state.doc.content.size;
+    const ok = editor
       .chain()
       .focus()
       .insertContentAt(range, replacementContent(paragraphs))
       .scrollIntoView()
       .run();
+    if (!ok) return null;
+
+    /* What went in is what the document grew by, plus what it lost. The old
+       range is gone, so the new one starts where it did. */
+    const grew = editor.state.doc.content.size - before;
+    return { from: range.from, to: range.to + grew };
   } catch {
-    return false;
+    return null;
   }
 }
 
-/** Put `text` in as new paragraphs at `pos`. One transaction, as above. */
+/**
+ * Put `text` in as new paragraphs at `pos`. One transaction, as above.
+ *
+ * Answers the range the new prose occupies, or null if nothing was written.
+ */
 export function applyInsertion(
   editor: Editor | null | undefined,
   pos: number,
   text: string,
-): boolean {
-  if (!editor || editor.isDestroyed || !editor.isEditable) return false;
+): WrittenRange | null {
+  if (!editor || editor.isDestroyed || !editor.isEditable) return null;
 
   const paragraphs = textToParagraphs(text);
-  if (paragraphs.length === 0) return false;
+  if (paragraphs.length === 0) return null;
 
   try {
-    return editor
+    const before = editor.state.doc.content.size;
+    const ok = editor
       .chain()
       .focus()
       .insertContentAt(pos, paragraphNodes(paragraphs))
       .scrollIntoView()
       .run();
+    if (!ok) return null;
+
+    // Nothing was removed, so the whole of the growth is the new prose.
+    return { from: pos, to: pos + (editor.state.doc.content.size - before) };
   } catch {
-    return false;
+    return null;
   }
 }
 

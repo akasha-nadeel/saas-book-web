@@ -26,13 +26,16 @@ import {
   type WriteAnchor,
 } from "@/lib/editor/assistant-write";
 import { useDictation } from "@/lib/editor/use-dictation";
+import { scrollEditorToMatch } from "@/lib/editor/search-highlight";
+import { markWritten } from "@/lib/editor/written-highlight";
 import { usePreservedEditorSelection } from "@/lib/editor/preserved-selection";
 import { aiChatClosed } from "@/lib/launch";
 import Link from "next/link";
 import { MODEL_NAMES, asChatModel, type ChatModel } from "@/lib/chat-model";
 import { CREDIT_COST, bestAffordable } from "@/lib/billing/credits";
 import { TIER_LIMITS, TIER_NAMES } from "@/lib/billing/tiers";
-import { blockText, type Block } from "@/lib/markdown";
+import { blockText, isOffered, parseMarkdown, type Block } from "@/lib/markdown";
+import { plural } from "@/lib/plural";
 import { useAccount } from "@/lib/use-account";
 import { useAutoGrow } from "@/lib/use-auto-grow";
 import { useChatScroll } from "@/lib/use-chat-scroll";
@@ -153,6 +156,20 @@ export function ChatPanel({
   const [applied, setApplied] = useState<string | null>(null);
 
   /**
+   * The passage write mode put in without being asked.
+   *
+   * Held so its own block stops drawing Replace and Insert. Those buttons on an
+   * applied passage are not merely redundant — Replace would write it a *second*
+   * time, over the prose it had just written, and the writer's undo would then
+   * only reach half of what they were looking at.
+   *
+   * Compared by text rather than by index, because the transcript is rebuilt
+   * from the store when a reply finishes and an index into it is a different
+   * message a moment later.
+   */
+  const [autoApplied, setAutoApplied] = useState<string | null>(null);
+
+  /**
    * **What is left, after everything this panel has spent.**
    *
    * `usePlan()` asks the server once, on mount. Every reply sent since then has
@@ -196,6 +213,16 @@ export function ChatPanel({
   const model = prefs.assistantModel;
   const canOfferWrites = canWrite && !!editor && !locked;
   const writeOn = canOfferWrites && prefs.assistantWrite;
+
+  /* **Read through a ref, because `send` outlives the render that made it.**
+     The closure captures whatever `writeOn` was when the question was typed,
+     and a reply arrives seconds later — long enough for the writer to have
+     turned the switch off, which is a thing they would do precisely because
+     they changed their mind about the assistant writing. */
+  const writeOnRef = useRef(writeOn);
+  useEffect(() => {
+    writeOnRef.current = writeOn;
+  }, [writeOn]);
 
   const abortRef = useRef<AbortController | null>(null);
   const listRef = useChatScroll();
@@ -322,18 +349,85 @@ export function ChatPanel({
     if (pos === null) return;
 
     keepVersion();
-    if (applyInsertion(editor, pos, blockText(block))) {
+    const written = applyInsertion(editor, pos, blockText(block));
+    if (written) {
       setPending(null);
       setApplied("Put into the chapter.");
+      showWritten(written);
     }
   };
 
   const applyPending = () => {
     if (!editor || !pending) return;
     keepVersion();
-    if (applyReplacement(editor, pending.range, pending.after)) {
+    const written = applyReplacement(editor, pending.range, pending.after);
+    if (written) {
       setApplied("Passage replaced.");
+      showWritten(written);
     }
+  };
+
+  /**
+   * Take the writer to what just changed, and leave it lit.
+   *
+   * **The whole of the reassurance, now that there is no press.** The scroll is
+   * the search panel's own — one function, so a passage the assistant wrote and
+   * a match the writer searched for arrive the same way — and the mark is a
+   * decoration rather than a selection, because focus is back in the chat box
+   * by now and a browser paints an unfocused selection as nothing much.
+   *
+   * A frame late, deliberately: the highlight's own plugin clears on any
+   * transaction that moves the selection, and the scroll sets one.
+   */
+  const showWritten = (range: { from: number; to: number }) => {
+    if (!editor) return;
+    scrollEditorToMatch(editor, range);
+    requestAnimationFrame(() => markWritten(editor, range));
+  };
+
+  /**
+   * Put the reply into the chapter, with no press.
+   *
+   * **Only when there is exactly one thing to put.** `isOffered` is the
+   * protocol — the model already fences or quotes prose it is offering — and it
+   * says *this is prose*, never *this is the prose you asked for*. One offered
+   * block is that question answered; two is a choice, and guessing which is how
+   * a feature like this rewrites the wrong paragraph. So two or more falls back
+   * to the buttons, and none means the reply was an answer rather than an edit.
+   *
+   * **Where it lands is the writer's, not the model's.** A selection is
+   * replaced; a bare caret gets the prose after its block. Nothing here reads
+   * the reply for a location — "after the last line" is not something this can
+   * act on, and inventing an anchor from quoted text is the failure the whole
+   * file is arranged against.
+   */
+  const applyWithoutAsking = (reply: string) => {
+    if (!editor || !writeOnRef.current) return;
+
+    const offered = parseMarkdown(reply).filter(isOffered);
+    if (offered.length !== 1) return;
+
+    const text = blockText(offered[0]);
+    if (!text.trim()) return;
+
+    const anchor = anchorFor(editor);
+    if (!anchor) return;
+
+    keepVersion();
+    const written =
+      anchor.kind === "selection"
+        ? applyReplacement(editor, { from: anchor.from, to: anchor.to }, text)
+        : applyInsertion(editor, insertBelowPos(editor) ?? anchor.pos, text);
+
+    if (!written) return;
+    setPending(null);
+    setAutoApplied(text);
+    setApplied(
+      anchor.kind === "selection"
+        ? `Replaced ${plural(countWords(anchor.text), "word")}.`
+        : "Put into the chapter.",
+    );
+    showWritten(written);
   };
 
   /**
@@ -380,6 +474,9 @@ export function ChatPanel({
    * always been.
    */
   function offeredActions(block: Block) {
+    /* Already in the chapter, and it says so below. */
+    if (autoApplied !== null && blockText(block) === autoApplied) return null;
+
     return (
       <>
         {selected && (
@@ -407,6 +504,7 @@ export function ChatPanel({
     if (!question || busy) return;
 
     const history: Message[] = [...messages, { role: "user", content: question }];
+    setAutoApplied(null);
     setMessages([...history, { role: "assistant", content: "" }]);
     setInput("");
     setBusy(true);
@@ -496,6 +594,7 @@ export function ChatPanel({
       ];
       saveChat(chapterId, finished);
       setLive(null);
+      applyWithoutAsking(reply);
     } catch (err) {
       /**
        * **A stopped reply is kept, not thrown away.**

@@ -4742,6 +4742,26 @@ body {
   font-weight: 600;
 }
 
+/* **The passage the assistant just wrote**, held until the writer's next move.
+
+   Drawn like a selection rather than like a search hit, and that is the point:
+   a search match is one of several answers to a question, so it shouts; this is
+   one passage that has just changed under the writer's eyes, and it only has to
+   say *here*. So it takes the paper's own ink at a low alpha — the same thing a
+   selection band is — and carries no border, no weight and no colour of its
+   own. Derived from `--paper-fg` for the reason `--paper-select` is: it has to
+   read on all five sheets without five values.
+
+   No `!important`, unlike the search rules above. Nothing competes for this
+   one. */
+.manuscript .tiptap .oc-written-passage {
+  background-color: color-mix(in srgb, var(--paper-fg) 16%, transparent);
+  border-radius: 2px;
+  /* Padding would reflow the line the moment the mark appeared, which on a
+     paginated page can push a paragraph onto the next sheet. */
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--paper-fg) 10%, transparent);
+}
+
 /* Inline code and links also belong to the page, not the chrome. */
 .manuscript .tiptap code {
   background: color-mix(in srgb, var(--paper-fg) 8%, transparent);

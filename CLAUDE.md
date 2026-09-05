@@ -1312,17 +1312,36 @@ therefore needs `h-dvh overflow-y-auto` — `min-h-dvh` puts content out of reac
   says nothing rather than something plausible. Report facts, never verdicts —
   the people selling verdicts to this audience are the ones it has been burned
   by.
-- **The assistant never changes the book on its own — every word it puts there
-  is a press.** This replaced *"it reads and reports; it never writes into the
-  book"* on 2026-09-01, and the rule it protects did not change: what was
-  refused was a machine altering somebody's prose without them seeing it.
-  A writer on Pro can turn on a switch in the assistant panel; with it on, prose
-  the model offers grows Replace and Insert. **Four things are the rule, not the
-  implementation, and none may be dropped**: a replacement is shown as a diff
-  before it is made; the anchor is the writer's own selection or caret and
-  *never* text matched back out of the manuscript; the whole change is one
-  transaction, so one undo reverts it; and the chapter as it stood is kept in
-  history first. Off by default. The prose report still has no rewrite button —
+- **The assistant never changes somebody's prose without them seeing it.** This
+  is the rule, and it has now outlived two implementations of itself. It was
+  *"it reads and reports; it never writes into the book"*, then *"every word it
+  puts there is a press"* — and on 2026-09-05 the press went too, because a
+  writer who asks for a rewrite and is handed two buttons has been given
+  homework. With the switch on, a reply is applied where the writer was already
+  working; the page scrolls to it and it stays lit until their next keystroke.
+  **Four things carry the rule now, and none may be dropped**: the anchor is the
+  writer's own selection or caret and *never* text matched back out of the
+  manuscript; the whole change is one transaction, so one undo reverts it; the
+  chapter as it stood is kept in history first; and it applies **only when the
+  reply offers exactly one passage** — `isOffered` says *this is prose*, never
+  *this is the prose you asked for*, so two offers is a choice and falls back to
+  the buttons. Off by default, and still `requirePro`.
+
+  **The diff is what was dropped, and the trade is worth stating.** The industry
+  consensus runs the other way — Cursor's users filed a *regression* when edits
+  began applying without one — but that consensus comes from code editors, where
+  a change touches files and hunks nobody can see at once. This puts one passage
+  in the paragraph the writer is looking at, with the previous version already
+  in history. Canva's assistant applies to the canvas for the same reason. The
+  safeguard moved from *before* the change to *around* it, and the pieces that
+  make that true are the four above — weaken any of them and the diff has to
+  come back.
+
+  **What it still cannot do is choose where.** "Add after the last line" names a
+  place, and nothing reads a reply for one: the target is the selection or the
+  caret. Making the model return a target needs a structured reply instead of
+  the blockquote, and a mis-parsed range rewrites a paragraph nobody chose —
+  which is the failure the anchor rule exists to prevent. The prose report still has no rewrite button —
   it reports on a whole book nobody has selected, which is the case none of the
   four above can cover. **Two features are still ruled out and stay ruled out:
   AI-generated covers and AI editing** — meaning the editorial *job*, sold in

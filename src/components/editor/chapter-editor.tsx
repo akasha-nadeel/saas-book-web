@@ -66,6 +66,7 @@ import {
   clearSearchHighlights,
   deselectEditorText,
 } from "@/lib/editor/search-highlight";
+import { WrittenHighlight } from "@/lib/editor/written-highlight";
 import {
   useDictation,
   useDictationLive,
@@ -1347,6 +1348,8 @@ function EditorSurface({
       SmartQuotes,
       // Search match highlights in the live manuscript (active match = green, others = grey).
       SearchHighlight,
+      // The passage the assistant just wrote, lit until the writer's next move.
+      WrittenHighlight,
       // Print layout: measures the prose and lays it out on real page sheets.
       // The closures are held by the plugin and only ever run later, from its
       // measure loop — never during render — so reading the ref here is safe.
