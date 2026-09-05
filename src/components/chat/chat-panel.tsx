@@ -558,21 +558,28 @@ export function ChatPanel({
           act on the question being typed, named after what it destroys rather
           than what it begins.
 
-          Floated over the transcript rather than given a row of its own: the
-          panel already has one header (`left-panel.tsx` owns it for all ten
-          tabs) and a second bar under it would be two headers on a 240px
-          column. It is out of the text's way at the right margin, and the list
-          below scrolls under it.
+          **A row of its own, above the conversation.** It floated over the
+          transcript on the reasoning that the panel already had a header and a
+          second bar under it would be two headers on a 240px column. That
+          header came off every panel on 2026-09-05 — the rail names the tab
+          now — so the objection has expired, and floating cost what floating
+          costs: the button sat on top of the first reply, and the list scrolled
+          underneath it.
+
+          Out of the conversation entirely now. Nothing passes under it, and the
+          transcript starts below rather than behind it.
 
           Disabled on an empty conversation, as `Clear` was — there is nothing
-          to start away from. */}
+          to start away from. The row keeps its height either way, so the
+          transcript does not jump the moment the first reply lands. */}
+      <div className="flex shrink-0 justify-end px-3 pt-2">
       <button
         type="button"
         onClick={() => setClearing(true)}
         disabled={messages.length === 0}
         aria-label="Start new chat"
-        className="group absolute top-2 right-3 z-10 flex h-8 w-8 items-center
-                   justify-center rounded-lg bg-panel text-muted outline-none
+        className="group relative flex h-8 w-8 items-center
+                   justify-center rounded-lg text-muted outline-none
                    transition-colors disabled:pointer-events-none
                    disabled:opacity-0 hover:bg-raised hover:text-fg
                    focus-visible:ring-2 focus-visible:ring-accent/60"
@@ -592,8 +599,9 @@ export function ChatPanel({
         </svg>
         <Tooltip label="Start new chat" side="bottom" align="end" nowrap />
       </button>
+      </div>
 
-      <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-3 py-4">
+      <div ref={listRef} className="scroll-slim flex-1 overflow-y-auto px-3 pt-1 pb-4">
         {messages.length === 0 ? (
           <div className="px-1">
             {/* **A greeting rather than an instruction.** The panel opened on
