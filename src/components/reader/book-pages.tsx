@@ -2,6 +2,7 @@
 
 import { useMemo, type CSSProperties } from "react";
 import {
+  darkPaper,
   chapterMatterOf,
   chapterNumberOf,
   getBody,
@@ -166,7 +167,7 @@ export function BookPages({
     [book, typeset],
   );
 
-  const dark = prefs.paper === "slate" || prefs.paper === "black";
+  const dark = darkPaper(prefs.paper, prefs.theme);
 
   /* Either the book's own face, size and spacing — the same variables the
      editor sets, so the read-through matches the writing surface exactly — or
@@ -202,6 +203,7 @@ export function BookPages({
         cover={cover}
         metrics={metrics}
         paper={prefs.paper}
+        darkSheet={dark}
         zoom={zoom}
         bookId={book.id}
         typographyKey={JSON.stringify(typoVars)}

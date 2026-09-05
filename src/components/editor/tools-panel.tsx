@@ -6,7 +6,7 @@ import { ListGroup, ListRow, SectionHeader } from "@/components/ui/list";
 import { Picker } from "@/components/ui/picker";
 import { PromptDialog } from "@/components/ui/dialog";
 import { Tooltip } from "@/components/ui/tooltip";
-import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { ThemeToggle, TintSwatches } from "@/components/theme/theme-toggle";
 import { RailMark, useMarkHandle } from "@/components/editor/rail-mark";
 import type { MarkName } from "@/components/editor/rail-mark";
 import { ACCEPTED, importImage } from "@/lib/image-import";
@@ -61,6 +61,11 @@ import { useEditorState } from "@/components/editor/editor-toolbar";
  */
 
 const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
+  /* First, because it is what a theme sets and what most writers will be on:
+     the sheet follows the app until they say otherwise. Its swatch is the
+     paper the theme is actually painting, read from the same custom property
+     the page uses, so the row shows the colour rather than describing it. */
+  { value: "theme", label: "Match the theme", swatch: "var(--paper-bg)" },
   { value: "white", label: "White", swatch: "#ffffff" },
   { value: "cream", label: "Off-white", swatch: "#ededed" },
   { value: "sepia", label: "Grey", swatch: "#d6d6d6" },
@@ -369,6 +374,19 @@ export function ToolsPanel({
                 <SectionHeader className="mt-4 mb-2">Theme</SectionHeader>
                 <ListGroup tone="lifted">
                   <ListRow title="Appearance" trailing={<ThemeToggle />} />
+                  {/* Under the three schemes, because they are one setting with
+                      nine answers — and in the same panel as the paper, so how
+                      the app looks and how the page looks are settled in one
+                      place. The paper stays its own choice: a white sheet under
+                      a dark app is the commonest pairing there is.
+
+                      The swatches take the row's whole width rather than its
+                      trailing slot: six circles beside a label squeezed the
+                      word "Colour" to a single letter in a 16rem panel. */}
+                  <ListRow>
+                    <span className="mb-2 block text-[13px] text-fg">Colour</span>
+                    <TintSwatches />
+                  </ListRow>
                 </ListGroup>
               </>
             )}

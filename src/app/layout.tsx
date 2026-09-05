@@ -23,7 +23,18 @@ import { ViewportController } from "@/components/viewport-controller";
  * server-rendered markup is already painted in. `ThemeSync` takes over the
  * moment React is running.
  */
-const THEME_BOOTSTRAP = `try{var t=JSON.parse(localStorage.getItem('openchapter:prefs')||'{}').theme;if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}document.documentElement.dataset.theme=t;}catch(e){document.documentElement.dataset.theme='dark';}`;
+/**
+ * The theme, written before the first paint.
+ *
+ * **Inline and hand-rolled because it has to run before anything else.** It
+ * cannot import `themeParts`, so the six names and their schemes are repeated
+ * here as one short map — the only duplication in the theming, and the reason
+ * `theme-tints.test.ts` reads this file and holds the map against `TINTS`.
+ *
+ * `data-theme` is the scheme and only the scheme; `data-tint` is the palette,
+ * and it is left off entirely rather than set empty when there is none.
+ */
+const THEME_BOOTSTRAP = `try{var M={parchment:'light',tawny:'light',olive:'light',copper:'dark',aubergine:'dark',charcoal:'dark'};var t=JSON.parse(localStorage.getItem('openchapter:prefs')||'{}').theme;var n=M[t];if(!n&&t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}var d=document.documentElement;d.dataset.theme=n||t;if(n){d.dataset.tint=t;}else{delete d.dataset.tint;}}catch(e){document.documentElement.dataset.theme='dark';}`;
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",

@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
-import { setTheme, systemTheme, themeUnset } from "@/lib/library-store";
+import {
+  setTheme,
+  systemTheme,
+  themeParts,
+  themeUnset,
+} from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
 
 /**
- * Keeps `<html data-theme>` in step with the stored preference.
+ * Keeps `<html>`'s two theme attributes in step with the stored preference.
  *
  * The very first paint is the inline script in the root layout, so there is no
  * flash of the wrong theme before React wakes up. This carries every change
@@ -19,6 +24,13 @@ import { usePrefs } from "@/lib/use-library";
  * gets the app turning with it, and without the listener below it would only
  * turn on the next reload.
  *
+ * **A named theme resolves to both attributes**, through `themeParts` — the one
+ * table that says a tint is a variation on light or dark rather than a third
+ * scheme. `data-theme` keeps meaning the scheme and only the scheme, which is
+ * what the `dark:` utilities answer to; `data-tint` carries the palette. The
+ * tint is *deleted* rather than set empty when there is none, so the attribute
+ * selector does not match on an empty string.
+ *
  * Rendered once, at the root. It draws nothing.
  */
 export function ThemeSync() {
@@ -26,8 +38,13 @@ export function ThemeSync() {
 
   useEffect(() => {
     const apply = () => {
-      document.documentElement.dataset.theme =
-        theme === "system" ? systemTheme() : theme;
+      const { scheme, tint } = themeParts(
+        theme === "system" ? systemTheme() : theme,
+      );
+      const root = document.documentElement;
+      root.dataset.theme = scheme;
+      if (tint) root.dataset.tint = tint;
+      else delete root.dataset.tint;
     };
     apply();
 

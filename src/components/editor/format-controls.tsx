@@ -35,6 +35,9 @@ const ALIGNMENTS: { value: TextAlignValue; label: string }[] = [
 ];
 
 const PAPERS: { value: PaperColor; label: string; swatch: string }[] = [
+  /* First, and the same row the Tools strip offers: the sheet follows the
+     app until the writer says otherwise. */
+  { value: "theme", label: "Match the theme", swatch: "var(--paper-bg)" },
   { value: "white", label: "White", swatch: "#ffffff" },
   { value: "cream", label: "Off-white", swatch: "#ededed" },
   { value: "sepia", label: "Grey", swatch: "#d6d6d6" },

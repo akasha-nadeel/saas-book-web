@@ -87,6 +87,7 @@ export function ReaderFlipbook({
   cover,
   metrics,
   paper,
+  darkSheet,
   zoom,
   bookId,
   typographyKey,
@@ -96,6 +97,8 @@ export function ReaderFlipbook({
   cover: string | null;
   metrics: PageMetrics;
   paper: string;
+  /** Whether that sheet is a dark one. See `darkPaper`. */
+  darkSheet: boolean;
   zoom: number;
   bookId: string;
   typographyKey: string;
@@ -292,7 +295,11 @@ export function ReaderFlipbook({
     return `Pages ${l}–${r} of ${total}`;
   })();
 
-  const dark = paper === "slate" || paper === "black";
+  /* Handed down rather than worked out from the name: with a themed sheet
+     the paper is `theme`, which is a deferral and not a colour — only the
+     screen that knows the theme can answer this. `darkPaper` is that one
+     rule, and `book-pages.tsx` has already called it. */
+  const dark = darkSheet;
 
   const from = committed;
   const turning = committed !== target && target >= 1;

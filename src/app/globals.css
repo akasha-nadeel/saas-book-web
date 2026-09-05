@@ -1388,6 +1388,251 @@
   --color-tremor-content-inverted: #08122e;
 }
 
+/* --------------------------------------------------------------------------
+   The six named themes
+   --------------------------------------------------------------------------
+   A writer can already choose the paper. These tint the *app* — the rail, the
+   bar, the panels, the dialogs — from a palette card of six warm colours.
+
+   **`data-theme` still carries the scheme and only the scheme.** A tint is a
+   variation on light or dark, never a third thing: `@custom-variant dark` and
+   the `dark:` utilities across thirteen files answer to `[data-theme=dark]`,
+   and the two blocks above stay the foundation each of these is a departure
+   from. So Copper sets `data-theme="dark" data-tint="copper"`, and a token a
+   tint does not state is the base's.
+
+   **Each swatch is a seed, not a page ground.** Tawny, Copper and Olive sit
+   near 50% lightness, where a colour works with one ink and not the other —
+   Tawny clears black at 5.98 and misses white at 3.51, Copper misses black at
+   4.21 and clears white at 4.99. A ground built from one of those is committed
+   to a single ink with no headroom left for `muted`, which is the value hints
+   and metadata are set in. So the seed sets the *hue*, and every value here was
+   solved for the contrast it has to clear rather than picked by eye: the ground
+   is the seed at a chosen lightness, and `fg`, `muted`, `accent` and `line` are
+   the seed's hue driven until each pair clears its floor.
+
+   **`theme-tints.test.ts` reads this file** and holds every block to those
+   floors and to stating the same token names as its siblings. If a swatch
+   cannot make a theme that passes, the theme changes — not the floor.
+
+   **Only the structural set is here.** The status family is not decoration:
+   `ok`/`note`/`stop` are where the colour *is* the information, and a green
+   that turned tawny would stop meaning "passed". The landing page's set, the
+   dialog palette and the badges belong to screens a writing theme has no
+   business re-skinning. The landing page needs no guard of its own — it
+   restates its tokens on its own root, and a custom property resolves from the
+   nearest declaring ancestor.
+   -------------------------------------------------------------------------- */
+
+
+[data-tint="parchment"] {
+  /* Parchment — #E7D8C6, a light scheme. */
+  --color-surface: #eee6dd;
+  --color-panel: #e6dbce;
+  --color-nav: #e6dbce;
+  --color-raised: #dcccba;
+  --color-float: #efe7df;
+  --color-lifted: #f6f1ec;
+  --color-line: #c9bbaa;
+  --color-lifted-line: #d7ccbf;
+  --color-fg: #312920;
+  --color-muted: #71614e;
+  --color-accent: #aa4124;
+  --color-accent-strong: #88341d;
+  --color-accent-ink: #ffffff;
+  --color-selected: color-mix(in srgb, #aa4124 14%, transparent);
+  --color-selected-fg: #aa4124;
+}
+
+[data-tint="tawny"] {
+  /* Tawny Leather — #B67C4F, a light scheme. */
+  --color-surface: #f5e4d6;
+  --color-panel: #f0d7c4;
+  --color-nav: #f0d7c4;
+  --color-raised: #eac7ab;
+  --color-float: #f5e5d8;
+  --color-lifted: #f9f0e9;
+  --color-line: #cbb9ac;
+  --color-lifted-line: #d8cbc1;
+  --color-fg: #322821;
+  --color-muted: #745f4f;
+  --color-accent: #95521e;
+  --color-accent-strong: #733f17;
+  --color-accent-ink: #ffffff;
+  --color-selected: color-mix(in srgb, #95521e 14%, transparent);
+  --color-selected-fg: #95521e;
+}
+
+[data-tint="olive"] {
+  /* Dusty Olive — #7F7A57, a light scheme. */
+  --color-surface: #ebe9e0;
+  --color-panel: #e2e0d2;
+  --color-nav: #e2e0d2;
+  --color-raised: #d5d3c0;
+  --color-float: #ecebe2;
+  --color-lifted: #f4f3ee;
+  --color-line: #c1bfb3;
+  --color-lifted-line: #cfcec5;
+  --color-fg: #2d2c26;
+  --color-muted: #676557;
+  --color-accent: #6c663a;
+  --color-accent-strong: #514d2c;
+  --color-accent-ink: #ffffff;
+  --color-selected: color-mix(in srgb, #6c663a 14%, transparent);
+  --color-selected-fg: #6c663a;
+}
+
+[data-tint="copper"] {
+  /* Copper Ink — #A65B46, a dark scheme. */
+  --color-surface: #24140f;
+  --color-panel: #160c09;
+  --color-nav: #160c09;
+  --color-raised: #391f18;
+  --color-float: #1d100c;
+  --color-lifted: #4b2920;
+  --color-line: #44312b;
+  --color-lifted-line: #5f443c;
+  --color-fg: #d2cac7;
+  --color-muted: #9d7a71;
+  --color-accent: #da6d4e;
+  --color-accent-strong: #e18970;
+  --color-accent-ink: #100c0a;
+  --color-selected: color-mix(in srgb, #160c09 62%, transparent);
+  --color-selected-fg: #d2cac7;
+}
+
+[data-tint="aubergine"] {
+  /* Aubergine Page — #5B4556, a dark scheme. */
+  --color-surface: #1e151c;
+  --color-panel: #110d10;
+  --color-nav: #110d10;
+  --color-raised: #2f222c;
+  --color-float: #171216;
+  --color-lifted: #3d2e3a;
+  --color-line: #3b3339;
+  --color-lifted-line: #534851;
+  --color-fg: #cecbcd;
+  --color-muted: #8d7e89;
+  --color-accent: #ab7ca1;
+  --color-accent-strong: #bb95b3;
+  --color-accent-ink: #100c0a;
+  --color-selected: color-mix(in srgb, #110d10 62%, transparent);
+  --color-selected-fg: #cecbcd;
+}
+
+[data-tint="charcoal"] {
+  /* Charcoal Ink — #434140, a dark scheme. */
+  --color-surface: #1a1919;
+  --color-panel: #100f0f;
+  --color-nav: #100f0f;
+  --color-raised: #2a2828;
+  --color-float: #151414;
+  --color-lifted: #373534;
+  --color-line: #363635;
+  --color-lifted-line: #4f4d4d;
+  --color-fg: #cdcdcd;
+  --color-muted: #858382;
+  --color-accent: #db8b4d;
+  --color-accent-strong: #e2a16f;
+  --color-accent-ink: #100c0a;
+  --color-selected: color-mix(in srgb, #100f0f 62%, transparent);
+  --color-selected-fg: #cdcdcd;
+}
+
+/* --------------------------------------------------------------------------
+   The sheet a theme brings with it
+   --------------------------------------------------------------------------
+   `data-paper="theme"` is not a sixth colour, it is a deferral: the page takes
+   whatever the chrome's theme says a page should look like. It is what
+   `setTheme` sets, so choosing Tawny warms the sheet as well as the app — and
+   any of the five named papers overrules it for good, which is the
+   `paperPicked` rule that was already here.
+
+   **A sheet stays a sheet.** These are the seed at the far end of its
+   lightness, not the tint at chrome strength: paper you write on for a day has
+   to be paper, and a saturated page is the thing every one of these themes
+   would get wrong first. What carries the theme is the hue, at the strength a
+   cream or a charcoal actually is.
+
+   `theme-tints.test.ts` holds each of these to the same floors as the chrome —
+   the ink, the muted, the link, and a rule the eye can find.
+   -------------------------------------------------------------------------- */
+
+/* With no theme chosen, the sheet is the scheme's own — which is what the two
+   plain schemes have always used. */
+[data-theme="light"] [data-paper="theme"] {
+  --paper-bg: #ffffff;
+  --paper-fg: #111111;
+  --paper-muted: #6b6b6b;
+  --paper-rule: #d9d9d9;
+  --paper-link: #1a52c4;
+  --paper-edge-on: #111111;
+}
+
+[data-theme="dark"] [data-paper="theme"] {
+  --paper-bg: #07090d;
+  --paper-fg: #f1f2fa;
+  --paper-muted: #bcc5de;
+  --paper-rule: #1b202a;
+  --paper-link: #7fb2ff;
+  --paper-edge-on: #ffffff;
+}
+
+
+[data-tint="parchment"] [data-paper="theme"] {
+  --paper-bg: #f7f1eb;
+  --paper-fg: #1a1714;
+  --paper-muted: #70675c;
+  --paper-rule: #e3dbd1;
+  --paper-link: #194fbd;
+  --paper-edge-on: #111111;
+}
+
+[data-tint="tawny"] [data-paper="theme"] {
+  --paper-bg: #f7f0eb;
+  --paper-fg: #1a1714;
+  --paper-muted: #71655b;
+  --paper-rule: #e3d9d1;
+  --paper-link: #194fbd;
+  --paper-edge-on: #111111;
+}
+
+[data-tint="olive"] [data-paper="theme"] {
+  --paper-bg: #f4f3ee;
+  --paper-fg: #181816;
+  --paper-muted: #6b6a61;
+  --paper-rule: #deddd6;
+  --paper-link: #194fbd;
+  --paper-edge-on: #111111;
+}
+
+[data-tint="copper"] [data-paper="theme"] {
+  --paper-bg: #180e0b;
+  --paper-fg: #f3f2f2;
+  --paper-muted: #bcb5b4;
+  --paper-rule: #342623;
+  --paper-link: #7aafff;
+  --paper-edge-on: #ffffff;
+}
+
+[data-tint="aubergine"] [data-paper="theme"] {
+  --paper-bg: #141013;
+  --paper-fg: #f2f2f2;
+  --paper-muted: #b9b6b8;
+  --paper-rule: #2e282d;
+  --paper-link: #7aafff;
+  --paper-edge-on: #ffffff;
+}
+
+[data-tint="charcoal"] [data-paper="theme"] {
+  --paper-bg: #121211;
+  --paper-fg: #f2f2f2;
+  --paper-muted: #b8b8b7;
+  --paper-rule: #2c2b2b;
+  --paper-link: #7aafff;
+  --paper-edge-on: #ffffff;
+}
+
 /* App shell. Layout constants, not part of the design language.
 
    The panel scales with the window rather than taking one fixed number. The
@@ -2392,13 +2637,28 @@ body {
    from the ink here. Mixed rather than stated, so a change of chrome colour
    carries its own hovers with it.
    -------------------------------------------------------------------------- */
+/* **The ground is a token; the ink is not.**
+
+   This block used to paint `#ffffff`, which under a tint painted the bar and
+   the rail white over the top of a cream the theme had just chosen — a class
+   selector beats the attribute selector the tint blocks are written with.
+
+   It cannot simply be excluded from tints, and that was tried: the base
+   `.nav-chrome` above re-points its tokens for the *dark* set, mixing its ink
+   from white, so a light tint left with those rules had near-white labels on a
+   cream rail. This correction is exactly what stops that, and every light tint
+   needs it as much as plain light does.
+
+   So the surfaces defer — `--color-nav` is `#ffffff` in plain light and the
+   tint's own chrome under a tint — and the ink stays literal, because it is
+   ink for a *light* chrome and every light tint has one. */
 :root[data-theme="light"] .nav-chrome,
 :root[data-theme="light"] .panel-chrome,
 :root[data-theme="light"] .shelf-sidebar {
-  background: #ffffff;
+  background: var(--color-nav);
 
-  --color-surface: #ffffff;
-  --color-panel: #ffffff;
+  --color-surface: var(--color-nav);
+  --color-panel: var(--color-nav);
 
   --color-fg: #17171a;
   --color-muted: #62626b;
@@ -2413,7 +2673,7 @@ body {
    the same grey desk they sit on. A near-white neutral gives the navigation a
    deliberate surface and, because the inner scroller inherits it, replaces
    the browser's dark scrollbar gutter with the rail's own background. */
-:root[data-theme="light"] .shelf-sidebar {
+:root[data-theme="light"]:not([data-tint]) .shelf-sidebar {
   background: #fafafd;
   --color-surface: #fafafd;
   --color-panel: #fafafd;

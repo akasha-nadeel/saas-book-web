@@ -3209,9 +3209,42 @@ const PREFS_KEY = "openchapter:prefs";
 
 /** The writing surface's background. A closed set, because each one needs a
  *  text colour chosen to stay readable against it. */
-export type PaperColor = "white" | "cream" | "sepia" | "slate" | "black";
+/**
+ * The sheet's own colour.
+ *
+ * **`theme` is not a sixth colour, it is a deferral** — the page takes whatever
+ * the chrome's theme says a page should look like, so a warm app gets a warm
+ * sheet without the writer choosing one. It is what a theme sets, and any of
+ * the five overrules it for good (`paperPicked`).
+ */
+export type PaperColor =
+  | "theme"
+  | "white"
+  | "cream"
+  | "sepia"
+  | "slate"
+  | "black";
+
+/**
+ * Whether a sheet is a dark one.
+ *
+ * Three screens asked this with `paper === "slate" || paper === "black"`, and
+ * `theme` broke all three at once: a deferral is not the name of a colour, so
+ * every one of them called a black themed page light and set a light colour
+ * scheme over it — white scrollbars on a black sheet.
+ *
+ * The theme is what answers for `theme`, which is why this takes it.
+ */
+export function darkPaper(paper: PaperColor, theme: Theme): boolean {
+  if (paper === "theme") {
+    const showing = theme === "system" ? systemTheme() : theme;
+    return themeParts(showing).scheme === "dark";
+  }
+  return paper === "slate" || paper === "black";
+}
 
 const PAPER_COLORS: readonly PaperColor[] = [
+  "theme",
   "white",
   "cream",
   "sepia",
@@ -3223,9 +3256,69 @@ const PAPER_COLORS: readonly PaperColor[] = [
  * The chrome's colour scheme. The paper above is a separate choice — a writer
  * can keep a white page whichever way the chrome is dressed.
  */
-export type Theme = "system" | "light" | "dark";
+/**
+ * The six named themes, each with the scheme it is a variation of.
+ *
+ * **A tint is never a third scheme.** `data-theme` on `<html>` keeps meaning
+ * light or dark and nothing else — that is what `@custom-variant dark` and the
+ * `dark:` utilities across thirteen files answer to — and `data-tint` carries
+ * the palette beside it. This table is the one place that says which is which,
+ * read by the bootstrap script and by `ThemeSync`, so the attribute written
+ * before paint and the attribute written after it cannot disagree.
+ *
+ * The names are the palette card's own. `seed` is the swatch each theme was
+ * derived from; it is not painted anywhere — the derived values live in
+ * `globals.css` — but it is what the swatch in the picker shows, so a writer
+ * chooses by the colour rather than by the word.
+ */
+export const TINTS = [
+  { id: "parchment", name: "Parchment", seed: "#E7D8C6", scheme: "light" },
+  { id: "tawny", name: "Tawny Leather", seed: "#B67C4F", scheme: "light" },
+  { id: "olive", name: "Dusty Olive", seed: "#7F7A57", scheme: "light" },
+  { id: "copper", name: "Copper Ink", seed: "#A65B46", scheme: "dark" },
+  { id: "aubergine", name: "Aubergine Page", seed: "#5B4556", scheme: "dark" },
+  { id: "charcoal", name: "Charcoal Ink", seed: "#434140", scheme: "dark" },
+] as const satisfies readonly {
+  id: string;
+  name: string;
+  seed: string;
+  scheme: "light" | "dark";
+}[];
 
-const THEMES: readonly Theme[] = ["system", "light", "dark"];
+export type Tint = (typeof TINTS)[number]["id"];
+
+/**
+ * The chrome's colour scheme.
+ *
+ * The paper above is a separate choice — a writer can keep a white page
+ * whichever way the chrome is dressed, which is the commonest pairing there is.
+ */
+export type Theme = "system" | "light" | "dark" | Tint;
+
+const THEMES: readonly Theme[] = [
+  "system",
+  "light",
+  "dark",
+  ...TINTS.map((t) => t.id),
+];
+
+/**
+ * The scheme a theme resolves to, and the tint it carries.
+ *
+ * `system` is answered by the caller, which is the only one of the three that
+ * needs to look at the machine — this is a pure lookup so the bootstrap can
+ * inline it and a test can read it.
+ */
+export function themeParts(theme: Exclude<Theme, "system">): {
+  scheme: "light" | "dark";
+  tint: Tint | null;
+} {
+  const found = TINTS.find((t) => t.id === theme);
+  if (found) return { scheme: found.scheme, tint: found.id };
+  /* Not a tint, so it is one of the two schemes by construction — the union is
+     the three plus the six, and `system` is excluded in the signature. */
+  return { scheme: theme as "light" | "dark", tint: null };
+}
 
 export interface Prefs {
   /**
@@ -3938,11 +4031,17 @@ export function setTheme(theme: Theme) {
   const next = { ...stored, ...getPrefs(), theme };
 
   if (stored.paperPicked !== true) {
-    const showing = theme === "system" ? systemTheme() : theme;
-    (next as Prefs).paper = showing === "light" ? "white" : "black";
-    // Still not "picked": the writer chose a *theme*, and the sheet came along
-    // with it. Marking it picked here would freeze the page at the first
-    // switch and quietly break the rule above.
+    /* **The sheet follows the theme, and now it follows it by name.** This
+       used to resolve to `white` or `black` — the two schemes' own papers —
+       which was right while there were two schemes and wrong the moment there
+       were nine: a *light* tint like Tawny is not `"light"`, so every one of
+       them landed the writer on a black page.
+
+       `theme` defers instead, and the paper blocks under each tint say what
+       that theme's page looks like. Still not "picked": the writer chose a
+       theme and the sheet came along with it, and marking it picked here would
+       freeze the page at the first switch. */
+    (next as Prefs).paper = "theme";
   }
 
   try {

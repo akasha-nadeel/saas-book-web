@@ -83,6 +83,7 @@ import {
 import { CoverDialog } from "@/components/shelf/cover-dialog";
 import { ShareDialog } from "@/components/collab/share-dialog";
 import {
+  darkPaper,
   bookWordCount,
   canWriteBook,
   chapterLabel,
@@ -1884,10 +1885,9 @@ function EditorSurface({
         // size and spacing.
         style={
           {
-            colorScheme:
-              prefs.paper === "slate" || prefs.paper === "black"
-                ? "dark"
-                : "light",
+            colorScheme: darkPaper(prefs.paper, prefs.theme)
+              ? "dark"
+              : "light",
             ...typographyVars(typographyOf(book)),
           } as CSSProperties
         }
@@ -1965,12 +1965,15 @@ function EditorSurface({
                desk behind it, and the desk there is a faint accent wash rather
                than the black the chrome is.
 
-               `zinc-100` rather than a token: `--color-raised` is the app's
-               *field* grey and is used for controls, and the desk is not a
-               control. It is the one literal here, and it is the same
-               near-white every word processor puts behind a page. */
+               **It was `zinc-100`, a literal, on the reasoning that the app's
+               greys are for controls and a desk is not a control.** That held
+               while the app had two schemes and broke with nine: a writer on
+               Tawny got a warm bar, a warm rail, a warm sheet, and a neutral
+               grey desk between them, which is the one surface big enough for
+               the mismatch to be the first thing you see. `--color-surface` is the
+               theme's own desk, which is what this is. */
             className="scroll-paper min-h-0 flex-1 cursor-text overflow-auto
-                       bg-zinc-100 dark:bg-accent/7 px-4 pt-3 pb-8 md:pb-10"
+                       bg-surface px-4 pt-3 pb-8 md:pb-10"
             // Both edges reserved for the scrollbar, so the page is centred in
             // the same box the bar above it is. Without it the scrollbar takes
             // its width off one side only, the page shifts left by half of it,

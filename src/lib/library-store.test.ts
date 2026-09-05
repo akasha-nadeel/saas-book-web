@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MATTER_SECTIONS } from "@/lib/matter";
 import {
+  darkPaper,
   applyRemoteForTest,
   archiveBook,
   bookChapterCount,
@@ -1052,11 +1053,33 @@ it("changes the theme", () => {
 // The page is a separate setting, but until a writer has actually chosen one
 // it is only carrying a default — and a black page in the middle of a white app
 // is something they would have to go and fix, having asked for nothing.
+//
+// **It defers rather than naming a colour**, which is what the six named themes
+// needed. This used to resolve to `white` or `black` — the two schemes' own
+// papers — and that was right while there were two schemes: with nine, a light
+// tint like Tawny is not `"light"`, so every one of them landed the writer on a
+// black page. `theme` says "whatever this theme's page is", and the paper
+// blocks under each tint answer it.
 it("brings an unpicked page with the theme", () => {
   setTheme("light");
-  expect(getPrefs().paper).toBe("white");
+  expect(getPrefs().paper).toBe("theme");
   setTheme("dark");
-  expect(getPrefs().paper).toBe("black");
+  expect(getPrefs().paper).toBe("theme");
+  setTheme("tawny");
+  expect(getPrefs().paper).toBe("theme");
+});
+
+// And the deferral resolves the way the theme does, which is the half a name
+// could not carry: three screens ask "is this sheet dark" and all three would
+// have called a black themed page light.
+it("resolves a deferred page against the theme", () => {
+  expect(darkPaper("theme", "tawny")).toBe(false);
+  expect(darkPaper("theme", "copper")).toBe(true);
+  expect(darkPaper("theme", "light")).toBe(false);
+  expect(darkPaper("theme", "dark")).toBe(true);
+  // A named sheet answers for itself whatever the chrome is doing.
+  expect(darkPaper("white", "copper")).toBe(false);
+  expect(darkPaper("black", "parchment")).toBe(true);
 });
 
 it("leaves a chosen page where the writer put it", () => {

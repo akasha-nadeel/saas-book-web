@@ -1,6 +1,6 @@
 "use client";
 
-import { setTheme, type Theme } from "@/lib/library-store";
+import { TINTS, setTheme, type Theme } from "@/lib/library-store";
 import { usePrefs } from "@/lib/use-library";
 
 /**
@@ -94,6 +94,59 @@ export function ThemeToggle() {
               {option.icon}
             </svg>
           </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * The six named themes, as a row of swatches under the three schemes.
+ *
+ * **Swatches and not a list of words**, because the answer is a colour: a
+ * writer choosing between Tawny Leather and Dusty Olive is choosing what the
+ * app will look like, and six names in a column tells them nothing they can
+ * see. Each still carries its name for a screen reader and on hover.
+ *
+ * **The swatch is the seed**, which is the colour on the palette card — not the
+ * ground the theme actually paints, which is that colour taken light or dark
+ * until the text on it is readable. The seed is what makes the theme
+ * recognisable; the derivation is in `globals.css` with its reasoning.
+ *
+ * One radiogroup with the three above it would have been truer to the fact that
+ * this is one setting with nine answers, but a radiogroup's arrow keys would
+ * then run through nine controls of two different shapes. Two groups, one
+ * question — and pressing any of the nine is the same `setTheme`.
+ */
+export function TintSwatches() {
+  const { theme } = usePrefs();
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Colour theme"
+      className="flex flex-wrap items-center gap-1.5"
+    >
+      {TINTS.map((tint) => {
+        const active = theme === tint.id;
+        return (
+          <button
+            key={tint.id}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            aria-label={tint.name}
+            title={tint.name}
+            onClick={() => setTheme(tint.id)}
+            className={`h-6 w-6 rounded-full border outline-none
+                        transition-transform hover:scale-110
+                        focus-visible:ring-2 focus-visible:ring-accent/60 ${
+                          active
+                            ? "border-accent ring-2 ring-accent/40"
+                            : "border-line"
+                        }`}
+            style={{ background: tint.seed }}
+          />
         );
       })}
     </div>
