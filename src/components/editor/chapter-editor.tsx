@@ -566,8 +566,11 @@ export function ChapterEditor({
         bookId={bookId}
         bookTitle={book.title}
         chapterTitle={chapter?.title ?? ""}
-        words={words}
+        /* Empty while the page has it: one reading, one place. */
+        words={prefs.wordsOnPage ? "" : words}
         saveState={saveState}
+        wordsOnPage={prefs.wordsOnPage}
+        onWordsPlace={(onPage) => setPref("wordsOnPage", onPage)}
         focus={focus}
         onFocus={setFocus}
         history={<HistoryControls editor={liveEditor} />}
@@ -907,6 +910,57 @@ function MobileBookNavigation({
         onClose={onClose}
       />
     </dialog>
+  );
+}
+
+/**
+ * The word count as it sits on the page, under the last line written.
+ *
+ * **Its own component because it counts every keystroke.** The surface around
+ * it holds the page geometry, the pagination and the autosave; re-rendering all
+ * of that on each transaction to move one number would be the most expensive
+ * reading in the app. Subscribed here, only this line re-renders.
+ *
+ * **And the number is live, where the bar's is not.** The stored count is
+ * written by the autosave, which debounces 800ms, so a book total summed from
+ * the shelf stands still while a writer is actually typing — which is precisely
+ * when somebody watching a target is looking at it. So the chapter being
+ * written is taken out of the stored total and put back at its live value: the
+ * rest of the book is stored (it is not being edited) and this chapter is the
+ * editor's own count.
+ *
+ * Two renderings of one reading, and that is deliberate: the bar has a row to
+ * itself and can afford "of", where this sits under somebody's prose in their
+ * own typeface and should take as little of the page as it can.
+ */
+function PageWordCount({
+  editor,
+  book,
+  chapterId,
+}: {
+  editor: Editor | null;
+  book: Book;
+  chapterId: string;
+}) {
+  useEditorState(editor);
+
+  const live = editor && !editor.isDestroyed ? editor : null;
+  const stored = book.chapters.find((c) => c.id === chapterId)?.words ?? 0;
+  const here = live ? (live.storage.characterCount.words() as number) : stored;
+  /* Never below zero: the two counts come from different moments, and a
+     mid-save disagreement should not print a minus sign under somebody's
+     prose. */
+  const written = Math.max(0, bookWordCount(book) - stored + here);
+
+  return (
+    <p
+      aria-hidden="true"
+      className="pointer-events-none mt-6 text-center font-sans text-[11px]
+                 tracking-wide text-muted/70 select-none"
+    >
+      {written.toLocaleString()}
+      {book.targetWords ? `/${book.targetWords.toLocaleString()}` : ""} words
+    </p>
   );
 }
 
@@ -2083,6 +2137,34 @@ function EditorSurface({
                   />
                 </div>
                 <EditorContent editor={editor} />
+
+                {/* **The count, under the last line the writer wrote.**
+
+                    Here rather than after the stack of sheets, because this is
+                    the box the prose actually flows in — the sheets are an
+                    absolute backdrop behind it (`.pageflow-sheets`) — so a
+                    block after the text lands directly beneath it and inside
+                    the page's own margins. It follows the writing down.
+
+                    **Nothing goes into the ProseMirror document.** Pagination
+                    measures the doc, and its own rule is that spacers are
+                    decorations and never content; that cuts both ways, and a
+                    reading printed into the manuscript would be a reading in
+                    the export.
+
+                    `aria-hidden` and `select-none` for the same reason: the
+                    bar's copy carries the `aria-live`, so a screen reader
+                    already has this number and does not want it read out in
+                    the middle of a chapter, and selecting the chapter must not
+                    pick up a number nobody typed. */}
+                {prefs.wordsOnPage && (
+                  <PageWordCount
+                    editor={editor}
+                    book={book}
+                    chapterId={chapterId}
+                  />
+                )}
+
                 {/* The Word-style mini toolbars: one over a text selection, one
                     over a selected image. */}
                 {/* The size list speaks in points, which only means anything

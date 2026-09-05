@@ -3255,6 +3255,19 @@ export interface Prefs {
   /** Hold the caret at a fixed height instead of letting it sink. */
   typewriter: boolean;
   /**
+   * Whether the word count sits on the page instead of in the bar.
+   *
+   * One reading in one of two places, never both: in the application bar with
+   * the save state, or faint under the last line of writing, which is where a
+   * writer watching a target wants it — the number and the words it counts in
+   * one glance instead of at opposite ends of the window.
+   *
+   * A setting rather than a view state, for the reason `zoom` is: it is a
+   * choice about how the writer wants to work, and one that reset on every
+   * reload would have to be made again every morning.
+   */
+  wordsOnPage: boolean;
+  /**
    * How large the page is drawn, as a multiplier — 1 is 100%.
    *
    * **Stored, because it is a setting and not a view state.** It was per-session
@@ -3420,6 +3433,10 @@ export interface Prefs {
 const DEFAULT_PREFS: Prefs = Object.freeze({
   focusMode: false,
   typewriter: false,
+  /* In the bar, where it has always been. Moving it is the writer's to ask
+     for; a count that started on the page would be a mark on the paper
+     nobody put there. */
+  wordsOnPage: false,
   // Full size. The one figure here a writer reads as a percentage.
   zoom: 1,
   // Off, as in a word processor: shown when a writer goes looking for what is
@@ -3503,6 +3520,7 @@ function parsePrefs(raw: string | null): Prefs {
     return {
       focusMode: parsed.focusMode === true,
       typewriter: parsed.typewriter === true,
+      wordsOnPage: parsed.wordsOnPage === true,
       // Narrowed like `panelTab`, and this one has teeth: a stored zero or
       // NaN draws a page of no width — including the control that would put it
       // back — so a bad value has to be caught here or the editor is unusable

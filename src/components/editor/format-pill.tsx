@@ -78,7 +78,15 @@ export function useFormatPillVisible(editor: Editor | null): boolean {
            editor" as far as this is concerned: the caret has not gone
            anywhere, the writer is choosing a size. The menus portal to
            `document.body`, so they are found by their role rather than by
-           being inside the bar. */
+           being inside the bar.
+
+           **Which is why a menu may only *keep* the bar, never summon it.**
+           Any menu in the app carries `role="menu"`, this one included but so
+           does the File menu at the top of the window — so as a plain `||`
+           this said "some menu is open, therefore the writer is formatting",
+           and pressing File made a formatting bar appear over a page nobody
+           had clicked into. A menu cannot tell us the caret is in the prose.
+           It can only tell us not to take away a bar that was already up. */
         const active = document.activeElement;
         const inChrome =
           active instanceof Element &&
@@ -98,7 +106,7 @@ export function useFormatPillVisible(editor: Editor | null): boolean {
          * selection bar stands down for a select-all, where it has nothing to
          * point at — see `selection-toolbar.tsx`.
          */
-        setShowing(editor.isFocused || inChrome);
+        setShowing((now) => editor.isFocused || (now && inChrome));
       });
     };
 

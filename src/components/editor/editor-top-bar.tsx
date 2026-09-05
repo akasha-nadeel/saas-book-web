@@ -44,6 +44,8 @@ export function EditorTopBar({
   saveState,
   focus,
   onFocus,
+  wordsOnPage,
+  onWordsPlace,
   history,
   fileActions,
   importControl,
@@ -70,6 +72,15 @@ export function EditorTopBar({
    */
   focus: boolean;
   onFocus: (on: boolean) => void;
+  /**
+   * Whether the count has been moved onto the page, and how to move it.
+   *
+   * The bar draws the control either way; what it stops drawing is the
+   * reading, which the screen hands it as an empty string once the page has
+   * it. One number in one place, and this is the door between them.
+   */
+  wordsOnPage: boolean;
+  onWordsPlace: (onPage: boolean) => void;
   /** Undo and redo. Passed in — `HistoryControls` needs the live editor. */
   history?: React.ReactNode;
   /** The rows of the File menu, which are the screen's to decide. */
@@ -148,10 +159,55 @@ export function EditorTopBar({
           corner a writer checks to find out whether their work is safe, and on
           a book shared read-only it says so instead — which is the only place
           in the editor that explains why the page will not take a keystroke. */}
+      {/* **Which way it moves has to be in the words**, because an icon for a
+          *position* cannot say it on its own — the same glyph would mean "put
+          it there" and "bring it back" depending on where it already is. */}
+      <button
+        type="button"
+        onClick={() => onWordsPlace(!wordsOnPage)}
+        aria-pressed={wordsOnPage}
+        aria-label={
+          wordsOnPage ? "Show the count in the bar" : "Show the count on the page"
+        }
+        className="group relative flex h-8 w-8 shrink-0 items-center
+                   justify-center rounded-lg text-fg/70 outline-none
+                   transition-colors hover:bg-raised hover:text-fg
+                   focus-visible:ring-2 focus-visible:ring-accent/60"
+      >
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-[18px] w-[18px]"
+        >
+          {/* A sheet with a tally along its foot: the count, and the page it
+              can go on. */}
+          <path d="M4.5 3.5h11v13h-11z" />
+          <path d="M7 13h6" />
+          <path d="M7 7h6M7 10h4" />
+        </svg>
+        <Tooltip
+          label={
+            wordsOnPage ? "Count in the bar" : "Count on the page"
+          }
+          side="bottom"
+          align="end"
+          nowrap
+        />
+      </button>
+
       {/* **The two readings, together.** They were at opposite ends of a strip
           of desk below this bar, which existed to hold them and nothing else
           once the controls around them had moved. Side by side up here they are
-          one glance rather than two, and the row they were on is gone. */}
+          one glance rather than two, and the row they were on is gone.
+
+          The count is absent from this pair while it is on the page — the
+          screen sends an empty string — and the separator below already knows
+          to stand down when either half is missing. */}
       <span className="pointer-events-none shrink-0 truncate font-sans text-xs tabular-nums text-muted">
         {words}
       </span>
