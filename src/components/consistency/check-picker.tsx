@@ -189,10 +189,18 @@ export function CheckPicker({
  * is what a tickbox announces — and this way the card itself takes focus, which
  * is what lets the example below reach a keyboard at all. A `<label>` cannot.
  *
- * **Every colour here is the check's own hue at a different strength**, mixed
- * into a theme token rather than painted flat, which is the rule
- * `finding-card.tsx` sets out: one value is a pale card by day and a deep one
- * at night with no second table.
+ * **Colour means picked, and an unpicked card has none.** Every card carried a
+ * wash of its own hue whether it was on or not, so eleven of them were eleven
+ * colours in a column and the ones actually chosen had to be found among them.
+ * Off is neutral throughout — a surface a step lighter than the panel, a tile a
+ * step above that, muted ink — and the hue arrives all at once on the press:
+ * the tile fills with it and the card and its edge take a wash of the same
+ * value.
+ *
+ * What colour there is, is the check's own hue **mixed into a theme token
+ * rather than painted flat**, which is the rule `finding-card.tsx` sets out:
+ * one value is a pale card by day and a deep one at night with no second
+ * table.
  */
 function CheckCard({
   on,
@@ -230,15 +238,15 @@ function CheckCard({
                   rounded-[10px] border p-2.5 text-left outline-none
                   transition-colors focus-visible:ring-2
                   focus-visible:ring-accent/60 ${
-                    on ? "" : "border-line bg-panel hover:border-fg/30"
+                    on ? "" : "border-line bg-raised hover:border-fg/30"
                   }`}
       style={
         on
           ? {
-              backgroundColor: `color-mix(in srgb, ${hue} 10%, var(--color-panel))`,
+              backgroundColor: `color-mix(in srgb, ${hue} 12%, var(--color-raised))`,
               /* A translucent hue rather than a mix into `--color-line`, which
                  the editor's panel re-points to a wash of `fg` — see the note
-                 on `tint` in `finding-card.tsx`. `--color-panel` is safe. */
+                 on `tint` in `finding-card.tsx`. A surface token is safe. */
               borderColor: `color-mix(in srgb, ${hue} 55%, transparent)`,
             }
           : undefined
@@ -251,8 +259,8 @@ function CheckCard({
           on
             ? { backgroundColor: hue, color: "var(--color-panel)" }
             : {
-                backgroundColor: `color-mix(in srgb, ${hue} 14%, transparent)`,
-                color: hue,
+                backgroundColor: "var(--color-lifted)",
+                color: "var(--color-muted)",
               }
         }
       >
