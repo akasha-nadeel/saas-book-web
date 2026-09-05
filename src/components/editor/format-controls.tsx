@@ -24,6 +24,7 @@ import {
   paragraphStyleSettings,
   type ParagraphStyle,
 } from "@/lib/typography";
+import { normalizeHref } from "@/lib/editor/link-url";
 import { useEditorState } from "./editor-toolbar";
 
 const ALIGNMENTS: { value: TextAlignValue; label: string }[] = [
@@ -321,9 +322,13 @@ export function FormatControls({
               : undefined
           }
           removeLabel="Remove link"
-          onSubmit={(href) =>
-            run((live) => live.chain().focus().setLink({ href }).run())
-          }
+          /* A bare domain is a link too — see `normalizeHref`, which the bar
+             over a selection runs its input through as well, so every box in
+             the app stores the same thing. */
+          onSubmit={(typed) => {
+            const href = normalizeHref(typed);
+            if (href) run((live) => live.chain().focus().setLink({ href }).run());
+          }}
           onClose={() => setLinkAsked(null)}
         />
       )}

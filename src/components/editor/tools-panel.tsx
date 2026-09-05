@@ -11,6 +11,7 @@ import { RailMark, useMarkHandle } from "@/components/editor/rail-mark";
 import type { MarkName } from "@/components/editor/rail-mark";
 import { ACCEPTED, importImage } from "@/lib/image-import";
 import { insertWidthPercent } from "@/lib/editor/image-resize";
+import { normalizeHref } from "@/lib/editor/link-url";
 import {
   setPref,
   setTypography,
@@ -409,7 +410,13 @@ export function ToolsPanel({
               ? () => live.chain().focus().unsetLink().run()
               : undefined
           }
-          onSubmit={(href) => live.chain().focus().setLink({ href }).run()}
+          /* A bare domain is a link too — see `normalizeHref`, which the bar
+             over a selection runs its input through as well, so both
+             boxes store the same thing. */
+          onSubmit={(typed) => {
+            const href = normalizeHref(typed);
+            if (href) live.chain().focus().setLink({ href }).run();
+          }}
           onClose={() => setLinkAsked(null)}
         />
       )}

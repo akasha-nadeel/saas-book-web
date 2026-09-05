@@ -1314,7 +1314,15 @@ function EditorSurface({
      */
     editable: canWrite,
     extensions: [
-      StarterKit,
+      /* **A link must not open when it is clicked**, which is not the default.
+         `StarterKit` brings Link with `openOnClick: true`, and that has never
+         bitten because until 2026-09-05 the app had no reachable way to make
+         one: a writer clicking a linked word to put the caret in it would have
+         left their manuscript for the web. `https` rather than Tiptap's `http`
+         for anything it autolinks, to agree with `normalizeHref`. */
+      StarterKit.configure({
+        link: { openOnClick: false, defaultProtocol: "https" },
+      }),
       CharacterCount,
       Placeholder.configure({ placeholder: "Begin your chapter…" }),
       // Images are stored inline as data URLs — see lib/image-import for why

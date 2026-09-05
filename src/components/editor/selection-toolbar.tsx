@@ -17,6 +17,8 @@ import { fontSizeOptions, fontSizePt } from "@/lib/editor/font-size";
 import { previewFont } from "@/lib/editor/font-preview";
 import { FONTS } from "@/lib/typography";
 import type { TextAlignValue } from "@/lib/editor/text-align";
+import { normalizeHref } from "@/lib/editor/link-url";
+import { PromptDialog } from "@/components/ui/dialog";
 
 /**
  * The floating formatting bar that appears over a text selection — the mini
@@ -34,11 +36,19 @@ import type { TextAlignValue } from "@/lib/editor/text-align";
  * with structure anyway, because that is what they read as — and because eleven
  * controls against seven left one row half the length of the other.
  *
- * Inline code and links were here and are not any more. Neither belongs in a
- * novel — there is no code in a manuscript, and a link cannot be followed in
- * print — so they were two of eighteen controls taking width from a bar that
- * was already too wide. Both marks remain in the document model, so a chapter
- * imported from HTML keeps them.
+ * Inline code was here and is not any more: there is no code in a manuscript,
+ * and it was one of eighteen controls taking width from a bar that was already
+ * too wide. The mark remains in the document model, so a chapter imported from
+ * HTML keeps it.
+ *
+ * **The link came back on 2026-09-05**, and the note that removed it is worth
+ * keeping because half of it still holds. It said a link cannot be followed in
+ * print — true, and answered by what this app mostly makes, which is an EPUB,
+ * where a link is followed by tapping it. The other half was width, and the bar
+ * is two rows now with room in the marks group. A link is a mark on a
+ * selection, and this is where every other mark on a selection lives; reaching
+ * it meant opening the Tools strip, which is three presses to do the one thing
+ * the writer had already selected the words for.
  *
  * Built on Tiptap's BubbleMenu, which sits it above the selection and follows
  * it as the page scrolls.
@@ -326,6 +336,17 @@ export function SelectionToolbar({
     return { getBoundingClientRect: () => rect, getClientRects: () => [rect] };
   }, []);
 
+  /**
+   * The box asking for a link. `null` is closed; a string is open, holding
+   * whatever is already on the selection so editing one starts from the link
+   * rather than from an empty field.
+   *
+   * Above the early return with the rest of the hooks, and it has to be: a
+   * hook after a conditional return is called in a different order on the
+   * render where there is no editor.
+   */
+  const [linkAsked, setLinkAsked] = useState<string | null>(null);
+
   if (!editor) return null;
 
   // The selected text's current inline size (a multiple of body), and whether
@@ -367,6 +388,8 @@ export function SelectionToolbar({
     pinnedRect.current = null;
   };
 
+  const linked = editor.getAttributes("link").href as string | undefined;
+
   const apply = (run: (chain: ReturnType<Editor["chain"]>) => unknown) => {
     const chain = editor.chain().focus();
     const at = range.current;
@@ -386,6 +409,7 @@ export function SelectionToolbar({
     });
 
   return (
+    <>
     <BubbleMenu
       editor={editor}
       // Only over a real text selection: skip the empty caret, a node (image)
@@ -465,6 +489,29 @@ export function SelectionToolbar({
           onClick={() => apply((chain) => chain.toggleStrike())}
         >
           <span className="line-through">S</span>
+        </Btn>
+        <Btn
+          label={linked ? "Edit link" : "Add link"}
+          active={!!linked}
+          /* The stored range, not the live selection: opening a modal takes
+             focus out of the prose, and `apply` below puts the range back
+             before the mark is set. A link attached to a collapsed caret marks
+             nothing, and silently. */
+          onClick={() => setLinkAsked(linked ?? "")}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-3.5 w-3.5"
+          >
+            <path d="M8.6 11.4a3.4 3.4 0 0 0 5 .3l2-2a3.4 3.4 0 0 0-4.8-4.8l-1.1 1.1" />
+            <path d="M11.4 8.6a3.4 3.4 0 0 0-5-.3l-2 2a3.4 3.4 0 0 0 4.8 4.8l1.1-1.1" />
+          </svg>
         </Btn>
 
         <Sep />
@@ -618,6 +665,33 @@ export function SelectionToolbar({
         </Btn>
       </div>
     </BubbleMenu>
+
+    {/* **The same dialog the Tools strip opens**, so there is one link box in
+        the app rather than two that drift apart. Outside the bubble menu: it
+        is a modal in the browser's top layer, and a modal inside a floating
+        bar that hides on a blur would be closed by its own opening.
+
+        `normalizeHref` is what lets a writer type `example.com`. It answers
+        null for something that is not a link at all, and then nothing is set —
+        the words keep their meaning rather than gaining a mark that points
+        nowhere. */}
+    {linkAsked !== null && (
+      <PromptDialog
+        title={linked ? "Edit link" : "Add link"}
+        label="Address"
+        initial={linkAsked}
+        confirmLabel={linked ? "Update" : "Add link"}
+        placeholder="example.com"
+        removeLabel="Remove link"
+        onRemove={linked ? () => apply((chain) => chain.unsetLink()) : undefined}
+        onSubmit={(typed) => {
+          const href = normalizeHref(typed);
+          if (href) apply((chain) => chain.setLink({ href }));
+        }}
+        onClose={() => setLinkAsked(null)}
+      />
+    )}
+    </>
   );
 }
 

@@ -1669,6 +1669,21 @@ body {
   --paper-muted: #6b6b6b;
   --paper-rule: #d9d9d9;
 
+  /* **A link on the page, and it has to be blue.**
+
+     Stated per paper rather than derived from `--paper-fg` the way
+     `--paper-select` is: a derivation from the ink can be a wash of the ink and
+     nothing else, and the one thing a reader has been taught about a link for
+     thirty years is its colour. So each sheet gets a value — deeper on the
+     light papers, lighter on the dark ones — chosen to clear 4.5:1 against its
+     own ground, since this is body text and not a label.
+
+     Not `--color-accent`. That belongs to the chrome and follows the *theme*,
+     so a white page under a dark theme would take the pale periwinkle meant for
+     a navy rail and put it on white. The paper is its own world; this is why it
+     has its own tokens. */
+  --paper-link: #1a52c4;
+
   /* The edge of the sheet when the panel has a part selected — the same value
      the panel's selected card carries, so the page answers the panel.
 
@@ -1711,6 +1726,7 @@ body {
   --paper-fg: #141414;
   --paper-muted: #616161;
   --paper-rule: #cfcfcf;
+  --paper-link: #1a52c4;
 }
 
 /* Was sepia. The lightest of the grey sheets. */
@@ -1718,6 +1734,9 @@ body {
   --paper-bg: #d6d6d6;
   --paper-fg: #171717;
   --paper-muted: #575757;
+  /* A step darker than the lighter sheets: this ground is #d6d6d6, so the same
+     blue would be reading against a grey rather than against white. */
+  --paper-link: #14429f;
   --paper-rule: #b5b5b5;
 }
 
@@ -1726,6 +1745,7 @@ body {
   --paper-fg: #f1f2fa;
   --paper-muted: #bcc5de;
   --paper-rule: #242a35;
+  --paper-link: #7fb2ff;
 
   /* Lifted off the dark sheet: on black, the edge runs the other way up. */
   --paper-edge-on: #ffffff;
@@ -1742,6 +1762,7 @@ body {
   --paper-fg: #f1f2fa;
   --paper-muted: #bcc5de;
   --paper-rule: #1b202a;
+  --paper-link: #7fb2ff;
 
   --paper-edge-on: #ffffff;
 }
@@ -4469,11 +4490,20 @@ body {
   font-size: 0.9em;
 }
 
+/* **A link reads as a link.** It was `color: inherit` under a hairline in the
+   rule colour, which is what you draw when a link cannot be followed — true of
+   print, and not true of the EPUB this app mostly makes, where a link is
+   followed by tapping it. Blue and underlined is the one piece of formatting
+   every reader already knows.
+
+   The underline takes the link's own colour rather than `--paper-rule`, or the
+   word is blue and its underline is grey. */
 .manuscript .tiptap a {
-  color: inherit;
+  color: var(--paper-link);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: var(--paper-rule);
+  text-decoration-color: currentColor;
+  text-decoration-thickness: from-font;
 }
 
 /* --------------------------------------------------------------------------
