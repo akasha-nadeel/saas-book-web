@@ -83,7 +83,7 @@ const TAB_MARKS: Record<PanelTab, MarkName> = {
   ideas: "ideas",
   bible: "bible",
   assistant: "assistant",
-  page: "type",
+  page: "tools",
   history: "history",
   trash: "trash",
 };
@@ -127,7 +127,7 @@ export function WorkspaceRail({
   /** Offer the assistant tab. False only on screens that intentionally omit AI. */
   assistant?: boolean;
   /**
-   * Whether Page & type is on screen, and how to open it.
+   * Whether the tools strip is on screen, and how to open it.
    *
    * **The one tab that does not open the panel**, and the rail has to know it:
    * the settings come out as a card at this rail’s edge instead. It is still a
@@ -164,23 +164,24 @@ export function WorkspaceRail({
    * it is needed.
    */
   const tabButton = (value: PanelTab) => {
-    /* **A tab is lit when it is what is on screen, not when its flag is
-       set.** Page & type is the one that answers somewhere else — a card at
-       the rail's edge rather than the panel — and the card stands in that same
-       slot, near enough the panel's own width, so an open panel behind it is
-       open and *not visible*. Left to their flags, Page and Manuscript would
-       light together and the rail would be claiming the writer is in two
-       places. The panel is deliberately not closed — putting the card away
-       gives them back the panel they left — so what changes is which of the
-       two the rail says they are looking at. */
+    /* **The tools strip stands in the panel's slot, so one of them is on
+       screen and never both.** Tools reads its own flag; every other tab is
+       lit only while that strip is away.
+
+       **And pressing one has to put it away**, which is the half that was
+       missing: `selectPanel` opened the panel behind a strip that went on
+       covering it, so the panel stayed hidden *and* the tab could not light,
+       and the whole column read as dead. A press on a tab is a request to see
+       that tab. */
     const isActive =
       value === "page" ? toolsOpen : !toolsOpen && leftPanel && tab === value;
     const handleClick = () => {
       if (value === "page") {
-        /* Same second-press rule as every other tab, pointed at the card. */
+        /* Same second-press rule as every other tab, pointed at the strip. */
         onTools?.(!toolsOpen);
         return;
       }
+      onTools?.(false);
       selectPanel(value, { tab, open: leftPanel }, { onSelectTab, onPanel });
     };
 

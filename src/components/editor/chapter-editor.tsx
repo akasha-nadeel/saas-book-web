@@ -257,12 +257,12 @@ export function ChapterEditor({
    * second panel in a slot of its own with its own stored flag. It is the
    * `chapters` tab of this one now, so there is one question and one answer.
    *
-   * The Page & type strip stands in the same place, so it takes the panel's
+   * The tools strip stands in the same place, so it takes the panel's
    * turn rather than sitting on top of it — and **the slot that holds the
    * page's width reads this same flag**, which is the half that was missed
    * first time round: hiding the panel while a 25rem spacer stayed behind left
    * a column of empty ground beside a 3rem strip. */
-  /* Page & type, the one rail tab that is not the panel: it opens as a strip
+  /* The tools, the one rail tab that is not the panel: it opens as a strip
      at the rail’s edge instead — see `ToolsPopover` for why. Declared above
      the flag below, which reads it. */
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -1862,8 +1862,16 @@ function EditorSurface({
 
               `pointer-events-none` on the stack with it turned back on for each
               child, so the empty space either side of the pill is not a lid over
-              the top of the page — a click there must reach the paper. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col items-center">
+              the top of the page — a click there must reach the paper.
+
+              **And it sits above the paper, which now has a number of its
+              own.** This column is four layers deep and they only read in
+              order if they are written down: the panel at 40, the two
+              connector rules at 41, the page at 42 — raised so those rules
+              finish underneath it — this bar at 43, and the rail at 45. At 20
+              the page covered the middle of the pill and left both ends
+              showing, which reads as a bar that failed to draw. */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-[43] flex flex-col items-center">
             {dictation.listening && (
               <div className="pointer-events-auto w-full">
                 <DictationBar

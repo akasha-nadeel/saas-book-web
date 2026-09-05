@@ -36,7 +36,6 @@ import {
 } from "@/lib/consistency";
 import { findBook, saveConsistencyRaw, type Book } from "@/lib/library-store";
 import { loadTypoWords } from "@/lib/typo-words";
-import { plural } from "@/lib/plural";
 import {
   useBible,
   useDismissals,
@@ -237,10 +236,6 @@ export function ConsistencyPanel({ bookId }: { bookId: string }) {
       >
         {!showing || !report ? (
           <>
-            <p className="mb-3 text-sm leading-relaxed text-muted">
-              Reads all {plural(toRead, "chapter")} at once and reports what this
-              book spells more than one way. Pick what to look for below.
-            </p>
             <CheckPicker
               picked={picked}
               onToggle={(id) =>

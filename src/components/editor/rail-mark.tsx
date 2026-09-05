@@ -68,6 +68,7 @@ export type MarkName =
   | "typewriter"
   | "paper"
   | "link"
+  | "tools"
   | "share"
   /* The body card's two, since its buttons lost their labels. */
   | "collapse"
@@ -115,6 +116,17 @@ const DRAWN: Partial<Record<MarkName, React.ReactNode>> = {
     <>
       <path d="M10 2.9a4.7 4.7 0 0 0-2.8 8.5c.5.4.8 1 .8 1.6v.6h4v-.6c0-.6.3-1.2.8-1.6A4.7 4.7 0 0 0 10 2.9Z" />
       <path d="M8.4 16.1h3.2M8.9 17.7h2.2" />
+    </>
+  ),
+  /* Three sliders, for the rail button that opens the tools. The standard
+     "adjust" glyph and nothing else in the rail wears it — it replaced the
+     letter T, which the strip's own Type tool also wears, so one press opened
+     a strip whose first icon was the button you had just pressed. */
+  tools: (
+    <>
+      <path d="M3 6h4M11 6h6M3 14h6M13 14h4" />
+      <path d="M9 6a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z" />
+      <path d="M15 14a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z" />
     </>
   ),
   /* Two links of a chain, for the one that puts a URL on a selection. There

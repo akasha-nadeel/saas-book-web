@@ -46,14 +46,16 @@ export const PANEL_TITLES: Record<PanelTab, string> = {
    * trigger rect purely because it used to live on the other edge of the
    * window.
    *
-   * **This is the one tab that is not the panel.** It opens as a card at the
-   * rail’s edge instead (`tools-popover.tsx`), because a dozen short settings
-   * rows in a 25rem full-height column is a panel three-quarters empty that
-   * pushes the manuscript sideways to be it. The name is written here with the
-   * other nine all the same: what the writer presses is the same kind of
-   * button, whatever shape the answer arrives in.
+   * **This is the one tab that is not the panel.** It opens as a strip of
+   * tools at the rail’s edge (`tools-popover.tsx`), each one either doing its
+   * job on the press or opening a small panel of its own beside it.
+   *
+   * **The word is "Tools" and the key is still `page`.** The key is a stored
+   * preference and a member of the `PanelTab` union; renaming it would be a
+   * migration for a word nobody sees. It was called Page & type while it was
+   * a card of labelled settings rows, which is not what it is any more.
    */
-  page: "Page & type",
+  page: "Tools",
   history: "Versions",
   trash: "Deleted chapters",
 };
@@ -84,7 +86,7 @@ export const PANEL_RAIL_NAMES: Record<PanelTab, string> = {
   bible: "Bible",
   bookmarks: "Marks",
   assistant: "Assistant",
-  page: "Page",
+  page: "Tools",
   history: "Versions",
   trash: "Trash",
 };

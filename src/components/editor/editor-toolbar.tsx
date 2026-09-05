@@ -11,7 +11,7 @@ import type { TextAlignValue } from "@/lib/editor/text-align";
  * **The rail itself is gone.** It was a column of glyphs down the right edge
  * of the window whose every control opened a portalled flyout that positioned
  * itself leftwards, because there was nowhere else for it to go — and half of
- * what it held is now in the Page & type panel on the other side of the page,
+ * what it held is now in the tools strip on the other side of the page,
  * where a control has room to be a labelled row instead of a glyph. Keeping
  * both would have been two ways to set one book’s type, which is how two
  * screens end up disagreeing about one manuscript.

@@ -36,6 +36,29 @@ import {
   type CheckGroup,
 } from "@/lib/consistency-checks";
 import { plural } from "@/lib/plural";
+import { Tooltip } from "@/components/ui/tooltip";
+import { useEffect, useState } from "react";
+import { EDITOR_LAYOUT_EVENT } from "@/lib/use-visual-viewport";
+
+/**
+ * Whether this is a screen with no pointer to hover with.
+ *
+ * The same classifier every other piece of editor chrome reads, through the
+ * same event — so the picker and the panel around it can never disagree about
+ * which mode they are in. Read here and passed down rather than in each of
+ * eleven cards, which would be eleven listeners for one fact.
+ */
+function useNoHover(): boolean {
+  const [touch, setTouch] = useState(false);
+  useEffect(() => {
+    const root = document.documentElement;
+    const read = () => setTouch(root.dataset.editorLayout === "continuous");
+    read();
+    root.addEventListener(EDITOR_LAYOUT_EVENT, read);
+    return () => root.removeEventListener(EDITOR_LAYOUT_EVENT, read);
+  }, []);
+  return touch;
+}
 
 export function CheckPicker({
   picked,
@@ -62,6 +85,7 @@ export function CheckPicker({
   onBack?: () => void;
 }) {
   const count = picked.size;
+  const noHover = useNoHover();
 
   return (
     <div className="@container">
@@ -106,6 +130,7 @@ export function CheckPicker({
                     hint={check.hint}
                     hue={check.hue}
                     onChange={() => onToggle(check.id)}
+                    showHint={noHover}
                   />
                 ))}
               </div>
@@ -145,18 +170,29 @@ export function CheckPicker({
 }
 
 /**
- * One check, tickable.
+ * One check, on or off.
  *
- * **The tick has to be a tick.** `export-page.tsx` records the verdict on
- * getting this wrong — a card whose only state was a tinted border, so nothing
- * on screen said on or off. The border and the ground here are the *second*
- * signal; the box is the first, and it is a real `<input type="checkbox">`
- * under an `sr-only`, so the keyboard and the screen reader get the control the
- * platform already knows how to describe.
+ * **The state has to be loud, and it is the tile that carries it.**
+ * `export-page.tsx` records the verdict on getting this wrong — a card whose
+ * only state was a tinted border, so nothing on screen said on or off. That
+ * lesson is why this had a drawn tickbox for most of its life.
  *
- * The drawn box is filled from `style` rather than from `peer-checked:`,
- * because the fill is the check's own hue and Tailwind cannot generate a class
- * for a colour it only learns at runtime.
+ * The box is gone and the lesson is not. What replaced it is a 36px tile that
+ * goes from a wash of the check's hue to the hue itself, which is a great deal
+ * louder than a 16px square and very much louder than a border. Everything
+ * else about the card follows it: the ground and the edge move in the same
+ * direction at the same moment, so there are three signals agreeing rather
+ * than one being relied on.
+ *
+ * **A button with `role="checkbox"`, not a label around a hidden input.** The
+ * keyboard and the screen reader get the same control either way — `aria-checked`
+ * is what a tickbox announces — and this way the card itself takes focus, which
+ * is what lets the example below reach a keyboard at all. A `<label>` cannot.
+ *
+ * **Every colour here is the check's own hue at a different strength**, mixed
+ * into a theme token rather than painted flat, which is the rule
+ * `finding-card.tsx` sets out: one value is a pale card by day and a deep one
+ * at night with no second table.
  */
 function CheckCard({
   on,
@@ -164,18 +200,38 @@ function CheckCard({
   hint,
   hue,
   onChange,
+  showHint,
 }: {
   on: boolean;
   name: string;
   hint: string;
   hue: string;
   onChange: () => void;
+  /**
+   * Draw the example under the name instead of leaving it to the tooltip.
+   *
+   * True where there is no pointer to hover with. The tooltip is the better
+   * shape — eleven cards with two lines each is a long scroll before a writer
+   * reaches Run — but a phone would simply never see the example, and four of
+   * the eleven names do not explain themselves.
+   */
+  showHint: boolean;
 }) {
   return (
-    <label
-      className={`flex cursor-pointer items-start gap-2.5 rounded-xl border p-3 transition-colors ${
-        on ? "" : "border-line bg-panel hover:border-fg/30"
-      }`}
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={on}
+      onClick={onChange}
+      /* The platform's own fallback, for anything that shows neither the
+         tooltip nor the line. */
+      title={hint}
+      className={`group relative flex w-full cursor-pointer items-center gap-3
+                  rounded-[10px] border p-2.5 text-left outline-none
+                  transition-colors focus-visible:ring-2
+                  focus-visible:ring-accent/60 ${
+                    on ? "" : "border-line bg-panel hover:border-fg/30"
+                  }`}
       style={
         on
           ? {
@@ -188,45 +244,49 @@ function CheckCard({
           : undefined
       }
     >
-      <input
-        type="checkbox"
-        checked={on}
-        onChange={onChange}
-        className="peer sr-only"
-      />
-
       <span
         aria-hidden="true"
-        className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors"
         style={
           on
-            ? { backgroundColor: hue, borderColor: hue }
-            : { borderColor: "var(--color-muted)" }
+            ? { backgroundColor: hue, color: "var(--color-panel)" }
+            : {
+                backgroundColor: `color-mix(in srgb, ${hue} 14%, transparent)`,
+                color: hue,
+              }
         }
       >
-        {on && (
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-panel)"
-            strokeWidth={3.5}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="h-3 w-3"
-          >
-            <path d="M20 6 9 17l-5-5" />
-          </svg>
-        )}
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-[18px] w-[18px]"
+        >
+          {/* A magnifier over a line of text: what every one of these does is
+              read the book looking for one thing. One mark for all eleven and
+              not eleven metaphors — the hue is what tells them apart, and it is
+              the same hue their findings carry. */}
+          <circle cx="10.5" cy="10.5" r="5.5" />
+          <path d="m15 15 4.5 4.5" />
+          <path d="M8 9.5h5M8 12h3" />
+        </svg>
       </span>
 
       <span className="min-w-0">
         <span className="block text-[13px] leading-snug font-semibold text-fg">
           {name}
         </span>
-        <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">
-          {hint}
-        </span>
+        {showHint && (
+          <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">
+            {hint}
+          </span>
+        )}
       </span>
-    </label>
+
+      {!showHint && <Tooltip label={hint} side="top" />}
+    </button>
   );
 }

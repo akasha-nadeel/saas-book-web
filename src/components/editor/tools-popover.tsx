@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ToolsPanel } from "@/components/editor/tools-panel";
 import type { Editor } from "@tiptap/react";
@@ -8,7 +8,7 @@ import type { Book, PaperColor } from "@/lib/library-store";
 import type { Dictation } from "@/lib/editor/use-dictation";
 
 /**
- * Page & type, as a card beside the rail rather than as the side panel.
+ * The tools, as a strip beside the rail rather than as the side panel.
  *
  * **The tools are not a panel, because they are not about the book.** Every
  * other tab in that column answers a question about the manuscript — where is
@@ -30,8 +30,7 @@ import type { Dictation } from "@/lib/editor/use-dictation";
  * menu (portalled, and therefore "outside" this card by any DOM test) is open.
  */
 
-/** The card's width, and how far its left edge sits from the rail. */
-const WIDTH = 320;
+/** How far the card's left edge sits from the rail. */
 const GAP = 10;
 /** Never nearer the top or bottom of the window than this. */
 const MARGIN = 12;
@@ -57,6 +56,10 @@ export function ToolsPopover({
   dictation: Dictation;
   canWrite: boolean;
 }) {
+  /* The card itself, so its placement can be worked out from the height it
+     actually has rather than from a number typed here. */
+  const cardRef = useRef<HTMLDivElement>(null);
+
   const [at, setAt] = useState<{
     left: number;
     top: number;
@@ -85,21 +88,53 @@ export function ToolsPopover({
          the window is the floor. */
       const ceiling = bar.top + MARGIN;
       const floor = window.innerHeight - MARGIN;
-      const height = Math.min(560, floor - ceiling - HEADROOM);
+
+      /* **Its real height, not a reservation.** This was `min(560, …)` —
+         560 whatever the strip held, where six icons closed are about 300 —
+         so the clamp below always had far too little room to play with and
+         pulled the card up to the ceiling every time. It opened at the top of
+         the rail while the button that opened it sat most of a window lower
+         down, which is a card that has come from nowhere.
+
+         A `ResizeObserver` is right here and would be wrong for the two
+         connector rules a few files away, whose own note argues against one:
+         an observer reports a box changing *size*, which is exactly what this
+         is — a panel opening beside the strip — and exactly what those are
+         not, since what moves the page mostly changes its position. */
+      const measured = cardRef.current?.offsetHeight ?? 0;
+      const height = Math.min(measured || 320, floor - ceiling - HEADROOM);
       const wanted = (button?.top ?? bar.top + 80) - HEADROOM;
-      setAt({
+      const top = Math.max(ceiling, Math.min(wanted, floor - height - HEADROOM));
+      const next = {
         left: bar.right + GAP,
-        top: Math.max(ceiling, Math.min(wanted, floor - height - HEADROOM)),
-        height,
-      });
+        top,
+        /* What it may grow to from where it ended up, so a card opened low on
+           a short window shrinks and scrolls rather than running off. */
+        height: floor - top - HEADROOM,
+      };
+
+      /* **Set only on a real change.** The observer watches the box whose own
+         `maxHeight` this writes, so an unconditional `setAt` is a loop
+         waiting for content tall enough to reach the cap. */
+      setAt((now) =>
+        now &&
+        now.left === next.left &&
+        now.top === next.top &&
+        now.height === next.height
+          ? now
+          : next,
+      );
     };
 
     place();
     window.addEventListener("resize", place);
     rail.addEventListener("scroll", place);
+    const watch = new ResizeObserver(place);
+    if (cardRef.current) watch.observe(cardRef.current);
     return () => {
       window.removeEventListener("resize", place);
       rail.removeEventListener("scroll", place);
+      watch.disconnect();
     };
   }, [open]);
 
@@ -138,13 +173,17 @@ export function ToolsPopover({
       /* Below the portalled menus at 50, so a picker opened from a row in here
          lands over the card rather than under it; above the rail at 45, which
          is what it comes out from behind. */
-      className="oc-tools-card fixed z-[46] flex flex-col items-start gap-2"
-      style={{ left: at.left, top: at.top, width: WIDTH }}
+      ref={cardRef}
+      /* **It hugs what is in it.** A fixed width left a 320px-wide invisible
+         box standing over the manuscript whenever only the strip was open, and
+         a click in the empty part of it reached nothing at all. */
+      className="oc-tools-card fixed z-[46] flex w-fit flex-col items-start gap-2"
+      style={{ left: at.left, top: at.top }}
     >
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close page and type"
+        aria-label="Close tools"
         /* The card's own ground, because it floats beside it and the two read
            as one thing lifted off the page. Its hover goes a step further up
            the same ladder rather than sideways into another colour. */
