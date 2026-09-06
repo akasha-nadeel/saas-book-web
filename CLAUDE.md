@@ -1185,6 +1185,39 @@ custom properties the editor and the reading view both read.
   2026-09-01**: `surface` #141b34 → `panel`/`nav` #080e26 → `raised` #212c4f,
   `line` #29335a, `fg` #f1f2fa, `muted` #bcc5de. The light set is untouched and
   still neutral.
+- **Since 2026-09-06 there are eight palettes, not two, and the extra six are
+  the same two ideas tinted.** `TINTS` in `library-store.ts` is the table —
+  Parchment, Tawny Leather and Dusty Olive are `light`; Copper Ink, Aubergine
+  Page and Charcoal Ink are `dark` — and `themeParts(theme)` is the one place a
+  stored theme is split into the two things the DOM carries. **`data-theme` is
+  the *scheme* and only the scheme; `data-tint` is the palette**, so every rule
+  written against light or dark keeps working and a tint re-points the tokens
+  on top. `prefs.theme` is therefore `system | light | dark | <tint>` — nine
+  values behind one key, and `Theme` is that union.
+- **A tint is two blocks in `globals.css`, and both are required.**
+  `[data-tint="…"]` re-points the palette; `[data-tint="…"] [data-paper="theme"]`
+  re-points the paper, because **the page follows the theme by deferral rather
+  than by being told**. `PaperColor` gained `"theme"` and it is the default:
+  `darkPaper(paper, theme)` answers what the surface should be, so choosing
+  Tawny does not have to reach in and set a paper — and a writer who wants a
+  pale page under a dark theme still picks one of the five literal papers and
+  keeps it.
+- **`theme-tints.test.ts` is what holds the six together**, and it is the only
+  thing that would notice them drifting. It reads `globals.css` itself: every
+  tint has a block, every block states **exactly the same token names** as the
+  others, each ground is far enough from its own panels (`src/lib/contrast.ts`,
+  with `AA_TEXT` 4.5 and `RULE_MIN` 1.2), and the inline `THEME_BOOTSTRAP` map
+  in `layout.tsx` — which cannot import `TINTS`, since it runs before React —
+  still agrees with `TINTS` about which tint is light and which is dark.
+- **The chrome is the part that gets missed.** `.nav-chrome` and
+  `.shelf-sidebar` re-point tokens rather than styling controls, which is what
+  makes them follow a tint at all — but the light-theme rule used to hardcode
+  `#ffffff` as its ground, so the bar and the rail stayed white under a tinted
+  page. The fix is the shape to copy: **the background defers to
+  `var(--color-nav)` and the ink stays literal.** Scoping the old rule with
+  `:not([data-tint])` instead is the wrong repair and was tried — the base
+  `.nav-chrome` mixes its ink from white for the dark set, so a tinted light
+  theme got near-white labels on cream.
 - **At night the page is the *lightest* surface and every panel sinks into it**,
   which reverses the rule that stood here while the ground was black — where
   everything above it had to be lighter, lifted by a hairline, since a shadow on
@@ -1193,15 +1226,17 @@ custom properties the editor and the reading view both read.
   sinks rather than lifts (`--color-selected` is a dark pill on the chrome, an
   accent wash by day). `raised` still lifts, because a hover has to come towards
   the pointer whichever way the rest of the stack runs.
-- **Every token stated in one block must be stated in the other.** A name in only
-  one keeps its dark value in daylight, and it will be a hairline nobody notices
-  for a month.
+- **Every token stated in one block must be stated in all of them.** A name in
+  only one keeps its dark value in daylight, and it will be a hairline nobody
+  notices for a month. With the tints that is eight blocks rather than two, so
+  the rule is enforced by test rather than by care — see `theme-tints.test.ts`
+  above.
 - **The theme decides colour, never layout.** No
   `[data-theme="light"] .thing { padding: … }`, or the two become two designs.
-- **`prefs.theme` is `system` | `light` | `dark`**, resolved onto
-  `<html data-theme>` by the bootstrap script before first paint; `ThemeSync`
-  carries every change after that and listens to the media query while the pref
-  is "system".
+- **`prefs.theme` is `system` | `light` | `dark` | one of the six tints**,
+  resolved onto `<html data-theme>` (and `data-tint`, when there is one) by the
+  bootstrap script before first paint; `ThemeSync` carries every change after
+  that and listens to the media query while the pref is "system".
 - **`dark:` is safe now, and this file used to forbid it.** The rule was right
   while the variant meant `prefers-color-scheme`, which ignores a writer who
   chose against their system. `globals.css` line 3 re-points it —

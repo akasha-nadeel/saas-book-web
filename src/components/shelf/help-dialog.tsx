@@ -9,6 +9,7 @@ import { ALL_CHECKS } from "@/lib/consistency";
 import { FREE_LIMITS } from "@/lib/free-limits";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
+import { TINTS } from "@/lib/library-store";
 
 /**
  * What OpenChapter can do, in one place.
@@ -45,7 +46,27 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: "The editor",
-        desc: "One chapter at a time on a page the size of the book you are making. The rail on the left holds the chapter list, search, notes, the consistency check, the assistant, and your versions.",
+        desc: "One chapter at a time on a page the size of the book you are making. One bar across the top: home, a File menu, undo and redo, the word count, whether it has saved, and Import and Export at the right. One rail down the left opens the chapter list, search, the consistency check, notes, ideas, your series bible, bookmarks, the assistant, versions and the trash, one at a time.",
+      },
+      {
+        name: "Colour themes",
+        desc: `${TINTS.map((t) => t.name).join(", ")} — beside plain light, plain dark, and whichever your computer is set to. A theme colours the whole editor: the bar, the rail, the panels and the page you type on. Under Paper and theme in Page and type.`,
+      },
+      {
+        name: "Page and type",
+        desc: "The Tools button on the rail opens a card rather than a panel: font, size, line spacing, paragraph style, first-line indent and the space between paragraphs. The paper has its own setting there — white, cream, sepia, slate, black, or whatever the theme says — so you can keep a dark theme with a light page. Typewriter scrolling holds the line you are typing at a fixed height, and paragraph marks show where your paragraphs actually end, so empty ones stop looking like room on the page.",
+      },
+      {
+        name: "Focus mode",
+        desc: "The button at the right of the top bar puts the chrome away — bar, rail and panel — leaving the page, the toolbar you get when you select text, and one button to come back. It closes nothing, so leaving focus mode gives you back exactly what was open.",
+      },
+      {
+        name: "Links",
+        desc: "Select some words and press the link button, in the toolbar that appears over the selection or in the Tools card. A full address works and so does a bare domain — openchapter.app becomes a link on its own. Links are blue and underlined, and they survive the export.",
+      },
+      {
+        name: "The word count",
+        desc: "In the top bar beside the save state, or faint under the last line you have written, where you can watch it without looking away from the sentence. One button in the bar moves it, and it stays where you put it.",
       },
       {
         name: "Autosave",
@@ -82,7 +103,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
       },
       {
         name: "Letting it write into the chapter",
-        desc: "Off by default. With it on, prose the assistant offers grows Replace and Insert: Replace swaps the passage you selected and shows the change word by word before it is made, Insert puts a paragraph in below the cursor. Nothing moves without a press, one undo takes any of it back, and the chapter as it stood is kept in Versions first.",
+        desc: "Off by default. With it on, a reply that offers one passage is put into the chapter rather than handed to you as a button — the page scrolls to it and it stays lit until your next keystroke. It goes where your selection or cursor is, never somewhere the assistant picked, and if a reply offers more than one passage you choose between them as before. One undo takes the whole change back, and the chapter as it stood is kept in Versions first.",
       },
     ],
   },

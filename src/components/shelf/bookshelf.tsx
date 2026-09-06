@@ -869,6 +869,21 @@ export function Bookshelf({
 
               {/* Getting help, then giving it back. */}
               <div className="mt-3 border-t border-line pt-3 flex flex-col gap-0.5">
+                {/* **`HelpDialog` was reachable from nothing**, which is how it
+                    went a fortnight out of date without anybody noticing: it
+                    was still rendered on `dialog === "help"` and no control
+                    set it. `shelfIcons.help` had survived too, so the row this
+                    restores is the one that was there. It goes first because
+                    it answers the question the other two are asked when it
+                    cannot — Support is for when the app is wrong, and this is
+                    for when it is merely unexplained. */}
+                <SideItem
+                  icon={shelfIcons.help}
+                  collapsed={sidebarCollapsed}
+                  onClick={() => setDialog("help")}
+                >
+                  How it works
+                </SideItem>
                 <SideItem
                   icon={shelfIcons.support}
                   collapsed={sidebarCollapsed}
@@ -1471,6 +1486,12 @@ function MobileDashboardNavigation({
           </nav>
 
           <div className="mt-4 border-t border-line pt-3 pb-3">
+            <SideItem
+              icon={shelfIcons.help}
+              onClick={() => showDialog("help")}
+            >
+              How it works
+            </SideItem>
             <SideItem
               icon={shelfIcons.support}
               onClick={() => showDialog("support")}

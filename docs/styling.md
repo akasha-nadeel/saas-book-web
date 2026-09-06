@@ -1,4 +1,4 @@
-# Styling: the palette, the two themes, and the shared primitives
+# Styling: the palette, the eight themes, and the shared primitives
 
 Read before adding a colour, a token, a theme rule, or a component to `src/components/ui/`.
 
@@ -252,6 +252,62 @@ Three more things follow from the palette, and each has bitten already:
   cards a *format* is chosen from were blank rectangles. Paper is a shade off
   #ffffff on purpose: `--color-panel` is white in daylight, and a pure white
   sheet on a white card is a sheet nobody can see.
+
+## The six named themes
+
+Added 2026-09-06. Until then the app had two palettes and `prefs.theme` had
+three values; a writer who wanted a warmer room got a choice between office
+white and midnight blue. Six named colour schemes sit beside them now —
+**Parchment**, **Tawny Leather** and **Dusty Olive** on the light side,
+**Copper Ink**, **Aubergine Page** and **Charcoal Ink** on the dark — and they
+colour the *whole* editor: bar, rail, panels and the page being typed on.
+
+**`data-theme` stayed the scheme, and `data-tint` is the new thing.** The
+obvious shape was one attribute with nine values, and it fails on the first
+rule anybody writes: every existing `[data-theme="light"]` rule, and every
+`dark:` utility across a dozen files, is a statement about *which way round the
+palette runs* — not about which of six grounds is under it. Splitting them
+means a tint inherits all of that and only re-points tokens on top. So Copper
+is `data-theme="dark" data-tint="copper"`, `TINTS` in `library-store.ts` is the
+one table saying which tint is which scheme, and `themeParts()` is the only
+place a stored theme is taken apart.
+
+**The page follows by deferral, not by instruction.** `PaperColor` gained a
+`"theme"` value and it is the default, so a tint's second CSS block —
+`[data-tint="…"] [data-paper="theme"]` — re-points the paper along with
+everything else. The alternative was for the theme picker to *set* a paper,
+which loses the writer's own choice the moment they pick a theme, and makes
+"which paper am I on" a question with two answers. Deferral keeps the five
+literal papers (white, cream, sepia, slate, black) meaning exactly what they
+say: a writer who wants a pale page under Aubergine picks one and keeps it,
+through every theme change.
+
+**Six palettes is where a colour system stops being maintainable by care.**
+Eight blocks now state the same token names, and a name missing from one keeps
+whatever the previous block left it — the hairline nobody notices for a month,
+multiplied by six. `theme-tints.test.ts` reads `globals.css` itself and holds
+them together: every tint has a block, every block states exactly the same
+names, every ground is far enough from its own panels, and the inline
+`THEME_BOOTSTRAP` map in `layout.tsx` still agrees with `TINTS` about which
+tint is light and which is dark. That last one is the only copy of the table
+that cannot import it — the script runs before React — so it is the one most
+likely to drift.
+
+`src/lib/contrast.ts` is what the test measures with: `parseHex`, `luminance`
+and `contrast`, with `AA_TEXT` at 4.5 and `RULE_MIN` at 1.2. It refuses
+eight-digit hex and `color-mix` rather than guessing at them, because a
+silently-passed value is worse than a failing one.
+
+**The trap, which cost two attempts to fix.** `.nav-chrome` and
+`.shelf-sidebar` re-point tokens rather than styling controls — that is what
+makes the bar and the rail follow a tint at all. But the light-theme rule had
+`#ffffff` typed into it, so under a tinted light theme the page went warm and
+the chrome stayed white. The **first repair was wrong**: scoping the old rule
+with `:not([data-tint])` left tinted themes falling through to base
+`.nav-chrome`, which mixes its ink from white for the dark set — near-white
+labels on cream. The shape that works is **background defers to
+`var(--color-nav)`, ink stays literal**, and it is the shape to copy for any
+rule of this kind.
 
 ## Panel design — the grouped-list language
 
