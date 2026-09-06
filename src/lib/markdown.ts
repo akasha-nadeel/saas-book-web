@@ -321,7 +321,15 @@ export function runsText(runs: Run[]): string {
  * get a copy button; a paragraph explaining a suggestion does not, or every
  * reply becomes a column of buttons and the one that matters stops standing
  * out.
+ *
+ * **An empty one is not an offer.** A model asked to *remove* a passage answers
+ * with an empty quote often enough to matter — it is showing you the nothing it
+ * would leave behind. Drawn as an offer that is a grey bar with a Copy and an
+ * Insert on it, both of which do nothing, which is the dead UI the house rules
+ * forbid. The kind is the *shape* of the block; this is the question of whether
+ * there is anything in it.
  */
 export function isOffered(block: Block): boolean {
-  return block.kind === "code" || block.kind === "quote";
+  if (block.kind !== "code" && block.kind !== "quote") return false;
+  return blockText(block).trim().length > 0;
 }

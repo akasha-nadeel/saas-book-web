@@ -76,7 +76,14 @@ export function AssistantReply({
   copyable?: boolean;
   className?: string;
 }) {
-  const blocks = parseMarkdown(text);
+  /* **A block with nothing in it is not drawn.** A model asked to *cut* a
+     passage answers with an empty blockquote — showing the nothing it would
+     leave behind — and the container for that is a grey bar with a rule down
+     its side and no words on it. `rule` is exempt because a horizontal rule is
+     the one block whose whole content is its own line. */
+  const blocks = parseMarkdown(text).filter(
+    (block) => block.kind === "rule" || blockText(block).trim() !== "",
+  );
   if (blocks.length === 0) return null;
 
   return (

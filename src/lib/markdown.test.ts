@@ -237,6 +237,20 @@ describe("isOffered", () => {
     expect(parseMarkdown("- a bullet").map(isOffered)).toEqual([false]);
     expect(parseMarkdown("# a heading").map(isOffered)).toEqual([false]);
   });
+
+  /*
+   * A model asked to *cut* a passage answers with an empty quote — it is showing
+   * the nothing it would leave behind. Offered, that draws a grey bar carrying a
+   * Copy and an Insert that both do nothing, and in write mode it would be
+   * applied. The kind is the shape of the block; this is whether anything is in
+   * it.
+   */
+  it("is false for an offer with nothing in it", () => {
+    expect(parseMarkdown(">").map(isOffered)).toEqual([false]);
+    expect(parseMarkdown("> \n>  ").map(isOffered)).toEqual([false]);
+    expect(parseMarkdown("```\n```").map(isOffered)).toEqual([false]);
+    expect(parseMarkdown("```\n   \n```").map(isOffered)).toEqual([false]);
+  });
 });
 
 describe("underscores in ordinary words", () => {

@@ -96,6 +96,22 @@ const WRITE_SUGGESTIONS = [
   "Give me a stronger opening line.",
 ];
 
+/**
+ * What the panel says after a stop.
+ *
+ * Three sentences and not one, because the three states differ in what the
+ * writer has to do next. Half a reply is still worth reading; no reply at all
+ * means asking again; and in write mode there is a third fact — the chapter was
+ * left alone — which is not obvious, since a reply that *had* finished would
+ * have gone straight in.
+ */
+function stopNotice(partial: boolean, writeOn: boolean): string {
+  if (!partial) return "You stopped this reply before any of it arrived.";
+  return writeOn
+    ? "You stopped this reply. What arrived is kept, and nothing was put into the chapter."
+    : "You stopped this reply. What arrived is kept.";
+}
+
 export function ChatPanel({
   chapterId,
   chapterTitle,
@@ -168,6 +184,32 @@ export function ChatPanel({
    * message a moment later.
    */
   const [autoApplied, setAutoApplied] = useState<string | null>(null);
+
+  /**
+   * What to say after the writer presses Stop.
+   *
+   * **A stop used to be silent**, and silence is the one thing it cannot be:
+   * the reply simply stopped growing, which is also exactly what a model
+   * finishing looks like. So a writer who stopped a reply half way had no way
+   * to tell a truncated answer from a complete one, and the panel's own
+   * behaviour depends on which it was — a stopped reply is never written into
+   * the chapter, however write mode is set.
+   *
+   * Held as the sentence rather than as a boolean, because there are three of
+   * them and the difference between them is what makes the line worth drawing.
+   * Cleared by the next send, by Clear, and on a timer like `applied`.
+   */
+  const [stopped, setStopped] = useState<string | null>(null);
+
+  /**
+   * Who aborted, so the catch below knows what the abort meant.
+   *
+   * Three things call `abort()` and they want opposite outcomes: **Stop** keeps
+   * what arrived and says so, **unmount** keeps it quietly, and **Clear** wants
+   * it gone. A ref rather than state because the catch runs a microtask after
+   * the press and must read what was true at the press, not at the last render.
+   */
+  const abortKindRef = useRef<"stop" | "clear" | null>(null);
 
   /**
    * **What is left, after everything this panel has spent.**
@@ -441,11 +483,13 @@ export function ChatPanel({
    * invites exactly that fear.
    */
   const clearConversation = () => {
+    abortKindRef.current = "clear";
     abortRef.current?.abort();
     setLive(null);
     clearChat(chapterId);
     setRefusal(null);
     setApplied(null);
+    setStopped(null);
   };
 
   const undoLast = () => {
@@ -510,6 +554,7 @@ export function ChatPanel({
     setBusy(true);
     setRefusal(null);
     setApplied(null);
+    setStopped(null);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -611,12 +656,25 @@ export function ChatPanel({
        * half an answer to a question you can still see beats an empty panel.
        */
       if ((err as Error).name === "AbortError") {
-        const stopped: Message[] = [
-          ...history,
-          { role: "assistant", content: reply },
-        ];
-        saveChat(chapterId, stopped);
+        const kind = abortKindRef.current;
+        abortKindRef.current = null;
+
+        /* **Clear is the one abort that means forget it.** It empties the
+           conversation and *then* aborts, so this handler runs a microtask
+           later — and saving here put everything the writer had just cleared
+           straight back on screen. */
+        if (kind === "clear") return;
+
+        /* An empty reply is dropped rather than saved: a bubble with nothing
+           in it renders as a gap in the transcript, and the sentence below
+           already says what happened to it. */
+        const partial = reply.trim().length > 0;
+        saveChat(
+          chapterId,
+          partial ? [...history, { role: "assistant", content: reply }] : history,
+        );
         setLive(null);
+        if (kind === "stop") setStopped(stopNotice(partial, writeOn));
         return;
       }
       console.error("[chat] failed", err);
@@ -722,7 +780,14 @@ export function ChatPanel({
                    asterisks in it. `group` is what reveals the copy control
                    below. */
                 <li key={i} className="group px-1 font-sans">
-                  {message.content ? (
+                  {/* **Rendered, not merely non-empty.** A reply can carry text
+                      and still draw nothing: `>` on its own is a model showing
+                      the nothing it would leave behind, and `AssistantReply`
+                      drops a block with no words in it rather than drawing a
+                      grey bar around them. `replyText` is what it would put on
+                      the clipboard, so this asks the same question the reader's
+                      eyes do. */}
+                  {message.content && replyText(message.content).trim() ? (
                     <>
                       {/* **The apply controls are drawn on a finished reply
                           only.** A blockquote is a block the moment its first
@@ -760,11 +825,35 @@ export function ChatPanel({
                     </>
                   ) : busy && i === messages.length - 1 ? (
                     <span className="text-sm text-muted">Thinking…</span>
+                  ) : message.content ? (
+                    /* **A reply that came to nothing still says so.** The
+                       alternative is a gap in the transcript where an answer
+                       should be, which reads as the panel having broken. The
+                       second sentence is the question a writer in write mode
+                       asks next, answered before they have to go and look. */
+                    <p className="text-xs text-muted">
+                      The assistant sent back an empty passage. Nothing was put
+                      into the chapter.
+                    </p>
                   ) : null}
                 </li>
               ),
             )}
           </ol>
+        )}
+
+        {/* **The end of the transcript, not a bar at the foot of the panel.**
+            It is about the reply immediately above it — the same place
+            ChatGPT and Claude put theirs — where a strip pinned above the
+            composer would read as a fact about the panel and would sit in the
+            same slot as the `applied` receipt, which is about the chapter.
+
+            It stays until the next question or Clear rather than fading on a
+            timer: a writer stops a reply in order to read what came, and a
+            line explaining what they are looking at should not leave while
+            they are still looking at it. */}
+        {stopped && !busy && (
+          <p className="mt-4 px-1 font-sans text-xs text-muted">{stopped}</p>
         )}
 
         {refusal && (
@@ -1121,7 +1210,14 @@ export function ChatPanel({
                 {(busy || input.trim()) && (
                   <button
                     type={busy ? "button" : "submit"}
-                    onClick={busy ? () => abortRef.current?.abort() : undefined}
+                    onClick={
+                    busy
+                      ? () => {
+                          abortKindRef.current = "stop";
+                          abortRef.current?.abort();
+                        }
+                      : undefined
+                  }
                     aria-label={busy ? "Stop generating" : "Send"}
                     className="flex h-8 w-8 shrink-0 items-center justify-center
                                rounded-full bg-accent text-accent-ink outline-none
