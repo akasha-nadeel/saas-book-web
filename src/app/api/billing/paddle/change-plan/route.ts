@@ -4,6 +4,7 @@ import {
   PADDLE_API_KEY,
   PADDLE_SANDBOX,
   isPaddleConfigured,
+  isPaddleDecline,
   isPaddleSetupFault,
   paddleErrorCode,
   paddlePriceId,
@@ -115,6 +116,26 @@ export async function POST(request: Request) {
       return Response.json(
         { error: "Changing plan isn't available on this deployment yet." },
         { status: 503 },
+      );
+    }
+
+    /* **A declined card is the writer's to fix, so it says so and says where.**
+       402 rather than 502 because nothing on our side failed: the gateway was
+       reached, the charge was attempted and the bank refused it. That is the
+       code this app already uses for "the payment is the problem", and the
+       button reads it to decide whether to offer the way out.
+
+       **A plan change charges money, which is the part nobody expects** — a
+       *downgrade* still bills the proration immediately, and on a subscription
+       still sitting on a legacy price it can be an increase. So the message
+       does not guess at the direction; it names the card and the remedy. */
+    if (isPaddleDecline(error)) {
+      return Response.json(
+        {
+          error:
+            "Your card was declined. Update your payment method and try again.",
+        },
+        { status: 402 },
       );
     }
 

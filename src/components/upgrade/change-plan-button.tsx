@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { PaidTier } from "@/lib/billing/tiers";
 import type { Period } from "@/lib/billing/plans";
@@ -46,10 +47,22 @@ export function ChangePlanButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Whether the refusal has a page the writer can go and act on.
+   *
+   * **402 is the only status here that leaves the writer something to do.**
+   * The route sends it when the bank declined the card, and a message naming a
+   * remedy without a way to reach it is half an answer — /billing is where the
+   * payment method is changed and it is two clicks away from this card
+   * otherwise. Read off the status rather than matched out of the message, so
+   * rewording the sentence cannot silently drop the link.
+   */
+  const [declined, setDeclined] = useState(false);
 
   async function change() {
     setBusy(true);
     setError(null);
+    setDeclined(false);
 
     try {
       const response = await fetch("/api/billing/paddle/change-plan", {
@@ -64,6 +77,7 @@ export function ChangePlanButton({
 
       if (!response.ok) {
         setError(data?.error ?? "Could not change the plan. Try again shortly.");
+        setDeclined(response.status === 402);
         return;
       }
 
@@ -92,6 +106,14 @@ export function ChangePlanButton({
       {error && (
         <p role="alert" className="mt-3 font-sans text-xs leading-relaxed text-muted">
           {error}
+          {declined && (
+            <>
+              {" "}
+              <Link href="/billing" className="text-accent underline">
+                Update payment method
+              </Link>
+            </>
+          )}
         </p>
       )}
     </div>

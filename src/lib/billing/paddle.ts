@@ -252,6 +252,34 @@ const PADDLE_SETUP_FAULTS = new Set([
   "paddle_billing_not_enabled",
 ]);
 
+/**
+ * The refusals that are the writer's card rather than our software.
+ *
+ * **A decline is not a fault and must not be reported as one.** It is the one
+ * refusal in this file the *writer* can fix, in a minute, without help — and
+ * until 2026-09-07 it was flattened into the same 502 as a gateway outage,
+ * telling somebody whose bank had just said no that we "could not change the
+ * plan". Nothing in that sentence is actionable, and the one thing that was
+ * went unsaid.
+ *
+ * It is separate from `PADDLE_SETUP_FAULTS` because the two point at different
+ * people: a setup fault is ours or the account owner's, a decline is the
+ * cardholder's. Same shape, opposite audience.
+ *
+ * Same rule as the set above — **codes go in once they have been seen.**
+ * `subscription_payment_declined` was: Paddle sent it five times on
+ * `/api/billing/paddle/change-plan` while a subscriber tried to move plan with
+ * a card their bank refused, and it arrives on a plan *change* because the
+ * proration is charged immediately.
+ */
+const PADDLE_DECLINE_FAULTS = new Set(["subscription_payment_declined"]);
+
+/** True when the gateway reached the card and the card said no. */
+export function isPaddleDecline(error: unknown): boolean {
+  const code = paddleErrorCode(error);
+  return code !== null && PADDLE_DECLINE_FAULTS.has(code);
+}
+
 /** True when the refusal is somebody's to fix rather than something to retry. */
 export function isPaddleSetupFault(error: unknown): boolean {
   const code = paddleErrorCode(error);
