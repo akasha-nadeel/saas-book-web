@@ -31,6 +31,24 @@ import { CONTACT_EMAIL } from "@/lib/legal";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Where the alert goes.
+ *
+ * **`CONTACT_EMAIL` is the address on the site, which is not the same thing as
+ * an address somebody reads.** It is published for writers to reach support at,
+ * and on a domain whose mail is set up to *send*; the first twelve alerts were
+ * accepted by Resend and delivered to a mailbox nobody was watching. An
+ * operational alert wants the inbox its owner actually opens, and that is not a
+ * fact about the product, so it is configuration rather than a constant.
+ *
+ * Falls back to the published address, which keeps a self-hosted copy working
+ * without a setting and is the right destination when the domain does have a
+ * mailbox.
+ */
+function alertAddress(): string {
+  return process.env.PLAN_INTEREST_ALERT_EMAIL?.trim() || CONTACT_EMAIL;
+}
+
 /** Where the press happened. Curiosity on the landing page, intent on /upgrade. */
 type Source = "upgrade" | "landing";
 
@@ -184,7 +202,7 @@ export async function POST(request: Request) {
     const line = `${who} pressed ${name} (${terms}) on ${where}.`;
 
     const sent = await sendEmail({
-      to: CONTACT_EMAIL,
+      to: alertAddress(),
       subject: `Someone wanted ${name}`,
       text: `${line}\n\nThe plans are not on sale, so they saw the "Available Soon" dialog. Every press is in the plan_interest table; this mail is one per plan per cycle per hour.`,
       html: `<p>${line}</p><p>The plans are not on sale, so they saw the &ldquo;Available Soon&rdquo; dialog. Every press is in the <code>plan_interest</code> table; this mail is one per plan per cycle per hour.</p>`,

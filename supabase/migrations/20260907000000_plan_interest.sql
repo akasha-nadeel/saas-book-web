@@ -67,11 +67,24 @@ alter table public.plan_interest
 
 alter table public.plan_interest enable row level security;
 
--- **No grants. Not to anon, not to authenticated.** RLS with no policy and no
+-- **No grants to anon, and none to authenticated.** RLS with no policy and no
 -- grant is a closed door rather than a locked one: there is no client path to
 -- this table in either direction, so nothing can read what other people wanted
--- and nothing can fill it from a script with a session. The service key writes
--- it; the dashboard reads it.
+-- and nothing can fill it from a script with a session.
 --
 -- Deliberately no select policy either. This is a private ledger of demand,
 -- not something a writer has any business seeing.
+
+-- **`service_role` still needs saying, and leaving it out cost twelve presses.**
+-- The first version of this file granted nothing at all, on the reading that
+-- "written by nothing but the server" meant no grants anywhere. It does not:
+-- this schema never relies on Supabase's default privileges, and every
+-- server-written table names the role explicitly — `book_members` at
+-- `20260806000000_collaboration.sql:880`, `ai_usage` at
+-- `20260822071735_launch_mvp_entitlements.sql:42`. Without this line the route
+-- holding the secret key gets `42501 permission denied for table
+-- plan_interest`, which is a *grant* refusal and reads nothing like an RLS one.
+--
+-- `select` as well as `insert`, so the ledger can be read back with the same
+-- key rather than only from the dashboard.
+grant select, insert on public.plan_interest to service_role;
