@@ -2460,24 +2460,39 @@ should either ship or lose the card.
       is stored as the change's *effective* date, because Paddle leaves its own
       `canceled_at` null until the period runs out.
 
-- [ ] **Live Paddle, applied for 2026-08-09 and waiting on two reviews.**
-      Seller ID 397664, Sri Lanka, sole trader. What is already done in the
-      live account: the product and both prices (`pro_01kzjxz78fknh3hr9dvg2rkr58`,
-      `pri_01kzjy5ewf255ssnrew3fjazsk` monthly, `pri_01kzjyce7089qb9q9p315asyqv`
-      yearly), the payout profile, the domain submitted for approval, and
-      verification submitted.
+- [x] **Live Paddle.** Applied 2026-08-09, selling 2026-09-07. Seller ID
+      397664, Sri Lanka, sole trader. Both reviews passed: the dashboard reads
+      *You're in Live* with the integration marked complete, and
+      `openchapterapp.com` is approved.
 
-      **Both were replaced on 2026-08-10** when the price moved to $9.99 /
-      $89.99. The live catalog now holds `pri_01kznxm0d86ytgwqbnsrfzjhvy`
-      ($9.99 monthly) and `pri_01kznxqx4j47kspyjt55vh0avb` ($89.99 yearly), with
-      the original pair **archived** — existing transactions are untouched, and
-      neither can be used for a new checkout. The ids still have to reach
-      `PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` in Vercel Production; see
-      the entry below.
+      **The prices this entry was written about are all gone**, and the trail is
+      worth keeping because it is three re-pricings deep. The original pair
+      (`pri_01kzjy5ewf255ssnrew3fjazsk` / `pri_01kzjyce7089qb9q9p315asyqv`) was
+      replaced on 2026-08-10 by $9.99 / $89.99, which was itself superseded when
+      the plans went to four on 2026-09-02. What the live catalog holds now:
 
-      Two things are pending and neither is ours to hurry: **account
-      verification** (Paddle, ~1–3 days) and **domain approval** for
-      `openchapterapp.com`. Live checkout cannot open until both pass.
+      - **`OpenChapter Pro`** (`pro_01kzjxz78fknh3hr9dvg2rkr58`) — the legacy
+        product, **still active on purpose**. `pri_01m0nfttaacc9fj66rkzzxmf72`
+        ($5.98 monthly) carries the one live subscription and archiving it would
+        break that renewal. Everything older on it is archived.
+      - **`OpenChapter Draft`** (`pro_01m1wycpe54x374a5br6kdg5d4`) —
+        `pri_01m1wyh484kr5tp8m38xqxaqnd` $7.98/mo,
+        `pri_01m1wyjh85whjg96hn8kbpaxwv` $71.82/yr
+      - **`OpenChapter Writer`** (`pro_01m1wydq65j3gxb281bb3jtfb6`) —
+        `pri_01m1wymzw4k4xz5rh3kara1fay` $14.98/mo,
+        `pri_01m1wynjr5vb51g7tdn0rgg2ft` $134.99/yr
+      - **`OpenChapter Studio`** (`pro_01m1wyejtsmtk3d8w4hhds6mh7`) —
+        `pri_01m1wyqx3n2205kxzm7ecybdg0` $29.98/mo,
+        `pri_01m1wyrf3kh3yw2x2cdgjyfve3` $269.82/yr
+      - **`OpenChapter Starter Pass`** (`pro_01m1wysqkrmw8fqmhtd23grt8c`) —
+        `pri_01m1wyw2gwxrj62fdtd80tb4qg`, $0.99 **one-time**. Created ready and
+        **deliberately wired to nothing**: `PADDLE_PRICE_STARTER_PASS` is unset,
+        because `passOnSale()` is that variable alone and the fulfilment does
+        not exist. See `.env.local.example` for the four pieces it needs.
+
+      **Three products rather than six prices on one**, so Paddle's per-product
+      revenue reports break down by plan and the product name goes on describing
+      what is in it.
 
       **Payoneer was the third and is abandoned.** Its activation form offers
       no Sri Lanka in the bank-country list at all, matching reports that it has
@@ -2503,29 +2518,45 @@ should either ship or lose the card.
       the price change below has to reach the live catalog rather than only the
       site.
 
-      Still to do once approved: a live API key (**make it non-expiring** —
-      the sandbox default of 90 days would silently break checkout), a live
-      client-side token, a notification destination at
-      `https://openchapterapp.com/api/billing/paddle/notify` with all events,
-      the five `PADDLE_*` values in Vercel's **Production** environment with
-      `PADDLE_ENV=production`, and one real payment, cancelled and refunded.
-      Until those are set, production quietly falls back to PayHere, which is
-      the right state rather than a broken one.
+      All of it is now in place: a live API key, a live client-side token, a
+      notification destination at
+      `https://openchapterapp.com/api/billing/paddle/notify` (Active, 5 events,
+      `transaction.completed` and `subscription.created` both delivered first
+      attempt), and the `PADDLE_*` values in Vercel's **Production** environment
+      with `PADDLE_ENV=production`. One real payment has been through it and is
+      the live subscription above. **The refund half was never run** — worth
+      doing before anybody else buys.
 
-- [ ] **Carry the new price ids into the sandbox and the environment.**
-      `plans.ts` moved to $9.99 / $89.99 on 2026-08-10 and the **live** catalog
-      was re-priced with it, which is the half that mattered for the review —
-      Paddle checks a site's figures against its live catalog. Two pieces are
-      left:
+      **What this entry did not anticipate, and it cost fifteen days.** Going to
+      four plans renamed the two price variables into six, with no fallback by
+      design; production kept the old two, `isPaddleConfigured()` refused the
+      partial set, `activeProvider()` answered null, and the site quietly went
+      **off sale from ~2026-08-23 to 2026-09-07** — with no error anywhere,
+      because "no gateway configured" is a legitimate state that opens
+      everything rather than breaking it. `/upgrade` rendered its plans the
+      whole time and `requireTier` handed every signed-in writer `studio`.
+      Nothing in the tree notices this: **the only signal was the absence of
+      sales**. A check that reads `activeProvider()` and complains when a
+      deployment has a Paddle key but no usable price set would have caught it
+      on the first request.
 
-      - **The sandbox catalog still holds $10.99 / $99**, so local testing
-        charges what the page no longer advertises. Same shape as the live fix:
-        two new prices, the old pair archived, the ids into `.env.local`.
-      - **`PADDLE_PRICE_MONTHLY` / `PADDLE_PRICE_ANNUAL` in Vercel
-        Production** want `pri_01kznxm0d86ytgwqbnsrfzjhvy` and
-        `pri_01kznxqx4j47kspyjt55vh0avb`, alongside the rest of the go-live
-        values above. A **redeploy** is needed either way, since the figure on
-        the page is inlined at build time.
+- [x] **Carry the price ids into the sandbox and the environment.** Done
+      2026-09-07, and overtaken twice on the way: the $9.99 / $89.99 pair this
+      was written for never reached production, because the plans went to four
+      on 2026-09-02 and took the two-name scheme with them.
+
+      - **The sandbox** carries the six `PADDLE_PRICE_<TIER>_<CYCLE>` ids in
+        `.env.local` and `PADDLE_ENV=sandbox`. Their *amounts* have not been
+        re-read against `plans.ts` since the four-tier change — worth one look
+        before trusting a local checkout's figure.
+      - **Production** has the six live ids, set 2026-09-07 and confirmed by
+        `/upgrade` answering `"provider":"paddle"` with
+        `"environment":"production"`. **`PADDLE_PRICE_MONTHLY` /
+        `PADDLE_PRICE_ANNUAL` were deleted the same day** — they had sat there
+        unread since the rename and were the whole of the outage above.
+      - A **redeploy is still needed after any env change**, since
+        `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN` is inlined at build time and Vercel
+        binds server variables at deploy rather than at request.
 
       **The rule for any future move: add prices, do not edit them.** A price is
       referenced by id and an existing subscription stays on the one it was
@@ -2553,12 +2584,22 @@ should either ship or lose the card.
         payment), which needs the BR. Premium is LKR 9,990.
 
       Paddle answered that, and the entry above records it. What remains is
-      **when to come back**: the crossover is around **19 subscribers** —
-      Paddle takes 5% + $0.50 = $1.00 a month on $9.99 with no fixed cost,
-      PayHere Plus takes 2.99% = $0.30 plus ~$13 fixed, and 13 ÷ 0.70 ≈ 19.
-      Below that Paddle is cheaper *and* needs no BR; above it Plus wins and
-      the gap widens with every subscriber. Recompute rather than quoting 18 if
-      the price or the rupee has moved. Two things the saving does not cover:
+      **when to come back**, and the answer stopped being one number when the
+      plans went to four on 2026-09-02: Paddle's 5% + $0.50 is mostly the fixed
+      50¢, so a dearer plan crosses over sooner. Against PayHere Plus at 2.99%
+      plus ~$13/month fixed, with `N = 13 ÷ (Paddle per sub − PayHere per sub)`:
+
+      | Plan | Paddle | Plus | Crossover |
+      |---|---|---|---|
+      | Draft $7.98 | $0.90 | $0.24 | ~20 subscribers |
+      | Writer $14.98 | $1.25 | $0.45 | ~16 |
+      | Studio $29.98 | $2.00 | $0.90 | ~12 |
+
+      So **12 to 20 depending on the mix**, against the flat 19 this entry used
+      to quote off the retired $9.99. Below it Paddle is cheaper *and* needs no
+      BR; above it Plus wins and the gap widens with every subscriber.
+      Recompute rather than quoting these if a price or the rupee moves — which
+      has now happened twice. Two things the saving does not cover:
       Plus needs the business registration, and leaving a merchant of record
       puts **worldwide sales tax** back on us.
 
