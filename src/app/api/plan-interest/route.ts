@@ -99,28 +99,17 @@ function describe(
   };
 }
 
-/**
- * The hour this press falls in, as Resend's idempotency key.
- *
- * **This is the rate limiter, and it is deliberately not a rate limiter.**
- * There is none in this repo and adding one for a button press would be out of
- * proportion — but a public endpoint that sends mail is a spam vector, and
- * saying so and doing nothing is not an answer either.
- *
- * Keying the send on `<tier>/<period>/<hour>` hands the job to the thing that
- * would otherwise be abused: Resend refuses a duplicate key, so a hostile loop
- * produces **at most one email per plan per cycle per hour** — six an hour,
- * whatever arrives — while every press still lands as a row. The signal
- * survives; the inbox does not fill.
- */
-function sendKey(
-  tier: InterestTier,
-  period: InterestPeriod,
-  at: Date,
-): string {
-  const hour = at.toISOString().slice(0, 13); // YYYY-MM-DDTHH
-  return `plan-interest/${tier}/${period}/${hour}`;
-}
+/* **There was an idempotency key here, and it was the wrong instrument.**
+   Resend refuses a repeat of one, which looked like a free rate limiter: one
+   mail per plan per cycle per hour, and the key carried the hour. Two things
+   were wrong with it. Its window is 24 hours rather than the hour encoded, so
+   the key was doing something other than it read as; and a repeat whose *body*
+   differs is refused with a 409 rather than quietly deduped — and the body
+   names who pressed and where they were, so the second person to want Studio
+   in an hour produced no mail and an error in the log. That is precisely the
+   press this feature exists to hear about.
+
+   The cap now counts rows in `plan_interest` instead. See `alreadyAlerted`. */
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as {
@@ -171,6 +160,24 @@ export async function POST(request: Request) {
     }
   }
 
+  /**
+   * Whether this plan has already been mailed about in the last hour.
+   *
+   * **The ledger is the rate limiter, now that there is one.** The first
+   * version handed the job to Resend's idempotency key, which was wrong twice:
+   * the window is 24 hours rather than the hour the key encoded, and a reused
+   * key whose *body* differs is refused outright with a 409. The body carries
+   * who pressed and where — so the second person to want Studio in a given hour
+   * sent no mail and logged an error, which is the one case this feature exists
+   * to catch.
+   *
+   * Counting rows instead asks the question directly and cannot disagree with
+   * itself. Starts false so that a deployment with no database still mails: an
+   * uncapped alert is a worse day than a missed one, but a *silent* one is
+   * worse than both.
+   */
+  let alreadyAlerted = false;
+
   const db = createAdminClient();
   if (db) {
     const { error } = await db
@@ -190,11 +197,25 @@ export async function POST(request: Request) {
             ? "supabase/migrations/20260907000000_plan_interest.sql has not been applied"
             : undefined,
       });
+    } else {
+      /* Counted *after* the insert, so this press is in the total: one row is
+         this one and nothing has been said yet, two or more means the hour has
+         already been reported. `head` keeps it a count rather than a fetch of
+         rows nobody reads. A failed count leaves the alert to go out, for the
+         reason on `alreadyAlerted`. */
+      const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count } = await db
+        .from("plan_interest")
+        .select("id", { count: "exact", head: true })
+        .eq("tier", tier)
+        .eq("period", period)
+        .gte("created_at", since);
+
+      alreadyAlerted = (count ?? 0) > 1;
     }
   }
 
-  if (isEmailConfigured()) {
-    const now = new Date();
+  if (isEmailConfigured() && !alreadyAlerted) {
     const { name, terms } = describe(tier, period);
     const who = email ?? "a signed-out visitor";
     const where = source === "landing" ? "the landing page" : "the plans page";
@@ -206,7 +227,6 @@ export async function POST(request: Request) {
       subject: `Someone wanted ${name}`,
       text: `${line}\n\nThe plans are not on sale, so they saw the "Available Soon" dialog. Every press is in the plan_interest table; this mail is one per plan per cycle per hour.`,
       html: `<p>${line}</p><p>The plans are not on sale, so they saw the &ldquo;Available Soon&rdquo; dialog. Every press is in the <code>plan_interest</code> table; this mail is one per plan per cycle per hour.</p>`,
-      idempotencyKey: sendKey(tier, period, now),
     });
 
     if (!sent.sent) {
