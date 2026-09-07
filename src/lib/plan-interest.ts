@@ -2,6 +2,26 @@ import type { Period } from "@/lib/billing/plans";
 import type { PaidTier } from "@/lib/billing/tiers";
 
 /**
+ * What can be wanted: the three plans, and the Starter Pass.
+ *
+ * **The pass is not a `PaidTier` and is not being made one.** `PaidTier` is
+ * what a subscription can be — `tierAtLeast` orders it, `TIER_LIMITS` gives
+ * each one a monthly grant, and the plan column in the database is checked
+ * against it. A one-time $0.99 charge is none of those things, and widening
+ * that type to carry it would put "pass" in front of every gate in the billing
+ * code for the sake of one button.
+ */
+export type InterestTier = PaidTier | "pass";
+
+/**
+ * How it would be charged, `once` being the pass.
+ *
+ * The word the pricing card already uses — *charged once, never renews* — so
+ * the record reads the way the page reads.
+ */
+export type InterestPeriod = Period | "once";
+
+/**
  * Tell the server somebody wanted a plan we are not currently selling.
  *
  * One function rather than a `fetch` at each call site, because the two callers
@@ -20,8 +40,8 @@ import type { PaidTier } from "@/lib/billing/tiers";
  * surface as an error to somebody who only pressed a price.
  */
 export function notePlanInterest(
-  tier: PaidTier,
-  period: Period,
+  tier: InterestTier,
+  period: InterestPeriod,
   source: "upgrade" | "landing",
 ): void {
   if (typeof navigator === "undefined") return;

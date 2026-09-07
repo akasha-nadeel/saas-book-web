@@ -130,7 +130,11 @@ export function PricingCards() {
           highlights={PASS_HIGHLIGHTS}
           replies={passReplyCounts()}
           action={
-            <Link href="/upgrade" className={PLAN_BUTTON_PLAIN}>
+            <Link
+              href="/upgrade"
+              onClick={() => notePlanInterest("pass", "once", "landing")}
+              className={PLAN_BUTTON_PLAIN}
+            >
               Get the Starter Pass
             </Link>
           }

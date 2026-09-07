@@ -19,8 +19,15 @@ create table if not exists public.plan_interest (
 
   -- Narrowed here as well as in the route. The route is the only writer today,
   -- but a CHECK is what stops tomorrow's second writer inventing a tier.
-  tier text not null check (tier in ('draft', 'writer', 'studio')),
-  period text not null check (period in ('monthly', 'annual')),
+  --
+  -- **`pass` is the Starter Pass and `once` is its cycle.** It is a one-time
+  -- $0.99 charge rather than a subscription, and the alternative was making
+  -- `period` nullable — which would have meant a column that is null for one
+  -- product and meaningful for the others, read by anybody counting demand as
+  -- "cycle unknown" rather than "there isn't one". `once` says the true thing,
+  -- and it is the word the card itself uses: *charged once, never renews*.
+  tier text not null check (tier in ('draft', 'writer', 'studio', 'pass')),
+  period text not null check (period in ('monthly', 'annual', 'once')),
 
   -- Where the press happened: the pricing cards on the landing page, or the
   -- plan cards on /upgrade. Worth separating — the first is curiosity and the
@@ -40,6 +47,23 @@ create table if not exists public.plan_interest (
 -- across weeks rather than per row.
 create index if not exists plan_interest_created_at_idx
   on public.plan_interest (created_at desc);
+
+-- **Restated rather than left to the CREATE**, because `create table if not
+-- exists` silently skips a table that already stands — so a copy of this file
+-- applied before the Starter Pass was added would keep the narrower checks and
+-- refuse every `pass` row with a constraint violation nobody would think to
+-- look for. Naming them makes the file correct whether it has run before or
+-- not, which is the same reason `20260902000000_plan_tiers.sql` drops before it
+-- adds.
+alter table public.plan_interest drop constraint if exists plan_interest_tier_check;
+alter table public.plan_interest
+  add constraint plan_interest_tier_check
+  check (tier in ('draft', 'writer', 'studio', 'pass'));
+
+alter table public.plan_interest drop constraint if exists plan_interest_period_check;
+alter table public.plan_interest
+  add constraint plan_interest_period_check
+  check (period in ('monthly', 'annual', 'once'));
 
 alter table public.plan_interest enable row level security;
 

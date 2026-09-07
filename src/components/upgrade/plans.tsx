@@ -382,7 +382,10 @@ export function Plans({
                  the plan buttons below. */
               <button
                 type="button"
-                onClick={() => setPassSoon(true)}
+                onClick={() => {
+                  notePlanInterest("pass", "once", "upgrade");
+                  setPassSoon(true);
+                }}
                 className={`w-full cursor-pointer ${PLAN_BUTTON_PLAIN}`}
               >
                 Get the Starter Pass

@@ -1,5 +1,7 @@
 import { asPeriod, displayPrice, priceOf, type Period } from "@/lib/billing/plans";
-import { asPaidTier, TIER_NAMES, type PaidTier } from "@/lib/billing/tiers";
+import { asPaidTier, TIER_NAMES } from "@/lib/billing/tiers";
+import { STARTER_PASS } from "@/lib/billing/starter-pass";
+import type { InterestPeriod, InterestTier } from "@/lib/plan-interest";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -37,6 +39,49 @@ function asSource(value: unknown): Source | null {
 }
 
 /**
+ * The pass narrows on its own, because `asPaidTier` will not take it.
+ *
+ * That refusal is correct — a `PaidTier` is something a subscription can be —
+ * so the pass is checked beside it rather than by widening the type every gate
+ * in the billing code reads. Both still end up narrowed before anything is
+ * written; nothing here trusts the body.
+ */
+function asInterestTier(value: unknown): InterestTier | null {
+  return value === "pass" ? "pass" : asPaidTier(value);
+}
+
+function asInterestPeriod(value: unknown): InterestPeriod | null {
+  return value === "once" ? "once" : asPeriod(value);
+}
+
+/**
+ * What was wanted, said the way the pricing page says it.
+ *
+ * The pass has no `TIER_NAMES` entry and no `priceOf` — it is not a tier and
+ * has no cycle — so it is named from `STARTER_PASS` instead of being forced
+ * through helpers that describe subscriptions.
+ */
+function describe(
+  tier: InterestTier,
+  period: InterestPeriod,
+): { name: string; terms: string } {
+  if (tier === "pass") {
+    return {
+      name: "the Starter Pass",
+      terms: `${displayPrice(STARTER_PASS.price)}, charged once`,
+    };
+  }
+  /* `once` cannot reach here — POST refuses a plan carrying it — but the two
+     narrowings happen on separate fields and TypeScript cannot see the pairing
+     between them, so the cycle is settled rather than asserted. */
+  const cycle: Period = period === "once" ? "monthly" : period;
+  return {
+    name: TIER_NAMES[tier],
+    terms: `${cycle === "annual" ? "annual" : "monthly"}, ${displayPrice(priceOf(tier, cycle))}`,
+  };
+}
+
+/**
  * The hour this press falls in, as Resend's idempotency key.
  *
  * **This is the rate limiter, and it is deliberately not a rate limiter.**
@@ -50,7 +95,11 @@ function asSource(value: unknown): Source | null {
  * whatever arrives — while every press still lands as a row. The signal
  * survives; the inbox does not fill.
  */
-function sendKey(tier: PaidTier, period: Period, at: Date): string {
+function sendKey(
+  tier: InterestTier,
+  period: InterestPeriod,
+  at: Date,
+): string {
   const hour = at.toISOString().slice(0, 13); // YYYY-MM-DDTHH
   return `plan-interest/${tier}/${period}/${hour}`;
 }
@@ -67,13 +116,22 @@ export async function POST(request: Request) {
      impossible — there is no field for a stranger to put a sentence in. The
      only text that ever reaches the email is an address out of a verified
      session. */
-  const tier = asPaidTier(body?.tier);
-  const period = asPeriod(body?.period);
+  const tier = asInterestTier(body?.tier);
+  const period = asInterestPeriod(body?.period);
   const source = asSource(body?.source);
 
   if (!tier || !period || !source) {
     /* Still 200. A malformed press is nothing to tell a visitor about, and the
        browser that sent it has no interface for the news. */
+    return Response.json({ ok: true });
+  }
+
+  /* **`once` belongs to the pass and to nothing else.** Each field narrows on
+     its own, so "studio, once" and "pass, annual" both survive that and would
+     land as rows describing products this app does not sell. Refused here
+     rather than left to the CHECK constraints, which would take the row but
+     lose the reason. */
+  if ((tier === "pass") !== (period === "once")) {
     return Response.json({ ok: true });
   }
 
@@ -119,16 +177,15 @@ export async function POST(request: Request) {
 
   if (isEmailConfigured()) {
     const now = new Date();
-    const cycle = period === "annual" ? "annual" : "monthly";
-    const price = displayPrice(priceOf(tier, period));
+    const { name, terms } = describe(tier, period);
     const who = email ?? "a signed-out visitor";
     const where = source === "landing" ? "the landing page" : "the plans page";
 
-    const line = `${who} pressed ${TIER_NAMES[tier]} (${cycle}, ${price}) on ${where}.`;
+    const line = `${who} pressed ${name} (${terms}) on ${where}.`;
 
     const sent = await sendEmail({
       to: CONTACT_EMAIL,
-      subject: `Someone wanted ${TIER_NAMES[tier]}`,
+      subject: `Someone wanted ${name}`,
       text: `${line}\n\nThe plans are not on sale, so they saw the "Available Soon" dialog. Every press is in the plan_interest table; this mail is one per plan per cycle per hour.`,
       html: `<p>${line}</p><p>The plans are not on sale, so they saw the &ldquo;Available Soon&rdquo; dialog. Every press is in the <code>plan_interest</code> table; this mail is one per plan per cycle per hour.</p>`,
       idempotencyKey: sendKey(tier, period, now),
