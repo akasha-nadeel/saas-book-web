@@ -652,8 +652,11 @@ export function TitleCheckPage({
 
                  `dismissed` stays: the writer can still wave a finding away,
                  which is now what closing it means. */
-              <VerdictBanner tone={verdictLine(clashes).tone}>
-                {verdictLine(clashes).headline}
+              <VerdictBanner
+                tone={stale ? "stale" : verdictLine(clashes).tone}
+              >
+                {verdictLine(clashes, stale ? (checked ?? undefined) : undefined)
+                  .headline}
               </VerdictBanner>
             )}
 
@@ -854,8 +857,20 @@ function VerdictBanner({
   actions,
   children,
 }: {
-  /** `note` when something already uses the name, `ok` when nothing does. */
-  tone: "ok" | "note";
+  /**
+   * `note` when something already uses the name, `ok` when nothing does, and
+   * `stale` when the finding is about a title the box no longer holds.
+   *
+   * **`stale` is drained of colour on purpose.** The finding survives an edit
+   * so trying the next candidate does not cost you the answer you are still
+   * reading — but a filled green bar reading "Nothing published under this
+   * exact name" over a field the writer has since typed "spiderman" into is
+   * read as a verdict on "spiderman". The grey line naming the real subject
+   * sat *above* the bar, quieter than the claim it was qualifying, which is
+   * not a qualification at all. Colour is information on this screen: an
+   * answer about a title nobody asked about has none to give.
+   */
+  tone: "ok" | "note" | "stale";
   /** The two decisions the finding leaves open. See `VerdictActions`. */
   actions?: React.ReactNode;
   children: React.ReactNode;
@@ -864,8 +879,12 @@ function VerdictBanner({
     <div
       role="status"
       className={`mt-4 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl
-                  px-4 py-3 text-white ${
-                    tone === "note" ? "bg-note-solid" : "bg-ok-solid"
+                  px-4 py-3 ${
+                    tone === "stale"
+                      ? "border border-line bg-raised text-muted"
+                      : `text-white ${
+                          tone === "note" ? "bg-note-solid" : "bg-ok-solid"
+                        }`
                   }`}
     >
       {/* A ring with a mark in it, as every filled status bar draws: the shape
@@ -873,8 +892,8 @@ function VerdictBanner({
           is the half of the signal that survives colour blindness. */}
       <span
         aria-hidden="true"
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full
-                   border border-white/60"
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full
+                    border ${tone === "stale" ? "border-current" : "border-white/60"}`}
       >
         <svg
           viewBox="0 0 20 20"
@@ -885,7 +904,13 @@ function VerdictBanner({
           strokeLinejoin="round"
           className="h-3.5 w-3.5"
         >
-          {tone === "note" ? (
+          {/* Three shapes for three tones, so the state survives colour
+              blindness and a greyscale screenshot alike: a bar for a finding
+              that is not answering the box, a stroke for a warning, a tick
+              for an all-clear. */}
+          {tone === "stale" ? (
+            <path d="M6 10h8" />
+          ) : tone === "note" ? (
             <path d="M10 5.5v5.5M10 14.2v.3" />
           ) : (
             <path d="m5.5 10.5 3 3 6-6.5" />
@@ -981,30 +1006,44 @@ function CoverSkeleton({
  * be wrong in on a screen somebody is using to decide whether a name is
  * crowded.
  */
-function verdictLine(clashes: TitleClash[]): {
+function verdictLine(
+  clashes: TitleClash[],
+  /**
+   * The title this line is about, named only when the box no longer holds it.
+   *
+   * **"this exact name" is a pronoun, and a pronoun needs its subject on
+   * screen.** While the box and the finding agree, the box *is* the subject
+   * and naming it twice is noise. Once they disagree the phrase points at
+   * whatever the writer has since typed, which is the one reading it must not
+   * have — so the subject goes into the sentence and the sentence limits
+   * itself, wherever on the bar the eye lands.
+   */
+  subject?: string,
+): {
   tone: "ok" | "note";
   headline: string;
 } {
   const exact = clashes.filter((c) => c.match === "exact").length;
   const near = clashes.length - exact;
+  const name = subject ? `“${subject}”` : "this exact name";
 
   if (exact > 0) {
     return {
       tone: "note",
       headline: `At least ${exact} published book${exact === 1 ? "" : "s"} use${
         exact === 1 ? "s" : ""
-      } this exact title`,
+      } ${subject ? `the title ${name}` : "this exact title"}`,
     };
   }
   if (near > 0) {
     return {
       tone: "ok",
-      headline: `Nothing under this exact name — but check the ${
+      headline: `Nothing under ${name} — but check the ${
         near === 1 ? "one" : near
       } close to it`,
     };
   }
-  return { tone: "ok", headline: "Nothing published under this exact name" };
+  return { tone: "ok", headline: `Nothing published under ${name}` };
 }
 
 function Result({
