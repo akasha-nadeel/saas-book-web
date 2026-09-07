@@ -157,6 +157,36 @@ export function trashedBookClosed(
 export const COMPS_RANKING_LIVE: boolean = false;
 
 /**
+ * Whether the paid plans can actually be bought.
+ *
+ * **False since 2026-09-07, and off on purpose rather than by accident.**
+ * Paddle is configured correctly — live keys, production environment, six
+ * price ids — but no stranger has ever completed a checkout against those
+ * prices, and the one card available to test with is being declined by its
+ * bank. A pricing page that takes money down a path nobody has walked is worse
+ * than one that says it is not open yet, so every paid button opens the
+ * "Available Soon" dialog and the press is recorded instead.
+ *
+ * **Do not do this by unsetting the Paddle environment variables**, which is
+ * the shortcut it looks like. `billingConfigured()` answering false makes
+ * `requireTier()` hand every signed-in writer `studio` and `requirePro()` gate
+ * nothing — the site would stop selling *and* give the paid product away. That
+ * is not a hypothetical: it is the state this deployment sat in from
+ * 2026-08-23 to 2026-09-07, when six renamed price variables went unset and
+ * nothing noticed, because "no gateway configured" is a legitimate state that
+ * opens everything rather than breaking anything. The gate belongs over the
+ * buttons, with the billing configuration left intact underneath.
+ *
+ * Flipping it back is this one edit and a deploy — after a real checkout has
+ * been proven end to end with a card that works.
+ *
+ * Plain const rather than an environment read, matching `COMPS_RANKING_LIVE`
+ * above: `launch.ts` imports nothing and is read by client and server alike,
+ * so one boolean serves every call site.
+ */
+export const PLANS_ON_SALE: boolean = false;
+
+/**
  * The book-tool segments the proxy sends home, plus `read`.
  *
  * **`title-check` came off this list on 2026-09-02 and `comps` went back on it

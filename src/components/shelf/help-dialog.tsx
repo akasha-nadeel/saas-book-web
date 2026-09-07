@@ -140,6 +140,10 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
         desc: `Everything in ${TIER_NAMES.writer}, with ${TIER_LIMITS.studio.creditsPerMonth.toLocaleString("en-US")} — for a writer leaning on the assistant daily.`,
       },
       {
+        name: "Not on sale yet",
+        desc: "The paid plans cannot be bought at the moment. Pressing one tells us which plan you wanted, so we know what to open first — and everything free stays free meanwhile.",
+      },
+      {
         name: "Cancelling",
         desc: "From the billing page, at any time. The plan runs to the end of the period you have paid for, and nothing is deleted when it lapses — your books are yours on every plan.",
       },

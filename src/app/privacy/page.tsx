@@ -127,6 +127,15 @@ export default function PrivacyPage() {
               the payment provider. Card details are entered there, not in
               OpenChapter.
             </>,
+            <>
+              <Term>Pressing a paid plan</Term> — the paid plans are not on sale
+              yet, so pressing one records which plan and which billing cycle
+              you pressed, and where you pressed it. That is how we decide what
+              to switch on first. If you are signed in, your account and email
+              address are recorded with it; if you are not, nothing that
+              identifies you is. No other detail is taken, and the record is not
+              shared with anybody.
+            </>,
           ]}
         />
         <p>

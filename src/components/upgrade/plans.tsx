@@ -31,6 +31,8 @@ import {
   tierAtLeast,
   type PaidTier,
 } from "@/lib/billing/tiers";
+import { PLANS_ON_SALE } from "@/lib/launch";
+import { notePlanInterest } from "@/lib/plan-interest";
 import {
   KeyIcon,
   NibIcon,
@@ -203,10 +205,16 @@ export function Plans({
     null,
   );
 
-  // With no merchant configured there is nothing to sell. The house rule is
-  // that a control either works or plainly says it does not, so the button
-  // stays where it will always be and pressing it explains itself.
-  const [soon, setSoon] = useState(false);
+  /**
+   * The plan whose "not on sale" dialog is open, or null.
+   *
+   * **Widened from a boolean when `PLANS_ON_SALE` arrived.** It used to answer
+   * only "there is no gateway on this copy", which is one fact about the
+   * deployment and needs no plan name. Now it also answers "this plan is not
+   * being sold yet", which is a fact about a plan — and a dialog headed
+   * "Plans" over a press on Studio is answering a question nobody asked.
+   */
+  const [soon, setSoon] = useState<PaidTier | null>(null);
   /* Its own flag rather than sharing `soon`: "no gateway is configured here"
      and "the pass has no checkout yet" are different facts, and one dialog
      answering both would be wrong for whichever reader it was not written
@@ -399,7 +407,25 @@ export function Plans({
               highlights={highlightsFor(tier)}
               replies={replyCountsFor(tier)}
               action={
-                /* **Every card answers for itself now.**
+                /* **Nothing is for sale, so nothing takes money.**
+
+                   One branch above the whole ladder rather than a condition
+                   inside each of its four money-moving arms, so switching
+                   selling back on is deleting this and nothing else. The
+                   ladder below is untouched and still correct — it is simply
+                   not reached while `PLANS_ON_SALE` is false. */
+                !PLANS_ON_SALE ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      notePlanInterest(tier, period, "upgrade");
+                      setSoon(tier);
+                    }}
+                    className={`w-full cursor-pointer ${planButton(featured)}`}
+                  >
+                    Get {TIER_NAMES[tier]}
+                  </button>
+                ) : /* **Every card answers for itself now.**
 
                    It used to be one boolean: already paying meant "Keep
                    writing" on all three, so a Draft customer looking at Studio
@@ -500,7 +526,7 @@ export function Plans({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setSoon(true)}
+                    onClick={() => setSoon(tier)}
                     className={`w-full cursor-pointer ${planButton(featured)}`}
                   >
                     Get {TIER_NAMES[tier]}
@@ -526,12 +552,34 @@ export function Plans({
       </div>
 
       {soon && (
-        <ComingSoonDialog title="Plans" onClose={() => setSoon(false)}>
-          There is no payment gateway configured on this copy of OpenChapter, so
-          there is nothing to buy and nothing is held back — the assistant is
-          unmetered here. Once billing is configured, {TIER_NAMES.draft} unlocks
-          unlimited books and the assistant runs on a monthly credit balance.
-          Every export format is free either way.
+        <ComingSoonDialog
+          title={PLANS_ON_SALE ? "Plans" : TIER_NAMES[soon]}
+          onClose={() => setSoon(null)}
+        >
+          {PLANS_ON_SALE ? (
+            <>
+              There is no payment gateway configured on this copy of
+              OpenChapter, so there is nothing to buy and nothing is held back —
+              the assistant is unmetered here. Once billing is configured,{" "}
+              {TIER_NAMES.draft} unlocks unlimited books and the assistant runs
+              on a monthly credit balance. Every export format is free either
+              way.
+            </>
+          ) : (
+            /* **It says the press was noted, because it was.** A button that
+               quietly reports to us is the thing the house rules are against,
+               and the feedback dialog already sets the precedent of listing
+               what is sent above the control that sends it. Naming the plan
+               back is also the honest version of "we heard you" — it shows
+               exactly what we wrote down. */
+            <>
+              {TIER_NAMES[soon]} is not on sale yet. We have noted that you
+              wanted it — that is how we decide what to switch on first, and it
+              is all we record about this press. Everything free stays free
+              meanwhile: five books, unlimited chapters and words, and every
+              export format.
+            </>
+          )}
         </ComingSoonDialog>
       )}
 

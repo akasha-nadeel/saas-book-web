@@ -55,6 +55,7 @@ import {
   type Period,
 } from "@/lib/billing/plans";
 import { TIER_NAMES } from "@/lib/billing/tiers";
+import { notePlanInterest } from "@/lib/plan-interest";
 
 /**
  * The three paid cards, in reading order.
@@ -152,7 +153,18 @@ export function PricingCards() {
             highlights={highlightsFor(tier)}
             replies={replyCountsFor(tier)}
             action={
-              <Link href="/upgrade" className={planButton(featured)}>
+              /* **Still a link, and the press is still heard.**
+                 Turning these into buttons to record the press would cost
+                 middle-click, open-in-new-tab and the keyboard behaviour a
+                 visitor expects of something that navigates — for a signal a
+                 beacon can carry without touching any of it. `notePlanInterest`
+                 uses `sendBeacon` precisely so it survives the navigation this
+                 same press starts. */
+              <Link
+                href="/upgrade"
+                onClick={() => notePlanInterest(tier, period, "landing")}
+                className={planButton(featured)}
+              >
                 Choose {TIER_NAMES[tier]}
               </Link>
             }
