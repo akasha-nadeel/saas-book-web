@@ -171,18 +171,31 @@ export async function POST(request: Request) {
    * sent no mail and logged an error, which is the one case this feature exists
    * to catch.
    *
-   * Counting rows instead asks the question directly and cannot disagree with
-   * itself. Starts false so that a deployment with no database still mails: an
-   * uncapped alert is a worse day than a missed one, but a *silent* one is
-   * worse than both.
+   * **Counting rows was the second wrong answer, for a subtler reason.** A row
+   * means somebody pressed; it does not mean anybody was told. Five Starter
+   * Pass presses landed during the hour every send was being refused, and the
+   * cap then read those five as "already reported" and kept suppressing the one
+   * plan that had never once been mailed about. The count now reads
+   * `alerted_at`, which is written only after the provider has taken the
+   * message — so a failed send leaves the next press free to try again.
+   *
+   * Starts false so a deployment with no database still mails: an uncapped
+   * alert is a worse day than a missed one, but a *silent* one is worse than
+   * both, which is the failure this whole comment is a record of.
    */
   let alreadyAlerted = false;
+  /** The row just written, so the send can mark it. */
+  let rowId: string | null = null;
 
   const db = createAdminClient();
   if (db) {
-    const { error } = await db
+    const { data: inserted, error } = await db
       .from("plan_interest")
-      .insert({ tier, period, source, owner, email });
+      .insert({ tier, period, source, owner, email })
+      .select("id")
+      .single();
+
+    rowId = typeof inserted?.id === "string" ? inserted.id : null;
 
     if (error) {
       /* Named rather than swallowed, because the failure everybody actually
@@ -198,20 +211,21 @@ export async function POST(request: Request) {
             : undefined,
       });
     } else {
-      /* Counted *after* the insert, so this press is in the total: one row is
-         this one and nothing has been said yet, two or more means the hour has
-         already been reported. `head` keeps it a count rather than a fetch of
-         rows nobody reads. A failed count leaves the alert to go out, for the
-         reason on `alreadyAlerted`. */
+      /* **Alerts in the last hour, not presses.** This row is not among them:
+         it is written with `alerted_at` null and only marked once the mail has
+         been accepted, so any count above zero is a message that genuinely
+         reached the provider. `head` keeps it a count rather than a fetch of
+         rows nobody reads, and a failed count leaves the alert to go out — see
+         `alreadyAlerted`. */
       const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { count } = await db
         .from("plan_interest")
         .select("id", { count: "exact", head: true })
         .eq("tier", tier)
         .eq("period", period)
-        .gte("created_at", since);
+        .gte("alerted_at", since);
 
-      alreadyAlerted = (count ?? 0) > 1;
+      alreadyAlerted = (count ?? 0) > 0;
     }
   }
 
@@ -229,7 +243,29 @@ export async function POST(request: Request) {
       html: `<p>${line}</p><p>The plans are not on sale, so they saw the &ldquo;Available Soon&rdquo; dialog. Every press is in the <code>plan_interest</code> table; this mail is one per plan per cycle per hour.</p>`,
     });
 
-    if (!sent.sent) {
+    if (sent.sent) {
+      /* **Marked only now, and this is the whole point of the column.** Written
+         alongside the row it would mean "a press happened", which is what the
+         row already means; written here it means the provider took the message,
+         which is the only thing the hourly cap has any business counting. A
+         send that fails leaves it null and the next press is free to try. */
+      if (db && rowId) {
+        const { error } = await db
+          .from("plan_interest")
+          .update({ alerted_at: new Date().toISOString() })
+          .eq("id", rowId);
+
+        if (error) {
+          /* The mail went; only the bookkeeping did not. Worth saying, because
+             the visible symptom is the opposite of the fault — alerts that
+             repeat rather than alerts that vanish. */
+          console.error("[interest] alert sent but not marked", {
+            code: error.code,
+            message: error.message,
+          });
+        }
+      }
+    } else {
       /* Logged, never surfaced. The row is the feature. */
       console.error("[interest] could not send the alert", {
         reason: sent.reason,

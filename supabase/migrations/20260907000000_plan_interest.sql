@@ -40,8 +40,22 @@ create table if not exists public.plan_interest (
   -- writers already counted elsewhere. `on delete set null` keeps the demand
   -- signal after somebody deletes their account, without keeping them.
   owner uuid references auth.users(id) on delete set null,
-  email text
+  email text,
+
+  -- **When an alert actually went out for this press, or null.**
+  --
+  -- The hourly cap needs to know how recently the owner was *told*, and the
+  -- first version answered that by counting presses instead — which is a
+  -- different fact wearing the same shape. Five Starter Pass presses were
+  -- recorded during an hour when every send was being refused by the mail
+  -- provider, and the cap then read those five as "already reported" and went
+  -- on suppressing the one plan nobody had ever heard about. A row means
+  -- somebody pressed; only this column means somebody was told.
+  alerted_at timestamptz
 );
+
+-- Same column, for a table created before it existed.
+alter table public.plan_interest add column if not exists alerted_at timestamptz;
 
 -- Reading this is "what should I switch on first", which is a question asked
 -- across weeks rather than per row.
@@ -86,5 +100,12 @@ alter table public.plan_interest enable row level security;
 -- plan_interest`, which is a *grant* refusal and reads nothing like an RLS one.
 --
 -- `select` as well as `insert`, so the ledger can be read back with the same
--- key rather than only from the dashboard.
-grant select, insert on public.plan_interest to service_role;
+-- key rather than only from the dashboard — the hourly cap is a count against
+-- this table. `update` for `alerted_at`, which is written after the mail has
+-- actually been accepted rather than alongside the row.
+grant select, insert, update on public.plan_interest to service_role;
+
+-- Every read this app makes is "was anything alerted for this plan lately",
+-- which is the three columns below and nothing else.
+create index if not exists plan_interest_alerted_idx
+  on public.plan_interest (tier, period, alerted_at desc);
