@@ -96,14 +96,17 @@ export const FREE_LIMITS: Record<Limited, { free: number; pro: number | null }> 
   comps: { free: 3, pro: null },
   covers: { free: 3, pro: null },
   /*
-   * **Two, and the title check is the exception to the three above
+   * **One, and the title check is the exception to the three above
    * (2026-09-14).** When the plans became Free and Pro it became one of the
    * two things Pro buys, beside unlimited books, so its free allowance is set
-   * by that rather than by cost — the same keyless catalogues, the same free
-   * cache. Two is one check and one second thought, and the pricing page says
-   * so because `plan-rows.ts` reads this number.
+   * by pricing rather than by cost — the same keyless catalogues, the same free
+   * cache. It was two for the first day and the owner cut it to one: a check a
+   * day shows the tool is real, and a second thought is what Pro sells. The
+   * pricing page says so because `plan-rows.ts` and `plan-highlights.ts` read
+   * this number, and the words below agree with a limit of one through
+   * `workOne`.
    */
-  titleCheck: { free: 2, pro: null },
+  titleCheck: { free: 1, pro: null },
   blurb: { free: 5, pro: null },
   prose: { free: 6, pro: null },
   track: { free: 2, pro: null },
@@ -347,14 +350,26 @@ const SHAPE: Record<Limited, Shape> = {
  * Lower case, and *a thing the writer does* rather than a feature name — "2
  * searches left today" reads as a count of their own work, where "2 of 3 Cover
  * Searches" reads as a meter bolted to a product.
+ *
+ * `workOne` is `work` for a daily limit of exactly one, which the title check
+ * is: "runs 1 title checks a day" is the sentence it exists to prevent. Only the
+ * daily shape carries it, because only a daily sentence puts the limit in front
+ * of `work`.
  */
 const WORDS: Record<
   Limited,
-  { one: string; many: string; short: string; shortOne: string; work: string }
+  {
+    one: string;
+    many: string;
+    short: string;
+    shortOne: string;
+    work: string;
+    workOne?: string;
+  }
 > = {
-  comps: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "comp searches" },
-  covers: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "cover searches" },
-  titleCheck: { one: "check", many: "checks", short: "checks", shortOne: "check", work: "title checks" },
+  comps: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "comp searches", workOne: "comp search" },
+  covers: { one: "search", many: "searches", short: "searches", shortOne: "search", work: "cover searches", workOne: "cover search" },
+  titleCheck: { one: "check", many: "checks", short: "checks", shortOne: "check", work: "title checks", workOne: "title check" },
   blurb: { one: "book", many: "books", short: "books", shortOne: "book", work: "the blurb" },
   prose: { one: "book", many: "books", short: "books", shortOne: "book", work: "the prose report" },
   track: { one: "book", many: "books", short: "books", shortOne: "book", work: "money tracking" },
@@ -366,6 +381,12 @@ const WORDS: Record<
 function label(action: Limited, count: number): string {
   const names = WORDS[action];
   return count === 1 ? names.one : names.many;
+}
+
+/** The tool's work, agreeing with a daily limit of this size. */
+function workFor(action: Limited, limit: number): string {
+  const names = WORDS[action];
+  return limit === 1 ? (names.workOne ?? names.work) : names.work;
 }
 
 /**
@@ -434,7 +455,7 @@ export function spentLine(allowance: Allowance): string | null {
       // **It says that it comes back**, which no other limit in this app has
       // ever had to. A sentence that stopped at "today's are used" would read as
       // the end of the road on a screen a writer could simply revisit tomorrow.
-      return `The free plan runs ${limit} ${words.work} a day, and today's are used. It starts again tomorrow.`;
+      return `The free plan runs ${limit} ${workFor(action, limit)} a day, and today's ${limit === 1 ? "is" : "are"} used. It starts again tomorrow.`;
     case "book":
       // It names the *other* books rather than this one: nothing is wrong with
       // the book on screen, and "this book is out of searches" would be false as
@@ -467,7 +488,7 @@ export function reachedHeadline(action: Limited): string {
 
   switch (SHAPE[action]) {
     case "daily":
-      return `The free plan runs ${limit} ${words.work} a day`;
+      return `The free plan runs ${limit} ${workFor(action, limit)} a day`;
     case "book":
       return `The free plan covers ${words.work} on ${limit} books`;
     case "item":

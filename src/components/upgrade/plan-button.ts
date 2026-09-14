@@ -14,14 +14,18 @@
 /**
  * The filled one, for the plan being recommended.
  *
- * `text-accent-ink` rather than a fixed white: the fill is the brand indigo by
- * day and a bright periwinkle at night, so the ink on it has to invert with it.
- * A hardcoded white is invisible in exactly one theme.
+ * `text-accent-ink` rather than a fixed white by day: the fill is the brand
+ * blue, and the ink on it has to follow the theme. **At night the featured
+ * card is the upgrade gradient** (see `CardTone` in `plan-card.tsx`), so the
+ * button turns to a veil of white with white type — a periwinkle slab with
+ * dark ink on a purple card would be a third colour on it.
  */
 export const PLAN_BUTTON_PRIMARY = `block w-full rounded-xl bg-accent px-5 py-3
   text-center font-sans text-sm font-semibold text-accent-ink shadow-sm
-  outline-none transition-[opacity,box-shadow] hover:opacity-90 hover:shadow-md
-  focus-visible:ring-2 focus-visible:ring-accent/60`;
+  outline-none transition-[opacity,box-shadow,background-color] hover:opacity-90
+  hover:shadow-md focus-visible:ring-2 focus-visible:ring-accent/60
+  dark:bg-white/20 dark:text-white dark:ring-1 dark:ring-white/35
+  dark:hover:bg-white/30 dark:hover:opacity-100 dark:focus-visible:ring-white/70`;
 
 /**
  * The quieter twin, for every card that is not the featured one.

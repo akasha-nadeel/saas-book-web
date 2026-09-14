@@ -311,6 +311,26 @@ describe("the lines", () => {
     expect(line).toContain("tomorrow");
   });
 
+  /*
+   * **A daily limit of one is singular all the way through.** The title check
+   * went to one on 2026-09-14, and the sentence built for three read "runs 1
+   * title checks a day, and today's are used".
+   */
+  it("agrees with a daily limit of one", () => {
+    expect(FREE_LIMITS.titleCheck.free).toBe(1);
+    const spent = { day: TODAY, counts: { titleCheck: 1 } };
+    expect(spentLine(dailyAllowance("titleCheck", spent, false, TODAY))).toBe(
+      "The free plan runs 1 title check a day, and today's is used. It starts again tomorrow.",
+    );
+  });
+
+  it("stays plural on a daily limit above one", () => {
+    const spent = { day: TODAY, counts: { comps: FREE_LIMITS.comps.free } };
+    expect(spentLine(dailyAllowance("comps", spent, false, TODAY))).toBe(
+      `The free plan runs ${FREE_LIMITS.comps.free} comp searches a day, and today's are used. It starts again tomorrow.`,
+    );
+  });
+
   /* And a limit that does *not* come back must not imply that it does. */
   it("promises nothing of the kind on the others", () => {
     const lines = [
@@ -349,6 +369,9 @@ describe("the dialog headline", () => {
   it("names the limit that was reached, in its own units", () => {
     expect(reachedHeadline("comps")).toBe(
       `The free plan runs ${FREE_LIMITS.comps.free} comp searches a day`,
+    );
+    expect(reachedHeadline("titleCheck")).toBe(
+      "The free plan runs 1 title check a day",
     );
     expect(reachedHeadline("prose")).toBe(
       `The free plan covers the prose report on ${FREE_LIMITS.prose.free} books`,

@@ -19,7 +19,7 @@ real users at the time, so nothing is migrated gently.
    | | Free | Pro |
    |---|---|---|
    | Books | 1 | Unlimited |
-   | Title checks | 2 a day | Unlimited |
+   | Title checks | 1 a day | Unlimited |
    | Exports (Word, EPUB, PDF), import, sync, consistency check, voice typing | Yes | Yes |
    | Price | $0 | **$5.99 / month** or **$49.99 / year** |
 

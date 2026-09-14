@@ -143,8 +143,8 @@ do not treat its absence of a subject as a gap to fill unless somebody asks.
   browser; no dependencies, no network, not part of the build. Its palette is
   copied from `globals.css`, so it goes stale when the tokens move.
 
-The suite is 106 files / 2,029 tests and takes about a minute and a half
-(measured 2026-09-14 after the AI removal, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
+The suite is 107 files / 2,034 tests and takes about a minute and a half
+(measured 2026-09-14 after the pricing-card change, all green, run on its own); jsdom prints `HTMLCanvasElement's getContext()` warnings
 from the image recoder and `Not implemented: navigation to another Document`
 from the routing tests — both are expected, not failures.
 
@@ -829,7 +829,10 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
   migration folds every retired row into `pro`, and `asTier` refuses the old
   names rather than mapping them.
 - **Pro buys exactly two things**: unlimited books (Free holds **one**) and
-  unlimited title checks (Free runs **two a day**, `FREE_LIMITS.titleCheck`).
+  unlimited title checks (Free runs **one a day**, `FREE_LIMITS.titleCheck`).
+  **Both pricing cards list every row of the comparison table**, in table
+  order (`plan-highlights.ts`); `plan-highlights.test.ts` fails if a row
+  reaches the table and not the cards.
   Everything else — imports, sync, all three export formats, unlimited words and
   chapters, the consistency check, voice typing — is on both plans.
 - **Prices live once in `plans.ts`: Pro is $5.99 a month or $49.99 a year** —
@@ -940,7 +943,7 @@ beside it: its 2.99% beats Paddle at around eighteen subscribers.
 
   | Shape | Tools | Free |
   |---|---|---|
-  | **Per day** | comps, covers, title check | 3 / 3 / 2 a day |
+  | **Per day** | comps, covers, title check | 3 / 3 / 1 a day |
   | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
   | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
 

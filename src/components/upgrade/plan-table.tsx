@@ -1,11 +1,9 @@
 /**
  * The four plans compared line by line, grouped.
  *
- * **This is where the claims live now.** The cards used to carry all ten rows
- * each — four columns of mostly identical values, in which the one line a buyer
- * is choosing between was eighth of ten. The cards lead with a handful and this
- * carries the contract, which is the arrangement every pricing page that works
- * arrives at: skim across the top, then read down when you are deciding.
+ * **The same lines as the cards, side by side.** Since 2026-09-14 each card
+ * lists every row too (`plan-highlights.ts`); this is where a reader compares
+ * them across, the two lines that differ against the ones that do not.
  *
  * **No `"use client"`**, for the same reason `plan-card.tsx` has none — the
  * landing page is a Server Component, and a client module's exports reach it as
@@ -138,7 +136,13 @@ export function PlanTable({
                             &#10003;
                           </span>
                         ) : (
-                          <span className="font-sans text-[0.9375rem] font-semibold tabular-nums">
+                          /* Hidden like the tick and the dash beside it: the
+                             sr-only span below already says the value, and
+                             without this a screen reader heard it twice. */
+                          <span
+                            className="font-sans text-[0.9375rem] font-semibold tabular-nums"
+                            aria-hidden="true"
+                          >
                             {value}
                           </span>
                         )}

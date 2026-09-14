@@ -19,7 +19,7 @@ Read before touching `src/lib/billing/`, `src/lib/free-limits.ts`, `src/componen
 >   one. `20260914000000_ai_free_pro_plan.sql` rewrites every retired row to
 >   `pro` and narrows the CHECKs; `asTier` refuses the old names.
 > - **Pro buys two things**: unlimited books (Free holds one) and unlimited
->   title checks (Free runs two a day). **$5.99 a month or $49.99 a year.**
+>   title checks (Free runs one a day). **$5.99 a month or $49.99 a year.**
 > - **The credit economy is gone** — `credits.ts`, `starter-pass.ts`,
 >   `aiChatClosed()`, `claimCredits`, `ai_credits`, `ai_usage`, `requirePro()`
 >   and `requireTier()`. The one server-side limit left is the book trigger.
@@ -113,9 +113,12 @@ the one-off price every month, that there is no period end to store, and that
 
 **What is free is enough to understand the product.** Free includes **one
 book**, unlimited chapters and words, autosave/sync where accounts are
-configured, **every export format**, the consistency check, voice typing and two
-title checks a day. Pro adds unlimited books and unlimited title checks, and
-nothing else. **One free book is stricter than every AI-free competitor
+configured, **every export format**, the consistency check, voice typing and one
+title check a day. Pro adds unlimited books and unlimited title checks, and
+nothing else. **Both pricing cards list every row of the comparison table**
+(`plan-highlights.ts`, since 2026-09-14), one line per `ROWS` label in table
+order, and `plan-highlights.test.ts` fails if a row reaches the table and not
+the cards. **One free book is stricter than every AI-free competitor
 checked** (WriteO and Novlr give two, Reedsy Studio unlimited) — that is the
 owner's deliberate push towards paying, and the first thing to revisit if
 sign-ups stall. EPUB and PDF were Pro until 2026-08-27; see the note in
@@ -142,14 +145,16 @@ of manuscripts. Three shapes replaced it:
 
 | Shape | Tools | Free |
 |---|---|---|
-| **Per day** | comps, covers, title check | 3 / 3 / 2 a day |
+| **Per day** | comps, covers, title check | 3 / 3 / 1 a day |
 | **Per book** | blurb, prose report, track | 5 / 6 / 2 books |
 | **By occupancy** | ARC readers, seats | 10 a book / 2 a book |
 
 **The title check is the live row, and its number is a pricing decision rather
 than a cost one** (2026-09-14): unlimited title checks are one of the two things
-Pro sells, so Free runs two a day while comps and covers, still hidden, stay at
-three.
+Pro sells, so Free runs one a day (two until the owner cut it, the same day)
+while comps and covers, still hidden, stay at three. A limit of one needed the
+daily sentences to agree with it, which is what `workOne` in `free-limits.ts`
+is for.
 
 **There was a fourth shape, "in total, for good"**, for work that cost a
 model call every press — keyword suggestions, the blurb conversation and the

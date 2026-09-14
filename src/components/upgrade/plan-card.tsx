@@ -15,9 +15,11 @@
  * **The card stopped being the comparison.** It used to carry all ten rows of
  * `ROWS` with a tick and a value badge against each, which is a table with
  * rounded corners — most of the lines identical across the columns, and the
- * one line a buyer is choosing between buried among them. So the card now leads with
- * a handful out of `plan-highlights.ts` and `PlanTable` underneath carries
- * every claim in full. Nothing was dropped; it moved to where it can be read.
+ * one line a buyer is choosing between buried among them. So the card led with
+ * a handful out of `plan-highlights.ts` and `PlanTable` underneath carried
+ * every claim in full. **Since 2026-09-14 the card lists every row again**, as
+ * plain lines rather than ticks and badges, and the table stays for reading
+ * across.
  *
  * **Centred, and the figure is the largest thing on it.** A price list is
  * scanned across before it is read down, so the four figures have to land at
@@ -33,7 +35,17 @@
 
 import type { Highlight } from "@/lib/billing/plan-highlights";
 
-/** Which of the two skins a card wears. */
+/**
+ * Which of the two skins a card wears.
+ *
+ * **The featured card changes fill at night, and only at night.** By day it is
+ * the brand blue with white ink. At night the accent is a bright periwinkle
+ * (#8ab4ff), and white type on that is about 2:1 — so in dark mode the card
+ * takes the upgrade gradient (`--color-upgrade-from` / `-to`, the app's one
+ * licensed gradient, stated identically in every theme block) and every word
+ * on it goes white, which clears 5:1 against both ends. `dark:` answers to
+ * `[data-theme="dark"]`, so the three dark tints get it too.
+ */
 export type CardTone = "plain" | "featured";
 
 export function PlanCard({
@@ -70,7 +82,8 @@ export function PlanCard({
                       ? // No outline on the filled card. It is already the
                         // loudest thing here, and a line around a block of
                         // colour only muddies its edge.
-                        "bg-accent text-accent-ink"
+                        `bg-accent text-accent-ink dark:bg-linear-to-br
+                         dark:from-upgrade-from dark:to-upgrade-to dark:text-white`
                       : "border border-line bg-panel text-fg"
                   }`}
     >
@@ -85,7 +98,7 @@ export function PlanCard({
                       font-bold tracking-[0.12em] whitespace-nowrap uppercase
                       ring-2 ring-surface ${
                         featured
-                          ? "bg-accent-ink text-accent"
+                          ? "bg-accent-ink text-accent dark:bg-white dark:text-upgrade-ink"
                           : "bg-accent text-accent-ink"
                       }`}
         >
@@ -98,7 +111,7 @@ export function PlanCard({
       <span
         className={`mx-auto grid h-11 w-11 place-items-center rounded-full ${
           featured
-            ? "bg-accent-ink/15 text-accent-ink"
+            ? "bg-accent-ink/15 text-accent-ink dark:bg-white/15 dark:text-white"
             : "bg-accent/12 text-accent"
         }`}
       >
@@ -120,7 +133,7 @@ export function PlanCard({
           line as the period switches. */}
       <p
         className={`h-5 font-sans text-sm font-medium ${
-          featured ? "text-accent-ink/75" : "text-muted"
+          featured ? "text-accent-ink/75 dark:text-white/75" : "text-muted"
         }`}
       >
         {note}
@@ -135,7 +148,7 @@ export function PlanCard({
         className={`flex min-h-[4.125rem] items-center justify-center rounded-md
                     px-3.5 py-3 font-sans text-sm leading-snug ${
                       featured
-                        ? "bg-accent-ink/12 text-accent-ink"
+                        ? "bg-accent-ink/12 text-accent-ink dark:bg-white/12 dark:text-white"
                         : "bg-accent/10 text-fg"
                     }`}
       >
@@ -147,26 +160,26 @@ export function PlanCard({
             rather than as one undifferentiated column. */}
         <p
           className={`pb-1.5 font-sans text-[0.625rem] font-semibold tracking-[0.11em] uppercase ${
-            featured ? "text-accent-ink/70" : "text-faint"
+            featured ? "text-accent-ink/70 dark:text-white/70" : "text-faint"
           }`}
         >
           What you get
         </p>
-        {/* No rules between the rows. At five short items the hairlines were
-            doing no separating that the leading does not already do, and they
-            made a five-line list look like a five-row table. */}
+        {/* No rules between the rows. On short items the hairlines were doing
+            no separating that the leading does not already do, and they made
+            the list look like a table. */}
         <ul className="flex flex-col">
           {highlights.map((line) => (
             <li
               key={`${line.lead ?? ""}${line.text}`}
               className={`py-1.5 font-sans text-sm leading-snug ${
-                featured ? "text-accent-ink/90" : "text-fg/85"
+                featured ? "text-accent-ink/90 dark:text-white/90" : "text-fg/85"
               }`}
             >
               {line.lead && (
                 <b
                   className={`font-semibold tabular-nums ${
-                    featured ? "text-accent-ink" : "text-fg"
+                    featured ? "text-accent-ink dark:text-white" : "text-fg"
                   }`}
                 >
                   {line.lead}{" "}

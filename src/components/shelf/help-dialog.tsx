@@ -9,6 +9,7 @@ import { FREE_LIMITS } from "@/lib/free-limits";
 import { MAX_SNAPSHOTS } from "@/lib/history";
 import { IMPORT_FORMATS } from "@/lib/import";
 import { TINTS } from "@/lib/library-store";
+import { plural } from "@/lib/plural";
 
 /**
  * What OpenChapter can do, in one place.
@@ -116,7 +117,7 @@ const SECTIONS: { title: string; items: { name: string; desc: string }[] }[] = [
     items: [
       {
         name: TIER_NAMES.free,
-        desc: `Free, no card. ${TIER_LIMITS.free.books} ${TIER_LIMITS.free.books === 1 ? "book" : "books"}, unlimited chapters and words, importing, syncing, every export format, and ${FREE_LIMITS.titleCheck.free} title checks a day.`,
+        desc: `Free, no card. ${plural(TIER_LIMITS.free.books ?? 0, "book")}, unlimited chapters and words, importing, syncing, every export format, and ${plural(FREE_LIMITS.titleCheck.free, "title check")} a day.`,
       },
       {
         name: TIER_NAMES.pro,

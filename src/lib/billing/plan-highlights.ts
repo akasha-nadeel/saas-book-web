@@ -1,11 +1,13 @@
 /**
- * What each card says a plan is for, and the handful of things it leads with.
+ * What each card says a plan is for, and everything it gives.
  *
- * **The card is a pitch and the table is the contract**, and this module exists
- * to keep that distinction honest. A card carrying every comparison row is a
- * table with rounded corners, so the card gets the handful that decide the
- * purchase and `ROWS` carries every claim in full underneath. Nothing here may
- * say something the table then contradicts.
+ * **Each card lists every row of the comparison table, in the table's order**
+ * (2026-09-14). The cards used to carry a handful and leave the rest to the
+ * table, and the owner wanted a reader to see the whole plan without scrolling
+ * down to it. The table stays underneath, where the same lines sit side by side.
+ * Each line names the `ROWS` label it stands for, and a test holds the two sets
+ * equal, so a row added to the table cannot be missing from a card. Nothing here
+ * may say something the table then contradicts.
  *
  * **Every figure is read out of `TIER_LIMITS` or `FREE_LIMITS`, never typed.**
  * These lines are prose, which is exactly the place a number goes stale
@@ -18,7 +20,7 @@
 
 import { FREE_LIMITS } from "@/lib/free-limits";
 import { nounFor } from "@/lib/plural";
-import { TIER_LIMITS, TIER_NAMES, type PaidTier, type PlanTier } from "./tiers";
+import { TIER_LIMITS, type PaidTier, type PlanTier } from "./tiers";
 
 /**
  * One line of a card's list.
@@ -27,10 +29,14 @@ import { TIER_LIMITS, TIER_NAMES, type PaidTier, type PlanTier } from "./tiers";
  * actually comparing — and `text` is the rest of the sentence. Splitting them
  * here rather than marking up a string keeps this module free of JSX, which is
  * what lets a Server Component import it.
+ *
+ * `row` is the `ROWS` label this line stands for. `NO_AI` has none, because the
+ * table has no row for it.
  */
 export interface Highlight {
   lead?: string;
   text: string;
+  row?: string;
 }
 
 /**
@@ -61,41 +67,66 @@ export const NO_AI: Highlight = {
   text: "— every word is yours",
 };
 
-/**
- * The lines on the Free card.
- *
+/*
+ * The lines both plans say the same, in `ROWS` order. Stated once so the two
+ * cards cannot word one row two ways.
+ */
+const CHAPTERS: Highlight = {
+  row: "Chapters and words",
+  lead: "Unlimited",
+  text: "chapters and words",
+};
+const SYNC: Highlight = { row: "Autosave and sync", text: "Autosave and sync" };
+const VOICE: Highlight = { row: "Voice typing", text: "Voice typing" };
+/*
  * **The exports line is the wedge and it is not hedged.** Every competitor
- * charges for formatting, so "every export format" on the free card is the
+ * charges for formatting, so the full format list on the free card is the
  * argument this page is making — and it is true of the code, which is the only
  * reason it may be said. See `launch.ts` for why that is not a limit waiting to
  * be introduced later.
  */
+const EXPORT: Highlight = { row: "Export", text: "Export — Word, EPUB, PDF" };
+const CONSISTENCY: Highlight = {
+  row: "Consistency check",
+  text: "Consistency check",
+};
+
+/** The lines on the Free card. */
 const FREE_HIGHLIGHTS: Highlight[] = [
   {
+    row: "Books",
     lead: String(TIER_LIMITS.free.books ?? 0),
-    text: `${nounFor(TIER_LIMITS.free.books ?? 0, "book")}, free for good`,
+    text: nounFor(TIER_LIMITS.free.books ?? 0, "book"),
   },
-  { lead: "Unlimited", text: "chapters and words" },
-  { text: "Every export format — Word, EPUB, PDF" },
+  CHAPTERS,
+  SYNC,
+  VOICE,
   {
+    row: "Title check",
     lead: String(FREE_LIMITS.titleCheck.free),
-    text: `${nounFor(FREE_LIMITS.titleCheck.free ?? 0, "title check")} a day`,
+    text: `${nounFor(FREE_LIMITS.titleCheck.free, "title check")} a day`,
   },
+  EXPORT,
+  CONSISTENCY,
   NO_AI,
 ];
 
 /**
  * The paid card.
  *
- * **"Everything in Free" is doing the comparison work**, which is what lets the
- * list stay short: the two things Pro adds are said first, and the rest is
- * inherited rather than repeated.
+ * Every line is spelled out rather than "Everything in Free", so the two cards
+ * can be read across line for line: the two that differ sit where the table
+ * puts them.
  */
 const PAID_HIGHLIGHTS: Record<PaidTier, Highlight[]> = {
   pro: [
-    { lead: "Unlimited", text: "books" },
-    { lead: "Unlimited", text: "title checks" },
-    { text: `Everything in ${TIER_NAMES.free}` },
+    { row: "Books", lead: "Unlimited", text: "books" },
+    CHAPTERS,
+    SYNC,
+    VOICE,
+    { row: "Title check", lead: "Unlimited", text: "title checks" },
+    EXPORT,
+    CONSISTENCY,
     NO_AI,
   ],
 };

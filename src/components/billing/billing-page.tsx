@@ -199,7 +199,8 @@ export function BillingPage({
                 {!plan.pro && (
                   <p className="mt-0.5 font-sans text-xs text-muted">
                     {plural(TIER_LIMITS.free.books ?? 0, "book")}, every
-                    export format, {FREE_LIMITS.titleCheck.free} title checks a day
+                    export format,{" "}
+                    {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
                   </p>
                 )}
               </div>
@@ -449,8 +450,8 @@ export function BillingPage({
                   until you are under that.
                 </li>
                 <li>
-                  {FREE_LIMITS.titleCheck.free} title checks a day instead of
-                  unlimited.
+                  {plural(FREE_LIMITS.titleCheck.free, "title check")} a day
+                  instead of unlimited.
                 </li>
                 {/* Export is on both plans, so cancelling takes nothing
                     away there — and a writer deciding whether to cancel is

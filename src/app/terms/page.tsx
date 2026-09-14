@@ -71,8 +71,8 @@ export default function TermsPage() {
         <p>
           The Free plan includes {plural(TIER_LIMITS.free.books ?? 0, "book")},
           unlimited chapters and words, autosave and sync where accounts are
-          configured, Word, EPUB and PDF export, and {FREE_LIMITS.titleCheck.free}{" "}
-          title checks a day.
+          configured, Word, EPUB and PDF export, and{" "}
+          {plural(FREE_LIMITS.titleCheck.free, "title check")} a day.
         </p>
         <p>
           {TIER_NAMES.pro} adds unlimited books and unlimited title checks. Every

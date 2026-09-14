@@ -323,7 +323,7 @@ export function Plans({
                       // disappears on it.
                       <p
                         role="alert"
-                        className="mt-3 font-sans text-xs leading-relaxed text-surface/75"
+                        className="mt-3 font-sans text-xs leading-relaxed text-accent-ink/75 dark:text-white/75"
                       >
                         {state.error}
                       </p>

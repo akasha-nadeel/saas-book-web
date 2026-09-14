@@ -1254,7 +1254,8 @@ categories, comps ranking and query translation, narration, transcription), the
 credit ledger and the Starter Pass were deleted — code, SQL, copy and the two
 SDK dependencies. The three paid plans, which differed only by credits, became
 one: **Pro, $5.99 a month or $49.99 a year, for unlimited books and unlimited
-title checks; Free keeps one book and two title checks a day.** Voice typing
+title checks; Free keeps one book and one title check a day** (two at first,
+cut to one the same day). Voice typing
 stays, because it is the browser's own speech feature rather than ours, and the
 FAQ and `/privacy` say where its audio goes. The decision, the competitor
 pricing research and what the owner still has to do in Paddle, Vercel and
